@@ -1,0 +1,5 @@
+[workspace]
+members = [
+  "uniffi_bindgen",
+  "wordpress_api",
+]

@@ -1,0 +1,13 @@
+[package]
+name = "wordpress_api"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+uniffi = { version = "0.24.3" }
+
+[build-dependencies]
+uniffi = { version = "0.24.3", features = [ "build", "cli" ] }
