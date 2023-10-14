@@ -3,3 +3,4 @@ members = [
   "uniffi_bindgen",
   "wordpress_api",
 ]
+resolver = "2"
