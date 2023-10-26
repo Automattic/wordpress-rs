@@ -3,12 +3,11 @@
  */
 package wordpress.rs
 
-import kotlin.test.Test
-import kotlin.test.assertTrue
+import org.junit.Before
+import org.junit.Test
 
 class LibraryTest {
-    @Test fun someLibraryMethodReturnsTrue() {
-        val classUnderTest = Library()
-        assertTrue(classUnderTest.someLibraryMethod(), "someLibraryMethod should return 'true'")
+    @Before
+    fun setup() {
     }
 }

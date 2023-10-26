@@ -1,23 +1,6 @@
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.8.20"
-
-    `java-library`
-}
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    implementation("net.java.dev.jna:jna:5.7.0")
-}
-
-testing {
-    suites {
-        withType(JvmTestSuite::class).matching { it.name in listOf("test", "integrationTest") }.configureEach {
-            useKotlinTest("1.8.20")
-        }
-    }
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 java {
@@ -26,10 +9,26 @@ java {
     }
 }
 
-sourceSets {
-    main {
-        kotlin {
-            srcDir("../../../out/uniffi/wordpress_api/")
-        }
+android {
+    namespace = "org.wordpress.rs"
+
+    compileSdk = 33
+
+    defaultConfig {
+        minSdk = 24
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+}
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation("net.java.dev.jna:jna:5.7.0")
+
+    testImplementation("junit:junit:4.13.2")
 }
