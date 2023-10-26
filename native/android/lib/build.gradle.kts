@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("org.mozilla.rust-android-gradle.rust-android")
 }
 
 java {
@@ -31,4 +32,10 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.7.0")
 
     testImplementation("junit:junit:4.13.2")
+}
+
+cargo {
+    module  = "../../../wordpress_api/"
+    libname = "wordpress_api"
+    targets = listOf("arm", "arm64", "x86")
 }
