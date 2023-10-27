@@ -3,8 +3,10 @@
  */
 package wordpress.rs
 
+import uniffi.wordpress_api.addCustom
+
 class Library {
-    fun someLibraryMethod(): Boolean {
-        return true
+    fun addCustomFromRust(a: Int, b: Int): Int {
+        return addCustom(a, b)
     }
 }

@@ -2,7 +2,6 @@ pluginManagement {
     plugins {
         id("com.android.library") version "8.1.0"
         id("org.jetbrains.kotlin.android") version "1.8.20"
-        id("org.mozilla.rust-android-gradle.rust-android") version "0.9.3"
     }
     repositories {
         gradlePluginPortal()

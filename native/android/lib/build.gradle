@@ -1,0 +1,42 @@
+plugins {
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+android {
+    namespace = "org.wordpress.rs"
+
+    compileSdk = 33
+
+    defaultConfig {
+        minSdk = 24
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    sourceSets {
+        main.java.srcDirs += "$buildDir/generated/source"
+    }
+}
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation "net.java.dev.jna:jna:5.7.0@aar"
+    testImplementation "net.java.dev.jna:jna:5.7.0@aar"
+    androidTestImplementation "net.java.dev.jna:jna:5.7.0@aar"
+
+    androidTestImplementation "androidx.test:runner:1.4.0"
+    androidTestImplementation "androidx.test:rules:1.4.0"
+    androidTestImplementation "junit:junit:4.13.2"
+}
+
