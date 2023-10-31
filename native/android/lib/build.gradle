@@ -2,6 +2,7 @@ plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
     id("org.mozilla.rust-android-gradle.rust-android")
+    id("com.automattic.android.publish-to-s3")
 }
 
 java {
@@ -53,13 +54,20 @@ cargo {
 }
 
 project.afterEvaluate {
-    // The `cargoBuild` task isn't available until after evaluation.
-    android.libraryVariants.all { variant ->
-        def productFlavor = ""
-        variant.productFlavors.each {
-            productFlavor += "${it.name.capitalize()}"
+    publishing {
+        publications {
+            MavenPublication(MavenPublication) {
+                from components.release
+
+                groupId "org.wordpress"
+                artifactId "rs"
+                // version is set by 'publish-to-s3' plugin
+            }
         }
-        def buildType = "${variant.buildType.name.capitalize()}"
-        tasks["generate${productFlavor}${buildType}Assets"].dependsOn(tasks["cargoBuild"])
-    }
+   }
+}
+
+tasks.matching { it.name.matches(/merge.*JniLibFolders/) }.configureEach {
+    it.inputs.dir(new File(buildDir, "rustJniLibs/android"))
+    it.dependsOn("cargoBuild")
 }

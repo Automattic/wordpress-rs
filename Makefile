@@ -23,4 +23,9 @@ _generate-bindings:
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
 
+_publish-android-local:
+	./native/android/gradlew -p ./native/android publishToMavenLocal -exclude-task prepareToPublishToS3
+
 test-android: _generate-bindings _test-android
+
+publish-android-local: _generate-bindings _publish-android-local
