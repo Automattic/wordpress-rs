@@ -17,9 +17,10 @@ _generate-jni-libs:
 
 _generate-bindings:
 	rm -rf $(android_generated_source_path)
+	cargo build --release
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwordpress_api.dylib --out-dir $(android_generated_source_path) --language kotlin
 
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
 
-test-android: _generate-jni-libs _generate-bindings _test-android
+test-android: _generate-bindings _test-android
