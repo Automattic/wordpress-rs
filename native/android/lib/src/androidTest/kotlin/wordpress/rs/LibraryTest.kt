@@ -6,7 +6,6 @@ package wordpress.rs
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import uniffi.wordpress_api.combineStrings
 
 class LibraryTest {
     @Before
@@ -20,6 +19,6 @@ class LibraryTest {
 
     @Test
     fun testCombineStrings() {
-        assertEquals(combineStrings("this", "that"), "this-that")
+        assertEquals(Library().combineStringsFromRust("this", "that"), "this-that")
     }
 }

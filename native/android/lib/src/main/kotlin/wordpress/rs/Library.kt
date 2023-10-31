@@ -4,9 +4,14 @@
 package wordpress.rs
 
 import uniffi.wordpress_api.addCustom
+import uniffi.wordpress_api.combineStrings
 
 class Library {
     fun addCustomFromRust(a: Int, b: Int): Int {
         return addCustom(a, b)
+    }
+
+    fun combineStringsFromRust(a: String, b: String): String {
+        return combineStrings(a, b)
     }
 }
