@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("org.mozilla.rust-android-gradle.rust-android")
 }
 
 java {
@@ -22,6 +23,7 @@ android {
 
     sourceSets {
         main.java.srcDirs += "$buildDir/generated/source"
+        main.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
     }
 }
 
@@ -38,5 +40,26 @@ dependencies {
     androidTestImplementation "androidx.test:runner:1.4.0"
     androidTestImplementation "androidx.test:rules:1.4.0"
     androidTestImplementation "junit:junit:4.13.2"
+
+    testImplementation "junit:junit:4.13.2"
 }
 
+cargo {
+    module  = "../../../wordpress_api/"
+    libname = "wordpress_api"
+    profile = "release"
+    targets = ["arm", "arm64", "x86", "x86_64"]
+    targetDirectory = '../../../target'
+}
+
+afterEvaluate {
+    // The `cargoBuild` task isn't available until after evaluation.
+    android.libraryVariants.all { variant ->
+        def productFlavor = ""
+        variant.productFlavors.each {
+            productFlavor += "${it.name.capitalize()}"
+        }
+        def buildType = "${variant.buildType.name.capitalize()}"
+        tasks["generate${productFlavor}${buildType}Assets"].dependsOn(tasks["cargoBuild"])
+    }
+}

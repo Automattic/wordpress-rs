@@ -16,9 +16,8 @@ _generate-jni-libs:
 	cp ./target/x86_64-linux-android/release/libwordpress_api.so $(jni_libs_root)/x86_64/libuniffi_wordpress_api.so
 
 _generate-bindings:
-	echo "hello"
 	rm -rf $(android_generated_source_path)
-	cargo run --release --bin uniffi_bindgen generate $(udl_path) --out-dir $(android_generated_source_path) --language kotlin
+	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwordpress_api.dylib --out-dir $(android_generated_source_path) --language kotlin
 
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
