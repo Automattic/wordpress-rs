@@ -23,7 +23,7 @@ android {
 
     sourceSets {
         main.java.srcDirs += "$buildDir/generated/source"
-        main.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
+        androidTest.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
     }
 }
 
@@ -52,7 +52,7 @@ cargo {
     targetDirectory = '../../../target'
 }
 
-afterEvaluate {
+project.afterEvaluate {
     // The `cargoBuild` task isn't available until after evaluation.
     android.libraryVariants.all { variant ->
         def productFlavor = ""
