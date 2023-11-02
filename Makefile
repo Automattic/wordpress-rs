@@ -3,6 +3,13 @@ android_generated_source_path := $(android_project_root)/lib/build/generated/sou
 jni_libs_root := $(android_project_root)/lib/src/main/jniLibs
 udl_path := wordpress_api/src/wordpress_api.udl
 
+# The directory where the git repo is mounted in the docker container
+docker_container_repo_dir=/app
+
+# Common docker options
+docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
+docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) foo
+
 _generate-jni-libs:
 	rm -rf $(jni_libs_root)
 	cargo build --release --lib --target x86_64-linux-android --target i686-linux-android --target armv7-linux-androideabi --target aarch64-linux-android
@@ -29,3 +36,6 @@ _publish-android-local:
 test-android: _generate-bindings _test-android
 
 publish-android-local: _generate-bindings _publish-android-local
+
+build-in-docker:
+	$(docker_build_and_run) cargo build --release
