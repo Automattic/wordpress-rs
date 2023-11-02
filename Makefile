@@ -8,7 +8,7 @@ docker_container_repo_dir=/app
 
 # Common docker options
 docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
-docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) foo
+docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 _generate-jni-libs:
 	rm -rf $(jni_libs_root)
@@ -38,4 +38,5 @@ test-android: _generate-bindings _test-android
 publish-android-local: _generate-bindings _publish-android-local
 
 build-in-docker:
-	$(docker_build_and_run) cargo build --release
+	$(call _generate-bindings)
+	$(docker_build_and_run)
