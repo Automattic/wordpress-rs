@@ -14,6 +14,6 @@ class LibraryTest {
 
     @Test
     fun testAddCustom() {
-        assertEquals(Library().addCustomFromRust(2, 4), 7)
+        assertEquals(Library().addCustomFromRust(2, 4), 6)
     }
 }

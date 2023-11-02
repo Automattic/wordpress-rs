@@ -34,22 +34,22 @@ repositories {
 }
 
 dependencies {
-    implementation "net.java.dev.jna:jna:5.7.0@aar"
-    testImplementation "net.java.dev.jna:jna:5.7.0@aar"
-    androidTestImplementation "net.java.dev.jna:jna:5.7.0@aar"
+    implementation "net.java.dev.jna:jna:5.13.0@aar"
+    androidTestImplementation "net.java.dev.jna:jna:5.13.0@aar"
 
     androidTestImplementation "androidx.test:runner:1.4.0"
     androidTestImplementation "androidx.test:rules:1.4.0"
     androidTestImplementation "junit:junit:4.13.2"
 
     testImplementation "junit:junit:4.13.2"
+    testImplementation "net.java.dev.jna:jna:5.13.0"
 }
 
 cargo {
     module  = "../../../wordpress_api/"
     libname = "wordpress_api"
     profile = "release"
-    targets = ["arm", "arm64", "x86", "x86_64"]
+    targets = ["arm", "arm64", "x86", "x86_64", "darwin-aarch64"]
     targetDirectory = '../../../target'
 }
 
