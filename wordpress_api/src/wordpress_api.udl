@@ -1,4 +1,5 @@
 namespace wordpress_api {
   i32 add_custom(i32 a, i32 b);
   string combine_strings(string a, string b);
+  void panic_from_rust();
 };

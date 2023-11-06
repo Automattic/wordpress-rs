@@ -5,6 +5,7 @@ package wordpress.rs
 
 import uniffi.wordpress_api.addCustom
 import uniffi.wordpress_api.combineStrings
+import uniffi.wordpress_api.panicFromRust
 
 class Library {
     fun addCustomFromRust(a: Int, b: Int): Int {
@@ -13,5 +14,9 @@ class Library {
 
     fun combineStringsFromRust(a: String, b: String): String {
         return combineStrings(a, b)
+    }
+
+    fun crashFromRust() {
+        return panicFromRust();
     }
 }

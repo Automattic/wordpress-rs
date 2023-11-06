@@ -16,4 +16,9 @@ class LibraryTest {
     fun testAddCustom() {
         assertEquals(Library().addCustomFromRust(2, 4), 6)
     }
+
+    @Test(expected = uniffi.wordpress_api.InternalException::class)
+    fun testCrashFromRust() {
+        Library().crashFromRust()
+    }
 }

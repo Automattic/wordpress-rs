@@ -6,6 +6,10 @@ pub fn combine_strings(a: String, b: String) -> String {
     format!("{}-{}", a, b)
 }
 
+pub fn panic_from_rust() {
+    panic!("This is a crash from Rust")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -20,6 +24,12 @@ mod tests {
     fn test_combine_strings() {
         let result = combine_strings("this".into(), "that".into());
         assert_eq!(result, "this-that");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_from_rust() {
+        panic_from_rust()
     }
 }
 

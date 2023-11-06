@@ -73,6 +73,10 @@ tasks.matching { it.name.matches(/merge.*JniLibFolders/) }.configureEach {
     it.dependsOn("cargoBuild")
 }
 
+tasks.matching { it.name.matches("test") }.configureEach {
+    it.dependsOn("cargoBuild")
+}
+
 ext.configureUniFFIBindgen("../../../wordpress_api/src/wordpress_api.udl")
 
 def getNativeRustTarget() {
