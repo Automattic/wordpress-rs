@@ -5,6 +5,8 @@ plugins {
     id("com.automattic.android.publish-to-s3")
 }
 
+apply from: 'uniffi.gradle'
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
@@ -23,7 +25,6 @@ android {
     }
 
     sourceSets {
-        main.java.srcDirs += "$buildDir/generated/source"
         androidTest.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
     }
 }
@@ -71,3 +72,5 @@ tasks.matching { it.name.matches(/merge.*JniLibFolders/) }.configureEach {
     it.inputs.dir(new File(buildDir, "rustJniLibs/android"))
     it.dependsOn("cargoBuild")
 }
+
+ext.configureUniFFIBindgen("../../../wordpress_api/src/wordpress_api.udl")
