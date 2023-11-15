@@ -22,10 +22,18 @@ android {
         minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            debugSymbolLevel 'FULL'
+        }
     }
 
     sourceSets {
         androidTest.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
+    }
+
+    packagingOptions {
+        doNotStrip "**/*.so"
     }
 }
 
@@ -52,6 +60,11 @@ cargo {
     profile = "release"
     targets = ["arm", "arm64", "x86", "x86_64", getNativeRustTarget()]
     targetDirectory = '../../../target'
+
+    exec { spec, toolchain ->
+        // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
+        spec.environment("RUSTFLAGS", "-g")
+    }
 }
 
 project.afterEvaluate {
