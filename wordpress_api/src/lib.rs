@@ -7,7 +7,7 @@ pub fn combine_strings(a: String, b: String) -> String {
 }
 
 pub fn panic_from_rust() {
-    panic!("This is a crash from Rust")
+    std::fs::read_to_string("doesnt_exist.txt").unwrap();
 }
 
 #[cfg(test)]
