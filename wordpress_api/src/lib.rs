@@ -1,3 +1,10 @@
+#![allow(dead_code)]
+use std::sync::Arc;
+
+use posts::*;
+
+mod posts;
+
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
 }
@@ -8,6 +15,14 @@ pub fn combine_strings(a: String, b: String) -> String {
 
 pub fn panic_from_rust() {
     std::fs::read_to_string("doesnt_exist.txt").unwrap();
+}
+
+struct RequestBuilder {}
+
+impl RequestBuilder {
+    fn posts(&self) -> Arc<PostsRequestBuilder> {
+        Arc::new(PostsRequestBuilder {})
+    }
 }
 
 #[cfg(test)]

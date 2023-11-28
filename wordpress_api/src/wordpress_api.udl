@@ -1,5 +1,62 @@
+// These are test functions that we are keeping while we figure out the design in case
+// we need them for further testing.
 namespace wordpress_api {
   i32 add_custom(i32 a, i32 b);
   string combine_strings(string a, string b);
   void panic_from_rust();
+};
+
+interface RequestBuilder {
+  PostsRequestBuilder posts();
+};
+
+// https://developer.wordpress.org/rest-api/reference/posts/
+// TODO: The schema and some of the action arguments for `/posts` endpoint has the notion of `context`.
+// This is an `enum` value, but it can only contain partial values per field.
+// This is an important design element to get right, because it's a common pattern for the API.
+//
+// IMPORTANT: This design does not include error handling yet!
+interface PostsRequestBuilder {
+  PostsRequest list(PostsListParams? params);
+  PostsRequest create(PostsCreateParams? params);
+  PostsRequest retrieve(u32 post_id, PostsRetrieveParams? params);
+  PostsRequest update(u32 post_id, PostsUpdateParams? params);
+  PostsRequest delete(u32 post_id, PostsDeleteParams? params);
+};
+
+// If we can represent a trait relationship in UDL, we could use a common Request trait
+// However, we'd still want a specific `PostsRequest` type so that we can have a strongly typed
+// return value for it.
+//
+// The reason we can use a `PostsRequest` type and not need a more specific type such as
+// `PostsListRequest` is because the API documentation states that the return value for
+// all `/posts` requests have the same schema: https://developer.wordpress.org/rest-api/reference/posts/#schema
+// If this is not the case, we'll need more specific types.
+dictionary PostsRequest {
+  string endpoint;
+  string? params;
+};
+
+// We should check if it's possible to use the same params for update & create
+dictionary PostsCreateParams {
+  string? title;
+  string? content;
+};
+
+dictionary PostsListParams {
+  u32? page;
+  u32? per_page;
+};
+
+dictionary PostsRetrieveParams {
+  string? password;
+};
+
+dictionary PostsUpdateParams {
+  string? title;
+  string? content;
+};
+
+dictionary PostsDeleteParams {
+  boolean? force;
 };
