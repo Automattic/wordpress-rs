@@ -2,5 +2,6 @@
 members = [
   "uniffi_bindgen",
   "wordpress_api",
+  "wordpress_api_request",
 ]
 resolver = "2"

@@ -964,3 +964,11 @@ version = "0.1.0"
 dependencies = [
  "uniffi",
 ]
+
+[[package]]
+name = "wordpress_api_request"
+version = "0.1.0"
+dependencies = [
+ "uniffi",
+ "wordpress_api",
+]

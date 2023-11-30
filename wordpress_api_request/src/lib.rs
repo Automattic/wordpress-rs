@@ -1,9 +1,6 @@
 #![allow(dead_code)]
 use std::sync::Arc;
-
-use posts::*;
-
-pub mod posts;
+use wordpress_api::posts::PostsRequestBuilder;
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -47,3 +44,5 @@ mod tests {
         panic_from_rust()
     }
 }
+
+//uniffi::include_scaffolding!("wordpress_api_request");
