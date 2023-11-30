@@ -1,6 +1,5 @@
-#![allow(dead_code)]
-use std::sync::Arc;
-use wordpress_api::posts::PostRequestBuilder;
+#![allow(dead_code, unused_variables)]
+use wordpress_api::PostRequest;
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -17,8 +16,8 @@ pub fn panic_from_rust() {
 struct RequestBuilder {}
 
 impl RequestBuilder {
-    fn posts(&self) -> Arc<PostRequestBuilder> {
-        Arc::new(PostRequestBuilder {})
+    fn post_request(&self, request: PostRequest) -> PostRequest {
+        request
     }
 }
 
@@ -45,4 +44,4 @@ mod tests {
     }
 }
 
-//uniffi::include_scaffolding!("wordpress_api_request");
+uniffi::include_scaffolding!("wordpress_api_request");

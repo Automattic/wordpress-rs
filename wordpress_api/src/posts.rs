@@ -49,5 +49,3 @@ pub struct PostRequest {
     pub endpoint: String,
     pub params: Option<String>,
 }
-
-uniffi::include_scaffolding!("posts");

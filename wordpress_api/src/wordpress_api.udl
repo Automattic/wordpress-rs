@@ -1,4 +1,4 @@
-namespace posts {
+namespace wordpress_api {
 };
 
 // https://developer.wordpress.org/rest-api/reference/posts/
@@ -50,4 +50,18 @@ dictionary PostUpdateParams {
 
 dictionary PostDeleteParams {
   boolean? force;
+};
+
+interface PageRequestBuilder {
+  PageRequest list(PageListParams? params);
+};
+
+dictionary PageRequest {
+  string endpoint;
+  string? params;
+};
+
+dictionary PageListParams {
+  u32? page;
+  u32? per_page;
 };
