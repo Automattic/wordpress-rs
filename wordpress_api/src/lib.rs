@@ -47,5 +47,3 @@ mod tests {
         panic_from_rust()
     }
 }
-
-uniffi::include_scaffolding!("wordpress_api");
