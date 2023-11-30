@@ -20,8 +20,8 @@ pub fn panic_from_rust() {
 struct RequestBuilder {}
 
 impl RequestBuilder {
-    fn posts(&self) -> Arc<PostsRequestBuilder> {
-        Arc::new(PostsRequestBuilder {})
+    fn posts(&self) -> Arc<PostRequestBuilder> {
+        Arc::new(PostRequestBuilder {})
     }
 }
 

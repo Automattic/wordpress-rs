@@ -1,5 +1,5 @@
 [External="wordpress_api"]
-typedef extern PostsRequestBuilder;
+typedef extern PostRequestBuilder;
 
 // These are test functions that we are keeping while we figure out the design in case
 // we need them for further testing.
@@ -10,5 +10,5 @@ namespace wordpress_api {
 };
 
 interface RequestBuilder {
-  PostsRequestBuilder posts();
+  PostRequestBuilder posts();
 };

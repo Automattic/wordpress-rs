@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use std::sync::Arc;
-use wordpress_api::posts::PostsRequestBuilder;
+use wordpress_api::posts::PostRequestBuilder;
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -17,8 +17,8 @@ pub fn panic_from_rust() {
 struct RequestBuilder {}
 
 impl RequestBuilder {
-    fn posts(&self) -> Arc<PostsRequestBuilder> {
-        Arc::new(PostsRequestBuilder {})
+    fn posts(&self) -> Arc<PostRequestBuilder> {
+        Arc::new(PostRequestBuilder {})
     }
 }
 

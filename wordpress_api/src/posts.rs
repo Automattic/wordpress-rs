@@ -1,51 +1,51 @@
-pub struct PostsRequestBuilder {}
+pub struct PostRequestBuilder {}
 
-impl PostsRequestBuilder {
-    pub fn list(&self, params: Option<PostsListParams>) -> PostsRequest {
+impl PostRequestBuilder {
+    pub fn list(&self, params: Option<PostListParams>) -> PostRequest {
         todo!()
     }
 
-    pub fn create(&self, params: Option<PostsCreateParams>) -> PostsRequest {
+    pub fn create(&self, params: Option<PostCreateParams>) -> PostRequest {
         todo!()
     }
 
-    pub fn retrieve(&self, post_id: u32, params: Option<PostsRetrieveParams>) -> PostsRequest {
+    pub fn retrieve(&self, post_id: u32, params: Option<PostRetrieveParams>) -> PostRequest {
         todo!()
     }
 
-    pub fn update(&self, post_id: u32, params: Option<PostsUpdateParams>) -> PostsRequest {
+    pub fn update(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostRequest {
         todo!()
     }
 
-    pub fn delete(&self, post_id: u32, params: Option<PostsDeleteParams>) -> PostsRequest {
+    pub fn delete(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostRequest {
         todo!()
     }
 }
 
-pub struct PostsListParams {
+pub struct PostListParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }
 
-pub struct PostsCreateParams {
+pub struct PostCreateParams {
     pub title: Option<String>,
     pub content: Option<String>,
 }
 
-pub struct PostsRetrieveParams {
+pub struct PostRetrieveParams {
     pub password: Option<String>,
 }
 
-pub struct PostsUpdateParams {
+pub struct PostUpdateParams {
     pub title: Option<String>,
     pub content: Option<String>,
 }
 
-pub struct PostsDeleteParams {
+pub struct PostDeleteParams {
     pub force: Option<bool>,
 }
 
-pub struct PostsRequest {
+pub struct PostRequest {
     pub endpoint: String,
     pub params: Option<String>,
 }
