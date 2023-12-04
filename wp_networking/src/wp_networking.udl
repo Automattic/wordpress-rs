@@ -1,5 +1,5 @@
-[External="wp_api"]
-typedef extern PostRequest;
+[ExternalTrait="wp_api"]
+typedef extern PostNetworkingInterface;
 
 // These are test functions that we are keeping while we figure out the design in case
 // we need them for further testing.
@@ -7,8 +7,6 @@ namespace wp_networking {
   i32 add_custom(i32 a, i32 b);
   string combine_strings(string a, string b);
   void panic_from_rust();
-};
 
-interface RequestBuilder {
-  PostRequest post_request(PostRequest request);
+  PostNetworkingInterface post_networking();
 };

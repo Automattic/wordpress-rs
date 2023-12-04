@@ -1,23 +1,35 @@
+pub trait PostNetworkingInterface: Send + Sync {
+    fn list(&self, request: PostListRequest) -> PostListResponse;
+    fn create(&self, request: PostCreateRequest) -> PostCreateResponse;
+    fn retrieve(&self, request: PostRetrieveRequest) -> PostRetrieveResponse;
+    fn update(&self, request: PostUpdateRequest) -> PostUpdateResponse;
+    fn delete(&self, request: PostDeleteRequest) -> PostDeleteResponse;
+}
+
 pub struct PostRequestBuilder {}
 
 impl PostRequestBuilder {
-    pub fn list(&self, params: Option<PostListParams>) -> PostRequest {
+    pub fn list(&self, params: Option<PostListParams>) -> PostListRequest {
         todo!()
     }
 
-    pub fn create(&self, params: Option<PostCreateParams>) -> PostRequest {
+    pub fn create(&self, params: Option<PostCreateParams>) -> PostCreateRequest {
         todo!()
     }
 
-    pub fn retrieve(&self, post_id: u32, params: Option<PostRetrieveParams>) -> PostRequest {
+    pub fn retrieve(
+        &self,
+        post_id: u32,
+        params: Option<PostRetrieveParams>,
+    ) -> PostRetrieveRequest {
         todo!()
     }
 
-    pub fn update(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostRequest {
+    pub fn update(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostUpdateRequest {
         todo!()
     }
 
-    pub fn delete(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostRequest {
+    pub fn delete(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostDeleteRequest {
         todo!()
     }
 }
@@ -45,7 +57,24 @@ pub struct PostDeleteParams {
     pub force: Option<bool>,
 }
 
-pub struct PostRequest {
-    pub endpoint: String,
+pub struct PostListRequest {
     pub params: Option<String>,
 }
+pub struct PostCreateRequest {
+    pub params: Option<String>,
+}
+pub struct PostRetrieveRequest {
+    pub params: Option<String>,
+}
+pub struct PostUpdateRequest {
+    pub params: Option<String>,
+}
+pub struct PostDeleteRequest {
+    pub params: Option<String>,
+}
+
+pub struct PostListResponse {}
+pub struct PostCreateResponse {}
+pub struct PostRetrieveResponse {}
+pub struct PostUpdateResponse {}
+pub struct PostDeleteResponse {}

@@ -1,5 +1,7 @@
 #![allow(dead_code, unused_variables)]
-use wp_api::PostRequest;
+use std::sync::Arc;
+
+use wp_api::{PostListRequest, PostListResponse, PostNetworkingInterface};
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -13,11 +15,31 @@ pub fn panic_from_rust() {
     std::fs::read_to_string("doesnt_exist.txt").unwrap();
 }
 
-struct RequestBuilder {}
+pub fn post_networking() -> Arc<dyn PostNetworkingInterface> {
+    WPPostNetworking {}
+}
 
-impl RequestBuilder {
-    fn post_request(&self, request: PostRequest) -> PostRequest {
-        request
+struct WPPostNetworking {}
+
+impl PostNetworkingInterface for WPPostNetworking {
+    fn list(&self, request: PostListRequest) -> PostListResponse {
+        todo!()
+    }
+
+    fn create(&self, request: wp_api::PostCreateRequest) -> wp_api::PostCreateResponse {
+        todo!()
+    }
+
+    fn retrieve(&self, request: wp_api::PostRetrieveRequest) -> wp_api::PostRetrieveResponse {
+        todo!()
+    }
+
+    fn update(&self, request: wp_api::PostUpdateRequest) -> wp_api::PostUpdateResponse {
+        todo!()
+    }
+
+    fn delete(&self, request: wp_api::PostDeleteRequest) -> wp_api::PostDeleteResponse {
+        todo!()
     }
 }
 

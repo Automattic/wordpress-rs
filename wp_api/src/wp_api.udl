@@ -1,6 +1,21 @@
 namespace wp_api {
 };
 
+[Trait]
+interface PostNetworkingInterface {
+  PostListResponse list(PostListRequest request);
+  PostCreateResponse create(PostCreateRequest request);
+  PostRetrieveResponse retrieve(PostRetrieveRequest request);
+  PostUpdateResponse update(PostUpdateRequest request);
+  PostDeleteResponse delete(PostDeleteRequest request);
+};
+
+dictionary PostListResponse {};
+dictionary PostCreateResponse {};
+dictionary PostRetrieveResponse {};
+dictionary PostUpdateResponse {};
+dictionary PostDeleteResponse {};
+
 // https://developer.wordpress.org/rest-api/reference/posts/
 // TODO: The schema and some of the action arguments for `/posts` endpoint has the notion of `context`.
 // This is an `enum` value, but it can only contain partial values per field.
@@ -8,23 +23,30 @@ namespace wp_api {
 //
 // IMPORTANT: This design does not include error handling yet!
 interface PostRequestBuilder {
-  PostRequest list(PostListParams? params);
-  PostRequest create(PostCreateParams? params);
-  PostRequest retrieve(u32 post_id, PostRetrieveParams? params);
-  PostRequest update(u32 post_id, PostUpdateParams? params);
-  PostRequest delete(u32 post_id, PostDeleteParams? params);
+  PostListRequest list(PostListParams? params);
+  PostCreateRequest create(PostCreateParams? params);
+  PostRetrieveRequest retrieve(u32 post_id, PostRetrieveParams? params);
+  PostUpdateRequest update(u32 post_id, PostUpdateParams? params);
+  PostDeleteRequest delete(u32 post_id, PostDeleteParams? params);
 };
 
-// If we can represent a trait relationship in UDL, we could use a common Request trait
-// However, we'd still want a specific `PostRequest` type so that we can have a strongly typed
-// return value for it.
-//
-// The reason we can use a `PostRequest` type and not need a more specific type such as
-// `PostListRequest` is because the API documentation states that the return value for
-// all `/posts` requests have the same schema: https://developer.wordpress.org/rest-api/reference/posts/#schema
-// If this is not the case, we'll need more specific types.
-dictionary PostRequest {
-  string endpoint;
+dictionary PostListRequest {
+  string? params;
+};
+
+dictionary PostCreateRequest {
+  string? params;
+};
+
+dictionary PostRetrieveRequest {
+  string? params;
+};
+
+dictionary PostUpdateRequest {
+  string? params;
+};
+
+dictionary PostDeleteRequest {
   string? params;
 };
 
