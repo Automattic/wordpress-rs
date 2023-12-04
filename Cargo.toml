@@ -8,4 +8,6 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-uniffi = { version = "0.25.0" }
+# External traits in UDL is only available since https://github.com/mozilla/uniffi-rs/pull/1867
+# Point to a specific commit until a new version is released
+uniffi = { git = "https://github.com/mozilla/uniffi-rs.git", rev = "d380d164cfdba9e091c461baa6855f0a2294ac5b" }
