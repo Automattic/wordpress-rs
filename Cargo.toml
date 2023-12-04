@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "uniffi_bindgen",
-  "wordpress_api",
-  "wordpress_api_request",
+  "wp_api",
+  "wp_networking",
+  "wp_parsing",
 ]
 resolver = "2"

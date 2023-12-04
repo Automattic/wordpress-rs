@@ -1,4 +1,4 @@
-namespace wordpress_api {
+namespace wp_api {
 };
 
 // https://developer.wordpress.org/rest-api/reference/posts/

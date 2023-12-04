@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_variables)]
-use wordpress_api::PostRequest;
+use wp_api::PostRequest;
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -44,4 +44,4 @@ mod tests {
     }
 }
 
-uniffi::include_scaffolding!("wordpress_api_request");
+uniffi::include_scaffolding!("wp_networking");
