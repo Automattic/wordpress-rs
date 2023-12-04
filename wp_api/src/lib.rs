@@ -6,4 +6,4 @@ pub use posts::*;
 pub mod pages;
 pub mod posts;
 
-uniffi::include_scaffolding!("wordpress_api");
+uniffi::include_scaffolding!("wp_api");

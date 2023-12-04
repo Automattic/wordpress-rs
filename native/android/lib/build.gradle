@@ -55,8 +55,8 @@ dependencies {
 }
 
 cargo {
-    module  = "../../../wordpress_api/"
-    libname = "wordpress_api"
+    module  = "../../../wp_api/"
+    libname = "wp_api"
     profile = "release"
     targets = ["arm", "arm64", "x86", "x86_64", getNativeRustTarget()]
     targetDirectory = '../../../target'
@@ -90,7 +90,7 @@ tasks.matching { it.name.matches("test") }.configureEach {
     it.dependsOn("cargoBuild")
 }
 
-ext.configureUniFFIBindgen("../../../wordpress_api/src/wordpress_api.udl")
+ext.configureUniFFIBindgen("../../../wp_api/src/wp_api.udl")
 
 def getNativeRustTarget() {
     // This seems to return 'darwin' for both Apple Silicon and Intel architectures

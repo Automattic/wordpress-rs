@@ -1,9 +1,9 @@
-[External="wordpress_api"]
+[External="wp_api"]
 typedef extern PostRequest;
 
 // These are test functions that we are keeping while we figure out the design in case
 // we need them for further testing.
-namespace wordpress_api {
+namespace wp_networking {
   i32 add_custom(i32 a, i32 b);
   string combine_strings(string a, string b);
   void panic_from_rust();

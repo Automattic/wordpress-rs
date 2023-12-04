@@ -1,14 +1,15 @@
 [package]
-name = "wordpress_api"
+name = "wp_networking"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
 crate-type = ["lib", "cdylib"]
-name = "wordpress_api"
+name = "wp_networking"
 
 [dependencies]
 uniffi = { version = "0.25.0" }
+wp_api = { path = "../wp_api" }
 
 [build-dependencies]
 uniffi = { version = "0.25.0", features = [ "build", "cli" ] }
