@@ -16,7 +16,7 @@ pub fn panic_from_rust() {
 }
 
 pub fn post_networking() -> Arc<dyn PostNetworkingInterface> {
-    WPPostNetworking {}
+    Arc::new(WPPostNetworking {})
 }
 
 struct WPPostNetworking {}
