@@ -8,7 +8,7 @@ crate-type = ["lib", "cdylib"]
 name = "wp_parsing"
 
 [dependencies]
-uniffi = { version = "0.25.0" }
+uniffi = { workspace = true }
 
 [build-dependencies]
-uniffi = { version = "0.25.0", features = [ "build", "cli" ] }
+uniffi = { workspace = true, features = [ "build", "cli" ]  }

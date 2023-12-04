@@ -8,8 +8,8 @@ crate-type = ["lib", "cdylib"]
 name = "wp_networking"
 
 [dependencies]
-uniffi = { version = "0.25.0" }
+uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
 
 [build-dependencies]
-uniffi = { version = "0.25.0", features = [ "build", "cli" ] }
+uniffi = { workspace = true , features = [ "build", "cli" ] }

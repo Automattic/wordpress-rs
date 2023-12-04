@@ -6,3 +6,6 @@ members = [
   "wp_parsing",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+uniffi = { version = "0.25.0" }
