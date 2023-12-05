@@ -10,12 +10,6 @@ interface PostNetworkingInterface {
   PostDeleteResponse delete(PostDeleteRequest request);
 };
 
-dictionary PostListResponse {};
-dictionary PostCreateResponse {};
-dictionary PostRetrieveResponse {};
-dictionary PostUpdateResponse {};
-dictionary PostDeleteResponse {};
-
 // https://developer.wordpress.org/rest-api/reference/posts/
 // TODO: The schema and some of the action arguments for `/posts` endpoint has the notion of `context`.
 // This is an `enum` value, but it can only contain partial values per field.
@@ -28,6 +22,34 @@ interface PostRequestBuilder {
   PostRetrieveRequest retrieve(u32 post_id, PostRetrieveParams? params);
   PostUpdateRequest update(u32 post_id, PostUpdateParams? params);
   PostDeleteRequest delete(u32 post_id, PostDeleteParams? params);
+};
+
+dictionary PostListResponse {};
+dictionary PostCreateResponse {};
+dictionary PostRetrieveResponse {};
+dictionary PostUpdateResponse {};
+dictionary PostDeleteResponse {};
+
+dictionary ParsedPostListResponse {
+  sequence<PostObject>? post_list;
+};
+dictionary ParsedPostCreateResponse {
+  PostObject? post;
+};
+dictionary ParsedPostRetrieveResponse {
+  PostObject? post;
+};
+dictionary ParsedPostUpdateResponse {
+  PostObject? post;
+};
+dictionary ParsedPostDeleteResponse {
+  PostObject? post;
+};
+
+dictionary PostObject {
+  u32? id;
+  string? title;
+  string? content;
 };
 
 dictionary PostListRequest {
@@ -73,6 +95,8 @@ dictionary PostUpdateParams {
 dictionary PostDeleteParams {
   boolean? force;
 };
+
+// ---------------------------------------------------------------------------
 
 interface PageRequestBuilder {
   PageRequest list(PageListParams? params);

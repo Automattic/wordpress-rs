@@ -78,3 +78,25 @@ pub struct PostCreateResponse {}
 pub struct PostRetrieveResponse {}
 pub struct PostUpdateResponse {}
 pub struct PostDeleteResponse {}
+
+pub struct ParsedPostListResponse {
+    pub post_list: Option<Vec<PostObject>>,
+}
+pub struct ParsedPostCreateResponse {
+    pub post: Option<PostObject>,
+}
+pub struct ParsedPostRetrieveResponse {
+    pub post: Option<PostObject>,
+}
+pub struct ParsedPostUpdateResponse {
+    pub post: Option<PostObject>,
+}
+pub struct ParsedPostDeleteResponse {
+    pub post: Option<PostObject>,
+}
+
+pub struct PostObject {
+    pub id: Option<u32>,
+    pub title: Option<String>,
+    pub content: Option<String>,
+}
