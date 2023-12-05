@@ -6,6 +6,14 @@ pub trait PostNetworkingInterface: Send + Sync {
     fn delete(&self, request: PostDeleteRequest) -> PostDeleteResponse;
 }
 
+pub trait PostResponseParser: Send + Sync {
+    fn list(&self, response: PostListResponse) -> ParsedPostListResponse;
+    fn create(&self, response: PostCreateResponse) -> ParsedPostCreateResponse;
+    fn retrieve(&self, response: PostRetrieveResponse) -> ParsedPostRetrieveResponse;
+    fn update(&self, response: PostUpdateResponse) -> ParsedPostUpdateResponse;
+    fn delete(&self, response: PostDeleteResponse) -> ParsedPostDeleteResponse;
+}
+
 pub struct PostRequestBuilder {}
 
 impl PostRequestBuilder {

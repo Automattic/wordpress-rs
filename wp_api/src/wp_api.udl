@@ -10,6 +10,15 @@ interface PostNetworkingInterface {
   PostDeleteResponse delete(PostDeleteRequest request);
 };
 
+[Trait]
+interface PostResponseParser {
+  ParsedPostListResponse list(PostListResponse response);
+  ParsedPostCreateResponse create(PostCreateResponse response);
+  ParsedPostRetrieveResponse retrieve(PostRetrieveResponse response);
+  ParsedPostUpdateResponse update(PostUpdateResponse response);
+  ParsedPostDeleteResponse delete(PostDeleteResponse response);
+};
+
 // https://developer.wordpress.org/rest-api/reference/posts/
 // TODO: The schema and some of the action arguments for `/posts` endpoint has the notion of `context`.
 // This is an `enum` value, but it can only contain partial values per field.
