@@ -87,22 +87,28 @@ pub struct PostRetrieveResponse {}
 pub struct PostUpdateResponse {}
 pub struct PostDeleteResponse {}
 
+#[derive(Debug)]
 pub struct ParsedPostListResponse {
     pub post_list: Option<Vec<PostObject>>,
 }
+#[derive(Debug)]
 pub struct ParsedPostCreateResponse {
     pub post: Option<PostObject>,
 }
+#[derive(Debug)]
 pub struct ParsedPostRetrieveResponse {
     pub post: Option<PostObject>,
 }
+#[derive(Debug)]
 pub struct ParsedPostUpdateResponse {
     pub post: Option<PostObject>,
 }
+#[derive(Debug)]
 pub struct ParsedPostDeleteResponse {
     pub post: Option<PostObject>,
 }
 
+#[derive(Debug)]
 pub struct PostObject {
     pub id: Option<u32>,
     pub title: Option<String>,

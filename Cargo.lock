@@ -1066,6 +1066,8 @@ name = "wp_cli"
 version = "0.1.0"
 dependencies = [
  "wp_api",
+ "wp_networking",
+ "wp_parsing",
 ]
 
 [[package]]
