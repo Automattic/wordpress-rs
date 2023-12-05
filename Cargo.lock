@@ -1062,6 +1062,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "wp_cli"
+version = "0.1.0"
+dependencies = [
+ "wp_api",
+]
+
+[[package]]
 name = "wp_networking"
 version = "0.1.0"
 dependencies = [

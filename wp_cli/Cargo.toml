@@ -1,0 +1,8 @@
+[package]
+name = "wp_cli"
+version = "0.1.0"
+edition = "2021"
+default-run = "wp_cli"
+
+[dependencies]
+wp_api = { path = "../wp_api" }
