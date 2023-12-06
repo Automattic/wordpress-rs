@@ -26,6 +26,8 @@ interface PostResponseParser {
 //
 // IMPORTANT: This design does not include error handling yet!
 interface PostRequestBuilder {
+  constructor();
+
   PostListRequest list(PostListParams? params);
   PostCreateRequest create(PostCreateParams? params);
   PostRetrieveRequest retrieve(u32 post_id, PostRetrieveParams? params);
