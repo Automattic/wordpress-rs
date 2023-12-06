@@ -1,2 +1,5 @@
 [bindings.kotlin]
 cdylib_name = "wp_api"
+
+[bindings.swift]
+generate_immutable_records = true

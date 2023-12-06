@@ -33,3 +33,5 @@ impl PostResponseParser for WPPostResponseParser {
         todo!()
     }
 }
+
+uniffi::include_scaffolding!("wp_parsing");

@@ -17,6 +17,12 @@ pub trait PostResponseParser: Send + Sync {
 pub struct PostRequestBuilder {}
 
 impl PostRequestBuilder {
+
+    // TODO: This might not be part of the long-term API
+    pub fn new() -> Self {
+        PostRequestBuilder{}
+    }
+
     pub fn list(&self, params: Option<PostListParams>) -> PostListRequest {
         todo!()
     }
