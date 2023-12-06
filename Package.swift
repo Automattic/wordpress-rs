@@ -37,17 +37,13 @@ let package = Package(
         .target(
             name: "wordpress-api-wrapper",
             dependencies: [
-                .target(name: "wp_apiFFI"),
-                .target(name: "wp_networkingFFI"),
-                .target(name: "wp_parsingFFI"),
+                .target(name: "libwordpressFFI")
             ],
             path: "native/swift/Sources/wordpress-api-wrapper",
             exclude: [
                 "README.md"
             ]
         ),
-        .binaryTarget(name: "wp_apiFFI", path: "target/wp_api.xcframework"),
-        .binaryTarget(name: "wp_networkingFFI", path: "target/wp_networking.xcframework"),
-        .binaryTarget(name: "wp_parsingFFI", path: "target/wp_parsing.xcframework"),
+        .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework"),
     ]
 )
