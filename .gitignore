@@ -13,3 +13,13 @@ local.properties
 
 # Ignore generated jni libs - at least for now
 ./native/android/lib/src/main/jniLibs
+
+# macOS
+.DS_Store
+
+# Swift
+.build
+.swiftpm/xcode
+
+# Auto-generated Swift Files
+native/swift/Sources/wp_*/*.swift
