@@ -1,17 +1,16 @@
 import Foundation
 
-import wp_api
-import wp_parsing
+import wordpress_api_wrapper
 
 public struct WordPressAPI {
 
     private let parser: PostResponseParser
 
-    public init(parser: wp_api.PostResponseParser = wp_parsing.postResponseParser()) {
+    public init(parser: PostResponseParser = postResponseParser()) {
         self.parser = parser
     }
 
-    public func listPosts(params: wp_api.PostListParams = .default) async throws -> wp_api.ParsedPostListResponse {
+    public func listPosts(params: PostListParams = .default) async throws -> ParsedPostListResponse {
         let request = PostRequestBuilder().list(params: params) // TODO: Get the request stuff over into a `URLRequest`
 
         let _request = URLRequest(url: URL(string: "https://public-api.wordpress.com")!)

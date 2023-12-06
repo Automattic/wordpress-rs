@@ -23,8 +23,7 @@ let package = Package(
         .target(
             name: "wordpress-api",
             dependencies: [
-                .target(name: "wp_api"),
-                .target(name: "wp_parsing"),
+                .target(name: "wordpress-api-wrapper"),
             ],
             path: "native/swift/Sources/wordpress-api"
         ),
@@ -36,33 +35,13 @@ let package = Package(
             path: "native/swift/Tests/wordpress-api"
         ),
         .target(
-            name: "wp_api",
+            name: "wordpress-api-wrapper",
             dependencies: [
                 .target(name: "wp_apiFFI"),
-            ],
-            path: "native/swift/Sources/wp_api",
-            exclude: [
-                "README.md"
-            ]
-        ),
-        .target(
-            name: "wp_networking",
-            dependencies: [
-                .target(name: "wp_api"),
                 .target(name: "wp_networkingFFI"),
-            ],
-            path: "native/swift/Sources/wp_networking",
-            exclude: [
-                "README.md"
-            ]
-        ),
-        .target(
-            name: "wp_parsing",
-            dependencies: [
-                .target(name: "wp_api"),
                 .target(name: "wp_parsingFFI"),
             ],
-            path: "native/swift/Sources/wp_parsing",
+            path: "native/swift/Sources/wordpress-api-wrapper",
             exclude: [
                 "README.md"
             ]

@@ -26,23 +26,23 @@ _generate-jni-libs:
 	cp ./target/x86_64-linux-android/release/libwp_api.so $(jni_libs_root)/x86_64/libuniffi_wp_api.so
 
 bindings:
-	rm -rf $(android_generated_source_path)
+	rm -rf $(android_generated_source_path) target/swift-bindings
 	cargo build --release
 
 	#wp_api
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir $(android_generated_source_path) --language kotlin
 	cargo run --release --bin uniffi_bindgen generate wp_api/src/wp_api.udl --out-dir ./target/swift-bindings --language swift
-	cp target/swift-bindings/wp_api.swift native/swift/Sources/wp_api/wp_api.swift
+	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
 	#wp_networking
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_networking.dylib --out-dir $(android_generated_source_path) --language kotlin
 	cargo run --release --bin uniffi_bindgen generate wp_networking/src/wp_networking.udl --out-dir ./target/swift-bindings --language swift
-	cp target/swift-bindings/wp_networking.swift native/swift/Sources/wp_networking/wp_networking.swift
+	cp target/swift-bindings/wp_networking.swift native/swift/Sources/wordpress-api-wrapper/wp_networking.swift
 
 	#wp_parsing
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_parsing.dylib --out-dir $(android_generated_source_path) --language kotlin
 	cargo run --release --bin uniffi_bindgen generate wp_parsing/src/wp_parsing.udl --out-dir ./target/swift-bindings --language swift
-	cp target/swift-bindings/wp_parsing.swift native/swift/Sources/wp_parsing/wp_parsing.swift
+	cp target/swift-bindings/wp_parsing.swift native/swift/Sources/wordpress-api-wrapper/wp_parsing.swift
 
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
@@ -117,7 +117,7 @@ xcframework-libraries:
 #	rustup toolchain install nightly
 #	rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
 %-xcframework: bindings %-xcframework-headers %-xcframework-combined-libraries
-	rm -rf target/lib$*.xcframework
+	rm -rf target/$*.xcframework
 	xcodebuild -create-xcframework \
 		-library target/aarch64-apple-ios/release/lib$*.a \
 		-headers target/swift-bindings/$*-headers \
@@ -131,7 +131,7 @@ xcframework-libraries:
 		-headers target/swift-bindings/$*-headers \
 		-library target/universal-watchos/release/lib$*.a \
 		-headers target/swift-bindings/$*-headers \
-		-output target/lib$*.xcframework
+		-output target/$*.xcframework
 
 xcframeworks:
 	$(MAKE) wp_api-xcframework

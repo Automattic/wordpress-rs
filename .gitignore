@@ -22,4 +22,4 @@ local.properties
 .swiftpm/xcode
 
 # Auto-generated Swift Files
-native/swift/Sources/wp_*/*.swift
+native/swift/Sources/wordpress-api-wrapper/*.swift
