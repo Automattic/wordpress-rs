@@ -1,6 +1,0 @@
-[ExternalTrait="wp_api"]
-typedef extern PostResponseParser;
-
-namespace wp_parsing {
-  PostResponseParser post_response_parser();
-};

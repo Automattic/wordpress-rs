@@ -7,4 +7,3 @@ default-run = "wp_cli"
 [dependencies]
 wp_api = { path = "../wp_api" }
 wp_networking = { path = "../wp_networking" }
-wp_parsing = { path = "../wp_parsing" }

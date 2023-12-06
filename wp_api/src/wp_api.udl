@@ -2,21 +2,8 @@ namespace wp_api {
 };
 
 [Trait]
-interface PostNetworkingInterface {
-  PostListResponse list(PostListRequest request);
-  PostCreateResponse create(PostCreateRequest request);
-  PostRetrieveResponse retrieve(PostRetrieveRequest request);
-  PostUpdateResponse update(PostUpdateRequest request);
-  PostDeleteResponse delete(PostDeleteRequest request);
-};
-
-[Trait]
-interface PostResponseParser {
-  ParsedPostListResponse list(PostListResponse response);
-  ParsedPostCreateResponse create(PostCreateResponse response);
-  ParsedPostRetrieveResponse retrieve(PostRetrieveResponse response);
-  ParsedPostUpdateResponse update(PostUpdateResponse response);
-  ParsedPostDeleteResponse delete(PostDeleteResponse response);
+interface WPNetworkingInterface {
+  WPNetworkResponse request(WPNetworkRequest request);
 };
 
 // https://developer.wordpress.org/rest-api/reference/posts/
@@ -25,21 +12,19 @@ interface PostResponseParser {
 // This is an important design element to get right, because it's a common pattern for the API.
 //
 // IMPORTANT: This design does not include error handling yet!
-interface PostRequestBuilder {
-  constructor();
+[Trait]
+interface WPApiInterface {
+  ParsedPostListResponse list_posts(PostListParams? params);
+  ParsedPostCreateResponse create_post(PostCreateParams? params);
+  ParsedPostRetrieveResponse retrieve_post(u32 post_id, PostRetrieveParams? params);
+  ParsedPostUpdateResponse update_post(u32 post_id, PostUpdateParams? params);
+  ParsedPostDeleteResponse delete_post(u32 post_id, PostDeleteParams? params);
 
-  PostListRequest list(PostListParams? params);
-  PostCreateRequest create(PostCreateParams? params);
-  PostRetrieveRequest retrieve(u32 post_id, PostRetrieveParams? params);
-  PostUpdateRequest update(u32 post_id, PostUpdateParams? params);
-  PostDeleteRequest delete(u32 post_id, PostDeleteParams? params);
+  ParsedPageListResponse list_pages(PageListParams? params);
 };
 
-dictionary PostListResponse {};
-dictionary PostCreateResponse {};
-dictionary PostRetrieveResponse {};
-dictionary PostUpdateResponse {};
-dictionary PostDeleteResponse {};
+dictionary WPNetworkRequest {};
+dictionary WPNetworkResponse {};
 
 dictionary ParsedPostListResponse {
   sequence<PostObject>? post_list;
@@ -61,26 +46,6 @@ dictionary PostObject {
   u32? id;
   string? title;
   string? content;
-};
-
-dictionary PostListRequest {
-  string? params;
-};
-
-dictionary PostCreateRequest {
-  string? params;
-};
-
-dictionary PostRetrieveRequest {
-  string? params;
-};
-
-dictionary PostUpdateRequest {
-  string? params;
-};
-
-dictionary PostDeleteRequest {
-  string? params;
 };
 
 // We should check if it's possible to use the same params for update & create
@@ -109,16 +74,17 @@ dictionary PostDeleteParams {
 
 // ---------------------------------------------------------------------------
 
-interface PageRequestBuilder {
-  PageRequest list(PageListParams? params);
-};
-
-dictionary PageRequest {
-  string endpoint;
-  string? params;
-};
-
 dictionary PageListParams {
   u32? page;
   u32? per_page;
+};
+
+dictionary ParsedPageListResponse {
+  sequence<PageObject>? page_list;
+};
+
+dictionary PageObject {
+  u32? id;
+  string? title;
+  string? content;
 };

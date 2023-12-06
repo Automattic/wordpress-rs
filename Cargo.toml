@@ -4,7 +4,6 @@ members = [
   "wp_api",
   "wp_cli",
   "wp_networking",
-  "wp_parsing",
 ]
 resolver = "2"
 

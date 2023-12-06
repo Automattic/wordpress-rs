@@ -1,17 +1,18 @@
 pub struct PageRequestBuilder {}
 
-impl PageRequestBuilder {
-    pub fn list(&self, params: Option<PageListParams>) -> PageRequest {
-        todo!()
-    }
-}
-
 pub struct PageListParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }
 
-pub struct PageRequest {
-    pub endpoint: String,
-    pub params: Option<String>,
+#[derive(Debug)]
+pub struct ParsedPageListResponse {
+    pub page_list: Option<Vec<PageObject>>,
+}
+
+#[derive(Debug)]
+pub struct PageObject {
+    pub id: Option<u32>,
+    pub title: Option<String>,
+    pub content: Option<String>,
 }

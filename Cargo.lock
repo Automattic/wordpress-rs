@@ -1067,19 +1067,10 @@ version = "0.1.0"
 dependencies = [
  "wp_api",
  "wp_networking",
- "wp_parsing",
 ]
 
 [[package]]
 name = "wp_networking"
-version = "0.1.0"
-dependencies = [
- "uniffi",
- "wp_api",
-]
-
-[[package]]
-name = "wp_parsing"
 version = "0.1.0"
 dependencies = [
  "uniffi",

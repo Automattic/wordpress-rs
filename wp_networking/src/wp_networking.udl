@@ -1,5 +1,8 @@
 [ExternalTrait="wp_api"]
-typedef extern PostNetworkingInterface;
+typedef extern WPApiInterface;
+
+[ExternalTrait="wp_api"]
+typedef extern WPNetworkingInterface;
 
 // These are test functions that we are keeping while we figure out the design in case
 // we need them for further testing.
@@ -8,5 +11,6 @@ namespace wp_networking {
   string combine_strings(string a, string b);
   void panic_from_rust();
 
-  PostNetworkingInterface post_networking();
+  WPApiInterface wp_api();
+  WPApiInterface wp_api_with_custom_networking(WPNetworkingInterface networking_interface);
 };
