@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
 use std::sync::Arc;
 
-use wp_api::{WPApiInterface, WPNetworkingInterface};
+use wp_api::{WPApiInterface, WPAuthentication, WPNetworkingInterface};
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -15,16 +15,19 @@ pub fn panic_from_rust() {
     std::fs::read_to_string("doesnt_exist.txt").unwrap();
 }
 
-pub fn wp_api() -> Arc<dyn WPApiInterface> {
+pub fn wp_api(authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
+        authentication,
         networking_interface: Arc::new(WPNetworking {}),
     })
 }
 
 pub fn wp_api_with_custom_networking(
+    authentication: WPAuthentication,
     networking_interface: Arc<dyn WPNetworkingInterface>,
 ) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
+        authentication,
         networking_interface,
     })
 }
@@ -38,6 +41,7 @@ impl WPNetworkingInterface for WPNetworking {
 }
 
 struct WPApi {
+    authentication: WPAuthentication,
     networking_interface: Arc<dyn WPNetworkingInterface>,
 }
 

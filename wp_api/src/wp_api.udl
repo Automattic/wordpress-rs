@@ -6,6 +6,10 @@ interface WPNetworkingInterface {
   WPNetworkResponse request(WPNetworkRequest request);
 };
 
+dictionary WPAuthentication {
+  string auth_token;
+};
+
 // https://developer.wordpress.org/rest-api/reference/posts/
 // TODO: The schema and some of the action arguments for `/posts` endpoint has the notion of `context`.
 // This is an `enum` value, but it can only contain partial values per field.

@@ -13,6 +13,11 @@ pub trait WPNetworkingInterface: Send + Sync {
 pub struct WPNetworkRequest {}
 pub struct WPNetworkResponse {}
 
+#[derive(Debug, Clone)]
+pub struct WPAuthentication {
+    pub auth_token: String,
+}
+
 pub trait WPApiInterface: Send + Sync {
     fn list_posts(&self, params: Option<PostListParams>) -> ParsedPostListResponse;
     fn create_post(&self, params: Option<PostCreateParams>) -> ParsedPostCreateResponse;
