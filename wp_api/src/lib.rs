@@ -22,7 +22,7 @@ pub struct WPNetworkRequest {
     pub url: String,
 }
 pub struct WPNetworkResponse {
-    pub text: String,
+    pub json: String,
 }
 
 #[derive(Debug, Clone)]

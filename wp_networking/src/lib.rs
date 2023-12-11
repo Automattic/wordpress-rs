@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use reqwest::blocking::Client;
 use wp_api::{
-    WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
+    ParsedPostListResponse, WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
+    WPNetworkingInterface,
 };
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
@@ -57,15 +58,15 @@ impl WPNetworkingInterface for WPNetworking {
         };
 
         // TODO: Error handling
-        let text = self
+        let json = self
             .client
             .request(method, request.url)
             .send()
             .unwrap()
-            .text()
+            .json()
             .unwrap();
 
-        WPNetworkResponse { text }
+        WPNetworkResponse { json }
     }
 }
 
@@ -75,14 +76,13 @@ struct WPApi {
 }
 
 impl WPApiInterface for WPApi {
-    fn list_posts(&self, params: Option<wp_api::PostListParams>) -> wp_api::ParsedPostListResponse {
-        self.networking_interface.request(WPNetworkRequest {
+    fn list_posts(&self, params: Option<wp_api::PostListParams>) -> ParsedPostListResponse {
+        let response = self.networking_interface.request(WPNetworkRequest {
             method: wp_api::RequestMethod::GET,
             // TODO: Correct URL
             url: "".into(),
         });
-        // TODO: Parse response
-        todo!()
+        serde_json::from_str(response.json.as_str()).unwrap()
     }
 
     fn create_post(

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 pub trait PostNetworkingInterface: Send + Sync {}
 
 pub struct PostListParams {
@@ -45,7 +47,7 @@ pub struct PostRetrieveResponse {}
 pub struct PostUpdateResponse {}
 pub struct PostDeleteResponse {}
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedPostListResponse {
     pub post_list: Option<Vec<PostObject>>,
 }
@@ -56,24 +58,24 @@ impl ParsedPostListResponse {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedPostCreateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedPostRetrieveResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedPostUpdateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedPostDeleteResponse {
     pub post: Option<PostObject>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PostObject {
     pub id: Option<u32>,
     pub title: Option<String>,

@@ -1881,6 +1881,7 @@ dependencies = [
 name = "wp_api"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "uniffi",
 ]
 
@@ -1897,6 +1898,7 @@ name = "wp_networking"
 version = "0.1.0"
 dependencies = [
  "reqwest",
+ "serde_json",
  "uniffi",
  "wp_api",
 ]

@@ -10,7 +10,8 @@ name = "wp_networking"
 [dependencies]
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
-reqwest = { version = "0.11.22", features = ["blocking"] }
+reqwest = { version = "0.11.22", features = ["blocking", "json"] }
+serde_json = "1.0"
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

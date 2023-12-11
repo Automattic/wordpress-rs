@@ -39,7 +39,7 @@ dictionary WPNetworkRequest {
   string url;
 };
 dictionary WPNetworkResponse {
-  string text;
+  string json;
 };
 
 dictionary ParsedPostListResponse {
