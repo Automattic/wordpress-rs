@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use reqwest::blocking::Client;
+use reqwest::{blocking::Client, header::HeaderMap};
 use wp_api::{
     ParsedPostListResponse, WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
     WPNetworkingInterface,
@@ -57,10 +57,12 @@ impl WPNetworkingInterface for WPNetworking {
             wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
         };
 
+        let headers: HeaderMap = (&request.header_map.unwrap()).try_into().unwrap();
         // TODO: Error handling
         let json = self
             .client
             .request(method, request.url)
+            .headers(headers)
             .send()
             .unwrap()
             .json()
@@ -77,10 +79,14 @@ struct WPApi {
 
 impl WPApiInterface for WPApi {
     fn list_posts(&self, params: Option<wp_api::PostListParams>) -> ParsedPostListResponse {
+        let mut header_map = HashMap::new();
+        header_map.insert("foo".into(), "bar".into());
+
         let response = self.networking_interface.request(WPNetworkRequest {
             method: wp_api::RequestMethod::GET,
             // TODO: Correct URL
             url: "".into(),
+            header_map: Some(header_map),
         });
         serde_json::from_str(response.json.as_str()).unwrap()
     }

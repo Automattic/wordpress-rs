@@ -1,5 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
+use std::collections::HashMap;
+
 pub use pages::*;
 pub use posts::*;
 
@@ -20,6 +22,7 @@ pub enum RequestMethod {
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
+    pub header_map: Option<HashMap<String, String>>,
 }
 pub struct WPNetworkResponse {
     pub json: String,

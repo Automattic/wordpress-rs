@@ -37,6 +37,7 @@ enum RequestMethod {
 dictionary WPNetworkRequest {
   RequestMethod method;
   string url;
+  record<string, string>? header_map;
 };
 dictionary WPNetworkResponse {
   string json;
