@@ -10,8 +10,20 @@ pub trait WPNetworkingInterface: Send + Sync {
     fn request(&self, request: WPNetworkRequest) -> WPNetworkResponse;
 }
 
-pub struct WPNetworkRequest {}
-pub struct WPNetworkResponse {}
+pub enum RequestMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+}
+
+pub struct WPNetworkRequest {
+    pub method: RequestMethod,
+    pub url: String,
+}
+pub struct WPNetworkResponse {
+    pub text: String,
+}
 
 #[derive(Debug, Clone)]
 pub struct WPAuthentication {

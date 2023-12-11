@@ -1,7 +1,10 @@
 #![allow(dead_code, unused_variables)]
 use std::sync::Arc;
 
-use wp_api::{WPApiInterface, WPAuthentication, WPNetworkingInterface};
+use reqwest::blocking::Client;
+use wp_api::{
+    WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
+};
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
     left + right
@@ -18,7 +21,7 @@ pub fn panic_from_rust() {
 pub fn wp_api(authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
         authentication,
-        networking_interface: Arc::new(WPNetworking {}),
+        networking_interface: Arc::new(WPNetworking::default()),
     })
 }
 
@@ -32,11 +35,37 @@ pub fn wp_api_with_custom_networking(
     })
 }
 
-struct WPNetworking {}
+struct WPNetworking {
+    client: Client,
+}
+
+impl Default for WPNetworking {
+    fn default() -> Self {
+        Self {
+            client: Client::new(),
+        }
+    }
+}
 
 impl WPNetworkingInterface for WPNetworking {
-    fn request(&self, request: wp_api::WPNetworkRequest) -> wp_api::WPNetworkResponse {
-        todo!()
+    fn request(&self, request: WPNetworkRequest) -> wp_api::WPNetworkResponse {
+        let method = match request.method {
+            wp_api::RequestMethod::GET => reqwest::Method::GET,
+            wp_api::RequestMethod::POST => reqwest::Method::POST,
+            wp_api::RequestMethod::PUT => reqwest::Method::PUT,
+            wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
+        };
+
+        // TODO: Error handling
+        let text = self
+            .client
+            .request(method, request.url)
+            .send()
+            .unwrap()
+            .text()
+            .unwrap();
+
+        WPNetworkResponse { text }
     }
 }
 
@@ -47,6 +76,12 @@ struct WPApi {
 
 impl WPApiInterface for WPApi {
     fn list_posts(&self, params: Option<wp_api::PostListParams>) -> wp_api::ParsedPostListResponse {
+        self.networking_interface.request(WPNetworkRequest {
+            method: wp_api::RequestMethod::GET,
+            // TODO: Correct URL
+            url: "".into(),
+        });
+        // TODO: Parse response
         todo!()
     }
 

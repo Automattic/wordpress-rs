@@ -27,8 +27,20 @@ interface WPApiInterface {
   ParsedPageListResponse list_pages(PageListParams? params);
 };
 
-dictionary WPNetworkRequest {};
-dictionary WPNetworkResponse {};
+enum RequestMethod {
+  "GET",
+  "POST",
+  "PUT",
+  "DELETE"
+};
+
+dictionary WPNetworkRequest {
+  RequestMethod method;
+  string url;
+};
+dictionary WPNetworkResponse {
+  string text;
+};
 
 dictionary ParsedPostListResponse {
   sequence<PostObject>? post_list;

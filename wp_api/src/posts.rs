@@ -49,6 +49,13 @@ pub struct PostDeleteResponse {}
 pub struct ParsedPostListResponse {
     pub post_list: Option<Vec<PostObject>>,
 }
+
+impl ParsedPostListResponse {
+    pub fn new(post_list: Option<Vec<PostObject>>) -> Self {
+        Self { post_list }
+    }
+}
+
 #[derive(Debug)]
 pub struct ParsedPostCreateResponse {
     pub post: Option<PostObject>,
