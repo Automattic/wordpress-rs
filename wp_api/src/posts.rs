@@ -78,6 +78,18 @@ pub struct ParsedPostDeleteResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostObject {
     pub id: Option<u32>,
-    pub title: Option<String>,
-    pub content: Option<String>,
+    pub title: Option<PostTitle>,
+    pub content: Option<PostContent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostTitle {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostContent {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
 }

@@ -3,8 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use reqwest::{blocking::Client, header::HeaderMap};
 use wp_api::{
-    ParsedPostListResponse, WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
-    WPNetworkingInterface,
+    ParsedPostListResponse, PostObject, WPApiInterface, WPAuthentication, WPNetworkRequest,
+    WPNetworkResponse, WPNetworkingInterface,
 };
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
@@ -19,18 +19,21 @@ pub fn panic_from_rust() {
     std::fs::read_to_string("doesnt_exist.txt").unwrap();
 }
 
-pub fn wp_api(authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
+pub fn wp_api(url: String, authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
+        url,
         authentication,
         networking_interface: Arc::new(WPNetworking::default()),
     })
 }
 
 pub fn wp_api_with_custom_networking(
+    url: String,
     authentication: WPAuthentication,
     networking_interface: Arc<dyn WPNetworkingInterface>,
 ) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
+        url,
         authentication,
         networking_interface,
     })
@@ -65,7 +68,7 @@ impl WPNetworkingInterface for WPNetworking {
             .headers(headers)
             .send()
             .unwrap()
-            .json()
+            .text()
             .unwrap();
 
         WPNetworkResponse { json }
@@ -73,6 +76,7 @@ impl WPNetworkingInterface for WPNetworking {
 }
 
 struct WPApi {
+    url: String,
     authentication: WPAuthentication,
     networking_interface: Arc<dyn WPNetworkingInterface>,
 }
@@ -80,15 +84,21 @@ struct WPApi {
 impl WPApiInterface for WPApi {
     fn list_posts(&self, params: Option<wp_api::PostListParams>) -> ParsedPostListResponse {
         let mut header_map = HashMap::new();
-        header_map.insert("foo".into(), "bar".into());
+        header_map.insert(
+            "Authorization".into(),
+            format!("Basic {}", self.authentication.auth_token).into(),
+        );
 
         let response = self.networking_interface.request(WPNetworkRequest {
             method: wp_api::RequestMethod::GET,
             // TODO: Correct URL
-            url: "".into(),
+            url: format!("{}/wp-json/wp/v2/posts?context=edit", self.url).into(),
             header_map: Some(header_map),
         });
-        serde_json::from_str(response.json.as_str()).unwrap()
+        let post_list: Vec<PostObject> = serde_json::from_str(response.json.as_str()).unwrap();
+        ParsedPostListResponse {
+            post_list: Some(post_list),
+        }
     }
 
     fn create_post(

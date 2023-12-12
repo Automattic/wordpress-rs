@@ -14,6 +14,6 @@ namespace wp_networking {
   string combine_strings(string a, string b);
   void panic_from_rust();
 
-  WPApiInterface wp_api(WPAuthentication authentication);
-  WPApiInterface wp_api_with_custom_networking(WPAuthentication authentication, WPNetworkingInterface networking_interface);
+  WPApiInterface wp_api(string url, WPAuthentication authentication);
+  WPApiInterface wp_api_with_custom_networking(string url, WPAuthentication authentication, WPNetworkingInterface networking_interface);
 };

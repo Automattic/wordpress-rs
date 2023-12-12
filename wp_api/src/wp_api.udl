@@ -61,8 +61,18 @@ dictionary ParsedPostDeleteResponse {
 
 dictionary PostObject {
   u32? id;
-  string? title;
-  string? content;
+  PostTitle? title;
+  PostContent? content;
+};
+
+dictionary PostTitle {
+  string? raw;
+  string? rendered;
+};
+
+dictionary PostContent {
+  string? raw;
+  string? rendered;
 };
 
 // We should check if it's possible to use the same params for update & create
