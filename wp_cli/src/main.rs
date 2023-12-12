@@ -1,11 +1,20 @@
+use std::fs::read_to_string;
+
 use wp_api::WPAuthentication;
 
 fn main() {
-    let mock_authentication = WPAuthentication {
-        auth_token: "mock_token".into(),
+    // A very naive approach just to get things working for now - this whole code will be deleted
+    // soon
+    let file_contents = read_to_string("test_credentials").unwrap();
+    let lines: Vec<&str> = file_contents.lines().collect();
+    let url = lines[0];
+    let auth_base64_token = lines[1];
+
+    let authentication = WPAuthentication {
+        auth_token: auth_base64_token.into(),
     };
 
-    let post_list = wp_networking::wp_api(mock_authentication.clone()).list_posts(None);
+    let post_list = wp_networking::wp_api(url.into(), authentication.clone()).list_posts(None);
     println!("{:?}", post_list);
 
     // let post_list_with_custom_networking = wp_networking::wp_api_with_custom_networking(
