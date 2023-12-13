@@ -1,6 +1,5 @@
 module libwordpressFFI {
     header "wp_apiFFI.h"
     header "wp_networkingFFI.h"
-    header "wp_parsingFFI.h"
     export *
 }
