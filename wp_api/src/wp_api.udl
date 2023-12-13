@@ -18,13 +18,13 @@ dictionary WPAuthentication {
 // IMPORTANT: This design does not include error handling yet!
 [Trait]
 interface WPApiInterface {
-  ParsedPostListResponse list_posts(PostListParams? params);
-  ParsedPostCreateResponse create_post(PostCreateParams? params);
-  ParsedPostRetrieveResponse retrieve_post(u32 post_id, PostRetrieveParams? params);
-  ParsedPostUpdateResponse update_post(u32 post_id, PostUpdateParams? params);
-  ParsedPostDeleteResponse delete_post(u32 post_id, PostDeleteParams? params);
+  PostListResponse list_posts(PostListParams? params);
+  PostCreateResponse create_post(PostCreateParams? params);
+  PostRetrieveResponse retrieve_post(u32 post_id, PostRetrieveParams? params);
+  PostUpdateResponse update_post(u32 post_id, PostUpdateParams? params);
+  PostDeleteResponse delete_post(u32 post_id, PostDeleteParams? params);
 
-  ParsedPageListResponse list_pages(PageListParams? params);
+  PageListResponse list_pages(PageListParams? params);
 };
 
 enum RequestMethod {
@@ -43,19 +43,19 @@ dictionary WPNetworkResponse {
   string json;
 };
 
-dictionary ParsedPostListResponse {
+dictionary PostListResponse {
   sequence<PostObject>? post_list;
 };
-dictionary ParsedPostCreateResponse {
+dictionary PostCreateResponse {
   PostObject? post;
 };
-dictionary ParsedPostRetrieveResponse {
+dictionary PostRetrieveResponse {
   PostObject? post;
 };
-dictionary ParsedPostUpdateResponse {
+dictionary PostUpdateResponse {
   PostObject? post;
 };
-dictionary ParsedPostDeleteResponse {
+dictionary PostDeleteResponse {
   PostObject? post;
 };
 
@@ -106,7 +106,7 @@ dictionary PageListParams {
   u32? per_page;
 };
 
-dictionary ParsedPageListResponse {
+dictionary PageListResponse {
   sequence<PageObject>? page_list;
 };
 

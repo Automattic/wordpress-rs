@@ -42,30 +42,30 @@ pub struct PostDeleteRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ParsedPostListResponse {
+pub struct PostListResponse {
     pub post_list: Option<Vec<PostObject>>,
 }
 
-impl ParsedPostListResponse {
+impl PostListResponse {
     pub fn new(post_list: Option<Vec<PostObject>>) -> Self {
         Self { post_list }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ParsedPostCreateResponse {
+pub struct PostCreateResponse {
     pub post: Option<PostObject>,
 }
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ParsedPostRetrieveResponse {
+pub struct PostRetrieveResponse {
     pub post: Option<PostObject>,
 }
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ParsedPostUpdateResponse {
+pub struct PostUpdateResponse {
     pub post: Option<PostObject>,
 }
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ParsedPostDeleteResponse {
+pub struct PostDeleteResponse {
     pub post: Option<PostObject>,
 }
 

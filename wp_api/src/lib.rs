@@ -42,27 +42,19 @@ pub struct WPAuthentication {
 }
 
 pub trait WPApiInterface: Send + Sync {
-    fn list_posts(&self, params: Option<PostListParams>) -> ParsedPostListResponse;
-    fn create_post(&self, params: Option<PostCreateParams>) -> ParsedPostCreateResponse;
+    fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse;
+    fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse;
     fn retrieve_post(
         &self,
         post_id: u32,
         params: Option<PostRetrieveParams>,
-    ) -> ParsedPostRetrieveResponse;
+    ) -> PostRetrieveResponse;
 
-    fn update_post(
-        &self,
-        post_id: u32,
-        params: Option<PostUpdateParams>,
-    ) -> ParsedPostUpdateResponse;
+    fn update_post(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostUpdateResponse;
 
-    fn delete_post(
-        &self,
-        post_id: u32,
-        params: Option<PostDeleteParams>,
-    ) -> ParsedPostDeleteResponse;
+    fn delete_post(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostDeleteResponse;
 
-    fn list_pages(&self, params: Option<PageListParams>) -> ParsedPageListResponse;
+    fn list_pages(&self, params: Option<PageListParams>) -> PageListResponse;
 }
 
 uniffi::include_scaffolding!("wp_api");

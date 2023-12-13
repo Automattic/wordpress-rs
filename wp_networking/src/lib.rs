@@ -3,8 +3,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use reqwest::{blocking::Client, header::HeaderMap};
 use wp_api::{
-    ParsedPostListResponse, PostObject, WPApiInterface, WPAuthentication, WPNetworkRequest,
-    WPNetworkResponse, WPNetworkingInterface,
+    PageListParams, PageListResponse, PostCreateParams, PostCreateResponse, PostDeleteParams,
+    PostDeleteResponse, PostListParams, PostListResponse, PostObject, PostRetrieveParams,
+    PostRetrieveResponse, PostUpdateParams, PostUpdateResponse, WPApiInterface, WPAuthentication,
+    WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
 };
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
@@ -82,7 +84,7 @@ struct WPApi {
 }
 
 impl WPApiInterface for WPApi {
-    fn list_posts(&self, params: Option<wp_api::PostListParams>) -> ParsedPostListResponse {
+    fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse {
         let mut header_map = HashMap::new();
         header_map.insert(
             "Authorization".into(),
@@ -95,43 +97,32 @@ impl WPApiInterface for WPApi {
             header_map: Some(header_map),
         });
         let post_list: Vec<PostObject> = serde_json::from_str(response.json.as_str()).unwrap();
-        ParsedPostListResponse {
+        PostListResponse {
             post_list: Some(post_list),
         }
     }
 
-    fn create_post(
-        &self,
-        params: Option<wp_api::PostCreateParams>,
-    ) -> wp_api::ParsedPostCreateResponse {
+    fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse {
         todo!()
     }
 
     fn retrieve_post(
         &self,
         post_id: u32,
-        params: Option<wp_api::PostRetrieveParams>,
-    ) -> wp_api::ParsedPostRetrieveResponse {
+        params: Option<PostRetrieveParams>,
+    ) -> PostRetrieveResponse {
         todo!()
     }
 
-    fn update_post(
-        &self,
-        post_id: u32,
-        params: Option<wp_api::PostUpdateParams>,
-    ) -> wp_api::ParsedPostUpdateResponse {
+    fn update_post(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostUpdateResponse {
         todo!()
     }
 
-    fn delete_post(
-        &self,
-        post_id: u32,
-        params: Option<wp_api::PostDeleteParams>,
-    ) -> wp_api::ParsedPostDeleteResponse {
+    fn delete_post(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostDeleteResponse {
         todo!()
     }
 
-    fn list_pages(&self, params: Option<wp_api::PageListParams>) -> wp_api::ParsedPageListResponse {
+    fn list_pages(&self, params: Option<PageListParams>) -> PageListResponse {
         todo!()
     }
 }
