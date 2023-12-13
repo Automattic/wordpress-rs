@@ -93,6 +93,7 @@ impl WPApiInterface for WPApi {
 
         let response = self.networking_interface.request(WPNetworkRequest {
             method: wp_api::RequestMethod::GET,
+            // TODO: Centralize the endpoints
             url: format!("{}/wp-json/wp/v2/posts", self.site_url).into(),
             header_map: Some(header_map),
         });
