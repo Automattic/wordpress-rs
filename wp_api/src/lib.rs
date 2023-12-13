@@ -22,13 +22,21 @@ pub enum RequestMethod {
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
+    // TODO: We probably want to implement a specific type for these headers instead of using a
+    // regular HashMap.
+    //
+    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
+    // module.
     pub header_map: Option<HashMap<String, String>>,
 }
+
 pub struct WPNetworkResponse {
+    // TODO: This is a placeholder for now to get a basic setup working
     pub json: String,
 }
 
 #[derive(Debug, Clone)]
+// TODO: This will probably become an `enum` where we support multiple authentication types.
 pub struct WPAuthentication {
     pub auth_token: String,
 }
