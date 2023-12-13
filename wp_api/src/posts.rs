@@ -41,12 +41,6 @@ pub struct PostDeleteRequest {
     pub params: Option<String>,
 }
 
-pub struct PostListResponse {}
-pub struct PostCreateResponse {}
-pub struct PostRetrieveResponse {}
-pub struct PostUpdateResponse {}
-pub struct PostDeleteResponse {}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParsedPostListResponse {
     pub post_list: Option<Vec<PostObject>>,
