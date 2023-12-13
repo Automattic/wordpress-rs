@@ -6,7 +6,7 @@ pub struct PageListParams {
 }
 
 #[derive(Debug)]
-pub struct ParsedPageListResponse {
+pub struct PageListResponse {
     pub page_list: Option<Vec<PageObject>>,
 }
 

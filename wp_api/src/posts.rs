@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 pub trait PostNetworkingInterface: Send + Sync {}
 
 pub struct PostListParams {
@@ -39,36 +41,49 @@ pub struct PostDeleteRequest {
     pub params: Option<String>,
 }
 
-pub struct PostListResponse {}
-pub struct PostCreateResponse {}
-pub struct PostRetrieveResponse {}
-pub struct PostUpdateResponse {}
-pub struct PostDeleteResponse {}
-
-#[derive(Debug)]
-pub struct ParsedPostListResponse {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostListResponse {
     pub post_list: Option<Vec<PostObject>>,
 }
-#[derive(Debug)]
-pub struct ParsedPostCreateResponse {
+
+impl PostListResponse {
+    pub fn new(post_list: Option<Vec<PostObject>>) -> Self {
+        Self { post_list }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostCreateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug)]
-pub struct ParsedPostRetrieveResponse {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostRetrieveResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug)]
-pub struct ParsedPostUpdateResponse {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostUpdateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug)]
-pub struct ParsedPostDeleteResponse {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostDeleteResponse {
     pub post: Option<PostObject>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PostObject {
     pub id: Option<u32>,
-    pub title: Option<String>,
-    pub content: Option<String>,
+    pub title: Option<PostTitle>,
+    pub content: Option<PostContent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostTitle {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostContent {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
 }

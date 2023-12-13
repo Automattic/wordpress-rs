@@ -14,6 +14,8 @@ namespace wp_networking {
   string combine_strings(string a, string b);
   void panic_from_rust();
 
-  WPApiInterface wp_api(WPAuthentication authentication);
-  WPApiInterface wp_api_with_custom_networking(WPAuthentication authentication, WPNetworkingInterface networking_interface);
+  // TODO: We should have a type for the `site_url`, but it's not yet clear what that type should
+  // look like or what it should contain, so we are using a placeholder string type for now.
+  WPApiInterface wp_api(string site_url, WPAuthentication authentication);
+  WPApiInterface wp_api_with_custom_networking(string site_url, WPAuthentication authentication, WPNetworkingInterface networking_interface);
 };
