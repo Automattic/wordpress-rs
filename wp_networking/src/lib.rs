@@ -86,6 +86,7 @@ struct WPApi {
 impl WPApiInterface for WPApi {
     fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse {
         let mut header_map = HashMap::new();
+        // TODO: Authorization headers should be generated through its type not like a cave man
         header_map.insert(
             "Authorization".into(),
             format!("Basic {}", self.authentication.auth_token).into(),
