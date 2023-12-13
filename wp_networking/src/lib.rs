@@ -19,21 +19,21 @@ pub fn panic_from_rust() {
     std::fs::read_to_string("doesnt_exist.txt").unwrap();
 }
 
-pub fn wp_api(url: String, authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
+pub fn wp_api(site_url: String, authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
-        url,
+        site_url,
         authentication,
         networking_interface: Arc::new(WPNetworking::default()),
     })
 }
 
 pub fn wp_api_with_custom_networking(
-    url: String,
+    site_url: String,
     authentication: WPAuthentication,
     networking_interface: Arc<dyn WPNetworkingInterface>,
 ) -> Arc<dyn WPApiInterface> {
     Arc::new(WPApi {
-        url,
+        site_url,
         authentication,
         networking_interface,
     })
@@ -76,7 +76,7 @@ impl WPNetworkingInterface for WPNetworking {
 }
 
 struct WPApi {
-    url: String,
+    site_url: String,
     authentication: WPAuthentication,
     networking_interface: Arc<dyn WPNetworkingInterface>,
 }
@@ -91,8 +91,7 @@ impl WPApiInterface for WPApi {
 
         let response = self.networking_interface.request(WPNetworkRequest {
             method: wp_api::RequestMethod::GET,
-            // TODO: Correct URL
-            url: format!("{}/wp-json/wp/v2/posts?context=edit", self.url).into(),
+            url: format!("{}/wp-json/wp/v2/posts", self.site_url).into(),
             header_map: Some(header_map),
         });
         let post_list: Vec<PostObject> = serde_json::from_str(response.json.as_str()).unwrap();
