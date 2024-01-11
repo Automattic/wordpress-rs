@@ -14,7 +14,9 @@ fn main() {
         auth_token: auth_base64_token.into(),
     };
 
-    let post_list = wp_networking::wp_api(url.into(), authentication.clone()).list_posts(None);
+    let post_list = wp_networking::wp_api(url.into(), authentication.clone())
+        .list_posts(None)
+        .unwrap();
     println!("{:?}", post_list);
 
     // let post_list_with_custom_networking = wp_networking::wp_api_with_custom_networking(

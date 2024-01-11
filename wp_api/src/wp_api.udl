@@ -26,6 +26,7 @@ dictionary WPAuthentication {
 // IMPORTANT: This design does not include error handling yet!
 [Trait]
 interface WPApiInterface {
+  [Throws=WPApiError]
   PostListResponse list_posts(PostListParams? params);
   PostCreateResponse create_post(PostCreateParams? params);
   PostRetrieveResponse retrieve_post(u32 post_id, PostRetrieveParams? params);

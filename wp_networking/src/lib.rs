@@ -5,8 +5,8 @@ use reqwest::{blocking::Client, header::HeaderMap};
 use wp_api::{
     PageListParams, PageListResponse, PostCreateParams, PostCreateResponse, PostDeleteParams,
     PostDeleteResponse, PostListParams, PostListResponse, PostObject, PostRetrieveParams,
-    PostRetrieveResponse, PostUpdateParams, PostUpdateResponse, WPApiInterface, WPAuthentication,
-    WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
+    PostRetrieveResponse, PostUpdateParams, PostUpdateResponse, WPApiError, WPApiInterface,
+    WPAuthentication, WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
 };
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
@@ -84,7 +84,7 @@ struct WPApi {
 }
 
 impl WPApiInterface for WPApi {
-    fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse {
+    fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError> {
         let mut header_map = HashMap::new();
         // TODO: Authorization headers should be generated through its type not like a cave man
         header_map.insert(
@@ -99,9 +99,9 @@ impl WPApiInterface for WPApi {
             header_map: Some(header_map),
         });
         let post_list: Vec<PostObject> = serde_json::from_str(response.json.as_str()).unwrap();
-        PostListResponse {
+        Ok(PostListResponse {
             post_list: Some(post_list),
-        }
+        })
     }
 
     fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse {

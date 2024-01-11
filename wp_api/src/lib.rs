@@ -57,7 +57,7 @@ pub struct WPAuthentication {
 }
 
 pub trait WPApiInterface: Send + Sync {
-    fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse;
+    fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError>;
     fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse;
     fn retrieve_post(
         &self,
