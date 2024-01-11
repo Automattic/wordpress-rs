@@ -8,6 +8,21 @@ pub use posts::*;
 pub mod pages;
 pub mod posts;
 
+#[derive(Debug, thiserror::Error)]
+pub enum WPApiError {
+    #[error("Authentication error: {message}")]
+    AuthenticationError { message: String },
+
+    #[error("Not found error: {message}")]
+    NotFoundError { message: String },
+
+    #[error("Validation error: {message}")]
+    ValidationError { message: String },
+
+    #[error("Invalid response error: {message}")]
+    InvalidResponseError { message: String },
+}
+
 pub trait WPNetworkingInterface: Send + Sync {
     fn request(&self, request: WPNetworkRequest) -> WPNetworkResponse;
 }

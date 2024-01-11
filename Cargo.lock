@@ -1882,6 +1882,7 @@ name = "wp_api"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "thiserror",
  "uniffi",
 ]
 

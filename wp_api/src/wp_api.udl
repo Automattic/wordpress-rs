@@ -1,6 +1,14 @@
 namespace wp_api {
 };
 
+[Error]
+interface WPApiError {
+    AuthenticationError(string message);
+    NotFoundError(string message);
+    ValidationError(string message);
+    InvalidResponseError(string message);
+};
+
 [Trait]
 interface WPNetworkingInterface {
   WPNetworkResponse request(WPNetworkRequest request);
