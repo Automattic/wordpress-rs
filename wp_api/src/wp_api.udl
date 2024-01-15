@@ -3,10 +3,10 @@ namespace wp_api {
 
 [Error]
 interface WPApiError {
-    AuthenticationError(string message);
-    NotFoundError(string message);
-    ValidationError(string message);
-    InvalidResponseError(string message);
+    AuthenticationError(string reason);
+    NotFoundError(string reason);
+    ValidationError(string reason);
+    InvalidResponseError(string reason, string response);
 };
 
 [Trait]

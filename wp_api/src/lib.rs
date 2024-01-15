@@ -10,17 +10,17 @@ pub mod posts;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WPApiError {
-    #[error("Authentication error: {message}")]
-    AuthenticationError { message: String },
+    #[error("Authentication error: {reason}")]
+    AuthenticationError { reason: String },
 
-    #[error("Not found error: {message}")]
-    NotFoundError { message: String },
+    #[error("Not found error: {reason}")]
+    NotFoundError { reason: String },
 
-    #[error("Validation error: {message}")]
-    ValidationError { message: String },
+    #[error("Validation error: {reason}")]
+    ValidationError { reason: String },
 
-    #[error("Invalid response error: {message}")]
-    InvalidResponseError { message: String },
+    #[error("Invalid response error: {reason} - {response}")]
+    InvalidResponseError { reason: String, response: String },
 }
 
 pub trait WPNetworkingInterface: Send + Sync {
