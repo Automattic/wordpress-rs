@@ -10,4 +10,5 @@ resolver = "2"
 [workspace.dependencies]
 # External traits in UDL is only available since https://github.com/mozilla/uniffi-rs/pull/1867
 # Point to a specific commit until a new version is released
+http = "1.0"
 uniffi = { git = "https://github.com/mozilla/uniffi-rs.git", rev = "d380d164cfdba9e091c461baa6855f0a2294ac5b" }
