@@ -2,28 +2,13 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+pub use api_error::*;
 pub use pages::*;
 pub use posts::*;
 
+pub mod api_error;
 pub mod pages;
 pub mod posts;
-
-pub use http::StatusCode;
-
-#[derive(Debug, thiserror::Error)]
-pub enum WPApiError {
-    #[error("Authentication error: {reason}")]
-    AuthenticationError { reason: String },
-
-    #[error("Not found error: {reason}")]
-    NotFoundError { reason: String },
-
-    #[error("Validation error: {reason}")]
-    ValidationError { reason: String },
-
-    #[error("Invalid response error: {reason} - {response}")]
-    InvalidResponseError { reason: String, response: String },
-}
 
 pub trait WPNetworkingInterface: Send + Sync {
     fn request(&self, request: WPNetworkRequest) -> WPNetworkResponse;
@@ -37,6 +22,7 @@ pub enum RequestMethod {
 }
 
 pub trait NetworkResponseStatus: Send + Sync {
+    fn as_u16(&self) -> u16;
     fn is_informational(&self) -> bool;
     fn is_success(&self) -> bool;
     fn is_redirection(&self) -> bool;
@@ -45,6 +31,10 @@ pub trait NetworkResponseStatus: Send + Sync {
 }
 
 impl NetworkResponseStatus for http::StatusCode {
+    fn as_u16(&self) -> u16 {
+        self.as_u16()
+    }
+
     fn is_informational(&self) -> bool {
         self.is_informational()
     }
