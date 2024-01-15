@@ -8,6 +8,8 @@ pub use posts::*;
 pub mod pages;
 pub mod posts;
 
+pub use http::StatusCode;
+
 #[derive(Debug, thiserror::Error)]
 pub enum WPApiError {
     #[error("Authentication error: {reason}")]
@@ -40,6 +42,28 @@ pub trait NetworkResponseStatus: Send + Sync {
     fn is_redirection(&self) -> bool;
     fn is_client_error(&self) -> bool;
     fn is_server_error(&self) -> bool;
+}
+
+impl NetworkResponseStatus for http::StatusCode {
+    fn is_informational(&self) -> bool {
+        self.is_informational()
+    }
+
+    fn is_success(&self) -> bool {
+        self.is_success()
+    }
+
+    fn is_redirection(&self) -> bool {
+        self.is_redirection()
+    }
+
+    fn is_client_error(&self) -> bool {
+        self.is_client_error()
+    }
+
+    fn is_server_error(&self) -> bool {
+        self.is_informational()
+    }
 }
 
 pub struct WPNetworkRequest {
