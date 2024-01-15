@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 pub use pages::*;
 pub use posts::*;
@@ -34,6 +34,14 @@ pub enum RequestMethod {
     DELETE,
 }
 
+pub trait NetworkResponseStatus: Send + Sync {
+    fn is_informational(&self) -> bool;
+    fn is_success(&self) -> bool;
+    fn is_redirection(&self) -> bool;
+    fn is_client_error(&self) -> bool;
+    fn is_server_error(&self) -> bool;
+}
+
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
@@ -46,8 +54,8 @@ pub struct WPNetworkRequest {
 }
 
 pub struct WPNetworkResponse {
-    // TODO: This is a placeholder for now to get a basic setup working
-    pub json: String,
+    pub status: Arc<dyn NetworkResponseStatus>,
+    pub body: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]

@@ -48,8 +48,19 @@ dictionary WPNetworkRequest {
   string url;
   record<string, string>? header_map;
 };
+
+[Trait]
+interface NetworkResponseStatus {
+    boolean is_informational();
+    boolean is_success();
+    boolean is_redirection();
+    boolean is_client_error();
+    boolean is_server_error();
+};
+
 dictionary WPNetworkResponse {
-  string json;
+  bytes body;
+  NetworkResponseStatus status;
 };
 
 dictionary PostListResponse {
