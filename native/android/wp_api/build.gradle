@@ -14,7 +14,7 @@ java {
 }
 
 android {
-    namespace = "org.wordpress.rs"
+    namespace = "rs.wp_api"
 
     compileSdk = 33
 
