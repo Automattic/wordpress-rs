@@ -97,6 +97,7 @@ def getNativeRustTarget() {
     // We don't use Intel macs anymore, so we should default to 'darwin-aarch64'
     switch (com.sun.jna.Platform.RESOURCE_PREFIX) {
         case 'darwin':
+            return 'darwin'
         case 'darwin-aarch64':
             return 'darwin-aarch64'
         case 'darwin-x86-64':
