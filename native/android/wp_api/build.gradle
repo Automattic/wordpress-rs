@@ -14,7 +14,7 @@ java {
 }
 
 android {
-    namespace = "rs.wp_api"
+    namespace = "rs.wordpress.wp_api"
 
     compileSdk = 33
 
@@ -73,8 +73,8 @@ project.afterEvaluate {
             MavenPublication(MavenPublication) {
                 from components.release
 
-                groupId "org.wordpress"
-                artifactId "rs"
+                groupId "rs.wordpress"
+                artifactId "wp_api"
                 // version is set by 'publish-to-s3' plugin
             }
         }

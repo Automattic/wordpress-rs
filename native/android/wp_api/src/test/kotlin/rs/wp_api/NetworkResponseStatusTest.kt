@@ -1,4 +1,4 @@
-package rs.wp_api
+package rs.wordpress.wp_api
 
 import org.junit.Test
 import uniffi.wp_api.NetworkResponseStatus
