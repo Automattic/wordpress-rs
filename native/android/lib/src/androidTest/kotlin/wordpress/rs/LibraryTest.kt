@@ -3,22 +3,10 @@
  */
 package wordpress.rs
 
-import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Test
 
 class LibraryTest {
     @Before
     fun setup() {
-    }
-
-    @Test
-    fun testAddCustom() {
-        assertEquals(Library().addCustomFromRust(2, 4), 6)
-    }
-
-    @Test
-    fun testCombineStrings() {
-        assertEquals(Library().combineStringsFromRust("this", "that"), "this-that")
     }
 }

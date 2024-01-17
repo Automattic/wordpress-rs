@@ -3,22 +3,10 @@
  */
 package wordpress.rs
 
-import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Test
 
 class LibraryTest {
     @Before
     fun setup() {
-    }
-
-    @Test
-    fun testAddCustom() {
-        assertEquals(Library().addCustomFromRust(2, 4), 6)
-    }
-
-    @Test(expected = uniffi.wordpress_api.InternalException::class)
-    fun testCrashFromRust() {
-        Library().crashFromRust()
     }
 }
