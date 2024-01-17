@@ -5,7 +5,7 @@ plugins {
     id("com.automattic.android.publish-to-s3")
 }
 
-apply from: 'uniffi.gradle'
+apply from: '../common.gradle'
 
 java {
     toolchain {
@@ -43,29 +43,16 @@ repositories {
 }
 
 dependencies {
-    implementation "net.java.dev.jna:jna:5.13.0@aar"
-    androidTestImplementation "net.java.dev.jna:jna:5.13.0@aar"
-
     androidTestImplementation "androidx.test:runner:1.4.0"
     androidTestImplementation "androidx.test:rules:1.4.0"
     androidTestImplementation "junit:junit:4.13.2"
 
     testImplementation "junit:junit:4.13.2"
-    testImplementation "net.java.dev.jna:jna:5.13.0"
 }
 
-cargo {
-    module  = "../../../wp_api/"
-    libname = "wp_api"
-    profile = "release"
-    targets = ["arm", "arm64", "x86", "x86_64", getNativeRustTarget()]
-    targetDirectory = '../../../target'
-
-    exec { spec, toolchain ->
-        // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
-        spec.environment("RUSTFLAGS", "-g")
-    }
-}
+ext.setupCargo("wp_api", ext.getNativeRustTarget(com.sun.jna.Platform.RESOURCE_PREFIX))
+ext.configureUniFFIBindgen("libwp_api.dylib")
+ext.addJnaDependencies()
 
 project.afterEvaluate {
     publishing {
@@ -81,30 +68,3 @@ project.afterEvaluate {
    }
 }
 
-tasks.matching { it.name.matches(/merge.*JniLibFolders/) }.configureEach {
-    it.inputs.dir(new File(buildDir, "rustJniLibs/android"))
-    it.dependsOn("cargoBuild")
-}
-
-tasks.matching { it.name.matches("test") }.configureEach {
-    it.dependsOn("cargoBuild")
-}
-
-ext.configureUniFFIBindgen("libwp_api.dylib")
-
-def getNativeRustTarget() {
-    // This seems to return 'darwin' for both Apple Silicon and Intel architectures
-    // We don't use Intel macs anymore, so we should default to 'darwin-aarch64'
-    switch (com.sun.jna.Platform.RESOURCE_PREFIX) {
-        case 'darwin':
-            return 'darwin'
-        case 'darwin-aarch64':
-            return 'darwin-aarch64'
-        case 'darwin-x86-64':
-            return 'darwin-x86-64'
-        case 'linux-x86-64':
-            return 'linux-x86-64'
-        case 'win32-x86-64':
-            return 'win32-x86-64-gnu'
-    }
-}

@@ -22,3 +22,49 @@ ext.configureUniFFIBindgen = { dylibFileName ->
         variant.registerJavaGeneratingTask(t.get(), new File(buildDir, uniffiGeneratedPath))
     }
 }
+
+ext.addJnaDependencies = {
+    dependencies {
+        implementation "net.java.dev.jna:jna:5.13.0@aar"
+        androidTestImplementation "net.java.dev.jna:jna:5.13.0@aar"
+        testImplementation "net.java.dev.jna:jna:5.13.0"
+    }
+}
+
+ext.setupCargo = { moduleName, nativeRustTarget ->
+    cargo {
+        module  = "../../../$moduleName/"
+        libname = moduleName
+        profile = "release"
+        targets = ["arm", "arm64", "x86", "x86_64", nativeRustTarget]
+        targetDirectory = '../../../target'
+
+        exec { spec, toolchain ->
+            // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
+            spec.environment("RUSTFLAGS", "-g")
+        }
+    }
+    tasks.matching { it.name.matches(/merge.*JniLibFolders/) }.configureEach {
+        it.inputs.dir(new File(buildDir, "rustJniLibs/android"))
+        it.dependsOn("cargoBuild")
+    }
+
+    tasks.matching { it.name.matches("test") }.configureEach {
+        it.dependsOn("cargoBuild")
+    }
+}
+
+ext.getNativeRustTarget = { resourcePrefix ->
+    switch (resourcePrefix) {
+        case 'darwin':
+            return 'darwin'
+        case 'darwin-aarch64':
+            return 'darwin-aarch64'
+        case 'darwin-x86-64':
+            return 'darwin-x86-64'
+        case 'linux-x86-64':
+            return 'linux-x86-64'
+        case 'win32-x86-64':
+            return 'win32-x86-64-gnu'
+    }
+}
