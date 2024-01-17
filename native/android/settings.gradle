@@ -22,4 +22,4 @@ plugins {
 }
 
 rootProject.name = "wordpress-rs"
-include("lib")
+include("wp_api")
