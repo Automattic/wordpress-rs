@@ -90,7 +90,7 @@ tasks.matching { it.name.matches("test") }.configureEach {
     it.dependsOn("cargoBuild")
 }
 
-ext.configureUniFFIBindgen("../../../wp_api/src/wp_api.udl")
+ext.configureUniFFIBindgen("../../../target/release/libwp_api.dylib")
 
 def getNativeRustTarget() {
     // This seems to return 'darwin' for both Apple Silicon and Intel architectures
