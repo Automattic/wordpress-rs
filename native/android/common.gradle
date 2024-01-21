@@ -20,6 +20,8 @@ ext.configureUniFFIBindgen = { dylibFileName ->
             inputs.file "${project.rootDir}/../../Cargo.lock"
         }
         variant.registerJavaGeneratingTask(t.get(), new File(buildDir, uniffiGeneratedPath))
+        def sourceSet = variant.sourceSets.find { it.name == variant.name }
+        sourceSet.java.srcDir new File(buildDir, "generated/source/uniffi/${variant.name}/java")
     }
 }
 
