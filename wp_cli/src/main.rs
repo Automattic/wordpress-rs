@@ -1,6 +1,7 @@
-use std::fs::read_to_string;
+use std::{fs::read_to_string, sync::Arc};
 
-use wp_api::WPAuthentication;
+use reqwest::{blocking::Client, header::HeaderMap};
+use wp_api::{WPAuthentication, WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface};
 
 fn main() {
     // A very naive approach just to get things working for now - this whole code will be deleted
@@ -14,9 +15,13 @@ fn main() {
         auth_token: auth_base64_token.into(),
     };
 
-    let post_list = wp_networking::wp_api(url.into(), authentication.clone())
-        .list_posts(None)
-        .unwrap();
+    let post_list = wp_networking::wp_api_with_custom_networking(
+        url.into(),
+        authentication.clone(),
+        Arc::new(WPNetworking::default()),
+    )
+    .list_posts(None)
+    .unwrap();
     println!("{:?}", post_list);
 
     // let post_list_with_custom_networking = wp_networking::wp_api_with_custom_networking(
@@ -37,3 +42,41 @@ fn main() {
 //         todo!()
 //     }
 // }
+//
+//
+struct WPNetworking {
+    client: Client,
+}
+
+impl Default for WPNetworking {
+    fn default() -> Self {
+        Self {
+            client: Client::new(),
+        }
+    }
+}
+
+impl WPNetworkingInterface for WPNetworking {
+    fn request(&self, request: WPNetworkRequest) -> wp_api::WPNetworkResponse {
+        let method = match request.method {
+            wp_api::RequestMethod::GET => reqwest::Method::GET,
+            wp_api::RequestMethod::POST => reqwest::Method::POST,
+            wp_api::RequestMethod::PUT => reqwest::Method::PUT,
+            wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
+        };
+
+        let request_headers: HeaderMap = (&request.header_map.unwrap()).try_into().unwrap();
+
+        // TODO: Error handling
+        let response = self
+            .client
+            .request(method, request.url)
+            .headers(request_headers)
+            .send()
+            .unwrap();
+        WPNetworkResponse {
+            status: Arc::new(response.status()),
+            body: response.text().unwrap().as_bytes().to_vec(),
+        }
+    }
+}

@@ -1,7 +1,6 @@
 #![allow(dead_code, unused_variables)]
 use std::{collections::HashMap, sync::Arc};
 
-use reqwest::{blocking::Client, header::HeaderMap};
 use wp_api::{
     ClientErrorType, PageListParams, PageListResponse, PostCreateParams, PostCreateResponse,
     PostDeleteParams, PostDeleteResponse, PostListParams, PostListResponse, PostObject,
@@ -21,14 +20,6 @@ pub fn panic_from_rust() {
     std::fs::read_to_string("doesnt_exist.txt").unwrap();
 }
 
-pub fn wp_api(site_url: String, authentication: WPAuthentication) -> Arc<dyn WPApiInterface> {
-    Arc::new(WPApi {
-        site_url,
-        authentication,
-        networking_interface: Arc::new(WPNetworking::default()),
-    })
-}
-
 pub fn wp_api_with_custom_networking(
     site_url: String,
     authentication: WPAuthentication,
@@ -39,43 +30,6 @@ pub fn wp_api_with_custom_networking(
         authentication,
         networking_interface,
     })
-}
-
-struct WPNetworking {
-    client: Client,
-}
-
-impl Default for WPNetworking {
-    fn default() -> Self {
-        Self {
-            client: Client::new(),
-        }
-    }
-}
-
-impl WPNetworkingInterface for WPNetworking {
-    fn request(&self, request: WPNetworkRequest) -> wp_api::WPNetworkResponse {
-        let method = match request.method {
-            wp_api::RequestMethod::GET => reqwest::Method::GET,
-            wp_api::RequestMethod::POST => reqwest::Method::POST,
-            wp_api::RequestMethod::PUT => reqwest::Method::PUT,
-            wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
-        };
-
-        let request_headers: HeaderMap = (&request.header_map.unwrap()).try_into().unwrap();
-
-        // TODO: Error handling
-        let response = self
-            .client
-            .request(method, request.url)
-            .headers(request_headers)
-            .send()
-            .unwrap();
-        WPNetworkResponse {
-            status: Arc::new(response.status()),
-            body: response.text().unwrap().as_bytes().to_vec(),
-        }
-    }
 }
 
 struct WPApi {
