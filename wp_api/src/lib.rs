@@ -1,10 +1,12 @@
 #![allow(dead_code, unused_variables)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+pub use api_error::*;
 pub use pages::*;
 pub use posts::*;
 
+pub mod api_error;
 pub mod pages;
 pub mod posts;
 
@@ -19,6 +21,41 @@ pub enum RequestMethod {
     DELETE,
 }
 
+pub trait NetworkResponseStatus: Send + Sync {
+    fn as_u16(&self) -> u16;
+    fn is_informational(&self) -> bool;
+    fn is_success(&self) -> bool;
+    fn is_redirection(&self) -> bool;
+    fn is_client_error(&self) -> bool;
+    fn is_server_error(&self) -> bool;
+}
+
+impl NetworkResponseStatus for http::StatusCode {
+    fn as_u16(&self) -> u16 {
+        self.as_u16()
+    }
+
+    fn is_informational(&self) -> bool {
+        self.is_informational()
+    }
+
+    fn is_success(&self) -> bool {
+        self.is_success()
+    }
+
+    fn is_redirection(&self) -> bool {
+        self.is_redirection()
+    }
+
+    fn is_client_error(&self) -> bool {
+        self.is_client_error()
+    }
+
+    fn is_server_error(&self) -> bool {
+        self.is_informational()
+    }
+}
+
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
@@ -31,8 +68,8 @@ pub struct WPNetworkRequest {
 }
 
 pub struct WPNetworkResponse {
-    // TODO: This is a placeholder for now to get a basic setup working
-    pub json: String,
+    pub status: Arc<dyn NetworkResponseStatus>,
+    pub body: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,7 +79,7 @@ pub struct WPAuthentication {
 }
 
 pub trait WPApiInterface: Send + Sync {
-    fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse;
+    fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError>;
     fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse;
     fn retrieve_post(
         &self,

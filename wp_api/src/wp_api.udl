@@ -1,6 +1,22 @@
 namespace wp_api {
 };
 
+
+enum ClientErrorType {
+    "BadRequest",
+    "Unauthorized",
+    "TooManyRequests",
+    "Other",
+};
+
+[Error]
+interface WPApiError {
+    ClientError(ClientErrorType error_type, u16 status_code);
+    ServerError(u16 status_code);
+    ParsingError(string reason, string response);
+    UnknownError();
+};
+
 [Trait]
 interface WPNetworkingInterface {
   WPNetworkResponse request(WPNetworkRequest request);
@@ -18,6 +34,7 @@ dictionary WPAuthentication {
 // IMPORTANT: This design does not include error handling yet!
 [Trait]
 interface WPApiInterface {
+  [Throws=WPApiError]
   PostListResponse list_posts(PostListParams? params);
   PostCreateResponse create_post(PostCreateParams? params);
   PostRetrieveResponse retrieve_post(u32 post_id, PostRetrieveParams? params);
@@ -39,8 +56,20 @@ dictionary WPNetworkRequest {
   string url;
   record<string, string>? header_map;
 };
+
+[Trait]
+interface NetworkResponseStatus {
+    u16 as_u16();
+    boolean is_informational();
+    boolean is_success();
+    boolean is_redirection();
+    boolean is_client_error();
+    boolean is_server_error();
+};
+
 dictionary WPNetworkResponse {
-  string json;
+  bytes body;
+  NetworkResponseStatus status;
 };
 
 dictionary PostListResponse {

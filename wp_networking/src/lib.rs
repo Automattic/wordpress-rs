@@ -3,10 +3,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use reqwest::{blocking::Client, header::HeaderMap};
 use wp_api::{
-    PageListParams, PageListResponse, PostCreateParams, PostCreateResponse, PostDeleteParams,
-    PostDeleteResponse, PostListParams, PostListResponse, PostObject, PostRetrieveParams,
-    PostRetrieveResponse, PostUpdateParams, PostUpdateResponse, WPApiInterface, WPAuthentication,
-    WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
+    ClientErrorType, PageListParams, PageListResponse, PostCreateParams, PostCreateResponse,
+    PostDeleteParams, PostDeleteResponse, PostListParams, PostListResponse, PostObject,
+    PostRetrieveParams, PostRetrieveResponse, PostUpdateParams, PostUpdateResponse, WPApiError,
+    WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
 };
 
 pub fn add_custom(left: i32, right: i32) -> i32 {
@@ -62,18 +62,19 @@ impl WPNetworkingInterface for WPNetworking {
             wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
         };
 
-        let headers: HeaderMap = (&request.header_map.unwrap()).try_into().unwrap();
+        let request_headers: HeaderMap = (&request.header_map.unwrap()).try_into().unwrap();
+
         // TODO: Error handling
-        let json = self
+        let response = self
             .client
             .request(method, request.url)
-            .headers(headers)
+            .headers(request_headers)
             .send()
-            .unwrap()
-            .text()
             .unwrap();
-
-        WPNetworkResponse { json }
+        WPNetworkResponse {
+            status: Arc::new(response.status()),
+            body: response.text().unwrap().as_bytes().to_vec(),
+        }
     }
 }
 
@@ -84,7 +85,7 @@ struct WPApi {
 }
 
 impl WPApiInterface for WPApi {
-    fn list_posts(&self, params: Option<PostListParams>) -> PostListResponse {
+    fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError> {
         let mut header_map = HashMap::new();
         // TODO: Authorization headers should be generated through its type not like a cave man
         header_map.insert(
@@ -95,13 +96,10 @@ impl WPApiInterface for WPApi {
         let response = self.networking_interface.request(WPNetworkRequest {
             method: wp_api::RequestMethod::GET,
             // TODO: Centralize the endpoints
-            url: format!("{}/wp-json/wp/v2/posts", self.site_url).into(),
+            url: format!("{}/wp-json/wp/v2/posts?context=edit", self.site_url).into(),
             header_map: Some(header_map),
         });
-        let post_list: Vec<PostObject> = serde_json::from_str(response.json.as_str()).unwrap();
-        PostListResponse {
-            post_list: Some(post_list),
-        }
+        parse_list_posts_response(&response)
     }
 
     fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse {
@@ -127,6 +125,29 @@ impl WPApiInterface for WPApi {
     fn list_pages(&self, params: Option<PageListParams>) -> PageListResponse {
         todo!()
     }
+}
+
+fn parse_list_posts_response(response: &WPNetworkResponse) -> Result<PostListResponse, WPApiError> {
+    let status_code = response.status.as_u16();
+    // TODO: Further parse the response body to include error message
+    if let Some(client_error_type) = ClientErrorType::from_status_code(status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code,
+        });
+    }
+    if response.status.is_server_error() {
+        return Err(WPApiError::ServerError { status_code });
+    }
+    let post_list: Vec<PostObject> = serde_json::from_slice(&response.body).or_else(|err| {
+        Err(WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })
+    })?;
+    Ok(PostListResponse {
+        post_list: Some(post_list),
+    })
 }
 
 #[cfg(test)]
