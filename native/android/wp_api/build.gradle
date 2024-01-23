@@ -51,7 +51,7 @@ dependencies {
 }
 
 ext.setupCargo("wp_api", ext.getNativeRustTarget(com.sun.jna.Platform.RESOURCE_PREFIX))
-ext.configureUniFFIBindgen("libwp_api.dylib")
+ext.configureUniFFIBindgen("wp_api")
 ext.addJnaDependencies()
 
 project.afterEvaluate {

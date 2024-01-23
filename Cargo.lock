@@ -18,15 +18,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
-name = "aho-corasick"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2969dcb958b36655471fc61f7e416fa76033bdd4bfed0678d8fee1e2d07a1f0"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -418,19 +409,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generator"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cc16584ff22b460a382b7feec54b23d2908d858152e5739a120b949293bd74e"
-dependencies = [
- "cc",
- "libc",
- "log",
- "rustversion",
- "windows",
-]
-
-[[package]]
 name = "gimli"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -444,9 +422,9 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "goblin"
-version = "0.6.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d6b4de4a8eb6c46a8c77e1d3be942cb9a8bf073c22374578e5ba4b08ed0ff68"
+checksum = "bb07a4ffed2093b118a525b1d8f5204ae274faed5604537caf7135d0f18d9887"
 dependencies = [
  "log",
  "plain",
@@ -627,29 +605,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
-name = "loom"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff50ecb28bb86013e935fb6683ab1f6d3a20016f123c76fd4c27470076ac30f5"
-dependencies = [
- "cfg-if",
- "generator",
- "pin-utils",
- "scoped-tls",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "matchers"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
-dependencies = [
- "regex-automata 0.1.10",
-]
-
-[[package]]
 name = "memchr"
 version = "2.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -726,16 +681,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nu-ansi-term"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
-dependencies = [
- "overload",
- "winapi",
-]
-
-[[package]]
 name = "num_cpus"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -761,13 +706,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
-name = "oneshot"
+name = "oneshot-uniffi"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f6640c6bda7731b1fdbab747981a0f896dd1fedaf9f4a53fa237a04a84431f4"
-dependencies = [
- "loom",
-]
+checksum = "6c548d5c78976f6955d72d0ced18c48ca07030f7a1d4024529fedd7c1c01b29c"
 
 [[package]]
 name = "openssl"
@@ -812,12 +754,6 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
-
-[[package]]
-name = "overload"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "paste"
@@ -883,50 +819,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex"
-version = "1.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-automata 0.4.3",
- "regex-syntax 0.8.2",
-]
-
-[[package]]
-name = "regex-automata"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
-dependencies = [
- "regex-syntax 0.6.29",
-]
-
-[[package]]
-name = "regex-automata"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
-dependencies = [
- "aho-corasick",
- "memchr",
- "regex-syntax 0.8.2",
-]
-
-[[package]]
-name = "regex-syntax"
-version = "0.6.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
-
-[[package]]
-name = "regex-syntax"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
-
-[[package]]
 name = "reqwest"
 version = "0.11.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -984,12 +876,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ffc183a10b4478d04cbbbfc96d0873219d962dd5accaff2ffbd4ceb7df837f4"
-
-[[package]]
 name = "ryu"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1005,25 +891,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "scoped-tls"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
-
-[[package]]
 name = "scroll"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04c565b551bafbef4157586fa379538366e4385d42082f255bfd96e4fe8519da"
+checksum = "6ab8598aa408498679922eff7fa985c25d58a90771bd6be794434c5277eab1a6"
 dependencies = [
  "scroll_derive",
 ]
 
 [[package]]
 name = "scroll_derive"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1db149f81d46d2deba7cd3c50772474707729550221e69588478ebf9ada425ae"
+checksum = "7f81c2fde025af7e69b1d1420531c8a8811ca898919db177141a85313b1cb932"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1106,15 +986,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sharded-slab"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
-dependencies = [
- "lazy_static",
-]
-
-[[package]]
 name = "siphasher"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1128,12 +999,6 @@ checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
 ]
-
-[[package]]
-name = "smallvec"
-version = "1.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dccd0940a2dcdf68d092b8cbab7dc0ad8fa938bf95787e1b916b0e3d0e8e970"
 
 [[package]]
 name = "smawk"
@@ -1250,16 +1115,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "thread_local"
-version = "1.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
-dependencies = [
- "cfg-if",
- "once_cell",
-]
-
-[[package]]
 name = "tinyvec"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1336,19 +1191,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
 dependencies = [
  "pin-project-lite",
- "tracing-attributes",
  "tracing-core",
-]
-
-[[package]]
-name = "tracing-attributes"
-version = "0.1.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1358,36 +1201,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
- "valuable",
-]
-
-[[package]]
-name = "tracing-log"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
-dependencies = [
- "log",
- "once_cell",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.3.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad0f048c97dbd9faa9b7df56362b8ebcaa52adb06b498c050d2f4e32f90a7a8b"
-dependencies = [
- "matchers",
- "nu-ansi-term",
- "once_cell",
- "regex",
- "sharded-slab",
- "smallvec",
- "thread_local",
- "tracing",
- "tracing-core",
- "tracing-log",
 ]
 
 [[package]]
@@ -1440,13 +1253,13 @@ checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
 
 [[package]]
 name = "uniffi"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "camino",
  "clap",
- "uniffi_bindgen 0.25.2",
+ "uniffi_bindgen 0.25.3",
  "uniffi_build",
  "uniffi_core",
  "uniffi_macros",
@@ -1461,8 +1274,8 @@ dependencies = [
 
 [[package]]
 name = "uniffi_bindgen"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "askama",
@@ -1485,18 +1298,18 @@ dependencies = [
 
 [[package]]
 name = "uniffi_build"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "camino",
- "uniffi_bindgen 0.25.2",
+ "uniffi_bindgen 0.25.3",
 ]
 
 [[package]]
 name = "uniffi_checksum_derive"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "quote",
  "syn",
@@ -1504,23 +1317,23 @@ dependencies = [
 
 [[package]]
 name = "uniffi_core"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "bytes",
  "camino",
  "log",
  "once_cell",
- "oneshot",
+ "oneshot-uniffi",
  "paste",
  "static_assertions",
 ]
 
 [[package]]
 name = "uniffi_macros"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "bincode",
  "camino",
@@ -1537,8 +1350,8 @@ dependencies = [
 
 [[package]]
 name = "uniffi_meta"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1548,8 +1361,8 @@ dependencies = [
 
 [[package]]
 name = "uniffi_testing"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "camino",
@@ -1560,8 +1373,8 @@ dependencies = [
 
 [[package]]
 name = "uniffi_udl"
-version = "0.25.2"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+version = "0.25.3"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "anyhow",
  "textwrap",
@@ -1586,12 +1399,6 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
-
-[[package]]
-name = "valuable"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "vcpkg"
@@ -1699,7 +1506,7 @@ dependencies = [
 [[package]]
 name = "weedle2"
 version = "4.0.0"
-source = "git+https://github.com/mozilla/uniffi-rs.git?rev=d380d164cfdba9e091c461baa6855f0a2294ac5b#d380d164cfdba9e091c461baa6855f0a2294ac5b"
+source = "git+https://github.com/mozilla/uniffi-rs.git?rev=22a9192162744b8a46997dcdcf628a7dba769570#22a9192162744b8a46997dcdcf628a7dba769570"
 dependencies = [
  "nom",
 ]
@@ -1725,15 +1532,6 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[package]]
-name = "windows"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e686886bc078bc1b0b600cac0147aadb815089b6e4da64016cbd754b6342700f"
-dependencies = [
- "windows-targets 0.48.5",
-]
 
 [[package]]
 name = "windows-sys"
@@ -1891,7 +1689,6 @@ dependencies = [
 name = "wp_cli"
 version = "0.1.0"
 dependencies = [
- "reqwest",
  "wp_api",
  "wp_networking",
 ]
@@ -1901,6 +1698,7 @@ name = "wp_networking"
 version = "0.1.0"
 dependencies = [
  "http",
+ "reqwest",
  "serde_json",
  "uniffi",
  "wp_api",

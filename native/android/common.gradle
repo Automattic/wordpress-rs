@@ -2,12 +2,12 @@
 //
 // A convenience function for configuring a `uniffi-bindgen` task,
 // with appropriate dependency info. This will call `uniffi-bindgen`
-// for the provided `.dylib` file in order to generate Kotlin language
+// for the provided `moduleName`'s `.dylib` file in order to generate Kotlin language
 // bindings and include them in the source set for the project.
-ext.configureUniFFIBindgen = { dylibFileName ->
+ext.configureUniFFIBindgen = { moduleName ->
     android.libraryVariants.all { variant ->
         def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/${variant.name}/java"
-        def dylibFilePath = "${project.projectDir}/../../../target/release/${dylibFileName}"
+        def dylibFilePath = "${project.projectDir}/../../../target/release/lib${moduleName}.dylib"
         def t = tasks.register("generate${variant.name.capitalize()}UniFFIBindings", Exec) {
             workingDir project.rootDir
             commandLine 'cargo', 'run', '--release', '--bin', 'uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
@@ -21,7 +21,7 @@ ext.configureUniFFIBindgen = { dylibFileName ->
         }
         variant.registerJavaGeneratingTask(t.get(), new File(buildDir, uniffiGeneratedPath))
         def sourceSet = variant.sourceSets.find { it.name == variant.name }
-        sourceSet.java.srcDir new File(buildDir, "generated/source/uniffi/${variant.name}/java")
+        sourceSet.java.srcDir new File(buildDir, "generated/source/uniffi/${variant.name}/java/uniffi")
     }
 }
 

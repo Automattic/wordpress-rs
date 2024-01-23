@@ -1,23 +1,129 @@
 #![allow(dead_code, unused_variables)]
+
 use std::{collections::HashMap, sync::Arc};
 
+use http::HeaderMap;
+use reqwest::blocking::Client;
 use wp_api::{
     ClientErrorType, PageListParams, PageListResponse, PostCreateParams, PostCreateResponse,
     PostDeleteParams, PostDeleteResponse, PostListParams, PostListResponse, PostObject,
     PostRetrieveParams, PostRetrieveResponse, PostUpdateParams, PostUpdateResponse, WPApiError,
-    WPApiInterface, WPAuthentication, WPNetworkRequest, WPNetworkResponse, WPNetworkingInterface,
+    WPAuthentication,
 };
 
-pub fn add_custom(left: i32, right: i32) -> i32 {
-    left + right
+pub struct WPNetworking {
+    client: Client,
 }
 
-pub fn combine_strings(a: String, b: String) -> String {
-    format!("{}-{}", a, b)
+impl Default for WPNetworking {
+    fn default() -> Self {
+        Self {
+            client: Client::new(),
+        }
+    }
 }
 
-pub fn panic_from_rust() {
-    std::fs::read_to_string("doesnt_exist.txt").unwrap();
+impl WPNetworkingInterface for WPNetworking {
+    fn request(&self, request: WPNetworkRequest) -> WPNetworkResponse {
+        let method = match request.method {
+            RequestMethod::GET => reqwest::Method::GET,
+            RequestMethod::POST => reqwest::Method::POST,
+            RequestMethod::PUT => reqwest::Method::PUT,
+            RequestMethod::DELETE => reqwest::Method::DELETE,
+        };
+
+        let request_headers: HeaderMap = (&request.header_map.unwrap()).try_into().unwrap();
+
+        // TODO: Error handling
+        let response = self
+            .client
+            .request(method, request.url)
+            .headers(request_headers)
+            .send()
+            .unwrap();
+        WPNetworkResponse {
+            status: Arc::new(response.status()),
+            body: response.text().unwrap().as_bytes().to_vec(),
+        }
+    }
+}
+
+pub trait WPNetworkingInterface: Send + Sync {
+    fn request(&self, request: WPNetworkRequest) -> WPNetworkResponse;
+}
+
+pub trait NetworkResponseStatus: Send + Sync {
+    fn as_u16(&self) -> u16;
+    fn is_informational(&self) -> bool;
+    fn is_success(&self) -> bool;
+    fn is_redirection(&self) -> bool;
+    fn is_client_error(&self) -> bool;
+    fn is_server_error(&self) -> bool;
+}
+
+impl NetworkResponseStatus for http::StatusCode {
+    fn as_u16(&self) -> u16 {
+        self.as_u16()
+    }
+
+    fn is_informational(&self) -> bool {
+        self.is_informational()
+    }
+
+    fn is_success(&self) -> bool {
+        self.is_success()
+    }
+
+    fn is_redirection(&self) -> bool {
+        self.is_redirection()
+    }
+
+    fn is_client_error(&self) -> bool {
+        self.is_client_error()
+    }
+
+    fn is_server_error(&self) -> bool {
+        self.is_informational()
+    }
+}
+
+pub enum RequestMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+}
+
+pub struct WPNetworkRequest {
+    pub method: RequestMethod,
+    pub url: String,
+    // TODO: We probably want to implement a specific type for these headers instead of using a
+    // regular HashMap.
+    //
+    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
+    // module.
+    pub header_map: Option<HashMap<String, String>>,
+}
+
+pub struct WPNetworkResponse {
+    pub status: Arc<dyn NetworkResponseStatus>,
+    pub body: Vec<u8>,
+}
+
+pub trait WPApiInterface: Send + Sync {
+    fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError>;
+    fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse;
+    fn retrieve_post(
+        &self,
+        post_id: u32,
+        params: Option<PostRetrieveParams>,
+    ) -> PostRetrieveResponse;
+
+    fn update_post(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostUpdateResponse;
+
+    fn delete_post(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostDeleteResponse;
+
+    fn list_pages(&self, params: Option<PageListParams>) -> PageListResponse;
 }
 
 pub fn wp_api_with_custom_networking(
@@ -28,7 +134,7 @@ pub fn wp_api_with_custom_networking(
     Arc::new(WPApi {
         site_url,
         authentication,
-        networking_interface,
+        networking_interface: networking_interface.clone(),
     })
 }
 
@@ -41,14 +147,14 @@ struct WPApi {
 impl WPApiInterface for WPApi {
     fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError> {
         let mut header_map = HashMap::new();
-        // TODO: Authorization headers should be generated through its type not like a cave man
+        // // TODO: Authorization headers should be generated through its type not like a cave man
         header_map.insert(
             "Authorization".into(),
             format!("Basic {}", self.authentication.auth_token).into(),
         );
 
         let response = self.networking_interface.request(WPNetworkRequest {
-            method: wp_api::RequestMethod::GET,
+            method: RequestMethod::GET,
             // TODO: Centralize the endpoints
             url: format!("{}/wp-json/wp/v2/posts?context=edit", self.site_url).into(),
             header_map: Some(header_map),
@@ -103,28 +209,3 @@ fn parse_list_posts_response(response: &WPNetworkResponse) -> Result<PostListRes
         post_list: Some(post_list),
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add_custom(2, 2);
-        assert_eq!(result, 4);
-    }
-
-    #[test]
-    fn test_combine_strings() {
-        let result = combine_strings("this".into(), "that".into());
-        assert_eq!(result, "this-that");
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_panic_from_rust() {
-        panic_from_rust()
-    }
-}
-
-uniffi::include_scaffolding!("wp_networking");
