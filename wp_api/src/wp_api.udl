@@ -1,4 +1,6 @@
 namespace wp_api {
+  [Throws=WPApiError]
+  PostListResponse parse_post_list_response(WPNetworkResponse response);
 };
 
 enum ClientErrorType {
@@ -36,6 +38,11 @@ dictionary WPNetworkRequest {
   RequestMethod method;
   string url;
   record<string, string>? header_map;
+};
+
+dictionary WPNetworkResponse {
+  bytes body;
+  u16 status_code;
 };
 
 dictionary PostListResponse {

@@ -63,4 +63,37 @@ pub struct WPNetworkRequest {
     pub header_map: Option<HashMap<String, String>>,
 }
 
+pub struct WPNetworkResponse {
+    pub status_code: u16,
+    pub body: Vec<u8>,
+}
+
+pub fn parse_post_list_response(
+    response: WPNetworkResponse,
+) -> Result<PostListResponse, WPApiError> {
+    // TODO: Further parse the response body to include error message
+    // TODO: Lots of unwraps to get a basic setup working
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+    let post_list: Vec<PostObject> = serde_json::from_slice(&response.body).or_else(|err| {
+        Err(WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })
+    })?;
+    Ok(PostListResponse {
+        post_list: Some(post_list),
+    })
+}
+
 uniffi::include_scaffolding!("wp_api");

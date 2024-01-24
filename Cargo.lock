@@ -1681,6 +1681,7 @@ version = "0.1.0"
 dependencies = [
  "http",
  "serde",
+ "serde_json",
  "thiserror",
  "uniffi",
 ]
@@ -1699,7 +1700,5 @@ version = "0.1.0"
 dependencies = [
  "http",
  "reqwest",
- "serde_json",
- "uniffi",
  "wp_api",
 ]

@@ -3,8 +3,7 @@
 use http::HeaderMap;
 use reqwest::blocking::Client;
 use wp_api::{
-    ClientErrorType, PostListParams, PostListResponse, PostObject, WPApiError, WPApiHelper,
-    WPAuthentication,
+    PostListParams, PostListResponse, WPApiError, WPApiHelper, WPAuthentication, WPNetworkResponse,
 };
 
 pub struct WPNetworking {
@@ -32,7 +31,7 @@ impl WPNetworking {
             .headers(request_headers)
             .send()
             .unwrap();
-        parse_list_posts_response(response)
+        wp_api::parse_post_list_response(wp_network_response(response))
     }
 }
 
@@ -45,28 +44,9 @@ fn request_method(method: wp_api::RequestMethod) -> http::Method {
     }
 }
 
-fn parse_list_posts_response(
-    response: reqwest::blocking::Response,
-) -> Result<PostListResponse, WPApiError> {
-    let status_code = response.status().as_u16();
-    // TODO: Further parse the response body to include error message
-    if let Some(client_error_type) = ClientErrorType::from_status_code(status_code) {
-        return Err(WPApiError::ClientError {
-            error_type: client_error_type,
-            status_code,
-        });
+fn wp_network_response(response: reqwest::blocking::Response) -> WPNetworkResponse {
+    WPNetworkResponse {
+        status_code: response.status().as_u16(),
+        body: response.bytes().unwrap().to_vec(),
     }
-    if response.status().is_server_error() {
-        return Err(WPApiError::ServerError { status_code });
-    }
-    let body = response.text().unwrap();
-    let post_list: Vec<PostObject> = serde_json::from_str(&body).or_else(|err| {
-        Err(WPApiError::ParsingError {
-            reason: err.to_string(),
-            response: body,
-        })
-    })?;
-    Ok(PostListResponse {
-        post_list: Some(post_list),
-    })
 }
