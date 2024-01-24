@@ -4,9 +4,23 @@
 package rs.wordpress.wp_api
 
 import org.junit.Before
+import org.junit.Test
+import uniffi.wp_api.RequestMethod
+import uniffi.wp_api.WpAuthentication
 
 class LibraryTest {
+    private val siteUrl = "_omitted_"
+    private val authentication = WpAuthentication(authToken = "_omitted_")
+    private val library = Library(siteUrl, authentication)
+
     @Before
     fun setup() {
+    }
+
+    @Test
+    fun testBasicPostListRequest() {
+        val request = library.postListRequest()
+        assert(request.method == RequestMethod.GET)
+        assert(request.url == "$siteUrl/wp-json/wp/v2/posts?context=edit")
     }
 }

@@ -3,5 +3,12 @@
  */
 package rs.wordpress.wp_api
 
-class Library {
+import uniffi.wp_api.WpApiHelper
+import uniffi.wp_api.WpAuthentication
+import uniffi.wp_api.WpNetworkRequest
+
+class Library(siteUrl: String, authentication: WpAuthentication) {
+    private val wpApiHelper = WpApiHelper(siteUrl, authentication)
+
+    fun postListRequest(): WpNetworkRequest = wpApiHelper.postListRequest()
 }

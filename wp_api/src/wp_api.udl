@@ -20,6 +20,24 @@ dictionary WPAuthentication {
   string auth_token;
 };
 
+enum RequestMethod {
+  "GET",
+  "POST",
+  "PUT",
+  "DELETE"
+};
+
+interface WPApiHelper {
+  constructor(string url, WPAuthentication authentication);
+  WPNetworkRequest post_list_request();
+};
+
+dictionary WPNetworkRequest {
+  RequestMethod method;
+  string url;
+  record<string, string>? header_map;
+};
+
 dictionary PostListResponse {
   sequence<PostObject>? post_list;
 };

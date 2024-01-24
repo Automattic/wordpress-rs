@@ -1,7 +1,7 @@
 use std::fs::read_to_string;
 
 use wp_api::WPAuthentication;
-use wp_networking::WPApi;
+use wp_networking::WPNetworking;
 
 fn main() {
     // A very naive approach just to get things working for now - this whole code will be deleted
@@ -15,7 +15,7 @@ fn main() {
         auth_token: auth_base64_token.into(),
     };
 
-    let wp_networking = WPApi::new(url.into(), authentication);
+    let wp_networking = WPNetworking::new(url.into(), authentication);
     let post_list = wp_networking.list_posts(None).unwrap();
     println!("{:?}", post_list);
 }

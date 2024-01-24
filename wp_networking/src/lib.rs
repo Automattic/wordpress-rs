@@ -1,23 +1,22 @@
 #![allow(dead_code, unused_variables)]
 
-use http::Method;
+use http::HeaderMap;
 use reqwest::blocking::Client;
 use wp_api::{
-    ClientErrorType, PostListParams, PostListResponse, PostObject, WPApiError, WPAuthentication,
+    ClientErrorType, PostListParams, PostListResponse, PostObject, WPApiError, WPApiHelper,
+    WPAuthentication,
 };
 
-pub struct WPApi {
+pub struct WPNetworking {
     client: Client,
-    site_url: String,
-    authentication: WPAuthentication,
+    helper: WPApiHelper,
 }
 
-impl WPApi {
+impl WPNetworking {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         Self {
             client: reqwest::blocking::Client::new(),
-            site_url,
-            authentication,
+            helper: WPApiHelper::new(site_url, authentication),
         }
     }
 
@@ -25,17 +24,24 @@ impl WPApi {
         &self,
         params: Option<PostListParams>,
     ) -> Result<PostListResponse, WPApiError> {
-        let url = format!("{}/wp-json/wp/v2/posts?context=edit", self.site_url);
+        let wp_request = self.helper.post_list_request();
+        let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
         let response = self
             .client
-            .request(Method::GET, url)
-            .header(
-                "Authorization",
-                format!("Basic {}", self.authentication.auth_token),
-            )
+            .request(request_method(wp_request.method), wp_request.url)
+            .headers(request_headers)
             .send()
             .unwrap();
         parse_list_posts_response(response)
+    }
+}
+
+fn request_method(method: wp_api::RequestMethod) -> http::Method {
+    match method {
+        wp_api::RequestMethod::GET => reqwest::Method::GET,
+        wp_api::RequestMethod::POST => reqwest::Method::POST,
+        wp_api::RequestMethod::PUT => reqwest::Method::PUT,
+        wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
     }
 }
 
