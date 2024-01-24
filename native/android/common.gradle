@@ -1,0 +1,80 @@
+// Adopted from https://github.com/mozilla/application-services/blob/v120.0.1/publish.gradle#L206-L226
+//
+// A convenience function for configuring a `uniffi-bindgen` task,
+// with appropriate dependency info. This will call `uniffi-bindgen`
+// for the provided `moduleName`'s `.dylib` file in order to generate Kotlin language
+// bindings and include them in the source set for the project.
+ext.configureUniFFIBindgen = { moduleName ->
+    android.libraryVariants.all { variant ->
+        def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/${variant.name}/java"
+        def dylibFilePath = "${project.projectDir}/../../../target/release/lib${moduleName}.dylib"
+        def t = tasks.register("generate${variant.name.capitalize()}UniFFIBindings", Exec) {
+            workingDir project.rootDir
+            commandLine 'cargo', 'run', '--release', '--bin', 'uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
+            outputs.dir uniffiGeneratedPath
+            // Re-generate if the interface definition changes.
+            inputs.file dylibFilePath
+            // Re-generate if our uniffi-bindgen tooling changes.
+            inputs.dir "${project.rootDir}/../../uniffi_bindgen/"
+            // Re-generate if our uniffi-bindgen version changes.
+            inputs.file "${project.rootDir}/../../Cargo.lock"
+            // Re-generate if the module source code changes
+            inputs.dir "${project.rootDir}/../../${moduleName}/"
+        }
+        variant.registerJavaGeneratingTask(t.get(), new File(buildDir, uniffiGeneratedPath))
+        def sourceSet = variant.sourceSets.find { it.name == variant.name }
+        sourceSet.java.srcDir new File(buildDir, "generated/source/uniffi/${variant.name}/java/uniffi")
+    }
+}
+
+ext.addJnaDependencies = {
+    dependencies {
+        implementation "net.java.dev.jna:jna:5.13.0@aar"
+        androidTestImplementation "net.java.dev.jna:jna:5.13.0@aar"
+        testImplementation "net.java.dev.jna:jna:5.13.0"
+    }
+}
+
+ext.setupCargo = { moduleName, nativeRustTarget ->
+    cargo {
+        module  = "../../../$moduleName/"
+        libname = moduleName
+        profile = "release"
+        targets = ["arm", "arm64", "x86", "x86_64", nativeRustTarget]
+        targetDirectory = '../../../target'
+
+        exec { spec, toolchain ->
+            // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
+            spec.environment("RUSTFLAGS", "-g")
+        }
+    }
+    tasks.matching { it.name.matches(/merge.*JniLibFolders/) }.configureEach {
+        it.inputs.dir(new File(buildDir, "rustJniLibs/android"))
+        it.dependsOn("cargoBuild")
+    }
+
+    tasks.matching { it.name.matches("test") }.configureEach {
+        it.dependsOn("cargoBuild")
+    }
+}
+
+ext.getNativeRustTarget = { resourcePrefix ->
+    switch (resourcePrefix) {
+        case 'darwin':
+            // For unit tests to work in Apple Silicon, we need to return 'darwin-aarch64' here
+            // However, that runs the cargo task as `cargoBuildDarwin-aarch64` which is not properly
+            // cached by cargo and requires a rebuild every time. This results in a significant
+            // development time loss, so for now, we are returning 'darwin' and using instrumented
+            // tests instead.
+            // return 'darwin-aarch64'
+            return 'darwin'
+        case 'darwin-aarch64':
+            return 'darwin-aarch64'
+        case 'darwin-x86-64':
+            return 'darwin-x86-64'
+        case 'linux-x86-64':
+            return 'linux-x86-64'
+        case 'win32-x86-64':
+            return 'win32-x86-64-gnu'
+    }
+}

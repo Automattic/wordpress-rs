@@ -3,16 +3,7 @@ name = "wp_networking"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["lib", "cdylib", "staticlib"]
-name = "wp_networking"
-
 [dependencies]
 http = { workspace = true }
-reqwest = { version = "0.11.22", features = ["blocking", "json"] }
-serde_json = "1.0"
-uniffi = { workspace = true }
+reqwest = { version = "0.11.22", features = ["blocking"] }
 wp_api = { path = "../wp_api" }
-
-[build-dependencies]
-uniffi = { workspace = true , features = [ "build", "cli" ] }

@@ -1,6 +1,7 @@
 namespace wp_api {
+  [Throws=WPApiError]
+  PostListResponse parse_post_list_response(WPNetworkResponse response);
 };
-
 
 enum ClientErrorType {
     "BadRequest",
@@ -17,31 +18,8 @@ interface WPApiError {
     UnknownError();
 };
 
-[Trait]
-interface WPNetworkingInterface {
-  WPNetworkResponse request(WPNetworkRequest request);
-};
-
 dictionary WPAuthentication {
   string auth_token;
-};
-
-// https://developer.wordpress.org/rest-api/reference/posts/
-// TODO: The schema and some of the action arguments for `/posts` endpoint has the notion of `context`.
-// This is an `enum` value, but it can only contain partial values per field.
-// This is an important design element to get right, because it's a common pattern for the API.
-//
-// IMPORTANT: This design does not include error handling yet!
-[Trait]
-interface WPApiInterface {
-  [Throws=WPApiError]
-  PostListResponse list_posts(PostListParams? params);
-  PostCreateResponse create_post(PostCreateParams? params);
-  PostRetrieveResponse retrieve_post(u32 post_id, PostRetrieveParams? params);
-  PostUpdateResponse update_post(u32 post_id, PostUpdateParams? params);
-  PostDeleteResponse delete_post(u32 post_id, PostDeleteParams? params);
-
-  PageListResponse list_pages(PageListParams? params);
 };
 
 enum RequestMethod {
@@ -51,25 +29,20 @@ enum RequestMethod {
   "DELETE"
 };
 
+interface WPApiHelper {
+  constructor(string url, WPAuthentication authentication);
+  WPNetworkRequest post_list_request();
+};
+
 dictionary WPNetworkRequest {
   RequestMethod method;
   string url;
   record<string, string>? header_map;
 };
 
-[Trait]
-interface NetworkResponseStatus {
-    u16 as_u16();
-    boolean is_informational();
-    boolean is_success();
-    boolean is_redirection();
-    boolean is_client_error();
-    boolean is_server_error();
-};
-
 dictionary WPNetworkResponse {
   bytes body;
-  NetworkResponseStatus status;
+  u16 status_code;
 };
 
 dictionary PostListResponse {

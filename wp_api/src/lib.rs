@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 pub use api_error::*;
 pub use pages::*;
@@ -10,8 +10,39 @@ pub mod api_error;
 pub mod pages;
 pub mod posts;
 
-pub trait WPNetworkingInterface: Send + Sync {
-    fn request(&self, request: WPNetworkRequest) -> WPNetworkResponse;
+pub struct WPApiHelper {
+    site_url: String,
+    authentication: WPAuthentication,
+}
+
+impl WPApiHelper {
+    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
+        Self {
+            site_url,
+            authentication,
+        }
+    }
+
+    pub fn post_list_request(&self) -> WPNetworkRequest {
+        let url = format!("{}/wp-json/wp/v2/posts?context=edit", self.site_url);
+
+        let mut header_map = HashMap::new();
+        header_map.insert(
+            "Authorization".into(),
+            format!("Basic {}", self.authentication.auth_token).into(),
+        );
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url,
+            header_map: Some(header_map),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+// TODO: This will probably become an `enum` where we support multiple authentication types.
+pub struct WPAuthentication {
+    pub auth_token: String,
 }
 
 pub enum RequestMethod {
@@ -19,41 +50,6 @@ pub enum RequestMethod {
     POST,
     PUT,
     DELETE,
-}
-
-pub trait NetworkResponseStatus: Send + Sync {
-    fn as_u16(&self) -> u16;
-    fn is_informational(&self) -> bool;
-    fn is_success(&self) -> bool;
-    fn is_redirection(&self) -> bool;
-    fn is_client_error(&self) -> bool;
-    fn is_server_error(&self) -> bool;
-}
-
-impl NetworkResponseStatus for http::StatusCode {
-    fn as_u16(&self) -> u16 {
-        self.as_u16()
-    }
-
-    fn is_informational(&self) -> bool {
-        self.is_informational()
-    }
-
-    fn is_success(&self) -> bool {
-        self.is_success()
-    }
-
-    fn is_redirection(&self) -> bool {
-        self.is_redirection()
-    }
-
-    fn is_client_error(&self) -> bool {
-        self.is_client_error()
-    }
-
-    fn is_server_error(&self) -> bool {
-        self.is_informational()
-    }
 }
 
 pub struct WPNetworkRequest {
@@ -68,30 +64,36 @@ pub struct WPNetworkRequest {
 }
 
 pub struct WPNetworkResponse {
-    pub status: Arc<dyn NetworkResponseStatus>,
+    pub status_code: u16,
     pub body: Vec<u8>,
 }
 
-#[derive(Debug, Clone)]
-// TODO: This will probably become an `enum` where we support multiple authentication types.
-pub struct WPAuthentication {
-    pub auth_token: String,
-}
-
-pub trait WPApiInterface: Send + Sync {
-    fn list_posts(&self, params: Option<PostListParams>) -> Result<PostListResponse, WPApiError>;
-    fn create_post(&self, params: Option<PostCreateParams>) -> PostCreateResponse;
-    fn retrieve_post(
-        &self,
-        post_id: u32,
-        params: Option<PostRetrieveParams>,
-    ) -> PostRetrieveResponse;
-
-    fn update_post(&self, post_id: u32, params: Option<PostUpdateParams>) -> PostUpdateResponse;
-
-    fn delete_post(&self, post_id: u32, params: Option<PostDeleteParams>) -> PostDeleteResponse;
-
-    fn list_pages(&self, params: Option<PageListParams>) -> PageListResponse;
+pub fn parse_post_list_response(
+    response: WPNetworkResponse,
+) -> Result<PostListResponse, WPApiError> {
+    // TODO: Further parse the response body to include error message
+    // TODO: Lots of unwraps to get a basic setup working
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+    let post_list: Vec<PostObject> = serde_json::from_slice(&response.body).or_else(|err| {
+        Err(WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })
+    })?;
+    Ok(PostListResponse {
+        post_list: Some(post_list),
+    })
 }
 
 uniffi::include_scaffolding!("wp_api");

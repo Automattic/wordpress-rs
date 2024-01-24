@@ -1,6 +1,7 @@
 use std::fs::read_to_string;
 
 use wp_api::WPAuthentication;
+use wp_networking::WPNetworking;
 
 fn main() {
     // A very naive approach just to get things working for now - this whole code will be deleted
@@ -14,26 +15,7 @@ fn main() {
         auth_token: auth_base64_token.into(),
     };
 
-    let post_list = wp_networking::wp_api(url.into(), authentication.clone())
-        .list_posts(None)
-        .unwrap();
+    let wp_networking = WPNetworking::new(url.into(), authentication);
+    let post_list = wp_networking.list_posts(None).unwrap();
     println!("{:?}", post_list);
-
-    // let post_list_with_custom_networking = wp_networking::wp_api_with_custom_networking(
-    //     mock_authentication.clone(),
-    //     Arc::new(CustomWPNetworking {}),
-    // )
-    // .list_posts(None);
-    // println!(
-    //     "Post List with custom networking: {:?}",
-    //     post_list_with_custom_networking
-    // );
 }
-
-// struct CustomWPNetworking {}
-//
-// impl WPNetworkingInterface for CustomWPNetworking {
-//     fn request(&self, _request: WPNetworkRequest) -> WPNetworkResponse {
-//         todo!()
-//     }
-// }
