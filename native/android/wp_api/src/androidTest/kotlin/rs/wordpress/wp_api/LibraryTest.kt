@@ -5,6 +5,7 @@ package rs.wordpress.wp_api
 
 import org.junit.Before
 import org.junit.Test
+import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpAuthentication
 
@@ -22,5 +23,12 @@ class LibraryTest {
         val request = library.postListRequest()
         assert(request.method == RequestMethod.GET)
         assert(request.url == "$siteUrl/wp-json/wp/v2/posts?context=edit")
+    }
+
+    @Test
+    fun testMakeBasicPostListRequest() {
+        val postListResponse = library.makePostListRequest()
+        val firstPost: PostObject = postListResponse.postList!!.first()
+        assert(firstPost.title?.raw == "Hello world!")
     }
 }
