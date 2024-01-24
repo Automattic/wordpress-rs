@@ -7,7 +7,9 @@ import org.junit.Before
 import org.junit.Test
 import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
+import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpAuthentication
+import kotlin.test.assertFailsWith
 
 class LibraryTest {
     private val siteUrl = "_omitted_"
@@ -30,5 +32,15 @@ class LibraryTest {
         val postListResponse = library.makePostListRequest()
         val firstPost: PostObject = postListResponse.postList!!.first()
         assert(firstPost.title?.raw == "Hello world!")
+    }
+
+    @Test
+    fun testBasicAuthenticationError() {
+        val unauthenticatedLibrary = Library(siteUrl, WpAuthentication("invalid_token"))
+        val exception = assertFailsWith<WpApiException.ClientException> {
+            unauthenticatedLibrary.makePostListRequest()
+        }
+        val expectedStatusCode: UShort = 401u
+        assert(exception.statusCode == expectedStatusCode)
     }
 }
