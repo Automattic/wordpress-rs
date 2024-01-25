@@ -1,6 +1,5 @@
 import XCTest
 import Foundation
-
 import wordpress_api
 
 final class WordPressAPITests: XCTestCase {
@@ -52,5 +51,15 @@ final class WordPressAPITests: XCTestCase {
         let response4 = try await api.listPosts(url: nextPage3)
         XCTAssertNil(response4.nextPage)
         XCTAssertEqual(response4.postList?.count, 6)
+    }
+
+    func testThatFetchingAllPagesWithAsyncIteratorWorks() async throws {
+        var posts = PostCollection()
+
+        for try await post in api.listPosts() {
+            posts.append(post)
+        }
+
+        XCTAssertEqual(posts.count, 36)
     }
 }

@@ -1,34 +1,17 @@
 import Foundation
-
 import wordpress_api_wrapper
 
 public struct WordPressAPI {
 
     private let urlSession: URLSession
-    private let helper: WpApiHelperProtocol
+    package let helper: WpApiHelperProtocol
 
     public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
         self.urlSession = urlSession
         self.helper = WpApiHelper(url: baseUrl.absoluteString, authentication: authenticationStategy)
     }
 
-    public func listPosts(params: PostListParams = PostListParams()) async throws -> PostListResponse {
-        let request = self.helper.postListRequest(params: params)
-        let response = try await perform(request: request)
-        return try parsePostListResponse(response: response)
-    }
-
-    public func retrievePost(id: UInt32, params: PostRetrieveParams? = nil) async throws -> PostObject? {
-        nil
-    }
-
-    public func listPosts(url: String) async throws -> PostListResponse {
-        let request = self.helper.rawRequest(url: url)
-        let response = try await perform(request: request)
-        return try parsePostListResponse(response: response)
-    }
-
-    private func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
+    package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
 
         return WpNetworkResponse(
@@ -36,6 +19,25 @@ public struct WordPressAPI {
             statusCode: response.httpStatusCode,
             headerMap: response.httpHeaders
         )
+    }
+
+    package func perform(request: WpNetworkRequest, callback: @escaping (Result<WpNetworkResponse, Error>) -> Void) {
+        self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
+            if let error {
+                callback(.failure(error))
+                return
+            }
+
+            guard let data = data, let response = response else {
+                abort() // TODO: We should have a custom error type here that represents an inability to parse whatever came back
+            }
+
+            callback(.success(WpNetworkResponse(
+                body: data,
+                statusCode: response.httpStatusCode,
+                headerMap: response.httpHeaders
+            )))
+        }
     }
 }
 
@@ -46,6 +48,21 @@ public extension WpNetworkRequest {
         request.httpMethod = self.method.rawValue
         request.allHTTPHeaderFields = self.headerMap
         return request
+    }
+}
+
+extension Result {
+    @inlinable public func tryMap<NewSuccess>(_ transform: (Success) throws -> NewSuccess) -> Result<NewSuccess, any Error> {
+        switch self {
+        case .success(let success):
+            do {
+                return .success(try transform(success))
+            } catch let err {
+                return .failure(err)
+            }
+
+        case .failure(let error): return .failure(error)
+        }
     }
 }
 
@@ -68,6 +85,7 @@ extension URLResponse {
     }
 }
 
+// TODO: Everything below this line should be moved into the Rust layer
 public extension WpAuthentication {
     init(username: String, password: String) {
         self.init(authToken: "\(username):\(password)".data(using: .utf8)!.base64EncodedString())

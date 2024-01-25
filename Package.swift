@@ -27,13 +27,6 @@ let package = Package(
             ],
             path: "native/swift/Sources/wordpress-api"
         ),
-        .testTarget(
-            name: "wordpress-api-tests",
-            dependencies: [
-                .target(name: "wordpress-api")
-            ],
-            path: "native/swift/Tests/wordpress-api"
-        ),
         .target(
             name: "wordpress-api-wrapper",
             dependencies: [
@@ -45,5 +38,12 @@ let package = Package(
             ]
         ),
         .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework"),
+        .testTarget(
+            name: "wordpress-api-tests",
+            dependencies: [
+                .target(name: "wordpress-api")
+            ],
+            path: "native/swift/Tests/wordpress-api"
+        )
     ]
 )
