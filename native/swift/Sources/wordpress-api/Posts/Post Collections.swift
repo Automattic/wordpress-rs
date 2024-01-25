@@ -1,6 +1,12 @@
 import Foundation
 import wordpress_api_wrapper
 
+extension PostObject: Identifiable {
+    var ID: any Hashable {
+        self.id
+    }
+}
+
 public typealias PostCollection = [PostObject]
 
 public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
