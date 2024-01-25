@@ -11,8 +11,18 @@ final class WordPressAPITests: XCTestCase {
         authenticationStategy: .init(username: "demo", password: "qD6z ty5l oLnL gXVe 0UED qBUB")
     )
 
-    func testThatListRequestSkeletonWorks() async throws {
+    func testThatListRequestReturnsPosts() async throws {
         let response = try await api.listPosts(params: .init(page: 1, perPage: 99))
         XCTAssertFalse(try XCTUnwrap(response.postList?.isEmpty))
+    }
+
+    func testThatListRequestReturnsCorrectNumberOfPostsByDefault() async throws {
+        let response = try await api.listPosts()
+        XCTAssertEqual(response.postList?.count, 10)
+    }
+
+    func testThatListRequestReturnsCorrectNumberOfPostsWhenSpecified() async throws {
+        let response = try await api.listPosts(params: .init(page: 1, perPage: 25))
+        XCTAssertEqual(response.postList?.count, 25)
     }
 }

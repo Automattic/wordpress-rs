@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub trait PostNetworkingInterface: Send + Sync {}
 
+#[derive(Default)] // The default has `None` for all
 pub struct PostListParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,

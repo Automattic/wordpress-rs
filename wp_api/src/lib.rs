@@ -26,14 +26,23 @@ impl WPApiHelper {
         }
     }
 
-    pub fn post_list_request(&self) -> WPNetworkRequest {
-        let url = self.site_url.join("/wp-json/wp/v2/posts?context=edit").unwrap();
+    pub fn post_list_request(&self, params: PostListParams) -> WPNetworkRequest {
+        let mut url = self.site_url.join("/wp-json/wp/v2/posts?context=edit").unwrap();
 
         let mut header_map = HashMap::new();
         header_map.insert(
             "Authorization".into(),
-            format!("Basic {}", self.authentication.auth_token).into(),
+            format!("Basic {}", self.authentication.auth_token),
         );
+
+        if let Some(page) = params.page {
+            url.query_pairs_mut().append_pair("page", page.to_string().as_str());
+        }
+
+        if let Some(per_page) = params.per_page {
+            url.query_pairs_mut().append_pair("per_page", per_page.to_string().as_str());
+        }
+
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
@@ -94,11 +103,9 @@ pub fn parse_post_list_response(
             status_code: response.status_code,
         });
     }
-    let post_list: Vec<PostObject> = serde_json::from_slice(&response.body).or_else(|err| {
-        Err(WPApiError::ParsingError {
-            reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
-        })
+    let post_list: Vec<PostObject> = serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+       reason: err.to_string(),
+       response: std::str::from_utf8(&response.body).unwrap().to_string(),
     })?;
     Ok(PostListResponse {
         post_list: Some(post_list),

@@ -12,8 +12,8 @@ public struct WordPressAPI {
         self.helper = WpApiHelper(url: baseUrl.absoluteString, authentication: authenticationStategy)
     }
 
-    public func listPosts(params: PostListParams) async throws -> PostListResponse {
-        let request = self.helper.postListRequest()
+    public func listPosts(params: PostListParams = PostListParams()) async throws -> PostListResponse {
+        let request = self.helper.postListRequest(params: params)
         let response = try await perform(request: request)
         return try parsePostListResponse(response: response)
     }
