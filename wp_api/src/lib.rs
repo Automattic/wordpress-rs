@@ -66,6 +66,12 @@ pub struct WPNetworkRequest {
 pub struct WPNetworkResponse {
     pub status_code: u16,
     pub body: Vec<u8>,
+    // TODO: We probably want to implement a specific type for these headers instead of using a
+    // regular HashMap.
+    //
+    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
+    // module.
+    pub header_map: Option<HashMap<String, String>>,
 }
 
 pub fn parse_post_list_response(

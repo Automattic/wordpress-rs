@@ -7,28 +7,12 @@ final class WordPressAPITests: XCTestCase {
 
     let api = WordPressAPI(
         urlSession: .shared,
-        authenticationStategy: .httpBasic(username: "user", password: "password")
+        baseUrl: URL(string: "https://sweetly-unadulterated.jurassic.ninja")!,
+        authenticationStategy: .init(username: "demo", password: "qD6z ty5l oLnL gXVe 0UED qBUB")
     )
-
-    func testThatCombiningStringsWorks() throws {
-        XCTAssertEqual(api.combineStrings("Hello", "World"), "Hello-World")
-    }
 
     func testThatListRequestSkeletonWorks() async throws {
         let response = try await api.listPosts(params: .init(page: 1, perPage: 99))
-        XCTAssertTrue(response.isEmpty)
-    }
-
-//    Current Fails with "Not Implemented"
-//    func testThatRetrieveRequestSkeletonWorks() async throws {
-//        let response = try await api.retrievePost(id: 42)
-//        XCTAssertNil(response)
-//    }
-
-    func testThatCreateRequestSkeletonWorks() async throws {
-        let response = try await api.createPost(params: .init(title: "My Post", content: "With Content"))
-        XCTAssertEqual(response.id, 1)
-        XCTAssertEqual(response.title, "foo")
-        XCTAssertEqual(response.content, "bar")
+        XCTAssertFalse(try XCTUnwrap(response.postList?.isEmpty))
     }
 }
