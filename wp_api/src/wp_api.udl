@@ -32,6 +32,7 @@ enum RequestMethod {
 interface WPApiHelper {
   constructor(string url, WPAuthentication authentication);
   WPNetworkRequest post_list_request(PostListParams params);
+  WPNetworkRequest raw_request(string url);
 };
 
 dictionary WPNetworkRequest {
@@ -48,6 +49,7 @@ dictionary WPNetworkResponse {
 
 dictionary PostListResponse {
   sequence<PostObject>? post_list;
+  string? next_page;
 };
 dictionary PostCreateResponse {
   PostObject? post;

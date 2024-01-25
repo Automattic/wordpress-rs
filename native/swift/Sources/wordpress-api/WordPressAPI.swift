@@ -22,6 +22,12 @@ public struct WordPressAPI {
         nil
     }
 
+    public func listPosts(url: String) async throws -> PostListResponse {
+        let request = self.helper.rawRequest(url: url)
+        let response = try await perform(request: request)
+        return try parsePostListResponse(response: response)
+    }
+
     private func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
 

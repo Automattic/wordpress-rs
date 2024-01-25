@@ -26,6 +26,21 @@ impl WPApiHelper {
         }
     }
 
+    pub fn raw_request(&self, url: String) -> WPNetworkRequest {
+        let mut header_map = HashMap::new();
+
+        header_map.insert(
+            "Authorization".into(),
+            format!("Basic {}", self.authentication.auth_token),
+        );
+
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: Url::parse(url.as_str()).unwrap().into(),
+            header_map: Some(header_map),
+        }
+    }
+
     pub fn post_list_request(&self, params: PostListParams) -> WPNetworkRequest {
         let mut url = self.site_url.join("/wp-json/wp/v2/posts?context=edit").unwrap();
 
@@ -107,9 +122,31 @@ pub fn parse_post_list_response(
        reason: err.to_string(),
        response: std::str::from_utf8(&response.body).unwrap().to_string(),
     })?;
+
+    let mut next_page: Option<String> = None;
+
+    if let Some(link_header) = extract_link_header(&response) {
+        if let Ok(res) = parse_link_header::parse_with_rel(link_header.as_str()) {
+            if let Some(next) = res.get("next") {
+                next_page = Some(next.raw_uri.clone())
+            }
+        }
+    }
+
     Ok(PostListResponse {
         post_list: Some(post_list),
+        next_page: next_page,
     })
+}
+
+pub fn extract_link_header(response: &WPNetworkResponse) -> Option<String> {
+    if let Some(headers) = response.header_map.clone() {  // TODO: This is inefficient
+        if headers.contains_key("Link") {
+            return Some(headers["Link"].clone())
+        }
+    }
+
+    return None
 }
 
 uniffi::include_scaffolding!("wp_api");
