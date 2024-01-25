@@ -23,11 +23,12 @@ public struct WordPressAPI {
     }
 
     private func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
-        let (data, rawResponse) = try await self.urlSession.data(for: request.asURLRequest())
+        let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
 
         return WpNetworkResponse(
             body: data,
-            statusCode: UInt16((rawResponse as! HTTPURLResponse).statusCode)
+            statusCode: response.httpStatusCode,
+            headerMap: response.httpHeaders
         )
     }
 }
@@ -39,6 +40,25 @@ public extension WpNetworkRequest {
         request.httpMethod = self.method.rawValue
         request.allHTTPHeaderFields = self.headerMap
         return request
+    }
+}
+
+extension URLResponse {
+    var httpStatusCode: UInt16 {
+        UInt16((self as! HTTPURLResponse).statusCode)
+    }
+
+    var httpHeaders: [String: String] {
+        (self as! HTTPURLResponse).allHeaderFields.reduce(into: [String: String]()) {
+            guard
+                let key = $1.key as? String,
+                let value = $1.value as? String
+            else {
+                return
+            }
+
+            $0.updateValue(value, forKey: key)
+        }
     }
 }
 

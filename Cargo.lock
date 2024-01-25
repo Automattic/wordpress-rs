@@ -1684,6 +1684,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "uniffi",
+ "url",
 ]
 
 [[package]]

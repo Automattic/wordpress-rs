@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 use std::collections::HashMap;
+use url::Url;
 
 pub use api_error::*;
 pub use pages::*;
@@ -11,20 +12,22 @@ pub mod pages;
 pub mod posts;
 
 pub struct WPApiHelper {
-    site_url: String,
+    site_url: Url,
     authentication: WPAuthentication,
 }
 
 impl WPApiHelper {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
+        let url = Url::parse(site_url.as_str()).unwrap();
+
         Self {
-            site_url,
+            site_url: url,
             authentication,
         }
     }
 
     pub fn post_list_request(&self) -> WPNetworkRequest {
-        let url = format!("{}/wp-json/wp/v2/posts?context=edit", self.site_url);
+        let url = self.site_url.join("/wp-json/wp/v2/posts?context=edit").unwrap();
 
         let mut header_map = HashMap::new();
         header_map.insert(
@@ -33,7 +36,7 @@ impl WPApiHelper {
         );
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url,
+            url: url.into(),
             header_map: Some(header_map),
         }
     }

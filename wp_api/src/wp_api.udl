@@ -43,6 +43,7 @@ dictionary WPNetworkRequest {
 dictionary WPNetworkResponse {
   bytes body;
   u16 status_code;
+  record<string, string>? header_map;
 };
 
 dictionary PostListResponse {
