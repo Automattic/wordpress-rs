@@ -1,34 +1,65 @@
 import XCTest
 import Foundation
-
 import wordpress_api
 
 final class WordPressAPITests: XCTestCase {
 
     let api = WordPressAPI(
         urlSession: .shared,
-        authenticationStategy: .httpBasic(username: "user", password: "password")
+        baseUrl: URL(string: "https://sweetly-unadulterated.jurassic.ninja")!,
+        authenticationStategy: .init(username: "demo", password: "qD6z ty5l oLnL gXVe 0UED qBUB")
     )
 
-    func testThatCombiningStringsWorks() throws {
-        XCTAssertEqual(api.combineStrings("Hello", "World"), "Hello-World")
-    }
-
-    func testThatListRequestSkeletonWorks() async throws {
+    func testThatListRequestReturnsPosts() async throws {
         let response = try await api.listPosts(params: .init(page: 1, perPage: 99))
-        XCTAssertTrue(response.isEmpty)
+        XCTAssertFalse(try XCTUnwrap(response.postList?.isEmpty))
     }
 
-//    Current Fails with "Not Implemented"
-//    func testThatRetrieveRequestSkeletonWorks() async throws {
-//        let response = try await api.retrievePost(id: 42)
-//        XCTAssertNil(response)
-//    }
+    func testThatListRequestReturnsCorrectNumberOfPostsByDefault() async throws {
+        let response = try await api.listPosts()
+        XCTAssertEqual(response.postList?.count, 10)
+    }
 
-    func testThatCreateRequestSkeletonWorks() async throws {
-        let response = try await api.createPost(params: .init(title: "My Post", content: "With Content"))
-        XCTAssertEqual(response.id, 1)
-        XCTAssertEqual(response.title, "foo")
-        XCTAssertEqual(response.content, "bar")
+    func testThatListRequestReturnsCorrectNumberOfPostsWhenSpecified() async throws {
+        let response = try await api.listPosts(params: .init(page: 1, perPage: 25))
+        XCTAssertEqual(response.postList?.count, 25)
+    }
+
+    func testThatListRequestFetchesMaxCount() async throws {
+        let response = try await api.listPosts(params: .init(page: 1, perPage: 100))
+        XCTAssertEqual(response.postList?.count, 36)
+    }
+
+    func testThatNextLinkIsNotNilWhenFetchingLessThanAllPosts() async throws {
+        let response = try await api.listPosts()
+        XCTAssertNotNil(response.nextPage)
+    }
+
+    func testThatFetchingAllPagesWorks() async throws {
+        let response = try await api.listPosts()
+        let nextPage = try XCTUnwrap(response.nextPage)
+        XCTAssertEqual(response.postList?.count, 10)
+
+        let response2 = try await api.listPosts(url: nextPage)
+        let nextPage2 = try XCTUnwrap(response2.nextPage)
+        XCTAssertEqual(response2.postList?.count, 10)
+
+        let response3 = try await api.listPosts(url: nextPage2)
+        let nextPage3 = try XCTUnwrap(response3.nextPage)
+        XCTAssertEqual(response3.postList?.count, 10)
+
+        let response4 = try await api.listPosts(url: nextPage3)
+        XCTAssertNil(response4.nextPage)
+        XCTAssertEqual(response4.postList?.count, 6)
+    }
+
+    func testThatFetchingAllPagesWithAsyncIteratorWorks() async throws {
+        var posts = PostCollection()
+
+        for try await post in api.listPosts() {
+            posts.append(post)
+        }
+
+        XCTAssertEqual(posts.count, 36)
     }
 }

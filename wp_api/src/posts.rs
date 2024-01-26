@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub trait PostNetworkingInterface: Send + Sync {}
 
+#[derive(Default)] // The default has `None` for all
 pub struct PostListParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
@@ -44,12 +45,7 @@ pub struct PostDeleteRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostListResponse {
     pub post_list: Option<Vec<PostObject>>,
-}
-
-impl PostListResponse {
-    pub fn new(post_list: Option<Vec<PostObject>>) -> Self {
-        Self { post_list }
-    }
+    pub next_page: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

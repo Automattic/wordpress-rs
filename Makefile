@@ -35,12 +35,6 @@ bindings:
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 	sed -i '' 's/wp_apiFFI/libwordpressFFI/g' native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
-	#wp_networking
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_networking.dylib --out-dir $(android_generated_source_path) --language kotlin
-	cargo run --release --bin uniffi_bindgen generate wp_networking/src/wp_networking.udl --out-dir ./target/swift-bindings --language swift
-	cp target/swift-bindings/wp_networking.swift native/swift/Sources/wordpress-api-wrapper/wp_networking.swift
-	sed -i '' 's/wp_networkingFFI/libwordpressFFI/g' native/swift/Sources/wordpress-api-wrapper/wp_networking.swift
-
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
 
@@ -70,17 +64,17 @@ xcframework-libraries:
 	$(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
 
 %-xcframework-library:
-	cargo build --target $* --release
+	cargo build --target $* --package wp_api --release
 	$(MAKE) $*-combine-libraries
 
 %-xcframework-library-with-nightly:
-	cargo +nightly build --target $* --release -Zbuild-std
+	cargo +nightly build --target $* --package wp_api --release -Zbuild-std
 	$(MAKE) $*-combine-libraries
 
 # Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
 # to combine the binaries
 %-combine-libraries:
-	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a target/$*/release/libwp_networking.a
+	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a #target/$*/release/libwp_networking.a
 
 # Some libraries need to be created in a multi-binary format, so we combine them here
 xcframework-combined-libraries: xcframework-libraries
