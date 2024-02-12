@@ -22,10 +22,6 @@ android {
         minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        ndk {
-            debugSymbolLevel 'FULL'
-        }
     }
 
     lintOptions {
@@ -43,10 +39,6 @@ android {
 
     sourceSets {
         androidTest.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
-    }
-
-    packagingOptions {
-        doNotStrip "**/*.so"
     }
 }
 
