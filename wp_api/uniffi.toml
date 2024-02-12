@@ -1,6 +1,7 @@
 [bindings.kotlin]
-cdylib_name = "wp_api"
 android_cleaner = true
+cdylib_name = "wp_api"
+generate_immutable_records = true
 
 [bindings.swift]
 generate_immutable_records = true

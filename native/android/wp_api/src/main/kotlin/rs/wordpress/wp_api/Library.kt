@@ -5,6 +5,7 @@ package rs.wordpress.wp_api
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import uniffi.wp_api.PostListParams
 import uniffi.wp_api.PostListResponse
 import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpAuthentication
@@ -16,7 +17,7 @@ class Library(siteUrl: String, authentication: WpAuthentication) {
     private val wpApiHelper = WpApiHelper(siteUrl, authentication)
     private val client = OkHttpClient()
 
-    fun postListRequest(): WpNetworkRequest = wpApiHelper.postListRequest()
+    fun postListRequest(): WpNetworkRequest = wpApiHelper.postListRequest(PostListParams())
 
     fun makePostListRequest(): PostListResponse {
         val wpNetworkRequest = postListRequest()
@@ -31,7 +32,7 @@ class Library(siteUrl: String, authentication: WpAuthentication) {
         }
 
         client.newCall(requestBuilder.build()).execute().use { response ->
-            return WpNetworkResponse(response.body!!.bytes(), response.code.toUShort())
+            return WpNetworkResponse(response.body!!.bytes(), response.code.toUShort(), null)
         }
     }
 }
