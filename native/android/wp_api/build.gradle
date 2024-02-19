@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.mozilla.rust-android-gradle.rust-android")
     id("com.automattic.android.publish-to-s3")
 }
@@ -53,7 +54,8 @@ dependencies {
     androidTestImplementation "androidx.test:runner:1.4.0"
     androidTestImplementation "androidx.test:rules:1.4.0"
     androidTestImplementation "junit:junit:4.13.2"
-    androidTestImplementation 'org.jetbrains.kotlin:kotlin-test'
+    androidTestImplementation "org.jetbrains.kotlin:kotlin-test"
+    androidTestImplementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3"
 
     testImplementation "junit:junit:4.13.2"
 }

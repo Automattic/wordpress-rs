@@ -24,7 +24,7 @@ class Library(siteUrl: String, authentication: WpAuthentication) {
         return parsePostListResponse(request(wpNetworkRequest))
     }
 
-    private fun request(wpNetworkRequest: WpNetworkRequest): WpNetworkResponse {
+    fun request(wpNetworkRequest: WpNetworkRequest): WpNetworkResponse {
         val requestBuilder = Request.Builder()
             .url(wpNetworkRequest.url)
         wpNetworkRequest.headerMap?.forEach { (key, value) ->
