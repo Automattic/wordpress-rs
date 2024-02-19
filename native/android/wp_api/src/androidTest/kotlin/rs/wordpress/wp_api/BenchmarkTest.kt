@@ -1,6 +1,7 @@
 package rs.wordpress.wp_api
 
 import android.util.Log
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okio.utf8Size
@@ -109,8 +110,39 @@ class BenchmarkTest {
     @Serializable
     data class KotlinPostObject(
         val id: UInt?,
+        val date: String?,
+        @SerialName("date_gmt")
+        val dateGmt: String?,
+        val guid: KotlinPostGuid?,
+        val modified: String?,
+        @SerialName("modified_gmt")
+        val modifiedGmt: String?,
+        val password: String?,
+        val slug: String?,
+        val status: String?,
+        val link: String?,
         val title: KotlinPostTitle?,
         val content: KotlinPostContent?,
+        val excerpt: KotlinPostExcerpt?,
+        val author: UInt?,
+        @SerialName("featured_media")
+        val featuredMedia: UInt?,
+        @SerialName("comment_status")
+        val commentStatus: String?,
+        @SerialName("ping_status")
+        val pingStatus: String?,
+        val sticky: Boolean?,
+        val template: String?,
+        val format: String?,
+        val meta: KotlinPostMeta?,
+        val categories: List<UInt>?,
+        val tags: List<UInt>?,
+    )
+
+    @Serializable
+    data class KotlinPostGuid(
+        val raw: String?,
+        val rendered: String?,
     )
 
     @Serializable
@@ -123,5 +155,20 @@ class BenchmarkTest {
     data class KotlinPostContent(
         val raw: String?,
         val rendered: String?,
+        val protected: Boolean?,
+        @SerialName("block_version")
+        val blockVersion: UInt?,
+    )
+
+    @Serializable
+    data class KotlinPostExcerpt(
+        val raw: String?,
+        val rendered: String?,
+        val protected: Boolean?,
+    )
+
+    @Serializable
+    data class KotlinPostMeta(
+        val footnotes: String?,
     )
 }
