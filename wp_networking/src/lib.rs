@@ -48,6 +48,6 @@ fn wp_network_response(response: reqwest::blocking::Response) -> WPNetworkRespon
     WPNetworkResponse {
         status_code: response.status().as_u16(),
         body: response.bytes().unwrap().to_vec(),
-        header_map: None // TODO: Properly read the headers
+        header_map: None, // TODO: Properly read the headers
     }
 }

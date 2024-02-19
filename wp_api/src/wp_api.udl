@@ -66,8 +66,33 @@ dictionary PostDeleteResponse {
 
 dictionary PostObject {
   u32? id;
+  string? date;
+  string? date_gmt;
+  PostGuid? guid;
+  string? modified;
+  string? modified_gmt;
+  string? password;
+  string? slug;
+  string? status;
+  string? link;
   PostTitle? title;
   PostContent? content;
+  PostExcerpt? excerpt;
+  u32? author;
+  u32? featured_media;
+  string? comment_status;
+  string? ping_status;
+  boolean? sticky;
+  string? template;
+  string? format;
+  PostMeta? meta;
+  sequence<u32>? categories;
+  sequence<u32>? tags;
+};
+
+dictionary PostGuid {
+  string? raw;
+  string? rendered;
 };
 
 dictionary PostTitle {
@@ -78,6 +103,18 @@ dictionary PostTitle {
 dictionary PostContent {
   string? raw;
   string? rendered;
+  boolean? protected;
+  u32? block_version;
+};
+
+dictionary PostExcerpt {
+  string? raw;
+  string? rendered;
+  boolean? protected;
+};
+
+dictionary PostMeta {
+  string? footnotes;
 };
 
 // We should check if it's possible to use the same params for update & create

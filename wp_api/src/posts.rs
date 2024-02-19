@@ -68,8 +68,34 @@ pub struct PostDeleteResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PostObject {
     pub id: Option<u32>,
+    pub date: Option<String>,
+    pub date_gmt: Option<String>,
+    pub guid: Option<PostGuid>,
+    pub modified: Option<String>,
+    pub modified_gmt: Option<String>,
+    pub password: Option<String>,
+    pub slug: Option<String>,
+    pub status: Option<String>,
+    pub link: Option<String>,
     pub title: Option<PostTitle>,
     pub content: Option<PostContent>,
+    pub excerpt: Option<PostExcerpt>,
+    pub author: Option<u32>,
+    pub featured_media: Option<u32>,
+    pub comment_status: Option<String>,
+    pub ping_status: Option<String>,
+    pub sticky: Option<bool>,
+    pub template: Option<String>,
+    pub format: Option<String>,
+    pub meta: Option<PostMeta>,
+    pub categories: Option<Vec<u32>>,
+    pub tags: Option<Vec<u32>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostGuid {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,4 +108,18 @@ pub struct PostTitle {
 pub struct PostContent {
     pub raw: Option<String>,
     pub rendered: Option<String>,
+    pub protected: Option<bool>,
+    pub block_version: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostExcerpt {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
+    pub protected: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PostMeta {
+    pub footnotes: Option<String>,
 }
