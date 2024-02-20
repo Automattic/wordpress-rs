@@ -16,6 +16,7 @@ import uniffi.wp_api.parsePostListResponse
 import kotlin.system.measureTimeMillis
 
 private const val TAG_BENCHMARK = "rs.wordpress.wp_api.BENCHMARK"
+private const val NUMBER_OF_ITERATIONS = 100
 
 class BenchmarkTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -29,83 +30,118 @@ class BenchmarkTest {
 
     @Test
     fun testRustBasedImplementation() {
-        val request: WpNetworkRequest
-        val response: WpNetworkResponse
-        val postListResponse: PostListResponse
+        var timeToBuildRequest: Long = 0
+        var timeToMakeNetworkRequest: Long = 0
+        var timeToParseResponse: Long = 0
 
-        val timeToBuildRequest: Long
-        val timeToMakeNetworkRequest: Long
-        val timeToParseResponse: Long
+        var totalTime: Long = 0
+        var jsonSize: Long = 0
 
-        val totalTime = measureTimeMillis {
-            timeToBuildRequest = measureTimeMillis {
-                request = library.postListRequest()
+        repeat(NUMBER_OF_ITERATIONS) {
+            val request: WpNetworkRequest
+            val response: WpNetworkResponse
+            val postListResponse: PostListResponse
+
+            totalTime += measureTimeMillis {
+                timeToBuildRequest += measureTimeMillis {
+                    request = library.postListRequest()
+                }
+                timeToMakeNetworkRequest += measureTimeMillis {
+                    response = library.request(request)
+                }
+                timeToParseResponse += measureTimeMillis {
+                    postListResponse = parsePostListResponse(response)
+                }
             }
-            timeToMakeNetworkRequest = measureTimeMillis {
-                response = library.request(request)
-            }
-            timeToParseResponse = measureTimeMillis {
-                postListResponse = parsePostListResponse(response)
-            }
+            val firstPost = postListResponse.postList!!.first()
+            assert(firstPost.title?.raw == "Hello world from Rust!")
+
+            jsonSize += jsonString(response).utf8Size()
         }
-        val firstPost = postListResponse.postList!!.first()
-        assert(firstPost.title?.raw == "Hello world from Rust!")
-
-        val jsonSize = jsonString(response).utf8Size()
-        logBenchmarkResults("cross-platform", timeToBuildRequest, timeToMakeNetworkRequest, timeToParseResponse, totalTime, jsonSize)
+        logBenchmarkResults(
+            "cross-platform",
+            timeToBuildRequest,
+            timeToMakeNetworkRequest,
+            timeToParseResponse,
+            totalTime,
+            jsonSize
+        )
     }
 
     @Test
     fun testKotlinBasedImplementation() {
-        val request: WpNetworkRequest
-        val response: WpNetworkResponse
-        val postListResponse: List<KotlinPostObject>
+        var timeToBuildRequest: Long = 0
+        var timeToMakeNetworkRequest: Long = 0
+        var timeToParseResponse: Long = 0
 
-        val timeToBuildRequest: Long
-        val timeToMakeNetworkRequest: Long
-        val timeToParseResponse: Long
+        var totalTime: Long = 0
+        var jsonSize: Long = 0
 
-        val totalTime = measureTimeMillis {
-            timeToBuildRequest = measureTimeMillis {
-                val url = siteUrl.plus("/wp-json/wp/v2/posts?context=edit");
-                val headerMap = mapOf("Authorization" to "Basic {}".plus(authentication.authToken))
-                request = WpNetworkRequest(RequestMethod.GET, url, headerMap)
+        repeat(NUMBER_OF_ITERATIONS) {
+            val request: WpNetworkRequest
+            val response: WpNetworkResponse
+            val postListResponse: List<KotlinPostObject>
+
+            totalTime += measureTimeMillis {
+
+                timeToBuildRequest += measureTimeMillis {
+                    val url = siteUrl.plus("/wp-json/wp/v2/posts?context=edit");
+                    val headerMap =
+                        mapOf("Authorization" to "Basic {}".plus(authentication.authToken))
+                    request = WpNetworkRequest(RequestMethod.GET, url, headerMap)
+                }
+                timeToMakeNetworkRequest += measureTimeMillis {
+                    response = library.request(request)
+                }
+                timeToParseResponse += measureTimeMillis {
+                    postListResponse = kotlinParsePostListResponse(response)
+                }
             }
-            timeToMakeNetworkRequest = measureTimeMillis {
-                response = library.request(request)
-            }
-            timeToParseResponse = measureTimeMillis {
-                postListResponse = kotlinParsePostListResponse(response)
-            }
+
+            val firstPost: KotlinPostObject = postListResponse.first()
+            assert(firstPost.title?.raw == "Hello world from Rust!")
+
+            jsonSize += jsonString(response).utf8Size()
         }
-
-        val firstPost: KotlinPostObject = postListResponse.first()
-        assert(firstPost.title?.raw == "Hello world from Rust!")
-
-        val jsonSize = jsonString(response).utf8Size()
-        logBenchmarkResults("Kotlin", timeToBuildRequest, timeToMakeNetworkRequest, timeToParseResponse, totalTime, jsonSize)
+        logBenchmarkResults(
+            "Kotlin",
+            timeToBuildRequest,
+            timeToMakeNetworkRequest,
+            timeToParseResponse,
+            totalTime,
+            jsonSize
+        )
     }
 
     private fun kotlinParsePostListResponse(response: WpNetworkResponse): List<KotlinPostObject> {
         return json.decodeFromString<List<KotlinPostObject>>(jsonString(response))
     }
 
-    private fun logBenchmarkResults(implementationType: String, timeToBuildRequest: Long, timeToMakeNetworkRequest: Long, timeToParseResponse: Long, totalTime: Long, jsonSize: Long) {
-        Log.println(Log.INFO, TAG_BENCHMARK,
+    private fun logBenchmarkResults(
+        implementationType: String,
+        timeToBuildRequest: Long,
+        timeToMakeNetworkRequest: Long,
+        timeToParseResponse: Long,
+        totalTime: Long,
+        jsonSize: Long
+    ) {
+        Log.println(
+            Log.INFO, TAG_BENCHMARK,
             """
-                Benchmark for $implementationType implementation:
+                Benchmark for $implementationType implementation for an average of $NUMBER_OF_ITERATIONS iterations:
                 ---
-                Time to build the request: $timeToBuildRequest
-                Time to parse the response for json with utf8 size($jsonSize): $timeToParseResponse
-                Time to build the request and parse the response: ${timeToBuildRequest + timeToParseResponse}
+                Average time to build the request: ${timeToBuildRequest / NUMBER_OF_ITERATIONS}
+                Average time to parse the response for json with utf8 size(${jsonSize / NUMBER_OF_ITERATIONS}): ${timeToParseResponse / NUMBER_OF_ITERATIONS}
+                Average time to build the request and parse the response: ${(timeToBuildRequest + timeToParseResponse) / NUMBER_OF_ITERATIONS}
                 
-                [EXTRA] Time to make the request: $timeToMakeNetworkRequest
-                [EXTRA] Total time: $totalTime
-                
-            """)
+                [EXTRA] Average time to make the request: ${timeToMakeNetworkRequest / NUMBER_OF_ITERATIONS}
+                [EXTRA] Average total time: ${totalTime / NUMBER_OF_ITERATIONS}
+            """.trimIndent()
+        )
     }
 
-    private fun jsonString(response: WpNetworkResponse): String = response.body.toString(Charsets.UTF_8)
+    private fun jsonString(response: WpNetworkResponse): String =
+        response.body.toString(Charsets.UTF_8)
 
     @Serializable
     data class KotlinPostObject(
