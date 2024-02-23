@@ -43,7 +43,10 @@ let package = Package(
             dependencies: [
                 .target(name: "wordpress-api")
             ],
-            path: "native/swift/Tests/wordpress-api"
+            path: "native/swift/Tests/wordpress-api",
+            resources: [
+                .copy("raw.json")
+            ]
         )
     ]
 )
