@@ -27,7 +27,7 @@ final class WordPressAPITests: XCTestCase {
 
     func testThatListRequestFetchesMaxCount() async throws {
         let response = try await api.listPosts(params: .init(page: 1, perPage: 100))
-        XCTAssertEqual(response.postList?.count, 36)
+        XCTAssertEqual(response.postList?.count, 46)
     }
 
     func testThatNextLinkIsNotNilWhenFetchingLessThanAllPosts() async throws {
@@ -49,8 +49,13 @@ final class WordPressAPITests: XCTestCase {
         XCTAssertEqual(response3.postList?.count, 10)
 
         let response4 = try await api.listPosts(url: nextPage3)
-        XCTAssertNil(response4.nextPage)
+        let nextPage4 = try XCTUnwrap(response4.nextPage)
+        XCTAssertEqual(response4.postList?.count, 10)
+
+        let response5 = try await api.listPosts(url: nextPage3)
+        XCTAssertNil(response5.nextPage)
         XCTAssertEqual(response4.postList?.count, 6)
+
     }
 
     func testThatFetchingAllPagesWithAsyncIteratorWorks() async throws {
