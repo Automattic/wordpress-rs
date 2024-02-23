@@ -24,6 +24,7 @@ final class BenchmarkTests: XCTestCase {
         }
     }
 
+    @available(iOS 16.0, *)
     func testSwiftRequestCreationSpeed() async throws {
         measure {
             for _ in 1...iterationCount {
@@ -58,92 +59,4 @@ final class BenchmarkTests: XCTestCase {
             }
         }
     }
-}
-
-struct WPEditContextPost: Codable {
-    let id: UInt64
-    let date: String
-    let dateGmt: String
-    let guid: WPGuid
-    let modified: String
-    let modifiedGmt: String
-    let password: String?
-    let slug: String
-    let status: String
-    let link: String
-    let title: WPTitle
-    let content: WPContent
-    let excerpt: WPExcerpt
-    let author: UInt64
-    let featuredMedia: UInt64
-    let commentStatus: String
-    let pingStatus: String
-    let sticky: Bool
-    let template: String
-    let format: String
-    let meta: WPMeta
-    let categories: [UInt64]
-    let tags: [UInt64]
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case date
-        case dateGmt = "date_gmt"
-        case guid
-        case modified
-        case modifiedGmt = "modified_gmt"
-        case password
-        case slug
-        case status
-        case link
-        case title
-        case content
-        case excerpt
-        case author
-
-        case featuredMedia = "featured_media"
-        case commentStatus = "comment_status"
-        case pingStatus    = "ping_status"
-
-        case sticky
-        case template
-        case format
-        case categories
-        case tags
-        case meta
-    }
-}
-
-struct WPGuid: Codable {
-    let raw: String?
-    let rendered: String?
-}
-
-struct WPTitle: Codable {
-    let raw: String?
-    let rendered: String?
-}
-
-struct WPContent: Codable {
-    let raw: String?
-    let rendered: String?
-    let protected: Bool?
-    let blockVersion: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case raw
-        case rendered
-        case protected
-        case blockVersion = "block_version"
-    }
-}
-
-struct WPExcerpt: Codable {
-    let raw: String?
-    let rendered: String?
-    let protected: Bool?
-}
-
-struct WPMeta: Codable {
-    let footnoes: String?
 }

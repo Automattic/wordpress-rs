@@ -27,9 +27,7 @@ import wordpress_api
 
         self.fetchPostsTask = Task { @MainActor in
             do {
-                for try await post in api.listPosts() {
-                    posts.append(post)
-                }
+                self.posts = try await api.listPostsRust()
             } catch let error {
                 shouldPresentAlert = true
                 self.error = MyError(underlyingError: error)

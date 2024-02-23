@@ -9,6 +9,12 @@ extension PostObject: Identifiable {
 
 public typealias PostCollection = [PostObject]
 
+extension WPEditContextPost: Identifiable {
+    var ID: any Hashable {
+        self.id
+    }
+}
+
 public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
     public typealias Element = PostObject
 

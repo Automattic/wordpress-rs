@@ -16,7 +16,7 @@ struct ContentView: View {
                 .padding()
             } else {
                 List(viewModel.posts) { post in
-                    Text(post.title?.raw ?? "")
+                    Text(post.title!.raw ?? "")
                 }
             }
         }
