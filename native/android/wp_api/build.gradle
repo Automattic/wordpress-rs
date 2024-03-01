@@ -39,6 +39,7 @@ android {
 
     sourceSets {
         androidTest.jniLibs.srcDirs += "$buildDir/rustJniLibs/android"
+        main.kotlin.srcDirs += "../lib/build/generated/source/uniffi/wp_api"
     }
 }
 
