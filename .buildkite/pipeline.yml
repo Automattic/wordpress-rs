@@ -1,17 +1,55 @@
-steps:
-  #################
-  # Build and Test
-  #################
-  - label: "🧪 Build and Test"
-    key: "test"
-    command: |
-      echo "--- :rust: Building + Testing"
-      make test-rust
+# Nodes with values to reuse in the pipeline.
+common_params:
+  plugins: &common_plugins
+    - automattic/a8c-ci-toolkit#2.17.0
+  # Common environment values to use with the `env` key.
+  env: &common_env
+    IMAGE_ID: xcode-15.2
 
-  #################
-  # Lint
-  #################
-  - label: "🧪 Lint Rust"
-    command: |
-      echo "--- :rust: Running Clippy"
-      make lint-rust
+steps:
+  #
+  # Rust Group
+  - group: ":rust: Core Library"
+    key: "rust"
+    steps:
+      - label: ":rust: Build and Test"
+        command: |
+          echo "--- :rust: Building + Testing"
+          make test-rust
+      - label: ":rust: Lint"
+        command: |
+          echo "--- :rust: Running Clippy"
+          make lint-rust
+  #
+  # Swift Group
+  - group: ":swift: Swift Wrapper"
+    key: "swift"
+    steps:
+      - label: ":swift: Build and Test"
+        command: |
+          export RUSTUP_HOME=
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "/Users/builder/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          rustup target add x86_64-apple-ios
+          rustup target add aarch64-apple-ios
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-ios-sim
+
+          rustup toolchain install nightly
+          rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+
+          echo "--- :swift: Building + Testing"
+          make test-swift
+        env: *common_env
+        plugins: *common_plugins
+        agents:
+          queue: mac
+      - label: ":swift: Lint"
+        command: |
+          echo "--- :swift: Swiftlint"
+          make lint-swift
