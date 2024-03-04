@@ -26,3 +26,6 @@ native/swift/Sources/wordpress-api-wrapper/*.swift
 
 # Temporary test credentials
 test_credentials
+
+# CI Cache
+.cargo

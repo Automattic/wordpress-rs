@@ -7,7 +7,9 @@ udl_path := wp_api/src/wp_api.udl
 docker_container_repo_dir=/app
 
 # Common docker options
+docker_container := public.ecr.aws/docker/library/rust:1.76
 docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
+docker_run := docker run -v $(PWD):/app -w /app -it -e CARGO_HOME=/app/.cargo $(docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 clean:
@@ -146,6 +148,14 @@ test-swift: xcframework
 test-android: bindings _test-android
 
 publish-android-local: bindings _publish-android-local
+
+test-rust:
+	$(docker_run) cargo test
+
+lint:
+
+lint-rust:
+	$(docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings"
 
 build-in-docker:
 	$(call bindings)

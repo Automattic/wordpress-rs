@@ -1,0 +1,17 @@
+steps:
+  #################
+  # Build and Test
+  #################
+  - label: "🧪 Build and Test"
+    key: "test"
+    command: |
+      echo "--- :rust: Building + Testing"
+      make test-rust
+
+  #################
+  # Lint
+  #################
+  - label: "🧪 Lint Rust"
+    command: |
+      echo "--- :rust: Running Clippy"
+      make lint-rust
