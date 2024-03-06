@@ -64,7 +64,7 @@ steps:
           make test-server
 
           echo "--- 🧪 Running Tests"
-          curl localhost/wp-json/wp/v2/posts | jq
+          curl -u test@example.com:$(cat test_credentials) 'http://localhost/wp-json/wp/v2/posts?context=edit' --fail-with-body | jq
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix:

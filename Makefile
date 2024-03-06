@@ -155,6 +155,7 @@ test-rust:
 	$(rust_docker_run) cargo test
 
 test-server:
+	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up --attach wpcli
 
 stop-server:

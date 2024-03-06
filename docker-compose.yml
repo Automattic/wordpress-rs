@@ -26,9 +26,11 @@ services:
 
     wpcli:
         image: 'public.ecr.aws/docker/library/wordpress:cli'
+        user: 33:33 # Fixes permissions issues with writing files
         volumes:
             - ./.buildkite/setup-test-site.sh:/setup-test-site.sh:ro
             - ./.wordpress/wp-config.php:/var/www/html/wp-config.php:ro
+            - ./test_credentials:/tmp/test_credentials
         environment:
             WORDPRESS_DB_HOST: mysql
             WORDPRESS_DB_USER: wordpress
