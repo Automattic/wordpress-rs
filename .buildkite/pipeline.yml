@@ -3,8 +3,6 @@ common_params:
   plugins: &common_plugins
     - automattic/a8c-ci-toolkit#2.17.0
   # Common environment values to use with the `env` key.
-  env: &common_env
-    IMAGE_ID: xcode-15.2
 
 steps:
   #
@@ -45,7 +43,8 @@ steps:
 
           echo "--- :swift: Building + Testing"
           make test-swift
-        env: *common_env
+        env:
+          IMAGE_ID: xcode-15.2
         plugins: *common_plugins
         agents:
           queue: mac
