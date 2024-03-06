@@ -11,6 +11,10 @@ services:
             WORDPRESS_DB_USER: wordpress
             WORDPRESS_DB_PASSWORD: wordpress
             WORDPRESS_DB_NAME: wordpress
+            WORDPRESS_CONFIG_EXTRA: |
+                # Allow application passwords to be used without HTTPS
+                define( 'WP_ENVIRONMENT_TYPE', 'local' );
+
         depends_on:
             mysql:
                 condition: service_healthy

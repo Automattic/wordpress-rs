@@ -36,7 +36,3 @@ wp plugin delete wordpress-importer
 
 ## Create an Application password for the admin user, and store it where it can be used by the test suite
 wp user application-password create test@example.com test --porcelain > /var/www/html/test_credentials
-
-## Allow using Application Passwords in this environment
-mkdir -p /var/www/html/wp-content/mu-plugins
-echo "<?php add_filter( 'wp_is_application_passwords_available', '__return_true' );" > /var/www/html/wp-content/mu-plugins/enable-application-passwords.php
