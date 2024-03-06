@@ -20,8 +20,9 @@ services:
                 condition: service_healthy
         healthcheck:
             test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
-            timeout: 3s
-            retries: 10
+            interval: 2s
+            timeout: 1s
+            retries: 30
 
     wpcli:
         image: 'public.ecr.aws/docker/library/wordpress:cli'
@@ -51,5 +52,6 @@ services:
             MYSQL_RANDOM_ROOT_PASSWORD: true
         healthcheck:
             test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-            timeout: 3s
-            retries: 10
+            interval: 2s
+            timeout: 1s
+            retries: 30
