@@ -24,8 +24,10 @@ local.properties
 # Auto-generated Swift Files
 native/swift/Sources/wordpress-api-wrapper/*.swift
 
-# Temporary test credentials
+# Test Server
+.wordpress
 test_credentials
+/logs
 
 # CI Cache
 .cargo

@@ -1,0 +1,51 @@
+version: '3'
+services:
+    wordpress:
+        image: 'public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION:-latest}'
+        ports:
+            - '80:80'
+        volumes:
+            - .wordpress:/var/www/html
+        environment:
+            WORDPRESS_DB_HOST: mysql
+            WORDPRESS_DB_USER: wordpress
+            WORDPRESS_DB_PASSWORD: wordpress
+            WORDPRESS_DB_NAME: wordpress
+        depends_on:
+            mysql:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
+            timeout: 3s
+            retries: 10
+
+    wpcli:
+        image: 'public.ecr.aws/docker/library/wordpress:cli'
+        volumes:
+            - ./.buildkite/setup-test-site.sh:/setup-test-site.sh:ro
+            - ./.wordpress/wp-config.php:/var/www/html/wp-config.php:ro
+        environment:
+            WORDPRESS_DB_HOST: mysql
+            WORDPRESS_DB_USER: wordpress
+            WORDPRESS_DB_PASSWORD: wordpress
+            WORDPRESS_DB_NAME: wordpress
+        depends_on:
+            mysql:
+                condition: service_healthy
+            wordpress:
+                condition: service_healthy
+        entrypoint: ["/setup-test-site.sh"]
+
+    mysql:
+        image: 'public.ecr.aws/docker/library/mysql:8.0'
+        ports:
+            - '3306:3306'
+        environment:
+            MYSQL_DATABASE: 'wordpress'
+            MYSQL_USER: 'wordpress'
+            MYSQL_PASSWORD: 'wordpress'
+            MYSQL_RANDOM_ROOT_PASSWORD: true
+        healthcheck:
+            test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+            timeout: 3s
+            retries: 10

@@ -154,6 +154,12 @@ publish-android-local: bindings _publish-android-local
 test-rust:
 	$(rust_docker_run) cargo test
 
+test-server:
+	docker-compose up --attach wpcli
+
+stop-server:
+	docker-compose down
+
 lint: lint-rust lint-swift
 
 lint-rust:
@@ -168,3 +174,7 @@ lintfix-swift:
 build-in-docker:
 	$(call bindings)
 	$(docker_build_and_run)
+
+dev-server:
+	mkdir -p .wordpress
+	docker-compose up

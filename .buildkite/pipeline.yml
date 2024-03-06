@@ -53,3 +53,29 @@ steps:
         command: |
           echo "--- :swift: Swiftlint"
           make lint-swift
+  #
+  # Docker Group
+  - group: ":wordpress: End-to-end Tests"
+    key: "e2e"
+    steps:
+      - label: ":wordpress: WordPress {{matrix}}"
+        command: |
+          echo "--- :docker: Setting up Test Server"
+          make test-server
+
+          echo "--- 🧪 Running Tests"
+          curl localhost/wp-json/wp/v2/posts | jq
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix:
+          - '6.4'
+          - '6.3'
+          - '6.2'
+          - '6.1'
+          - '6.0'
+          - '5.9'
+          - '5.8'
+          - '5.7'
+          - '5.6' # First version to introduce appliation passwords
+
+

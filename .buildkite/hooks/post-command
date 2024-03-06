@@ -1,0 +1,10 @@
+#!/bin/bash
+
+mkdir -p logs
+
+echo "--- :docker: Saving Docker Logs"
+docker-compose logs wpcli > logs/wpcli.log
+docker-compose logs wordpress > logs/wordpress.log
+docker-compose logs mysql > logs/mysql.log
+
+buildkite-agent artifact upload "logs/*.log"
