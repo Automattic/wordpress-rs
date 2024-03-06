@@ -2,9 +2,11 @@ import Foundation
 import wordpress_api_wrapper
 
 extension PostObject: Identifiable {
+    // swiftlint:disable identifier_name
     var ID: any Hashable {
         self.id
     }
+    // swiftlint:enable identifier_name
 }
 
 public typealias PostCollection = [PostObject]
@@ -16,6 +18,10 @@ public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
 
     private var posts: [PostObject] = []
     private var nextPage: WpNetworkRequest?
+
+    enum Errors: Error {
+        case unableToFetchPosts
+    }
 
     init(api: WordPressAPI, initialParams: PostListParams) {
         self.api = api
@@ -41,7 +47,7 @@ public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
         if let postList = parsedResponse.postList {
             self.posts.append(contentsOf: postList)
         } else {
-            abort() // TODO: Not sure if this should be an error
+            throw Errors.unableToFetchPosts
         }
 
         if let nextPageUri = parsedResponse.nextPage {
