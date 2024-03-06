@@ -25,7 +25,6 @@ steps:
     steps:
       - label: ":swift: Build and Test"
         command: |
-          export RUSTUP_HOME=
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
 
