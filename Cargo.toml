@@ -3,6 +3,7 @@ members = [
   "uniffi_bindgen",
   "wp_api",
   "wp_cli",
+  "wp_derive",
   "wp_networking",
 ]
 resolver = "2"
