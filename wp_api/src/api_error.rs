@@ -1,6 +1,6 @@
 use http::StatusCode;
 
-#[derive(uniffi::Error, Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum WPApiError {
     #[error(
         "Client error with type '{:?}' and status_code '{}'",
@@ -19,7 +19,7 @@ pub enum WPApiError {
     UnknownError,
 }
 
-#[derive(uniffi::Enum, Debug)]
+#[derive(Debug, uniffi::Enum)]
 pub enum ClientErrorType {
     BadRequest,
     Unauthorized,

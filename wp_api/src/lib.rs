@@ -69,7 +69,7 @@ impl WPApiHelper {
     }
 }
 
-#[derive(uniffi::Record, Debug, Clone)]
+#[derive(Debug, Clone, uniffi::Record)]
 // TODO: This will probably become an `enum` where we support multiple authentication types.
 pub struct WPAuthentication {
     pub auth_token: String,

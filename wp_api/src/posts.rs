@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub trait PostNetworkingInterface: Send + Sync {}
 
-#[derive(uniffi::Record, Default)] // The default has `None` for all
+#[derive(Default, uniffi::Record)] // The default has `None` for all
 pub struct PostListParams {
     #[uniffi(default = 1)]
     pub page: u32,
@@ -53,25 +53,25 @@ pub struct PostDeleteRequest {
     pub params: Option<String>,
 }
 
-#[derive(uniffi::Record, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostListResponse {
     pub post_list: Option<Vec<PostObject>>,
     pub next_page: Option<String>,
 }
 
-#[derive(uniffi::Record, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostCreateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(uniffi::Record, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostRetrieveResponse {
     pub post: Option<PostObject>,
 }
-#[derive(uniffi::Record, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostUpdateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(uniffi::Record, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostDeleteResponse {
     pub post: Option<PostObject>,
 }
@@ -103,7 +103,7 @@ pub struct PostObject {
     pub tags: Option<Vec<u32>>,
 }
 
-#[derive(uniffi::Record, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostGuid {
     pub raw: Option<String>,
     pub rendered: Option<String>,
