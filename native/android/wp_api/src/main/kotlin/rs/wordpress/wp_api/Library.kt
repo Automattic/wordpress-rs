@@ -17,7 +17,8 @@ class Library(siteUrl: String, authentication: WpAuthentication) {
     private val wpApiHelper = WpApiHelper(siteUrl, authentication)
     private val client = OkHttpClient()
 
-    fun postListRequest(): WpNetworkRequest = wpApiHelper.postListRequest(PostListParams())
+    fun postListRequest(): WpNetworkRequest =
+        wpApiHelper.postListRequest(PostListParams())
 
     fun makePostListRequest(): PostListResponse {
         val wpNetworkRequest = postListRequest()
@@ -32,7 +33,11 @@ class Library(siteUrl: String, authentication: WpAuthentication) {
         }
 
         client.newCall(requestBuilder.build()).execute().use { response ->
-            return WpNetworkResponse(response.body!!.bytes(), response.code.toUShort(), null)
+            return WpNetworkResponse(
+                body = response.body!!.bytes(),
+                statusCode = response.code.toUShort(),
+                headerMap = null
+            )
         }
     }
 }

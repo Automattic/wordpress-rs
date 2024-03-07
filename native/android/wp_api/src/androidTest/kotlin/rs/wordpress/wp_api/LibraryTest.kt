@@ -24,7 +24,7 @@ class LibraryTest {
     fun testBasicPostListRequest() {
         val request = library.postListRequest()
         assert(request.method == RequestMethod.GET)
-        assert(request.url == "$siteUrl/wp-json/wp/v2/posts?context=edit")
+        assert(request.url == "$siteUrl/wp-json/wp/v2/posts?context=edit&page=1&per_page=10")
     }
 
     @Test
