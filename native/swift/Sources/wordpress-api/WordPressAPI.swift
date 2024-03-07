@@ -12,7 +12,7 @@ public struct WordPressAPI {
 
     public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
         self.urlSession = urlSession
-        self.helper = WpApiHelper(url: baseUrl.absoluteString, authentication: authenticationStategy)
+        self.helper = WpApiHelper(siteUrl: baseUrl.absoluteString, authentication: authenticationStategy)
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
