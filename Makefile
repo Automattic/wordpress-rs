@@ -1,7 +1,6 @@
 android_project_root := ./native/android
 android_generated_source_path := $(android_project_root)/lib/build/generated/source
 jni_libs_root := $(android_project_root)/lib/src/main/jniLibs
-udl_path := wp_api/src/wp_api.udl
 
 # The directory where the git repo is mounted in the docker container
 docker_container_repo_dir=/app
@@ -35,7 +34,7 @@ bindings:
 
 	#wp_api
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir $(android_generated_source_path) --language kotlin
-	cargo run --release --bin uniffi_bindgen generate wp_api/src/wp_api.udl --out-dir ./target/swift-bindings --language swift
+	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 	sed -i '' 's/wp_apiFFI/libwordpressFFI/g' native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
