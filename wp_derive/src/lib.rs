@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Ident};
 
-#[proc_macro_derive(EditContext)]
+#[proc_macro_derive(EditContext, attributes(ContextEdit, ContextView, ContextEmbed))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident;
@@ -17,7 +17,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
     } else {
         unimplemented!("Only implemented for Structs for now");
     };
-    let non_optional_fields = fields.iter().map(|f| {
+    let filtered_fields = fields.iter().filter(|f| {
+        for attr in &f.attrs {
+            if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "ContextEdit" {
+                return true;
+            }
+        }
+        false
+    });
+    let non_optional_fields = filtered_fields.map(|f| {
         let new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
         syn::Field {
             attrs: Vec::new(),
