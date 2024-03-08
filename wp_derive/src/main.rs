@@ -6,6 +6,8 @@ pub struct PostObject {
     pub id: Option<u32>,
     #[WPContext("edit")]
     pub date: Option<String>,
+    #[WPContext("embed")]
+    pub embed_date: Option<String>,
 }
 
 fn main() {}

@@ -6,8 +6,6 @@ use syn::{parse_macro_input, DeriveInput, Ident};
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident;
-    let cname = format!("{}WithEditContext", name);
-    let cident = Ident::new(&cname, name.span());
     let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
         if let syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
@@ -18,28 +16,36 @@ pub fn derive(input: TokenStream) -> TokenStream {
         } else {
             unimplemented!("Only implemented for Structs for now");
         };
-    let non_optional_fields = filtered_fields_for_context(fields.iter(), "\"view\"").map(|f| {
-        let new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
-        syn::Field {
-            attrs: Vec::new(),
-            vis: f.vis.clone(),
-            mutability: syn::FieldMutability::None,
-            ident: f.ident.clone(),
-            colon_token: f.colon_token,
-            ty: new_type,
-        }
+    let mut token_stream = proc_macro2::TokenStream::new();
+
+    ["Edit", "Embed", "View"].iter().for_each(|context| {
+        let cname = format!("{}With{}Context", name, context);
+        let cident = Ident::new(&cname, name.span());
+        let non_optional_fields =
+            filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
+                .map(|f| {
+                    let new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+                    syn::Field {
+                        attrs: Vec::new(),
+                        vis: f.vis.clone(),
+                        mutability: syn::FieldMutability::None,
+                        ident: f.ident.clone(),
+                        colon_token: f.colon_token,
+                        ty: new_type,
+                    }
+                });
+        token_stream.extend(quote! {
+            pub struct #cident {
+                #(#non_optional_fields,)*
+            }
+        });
     });
-    quote! {
-        pub struct #cident {
-            #(#non_optional_fields,)*
-        }
-    }
-    .into()
+    token_stream.into()
 }
 
 fn filtered_fields_for_context<'a>(
     fields: impl Iterator<Item = &'a syn::Field>,
-    context: &'a str,
+    context: String,
 ) -> impl Iterator<Item = &'a syn::Field> {
     fields.filter(move |f| {
         for attr in &f.attrs {
