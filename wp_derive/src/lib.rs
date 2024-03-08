@@ -8,32 +8,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let cname = format!("{}WithEditContext", name);
     let cident = Ident::new(&cname, name.span());
-    let fields = if let syn::Data::Struct(syn::DataStruct {
-        fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
-        ..
-    }) = ast.data
-    {
-        named
-    } else {
-        unimplemented!("Only implemented for Structs for now");
-    };
-    let filtered_fields = fields.iter().filter(|f| {
-        for attr in &f.attrs {
-            if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "WPContext" {
-                if let syn::Meta::List(meta_list) = &attr.meta {
-                    return meta_list.tokens.clone().into_iter().any(|t| {
-                        if let proc_macro2::TokenTree::Literal(l) = t {
-                            l.to_string() == "\"view\""
-                        } else {
-                            false
-                        }
-                    });
-                }
-            }
-        }
-        false
-    });
-    let non_optional_fields = filtered_fields.map(|f| {
+    let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
+        if let syn::Data::Struct(syn::DataStruct {
+            fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+            ..
+        }) = ast.data
+        {
+            named
+        } else {
+            unimplemented!("Only implemented for Structs for now");
+        };
+    let non_optional_fields = filtered_fields_for_context(fields.iter(), "\"view\"").map(|f| {
         let new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
         syn::Field {
             attrs: Vec::new(),
@@ -50,6 +35,29 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+fn filtered_fields_for_context<'a>(
+    fields: impl Iterator<Item = &'a syn::Field>,
+    context: &'a str,
+) -> impl Iterator<Item = &'a syn::Field> {
+    fields.filter(move |f| {
+        for attr in &f.attrs {
+            if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "WPContext" {
+                if let syn::Meta::List(meta_list) = &attr.meta {
+                    return meta_list.tokens.clone().into_iter().any(|t| {
+                        if let proc_macro2::TokenTree::Literal(l) = t {
+                            //l.to_string() == "\"view\""
+                            l.to_string() == context
+                        } else {
+                            false
+                        }
+                    });
+                }
+            }
+        }
+        false
+    })
 }
 
 fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
