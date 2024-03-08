@@ -1,6 +1,6 @@
-use wp_derive::EditContext;
+use wp_derive::WPContextual;
 
-#[derive(EditContext)]
+#[derive(WPContextual)]
 pub struct PostObject {
     pub id: Option<u32>,
     pub date: Option<String>,

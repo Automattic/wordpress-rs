@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Ident};
 
-#[proc_macro_derive(EditContext, attributes(ContextEdit, ContextView, ContextEmbed))]
+#[proc_macro_derive(WPContextual, attributes(WPContext))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident;
@@ -19,8 +19,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
     let filtered_fields = fields.iter().filter(|f| {
         for attr in &f.attrs {
-            if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "ContextEdit" {
-                return true;
+            if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "WPContext" {
+                if let syn::Meta::List(meta_list) = &attr.meta {
+                    return meta_list.tokens.clone().into_iter().any(|t| {
+                        if let proc_macro2::TokenTree::Literal(l) = t {
+                            l.to_string() == "\"view\""
+                        } else {
+                            false
+                        }
+                    });
+                }
             }
         }
         false

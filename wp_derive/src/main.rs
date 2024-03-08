@@ -1,10 +1,10 @@
-use wp_derive::EditContext;
+use wp_derive::WPContextual;
 
-#[derive(EditContext)]
+#[derive(WPContextual)]
 pub struct PostObject {
-    #[ContextEdit]
-    #[ContextView]
+    #[WPContext("edit", "view", "embed")]
     pub id: Option<u32>,
+    #[WPContext("edit")]
     pub date: Option<String>,
 }
 
