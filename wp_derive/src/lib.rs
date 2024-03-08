@@ -2,6 +2,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Ident};
 
+const CONTEXTS: [&'static str; 3] = ["Edit", "Embed", "View"];
+
 #[proc_macro_derive(WPContextual, attributes(WPContext))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -16,10 +18,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
         } else {
             unimplemented!("Only implemented for Structs for now");
         };
-    let mut token_stream = proc_macro2::TokenStream::new();
 
-    ["Edit", "Embed", "View"].iter().for_each(|context| {
-        let cname = format!("{}With{}Context", name, context);
+    let mut token_stream = proc_macro2::TokenStream::new();
+    CONTEXTS.iter().for_each(|context| {
+        let cname = ident_name_for_context(name, context);
         let cident = Ident::new(&cname, name.span());
         let non_optional_fields =
             filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
@@ -53,7 +55,6 @@ fn filtered_fields_for_context<'a>(
                 if let syn::Meta::List(meta_list) = &attr.meta {
                     return meta_list.tokens.clone().into_iter().any(|t| {
                         if let proc_macro2::TokenTree::Literal(l) = t {
-                            //l.to_string() == "\"view\""
                             l.to_string() == context
                         } else {
                             false
@@ -90,4 +91,8 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
         }
     }
     None
+}
+
+fn ident_name_for_context(ident: &Ident, context: &str) -> String {
+    format!("{}With{}Context", ident, context)
 }
