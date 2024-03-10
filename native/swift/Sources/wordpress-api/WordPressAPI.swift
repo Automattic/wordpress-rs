@@ -6,57 +6,29 @@ import FoundationNetworking
 #endif
 
 public struct WordPressAPI {
-
-    enum Errors: Error {
-        case unableToParseResponse
-    }
-
     private let urlSession: URLSession
     package let helper: WpApiHelperProtocol
 
-    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
+    public init(urlSession: URLSession, baseUrl: URL, authenticationStrategy: WpAuthentication) {
+        // TODO: We use URLSession APIs that accept completion block, which doesn't work with background URLSession.
+        // See `URLSession.backgroundSession(configuration:)` in `URLSession+WordPressAPI.swift`.
         self.urlSession = urlSession
-        self.helper = WpApiHelper(siteUrl: baseUrl.absoluteString, authentication: authenticationStategy)
+        self.helper = WpApiHelper(siteUrl: baseUrl.absoluteString, authentication: authenticationStrategy)
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
-        try await withCheckedThrowingContinuation { continuation in
-            self.perform(request: request) { result in
-                continuation.resume(with: result)
-            }
-        }
+        try await self.urlSession.perform(request: request).get()
     }
 
     package func perform(request: WpNetworkRequest, callback: @escaping (Result<WpNetworkResponse, Error>) -> Void) {
-        let task = self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
-            if let error {
-                callback(.failure(error))
-                return
-            }
-
-            guard let data = data, let response = response else {
-                callback(.failure(Errors.unableToParseResponse))
-                return
-            }
-
+        Task {
             do {
-                let response = try WpNetworkResponse.from(data: data, response: response)
-                callback(.success(response))
+                let result = try await self.perform(request: request)
+                callback(.success(result))
             } catch {
                 callback(.failure(error))
             }
         }
-        task.resume()
-    }
-}
-
-public extension WpNetworkRequest {
-    func asURLRequest() -> URLRequest {
-        let url = URL(string: self.url)!
-        var request = URLRequest(url: url)
-        request.httpMethod = self.method.rawValue
-        request.allHTTPHeaderFields = self.headerMap
-        return request
     }
 }
 
@@ -73,37 +45,6 @@ extension Result {
             }
 
         case .failure(let error): return .failure(error)
-        }
-    }
-}
-
-extension WpNetworkResponse {
-    static func from(data: Data, response: URLResponse) throws -> WpNetworkResponse {
-        guard let response = response as? HTTPURLResponse else {
-            abort()
-        }
-
-        return WpNetworkResponse(
-            body: data,
-            statusCode: UInt16(response.statusCode),
-            headerMap: response.httpHeaders
-        )
-
-    }
-}
-
-extension HTTPURLResponse {
-
-    var httpHeaders: [String: String] {
-        allHeaderFields.reduce(into: [String: String]()) {
-            guard
-                let key = $1.key as? String,
-                let value = $1.value as? String
-            else {
-                return
-            }
-
-            $0.updateValue(value, forKey: key)
         }
     }
 }

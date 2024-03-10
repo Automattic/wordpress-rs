@@ -27,7 +27,9 @@ let package = Package(
             targets: ["wordpress-api"]
         )
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/AliSoftware/OHHTTPStubs", .upToNextMajor(from: "9.1.0"))
+    ],
     targets: [
         .target(
             name: "wordpress-api",
@@ -51,7 +53,8 @@ let package = Package(
             name: "wordpress-api-tests",
             dependencies: [
                 .target(name: "wordpress-api"),
-                .target(name: "libwordpressFFI")
+                .target(name: "libwordpressFFI"),
+                .product(name: "OHHTTPStubsSwift", package: "OHHTTPStubs")
             ],
             path: "native/swift/Tests/wordpress-api"
         )
