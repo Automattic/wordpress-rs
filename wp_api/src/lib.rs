@@ -11,12 +11,15 @@ pub mod api_error;
 pub mod pages;
 pub mod posts;
 
+#[derive(uniffi::Object)]
 pub struct WPApiHelper {
     site_url: Url,
     authentication: WPAuthentication,
 }
 
+#[uniffi::export]
 impl WPApiHelper {
+    #[uniffi::constructor]
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
 
@@ -53,15 +56,10 @@ impl WPApiHelper {
             format!("Basic {}", self.authentication.auth_token),
         );
 
-        if let Some(page) = params.page {
-            url.query_pairs_mut()
-                .append_pair("page", page.to_string().as_str());
-        }
-
-        if let Some(per_page) = params.per_page {
-            url.query_pairs_mut()
-                .append_pair("per_page", per_page.to_string().as_str());
-        }
+        url.query_pairs_mut()
+            .append_pair("page", params.page.to_string().as_str());
+        url.query_pairs_mut()
+            .append_pair("per_page", params.per_page.to_string().as_str());
 
         WPNetworkRequest {
             method: RequestMethod::GET,
@@ -71,12 +69,13 @@ impl WPApiHelper {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, uniffi::Record)]
 // TODO: This will probably become an `enum` where we support multiple authentication types.
 pub struct WPAuthentication {
     pub auth_token: String,
 }
 
+#[derive(uniffi::Enum)]
 pub enum RequestMethod {
     GET,
     POST,
@@ -84,6 +83,7 @@ pub enum RequestMethod {
     DELETE,
 }
 
+#[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
@@ -95,9 +95,10 @@ pub struct WPNetworkRequest {
     pub header_map: Option<HashMap<String, String>>,
 }
 
+#[derive(uniffi::Record)]
 pub struct WPNetworkResponse {
-    pub status_code: u16,
     pub body: Vec<u8>,
+    pub status_code: u16,
     // TODO: We probably want to implement a specific type for these headers instead of using a
     // regular HashMap.
     //
@@ -106,6 +107,7 @@ pub struct WPNetworkResponse {
     pub header_map: Option<HashMap<String, String>>,
 }
 
+#[uniffi::export]
 pub fn parse_post_list_response(
     response: WPNetworkResponse,
 ) -> Result<PostListResponse, WPApiError> {
@@ -156,4 +158,4 @@ pub fn extract_link_header(response: &WPNetworkResponse) -> Option<String> {
     None
 }
 
-uniffi::include_scaffolding!("wp_api");
+uniffi::setup_scaffolding!("wp_api");

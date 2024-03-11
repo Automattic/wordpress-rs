@@ -2,70 +2,81 @@ use serde::{Deserialize, Serialize};
 
 pub trait PostNetworkingInterface: Send + Sync {}
 
-#[derive(Default)] // The default has `None` for all
+#[derive(Default, uniffi::Record)]
 pub struct PostListParams {
-    pub page: Option<u32>,
-    pub per_page: Option<u32>,
+    #[uniffi(default = 1)]
+    pub page: u32,
+    #[uniffi(default = 10)]
+    pub per_page: u32,
 }
 
+#[derive(uniffi::Record)]
 pub struct PostCreateParams {
     pub title: Option<String>,
     pub content: Option<String>,
 }
 
+#[derive(uniffi::Record)]
 pub struct PostRetrieveParams {
     pub password: Option<String>,
 }
 
+#[derive(uniffi::Record)]
 pub struct PostUpdateParams {
     pub title: Option<String>,
     pub content: Option<String>,
 }
 
+#[derive(uniffi::Record)]
 pub struct PostDeleteParams {
     pub force: Option<bool>,
 }
 
+#[derive(uniffi::Record)]
 pub struct PostListRequest {
     pub params: Option<String>,
 }
+#[derive(uniffi::Record)]
 pub struct PostCreateRequest {
     pub params: Option<String>,
 }
+#[derive(uniffi::Record)]
 pub struct PostRetrieveRequest {
     pub params: Option<String>,
 }
+#[derive(uniffi::Record)]
 pub struct PostUpdateRequest {
     pub params: Option<String>,
 }
+#[derive(uniffi::Record)]
 pub struct PostDeleteRequest {
     pub params: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostListResponse {
     pub post_list: Option<Vec<PostObject>>,
     pub next_page: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostCreateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostRetrieveResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostUpdateResponse {
     pub post: Option<PostObject>,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostDeleteResponse {
     pub post: Option<PostObject>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostObject {
     pub id: Option<u32>,
     pub date: Option<String>,
@@ -92,19 +103,19 @@ pub struct PostObject {
     pub tags: Option<Vec<u32>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostGuid {
     pub raw: Option<String>,
     pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostTitle {
     pub raw: Option<String>,
     pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostContent {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -112,14 +123,14 @@ pub struct PostContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostExcerpt {
     pub raw: Option<String>,
     pub rendered: Option<String>,
     pub protected: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostMeta {
     pub footnotes: Option<String>,
 }
