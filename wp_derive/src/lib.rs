@@ -103,15 +103,14 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
 }
 
 fn ident_name_without_prefix(ident: &Ident) -> Result<String, syn::Error> {
-    ident.to_string().strip_prefix(IDENT_PREFIX).map_or_else(
-        || {
-            Err(syn::Error::new(
-                ident.span(),
-                incorrect_ident_name_error_message(),
-            ))
-        },
-        |ident_name_without_prefix| Ok(ident_name_without_prefix.to_string()),
-    )
+    let ident_name = ident.to_string();
+    let incorrect_ident_error = syn::Error::new(ident.span(), incorrect_ident_name_error_message());
+    let ident_name_without_prefix = ident_name
+        .strip_prefix(IDENT_PREFIX)
+        .ok_or_else(|| incorrect_ident_error.clone())?;
+    syn::parse_str::<Ident>(ident_name_without_prefix)
+        .map_err(|_| incorrect_ident_error.clone())?;
+    Ok(ident_name_without_prefix.to_string())
 }
 
 fn ident_name_for_context(ident_name_without_prefix: &String, context: &str) -> String {
@@ -137,5 +136,5 @@ fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
 }
 
 fn incorrect_ident_name_error_message() -> String {
-    format!("Original Struct names need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter", IDENT_PREFIX)
+    format!("Original Struct names need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)
 }
