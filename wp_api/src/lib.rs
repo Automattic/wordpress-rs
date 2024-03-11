@@ -141,7 +141,7 @@ pub fn parse_post_list_response(
 
     Ok(PostListResponse {
         post_list: Some(post_list),
-        next_page: next_page,
+        next_page,
     })
 }
 
@@ -153,7 +153,7 @@ pub fn extract_link_header(response: &WPNetworkResponse) -> Option<String> {
         }
     }
 
-    return None;
+    None
 }
 
 uniffi::include_scaffolding!("wp_api");

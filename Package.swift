@@ -23,7 +23,7 @@ let package = Package(
         .target(
             name: "wordpress-api",
             dependencies: [
-                .target(name: "wordpress-api-wrapper"),
+                .target(name: "wordpress-api-wrapper")
             ],
             path: "native/swift/Sources/wordpress-api"
         ),

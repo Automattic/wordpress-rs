@@ -3,6 +3,10 @@ import wordpress_api_wrapper
 
 public struct WordPressAPI {
 
+    enum Errors: Error {
+        case unableToParseResponse
+    }
+
     private let urlSession: URLSession
     package let helper: WpApiHelperProtocol
 
@@ -13,12 +17,7 @@ public struct WordPressAPI {
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
-
-        return WpNetworkResponse(
-            body: data,
-            statusCode: response.httpStatusCode,
-            headerMap: response.httpHeaders
-        )
+        return try WpNetworkResponse.from(data: data, response: response)
     }
 
     package func perform(request: WpNetworkRequest, callback: @escaping (Result<WpNetworkResponse, Error>) -> Void) {
@@ -29,14 +28,16 @@ public struct WordPressAPI {
             }
 
             guard let data = data, let response = response else {
-                abort() // TODO: We should have a custom error type here that represents an inability to parse whatever came back
+                callback(.failure(Errors.unableToParseResponse))
+                return
             }
 
-            callback(.success(WpNetworkResponse(
-                body: data,
-                statusCode: response.httpStatusCode,
-                headerMap: response.httpHeaders
-            )))
+            do {
+                let response = try WpNetworkResponse.from(data: data, response: response)
+                callback(.success(response))
+            } catch {
+                callback(.failure(error))
+            }
         }
     }
 }
@@ -52,7 +53,9 @@ public extension WpNetworkRequest {
 }
 
 extension Result {
-    @inlinable public func tryMap<NewSuccess>(_ transform: (Success) throws -> NewSuccess) -> Result<NewSuccess, any Error> {
+    @inlinable public func tryMap<NewSuccess>(
+            _ transform: (Success) throws -> NewSuccess
+    ) -> Result<NewSuccess, any Error> {
         switch self {
         case .success(let success):
             do {
@@ -66,13 +69,25 @@ extension Result {
     }
 }
 
-extension URLResponse {
-    var httpStatusCode: UInt16 {
-        UInt16((self as! HTTPURLResponse).statusCode)
+extension WpNetworkResponse {
+    static func from(data: Data, response: URLResponse) throws -> WpNetworkResponse {
+        guard let response = response as? HTTPURLResponse else {
+            abort()
+        }
+
+        return WpNetworkResponse(
+            body: data,
+            statusCode: UInt16(response.statusCode),
+            headerMap: response.httpHeaders
+        )
+
     }
+}
+
+extension HTTPURLResponse {
 
     var httpHeaders: [String: String] {
-        (self as! HTTPURLResponse).allHeaderFields.reduce(into: [String: String]()) {
+        allHeaderFields.reduce(into: [String: String]()) {
             guard
                 let key = $1.key as? String,
                 let value = $1.value as? String
@@ -85,7 +100,7 @@ extension URLResponse {
     }
 }
 
-// TODO: Everything below this line should be moved into the Rust layer
+// Note: Everything below this line should be moved into the Rust layer
 public extension WpAuthentication {
     init(username: String, password: String) {
         self.init(authToken: "\(username):\(password)".data(using: .utf8)!.base64EncodedString())

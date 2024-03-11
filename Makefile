@@ -7,7 +7,11 @@ udl_path := wp_api/src/wp_api.udl
 docker_container_repo_dir=/app
 
 # Common docker options
+rust_docker_container := public.ecr.aws/docker/library/rust:1.76
+swiftlint_container := ghcr.io/realm/swiftlint:0.53.0
+
 docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
+rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 clean:
@@ -147,6 +151,32 @@ test-android: bindings _test-android
 
 publish-android-local: bindings _publish-android-local
 
+test-rust:
+	$(rust_docker_run) cargo test
+
+test-server:
+	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
+	docker-compose up -d
+	docker-compose run wpcli
+
+stop-server:
+	docker-compose down
+
+lint: lint-rust lint-swift
+
+lint-rust:
+	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings"
+
+lint-swift:
+	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint
+
+lintfix-swift:
+	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint --autocorrect
+
 build-in-docker:
 	$(call bindings)
 	$(docker_build_and_run)
+
+dev-server:
+	mkdir -p .wordpress
+	docker-compose up
