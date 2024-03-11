@@ -14,7 +14,7 @@ rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docke
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 clean:
-	git clean -ffxd
+	git clean -ffXd
 
 _generate-jni-libs:
 	rm -rf $(jni_libs_root)
@@ -155,7 +155,8 @@ test-rust:
 
 test-server:
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
-	docker-compose up --attach wpcli
+	docker-compose up -d
+	docker-compose run wpcli
 
 stop-server:
 	docker-compose down
