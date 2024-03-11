@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
-#[derive(WPContextual)]
+#[derive(Debug, Serialize, Deserialize, WPContextual, uniffi::Record)]
 pub struct PostObject {
     #[WPContext("edit", "view", "embed")]
     pub id: Option<u32>,
@@ -11,5 +12,7 @@ pub struct PostObject {
     #[WPContext("edit", "view", "embed")]
     pub already_strongly_typed: u32,
 }
+
+uniffi::setup_scaffolding!("wp_derive");
 
 fn main() {}

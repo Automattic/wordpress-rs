@@ -37,6 +37,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     }
                 });
         token_stream.extend(quote! {
+            #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
             pub struct #cident {
                 #(#non_optional_fields,)*
             }
