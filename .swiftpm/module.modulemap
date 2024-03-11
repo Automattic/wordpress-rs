@@ -1,4 +1,0 @@
-module libwordpressFFI {
-    header "wp_apiFFI.h"
-    export *
-}

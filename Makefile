@@ -36,7 +36,6 @@ bindings:
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir $(android_generated_source_path) --language kotlin
 	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
-	sed -i '' 's/wp_apiFFI/libwordpressFFI/g' native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
@@ -111,7 +110,7 @@ xcframework-headers: bindings
 	mkdir -p target/swift-bindings/headers
 
 	mv target/swift-bindings/*.h target/swift-bindings/headers
-	cp .swiftpm/module.modulemap target/swift-bindings/headers/module.modulemap
+	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
 
 # Generate the xcframework
 #
