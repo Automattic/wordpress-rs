@@ -3,6 +3,7 @@ use wp_derive::WPContextual;
 
 #[derive(Debug, Serialize, Deserialize, WPContextual, uniffi::Record)]
 pub struct PostObject {
+    #[serde(rename(serialize = "ser_name"))]
     #[WPContext("edit", "view", "embed")]
     pub id: Option<u32>,
     #[WPContext("edit")]

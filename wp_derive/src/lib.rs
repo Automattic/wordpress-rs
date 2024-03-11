@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident};
+use syn::{parse_macro_input, Attribute, DeriveInput, Ident};
 
 const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
 
@@ -28,7 +28,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 .map(|f| {
                     let new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
                     syn::Field {
-                        attrs: Vec::new(),
+                        // Remove the WPContext attribute from the generated field
+                        attrs: attrs_without_wp_context(f.attrs.clone()),
                         vis: f.vis.clone(),
                         mutability: syn::FieldMutability::None,
                         ident: f.ident.clone(),
@@ -52,7 +53,9 @@ fn filtered_fields_for_context<'a>(
 ) -> impl Iterator<Item = &'a syn::Field> {
     fields.filter(move |f| {
         for attr in &f.attrs {
-            if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "WPContext" {
+            if attr.path().segments.len() == 1
+                && is_wp_context_ident(&attr.path().segments[0].ident)
+            {
                 if let syn::Meta::List(meta_list) = &attr.meta {
                     return meta_list.tokens.clone().into_iter().any(|t| {
                         if let proc_macro2::TokenTree::Literal(l) = t {
@@ -96,4 +99,22 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
 
 fn ident_name_for_context(ident: &Ident, context: &str) -> String {
     format!("{}With{}Context", ident, context)
+}
+
+fn is_wp_context_ident(ident: &Ident) -> bool {
+    ident.to_string().eq("WPContext")
+}
+
+fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
+    attrs
+        .into_iter()
+        .filter(|attr| {
+            !attr
+                .meta
+                .path()
+                .segments
+                .iter()
+                .any(|s| is_wp_context_ident(&s.ident))
+        })
+        .collect()
 }
