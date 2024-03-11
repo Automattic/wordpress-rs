@@ -3,11 +3,16 @@ use quote::quote;
 use syn::{parse_macro_input, Attribute, DeriveInput, Ident};
 
 const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
+const IDENT_PREFIX: &str = "Sparse";
 
 #[proc_macro_derive(WPContextual, attributes(WPContext))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
-    let name = &ast.ident;
+    let original_ident = &ast.ident;
+    let ident_name_without_prefix = match ident_name_without_prefix(original_ident) {
+        Ok(ident) => ident,
+        Err(e) => return e.into_compile_error().into(),
+    };
     let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
         if let syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
@@ -21,8 +26,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let mut token_stream = proc_macro2::TokenStream::new();
     CONTEXTS.iter().for_each(|context| {
-        let cname = ident_name_for_context(name, context);
-        let cident = Ident::new(&cname, name.span());
+        let cname = ident_name_for_context(&ident_name_without_prefix, context);
+        let cident = Ident::new(&cname, original_ident.span());
         let non_optional_fields =
             filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
                 .map(|f| {
@@ -97,8 +102,20 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-fn ident_name_for_context(ident: &Ident, context: &str) -> String {
-    format!("{}With{}Context", ident, context)
+fn ident_name_without_prefix(ident: &Ident) -> Result<String, syn::Error> {
+    ident.to_string().strip_prefix(IDENT_PREFIX).map_or_else(
+        || {
+            Err(syn::Error::new(
+                ident.span(),
+                incorrect_ident_name_error_message(),
+            ))
+        },
+        |ident_name_without_prefix| Ok(ident_name_without_prefix.to_string()),
+    )
+}
+
+fn ident_name_for_context(ident_name_without_prefix: &String, context: &str) -> String {
+    format!("{}With{}Context", ident_name_without_prefix, context)
 }
 
 fn is_wp_context_ident(ident: &Ident) -> bool {
@@ -117,4 +134,8 @@ fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
                 .any(|s| is_wp_context_ident(&s.ident))
         })
         .collect()
+}
+
+fn incorrect_ident_name_error_message() -> String {
+    format!("Original Struct names need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter", IDENT_PREFIX)
 }

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
 #[derive(Debug, Serialize, Deserialize, WPContextual, uniffi::Record)]
-pub struct PostObject {
+pub struct SparsePostObject {
     #[serde(rename(serialize = "ser_name"))]
     #[WPContext("edit", "view", "embed")]
     pub id: Option<u32>,
