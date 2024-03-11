@@ -20,7 +20,7 @@ services:
                 condition: service_healthy
         healthcheck:
             test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
-            interval: 2s
+            interval: 4s
             timeout: 1s
             retries: 30
 
@@ -54,6 +54,6 @@ services:
             MYSQL_RANDOM_ROOT_PASSWORD: true
         healthcheck:
             test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-            interval: 2s
+            interval: 4s
             timeout: 1s
             retries: 30

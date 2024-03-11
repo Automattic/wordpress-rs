@@ -156,7 +156,7 @@ test-rust:
 
 test-server:
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
-	docker-compose up --attach wpcli
+	docker-compose up --attach wpcli --exit-code-from wpcli
 
 stop-server:
 	docker-compose down
