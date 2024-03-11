@@ -15,7 +15,7 @@ rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docke
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 clean:
-	git clean -ffxd
+	git clean -ffXd
 
 _generate-jni-libs:
 	rm -rf $(jni_libs_root)
