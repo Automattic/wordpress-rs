@@ -2,11 +2,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Ident};
 
-const CONTEXTS: [&'static str; 3] = ["Edit", "Embed", "View"];
+const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
 
 #[proc_macro_derive(WPContextual, attributes(WPContext))]
 pub fn derive(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
+    let ast: DeriveInput = parse_macro_input!(input);
     let name = &ast.ident;
     let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
         if let syn::Data::Struct(syn::DataStruct {
