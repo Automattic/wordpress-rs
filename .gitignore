@@ -20,6 +20,7 @@ local.properties
 # Swift
 .build
 .swiftpm/xcode
+xcuserdata
 
 # Auto-generated Swift Files
 native/swift/Sources/wordpress-api-wrapper/*.swift
