@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
-#[derive(Debug, Serialize, Deserialize, WPContextual, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparsePostObject {
     #[serde(rename(serialize = "ser_name"))]
     #[WPContext("edit", "view", "embed")]
@@ -12,6 +12,14 @@ pub struct SparsePostObject {
     pub embed_date: Option<String>,
     #[WPContext("edit", "view", "embed")]
     pub already_strongly_typed: u32,
+    #[WPContext("edit", "view")]
+    pub guid: Option<SparsePostGuid>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
+pub struct SparsePostGuid {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
 }
 
 uniffi::setup_scaffolding!("wp_derive");
