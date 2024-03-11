@@ -42,6 +42,8 @@ services:
             wordpress:
                 condition: service_healthy
         entrypoint: ["/setup-test-site.sh"]
+        profiles:
+            - donotstart
 
     mysql:
         image: 'public.ecr.aws/docker/library/mysql:8.0'
