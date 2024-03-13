@@ -150,6 +150,9 @@ xcframework: bindings xcframework-combined-libraries xcframework-headers
 		-headers target/swift-bindings/headers \
 		-output target/libwordpressFFI.xcframework
 
+docker-image-swift:
+	docker build -t wordpress-rs-swift -f Dockerfile.swift .
+
 swift-linux-library: bindings
 	mkdir -p target/swift-bindings/libwordpressFFI-linux
 	cp target/swift-bindings/*.h target/swift-bindings/libwordpressFFI-linux/
@@ -159,7 +162,10 @@ swift-linux-library: bindings
 test-swift:
 	$(MAKE) test-swift-$(uname)
 
-test-swift-linux: swift-linux-library
+test-swift-linux: docker-image-swift
+	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
+
+test-swift-linux-in-docker: swift-linux-library
 	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
 
 test-swift-darwin: xcframework

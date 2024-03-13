@@ -49,24 +49,8 @@ steps:
           queue: mac
       - label: ":swift: :linux: Build and Test"
         command: |
-          echo "--- :linux: Install dependencies"
-          apt-get update
-          apt-get install -y \
-            build-essential \
-            curl \
-            make \
-            libssl-dev
-
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-          . "$$HOME/.cargo/env"
-          rustup toolchain install nightly
-
           echo "--- :swift: Building + Testing"
-          make test-swift
-        plugins:
-          - docker#v5.10.0:
-              image: "public.ecr.aws/docker/library/swift:5.9"
+          make test-swift-linux
       - label: ":swift: Lint"
         command: |
           echo "--- :swift: Swiftlint"
