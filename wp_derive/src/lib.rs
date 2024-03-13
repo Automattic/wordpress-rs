@@ -24,8 +24,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             unimplemented!("Only implemented for Structs for now");
         };
 
-    let mut token_stream = proc_macro2::TokenStream::new();
-    CONTEXTS.iter().for_each(|context| {
+    let contextual_token_streams = CONTEXTS.iter().map(|context| {
         let cname = ident_name_for_context(&ident_name_without_prefix, context);
         let cident = Ident::new(&cname, original_ident.span());
         let cfields: Vec<syn::Field> =
@@ -53,15 +52,20 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 })
                 .collect();
         if !cfields.is_empty() {
-            token_stream.extend(quote! {
+            quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
                 pub struct #cident {
                     #(#cfields,)*
                 }
-            });
+            }
+            .into()
+        } else {
+            proc_macro::TokenStream::new()
         }
     });
-    token_stream.into()
+    let mut result = TokenStream::new();
+    result.extend(contextual_token_streams);
+    result
 }
 
 fn filtered_fields_for_context<'a>(
