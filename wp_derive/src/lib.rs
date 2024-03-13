@@ -28,7 +28,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     CONTEXTS.iter().for_each(|context| {
         let cname = ident_name_for_context(&ident_name_without_prefix, context);
         let cident = Ident::new(&cname, original_ident.span());
-        let non_optional_fields =
+        let cfields: Vec<syn::Field> =
             filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
                 .map(|f| {
                     let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
@@ -50,13 +50,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         colon_token: f.colon_token,
                         ty: new_type,
                     }
-                });
-        token_stream.extend(quote! {
-            #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-            pub struct #cident {
-                #(#non_optional_fields,)*
-            }
-        });
+                })
+                .collect();
+        if !cfields.is_empty() {
+            token_stream.extend(quote! {
+                #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+                pub struct #cident {
+                    #(#cfields,)*
+                }
+            });
+        }
     });
     token_stream.into()
 }
