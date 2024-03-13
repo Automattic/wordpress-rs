@@ -1,18 +1,25 @@
+use const_format::formatcp;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Attribute, DeriveInput, Ident};
 
 const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
 const IDENT_PREFIX: &str = "Sparse";
+const INCORRECT_IDENT_NAME_ERROR_MESSAGE: &str = formatcp!("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX);
+const INCORRECT_FIELD_TYPE_ERROR_MESSAGE: &str = formatcp!(
+    "WPContextualField field types need to start with '{}' prefix",
+    IDENT_PREFIX
+);
 
 #[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
     let original_ident = &ast.ident;
-    let ident_name_without_prefix = match ident_name_without_prefix(original_ident) {
-        Ok(ident) => ident,
-        Err(e) => return e.into_compile_error().into(),
-    };
+    let ident_name_without_prefix =
+        match ident_name_without_prefix(original_ident, INCORRECT_IDENT_NAME_ERROR_MESSAGE) {
+            Ok(ident) => ident,
+            Err(e) => return e.into_compile_error().into(),
+        };
     let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
         if let syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
@@ -120,14 +127,12 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-// TODO: Return a more meaningful Result type - ideally don't require mutability
 fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) -> Result<bool, syn::Error> {
     if let syn::Type::Path(ref mut p) = ty {
-        // TODO: Add spanned error
         assert!(p.path.segments.len() == 1);
-        //p.path.segments.into_iter().
         let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
-        let ident_name_without_prefix = ident_name_without_prefix(&segment.ident)?;
+        let ident_name_without_prefix =
+            ident_name_without_prefix(&segment.ident, INCORRECT_FIELD_TYPE_ERROR_MESSAGE)?;
         segment.ident = Ident::new(
             &ident_name_for_context(&ident_name_without_prefix, context),
             segment.ident.span(),
@@ -138,10 +143,9 @@ fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) -> Result
     }
 }
 
-// TODO: Refactor to support fields as well as structs
-fn ident_name_without_prefix(ident: &Ident) -> Result<String, syn::Error> {
+fn ident_name_without_prefix(ident: &Ident, error_message: &str) -> Result<String, syn::Error> {
     let ident_name = ident.to_string();
-    let incorrect_ident_error = syn::Error::new(ident.span(), incorrect_ident_name_error_message());
+    let incorrect_ident_error = syn::Error::new(ident.span(), error_message);
     let ident_name_without_prefix = ident_name
         .strip_prefix(IDENT_PREFIX)
         .ok_or_else(|| incorrect_ident_error.clone())?;
@@ -175,8 +179,4 @@ fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
                 .any(|s| is_wp_context_ident(&s.ident) || is_wp_contextual_field_ident(&s.ident))
         })
         .collect()
-}
-
-fn incorrect_ident_name_error_message() -> String {
-    format!("Original Struct names need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)
 }
