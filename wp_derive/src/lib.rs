@@ -5,7 +5,7 @@ use syn::{parse_macro_input, Attribute, DeriveInput, Ident};
 const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
 const IDENT_PREFIX: &str = "Sparse";
 
-#[proc_macro_derive(WPContextual, attributes(WPContext))]
+#[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
     let original_ident = &ast.ident;
@@ -31,7 +31,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let non_optional_fields =
             filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
                 .map(|f| {
-                    let new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+                    let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+                    let is_wp_contextual_field = f.attrs.iter().any(|attr| {
+                        attr.path()
+                            .segments
+                            .iter()
+                            .any(|s| is_wp_contextual_field_ident(&s.ident))
+                    });
+                    if is_wp_contextual_field {
+                        modify_for_contextual_field_type(&mut new_type, context);
+                    }
                     syn::Field {
                         // Remove the WPContext attribute from the generated field
                         attrs: attrs_without_wp_context(f.attrs.clone()),
@@ -58,17 +67,18 @@ fn filtered_fields_for_context<'a>(
 ) -> impl Iterator<Item = &'a syn::Field> {
     fields.filter(move |f| {
         for attr in &f.attrs {
-            if attr.path().segments.len() == 1
-                && is_wp_context_ident(&attr.path().segments[0].ident)
-            {
-                if let syn::Meta::List(meta_list) = &attr.meta {
-                    return meta_list.tokens.clone().into_iter().any(|t| {
-                        if let proc_macro2::TokenTree::Literal(l) = t {
-                            l.to_string() == context
-                        } else {
-                            false
-                        }
-                    });
+            for segment in attr.path().segments.iter() {
+                let segment_ident = &segment.ident;
+                if is_wp_context_ident(segment_ident) {
+                    if let syn::Meta::List(meta_list) = &attr.meta {
+                        return meta_list.tokens.clone().into_iter().any(|t| {
+                            if let proc_macro2::TokenTree::Literal(l) = t {
+                                l.to_string() == context
+                            } else {
+                                false
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -102,6 +112,20 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
+fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) {
+    if let syn::Type::Path(ref mut p) = ty {
+        // TODO: Add spanned error
+        assert!(p.path.segments.len() == 1);
+        //p.path.segments.into_iter().
+        let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
+        segment.ident = Ident::new(
+            &ident_name_for_context(&ident_name_without_prefix(&segment.ident).unwrap(), context),
+            segment.ident.span(),
+        );
+    }
+}
+
+// TODO: Refactor to support fields as well as structs
 fn ident_name_without_prefix(ident: &Ident) -> Result<String, syn::Error> {
     let ident_name = ident.to_string();
     let incorrect_ident_error = syn::Error::new(ident.span(), incorrect_ident_name_error_message());
@@ -121,6 +145,11 @@ fn is_wp_context_ident(ident: &Ident) -> bool {
     ident.to_string().eq("WPContext")
 }
 
+fn is_wp_contextual_field_ident(ident: &Ident) -> bool {
+    ident.to_string().eq("WPContextualField")
+}
+
+// TODO: Update the name
 fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
     attrs
         .into_iter()
@@ -130,7 +159,7 @@ fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
                 .path()
                 .segments
                 .iter()
-                .any(|s| is_wp_context_ident(&s.ident))
+                .any(|s| is_wp_context_ident(&s.ident) || is_wp_contextual_field_ident(&s.ident))
         })
         .collect()
 }

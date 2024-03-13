@@ -13,12 +13,15 @@ pub struct SparsePostObject {
     #[WPContext("edit", "view", "embed")]
     pub already_strongly_typed: u32,
     #[WPContext("edit", "view")]
+    #[WPContextualField]
     pub guid: Option<SparsePostGuid>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparsePostGuid {
+    #[WPContext("edit")]
     pub raw: Option<String>,
+    #[WPContext("edit", "view")]
     pub rendered: Option<String>,
 }
 
