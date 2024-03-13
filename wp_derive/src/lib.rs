@@ -52,20 +52,21 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 })
                 .collect();
         if !cfields.is_empty() {
-            quote! {
+            Ok(quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
                 pub struct #cident {
                     #(#cfields,)*
                 }
             }
-            .into()
+            .into())
         } else {
-            proc_macro::TokenStream::new()
+            Ok(proc_macro::TokenStream::new())
         }
     });
-    let mut result = TokenStream::new();
-    result.extend(contextual_token_streams);
-    result
+    match contextual_token_streams.collect::<Result<Vec<TokenStream>, syn::Error>>() {
+        Ok(token_streams) => TokenStream::from_iter(token_streams),
+        Err(e) => e.into_compile_error().into(),
+    }
 }
 
 fn filtered_fields_for_context<'a>(
