@@ -27,7 +27,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let contextual_token_streams = CONTEXTS.iter().map(|context| {
         let cname = ident_name_for_context(&ident_name_without_prefix, context);
         let cident = Ident::new(&cname, original_ident.span());
-        let cfields: Vec<syn::Field> =
+        let cfields =
             filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
                 .map(|f| {
                     let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
@@ -38,19 +38,19 @@ pub fn derive(input: TokenStream) -> TokenStream {
                             .any(|s| is_wp_contextual_field_ident(&s.ident))
                     });
                     if is_wp_contextual_field {
-                        modify_for_contextual_field_type(&mut new_type, context);
+                        modify_for_contextual_field_type(&mut new_type, context)?;
                     }
-                    syn::Field {
-                        // Remove the WPContext attribute from the generated field
+                    Ok::<syn::Field, syn::Error>(syn::Field {
+                        // Remove the WPContext & WPContextualField attributes from the generated field
                         attrs: attrs_without_wp_context(f.attrs.clone()),
                         vis: f.vis.clone(),
                         mutability: syn::FieldMutability::None,
                         ident: f.ident.clone(),
                         colon_token: f.colon_token,
                         ty: new_type,
-                    }
+                    })
                 })
-                .collect();
+                .collect::<Result<Vec<syn::Field>, syn::Error>>()?;
         if !cfields.is_empty() {
             Ok(quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
@@ -120,16 +120,21 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) {
+// TODO: Return a more meaningful Result type - ideally don't require mutability
+fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) -> Result<bool, syn::Error> {
     if let syn::Type::Path(ref mut p) = ty {
         // TODO: Add spanned error
         assert!(p.path.segments.len() == 1);
         //p.path.segments.into_iter().
         let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
+        let ident_name_without_prefix = ident_name_without_prefix(&segment.ident)?;
         segment.ident = Ident::new(
-            &ident_name_for_context(&ident_name_without_prefix(&segment.ident).unwrap(), context),
+            &ident_name_for_context(&ident_name_without_prefix, context),
             segment.ident.span(),
         );
+        Ok(true)
+    } else {
+        Ok(false)
     }
 }
 
