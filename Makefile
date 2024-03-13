@@ -13,6 +13,14 @@ docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
+uname := $(shell uname | tr A-Z a-z)
+ifeq ($(uname), linux)
+	dylib_ext := so
+endif
+ifeq ($(uname), darwin)
+	dylib_ext := dylib
+endif
+
 clean:
 	git clean -ffXd
 
@@ -33,8 +41,8 @@ bindings:
 	cargo build --release
 
 	#wp_api
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir $(android_generated_source_path) --language kotlin
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.dylib --out-dir ./target/swift-bindings --language swift
+	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
+	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
 _test-android:
@@ -109,7 +117,7 @@ xcframework-headers: bindings
 	rm -rvf target/swift-bindings/headers
 	mkdir -p target/swift-bindings/headers
 
-	mv target/swift-bindings/*.h target/swift-bindings/headers
+	cp target/swift-bindings/*.h target/swift-bindings/headers
 	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
 
 # Generate the xcframework
@@ -142,7 +150,25 @@ xcframework: bindings xcframework-combined-libraries xcframework-headers
 		-headers target/swift-bindings/headers \
 		-output target/libwordpressFFI.xcframework
 
-test-swift: xcframework
+docker-image-swift:
+	docker build -t wordpress-rs-swift -f Dockerfile.swift .
+
+swift-linux-library: bindings
+	mkdir -p target/swift-bindings/libwordpressFFI-linux
+	cp target/swift-bindings/*.h target/swift-bindings/libwordpressFFI-linux/
+	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/libwordpressFFI-linux/module.modulemap
+	cp target/release/libwp_api.a target/swift-bindings/libwordpressFFI-linux/
+
+test-swift:
+	$(MAKE) test-swift-$(uname)
+
+test-swift-linux: docker-image-swift
+	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
+
+test-swift-linux-in-docker: swift-linux-library
+	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
+
+test-swift-darwin: xcframework
 	swift test
 
 test-android: bindings _test-android

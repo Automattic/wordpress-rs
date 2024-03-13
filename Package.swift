@@ -4,6 +4,15 @@
 
 import PackageDescription
 
+#if os(Linux)
+let libwordpressFFI: Target = .systemLibrary(
+        name: "libwordpressFFI",
+        path: "target/swift-bindings/libwordpressFFI-linux/"
+    )
+#elseif os(macOS)
+let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
+#endif
+
 let package = Package(
     name: "wordpress",
     platforms: [
@@ -37,11 +46,12 @@ let package = Package(
                 "README.md"
             ]
         ),
-        .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework"),
+        libwordpressFFI,
         .testTarget(
             name: "wordpress-api-tests",
             dependencies: [
-                .target(name: "wordpress-api")
+                .target(name: "wordpress-api"),
+                .target(name: "libwordpressFFI")
             ],
             path: "native/swift/Tests/wordpress-api"
         )

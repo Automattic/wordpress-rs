@@ -1,6 +1,10 @@
 import Foundation
 import wordpress_api_wrapper
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public struct WordPressAPI {
 
     enum Errors: Error {
@@ -16,12 +20,15 @@ public struct WordPressAPI {
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
-        let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
-        return try WpNetworkResponse.from(data: data, response: response)
+        try await withCheckedThrowingContinuation { continuation in
+            self.perform(request: request) { result in
+                continuation.resume(with: result)
+            }
+        }
     }
 
     package func perform(request: WpNetworkRequest, callback: @escaping (Result<WpNetworkResponse, Error>) -> Void) {
-        self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
+        let task = self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
             if let error {
                 callback(.failure(error))
                 return
@@ -39,6 +46,7 @@ public struct WordPressAPI {
                 callback(.failure(error))
             }
         }
+        task.resume()
     }
 }
 
