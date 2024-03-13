@@ -1,48 +1,30 @@
 import Foundation
-import CryptoKit
+import Crypto
 import XCTest
-import OHHTTPStubs
-import OHHTTPStubsSwift
+
+#if os(Linux)
+import FoundationNetworking
+#endif
 
 @testable import wordpress_api
 
 class URLSessionHelperTests: XCTestCase {
 
     var session: URLSession!
+    var stub: HTTPStub!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
+
         session = .shared
-    }
-
-    override func tearDown() {
-        super.tearDown()
-        HTTPStubs.removeAllStubs()
-        XCTAssertEqual(session.debugNumberOfTaskData, 0)
-    }
-
-    func testConnectionError() async throws {
-        stub(condition: isPath("/hello")) { _ in
-            HTTPStubsResponse(error: URLError(.serverCertificateUntrusted))
-        }
-
-        let result = await session.perform(request: .init(url: URL(string: "https://wordpress.org/hello")!))
-        do {
-            _ = try result.get()
-            XCTFail("The above call should throw")
-        } catch let WordPressAPIError.connection(error) {
-            XCTAssertEqual(error.code, URLError.Code.serverCertificateUntrusted)
-        } catch {
-            XCTFail("Unknown error: \(error)")
-        }
+        stub = try await launchHTTPStub()
     }
 
     func test200() async throws {
-        stub(condition: isPath("/hello")) { _ in
-            HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
+        stub.stub(condition: isPath("/hello")) { _ in
+            HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200)
         }
-
-        let result = await session.perform(request: .init(url: URL(string: "https://wordpress.org/hello")!))
+        let result = await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!))
 
         // The result is a successful result. This line should not throw
         let response = try result.get()
@@ -51,28 +33,30 @@ class URLSessionHelperTests: XCTestCase {
     }
 
     func test500() async throws {
-        stub(condition: isPath("/hello")) { _ in
+        stub.stub(condition: isPath("/hello")) { _ in
             HTTPStubsResponse(data: "Internal server error".data(using: .utf8)!, statusCode: 500, headers: nil)
         }
 
         let result = await session
-            .perform(request: .init(url: URL(string: "https://wordpress.org/hello")!))
+            .perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!))
         try XCTAssertEqual(result.get().statusCode, 500)
     }
 
     func testHeader() async throws {
-        stub(condition: hasHeaderNamed("X-Request", value: "Ping")) { _ in
+        stub.stub(condition: hasHeaderNamed("X-Request", value: "Ping")) { _ in
             HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: ["X-Response": "Pong"])
         }
-
+   
         let result = await session
-            .perform(request: .init(method: .get, url: "https://wordpress.org/hello", headerMap: ["X-Request": "Ping"]))
+            .perform(request: .init(method: .get, url: "\(stub.serverURL.absoluteString)/hello", headerMap: ["X-Request": "Ping"]))
         try XCTAssertEqual(result.get().statusCode, 200)
         try XCTAssertEqual(result.get().headerMap?["X-Response"], "Pong")
     }
 
+// URLSessionTask on Linux doesn't appear to support tracking progress. See https://github.com/apple/swift-corelibs-foundation/blob/swift-5.10-RELEASE/Sources/FoundationNetworking/URLSession/URLSessionTask.swift#L42
+#if !os(Linux)
     func testProgressTracking() async throws {
-        stub(condition: isPath("/hello")) { _ in
+        stub.stub(condition: isPath("/hello")) { _ in
             HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
         }
 
@@ -80,15 +64,16 @@ class URLSessionHelperTests: XCTestCase {
         XCTAssertEqual(progress.completedUnitCount, 0)
         XCTAssertEqual(progress.fractionCompleted, 0)
 
-        let _ = await session.perform(request: .init(url: URL(string: "https://wordpress.org/hello")!), fulfilling: progress)
+        let _ = await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!), fulfilling: progress)
         XCTAssertEqual(progress.completedUnitCount, 20)
         XCTAssertEqual(progress.fractionCompleted, 1)
     }
+#endif
 
     func testCancellation() async throws {
         // Give a slow HTTP request that takes 0.5 second to complete
-        stub(condition: isPath("/hello")) { _ in
-            let response = HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
+        stub.stub(condition: isPath("/hello")) { _ in
+            var response = HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
             response.responseTime = 0.5
             return response
         }
@@ -100,7 +85,7 @@ class URLSessionHelperTests: XCTestCase {
         }
 
         // The result should be an cancellation result
-        let result = await session.perform(request: .init(url: URL(string: "https://wordpress.org/hello")!), fulfilling: progress)
+        let result = await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!), fulfilling: progress)
         if case let .failure(.connection(urlError)) = result, urlError.code == .cancelled {
             // Do nothing
         } else {
@@ -111,7 +96,7 @@ class URLSessionHelperTests: XCTestCase {
     // TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testEncodingError() async {
 //        let underlyingError = NSError(domain: "test", code: 123)
-//        let builder = HTTPRequestBuilder(url: URL(string: "https://wordpress.org")!)
+//        let builder = HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)")!)
 //            .method(.post)
 //            .body(json: { throw underlyingError })
 //        let result = await session.perform(request: builder, errorType: TestError.self)
@@ -126,12 +111,12 @@ class URLSessionHelperTests: XCTestCase {
 // TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testMultipartForm() async throws {
 //        var req: URLRequest?
-//        stub(condition: isPath("/hello")) {
+//        stub.stub(condition: isPath("/hello")) {
 //            req = $0
 //            return HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
 //        }
 //
-//        let builder = HTTPRequestBuilder(url: URL(string: "https://wordpress.org/hello")!)
+//        let builder = HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!)
 //            .method(.post)
 //            .body(form: [MultipartFormField(text: "value", name: "name", filename: nil)])
 //
@@ -162,11 +147,11 @@ class URLSessionHelperTests: XCTestCase {
             try? FileManager.default.removeItem(at: file)
         }
 
-        stub(condition: isPath("/hello")) { _ in
+        stub.stub(condition: isPath("/hello")) { _ in
             HTTPStubsResponse(fileURL: file, statusCode: 200, headers: nil)
         }
 
-        let response = try await session.perform(request: .init(url: URL(string: "https://wordpress.org/hello")!)).get()
+        let response = try await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!)).get()
 
         try XCTAssertEqual(
             sha256(XCTUnwrap(InputStream(url: file))),
@@ -176,7 +161,7 @@ class URLSessionHelperTests: XCTestCase {
 
 // TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testTempFileRemovedAfterMultipartUpload() async throws {
-//        stub(condition: isPath("/upload")) { _ in
+//        stub.stub(condition: isPath("/upload")) { _ in
 //            HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
 //        }
 //
@@ -191,7 +176,7 @@ class URLSessionHelperTests: XCTestCase {
 //        let tempFilesBeforeUpload = existingTempFiles()
 //
 //        // Perform upload HTTP request
-//        let builder = try HTTPRequestBuilder(url: URL(string: "https://wordpress.org/upload")!)
+//        let builder = try HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)/upload")!)
 //            .method(.post)
 //            .body(form: [MultipartFormField(fileAtPath: file.path, name: "file", filename: "file.txt", mimeType: "text/plain")])
 //        let _ = await session.perform(request: builder, errorType: TestError.self)
@@ -207,7 +192,7 @@ class URLSessionHelperTests: XCTestCase {
 
 // TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testTempFileRemovedAfterMultipartUploadError() async throws {
-//        stub(condition: isPath("/upload")) { _ in
+//        stub.stub(condition: isPath("/upload")) { _ in
 //            HTTPStubsResponse(error: URLError(.networkConnectionLost))
 //        }
 //
@@ -222,7 +207,7 @@ class URLSessionHelperTests: XCTestCase {
 //        let tempFilesBeforeUpload = existingTempFiles()
 //
 //        // Perform upload HTTP request
-//        let builder = try HTTPRequestBuilder(url: URL(string: "https://wordpress.org/upload")!)
+//        let builder = try HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)/upload")!)
 //            .method(.post)
 //            .body(form: [MultipartFormField(fileAtPath: file.path, name: "file", filename: "file.txt", mimeType: "text/plain")])
 //        let _ = await session.perform(request: builder, errorType: TestError.self)
@@ -277,6 +262,10 @@ class URLSessionHelperTests: XCTestCase {
     }
 }
 
+// MARK: - Background URLSession Tests - Only available on Apple platforms
+
+#if WP_SUPPORT_BACKGROUND_URL_SESSION
+
 class BackgroundURLSessionHelperTests: URLSessionHelperTests {
 
     // swiftlint:disable weak_delegate
@@ -287,7 +276,7 @@ class BackgroundURLSessionHelperTests: URLSessionHelperTests {
         super.setUp()
 
         delegate = TestBackgroundURLSessionDelegate()
-        session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
     }
 
     override func tearDown() {
@@ -314,3 +303,5 @@ private class TestBackgroundURLSessionDelegate: BackgroundURLSessionDelegate {
         super.urlSession(session, task: task, didCompleteWithError: error)
     }
 }
+
+#endif

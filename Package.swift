@@ -30,7 +30,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/AliSoftware/OHHTTPStubs", .upToNextMajor(from: "9.1.0"))
+        .package(url: "https://github.com/apple/swift-crypto", .upToNextMajor(from: "3.3.0")),
+        .package(url: "https://github.com/swhitty/FlyingFox", exact: "0.12.2"),
     ],
     targets: [
         .target(
@@ -59,7 +60,8 @@ let package = Package(
             dependencies: [
                 .target(name: "wordpress-api"),
                 .target(name: "libwordpressFFI"),
-                .product(name: "OHHTTPStubsSwift", package: "OHHTTPStubs")
+                .product(name: "Crypto", package: "swift-crypto"),
+                "FlyingFox",
             ],
             path: "native/swift/Tests/wordpress-api",
             swiftSettings: [
