@@ -13,6 +13,8 @@ let libwordpressFFI: Target = .systemLibrary(
 let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
 #endif
 
+let supportBackgroundURLSession: SwiftSetting = .define("WP_SUPPORT_BACKGROUND_URL_SESSION", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
+
 let package = Package(
     name: "wordpress",
     platforms: [
@@ -36,7 +38,10 @@ let package = Package(
             dependencies: [
                 .target(name: "wordpress-api-wrapper")
             ],
-            path: "native/swift/Sources/wordpress-api"
+            path: "native/swift/Sources/wordpress-api",
+            swiftSettings: [
+                supportBackgroundURLSession
+            ]
         ),
         .target(
             name: "wordpress-api-wrapper",
@@ -56,7 +61,10 @@ let package = Package(
                 .target(name: "libwordpressFFI"),
                 .product(name: "OHHTTPStubsSwift", package: "OHHTTPStubs")
             ],
-            path: "native/swift/Tests/wordpress-api"
+            path: "native/swift/Tests/wordpress-api",
+            swiftSettings: [
+                supportBackgroundURLSession
+            ]
         )
     ]
 )

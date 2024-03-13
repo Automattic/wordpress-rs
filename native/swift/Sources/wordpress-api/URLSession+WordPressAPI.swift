@@ -1,21 +1,13 @@
 import Foundation
 import wordpress_api_wrapper
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 typealias WordPressAPIResult<Response> = Result<Response, WordPressAPIError>
 
 extension URLSession {
-
-    /// Create a background URLSession instance that can be used in the `perform(request:...)` async function.
-    ///
-    /// The `perform(request:...)` async function can be used in all non-background `URLSession` instances without any
-    /// extra work. However, there is a requirement to make the function works with with background `URLSession` instances.
-    /// That is the `URLSession` must have a delegate of `BackgroundURLSessionDelegate` type.
-    static func backgroundSession(configuration: URLSessionConfiguration) -> URLSession {
-        assert(configuration.identifier != nil)
-        // Pass `delegateQueue: nil` to get a serial queue, which is required to ensure thread safe access to
-        // `WordPressKitSessionDelegate` instances.
-        return URLSession(configuration: configuration, delegate: BackgroundURLSessionDelegate(), delegateQueue: nil)
-    }
 
     /// Send a HTTP request and return its response as a `WordPressAPIResult` instance.
     ///
@@ -40,9 +32,11 @@ extension URLSession {
         request: WpNetworkRequest,
         fulfilling parentProgress: Progress? = nil
     ) async -> WordPressAPIResult<WpNetworkResponse> {
+#if WP_SUPPORT_BACKGROUND_URL_SESSION
         if configuration.identifier != nil {
             assert(delegate is BackgroundURLSessionDelegate, "Unexpected `URLSession` delegate type. See the `backgroundSession(configuration:)`")
         }
+#endif
 
         if let parentProgress {
             assert(parentProgress.completedUnitCount == 0 && parentProgress.totalUnitCount > 0, "Invalid parent progress")
@@ -84,60 +78,15 @@ extension URLSession {
 
     private func task(
         for wpRequest: WpNetworkRequest,
-        completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, Error?) -> Void
+        completion: @escaping @Sendable (Data?, URLResponse?, Error?) -> Void
     ) throws -> URLSessionTask {
         let request = try wpRequest.asURLRequest()
 
-        // This additional `callCompletionFromDelegate` is added to unit test `BackgroundURLSessionDelegate`.
-        // Background `URLSession` doesn't work on unit tests, we have to create a non-background `URLSession`
-        // which has a `BackgroundURLSessionDelegate` delegate in order to test `BackgroundURLSessionDelegate`.
-        //
-        // In reality, `callCompletionFromDelegate` and `isBackgroundSession` have the same value.
-        let callCompletionFromDelegate = delegate is BackgroundURLSessionDelegate
-//        let isBackgroundSession = configuration.identifier != nil
-        let task: URLSessionTask
-        let body = wpRequest.body
-        var completion = originalCompletion
-        if let body {
-            // Use special `URLSession.uploadTask` API for multipart POST requests.
-            task = body.map(
-                left: {
-                    if callCompletionFromDelegate {
-                        return uploadTask(with: request, from: $0)
-                    } else {
-                        return uploadTask(with: request, from: $0, completionHandler: completion)
-                    }
-                },
-                right: { tempFileURL in
-                    // Remove the temp file, which contains request body, once the HTTP request completes.
-                    completion = { data, response, error in
-                        try? FileManager.default.removeItem(at: tempFileURL)
-                        originalCompletion(data, response, error)
-                    }
-
-                    if callCompletionFromDelegate {
-                        return uploadTask(with: request, fromFile: tempFileURL)
-                    } else {
-                        return uploadTask(with: request, fromFile: tempFileURL, completionHandler: completion)
-                    }
-                }
-            )
+        if let body = wpRequest.body {
+            return createUploadTask(with: request, body: body, completion: completion)
         } else {
-            // Use `URLSession.dataTask` for all other request
-            if callCompletionFromDelegate {
-                task = dataTask(with: request)
-            } else {
-                task = dataTask(with: request, completionHandler: completion)
-            }
+            return createDataTask(with: request, completion: completion)
         }
-
-        if callCompletionFromDelegate {
-            assert(delegate is BackgroundURLSessionDelegate, "Unexpected `URLSession` delegate type. See the `backgroundSession(configuration:)`")
-
-            set(completion: completion, forTaskWithIdentifier: task.taskIdentifier)
-        }
-
-        return task
     }
 
     private static func parseResponse(
@@ -168,14 +117,123 @@ extension URLSession {
 
 // MARK: - Background URL Session Support
 
+#if WP_SUPPORT_BACKGROUND_URL_SESSION
+
+private extension URLSession {
+
+    func createDataTask(with request: URLRequest, completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionDataTask {
+        // This additional `callCompletionFromDelegate` is added to unit test `BackgroundURLSessionDelegate`.
+        // Background `URLSession` doesn't work on unit tests, we have to create a non-background `URLSession`
+        // which has a `BackgroundURLSessionDelegate` delegate in order to test `BackgroundURLSessionDelegate`.
+        //
+        // In reality, `callCompletionFromDelegate` and `isBackgroundSession` have the same value.
+        let callCompletionFromDelegate = delegate is BackgroundURLSessionDelegate
+
+        let task: URLSessionDataTask
+        if callCompletionFromDelegate {
+            task = dataTask(with: request)
+            set(completion: completion, forTaskWithIdentifier: task.taskIdentifier)
+        } else {
+            task = dataTask(with: request, completionHandler: completion)
+        }
+
+        return task
+    }
+
+    func createUploadTask(with request: URLRequest, body: Either<Data, URL>, completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionUploadTask {
+        // This additional `callCompletionFromDelegate` is added to unit test `BackgroundURLSessionDelegate`.
+        // Background `URLSession` doesn't work on unit tests, we have to create a non-background `URLSession`
+        // which has a `BackgroundURLSessionDelegate` delegate in order to test `BackgroundURLSessionDelegate`.
+        //
+        // In reality, `callCompletionFromDelegate` and `isBackgroundSession` have the same value.
+        let callCompletionFromDelegate = delegate is BackgroundURLSessionDelegate
+
+        var completion = originalCompletion
+
+        let task = body.map(
+            left: {
+                if callCompletionFromDelegate {
+                    return uploadTask(with: request, from: $0)
+                } else {
+                    return uploadTask(with: request, from: $0, completionHandler: completion)
+                }
+            },
+            right: { tempFileURL in
+                // Remove the temp file, which contains request body, once the HTTP request completes.
+                completion = { data, response, error in
+                    try? FileManager.default.removeItem(at: tempFileURL)
+                    originalCompletion(data, response, error)
+                }
+
+                if callCompletionFromDelegate {
+                    return uploadTask(with: request, fromFile: tempFileURL)
+                } else {
+                    return uploadTask(with: request, fromFile: tempFileURL, completionHandler: completion)
+                }
+            }
+        )
+
+        if callCompletionFromDelegate {
+            set(completion: completion, forTaskWithIdentifier: task.taskIdentifier)
+        }
+
+        return task
+    }
+
+}
+
+#else
+
+private extension URLSession {
+
+    func createDataTask(with request: URLRequest, completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionDataTask {
+        dataTask(with: request, completionHandler: completion)
+    }
+
+    func createUploadTask(with request: URLRequest, body: Either<Data, URL>, completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionUploadTask {
+        body.map(
+            left: {
+                uploadTask(with: request, from: $0, completionHandler: originalCompletion)
+            },
+            right: { tempFileURL in
+                // Remove the temp file, which contains request body, once the HTTP request completes.
+                let completion = { data, response, error in
+                    try? FileManager.default.removeItem(at: tempFileURL)
+                    originalCompletion(data, response, error)
+                }
+                return uploadTask(with: request, fromFile: tempFileURL, completionHandler: completion)
+            }
+        )
+    }
+
+}
+
+#endif
+
+#if WP_SUPPORT_BACKGROUND_URL_SESSION
+
+extension URLSession {
+
+    /// Create a background URLSession instance that can be used in the `perform(request:...)` async function.
+    ///
+    /// The `perform(request:...)` async function can be used in all non-background `URLSession` instances without any
+    /// extra work. However, there is a requirement to make the function works with with background `URLSession` instances.
+    /// That is the `URLSession` must have a delegate of `BackgroundURLSessionDelegate` type.
+    static func backgroundSession(configuration: URLSessionConfiguration) -> URLSession {
+        assert(configuration.identifier != nil)
+        // Pass `delegateQueue: nil` to get a serial queue, which is required to ensure thread safe access to
+        // `WordPressKitSessionDelegate` instances.
+        return URLSession(configuration: configuration, delegate: BackgroundURLSessionDelegate(), delegateQueue: nil)
+    }
+
+}
+
 private final class SessionTaskData {
     var responseBody = Data()
     var completion: ((Data?, URLResponse?, Error?) -> Void)?
 }
 
 class BackgroundURLSessionDelegate: NSObject, URLSessionDataDelegate {
-
-    private var taskData = [Int: SessionTaskData]()
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         session.received(data, forTaskWithIdentifier: dataTask.taskIdentifier)
@@ -239,6 +297,8 @@ private extension URLSession {
 
 }
 
+#endif
+
 // MARK: - wordpress_api_wrapper helpers
 
 extension WpNetworkRequest {
@@ -278,6 +338,10 @@ extension HTTPURLResponse {
 
 extension URLSession {
     var debugNumberOfTaskData: Int {
+#if WP_SUPPORT_BACKGROUND_URL_SESSION
         self.taskData.count
+#else
+        0
+#endif
     }
 }

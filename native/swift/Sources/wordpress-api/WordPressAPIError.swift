@@ -1,5 +1,9 @@
 import Foundation
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public enum WordPressAPIError: Error {
     static var unknownErrorMessage: String {
         NSLocalizedString(
