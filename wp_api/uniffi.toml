@@ -4,4 +4,6 @@ cdylib_name = "wp_api"
 generate_immutable_records = true
 
 [bindings.swift]
+ffi_module_name = "libwordpressFFI"
+ffi_module_filename = "libwordpressFFI"
 generate_immutable_records = true
