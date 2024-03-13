@@ -45,7 +45,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                             .any(|s| is_wp_contextual_field_ident(&s.ident))
                     });
                     if is_wp_contextual_field {
-                        modify_for_contextual_field_type(&mut new_type, context)?;
+                        new_type = contextual_field_type(&new_type, context)?;
                     }
                     Ok::<syn::Field, syn::Error>(syn::Field {
                         // Remove the WPContext & WPContextualField attributes from the generated field
@@ -127,7 +127,8 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) -> Result<bool, syn::Error> {
+fn contextual_field_type(ty: &syn::Type, context: &str) -> Result<syn::Type, syn::Error> {
+    let mut ty = ty.clone();
     if let syn::Type::Path(ref mut p) = ty {
         assert!(p.path.segments.len() == 1);
         let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
@@ -137,9 +138,9 @@ fn modify_for_contextual_field_type(ty: &mut syn::Type, context: &str) -> Result
             &ident_name_for_context(&ident_name_without_prefix, context),
             segment.ident.span(),
         );
-        Ok(true)
+        Ok(ty)
     } else {
-        Ok(false)
+        unimplemented!("Only syn::Meta::Path type is implemented for WPContextualField")
     }
 }
 
