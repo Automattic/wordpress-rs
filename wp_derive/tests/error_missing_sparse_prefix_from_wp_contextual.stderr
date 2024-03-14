@@ -1,0 +1,5 @@
+error: WPContextual types need to start with 'Sparse' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.
+ --> tests/error_missing_sparse_prefix_from_wp_contextual.rs:4:12
+  |
+4 | pub struct Foo {}
+  |            ^^^

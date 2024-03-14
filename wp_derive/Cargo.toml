@@ -2,9 +2,14 @@
 name = "wp_derive"
 version = "0.1.0"
 edition = "2021"
+autotests = false
 
 [lib]
 proc-macro = true
+
+[[test]]
+name = "tests"
+path = "tests/all_tests.rs"
 
 [dev-dependencies]
 trybuild = { version = "1.0.89", features = ["diff"] }
