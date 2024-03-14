@@ -10,8 +10,19 @@ public struct WordPressAPI {
     package let helper: WpApiHelperProtocol
 
     public init(urlSession: URLSession, baseUrl: URL, authenticationStrategy: WpAuthentication) {
-        // TODO: We use URLSession APIs that accept completion block, which doesn't work with background URLSession.
+#if WP_SUPPORT_BACKGROUND_URL_SESSION
+        // We use URLSession APIs that accept completion block, which doesn't work with background URLSession.
         // See `URLSession.backgroundSession(configuration:)` in `URLSession+WordPressAPI.swift`.
+        assert(
+            urlSession.configuration.identifier == nil || urlSession.delegate is BackgroundURLSessionDelegate,
+            "Background URLSession must use BackgroundURLSessionDelegate"
+        )
+#else
+        assert(
+            urlSession.configuration.identifier == nil,
+            "Background URLSession are not supported"
+        )
+#endif
         self.urlSession = urlSession
         self.helper = WpApiHelper(siteUrl: baseUrl.absoluteString, authentication: authenticationStrategy)
     }
