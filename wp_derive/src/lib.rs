@@ -5,21 +5,25 @@ use syn::{parse_macro_input, Attribute, DeriveInput, Ident};
 
 const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
 const IDENT_PREFIX: &str = "Sparse";
-const INCORRECT_IDENT_NAME_ERROR_MESSAGE: &str = formatcp!("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX);
-const INCORRECT_FIELD_TYPE_ERROR_MESSAGE: &str = formatcp!(
+const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL: &str = formatcp!("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX);
+const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL_FIELD: &str = formatcp!(
     "WPContextualField field types need to start with '{}' prefix",
     IDENT_PREFIX
 );
+const ERROR_EMPTY_RESULT: &str =
+    "WPContextual didn't generate anything. Did you forget to use #[WPContext] attribute?";
 
 #[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
     let original_ident = &ast.ident;
-    let ident_name_without_prefix =
-        match ident_name_without_prefix(original_ident, INCORRECT_IDENT_NAME_ERROR_MESSAGE) {
-            Ok(ident) => ident,
-            Err(e) => return e.into_compile_error().into(),
-        };
+    let ident_name_without_prefix = match ident_name_without_prefix(
+        original_ident,
+        ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL,
+    ) {
+        Ok(ident) => ident,
+        Err(e) => return e.into_compile_error().into(),
+    };
     let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
         if let syn::Data::Struct(syn::DataStruct {
             fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
@@ -70,10 +74,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
             Ok(proc_macro::TokenStream::new())
         }
     });
-    match contextual_token_streams.collect::<Result<Vec<TokenStream>, syn::Error>>() {
-        Ok(token_streams) => TokenStream::from_iter(token_streams),
-        Err(e) => e.into_compile_error().into(),
-    }
+    contextual_token_streams
+        .collect::<Result<Vec<TokenStream>, syn::Error>>()
+        .map(TokenStream::from_iter)
+        .and_then(|t: TokenStream| {
+            if t.is_empty() {
+                Err(syn::Error::new(original_ident.span(), ERROR_EMPTY_RESULT))
+            } else {
+                Ok(t)
+            }
+        })
+        .unwrap_or_else(|e| e.into_compile_error().into())
 }
 
 fn filtered_fields_for_context<'a>(
@@ -132,8 +143,10 @@ fn contextual_field_type(ty: &syn::Type, context: &str) -> Result<syn::Type, syn
     if let syn::Type::Path(ref mut p) = ty {
         assert!(p.path.segments.len() == 1);
         let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
-        let ident_name_without_prefix =
-            ident_name_without_prefix(&segment.ident, INCORRECT_FIELD_TYPE_ERROR_MESSAGE)?;
+        let ident_name_without_prefix = ident_name_without_prefix(
+            &segment.ident,
+            ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL_FIELD,
+        )?;
         segment.ident = Ident::new(
             &ident_name_for_context(&ident_name_without_prefix, context),
             segment.ident.span(),
