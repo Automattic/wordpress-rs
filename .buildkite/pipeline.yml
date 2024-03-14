@@ -25,9 +25,6 @@ steps:
     steps:
       - label: ":swift: :darwin: Build and Test"
         command: |
-          echo "--- :buildkite: Debug env ---"
-          printenv
-
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
 
