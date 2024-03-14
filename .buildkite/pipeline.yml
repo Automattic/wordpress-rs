@@ -47,10 +47,15 @@ steps:
         plugins: *common_plugins
         agents:
           queue: mac
+        artifact_paths:
+          - ".build/spm-all-tests.xunit.xml"
       - label: ":swift: :linux: Build and Test"
         command: |
           echo "--- :swift: Building + Testing"
           make test-swift-linux
+        plugins: *common_plugins
+        artifact_paths:
+          - ".build/spm-all-tests.xunit.xml"
       - label: ":swift: Lint"
         command: |
           echo "--- :swift: Swiftlint"

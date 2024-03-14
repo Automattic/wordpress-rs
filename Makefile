@@ -13,6 +13,9 @@ docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
+# See https://github.com/apple/swift-package-manager/issues/4752
+swift_test_opts := --xunit-output .build/spm-all-tests.xunit.xml --parallel --num-workers=1
+
 uname := $(shell uname | tr A-Z a-z)
 ifeq ($(uname), linux)
 	dylib_ext := so
@@ -166,10 +169,10 @@ test-swift-linux: docker-image-swift
 	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
-	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
+	swift test $(swift_test_opts) -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
 
 test-swift-darwin: xcframework
-	swift test
+	swift test $(swift_test_opts)
 
 test-android: bindings _test-android
 
