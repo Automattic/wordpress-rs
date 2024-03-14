@@ -26,11 +26,11 @@ final class HTTPStub {
             guard let self else { return HTTPResponse(statusCode: .serviceUnavailable) }
 
             let urlRequest = try await request.asURLRequest(serverURL: serverURL)
-            guard let responseBlock = self.stubs.first(where: { condition, _ in condition(urlRequest) })?.response else {
+            guard let stub = self.stubs.first(where: { condition, _ in condition(urlRequest) })?.response else {
                 return HTTPResponse(statusCode: .notFound)
             }
 
-            return try await responseBlock(urlRequest).response(for: urlRequest)
+            return try await stub(urlRequest).response(for: urlRequest)
         }
         await server.appendRoute("*", handler: handler)
     }

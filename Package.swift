@@ -13,7 +13,10 @@ let libwordpressFFI: Target = .systemLibrary(
 let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
 #endif
 
-let supportBackgroundURLSession: SwiftSetting = .define("WP_SUPPORT_BACKGROUND_URL_SESSION", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS]))
+let supportBackgroundURLSession: SwiftSetting = .define(
+    "WP_SUPPORT_BACKGROUND_URL_SESSION",
+    .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])
+)
 
 let package = Package(
     name: "wordpress",

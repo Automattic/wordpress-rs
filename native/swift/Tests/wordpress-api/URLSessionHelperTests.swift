@@ -46,14 +46,23 @@ class URLSessionHelperTests: XCTestCase {
         stub.stub(condition: hasHeaderNamed("X-Request", value: "Ping")) { _ in
             HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: ["X-Response": "Pong"])
         }
-   
+
         let result = await session
-            .perform(request: .init(method: .get, url: "\(stub.serverURL.absoluteString)/hello", headerMap: ["X-Request": "Ping"]))
+            .perform(
+                request: .init(
+                    method: .get,
+                    url: "\(stub.serverURL.absoluteString)/hello",
+                    headerMap: ["X-Request": "Ping"]
+                )
+            )
         try XCTAssertEqual(result.get().statusCode, 200)
         try XCTAssertEqual(result.get().headerMap?["X-Response"], "Pong")
     }
 
-// URLSessionTask on Linux doesn't appear to support tracking progress. See https://github.com/apple/swift-corelibs-foundation/blob/swift-5.10-RELEASE/Sources/FoundationNetworking/URLSession/URLSessionTask.swift#L42
+// swiftlint:disable line_length
+// URLSessionTask on Linux doesn't appear to support tracking progress.
+// See https://github.com/apple/swift-corelibs-foundation/blob/swift-5.10-RELEASE/Sources/FoundationNetworking/URLSession/URLSessionTask.swift#L42
+// swiftlint:enable line_length
 #if !os(Linux)
     func testProgressTracking() async throws {
         stub.stub(condition: isPath("/hello")) { _ in
@@ -64,7 +73,10 @@ class URLSessionHelperTests: XCTestCase {
         XCTAssertEqual(progress.completedUnitCount, 0)
         XCTAssertEqual(progress.fractionCompleted, 0)
 
-        let _ = await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!), fulfilling: progress)
+        _ = await session.perform(
+            request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!),
+            fulfilling: progress
+        )
         XCTAssertEqual(progress.completedUnitCount, 20)
         XCTAssertEqual(progress.fractionCompleted, 1)
     }
@@ -85,7 +97,10 @@ class URLSessionHelperTests: XCTestCase {
         }
 
         // The result should be an cancellation result
-        let result = await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!), fulfilling: progress)
+        let result = await session.perform(
+            request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!),
+            fulfilling: progress
+        )
         if case let .failure(.connection(urlError)) = result, urlError.code == .cancelled {
             // Do nothing
         } else {
@@ -93,7 +108,7 @@ class URLSessionHelperTests: XCTestCase {
         }
     }
 
-    // TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
+// Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testEncodingError() async {
 //        let underlyingError = NSError(domain: "test", code: 123)
 //        let builder = HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)")!)
@@ -108,7 +123,7 @@ class URLSessionHelperTests: XCTestCase {
 //        }
 //    }
 
-// TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
+// Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testMultipartForm() async throws {
 //        var req: URLRequest?
 //        stub.stub(condition: isPath("/hello")) {
@@ -137,7 +152,8 @@ class URLSessionHelperTests: XCTestCase {
 //
 //        let requestBody = try XCTUnwrap(request.httpBody ?? request.httpBodyStream?.readToEnd())
 //
-//        let expectedBody = "--\(boundary)\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nvalue\r\n--\(boundary)--\r\n"
+//        let expectedBody
+//            = "--\(boundary)\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nvalue\r\n--\(boundary)--\r\n"
 //        XCTAssertEqual(String(data: requestBody, encoding: .utf8), expectedBody)
 //    }
 
@@ -151,7 +167,11 @@ class URLSessionHelperTests: XCTestCase {
             HTTPStubsResponse(fileURL: file, statusCode: 200, headers: nil)
         }
 
-        let response = try await session.perform(request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!)).get()
+        let response = try await session
+            .perform(
+                request: .init(url: URL(string: "\(stub.serverURL.absoluteString)/hello")!)
+            )
+            .get()
 
         try XCTAssertEqual(
             sha256(XCTUnwrap(InputStream(url: file))),
@@ -159,14 +179,14 @@ class URLSessionHelperTests: XCTestCase {
         )
     }
 
-// TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
+// Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testTempFileRemovedAfterMultipartUpload() async throws {
 //        stub.stub(condition: isPath("/upload")) { _ in
 //            HTTPStubsResponse(data: "success".data(using: .utf8)!, statusCode: 200, headers: nil)
 //        }
 //
-//        // Create a large file which will be uploaded. The file size needs to be larger than the hardcoded threshold of
-//        // creating a temporary file for upload.
+//        // Create a large file which will be uploaded. The file size needs to be larger than the hardcoded threshold
+//        // of creating a temporary file for upload.
 //        let file = try self.createLargeFile(megaBytes: 30)
 //        defer {
 //            try? FileManager.default.removeItem(at: file)
@@ -178,26 +198,35 @@ class URLSessionHelperTests: XCTestCase {
 //        // Perform upload HTTP request
 //        let builder = try HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)/upload")!)
 //            .method(.post)
-//            .body(form: [MultipartFormField(fileAtPath: file.path, name: "file", filename: "file.txt", mimeType: "text/plain")])
+//            .body(
+//                form: [
+//                    MultipartFormField(
+//                        fileAtPath: file.path,
+//                        name: "file",
+//                        filename: "file.txt",
+//                        mimeType: "text/plain"
+//                    )
+//                ]
+//            )
 //        let _ = await session.perform(request: builder, errorType: TestError.self)
 //
 //        // Capture a list of files in the temp dirs, after calling the upload function.
 //        let tempFilesAfterUpload = existingTempFiles()
 //
-//        // There should be no new files after the HTTP request returns. This assertion relies on an implementation detail
-//        // where the multipart form content is put into a file in temp dirs.
+//        // There should be no new files after the HTTP request returns. This assertion relies on an implementation
+//        // detail where the multipart form content is put into a file in temp dirs.
 //        let newFiles = tempFilesAfterUpload.subtracting(tempFilesBeforeUpload)
 //        XCTAssertEqual(newFiles.count, 0)
 //    }
 
-// TODO: Re-evaluate this test once WpNetworkRequest supports HTTP body
+// Re-evaluate this test once WpNetworkRequest supports HTTP body
 //    func testTempFileRemovedAfterMultipartUploadError() async throws {
 //        stub.stub(condition: isPath("/upload")) { _ in
 //            HTTPStubsResponse(error: URLError(.networkConnectionLost))
 //        }
 //
-//        // Create a large file which will be uploaded. The file size needs to be larger than the hardcoded threshold of
-//        // creating a temporary file for upload.
+//        // Create a large file which will be uploaded. The file size needs to be larger than the hardcoded threshold
+//        // of creating a temporary file for upload.
 //        let file = try self.createLargeFile(megaBytes: 30)
 //        defer {
 //            try? FileManager.default.removeItem(at: file)
@@ -209,23 +238,31 @@ class URLSessionHelperTests: XCTestCase {
 //        // Perform upload HTTP request
 //        let builder = try HTTPRequestBuilder(url: URL(string: "\(stub.serverURL.absoluteString)/upload")!)
 //            .method(.post)
-//            .body(form: [MultipartFormField(fileAtPath: file.path, name: "file", filename: "file.txt", mimeType: "text/plain")])
+//            .body(
+//                form: [
+//                    MultipartFormField(
+//                        fileAtPath: file.path,
+//                        name: "file",
+//                        filename: "file.txt",
+//                        mimeType: "text/plain")
+//                    ]
+//            )
 //        let _ = await session.perform(request: builder, errorType: TestError.self)
 //
 //        // Capture a list of files in the temp dirs, after calling the upload function.
 //        let tempFilesAfterUpload = existingTempFiles()
 //
-//        // There should be no new files after the HTTP request returns. This assertion relies on an implementation detail
-//        // where the multipart form content is put into a file in temp dirs.
+//        // There should be no new files after the HTTP request returns. This assertion relies on an implementation
+//        // detail where the multipart form content is put into a file in temp dirs.
 //        let newFiles = tempFilesAfterUpload.subtracting(tempFilesBeforeUpload)
 //        XCTAssertEqual(newFiles.count, 0)
 //    }
 
     private func existingTempFiles() -> Set<String> {
-        let fm = FileManager.default
+        let fileManager = FileManager.default
         let enumerators = [
-            fm.enumerator(atPath: NSTemporaryDirectory()),
-            fm.enumerator(atPath: fm.temporaryDirectory.path)
+            fileManager.enumerator(atPath: NSTemporaryDirectory()),
+            fileManager.enumerator(atPath: fileManager.temporaryDirectory.path)
         ].compactMap { $0 }
 
         var result: Set<String> = []
@@ -238,7 +275,8 @@ class URLSessionHelperTests: XCTestCase {
     }
 
     private func createLargeFile(megaBytes: Int) throws -> URL {
-        let file = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let file = try FileManager.default
+            .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("large-file-\(UUID().uuidString).txt")
 
         try Data(repeating: 46, count: 1024 * 1000 * megaBytes).write(to: file)

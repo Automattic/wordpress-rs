@@ -17,7 +17,8 @@ public enum WordPressAPIError: Error {
     case requestEncodingFailure(underlyingError: Error)
     /// Error occured in the HTTP connection.
     case connection(URLError)
-    /// The API call returned an HTTP response that WordPressKit can't parse. Receiving this error could be an indicator that there is an error response that's not handled properly by WordPressKit.
+    /// The API call returned an HTTP response that WordPressKit can't parse. Receiving this error could be an
+    /// indicator that there is an error response that's not handled properly by WordPressKit.
     case unparsableResponse(response: HTTPURLResponse?, body: Data?, underlyingError: Error)
     /// Other error occured.
     case unknown(underlyingError: Error)

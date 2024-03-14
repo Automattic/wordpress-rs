@@ -18,7 +18,8 @@ extension URLSession {
     /// - `totalUnitCount` must not be zero.
     /// - `completedUnitCount` must be zero.
     /// - It's used exclusivity for tracking the HTTP request overal progress: No children in its progress tree.
-    /// - `cancellationHandler` must be nil. You can call `fulfillingProgress.cancel()` to cancel the ongoing HTTP request.
+    /// - `cancellationHandler` must be nil. You can call `fulfillingProgress.cancel()` to cancel the ongoing HTTP
+    ///     equest.
     ///
     ///  Upon completion, the HTTP request's progress fulfills the `fulfillingProgress`.
     ///
@@ -26,21 +27,30 @@ extension URLSession {
     ///
     /// - Parameters:
     ///   - request: A `WpNetworkRequest` instance that represents an HTTP request to be sent.
-    ///   - parentProgress: A `Progress` instance that will be used as the parent progress of the HTTP request's overall
-    ///         progress. See the function documentation regarding requirements on this argument.
+    ///   - parentProgress: A `Progress` instance that will be used as the parent progress of the HTTP request's
+    ///         overall progress. See the function documentation regarding requirements on this argument.
     func perform(
         request: WpNetworkRequest,
         fulfilling parentProgress: Progress? = nil
     ) async -> WordPressAPIResult<WpNetworkResponse> {
 #if WP_SUPPORT_BACKGROUND_URL_SESSION
         if configuration.identifier != nil {
-            assert(delegate is BackgroundURLSessionDelegate, "Unexpected `URLSession` delegate type. See the `backgroundSession(configuration:)`")
+            assert(
+                delegate is BackgroundURLSessionDelegate,
+                "Unexpected `URLSession` delegate type. See the `backgroundSession(configuration:)`"
+            )
         }
 #endif
 
         if let parentProgress {
-            assert(parentProgress.completedUnitCount == 0 && parentProgress.totalUnitCount > 0, "Invalid parent progress")
-            assert(parentProgress.cancellationHandler == nil, "The progress instance's cancellationHandler property must be nil")
+            assert(
+                parentProgress.completedUnitCount == 0 && parentProgress.totalUnitCount > 0,
+                "Invalid parent progress"
+            )
+            assert(
+                parentProgress.cancellationHandler == nil,
+                "The progress instance's cancellationHandler property must be nil"
+            )
         }
 
         return await withCheckedContinuation { continuation in
@@ -104,9 +114,16 @@ extension URLSession {
             }
         } else {
             if let httpResponse = response as? HTTPURLResponse {
-                result = .success(.init(body: data ?? Data(), statusCode: UInt16(httpResponse.statusCode), headerMap: httpResponse.httpHeaders))
+                result = .success(
+                    .init(
+                        body: data ?? Data(),
+                        statusCode: UInt16(httpResponse.statusCode),
+                        headerMap: httpResponse.httpHeaders)
+                )
             } else {
-                result = .failure(.unparsableResponse(response: nil, body: data, underlyingError: URLError(.badServerResponse)))
+                result = .failure(
+                    .unparsableResponse(response: nil, body: data, underlyingError: URLError(.badServerResponse))
+                )
             }
         }
 
@@ -121,7 +138,10 @@ extension URLSession {
 
 private extension URLSession {
 
-    func createDataTask(with request: URLRequest, completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionDataTask {
+    func createDataTask(
+        with request: URLRequest,
+        completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void
+    ) -> URLSessionDataTask {
         // This additional `callCompletionFromDelegate` is added to unit test `BackgroundURLSessionDelegate`.
         // Background `URLSession` doesn't work on unit tests, we have to create a non-background `URLSession`
         // which has a `BackgroundURLSessionDelegate` delegate in order to test `BackgroundURLSessionDelegate`.
@@ -140,7 +160,11 @@ private extension URLSession {
         return task
     }
 
-    func createUploadTask(with request: URLRequest, body: Either<Data, URL>, completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionUploadTask {
+    func createUploadTask(
+        with request: URLRequest,
+        body: Either<Data, URL>,
+        completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void
+    ) -> URLSessionUploadTask {
         // This additional `callCompletionFromDelegate` is added to unit test `BackgroundURLSessionDelegate`.
         // Background `URLSession` doesn't work on unit tests, we have to create a non-background `URLSession`
         // which has a `BackgroundURLSessionDelegate` delegate in order to test `BackgroundURLSessionDelegate`.
@@ -186,11 +210,18 @@ private extension URLSession {
 
 private extension URLSession {
 
-    func createDataTask(with request: URLRequest, completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionDataTask {
+    func createDataTask(
+        with request: URLRequest,
+        completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void
+    ) -> URLSessionDataTask {
         dataTask(with: request, completionHandler: completion)
     }
 
-    func createUploadTask(with request: URLRequest, body: Either<Data, URL>, completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void) -> URLSessionUploadTask {
+    func createUploadTask(
+        with request: URLRequest,
+        body: Either<Data, URL>,
+        completion originalCompletion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void
+    ) -> URLSessionUploadTask {
         body.map(
             left: {
                 uploadTask(with: request, from: $0, completionHandler: originalCompletion)
@@ -217,8 +248,8 @@ extension URLSession {
     /// Create a background URLSession instance that can be used in the `perform(request:...)` async function.
     ///
     /// The `perform(request:...)` async function can be used in all non-background `URLSession` instances without any
-    /// extra work. However, there is a requirement to make the function works with with background `URLSession` instances.
-    /// That is the `URLSession` must have a delegate of `BackgroundURLSessionDelegate` type.
+    /// extra work. However, there is a requirement to make the function works with with background `URLSession`
+    /// instances. That is the `URLSession` must have a delegate of `BackgroundURLSessionDelegate` type.
     static func backgroundSession(configuration: URLSessionConfiguration) -> URLSession {
         assert(configuration.identifier != nil)
         // Pass `delegateQueue: nil` to get a serial queue, which is required to ensure thread safe access to
@@ -303,9 +334,10 @@ private extension URLSession {
 
 extension WpNetworkRequest {
     func asURLRequest() throws -> URLRequest {
-        guard let url = URL(string: self.url), (url.scheme == "http" || url.scheme == "https") else {
+        guard let url = URL(string: self.url), url.scheme == "http" || url.scheme == "https" else {
             throw URLError(.badURL)
         }
+
         var request = URLRequest(url: url)
         request.httpMethod = self.method.rawValue
         request.allHTTPHeaderFields = self.headerMap
@@ -313,7 +345,7 @@ extension WpNetworkRequest {
     }
 
     var body: Either<Data, URL>? {
-        // TODO: To be implemented
+        // To be implemented
         return nil
     }
 }
