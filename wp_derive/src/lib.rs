@@ -3,7 +3,7 @@ use std::{fmt::Display, slice::Iter, str::FromStr};
 use const_format::formatcp;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Attribute, DeriveInput, Ident};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident};
 
 const IDENT_PREFIX: &str = "Sparse";
 const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL: &str = formatcp!("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX);
@@ -68,7 +68,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
                 Ok::<syn::Field, syn::Error>(syn::Field {
                     // Remove the WPContext & WPContextualField attributes from the generated field
-                    attrs: attrs_without_wp_context(f.attrs.clone()),
+                    attrs: pf
+                        .parsed_attrs
+                        .iter()
+                        .filter_map(|parsed_attr| {
+                            if let WPParsedAttr::ExternalAttr { attr } = parsed_attr {
+                                Some(attr.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect(),
                     vis: f.vis.clone(),
                     mutability: syn::FieldMutability::None,
                     ident: f.ident.clone(),
@@ -170,31 +180,17 @@ fn is_wp_contextual_field_ident(ident: &Ident) -> bool {
     ident.to_string().eq("WPContextualField")
 }
 
-// TODO: Update the name
-fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
-    attrs
-        .into_iter()
-        .filter(|attr| {
-            !attr
-                .meta
-                .path()
-                .segments
-                .iter()
-                .any(|s| is_wp_context_ident(&s.ident) || is_wp_contextual_field_ident(&s.ident))
-        })
-        .collect()
-}
-
 #[derive(Debug, PartialEq, Eq)]
 struct WPParsedField {
     field: syn::Field,
     parsed_attrs: Vec<WPParsedAttr>,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq)]
 enum WPParsedAttr {
     ParsedContextualFieldAttr,
     ParsedContextAttr { contexts: Vec<WPContextAttr> },
+    ExternalAttr { attr: syn::Attribute },
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -272,7 +268,7 @@ fn parse_field_attrs<'a>(
                         Err(WPDeriveParseAttrError::unexpected_wp_context_meta(attr.meta.span()))
                     }
                 } else {
-                    Err(WPDeriveParseAttrError::unexpected_attr(attr.span()))
+                    Ok(WPParsedAttr::ExternalAttr { attr:attr.clone() })
                 }
             }).collect::<Result<Vec<WPParsedAttr>, WPDeriveParseAttrError>>()?;
             Ok(WPParsedField {
@@ -289,7 +285,6 @@ enum WPDeriveParseAttrErrorType {
     UnexpectedWPContextLiteral,
     // syn::Meta::Path or syn::Meta::NameValue
     UnexpectedWPContextMeta,
-    UnexpectedAttr,
     UnexpectedAttrPathSegmentCount,
 }
 
@@ -312,10 +307,6 @@ impl WPDeriveParseAttrError {
 
     fn unexpected_wp_context_meta(span: proc_macro2::Span) -> Self {
         Self::new(WPDeriveParseAttrErrorType::UnexpectedWPContextMeta, span)
-    }
-
-    fn unexpected_attr(span: proc_macro2::Span) -> Self {
-        Self::new(WPDeriveParseAttrErrorType::UnexpectedAttr, span)
     }
 }
 
