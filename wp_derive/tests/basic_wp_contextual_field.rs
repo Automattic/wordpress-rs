@@ -4,18 +4,18 @@ use wp_derive::WPContextual;
 pub struct SparseFoo {
     #[WPContext("edit")]
     #[WPContextualField]
-    pub foo: Option<SparseBaz>,
+    pub bar: Option<SparseBar>,
 }
 
 #[derive(WPContextual)]
-pub struct SparseBaz {
+pub struct SparseBar {
     #[WPContext("edit")]
-    pub qux: u32,
+    pub baz: u32,
 }
 
 fn main() {
     let _ = FooWithEditContext {
-        foo: BazWithEditContext { qux: 0 },
+        bar: BarWithEditContext { baz: 0 },
     };
 }
 
