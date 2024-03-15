@@ -1,9 +1,10 @@
+use std::{fmt::Display, slice::Iter, str::FromStr};
+
 use const_format::formatcp;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Attribute, DeriveInput, Ident};
+use syn::{parse_macro_input, spanned::Spanned, Attribute, DeriveInput, Ident};
 
-const CONTEXTS: [&str; 3] = ["Edit", "Embed", "View"];
 const IDENT_PREFIX: &str = "Sparse";
 const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL: &str = formatcp!("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX);
 const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL_FIELD: &str = formatcp!(
@@ -35,33 +36,47 @@ pub fn derive(input: TokenStream) -> TokenStream {
             unimplemented!("Only implemented for Structs for now");
         };
 
-    let contextual_token_streams = CONTEXTS.iter().map(|context| {
-        let cname = ident_name_for_context(&ident_name_without_prefix, context);
+    let parsed_fields = match parse_field_attrs(fields.iter()) {
+        Ok(p) => p,
+        Err(e) => return syn::Error::from(e).to_compile_error().into(),
+    };
+    let contextual_token_streams = WPContextAttr::iter().map(|context_attr| {
+        let cname = ident_name_for_context(&ident_name_without_prefix, &context_attr);
         let cident = Ident::new(&cname, original_ident.span());
-        let cfields =
-            filtered_fields_for_context(fields.iter(), format!("\"{}\"", context.to_lowercase()))
-                .map(|f| {
-                    let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
-                    let is_wp_contextual_field = f.attrs.iter().any(|attr| {
-                        attr.path()
-                            .segments
-                            .iter()
-                            .any(|s| is_wp_contextual_field_ident(&s.ident))
-                    });
-                    if is_wp_contextual_field {
-                        new_type = contextual_field_type(&new_type, context)?;
+        let cfields = parsed_fields
+            .iter()
+            .filter(|pf| {
+                pf.parsed_attrs.iter().any(|parsed_attr| {
+                    if let WPParsedAttr::ParsedContextAttr { contexts } = parsed_attr {
+                        contexts.iter().any(|c| c == context_attr)
+                    } else {
+                        false
                     }
-                    Ok::<syn::Field, syn::Error>(syn::Field {
-                        // Remove the WPContext & WPContextualField attributes from the generated field
-                        attrs: attrs_without_wp_context(f.attrs.clone()),
-                        vis: f.vis.clone(),
-                        mutability: syn::FieldMutability::None,
-                        ident: f.ident.clone(),
-                        colon_token: f.colon_token,
-                        ty: new_type,
-                    })
                 })
-                .collect::<Result<Vec<syn::Field>, syn::Error>>()?;
+            })
+            .map(|pf| {
+                let f = &pf.field;
+                let is_wp_contextual_field = f.attrs.iter().any(|attr| {
+                    attr.path()
+                        .segments
+                        .iter()
+                        .any(|s| is_wp_contextual_field_ident(&s.ident))
+                });
+                let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+                if is_wp_contextual_field {
+                    new_type = contextual_field_type(&new_type, &context_attr)?;
+                }
+                Ok::<syn::Field, syn::Error>(syn::Field {
+                    // Remove the WPContext & WPContextualField attributes from the generated field
+                    attrs: attrs_without_wp_context(f.attrs.clone()),
+                    vis: f.vis.clone(),
+                    mutability: syn::FieldMutability::None,
+                    ident: f.ident.clone(),
+                    colon_token: f.colon_token,
+                    ty: new_type,
+                })
+            })
+            .collect::<Result<Vec<syn::Field>, syn::Error>>()?;
         if !cfields.is_empty() {
             Ok(quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
@@ -85,31 +100,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         })
         .unwrap_or_else(|e| e.into_compile_error().into())
-}
-
-fn filtered_fields_for_context<'a>(
-    fields: impl Iterator<Item = &'a syn::Field>,
-    context: String,
-) -> impl Iterator<Item = &'a syn::Field> {
-    fields.filter(move |f| {
-        for attr in &f.attrs {
-            for segment in attr.path().segments.iter() {
-                let segment_ident = &segment.ident;
-                if is_wp_context_ident(segment_ident) {
-                    if let syn::Meta::List(meta_list) = &attr.meta {
-                        return meta_list.tokens.clone().into_iter().any(|t| {
-                            if let proc_macro2::TokenTree::Literal(l) = t {
-                                l.to_string() == context
-                            } else {
-                                false
-                            }
-                        });
-                    }
-                }
-            }
-        }
-        false
-    })
 }
 
 fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
@@ -138,7 +128,7 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-fn contextual_field_type(ty: &syn::Type, context: &str) -> Result<syn::Type, syn::Error> {
+fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
     if let syn::Type::Path(ref mut p) = ty {
         assert!(p.path.segments.len() == 1);
@@ -168,7 +158,7 @@ fn ident_name_without_prefix(ident: &Ident, error_message: &str) -> Result<Strin
     Ok(ident_name_without_prefix.to_string())
 }
 
-fn ident_name_for_context(ident_name_without_prefix: &String, context: &str) -> String {
+fn ident_name_for_context(ident_name_without_prefix: &String, context: &WPContextAttr) -> String {
     format!("{}With{}Context", ident_name_without_prefix, context)
 }
 
@@ -193,4 +183,144 @@ fn attrs_without_wp_context(attrs: Vec<Attribute>) -> Vec<Attribute> {
                 .any(|s| is_wp_context_ident(&s.ident) || is_wp_contextual_field_ident(&s.ident))
         })
         .collect()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct WPParsedField {
+    field: syn::Field,
+    parsed_attrs: Vec<WPParsedAttr>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum WPParsedAttr {
+    ParsedContextualFieldAttr,
+    ParsedContextAttr { contexts: Vec<WPContextAttr> },
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum WPContextAttr {
+    Edit,
+    Embed,
+    View,
+}
+
+impl WPContextAttr {
+    pub fn iter() -> Iter<'static, WPContextAttr> {
+        [
+            WPContextAttr::Edit,
+            WPContextAttr::Embed,
+            WPContextAttr::View,
+        ]
+        .iter()
+    }
+}
+
+impl Display for WPContextAttr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Edit => "Edit",
+                Self::Embed => "Embed",
+                Self::View => "View",
+            }
+        )
+    }
+}
+
+impl FromStr for WPContextAttr {
+    type Err = WPDeriveParseAttrErrorType;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "\"edit\"" => Ok(Self::Edit),
+            "\"embed\"" => Ok(Self::Embed),
+            "\"view\"" => Ok(Self::View),
+            _ => Err(WPDeriveParseAttrErrorType::UnexpectedWPContextLiteral),
+        }
+    }
+}
+
+fn parse_field_attrs<'a>(
+    fields: impl Iterator<Item = &'a syn::Field>,
+) -> Result<Vec<WPParsedField>, WPDeriveParseAttrError> {
+    fields
+        .map(|f| {
+            let parsed_attrs = f.attrs.iter().map(|attr| {
+                if attr.path().segments.len() != 1 {
+                    return Err(WPDeriveParseAttrError::unexpected_segment_count(attr.path().span()));
+                }
+                let path_segment = attr.path().segments.first().expect("There should be only 1 segment as validated previously using UnexpectedAttrPathSegmentCount error");
+                let segment_ident = &path_segment.ident;
+                if is_wp_contextual_field_ident(segment_ident) {
+                    return Ok(WPParsedAttr::ParsedContextualFieldAttr);
+                }
+                if is_wp_context_ident(segment_ident) {
+                    if let syn::Meta::List(meta_list) = &attr.meta {
+                        let contexts: Vec<WPContextAttr> = meta_list.tokens.clone().into_iter().filter_map(|t| {
+                            if let proc_macro2::TokenTree::Literal(l) = t {
+                                Some(WPContextAttr::from_str(&l.to_string()).map_err(|err_type| {
+                                    WPDeriveParseAttrError::new(err_type, l.span())
+                                }))
+                            } else {
+                                None
+                            }
+                        }).collect::<Result<Vec<WPContextAttr>, WPDeriveParseAttrError>>()?;
+                        Ok(WPParsedAttr::ParsedContextAttr { contexts })
+                    } else {
+                        Err(WPDeriveParseAttrError::unexpected_wp_context_meta(attr.meta.span()))
+                    }
+                } else {
+                    Err(WPDeriveParseAttrError::unexpected_attr(attr.span()))
+                }
+            }).collect::<Result<Vec<WPParsedAttr>, WPDeriveParseAttrError>>()?;
+            Ok(WPParsedField {
+                field: f.clone(),
+                parsed_attrs
+            })
+        })
+        .collect::<Result<Vec<WPParsedField>, WPDeriveParseAttrError>>()
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug)]
+enum WPDeriveParseAttrErrorType {
+    UnexpectedWPContextLiteral,
+    // syn::Meta::Path or syn::Meta::NameValue
+    UnexpectedWPContextMeta,
+    UnexpectedAttr,
+    UnexpectedAttrPathSegmentCount,
+}
+
+struct WPDeriveParseAttrError {
+    error_type: WPDeriveParseAttrErrorType,
+    span: proc_macro2::Span,
+}
+
+impl WPDeriveParseAttrError {
+    fn new(error_type: WPDeriveParseAttrErrorType, span: proc_macro2::Span) -> Self {
+        Self { error_type, span }
+    }
+
+    fn unexpected_segment_count(span: proc_macro2::Span) -> Self {
+        Self::new(
+            WPDeriveParseAttrErrorType::UnexpectedAttrPathSegmentCount,
+            span,
+        )
+    }
+
+    fn unexpected_wp_context_meta(span: proc_macro2::Span) -> Self {
+        Self::new(WPDeriveParseAttrErrorType::UnexpectedWPContextMeta, span)
+    }
+
+    fn unexpected_attr(span: proc_macro2::Span) -> Self {
+        Self::new(WPDeriveParseAttrErrorType::UnexpectedAttr, span)
+    }
+}
+
+impl From<WPDeriveParseAttrError> for syn::Error {
+    fn from(err: WPDeriveParseAttrError) -> Self {
+        syn::Error::new(err.span, format!("{:?}", err.error_type))
+    }
 }
