@@ -312,7 +312,7 @@ enum WPDeriveParseAttrErrorType {
     #[error("Expected \"edit\", \"embed\" or \"view\", found {}", input)]
     UnexpectedWPContextLiteral { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
-    #[error("UnexpectedWPContextMeta")]
+    #[error("Expected #[WPContext(\"edit\", \"embed\", \"view\")]. Did you forget to add context literals?")]
     UnexpectedWPContextMeta,
     #[error("UnexpectedAttrPathSegmentCount")]
     UnexpectedAttrPathSegmentCount,
