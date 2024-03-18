@@ -270,40 +270,69 @@ fn parse_field_attrs<'a>(
 ) -> Result<Vec<WPParsedField>, WPDeriveParseAttrError> {
     fields
         .map(|f| {
-            let parsed_attrs = f.attrs.iter().map(|attr| {
-                if attr.path().segments.len() != 1 {
-                    return Err(WPDeriveParseAttrError::unexpected_segment_count(attr.path().span()));
-                }
-                let path_segment = attr.path().segments.first().expect("There should be only 1 segment as validated previously using UnexpectedAttrPathSegmentCount error");
-                let segment_ident = &path_segment.ident;
-                if is_wp_contextual_field_ident(segment_ident) {
-                    return Ok(WPParsedAttr::ParsedWPContextualField);
-                }
-                if is_wp_context_ident(segment_ident) {
-                    if let syn::Meta::List(meta_list) = &attr.meta {
-                        let contexts: Vec<WPContextAttr> = meta_list.tokens.clone().into_iter().filter_map(|t| {
-                            if let proc_macro2::TokenTree::Ident(l) = t {
-                                Some(WPContextAttr::from_str(&l.to_string()).map_err(|err_type| {
-                                    WPDeriveParseAttrError::new(err_type, l.span())
-                                }))
-                            } else {
-                                None
-                            }
-                        }).collect::<Result<Vec<WPContextAttr>, WPDeriveParseAttrError>>()?;
-                        Ok(WPParsedAttr::ParsedWPContext { contexts })
-                    } else {
-                        Err(WPDeriveParseAttrError::unexpected_wp_context_meta(attr.meta.span()))
+            let parsed_attrs = f
+                .attrs
+                .iter()
+                .map(|attr| {
+                    if attr.path().segments.len() != 1 {
+                        return Err(WPDeriveParseAttrError::unexpected_segment_count(
+                            attr.path().span(),
+                        ));
                     }
-                } else {
-                    Ok(WPParsedAttr::ExternalAttr { attr:attr.clone() })
-                }
-            }).collect::<Result<Vec<WPParsedAttr>, WPDeriveParseAttrError>>()?;
+                    let path_segment = attr
+                        .path()
+                        .segments
+                        .first()
+                        .expect("Already validated that there is only one segment");
+                    let segment_ident = &path_segment.ident;
+                    if is_wp_contextual_field_ident(segment_ident) {
+                        return Ok(WPParsedAttr::ParsedWPContextualField);
+                    }
+                    if is_wp_context_ident(segment_ident) {
+                        if let syn::Meta::List(meta_list) = &attr.meta {
+                            let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
+                            Ok(WPParsedAttr::ParsedWPContext { contexts })
+                        } else {
+                            Err(WPDeriveParseAttrError::unexpected_wp_context_meta(
+                                attr.meta.span(),
+                            ))
+                        }
+                    } else {
+                        Ok(WPParsedAttr::ExternalAttr { attr: attr.clone() })
+                    }
+                })
+                .collect::<Result<Vec<WPParsedAttr>, WPDeriveParseAttrError>>()?;
             Ok(WPParsedField {
                 field: f.clone(),
-                parsed_attrs
+                parsed_attrs,
             })
         })
         .collect::<Result<Vec<WPParsedField>, WPDeriveParseAttrError>>()
+}
+
+fn parse_contexts_from_tokens(
+    tokens: proc_macro2::TokenStream,
+) -> Result<Vec<WPContextAttr>, WPDeriveParseAttrError> {
+    tokens
+        .into_iter()
+        .filter_map(|t| match t {
+            proc_macro2::TokenTree::Ident(ident) => Some(
+                WPContextAttr::from_str(&ident.to_string())
+                    .map_err(|err_type| WPDeriveParseAttrError::new(err_type, ident.span())),
+            ),
+            proc_macro2::TokenTree::Punct(p) => {
+                if p.as_char() == ',' {
+                    None
+                } else {
+                    Some(Err(WPDeriveParseAttrError::new(
+                        WPDeriveParseAttrErrorType::UnexpectedPunct,
+                        p.span(),
+                    )))
+                }
+            }
+            _ => None,
+        })
+        .collect::<Result<Vec<WPContextAttr>, WPDeriveParseAttrError>>()
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -316,6 +345,8 @@ enum WPDeriveParseAttrErrorType {
     UnexpectedWPContextMeta,
     #[error("UnexpectedAttrPathSegmentCount")]
     UnexpectedAttrPathSegmentCount,
+    #[error("Did you mean ','?")]
+    UnexpectedPunct,
 }
 
 struct WPDeriveParseAttrError {

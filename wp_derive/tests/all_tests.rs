@@ -10,5 +10,6 @@ fn tests() {
     t.compile_fail("tests/error_unexpected_wp_context_literal.rs");
     t.compile_fail("tests/error_unexpected_wp_context_meta_variant_path.rs");
     t.compile_fail("tests/error_unexpected_wp_context_meta_variant_name_value.rs");
+    t.compile_fail("tests/error_unexpected_wp_context_punct.rs");
     // Test syntax errors for WPContextualField & WPContext field attributes
 }

@@ -1,0 +1,5 @@
+error: Did you mean ','?
+ --> tests/error_unexpected_wp_context_punct.rs:5:21
+  |
+5 |     #[WPContext(edit. view)]
+  |                     ^
