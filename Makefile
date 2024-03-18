@@ -173,17 +173,35 @@ test-swift-darwin: xcframework
 
 test-swift-macOS: test-swift-darwin
 
-test-swift-iOS: XCODEBUILD_DESTINATION='platform=iOS Simulator,name=iPhone 15,OS=17.2'
+test-swift-iOS: XCODEBUILD_PLATFORM='iOS-17-2'
 test-swift-iOS: xcframework _xcodebuild_test
 
-test-swift-tvOS: XCODEBUILD_DESTINATION='platform=tvOS Simulator,name=Apple TV,OS=17.2'
+test-swift-tvOS: XCODEBUILD_PLATFORM='tvOS-17-2'
 test-swift-tvOS: xcframework _xcodebuild_test
 
-test-swift-watchOS: XCODEBUILD_DESTINATION='platform=watchOS Simulator,name=Apple Watch Series 9 (45mm),OS=10.2'
+test-swift-watchOS: XCODEBUILD_PLATFORM='watchOS-10-2'
 test-swift-watchOS: xcframework _xcodebuild_test
 
+# Find a simulator for the given platform.
+# Requires a parameter whose value is the os and version part of simulator
+# runtime identifier returned by `xcrun simctl list runtimes`.
+_xcodebuild_test_simulator_id = $(shell \
+	xcrun simctl list --json devices available \
+	| jq -re '.devices."com.apple.CoreSimulator.SimRuntime.$(1)" | last.udid' \
+)
+
+_xcodebuild_test: XCODEBUILD_DEVICE_ID='$(call _xcodebuild_test_simulator_id,${XCODEBUILD_PLATFORM})'
 _xcodebuild_test:
-	env NSUnbufferedIO=YES xcodebuild -scheme wordpress -derivedDataPath DerivedData -destination ${XCODEBUILD_DESTINATION} test | xcbeautify
+	ifeq (${XCODEBUILD_DEVICE_ID}, "null")
+		$(error No simulator found for platform ${XCODEBUILD_PLATFORM})
+	endif
+	env NSUnbufferedIO=YES \
+		xcodebuild \
+		-scheme wordpress \
+		-derivedDataPath DerivedData \
+		-destination "id=$(XCODEBUILD_DEVICE_ID)" \
+		test \
+		| xcbeautify
 
 test-android: bindings _test-android
 
