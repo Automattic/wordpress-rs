@@ -23,7 +23,7 @@ steps:
   - group: ":swift: Swift Wrapper"
     key: "swift"
     steps:
-      - label: ":swift: :darwin: Build and Test"
+      - label: ":swift: :darwin: Build and Test on {{matrix}}"
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
@@ -41,12 +41,17 @@ steps:
           rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
 
           echo "--- :swift: Building + Testing"
-          make test-swift
+          make test-swift-{{matrix}}
         env:
           IMAGE_ID: xcode-15.2
         plugins: *common_plugins
         agents:
           queue: mac
+        matrix:
+          - macOS
+          - iOS
+          - tvOS
+          - watchOS
       - label: ":swift: :linux: Build and Test"
         command: |
           echo "--- :swift: Building + Testing"

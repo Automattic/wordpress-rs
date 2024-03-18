@@ -171,6 +171,20 @@ test-swift-linux-in-docker: swift-linux-library
 test-swift-darwin: xcframework
 	swift test
 
+test-swift-macOS: test-swift-darwin
+
+test-swift-iOS: XCODEBUILD_DESTINATION='platform=iOS Simulator,name=iPhone 15,OS=17.2'
+test-swift-iOS: xcframework _xcodebuild_test
+
+test-swift-tvOS: XCODEBUILD_DESTINATION='platform=tvOS Simulator,name=Apple TV,OS=17.2'
+test-swift-tvOS: xcframework _xcodebuild_test
+
+test-swift-watchOS: XCODEBUILD_DESTINATION='platform=watchOS Simulator,name=Apple Watch Series 9 (45mm),OS=10.2'
+test-swift-watchOS: xcframework _xcodebuild_test
+
+_xcodebuild_test:
+	env NSUnbufferedIO=YES xcodebuild -scheme wordpress -derivedDataPath DerivedData -destination ${XCODEBUILD_DESTINATION} test | xcbeautify
+
 test-android: bindings _test-android
 
 publish-android-local: bindings _publish-android-local
