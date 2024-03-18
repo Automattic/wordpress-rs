@@ -258,7 +258,9 @@ impl FromStr for WPContextAttr {
             "\"edit\"" => Ok(Self::Edit),
             "\"embed\"" => Ok(Self::Embed),
             "\"view\"" => Ok(Self::View),
-            _ => Err(WPDeriveParseAttrErrorType::UnexpectedWPContextLiteral),
+            _ => Err(WPDeriveParseAttrErrorType::UnexpectedWPContextLiteral {
+                input: input.to_string(),
+            }),
         }
     }
 }
@@ -305,11 +307,14 @@ fn parse_field_attrs<'a>(
 }
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum WPDeriveParseAttrErrorType {
-    UnexpectedWPContextLiteral,
+    #[error("Expected \"edit\", \"embed\" or \"view\", found {}", input)]
+    UnexpectedWPContextLiteral { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
+    #[error("UnexpectedWPContextMeta")]
     UnexpectedWPContextMeta,
+    #[error("UnexpectedAttrPathSegmentCount")]
     UnexpectedAttrPathSegmentCount,
 }
 
@@ -337,6 +342,6 @@ impl WPDeriveParseAttrError {
 
 impl From<WPDeriveParseAttrError> for syn::Error {
     fn from(err: WPDeriveParseAttrError) -> Self {
-        syn::Error::new(err.span, format!("{:?}", err.error_type))
+        syn::Error::new(err.span, err.error_type.to_string())
     }
 }
