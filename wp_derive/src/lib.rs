@@ -12,7 +12,9 @@ const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL_FIELD: &str = formatcp!(
     IDENT_PREFIX
 );
 const ERROR_EMPTY_RESULT: &str =
-    "WPContextual didn't generate anything. Did you forget to use #[WPContext] attribute?";
+    "WPContextual didn't generate anything. Did you forget to add #[WPContext] attribute?";
+const ERROR_WP_CONTEXTUAL_FIELD_WITHOUT_ANY_WP_CONTEXTS: &str =
+    "#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?";
 
 #[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -40,6 +42,29 @@ pub fn derive(input: TokenStream) -> TokenStream {
         Ok(p) => p,
         Err(e) => return syn::Error::from(e).to_compile_error().into(),
     };
+    if let Some(pf) = parsed_fields
+        .iter()
+        .filter(|pf| {
+            pf.parsed_attrs
+                .contains(&WPParsedAttr::ParsedWPContextualField)
+        })
+        .find(|pf| {
+            // Find any field that has #[WPContextualField] attribute, but not #[WPContext]
+            // attribute
+            !pf.parsed_attrs.iter().any(|pf| match pf {
+                WPParsedAttr::ParsedWPContext { contexts } => !contexts.is_empty(),
+                _ => false,
+            })
+        })
+    {
+        return syn::Error::new(
+            pf.field.span(),
+            ERROR_WP_CONTEXTUAL_FIELD_WITHOUT_ANY_WP_CONTEXTS,
+        )
+        .to_compile_error()
+        .into();
+    };
+
     let contextual_token_streams = WPContextAttr::iter().map(|context_attr| {
         let cname = ident_name_for_context(&ident_name_without_prefix, context_attr);
         let cident = Ident::new(&cname, original_ident.span());
