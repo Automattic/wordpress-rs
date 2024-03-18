@@ -41,7 +41,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         Err(e) => return syn::Error::from(e).to_compile_error().into(),
     };
     let contextual_token_streams = WPContextAttr::iter().map(|context_attr| {
-        let cname = ident_name_for_context(&ident_name_without_prefix, &context_attr);
+        let cname = ident_name_for_context(&ident_name_without_prefix, context_attr);
         let cident = Ident::new(&cname, original_ident.span());
         let cfields = parsed_fields
             .iter()
@@ -64,7 +64,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 });
                 let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
                 if is_wp_contextual_field {
-                    new_type = contextual_field_type(&new_type, &context_attr)?;
+                    new_type = contextual_field_type(&new_type, context_attr)?;
                 }
                 Ok::<syn::Field, syn::Error>(syn::Field {
                     // Remove the WPContext & WPContextualField attributes from the generated field
@@ -193,7 +193,7 @@ enum WPParsedAttr {
     ExternalAttr { attr: syn::Attribute },
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum WPContextAttr {
     Edit,
     Embed,
