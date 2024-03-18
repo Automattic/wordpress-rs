@@ -47,7 +47,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             .iter()
             .filter(|pf| {
                 pf.parsed_attrs.iter().any(|parsed_attr| {
-                    if let WPParsedAttr::ParsedContextAttr { contexts } = parsed_attr {
+                    if let WPParsedAttr::ParsedWPContext { contexts } = parsed_attr {
                         contexts.iter().any(|c| c == context_attr)
                     } else {
                         false
@@ -188,8 +188,8 @@ struct WPParsedField {
 
 #[derive(Debug, PartialEq, Eq)]
 enum WPParsedAttr {
-    ParsedContextualFieldAttr,
-    ParsedContextAttr { contexts: Vec<WPContextAttr> },
+    ParsedWPContextualField,
+    ParsedWPContext { contexts: Vec<WPContextAttr> },
     ExternalAttr { attr: syn::Attribute },
 }
 
@@ -250,7 +250,7 @@ fn parse_field_attrs<'a>(
                 let path_segment = attr.path().segments.first().expect("There should be only 1 segment as validated previously using UnexpectedAttrPathSegmentCount error");
                 let segment_ident = &path_segment.ident;
                 if is_wp_contextual_field_ident(segment_ident) {
-                    return Ok(WPParsedAttr::ParsedContextualFieldAttr);
+                    return Ok(WPParsedAttr::ParsedWPContextualField);
                 }
                 if is_wp_context_ident(segment_ident) {
                     if let syn::Meta::List(meta_list) = &attr.meta {
@@ -263,7 +263,7 @@ fn parse_field_attrs<'a>(
                                 None
                             }
                         }).collect::<Result<Vec<WPContextAttr>, WPDeriveParseAttrError>>()?;
-                        Ok(WPParsedAttr::ParsedContextAttr { contexts })
+                        Ok(WPParsedAttr::ParsedWPContext { contexts })
                     } else {
                         Err(WPDeriveParseAttrError::unexpected_wp_context_meta(attr.meta.span()))
                     }
