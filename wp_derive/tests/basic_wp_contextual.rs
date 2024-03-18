@@ -2,7 +2,7 @@ use wp_derive::WPContextual;
 
 #[derive(WPContextual)]
 pub struct SparseFoo {
-    #[WPContext("edit", "embed", "view")]
+    #[WPContext(edit, embed, view)]
     pub bar: Option<u32>,
 }
 

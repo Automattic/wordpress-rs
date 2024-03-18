@@ -4,7 +4,7 @@ use wp_derive::WPContextual;
 
 #[derive(WPContextual)]
 pub struct SparseFoo {
-    #[WPContext("edit")]
+    #[WPContext(edit)]
     #[WPContextualField]
     bar: Option<Bar>,
 }

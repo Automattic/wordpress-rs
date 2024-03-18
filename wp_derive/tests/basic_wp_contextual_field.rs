@@ -2,14 +2,14 @@ use wp_derive::WPContextual;
 
 #[derive(WPContextual)]
 pub struct SparseFoo {
-    #[WPContext("edit")]
+    #[WPContext(edit)]
     #[WPContextualField]
     pub bar: Option<SparseBar>,
 }
 
 #[derive(WPContextual)]
 pub struct SparseBar {
-    #[WPContext("edit")]
+    #[WPContext(edit)]
     pub baz: u32,
 }
 

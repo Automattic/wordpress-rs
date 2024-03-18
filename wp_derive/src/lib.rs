@@ -255,9 +255,9 @@ impl FromStr for WPContextAttr {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
-            "\"edit\"" => Ok(Self::Edit),
-            "\"embed\"" => Ok(Self::Embed),
-            "\"view\"" => Ok(Self::View),
+            "edit" => Ok(Self::Edit),
+            "embed" => Ok(Self::Embed),
+            "view" => Ok(Self::View),
             _ => Err(WPDeriveParseAttrErrorType::UnexpectedWPContextLiteral {
                 input: input.to_string(),
             }),
@@ -282,7 +282,7 @@ fn parse_field_attrs<'a>(
                 if is_wp_context_ident(segment_ident) {
                     if let syn::Meta::List(meta_list) = &attr.meta {
                         let contexts: Vec<WPContextAttr> = meta_list.tokens.clone().into_iter().filter_map(|t| {
-                            if let proc_macro2::TokenTree::Literal(l) = t {
+                            if let proc_macro2::TokenTree::Ident(l) = t {
                                 Some(WPContextAttr::from_str(&l.to_string()).map_err(|err_type| {
                                     WPDeriveParseAttrError::new(err_type, l.span())
                                 }))
@@ -309,10 +309,10 @@ fn parse_field_attrs<'a>(
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 enum WPDeriveParseAttrErrorType {
-    #[error("Expected \"edit\", \"embed\" or \"view\", found {}", input)]
+    #[error("Expected 'edit', 'embed' or 'view', found '{}'", input)]
     UnexpectedWPContextLiteral { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
-    #[error("Expected #[WPContext(\"edit\", \"embed\", \"view\")]. Did you forget to add context literals?")]
+    #[error("Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?")]
     UnexpectedWPContextMeta,
     #[error("UnexpectedAttrPathSegmentCount")]
     UnexpectedAttrPathSegmentCount,

@@ -1,5 +1,5 @@
-error: Expected "edit", "embed" or "view", found "Edit"
+error: Expected 'edit', 'embed' or 'view', found 'Edit'
  --> tests/error_unexpected_wp_context_literal.rs:5:17
   |
-5 |     #[WPContext("Edit")]
-  |                 ^^^^^^
+5 |     #[WPContext(Edit)]
+  |                 ^^^^

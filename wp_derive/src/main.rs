@@ -4,15 +4,15 @@ use wp_derive::WPContextual;
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparsePostObject {
     #[serde(rename(serialize = "ser_name"))]
-    #[WPContext("edit", "view", "embed")]
+    #[WPContext(edit, view, embed)]
     pub id: Option<u32>,
-    #[WPContext("edit")]
+    #[WPContext(edit)]
     pub date: Option<String>,
-    #[WPContext("embed")]
+    #[WPContext(embed)]
     pub embed_date: Option<String>,
-    #[WPContext("edit", "view", "embed")]
+    #[WPContext(edit, view, embed)]
     pub already_strongly_typed: u32,
-    #[WPContext("edit", "view")]
+    #[WPContext(edit, view)]
     #[WPContextualField]
     pub guid: Option<SparsePostGuid>,
 }
@@ -25,9 +25,9 @@ pub struct PostGuid {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparsePostGuid {
-    #[WPContext("edit")]
+    #[WPContext(edit)]
     pub raw: Option<String>,
-    #[WPContext("edit", "view")]
+    #[WPContext(edit, view)]
     pub rendered: Option<String>,
 }
 
