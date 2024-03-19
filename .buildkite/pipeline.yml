@@ -43,7 +43,7 @@ steps:
           echo "--- :swift: Building + Testing"
           make test-swift-{{matrix}}
         env:
-          IMAGE_ID: xcode-15.2
+          IMAGE_ID: xcode-15.3
         plugins: *common_plugins
         agents:
           queue: mac
