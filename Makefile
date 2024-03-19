@@ -174,13 +174,13 @@ test-swift-darwin: xcframework
 test-swift-macOS: test-swift-darwin
 
 test-swift-iOS: xcframework
-	scripts/xcodebuild-test.sh iOS-17-2
+	scripts/xcodebuild-test.sh iOS-17-4
 
 test-swift-tvOS: xcframework
-	scripts/xcodebuild-test.sh tvOS-17-2
+	scripts/xcodebuild-test.sh tvOS-17-4
 
 test-swift-watchOS: xcframework
-	scripts/xcodebuild-test.sh watchOS-10-2
+	scripts/xcodebuild-test.sh watchOS-10-4
 
 test-android: bindings _test-android
 
