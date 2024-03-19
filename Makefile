@@ -171,6 +171,17 @@ test-swift-linux-in-docker: swift-linux-library
 test-swift-darwin: xcframework
 	swift test
 
+test-swift-macOS: test-swift-darwin
+
+test-swift-iOS: xcframework
+	scripts/xcodebuild-test.sh iOS-17-4
+
+test-swift-tvOS: xcframework
+	scripts/xcodebuild-test.sh tvOS-17-4
+
+test-swift-watchOS: xcframework
+	scripts/xcodebuild-test.sh watchOS-10-4
+
 test-android: bindings _test-android
 
 publish-android-local: bindings _publish-android-local
