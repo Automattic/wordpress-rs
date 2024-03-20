@@ -1,31 +1,24 @@
 use std::{fmt::Display, slice::Iter, str::FromStr};
 
-use const_format::formatcp;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident};
 
 const IDENT_PREFIX: &str = "Sparse";
-const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL: &str = formatcp!("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX);
-const ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL_FIELD: &str = formatcp!(
-    "WPContextualField field types need to start with '{}' prefix",
-    IDENT_PREFIX
-);
-const ERROR_EMPTY_RESULT: &str =
-    "WPContextual didn't generate anything. Did you forget to add #[WPContext] attribute?";
-const ERROR_WP_CONTEXTUAL_FIELD_WITHOUT_ANY_WP_CONTEXTS: &str =
-    "#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?";
 
 #[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
     let original_ident = &ast.ident;
-    let ident_name_without_prefix = match ident_name_without_prefix(
-        original_ident,
-        ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL,
-    ) {
-        Ok(ident) => ident,
-        Err(e) => return e.into_compile_error().into(),
+    let origina_ident_name = original_ident.to_string();
+    let ident_name_without_prefix = match origina_ident_name.strip_prefix(IDENT_PREFIX) {
+        Some(ident) => ident,
+        None => {
+            return WPContextualParseError::WPContextualMissingSparsePrefix
+                .into_syn_error(original_ident.span())
+                .into_compile_error()
+                .into()
+        }
     };
     let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
         if let syn::Data::Struct(syn::DataStruct {
@@ -40,7 +33,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let parsed_fields = match parse_field_attrs(fields.iter()) {
         Ok(p) => p,
-        Err(e) => return syn::Error::from(e).to_compile_error().into(),
+        Err(e) => return e.to_compile_error().into(),
     };
     if let Some(pf) = parsed_fields
         .iter()
@@ -57,16 +50,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
             })
         })
     {
-        return syn::Error::new(
-            pf.field.span(),
-            ERROR_WP_CONTEXTUAL_FIELD_WITHOUT_ANY_WP_CONTEXTS,
-        )
-        .to_compile_error()
-        .into();
+        return WPContextualParseError::WPContextualFieldWithoutWPContext
+            .into_syn_error(pf.field.span())
+            .to_compile_error()
+            .into();
     };
 
     let contextual_token_streams = WPContextAttr::iter().map(|context_attr| {
-        let cname = ident_name_for_context(&ident_name_without_prefix, context_attr);
+        let cname = ident_name_for_context(ident_name_without_prefix, context_attr);
         let cident = Ident::new(&cname, original_ident.span());
         let cfields = parsed_fields
             .iter()
@@ -129,7 +120,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         .map(TokenStream::from_iter)
         .and_then(|t: TokenStream| {
             if t.is_empty() {
-                Err(syn::Error::new(original_ident.span(), ERROR_EMPTY_RESULT))
+                Err(WPContextualParseError::EmptyResult.into_syn_error(original_ident.span()))
             } else {
                 Ok(t)
             }
@@ -168,10 +159,12 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
     if let syn::Type::Path(ref mut p) = ty {
         assert!(p.path.segments.len() == 1);
         let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
-        let ident_name_without_prefix = ident_name_without_prefix(
-            &segment.ident,
-            ERROR_MISSING_SPARSE_PREFIX_FROM_WP_CONTEXTUAL_FIELD,
-        )?;
+
+        let ident_name_without_prefix = match segment.ident.to_string().strip_prefix(IDENT_PREFIX) {
+            Some(ident) => Ok(ident.to_string()),
+            None => Err(WPContextualParseError::WPContextualFieldMissingSparsePrefix
+                .into_syn_error(segment.ident.span())),
+        }?;
         segment.ident = Ident::new(
             &ident_name_for_context(&ident_name_without_prefix, context),
             segment.ident.span(),
@@ -182,18 +175,7 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
     }
 }
 
-fn ident_name_without_prefix(ident: &Ident, error_message: &str) -> Result<String, syn::Error> {
-    let ident_name = ident.to_string();
-    let incorrect_ident_error = syn::Error::new(ident.span(), error_message);
-    let ident_name_without_prefix = ident_name
-        .strip_prefix(IDENT_PREFIX)
-        .ok_or_else(|| incorrect_ident_error.clone())?;
-    syn::parse_str::<Ident>(ident_name_without_prefix)
-        .map_err(|_| incorrect_ident_error.clone())?;
-    Ok(ident_name_without_prefix.to_string())
-}
-
-fn ident_name_for_context(ident_name_without_prefix: &String, context: &WPContextAttr) -> String {
+fn ident_name_for_context(ident_name_without_prefix: &str, context: &WPContextAttr) -> String {
     format!("{}With{}Context", ident_name_without_prefix, context)
 }
 
@@ -203,6 +185,73 @@ fn is_wp_context_ident(ident: &Ident) -> bool {
 
 fn is_wp_contextual_field_ident(ident: &Ident) -> bool {
     ident.to_string().eq("WPContextualField")
+}
+
+fn parse_field_attrs<'a>(
+    fields: impl Iterator<Item = &'a syn::Field>,
+) -> Result<Vec<WPParsedField>, syn::Error> {
+    fields
+        .map(|f| {
+            let parsed_attrs = f
+                .attrs
+                .iter()
+                .map(|attr| {
+                    if attr.path().segments.len() != 1 {
+                        return Err(WPContextualParseAttrError::UnexpectedAttrPathSegmentCount
+                            .into_syn_error(attr.path().span()));
+                    }
+                    let path_segment = attr
+                        .path()
+                        .segments
+                        .first()
+                        .expect("Already validated that there is only one segment");
+                    let segment_ident = &path_segment.ident;
+                    if is_wp_contextual_field_ident(segment_ident) {
+                        return Ok(WPParsedAttr::ParsedWPContextualField);
+                    }
+                    if is_wp_context_ident(segment_ident) {
+                        if let syn::Meta::List(meta_list) = &attr.meta {
+                            let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
+                            Ok(WPParsedAttr::ParsedWPContext { contexts })
+                        } else {
+                            Err(WPContextualParseAttrError::MissingWPContextMeta
+                                .into_syn_error(attr.meta.span()))
+                        }
+                    } else {
+                        Ok(WPParsedAttr::ExternalAttr { attr: attr.clone() })
+                    }
+                })
+                .collect::<Result<Vec<WPParsedAttr>, syn::Error>>()?;
+            Ok(WPParsedField {
+                field: f.clone(),
+                parsed_attrs,
+            })
+        })
+        .collect::<Result<Vec<WPParsedField>, syn::Error>>()
+}
+
+fn parse_contexts_from_tokens(
+    tokens: proc_macro2::TokenStream,
+) -> Result<Vec<WPContextAttr>, syn::Error> {
+    tokens
+        .into_iter()
+        .filter_map(|t| match t {
+            proc_macro2::TokenTree::Ident(ident) => Some(
+                WPContextAttr::from_str(&ident.to_string())
+                    .map_err(|error_type| error_type.into_syn_error(ident.span())),
+            ),
+            proc_macro2::TokenTree::Punct(p) => {
+                if p.as_char() == ',' {
+                    None
+                } else {
+                    Some(Err(
+                        WPContextualParseAttrError::UnexpectedPunct.into_syn_error(p.span())
+                    ))
+                }
+            }
+            _ => None,
+        })
+        .collect::<Result<Vec<WPContextAttr>, syn::Error>>()
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -251,93 +300,45 @@ impl Display for WPContextAttr {
 }
 
 impl FromStr for WPContextAttr {
-    type Err = WPDeriveParseAttrErrorType;
+    type Err = WPContextualParseAttrError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
             "edit" => Ok(Self::Edit),
             "embed" => Ok(Self::Embed),
             "view" => Ok(Self::View),
-            _ => Err(WPDeriveParseAttrErrorType::UnexpectedWPContextLiteral {
+            _ => Err(WPContextualParseAttrError::UnexpectedWPContextLiteral {
                 input: input.to_string(),
             }),
         }
     }
 }
 
-fn parse_field_attrs<'a>(
-    fields: impl Iterator<Item = &'a syn::Field>,
-) -> Result<Vec<WPParsedField>, WPDeriveParseAttrError> {
-    fields
-        .map(|f| {
-            let parsed_attrs = f
-                .attrs
-                .iter()
-                .map(|attr| {
-                    if attr.path().segments.len() != 1 {
-                        return Err(WPDeriveParseAttrError::unexpected_attr_path_segment_count(
-                            attr.path().span(),
-                        ));
-                    }
-                    let path_segment = attr
-                        .path()
-                        .segments
-                        .first()
-                        .expect("Already validated that there is only one segment");
-                    let segment_ident = &path_segment.ident;
-                    if is_wp_contextual_field_ident(segment_ident) {
-                        return Ok(WPParsedAttr::ParsedWPContextualField);
-                    }
-                    if is_wp_context_ident(segment_ident) {
-                        if let syn::Meta::List(meta_list) = &attr.meta {
-                            let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
-                            Ok(WPParsedAttr::ParsedWPContext { contexts })
-                        } else {
-                            Err(WPDeriveParseAttrError::unexpected_wp_context_meta(
-                                attr.meta.span(),
-                            ))
-                        }
-                    } else {
-                        Ok(WPParsedAttr::ExternalAttr { attr: attr.clone() })
-                    }
-                })
-                .collect::<Result<Vec<WPParsedAttr>, WPDeriveParseAttrError>>()?;
-            Ok(WPParsedField {
-                field: f.clone(),
-                parsed_attrs,
-            })
-        })
-        .collect::<Result<Vec<WPParsedField>, WPDeriveParseAttrError>>()
-}
-
-fn parse_contexts_from_tokens(
-    tokens: proc_macro2::TokenStream,
-) -> Result<Vec<WPContextAttr>, WPDeriveParseAttrError> {
-    tokens
-        .into_iter()
-        .filter_map(|t| match t {
-            proc_macro2::TokenTree::Ident(ident) => Some(
-                WPContextAttr::from_str(&ident.to_string())
-                    .map_err(|err_type| WPDeriveParseAttrError::new(err_type, ident.span())),
-            ),
-            proc_macro2::TokenTree::Punct(p) => {
-                if p.as_char() == ',' {
-                    None
-                } else {
-                    Some(Err(WPDeriveParseAttrError::new(
-                        WPDeriveParseAttrErrorType::UnexpectedPunct,
-                        p.span(),
-                    )))
-                }
-            }
-            _ => None,
-        })
-        .collect::<Result<Vec<WPContextAttr>, WPDeriveParseAttrError>>()
-}
-
-#[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
-enum WPDeriveParseAttrErrorType {
+enum WPContextualParseError {
+    #[error(
+        "WPContextual didn't generate anything. Did you forget to add #[WPContext] attribute?"
+    )]
+    EmptyResult,
+    #[error("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
+    WPContextualMissingSparsePrefix,
+    #[error(
+        "WPContextualField field types need to start with '{}' prefix",
+        IDENT_PREFIX
+    )]
+    WPContextualFieldMissingSparsePrefix,
+    #[error("#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
+    WPContextualFieldWithoutWPContext,
+}
+
+impl WPContextualParseError {
+    fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
+        syn::Error::new(span, self.to_string())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum WPContextualParseAttrError {
     // It's possible to trigger this error by using something like `#[wp_derive::WPContext]`,
     // however that's not a valid syntax. There is probably no valid syntax that uses `::` in the
     // current setup, but in case we are missing anything, we should be able to improve the
@@ -350,33 +351,11 @@ enum WPDeriveParseAttrErrorType {
     UnexpectedWPContextLiteral { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
     #[error("Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?")]
-    UnexpectedWPContextMeta,
+    MissingWPContextMeta,
 }
 
-struct WPDeriveParseAttrError {
-    error_type: WPDeriveParseAttrErrorType,
-    span: proc_macro2::Span,
-}
-
-impl WPDeriveParseAttrError {
-    fn new(error_type: WPDeriveParseAttrErrorType, span: proc_macro2::Span) -> Self {
-        Self { error_type, span }
-    }
-
-    fn unexpected_attr_path_segment_count(span: proc_macro2::Span) -> Self {
-        Self::new(
-            WPDeriveParseAttrErrorType::UnexpectedAttrPathSegmentCount,
-            span,
-        )
-    }
-
-    fn unexpected_wp_context_meta(span: proc_macro2::Span) -> Self {
-        Self::new(WPDeriveParseAttrErrorType::UnexpectedWPContextMeta, span)
-    }
-}
-
-impl From<WPDeriveParseAttrError> for syn::Error {
-    fn from(err: WPDeriveParseAttrError) -> Self {
-        syn::Error::new(err.span, err.error_type.to_string())
+impl WPContextualParseAttrError {
+    fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
+        syn::Error::new(span, self.to_string())
     }
 }
