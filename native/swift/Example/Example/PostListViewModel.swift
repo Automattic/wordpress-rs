@@ -4,20 +4,25 @@ import wordpress_api
 
 @Observable class PostListViewModel {
 
-    static let shared = PostListViewModel()
-
     var posts: PostCollection
     var fetchPostsTask: Task<Void, Never>?
     var error: MyError?
     var shouldPresentAlert = false
 
-    private let api = WordPressAPI(
-        urlSession: .shared,
-        baseUrl: URL(string: "https://sweetly-unadulterated.jurassic.ninja")!,
-        authenticationStategy: .init(username: "demo", password: "qD6z ty5l oLnL gXVe 0UED qBUB")
-    )
+    let loginManager: LoginManager
 
-    init(posts: PostCollection = PostCollection()) {
+    // swiftlint:disable force_try
+    var api: WordPressAPI {
+        WordPressAPI(
+            urlSession: .shared,
+            baseUrl: URL(string: loginManager.getDefaultSiteUrl()!)!,
+            authenticationStategy: try! loginManager.getLoginCredentials()!
+        )
+    }
+    // swiftlint:enable force_try
+
+    init(loginManager: LoginManager, posts: PostCollection = PostCollection()) {
+        self.loginManager = loginManager
         self.posts = posts
     }
 

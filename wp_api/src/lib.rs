@@ -4,10 +4,12 @@ use std::collections::HashMap;
 use url::Url;
 
 pub use api_error::*;
+pub use login::*;
 pub use pages::*;
 pub use posts::*;
 
 pub mod api_error;
+pub mod login;
 pub mod pages;
 pub mod posts;
 
@@ -145,6 +147,17 @@ pub fn parse_post_list_response(
         post_list: Some(post_list),
         next_page,
     })
+}
+
+#[uniffi::export]
+pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
+    let api_details =
+        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })?;
+
+    Ok(api_details)
 }
 
 pub fn extract_link_header(response: &WPNetworkResponse) -> Option<String> {

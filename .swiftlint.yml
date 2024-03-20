@@ -4,3 +4,4 @@ excluded: # paths to ignore during linting. Takes precedence over `included`.
   - .build                                                  # Compiled Code
   - native/swift/Sources/wordpress-api-wrapper/wp_api.swift # auto-generated code
   - target                                                  # Compiled Code
+  - Dockerfile.swift                                        # Not a Swift file

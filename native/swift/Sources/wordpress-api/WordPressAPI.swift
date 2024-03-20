@@ -48,6 +48,45 @@ public struct WordPressAPI {
         }
         task.resume()
     }
+
+    public struct Helpers {
+
+        public static func parseUrl(string: String) throws -> URL {
+
+            if let url = URL(string: string), url.scheme != nil {
+                return url
+            }
+
+            if let url = URL(string: "http://" + string) {
+                return url
+            }
+
+            if let url = URL(string: "http://" + string + "/") {
+                return url
+            }
+
+            debugPrint("Invalid URL")
+
+            throw ParseError.invalidUrl
+        }
+
+        static func findRestEndpoint(data: Data) throws -> URL {
+            if let url = wordpress_api_wrapper.findRestEndpoint(bytes: data) {
+                return url.asUrl()
+            }
+
+            throw ParseError.invalidHtml
+        }
+
+        public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
+            return wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
+        }
+    }
+
+    enum ParseError: Error {
+        case invalidUrl
+        case invalidHtml
+    }
 }
 
 public extension WpNetworkRequest {
@@ -123,5 +162,27 @@ extension RequestMethod {
         case .put: "PUT"
         case .delete: "DELETE"
         }
+    }
+}
+
+extension WpNetworkRequest {
+    init(method: RequestMethod, url: URL, headerMap: [String: String]? = nil) {
+        self.init(method: method, url: url.absoluteString, headerMap: headerMap)
+    }
+}
+
+extension WpRestApiurl {
+    func asUrl() -> URL {
+        guard let url = URL(string: stringValue) else {
+            preconditionFailure("Invalid URL: \(stringValue)")
+        }
+
+        return url
+    }
+}
+
+extension URL {
+    func asRestUrl() -> WpRestApiurl {
+        WpRestApiurl(stringValue: self.absoluteString)
     }
 }
