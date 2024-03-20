@@ -1,6 +1,10 @@
 import Foundation
 import wordpress_api_wrapper
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public extension WordPressAPI {
     static func findRestApiEndpointRoot(forSiteUrl url: URL, using session: URLSession) async throws -> URL {
         debugPrint(url)
