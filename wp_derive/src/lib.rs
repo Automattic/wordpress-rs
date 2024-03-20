@@ -275,7 +275,7 @@ fn parse_field_attrs<'a>(
                 .iter()
                 .map(|attr| {
                     if attr.path().segments.len() != 1 {
-                        return Err(WPDeriveParseAttrError::unexpected_segment_count(
+                        return Err(WPDeriveParseAttrError::unexpected_attr_path_segment_count(
                             attr.path().span(),
                         ));
                     }
@@ -338,15 +338,19 @@ fn parse_contexts_from_tokens(
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 enum WPDeriveParseAttrErrorType {
+    // It's possible to trigger this error by using something like `#[wp_derive::WPContext]`,
+    // however that's not a valid syntax. There is probably no valid syntax that uses `::` in the
+    // current setup, but in case we are missing anything, we should be able to improve the
+    // messaging by asking it to be reported.
+    #[error("Expected #[WPContext] or #[WPContextualField], found multi-segment path.\nPlease report to the `wp_derive` developers how you triggered this error type so that a test for it can be added.")]
+    UnexpectedAttrPathSegmentCount,
+    #[error("Did you mean ','?")]
+    UnexpectedPunct,
     #[error("Expected 'edit', 'embed' or 'view', found '{}'", input)]
     UnexpectedWPContextLiteral { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
     #[error("Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?")]
     UnexpectedWPContextMeta,
-    #[error("UnexpectedAttrPathSegmentCount")]
-    UnexpectedAttrPathSegmentCount,
-    #[error("Did you mean ','?")]
-    UnexpectedPunct,
 }
 
 struct WPDeriveParseAttrError {
@@ -359,7 +363,7 @@ impl WPDeriveParseAttrError {
         Self { error_type, span }
     }
 
-    fn unexpected_segment_count(span: proc_macro2::Span) -> Self {
+    fn unexpected_attr_path_segment_count(span: proc_macro2::Span) -> Self {
         Self::new(
             WPDeriveParseAttrErrorType::UnexpectedAttrPathSegmentCount,
             span,
