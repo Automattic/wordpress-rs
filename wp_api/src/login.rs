@@ -9,26 +9,26 @@ use crate::url::*;
 pub fn extract_login_details_from_url(
     url: WPRestAPIURL,
 ) -> Option<WPAPIApplicationPasswordDetails> {
-    let mut map = HashMap::new();
-
-    for pair in url.as_url().query_pairs() {
-        map.insert(pair.0.to_string(), pair.1.to_string());
-    }
-
-    println!("{:?}", map);
-
-    if !map.contains_key("site_url")
-        || !map.contains_key("user_login")
-        || !map.contains_key("password")
+    if let (Some(site_url), Some(user_login), Some(password)) =
+        url.as_url()
+            .query_pairs()
+            .fold((None, None, None), |accum, (k, v)| {
+                match k.to_string().as_str() {
+                    "site_url" => (Some(v.to_string()), accum.1, accum.2),
+                    "user_login" => (accum.0, Some(v.to_string()), accum.2),
+                    "password" => (accum.0, accum.1, Some(v.to_string())),
+                    _ => accum,
+                }
+            })
     {
-        return None;
+        Some(WPAPIApplicationPasswordDetails {
+            site_url,
+            user_login,
+            password,
+        })
+    } else {
+        None
     }
-
-    Some(WPAPIApplicationPasswordDetails {
-        site_url: map["site_url"].clone(),
-        user_login: map["user_login"].clone(),
-        password: map["password"].clone(),
-    })
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
