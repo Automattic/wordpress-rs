@@ -11,8 +11,8 @@ fn main() {
     let url = lines[0];
     let auth_base64_token = lines[1];
 
-    let authentication = WPAuthentication {
-        auth_token: auth_base64_token.into(),
+    let authentication = WPAuthentication::AuthorizationHeader {
+        token: auth_base64_token.into(),
     };
 
     let wp_networking = WPNetworking::new(url.into(), authentication);

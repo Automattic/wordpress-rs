@@ -70,14 +70,6 @@ public struct WordPressAPI {
             throw ParseError.invalidUrl
         }
 
-        static func findRestEndpoint(data: Data) throws -> URL {
-            if let url = wordpress_api_wrapper.findRestEndpoint(bytes: data) {
-                return url.asUrl()
-            }
-
-            throw ParseError.invalidHtml
-        }
-
         public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
             return wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
@@ -150,7 +142,7 @@ extension HTTPURLResponse {
 // Note: Everything below this line should be moved into the Rust layer
 public extension WpAuthentication {
     init(username: String, password: String) {
-        self.init(authToken: "\(username):\(password)".data(using: .utf8)!.base64EncodedString())
+        self = .authorizationHeader(token: "\(username):\(password)".data(using: .utf8)!.base64EncodedString())
     }
 }
 
@@ -161,6 +153,7 @@ extension RequestMethod {
         case .post: "POST"
         case .put: "PUT"
         case .delete: "DELETE"
+        case .head: "HEAD"
         }
     }
 }

@@ -106,17 +106,20 @@ struct LoginView: View {
 
     func getLoginUrl() async throws -> URL? {
         let parsedUrl = try WordPressAPI.Helpers.parseUrl(string: url)
-        debugPrint("Trying login to \(parsedUrl)")
 
-        let apiRoot = try await WordPressAPI.findRestApiEndpointRoot(
+        guard let apiRoot = try await WordPressAPI.findRestApiEndpointRoot(
             forSiteUrl: parsedUrl,
             using: URLSession.shared
-        )
+        ) else {
+            return nil
+        }
+
         let client = WordPressAPI(
             urlSession: .shared,
             baseUrl: apiRoot,
-            authenticationStategy: .init(authToken: "")
+            authenticationStategy: .none
         )
+
         let capabilities = try await client.getRestAPICapabilities(forApiRoot: apiRoot, using: .shared)
 
         guard let authenticationUrl = capabilities.authentication.first?.value.endpoints.authorization else {

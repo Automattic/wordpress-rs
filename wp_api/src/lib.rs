@@ -1,17 +1,18 @@
 #![allow(dead_code, unused_variables)]
 
 use std::collections::HashMap;
-use url::Url;
 
 pub use api_error::*;
 pub use login::*;
 pub use pages::*;
 pub use posts::*;
+pub use url::*;
 
 pub mod api_error;
 pub mod login;
 pub mod pages;
 pub mod posts;
+pub mod url;
 
 #[derive(uniffi::Object)]
 pub struct WPApiHelper {
@@ -34,10 +35,12 @@ impl WPApiHelper {
     pub fn raw_request(&self, url: String) -> WPNetworkRequest {
         let mut header_map = HashMap::new();
 
-        header_map.insert(
-            "Authorization".into(),
-            format!("Basic {}", self.authentication.auth_token),
-        );
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
 
         WPNetworkRequest {
             method: RequestMethod::GET,
@@ -53,10 +56,13 @@ impl WPApiHelper {
             .unwrap();
 
         let mut header_map = HashMap::new();
-        header_map.insert(
-            "Authorization".into(),
-            format!("Basic {}", self.authentication.auth_token),
-        );
+
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
 
         url.query_pairs_mut()
             .append_pair("page", params.page.to_string().as_str());
@@ -71,10 +77,10 @@ impl WPApiHelper {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Record)]
-// TODO: This will probably become an `enum` where we support multiple authentication types.
-pub struct WPAuthentication {
-    pub auth_token: String,
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum WPAuthentication {
+    AuthorizationHeader { token: String },
+    None,
 }
 
 #[derive(uniffi::Enum)]
@@ -83,6 +89,7 @@ pub enum RequestMethod {
     POST,
     PUT,
     DELETE,
+    HEAD,
 }
 
 #[derive(uniffi::Record)]
@@ -107,6 +114,25 @@ pub struct WPNetworkResponse {
     // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
     // module.
     pub header_map: Option<HashMap<String, String>>,
+}
+
+impl WPNetworkResponse {
+    pub fn get_link_header(&self, name: &str) -> Option<Url> {
+        if let Some(headers) = self.header_map.clone() {
+            // TODO: This is inefficient
+            if headers.contains_key("Link") {
+                if let Ok(res) = parse_link_header::parse_with_rel(&headers["Link"]) {
+                    if let Some(next) = res.get(name) {
+                        if let Ok(url) = Url::parse(next.raw_uri.as_str()) {
+                            return Some(url);
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
 }
 
 #[uniffi::export]
@@ -135,12 +161,8 @@ pub fn parse_post_list_response(
 
     let mut next_page: Option<String> = None;
 
-    if let Some(link_header) = extract_link_header(&response) {
-        if let Ok(res) = parse_link_header::parse_with_rel(link_header.as_str()) {
-            if let Some(next) = res.get("next") {
-                next_page = Some(next.raw_uri.clone())
-            }
-        }
+    if let Some(link_header) = response.get_link_header("next") {
+        next_page = Some(link_header.to_string())
     }
 
     Ok(PostListResponse {
@@ -160,12 +182,11 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     Ok(api_details)
 }
 
-pub fn extract_link_header(response: &WPNetworkResponse) -> Option<String> {
-    if let Some(headers) = response.header_map.clone() {
-        // TODO: This is inefficient
-        if headers.contains_key("Link") {
-            return Some(headers["Link"].clone());
-        }
+// TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
+#[uniffi::export]
+pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRestAPIURL> {
+    if let Some(url) = response.get_link_header(name) {
+        return Some(url.into())
     }
 
     None

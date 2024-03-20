@@ -1,16 +1,17 @@
 import Foundation
 import wordpress_api_wrapper
 
-#if os(Linux)
+#if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
 public extension WordPressAPI {
-    static func findRestApiEndpointRoot(forSiteUrl url: URL, using session: URLSession) async throws -> URL {
-        debugPrint(url)
-        let response = try await session.data(from: url)
-        let url = try WordPressAPI.Helpers.findRestEndpoint(data: response.0)
-        return url
+    static func findRestApiEndpointRoot(forSiteUrl url: URL, using session: URLSession) async throws -> URL? {
+        let request = WpNetworkRequest(method: .head, url: url)
+        let ephemeralClient = WordPressAPI(urlSession: session, baseUrl: url, authenticationStategy: .none)
+        let response = try await ephemeralClient.perform(request: request)
+
+        return wordpress_api_wrapper.getLinkHeader(response: response, name: "https://api.w.org/")?.asUrl()
     }
 
     func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpapiDetails {
