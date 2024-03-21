@@ -48,6 +48,37 @@ public struct WordPressAPI {
         }
         task.resume()
     }
+
+    public struct Helpers {
+
+        public static func parseUrl(string: String) throws -> URL {
+
+            if let url = URL(string: string), url.scheme != nil {
+                return url
+            }
+
+            if let url = URL(string: "http://" + string) {
+                return url
+            }
+
+            if let url = URL(string: "http://" + string + "/") {
+                return url
+            }
+
+            debugPrint("Invalid URL")
+
+            throw ParseError.invalidUrl
+        }
+
+        public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
+            return wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
+        }
+    }
+
+    enum ParseError: Error {
+        case invalidUrl
+        case invalidHtml
+    }
 }
 
 public extension WpNetworkRequest {
@@ -111,7 +142,7 @@ extension HTTPURLResponse {
 // Note: Everything below this line should be moved into the Rust layer
 public extension WpAuthentication {
     init(username: String, password: String) {
-        self.init(authToken: "\(username):\(password)".data(using: .utf8)!.base64EncodedString())
+        self = .authorizationHeader(token: "\(username):\(password)".data(using: .utf8)!.base64EncodedString())
     }
 }
 
@@ -122,6 +153,29 @@ extension RequestMethod {
         case .post: "POST"
         case .put: "PUT"
         case .delete: "DELETE"
+        case .head: "HEAD"
         }
+    }
+}
+
+extension WpNetworkRequest {
+    init(method: RequestMethod, url: URL, headerMap: [String: String]? = nil) {
+        self.init(method: method, url: url.absoluteString, headerMap: headerMap)
+    }
+}
+
+extension WpRestApiurl {
+    func asUrl() -> URL {
+        guard let url = URL(string: stringValue) else {
+            preconditionFailure("Invalid URL: \(stringValue)")
+        }
+
+        return url
+    }
+}
+
+extension URL {
+    func asRestUrl() -> WpRestApiurl {
+        WpRestApiurl(stringValue: self.absoluteString)
     }
 }

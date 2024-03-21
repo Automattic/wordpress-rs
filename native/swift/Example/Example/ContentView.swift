@@ -4,7 +4,14 @@ import wordpress_api
 struct ContentView: View {
 
     @State
-    private var viewModel = PostListViewModel.shared
+    private var viewModel: PostListViewModel
+
+    @EnvironmentObject
+    var loginManager: LoginManager
+
+    init(viewModel: PostListViewModel) {
+        self.viewModel = viewModel
+    }
 
     var body: some View {
         Group {
@@ -37,10 +44,28 @@ struct ContentView: View {
             } else {
                 Text("Something went wrong")
             }
+        }).toolbar(content: {
+            #if os(macOS)
+            ToolbarItem {
+                Button("Log Out") {
+                    Task {
+                        await loginManager.logout()
+                    }
+                }
+            }
+            #else
+            ToolbarItem(placement: .bottomBar) {
+                Button("Log Out") {
+                    Task {
+                        await loginManager.logout()
+                    }
+                }
+            }
+            #endif
         })
     }
 }
-
-#Preview {
-    ContentView()
-}
+//
+// #Preview {
+//    ContentView()
+// }
