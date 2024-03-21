@@ -4,6 +4,7 @@ fn tests() {
     t.pass("tests/basic_wp_contextual.rs");
     t.pass("tests/basic_wp_contextual_field.rs");
     t.pass("tests/wp_contextual_field_with_multiple_segments.rs");
+    t.pass("tests/wp_contextual_field_with_inner_type.rs");
     t.compile_fail("tests/error_missing_sparse_prefix_from_wp_contextual.rs");
     t.compile_fail("tests/error_missing_sparse_prefix_from_wp_contextual_field.rs");
     t.compile_fail("tests/error_empty_result.rs");
