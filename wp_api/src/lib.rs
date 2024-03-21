@@ -95,7 +95,7 @@ pub struct WPNetworkRequest {
     pub header_map: Option<HashMap<String, String>>,
 }
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct WPNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
@@ -107,29 +107,42 @@ pub struct WPNetworkResponse {
     pub header_map: Option<HashMap<String, String>>,
 }
 
+impl WPNetworkResponse {
+    fn as_error(&self) -> Option<WPRestError> {
+        if self.status_code >= 400 {
+            WPRestError::from_slice(&self.body)
+        } else {
+            None
+        }
+    }
+}
+
 #[uniffi::export]
 pub fn parse_post_list_response(
     response: WPNetworkResponse,
 ) -> Result<PostListResponse, WPApiError> {
     // TODO: Further parse the response body to include error message
     // TODO: Lots of unwraps to get a basic setup working
-    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
-        return Err(WPApiError::ClientError {
-            error_type: client_error_type,
+    if let Some(endpoint_error) = response.as_error() {
+        return Err(WPApiError::EndpointError {
             status_code: response.status_code,
+            error: endpoint_error,
         });
     }
-    let status = http::StatusCode::from_u16(response.status_code).unwrap();
-    if status.is_server_error() {
-        return Err(WPApiError::ServerError {
-            status_code: response.status_code,
-        });
+
+    if response.status_code != 200 {
+        return Err(WPApiError::UnacceptableStatusCodeError { response: response });
     }
-    let post_list: Vec<PostObject> =
-        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+
+    let parsed: Result<Vec<PostObject>, _> = serde_json::from_slice(&response.body);
+    if let Err(err) = parsed {
+        return Err(WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
-        })?;
+            response: response,
+        });
+    }
+
+    let post_list: Vec<PostObject> = parsed.unwrap();
 
     let mut next_page: Option<String> = None;
 

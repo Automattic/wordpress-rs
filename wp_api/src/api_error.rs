@@ -1,22 +1,18 @@
 use http::StatusCode;
+use serde::*;
+
+use crate::WPNetworkResponse;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum WPApiError {
-    #[error(
-        "Client error with type '{:?}' and status_code '{}'",
-        error_type,
-        status_code
-    )]
-    ClientError {
-        error_type: ClientErrorType,
-        status_code: u16,
-    },
-    #[error("Server error with status_code '{}'", status_code)]
-    ServerError { status_code: u16 },
-    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
-    ParsingError { reason: String, response: String },
+    #[error("Endpoint error with code '{}'", error.code)]
+    EndpointError { status_code: u16, error: WPRestError },
+    #[error("Unacceptable status code: {}\n", response.status_code)]
+    UnacceptableStatusCodeError { response: WPNetworkResponse },
+    #[error("Error while parsing. \nReason: {}\n", reason)]
+    ParsingError { reason: String, response: WPNetworkResponse },
     #[error("Error that's not yet handled by the library")]
-    UnknownError,
+    UnknownError { response: WPNetworkResponse },
 }
 
 #[derive(Debug, uniffi::Enum)]
@@ -46,5 +42,59 @@ impl ClientErrorType {
         } else {
             None
         }
+    }
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct WPRestError {
+    pub code: String,
+    pub message: String,
+    pub data_json: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WPRestErrorInternal {
+    code: String,
+    message: String,
+    data: Option<serde_json::Value>,
+}
+
+impl WPRestError {
+    pub fn from_slice(body: &Vec<u8>) -> Option<Self> {
+        let parsed: Option<WPRestErrorInternal> = serde_json::from_slice(body).ok();
+        parsed.map(Self::from_internal)
+    }
+
+    pub fn from_str(body: &str) -> Option<Self> {
+        let parsed: Option<WPRestErrorInternal> = serde_json::from_str(body).ok();
+        parsed.map(Self::from_internal)
+    }
+
+    fn from_internal(internal: WPRestErrorInternal) -> Self {
+        Self {
+            code: internal.code,
+            message: internal.message,
+            data_json: serde_json::to_string(&internal.data).ok(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_rest_error() {
+        let response_body = r#"{"code":"rest_post_invalid_page_number","message":"The page number requested is larger than the number of pages available.","data":{"status":400}}"#;
+        let rest_error: Option<WPRestError> = WPRestError::from_str(response_body);
+        assert!(rest_error.is_some());
+
+        let unwrapped = rest_error.unwrap();
+        assert_eq!(unwrapped.code, "rest_post_invalid_page_number");
+        assert_eq!(
+            unwrapped.message,
+            "The page number requested is larger than the number of pages available."
+        );
+        assert_eq!(unwrapped.data_json, Some(r#"{"status":400}"#.to_string()));
     }
 }
