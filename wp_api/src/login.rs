@@ -1,7 +1,7 @@
+use crate::url::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use crate::url::*;
 
 // After a successful login, the system will receive an OAuth callback with the login details
 // embedded as query params. This function parses that URL and extracts the login details as an object.
