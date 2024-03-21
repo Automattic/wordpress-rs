@@ -160,8 +160,38 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
 fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
     if let syn::Type::Path(ref mut p) = ty {
-        assert!(p.path.segments.len() == 1);
-        let segment: &mut syn::PathSegment = p.path.segments.first_mut().unwrap();
+        // A `syn::Type::Path` has to have at least one segment. If it has multiple segments, we are only
+        // interested in modifying the last one.
+        //
+        // Consider the following:
+        // ```
+        // #[derive(WPContextual)]
+        // pub struct SparseFoo {
+        //     #[WPContext(edit)]
+        //     #[WPContextualField]
+        //     pub bar: Option<SparseBar>,
+        //     #[WPContext(view)]
+        //     #[WPContextualField]
+        //     pub baz: Option<baz::SparseBaz>,
+        // }
+        // ```
+        //
+        // `SparseBar` only has one segment and `baz::SparseBaz` has two segments. In each case,
+        // we want to get the last segment, drop the `Sparse` prefix and attach the `With{}Context`
+        // postfix to it, depending on the context. In this case, the resulting generated code
+        // should look like the following:
+        //
+        // pub struct FooWithEditContext {
+        //     pub bar: BarWithEditContext,
+        // }
+        //
+        // pub struct FooWithViewContext {
+        //     pub baz: baz::BazWithEditContext,
+        // }
+        // ```
+        //
+        assert!(!p.path.segments.is_empty());
+        let segment: &mut syn::PathSegment = p.path.segments.last_mut().unwrap();
 
         let ident_name_without_prefix = match segment.ident.to_string().strip_prefix(IDENT_PREFIX) {
             Some(ident) => Ok(ident.to_string()),
@@ -174,7 +204,7 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
         );
         Ok(ty)
     } else {
-        unimplemented!("Only syn::Meta::Path type is implemented for WPContextualField")
+        unimplemented!("Only syn::Type::Path variant is implemented for WPContextualField")
     }
 }
 
