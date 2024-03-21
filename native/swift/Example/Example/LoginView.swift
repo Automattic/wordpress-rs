@@ -90,7 +90,7 @@ struct LoginView: View {
                     callbackURLScheme: "exampleauth"
                 )
 
-                guard let loginDetails = WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
+                guard let loginDetails = try WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
                     debugPrint("Unable to parse login details")
                     abort()
                 }

@@ -70,8 +70,8 @@ public struct WordPressAPI {
             throw ParseError.invalidUrl
         }
 
-        public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
-            return wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
+        public static func extractLoginDetails(from url: URL) throws -> WpapiApplicationPasswordDetails? {
+            return try wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
 

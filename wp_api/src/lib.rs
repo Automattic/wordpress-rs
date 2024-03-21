@@ -186,7 +186,7 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
 #[uniffi::export]
 pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRestAPIURL> {
     if let Some(url) = response.get_link_header(name) {
-        return Some(url.into())
+        return Some(url.into());
     }
 
     None
