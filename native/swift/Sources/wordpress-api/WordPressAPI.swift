@@ -1,5 +1,5 @@
 import Foundation
-@_exported import wordpress_api_wrapper
+import wordpress_api_wrapper
 
 #if os(Linux)
 import FoundationNetworking
@@ -68,10 +68,6 @@ public struct WordPressAPI {
             debugPrint("Invalid URL")
 
             throw ParseError.invalidUrl
-        }
-
-        public static func extractLoginDetails(from url: URL) throws -> WpapiApplicationPasswordDetails? {
-            return try wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
 

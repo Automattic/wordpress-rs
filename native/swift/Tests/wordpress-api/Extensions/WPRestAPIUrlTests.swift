@@ -1,5 +1,6 @@
 import XCTest
 import wordpress_api
+import wordpress_api_wrapper // We need to construct internal types to test them properly
 
 final class WPRestAPIUrlTests: XCTestCase {
 

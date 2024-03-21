@@ -90,12 +90,9 @@ struct LoginView: View {
                     callbackURLScheme: "exampleauth"
                 )
 
-                guard let loginDetails = try WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
-                    debugPrint("Unable to parse login details")
-                    abort()
-                }
-
+                let loginDetails = try urlWithToken.asOAuthResponseUrl().getPasswordDetails()
                 try await loginManager.setLoginCredentials(to: loginDetails)
+
             } catch let err {
                 self.isLoggingIn = false
                 self.loginError = err.localizedDescription
