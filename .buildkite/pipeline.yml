@@ -18,6 +18,10 @@ steps:
         command: |
           echo "--- :rust: Running Clippy"
           make lint-rust
+
+          echo "--- :rust: Ensuring Code Conforms to rustfmt"
+          make fmt-check-rust
+
   #
   # Swift Group
   - group: ":swift: Swift Wrapper"

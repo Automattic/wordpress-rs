@@ -208,6 +208,12 @@ lint-swift:
 lintfix-swift:
 	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint --autocorrect
 
+fmt-rust:
+	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt"
+
+fmt-check-rust:
+	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt --all -- --check"
+
 build-in-docker:
 	$(call bindings)
 	$(docker_build_and_run)
