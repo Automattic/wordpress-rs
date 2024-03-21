@@ -28,7 +28,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
         {
             named
         } else {
-            unimplemented!("Only implemented for Structs for now");
+            return WPContextualParseError::WPContextualNotAStruct
+                .into_syn_error(original_ident.span())
+                .into_compile_error()
+                .into();
         };
 
     let parsed_fields = match parse_field_attrs(fields.iter()) {
@@ -320,8 +323,6 @@ enum WPContextualParseError {
         "WPContextual didn't generate anything. Did you forget to add #[WPContext] attribute?"
     )]
     EmptyResult,
-    #[error("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
-    WPContextualMissingSparsePrefix,
     #[error(
         "WPContextualField field types need to start with '{}' prefix",
         IDENT_PREFIX
@@ -329,6 +330,10 @@ enum WPContextualParseError {
     WPContextualFieldMissingSparsePrefix,
     #[error("#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
     WPContextualFieldWithoutWPContext,
+    #[error("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
+    WPContextualMissingSparsePrefix,
+    #[error("#[WPContextual] is only implemented for Structs")]
+    WPContextualNotAStruct,
 }
 
 impl WPContextualParseError {
