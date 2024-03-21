@@ -159,9 +159,29 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
 
 fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
+    let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
+    let ident_name_without_prefix = match inner_segment.ident.to_string().strip_prefix(IDENT_PREFIX)
+    {
+        Some(ident) => Ok(ident.to_string()),
+        None => Err(WPContextualParseError::WPContextualFieldMissingSparsePrefix
+            .into_syn_error(inner_segment.ident.span())),
+    }?;
+
+    inner_segment.ident = Ident::new(
+        &ident_name_for_context(&ident_name_without_prefix, context),
+        inner_segment.ident.span(),
+    );
+    Ok(ty)
+}
+
+fn find_contextual_field_inner_segment(
+    ty: &mut syn::Type,
+) -> Result<&mut syn::PathSegment, syn::Error> {
     if let syn::Type::Path(ref mut p) = ty {
-        // A `syn::Type::Path` has to have at least one segment. If it has multiple segments, we are only
-        // interested in modifying the last one.
+        // A `syn::Type::Path` has to have at least one segment.
+        assert!(!p.path.segments.is_empty());
+
+        // If it has multiple segments, we are only interested in modifying the last one.
         //
         // Consider the following:
         // ```
@@ -189,22 +209,54 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
         //     pub baz: baz::BazWithEditContext,
         // }
         // ```
-        //
-        assert!(!p.path.segments.is_empty());
         let segment: &mut syn::PathSegment = p.path.segments.last_mut().unwrap();
 
-        let ident_name_without_prefix = match segment.ident.to_string().strip_prefix(IDENT_PREFIX) {
-            Some(ident) => Ok(ident.to_string()),
-            None => Err(WPContextualParseError::WPContextualFieldMissingSparsePrefix
-                .into_syn_error(segment.ident.span())),
-        }?;
-        segment.ident = Ident::new(
-            &ident_name_for_context(&ident_name_without_prefix, context),
-            segment.ident.span(),
-        );
-        Ok(ty)
+        match segment.arguments {
+            // No inner type
+            //
+            // ```
+            // #[derive(WPContextual)]
+            // pub struct SparseFoo {
+            //     #[WPContext(edit)]
+            //     #[WPContextualField]
+            //     pub bar: Option<SparseBar>,
+            // }
+            // ```
+            syn::PathArguments::None => Ok(segment),
+            // Type is surrounded with angled brackets
+            //
+            // ```
+            // #[derive(WPContextual)]
+            // pub struct SparseFoo {
+            //     #[WPContext(edit)]
+            //     #[WPContextualField]
+            //     pub bar: Option<Vec<SparseBar>>,
+            //     #[WPContext(view)]
+            //     #[WPContextualField]
+            //     pub baz: Option<Vec<Vec<SparseBaz>>>,
+            // }
+            // ```
+            syn::PathArguments::AngleBracketed(ref mut path_args) => path_args
+                .args
+                .iter_mut()
+                .find_map(|generic_arg| {
+                    if let syn::GenericArgument::Type(tty) = generic_arg {
+                        Some(find_contextual_field_inner_segment(tty))
+                    } else {
+                        None
+                    }
+                })
+                .ok_or(
+                    WPContextualParseError::WPContextualFieldSegmentNotSupported
+                        .into_syn_error(segment.ident.span()),
+                )?,
+            syn::PathArguments::Parenthesized(_) => {
+                Err(WPContextualParseError::WPContextualFieldSegmentNotSupported
+                    .into_syn_error(segment.ident.span()))
+            }
+        }
     } else {
-        unimplemented!("Only syn::Type::Path variant is implemented for WPContextualField")
+        Err(WPContextualParseError::WPContextualFieldTypeNotSupported.into_syn_error(ty.span()))
     }
 }
 
@@ -360,6 +412,10 @@ enum WPContextualParseError {
     WPContextualFieldMissingSparsePrefix,
     #[error("#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
     WPContextualFieldWithoutWPContext,
+    #[error("This inner segment type is not supported by #[WPContextualField]")]
+    WPContextualFieldSegmentNotSupported,
+    #[error("This type is not supported by #[WPContextualField]")]
+    WPContextualFieldTypeNotSupported,
     #[error("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
     WPContextualMissingSparsePrefix,
     #[error("#[WPContextual] is only implemented for Structs")]
