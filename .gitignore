@@ -2,6 +2,10 @@
 /Cargo.lock
 /out
 
+# Rust Code Coverage
+tarpaulin-report.html
+cobertura.xml
+
 # Ignore Gradle project-specific cache directory
 .gradle
 

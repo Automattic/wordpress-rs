@@ -194,6 +194,9 @@ test-server:
 	docker-compose up -d
 	docker-compose run wpcli
 
+codecov-rust:
+	$(rust_docker_run) /bin/bash -c 'cargo install cargo-tarpaulin && cargo tarpaulin --out html --out xml'
+
 stop-server:
 	docker-compose down
 
