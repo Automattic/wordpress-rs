@@ -60,12 +60,12 @@ struct WPRestErrorInternal {
 }
 
 impl WPRestError {
-    pub fn from_slice(body: &Vec<u8>) -> Option<Self> {
+    pub fn from_slice(body: &[u8]) -> Option<Self> {
         let parsed: Option<WPRestErrorInternal> = serde_json::from_slice(body).ok();
         parsed.map(Self::from_internal)
     }
 
-    pub fn from_str(body: &str) -> Option<Self> {
+    pub fn from_json_str(body: &str) -> Option<Self> {
         let parsed: Option<WPRestErrorInternal> = serde_json::from_str(body).ok();
         parsed.map(Self::from_internal)
     }
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn test_parse_rest_error() {
         let response_body = r#"{"code":"rest_post_invalid_page_number","message":"The page number requested is larger than the number of pages available.","data":{"status":400}}"#;
-        let rest_error: Option<WPRestError> = WPRestError::from_str(response_body);
+        let rest_error: Option<WPRestError> = WPRestError::from_json_str(response_body);
         assert!(rest_error.is_some());
 
         let unwrapped = rest_error.unwrap();

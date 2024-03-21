@@ -157,14 +157,14 @@ pub fn parse_post_list_response(
     }
 
     if response.status_code != 200 {
-        return Err(WPApiError::UnacceptableStatusCodeError { response: response });
+        return Err(WPApiError::UnacceptableStatusCodeError { response });
     }
 
     let parsed: Result<Vec<PostObject>, _> = serde_json::from_slice(&response.body);
     if let Err(err) = parsed {
         return Err(WPApiError::ParsingError {
             reason: err.to_string(),
-            response: response,
+            response,
         });
     }
 
