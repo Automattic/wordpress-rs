@@ -1,5 +1,5 @@
 import Foundation
-import wordpress_api_wrapper
+@_exported import wordpress_api_wrapper
 
 #if os(Linux)
 import FoundationNetworking
@@ -161,16 +161,6 @@ extension RequestMethod {
 extension WpNetworkRequest {
     init(method: RequestMethod, url: URL, headerMap: [String: String]? = nil) {
         self.init(method: method, url: url.absoluteString, headerMap: headerMap)
-    }
-}
-
-extension WpRestApiurl {
-    func asUrl() -> URL {
-        guard let url = URL(string: stringValue) else {
-            preconditionFailure("Invalid URL: \(stringValue)")
-        }
-
-        return url
     }
 }
 

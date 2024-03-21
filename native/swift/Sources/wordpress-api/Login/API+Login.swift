@@ -11,7 +11,7 @@ public extension WordPressAPI {
         let ephemeralClient = WordPressAPI(urlSession: session, baseUrl: url, authenticationStategy: .none)
         let response = try await ephemeralClient.perform(request: request)
 
-        return wordpress_api_wrapper.getLinkHeader(response: response, name: "https://api.w.org/")?.asUrl()
+        return try wordpress_api_wrapper.getLinkHeader(response: response, name: "https://api.w.org/")?.asUrl()
     }
 
     func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpapiDetails {
