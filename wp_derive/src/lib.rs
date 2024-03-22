@@ -135,7 +135,7 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     if let syn::Type::Path(ref p) = ty {
         let first_segment = &p.path.segments[0];
 
-        // `Option` type has only one segment with and ident `Option`
+        // `Option` type has only one segment with an ident `Option`
         if p.path.segments.len() != 1 || first_segment.ident != "Option" {
             return None;
         }
@@ -448,5 +448,76 @@ enum WPContextualParseAttrError {
 impl WPContextualParseAttrError {
     fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
         syn::Error::new(span, self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::*;
+
+    #[test]
+    fn find_contextual_field_inner_segment_simple() {
+        validate_find_contextual_field_inner_segment(
+            "Bar",
+            parse_quote! {
+                let foo: Option<Bar>;
+            },
+        );
+    }
+
+    #[test]
+    fn find_contextual_field_inner_segment_wrapped_in_vec() {
+        validate_find_contextual_field_inner_segment(
+            "Bar",
+            parse_quote! {
+                let foo: Option<Vec<Bar>>;
+            },
+        );
+    }
+
+    #[test]
+    fn find_contextual_field_inner_segment_wrapped_in_segmented_vec() {
+        validate_find_contextual_field_inner_segment(
+            "Bar",
+            parse_quote! {
+                let foo: Option<std::vec::Vec<Bar>>;
+            },
+        );
+    }
+
+    #[test]
+    fn find_contextual_field_inner_segment_wrapped_in_multiple_vecs() {
+        validate_find_contextual_field_inner_segment(
+            "Bar",
+            parse_quote! {
+                let foo: Option<std::vec::Vec<Vec<Bar>>>;
+            },
+        );
+    }
+
+    fn validate_find_contextual_field_inner_segment(result: &str, stmt: syn::Stmt) {
+        let mut input_type = type_from_simple_let_stmt(stmt);
+        assert_eq!(
+            find_contextual_field_inner_segment(&mut input_type)
+                .unwrap()
+                .ident
+                .to_string(),
+            result
+        );
+    }
+
+    fn type_from_simple_let_stmt(stmt: syn::Stmt) -> syn::Type {
+        if let syn::Stmt::Local(syn::Local {
+            pat: syn::Pat::Type(syn::PatType { ty, .. }),
+            ..
+        }) = stmt
+        {
+            Some(*ty)
+        } else {
+            None
+        }
+        .unwrap()
     }
 }
