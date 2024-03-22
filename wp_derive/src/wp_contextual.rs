@@ -174,32 +174,6 @@ fn context_fields(
         .collect()
 }
 
-fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
-    if let syn::Type::Path(ref p) = ty {
-        let first_segment = &p.path.segments[0];
-
-        // `Option` type has only one segment with an ident `Option`
-        if p.path.segments.len() != 1 || first_segment.ident != "Option" {
-            return None;
-        }
-
-        // PathArgument of an `Option` is always `AngleBracketed`
-        if let syn::PathArguments::AngleBracketed(ref angle_bracketed_type) =
-            first_segment.arguments
-        {
-            // `Option` has only one argument inside angle brackets
-            if angle_bracketed_type.args.len() != 1 {
-                return None;
-            }
-
-            if let Some(syn::GenericArgument::Type(t)) = angle_bracketed_type.args.first() {
-                return Some(t.clone());
-            }
-        }
-    }
-    None
-}
-
 // Returns a contextual type for the given type.
 //
 // ```
@@ -345,6 +319,32 @@ fn find_contextual_field_inner_segment(
     }
 }
 
+fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
+    if let syn::Type::Path(ref p) = ty {
+        let first_segment = &p.path.segments[0];
+
+        // `Option` type has only one segment with an ident `Option`
+        if p.path.segments.len() != 1 || first_segment.ident != "Option" {
+            return None;
+        }
+
+        // PathArgument of an `Option` is always `AngleBracketed`
+        if let syn::PathArguments::AngleBracketed(ref angle_bracketed_type) =
+            first_segment.arguments
+        {
+            // `Option` has only one argument inside angle brackets
+            if angle_bracketed_type.args.len() != 1 {
+                return None;
+            }
+
+            if let Some(syn::GenericArgument::Type(t)) = angle_bracketed_type.args.first() {
+                return Some(t.clone());
+            }
+        }
+    }
+    None
+}
+
 fn ident_name_for_context(ident_name_without_prefix: &str, context: &WPContextAttr) -> String {
     format!("{}With{}Context", ident_name_without_prefix, context)
 }
@@ -357,6 +357,16 @@ fn is_wp_contextual_field_ident(ident: &Ident) -> bool {
     ident.to_string().eq("WPContextualField")
 }
 
+// ```
+// #[WPContextual]
+// pub struct SparseFoo {
+//     #[WPContext(edit, embed)]
+//     pub bar: Option<u32>,
+// }
+// ```
+//
+// In this example, given the `TokenStream` for `edit, embed`, turns it into
+// vec![WPContextAttr::Edit, WPContextAttr::Embed].
 fn parse_contexts_from_tokens(
     tokens: proc_macro2::TokenStream,
 ) -> Result<Vec<WPContextAttr>, syn::Error> {
@@ -376,7 +386,12 @@ fn parse_contexts_from_tokens(
                     ))
                 }
             }
-            _ => None,
+            proc_macro2::TokenTree::Group(g) => Some(Err(
+                WPContextualParseAttrError::UnexpectedToken.into_syn_error(g.span()),
+            )),
+            proc_macro2::TokenTree::Literal(l) => Some(Err(
+                WPContextualParseAttrError::UnexpectedLiteralToken.into_syn_error(l.span()),
+            )),
         })
         .collect::<Result<Vec<WPContextAttr>, syn::Error>>()
 }
@@ -434,7 +449,7 @@ impl FromStr for WPContextAttr {
             "edit" => Ok(Self::Edit),
             "embed" => Ok(Self::Embed),
             "view" => Ok(Self::View),
-            _ => Err(WPContextualParseAttrError::UnexpectedWPContextLiteral {
+            _ => Err(WPContextualParseAttrError::UnexpectedWPContextIdent {
                 input: input.to_string(),
             }),
         }
@@ -474,15 +489,20 @@ enum WPContextualParseAttrError {
     // however that's not a valid syntax. There is probably no valid syntax that uses `::` in the
     // current setup, but in case we are missing anything, we should be able to improve the
     // messaging by asking it to be reported.
-    #[error("Expected #[WPContext] or #[WPContextualField], found multi-segment path.\nPlease report to the `wp_derive` developers how you triggered this error type so that a test for it can be added.")]
+    #[error("Expected #[WPContext] or #[WPContextualField], found multi-segment path.\nPlease report this case to the `wp_derive` developers.")]
     UnexpectedAttrPathSegmentCount,
     #[error("Did you mean ','?")]
     UnexpectedPunct,
     #[error("Expected 'edit', 'embed' or 'view', found '{}'", input)]
-    UnexpectedWPContextLiteral { input: String },
+    // TODO: rename as Ident
+    UnexpectedWPContextIdent { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
     #[error("Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?")]
     MissingWPContextMeta,
+    #[error("Expected #[WPContext(edit, embed, view)], found unsupported tokens")]
+    UnexpectedToken,
+    #[error("Expected #[WPContext(edit, embed, view)]. Try removing the quotation?")]
+    UnexpectedLiteralToken,
 }
 
 impl WPContextualParseAttrError {
