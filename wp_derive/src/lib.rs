@@ -20,20 +20,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 .into()
         }
     };
-    let fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma> =
-        if let syn::Data::Struct(syn::DataStruct {
-            fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
-            ..
-        }) = ast.data
-        {
-            named
-        } else {
-            return WPContextualParseError::WPContextualNotAStruct
+    let fields = match struct_fields(&ast.data) {
+        Ok(fields) => fields,
+        Err(err) => {
+            return err
                 .into_syn_error(original_ident.span())
                 .into_compile_error()
                 .into();
-        };
-
+        }
+    };
     let parsed_fields = match parse_field_attrs(fields.iter()) {
         Ok(p) => p,
         Err(e) => return e.to_compile_error().into(),
@@ -129,6 +124,20 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         })
         .unwrap_or_else(|e| e.into_compile_error().into())
+}
+
+fn struct_fields(
+    data: &syn::Data,
+) -> Result<&syn::punctuated::Punctuated<syn::Field, syn::token::Comma>, WPContextualParseError> {
+    if let syn::Data::Struct(syn::DataStruct {
+        fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+        ..
+    }) = data
+    {
+        Ok(named)
+    } else {
+        Err(WPContextualParseError::WPContextualNotAStruct)
+    }
 }
 
 fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
