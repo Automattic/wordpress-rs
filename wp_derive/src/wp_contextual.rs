@@ -6,6 +6,7 @@ use syn::{spanned::Spanned, DeriveInput, Ident};
 
 const IDENT_PREFIX: &str = "Sparse";
 
+// TODO: Public documentation
 pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let original_ident = &ast.ident;
     let original_ident_name = original_ident.to_string();
@@ -339,6 +340,11 @@ fn find_contextual_field_inner_segment(
     }
 }
 
+// Extracts `Foo` from `Option<Foo>`.
+//
+// It currently doesn't support `std::option::Option<Foo>` or `core::option::Option<Foo>`. Although
+// it'd be fairly straightforward to do so, it's also unnecessary as we want to encourage the
+// usage of simple `Option` type for consistency.
 fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     if let syn::Type::Path(ref p) = ty {
         let first_segment = &p.path.segments[0];
@@ -586,6 +592,20 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             WPContextualParseError::WPContextualFieldTypeNotSupported.to_string()
+        );
+    }
+
+    #[test]
+    fn extract_inner_type_of_option_simple() {
+        let input_type = type_from_simple_let_stmt(parse_quote! {
+            let foo: Option<Foo>;
+        });
+        let expected_type = type_from_simple_let_stmt(parse_quote! {
+            let foo: Foo;
+        });
+        assert_eq!(
+            extract_inner_type_of_option(&input_type),
+            Some(expected_type)
         );
     }
 
