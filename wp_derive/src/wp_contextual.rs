@@ -21,7 +21,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let contextual_token_streams = WPContextAttr::iter().map(|current_context| {
         let cname = ident_name_for_context(ident_name_without_prefix, current_context);
         let cident = Ident::new(&cname, original_ident.span());
-        let cfields = context_fields(&parsed_fields, current_context)?;
+        let cfields = generate_context_fields(&parsed_fields, current_context)?;
         if !cfields.is_empty() {
             Ok(quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
@@ -123,9 +123,13 @@ fn parse_fields(
     Ok(parsed_fields)
 }
 
-fn context_fields(
+// Generates fields for the given context.
+//
+// It'll filter out any fields that don't have the given context, handle any mappings due to
+// #[WPContextualField] attribute and remove #[WPContext] and #[WPContextualField] attributes.
+fn generate_context_fields(
     parsed_fields_attrs: &[WPParsedField],
-    current_context: &WPContextAttr,
+    context: &WPContextAttr,
 ) -> Result<Vec<syn::Field>, syn::Error> {
     parsed_fields_attrs
         .iter()
@@ -133,7 +137,7 @@ fn context_fields(
             // Filter out any field that doesn't have this context
             pf.parsed_attrs.iter().any(|parsed_attr| {
                 if let WPParsedAttr::ParsedWPContext { contexts } = parsed_attr {
-                    contexts.iter().any(|c| c == current_context)
+                    contexts.iter().any(|c| c == context)
                 } else {
                     false
                 }
@@ -141,15 +145,15 @@ fn context_fields(
         })
         .map(|pf| {
             let f = &pf.field;
-            let is_wp_contextual_field = f.attrs.iter().any(|attr| {
+            let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+            if f.attrs.iter().any(|attr| {
                 attr.path()
                     .segments
                     .iter()
                     .any(|s| is_wp_contextual_field_ident(&s.ident))
-            });
-            let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
-            if is_wp_contextual_field {
-                new_type = contextual_field_type(&new_type, current_context)?;
+            }) {
+                // If the field has #[WPContextualField] attr, map it to its contextual field type
+                new_type = contextual_field_type(&new_type, context)?;
             }
             Ok::<syn::Field, syn::Error>(syn::Field {
                 // Remove the WPContext & WPContextualField attributes from the generated field
@@ -157,6 +161,7 @@ fn context_fields(
                     .parsed_attrs
                     .iter()
                     .filter_map(|parsed_attr| {
+                        // The generated field should only contain external attributes
                         if let WPParsedAttr::ExternalAttr { attr } = parsed_attr {
                             Some(attr.to_owned())
                         } else {
