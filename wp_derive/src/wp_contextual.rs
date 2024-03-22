@@ -46,6 +46,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
         })
 }
 
+// Validate that the given `data` is a `syn::Data::Struct` and extracts the fields from it
 fn struct_fields(
     data: &syn::Data,
 ) -> Result<&syn::punctuated::Punctuated<syn::Field, syn::token::Comma>, WPContextualParseError> {
@@ -60,6 +61,19 @@ fn struct_fields(
     }
 }
 
+// Turns a list of `syn::Field`s to a list of `WPParsedField`s by parsing its attributes.
+//
+// The following errors are directly handled by this function:
+// * `WPContextualParseAttrError::UnexpectedAttrPathSegmentCount`: The attribute path has multiple
+// segments, separated by `::`. This case doesn't seem to be a valid syntax regardless of how
+// we handle it, but it's handled as an error just in case.
+// * `WPContextualParseAttrError::MissingWPContextMeta`: #[WPContext] attribute doesn't have any
+// contexts.
+// * `WPContextualParseError::WPContextualFieldWithoutWPContext`: #[WPContextualField] is added to
+// a field that doesn't have the #[WPContext] attribute.
+//
+// It'll also handle incorrectly formatted #[WPContext] attribute through
+// `parse_contexts_from_tokens` helper.
 fn parse_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
 ) -> Result<Vec<WPParsedField>, syn::Error> {
@@ -103,7 +117,8 @@ fn parse_fields(
         })
         .collect::<Result<Vec<WPParsedField>, syn::Error>>()?;
 
-    // Find any field that has #[WPContextualField] attribute, but not #[WPContext] attribute
+    // Check if there are any fields that has #[WPContextualField] attribute,
+    // but not the #[WPContext] attribute
     if let Some(pf) = parsed_fields
         .iter()
         .filter(|pf| {
@@ -499,7 +514,6 @@ enum WPContextualParseAttrError {
     #[error("Did you mean ','?")]
     UnexpectedPunct,
     #[error("Expected 'edit', 'embed' or 'view', found '{}'", input)]
-    // TODO: rename as Ident
     UnexpectedWPContextIdent { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
     #[error("Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?")]
