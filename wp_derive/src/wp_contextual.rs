@@ -7,85 +7,21 @@ use syn::{spanned::Spanned, DeriveInput, Ident};
 const IDENT_PREFIX: &str = "Sparse";
 
 pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
-    //let ast: DeriveInput = parse_macro_input!(input);
     let original_ident = &ast.ident;
-    let origina_ident_name = original_ident.to_string();
-    let ident_name_without_prefix = match origina_ident_name.strip_prefix(IDENT_PREFIX) {
-        Some(ident) => ident,
-        None => {
-            return Err(WPContextualParseError::WPContextualMissingSparsePrefix
-                .into_syn_error(original_ident.span()));
-        }
-    };
+    let original_ident_name = original_ident.to_string();
+
+    let ident_name_without_prefix = original_ident_name.strip_prefix(IDENT_PREFIX).ok_or(
+        WPContextualParseError::WPContextualMissingSparsePrefix
+            .into_syn_error(original_ident.span()),
+    )?;
     let fields =
         struct_fields(&ast.data).map_err(|err| err.into_syn_error(original_ident.span()))?;
-    let parsed_fields = parse_field_attrs(fields.iter())?;
-    if let Some(pf) = parsed_fields
-        .iter()
-        .filter(|pf| {
-            pf.parsed_attrs
-                .contains(&WPParsedAttr::ParsedWPContextualField)
-        })
-        .find(|pf| {
-            // Find any field that has #[WPContextualField] attribute, but not #[WPContext]
-            // attribute
-            !pf.parsed_attrs.iter().any(|pf| match pf {
-                WPParsedAttr::ParsedWPContext { contexts } => !contexts.is_empty(),
-                _ => false,
-            })
-        })
-    {
-        return Err(WPContextualParseError::WPContextualFieldWithoutWPContext
-            .into_syn_error(pf.field.span()));
-    };
+    let parsed_fields = parse_fields(fields)?;
 
-    let contextual_token_streams = WPContextAttr::iter().map(|context_attr| {
-        let cname = ident_name_for_context(ident_name_without_prefix, context_attr);
+    let contextual_token_streams = WPContextAttr::iter().map(|current_context| {
+        let cname = ident_name_for_context(ident_name_without_prefix, current_context);
         let cident = Ident::new(&cname, original_ident.span());
-        let cfields = parsed_fields
-            .iter()
-            .filter(|pf| {
-                pf.parsed_attrs.iter().any(|parsed_attr| {
-                    if let WPParsedAttr::ParsedWPContext { contexts } = parsed_attr {
-                        contexts.iter().any(|c| c == context_attr)
-                    } else {
-                        false
-                    }
-                })
-            })
-            .map(|pf| {
-                let f = &pf.field;
-                let is_wp_contextual_field = f.attrs.iter().any(|attr| {
-                    attr.path()
-                        .segments
-                        .iter()
-                        .any(|s| is_wp_contextual_field_ident(&s.ident))
-                });
-                let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
-                if is_wp_contextual_field {
-                    new_type = contextual_field_type(&new_type, context_attr)?;
-                }
-                Ok::<syn::Field, syn::Error>(syn::Field {
-                    // Remove the WPContext & WPContextualField attributes from the generated field
-                    attrs: pf
-                        .parsed_attrs
-                        .iter()
-                        .filter_map(|parsed_attr| {
-                            if let WPParsedAttr::ExternalAttr { attr } = parsed_attr {
-                                Some(attr.to_owned())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                    vis: f.vis.clone(),
-                    mutability: syn::FieldMutability::None,
-                    ident: f.ident.clone(),
-                    colon_token: f.colon_token,
-                    ty: new_type,
-                })
-            })
-            .collect::<Result<Vec<syn::Field>, syn::Error>>()?;
+        let cfields = context_fields(&parsed_fields, current_context)?;
         if !cfields.is_empty() {
             Ok(quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
@@ -122,6 +58,120 @@ fn struct_fields(
     } else {
         Err(WPContextualParseError::WPContextualNotAStruct)
     }
+}
+
+fn parse_fields(
+    fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
+) -> Result<Vec<WPParsedField>, syn::Error> {
+    let parsed_fields = fields
+        .iter()
+        .map(|f| {
+            let parsed_attrs = f
+                .attrs
+                .iter()
+                .map(|attr| {
+                    if attr.path().segments.len() != 1 {
+                        return Err(WPContextualParseAttrError::UnexpectedAttrPathSegmentCount
+                            .into_syn_error(attr.path().span()));
+                    }
+                    let path_segment = attr
+                        .path()
+                        .segments
+                        .first()
+                        .expect("Already validated that there is only one segment");
+                    let segment_ident = &path_segment.ident;
+                    if is_wp_contextual_field_ident(segment_ident) {
+                        return Ok(WPParsedAttr::ParsedWPContextualField);
+                    }
+                    if is_wp_context_ident(segment_ident) {
+                        if let syn::Meta::List(meta_list) = &attr.meta {
+                            let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
+                            Ok(WPParsedAttr::ParsedWPContext { contexts })
+                        } else {
+                            Err(WPContextualParseAttrError::MissingWPContextMeta
+                                .into_syn_error(attr.meta.span()))
+                        }
+                    } else {
+                        Ok(WPParsedAttr::ExternalAttr { attr: attr.clone() })
+                    }
+                })
+                .collect::<Result<Vec<WPParsedAttr>, syn::Error>>()?;
+            Ok(WPParsedField {
+                field: f.clone(),
+                parsed_attrs,
+            })
+        })
+        .collect::<Result<Vec<WPParsedField>, syn::Error>>()?;
+
+    // Find any field that has #[WPContextualField] attribute, but not #[WPContext] attribute
+    if let Some(pf) = parsed_fields
+        .iter()
+        .filter(|pf| {
+            pf.parsed_attrs
+                .contains(&WPParsedAttr::ParsedWPContextualField)
+        })
+        .find(|pf| {
+            !pf.parsed_attrs.iter().any(|pf| match pf {
+                WPParsedAttr::ParsedWPContext { contexts } => !contexts.is_empty(),
+                _ => false,
+            })
+        })
+    {
+        return Err(WPContextualParseError::WPContextualFieldWithoutWPContext
+            .into_syn_error(pf.field.span()));
+    };
+    Ok(parsed_fields)
+}
+
+fn context_fields(
+    parsed_fields_attrs: &[WPParsedField],
+    current_context: &WPContextAttr,
+) -> Result<Vec<syn::Field>, syn::Error> {
+    parsed_fields_attrs
+        .iter()
+        .filter(|pf| {
+            // Filter out any field that doesn't have this context
+            pf.parsed_attrs.iter().any(|parsed_attr| {
+                if let WPParsedAttr::ParsedWPContext { contexts } = parsed_attr {
+                    contexts.iter().any(|c| c == current_context)
+                } else {
+                    false
+                }
+            })
+        })
+        .map(|pf| {
+            let f = &pf.field;
+            let is_wp_contextual_field = f.attrs.iter().any(|attr| {
+                attr.path()
+                    .segments
+                    .iter()
+                    .any(|s| is_wp_contextual_field_ident(&s.ident))
+            });
+            let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+            if is_wp_contextual_field {
+                new_type = contextual_field_type(&new_type, current_context)?;
+            }
+            Ok::<syn::Field, syn::Error>(syn::Field {
+                // Remove the WPContext & WPContextualField attributes from the generated field
+                attrs: pf
+                    .parsed_attrs
+                    .iter()
+                    .filter_map(|parsed_attr| {
+                        if let WPParsedAttr::ExternalAttr { attr } = parsed_attr {
+                            Some(attr.to_owned())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                vis: f.vis.clone(),
+                mutability: syn::FieldMutability::None,
+                ident: f.ident.clone(),
+                colon_token: f.colon_token,
+                ty: new_type,
+            })
+        })
+        .collect()
 }
 
 fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
@@ -263,49 +313,6 @@ fn is_wp_context_ident(ident: &Ident) -> bool {
 
 fn is_wp_contextual_field_ident(ident: &Ident) -> bool {
     ident.to_string().eq("WPContextualField")
-}
-
-fn parse_field_attrs<'a>(
-    fields: impl Iterator<Item = &'a syn::Field>,
-) -> Result<Vec<WPParsedField>, syn::Error> {
-    fields
-        .map(|f| {
-            let parsed_attrs = f
-                .attrs
-                .iter()
-                .map(|attr| {
-                    if attr.path().segments.len() != 1 {
-                        return Err(WPContextualParseAttrError::UnexpectedAttrPathSegmentCount
-                            .into_syn_error(attr.path().span()));
-                    }
-                    let path_segment = attr
-                        .path()
-                        .segments
-                        .first()
-                        .expect("Already validated that there is only one segment");
-                    let segment_ident = &path_segment.ident;
-                    if is_wp_contextual_field_ident(segment_ident) {
-                        return Ok(WPParsedAttr::ParsedWPContextualField);
-                    }
-                    if is_wp_context_ident(segment_ident) {
-                        if let syn::Meta::List(meta_list) = &attr.meta {
-                            let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
-                            Ok(WPParsedAttr::ParsedWPContext { contexts })
-                        } else {
-                            Err(WPContextualParseAttrError::MissingWPContextMeta
-                                .into_syn_error(attr.meta.span()))
-                        }
-                    } else {
-                        Ok(WPParsedAttr::ExternalAttr { attr: attr.clone() })
-                    }
-                })
-                .collect::<Result<Vec<WPParsedAttr>, syn::Error>>()?;
-            Ok(WPParsedField {
-                field: f.clone(),
-                parsed_attrs,
-            })
-        })
-        .collect::<Result<Vec<WPParsedField>, syn::Error>>()
 }
 
 fn parse_contexts_from_tokens(
