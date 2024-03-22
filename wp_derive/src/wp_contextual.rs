@@ -217,9 +217,27 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
     Ok(ty)
 }
 
+// This is a recursive function that finds the inner path segment of a #[WPContextualField].
+//
+// There are many cases that are not supported by #[WPContextualField] mainly because these cases
+// are also not supported by UniFFI and/or serde. For example, we can't use tuples, references,
+// functions etc as a #[WPContextualField], but we also wouldn't expect to.
+//
+// The main cases we need to handle are Option<SparseFoo> and Option<Vec<SparseFoo>> types where
+// the API is either returning a single object or a list of objects.
+//
+// By making this a recursive function, we also handle cases such as Option<Vec<Vec<SparseFoo>>>,
+// but it's very unlikely that this case will ever be used.
+// We also support multiple segments, such as Option<std::vec::Vec<SparseFoo>>.
+//
+// The error returned from this function is a generic one, pointing out that
+// we don't support the given type. In this case, this is our best option because
+// building an exhaustive list of errors is neither feasible nor useful.
 fn find_contextual_field_inner_segment(
     ty: &mut syn::Type,
 ) -> Result<&mut syn::PathSegment, syn::Error> {
+    let unsupported_err =
+        WPContextualParseError::WPContextualFieldTypeNotSupported.into_syn_error(ty.span());
     if let syn::Type::Path(ref mut p) = ty {
         // A `syn::Type::Path` has to have at least one segment.
         assert!(!p.path.segments.is_empty());
@@ -289,17 +307,11 @@ fn find_contextual_field_inner_segment(
                         None
                     }
                 })
-                .ok_or(
-                    WPContextualParseError::WPContextualFieldSegmentNotSupported
-                        .into_syn_error(segment.ident.span()),
-                )?,
-            syn::PathArguments::Parenthesized(_) => {
-                Err(WPContextualParseError::WPContextualFieldSegmentNotSupported
-                    .into_syn_error(segment.ident.span()))
-            }
+                .ok_or(unsupported_err)?,
+            syn::PathArguments::Parenthesized(_) => Err(unsupported_err),
         }
     } else {
-        Err(WPContextualParseError::WPContextualFieldTypeNotSupported.into_syn_error(ty.span()))
+        Err(unsupported_err)
     }
 }
 
@@ -412,9 +424,7 @@ enum WPContextualParseError {
     WPContextualFieldMissingSparsePrefix,
     #[error("#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
     WPContextualFieldWithoutWPContext,
-    #[error("This inner segment type is not supported by #[WPContextualField]")]
-    WPContextualFieldSegmentNotSupported,
-    #[error("This type is not supported by #[WPContextualField]")]
+    #[error("Only Option<SparseFoo> & Option<Vec<SparseFoo>> types are supported by #[WPContextualField]")]
     WPContextualFieldTypeNotSupported,
     #[error("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
     WPContextualMissingSparsePrefix,
@@ -494,6 +504,19 @@ mod tests {
             parse_quote! {
                 let foo: Option<std::vec::Vec<Vec<Bar>>>;
             },
+        );
+    }
+
+    #[test]
+    fn find_contextual_field_inner_segment_error_tuple_not_supported() {
+        let mut input_type = type_from_simple_let_stmt(parse_quote! {
+            let foo: (u32, u32);
+        });
+        assert_eq!(
+            find_contextual_field_inner_segment(&mut input_type)
+                .unwrap_err()
+                .to_string(),
+            WPContextualParseError::WPContextualFieldTypeNotSupported.to_string()
         );
     }
 
