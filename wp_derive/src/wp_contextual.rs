@@ -200,6 +200,37 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
+// Returns a contextual type for the given type.
+//
+// ```
+// #[derive(WPContextual)]
+// pub struct SparseFoo {
+//     #[WPContext(edit)]
+//     #[WPContextualField]
+//     pub bar: Option<SparseBar>,
+// }
+//
+// #[WPContextual]
+// pub struct SparseBar {
+//     #[WPContext(edit)]
+//     pub baz: Option<u32>,
+// }
+// ```
+//
+// Given the above, we'd like to generate:
+//
+// ```
+// pub struct FooWithEditContext {
+//     pub bar: BarWithEditContext,
+// }
+//
+// pub struct BarWithEditContext {
+//     pub baz: u32,
+// }
+// ```
+//
+// In this case, this function takes the `Option<SparseBar>` type and `&WPContextAttr::Edit`
+// and turns it into `BarWithEditContext` type.
 fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
     let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
@@ -209,7 +240,6 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
         None => Err(WPContextualParseError::WPContextualFieldMissingSparsePrefix
             .into_syn_error(inner_segment.ident.span())),
     }?;
-
     inner_segment.ident = Ident::new(
         &ident_name_for_context(&ident_name_without_prefix, context),
         inner_segment.ident.span(),
