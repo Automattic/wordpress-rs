@@ -17,6 +17,13 @@ function run_tests() {
 
 function build_for_real_device() {
     local platform; platform=$1
+
+    # See https://github.com/Automattic/wordpress-rs/issues/48
+    if [[ $platform == "watchOS" ]]; then
+        echo "~~~ watchOS is not supported yet"
+        return
+    fi
+
     echo "--- :swift: Building for $platform device"
     export NSUnbufferedIO=YES
     xcodebuild -destination "generic/platform=$platform" \
