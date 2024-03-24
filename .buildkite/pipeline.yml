@@ -27,7 +27,8 @@ steps:
   - group: ":swift: Swift Wrapper"
     key: "swift"
     steps:
-      - label: ":swift: :darwin: Build and Test on {{matrix}}"
+      - label: ":swift: :darwin: Build xcframework"
+        key: "xcframework"
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
@@ -44,13 +45,29 @@ steps:
           rustup toolchain install nightly
           rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
 
-          echo "--- 🧹 Clearing simulator cache"
-          rm -rf ~/Library/Developer/CoreSimulator/Caches
+          echo "--- :swift: Building xcframework"
+          make xcframework
+          zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
+        artifact_paths:
+          - target/libwordpressFFI.xcframework.zip
+          - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
+        env:
+          IMAGE_ID: xcode-15.3
+        agents:
+          queue: mac
+      - label: ":swift: :darwin: Build and Test on {{matrix}}"
+        command: |
+          echo "--- :arrow_down: Downloading xcframework"
+          buildkite-agent artifact download target/libwordpressFFI.xcframework.zip . --step "xcframework"
+          buildkite-agent artifact download native/swift/Sources/wordpress-api-wrapper/wp_api.swift . --step "xcframework"
+          unzip target/libwordpressFFI.xcframework.zip -d .
 
           echo "--- :swift: Building + Testing"
           make test-swift-{{matrix}}
         env:
           IMAGE_ID: xcode-15.3
+          SKIP_PACKAGE_WP_API: "true"
+        depends_on: xcframework
         plugins: *common_plugins
         agents:
           queue: mac

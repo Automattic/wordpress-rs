@@ -120,6 +120,11 @@ xcframework-headers: bindings
 	cp target/swift-bindings/*.h target/swift-bindings/headers
 	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
 
+ifeq ($(SKIP_PACKAGE_WP_API),true)
+xcframework:
+	@echo "Skip building libwordpressFFI.xcframework"
+else
+
 # Generate the xcframework
 #
 # Requires the following runtimes:
@@ -149,6 +154,8 @@ xcframework: bindings xcframework-combined-libraries xcframework-headers
 		-library target/universal-watchos/release/libwordpress.a \
 		-headers target/swift-bindings/headers \
 		-output target/libwordpressFFI.xcframework
+
+endif
 
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
