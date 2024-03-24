@@ -76,6 +76,31 @@ steps:
           - iOS
           - tvOS
           - watchOS
+      - label: ":swift: :darwin: Build on {{matrix}}"
+        command: |
+          echo "--- :arrow_down: Downloading xcframework"
+          buildkite-agent artifact download target/libwordpressFFI.xcframework.zip . --step "xcframework"
+          buildkite-agent artifact download native/swift/Sources/wordpress-api-wrapper/wp_api.swift . --step "xcframework"
+          unzip target/libwordpressFFI.xcframework.zip -d .
+
+          echo "--- :swift: Building"
+          export NSUnbufferedIO=YES
+          xcodebuild -destination 'generic/platform={{matrix}}' \
+            -scheme wordpress \
+            -derivedDataPath DerivedData \
+            build | xcbeautify
+        env:
+          IMAGE_ID: xcode-15.3
+          SKIP_PACKAGE_WP_API: "true"
+        depends_on: xcframework
+        plugins: *common_plugins
+        agents:
+          queue: mac
+        matrix:
+          - macOS
+          - iOS
+          - tvOS
+          - watchOS
       - label: ":swift: :linux: Build and Test"
         command: |
           echo "--- :swift: Building + Testing"
