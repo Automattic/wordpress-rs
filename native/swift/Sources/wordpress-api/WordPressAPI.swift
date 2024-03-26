@@ -125,8 +125,25 @@ public struct WordPressAPI {
     }
 }
 
+public protocol Paginatable {
+    static func parse(list: Data) -> Result<[Self], WpApiError>
+}
+
+extension PostObject: Paginatable {
+    public static func parse(list: Data) -> Result<[PostObject], WpApiError> {
+        do {
+            let result = try wordpress_api_wrapper.parsePostList(json: list)
+            return .success(result)
+        } catch let error as WpApiError {
+            return .failure(error)
+        } catch {
+            fatalError("Unexpected error: \(error)")
+        }
+    }
+}
+
 extension WordPressAPI {
-    public func listPosts(perPage: UInt32) -> AsyncThrowingStream<[PostObject], Error /* PaginationError */> {
+    public func list<R: Paginatable>(type: R.Type, perPage: UInt32) -> AsyncThrowingStream<[R], Error /* PaginationError */> {
         let paginator = Paginator(
             client: APIClient(urlSession: self.urlSession),
             apiHelper: self.helper,
@@ -134,12 +151,12 @@ extension WordPressAPI {
             query: nil,
             perPage: perPage
         )
-        let stream: (AsyncThrowingStream<[PostObject], Error>.Continuation) -> Void = { continuation in
+        let stream: (AsyncThrowingStream<[R], Error>.Continuation) -> Void = { continuation in
             DispatchQueue.global().async {
                 while true /* unless cancelled */ {
+                    let pagination: Data
                     do {
-                        let result = try paginator.nextPage()
-                        continuation.yield(result.postList ?? [])
+                        pagination = try paginator.nextPage()
                     } catch let error as PaginationError {
                         if error == .ReachedEnd {
                             continuation.finish()
@@ -152,11 +169,17 @@ extension WordPressAPI {
                         break
                     }
 
+                    switch R.parse(list: pagination) {
+                    case let .success(result):
+                        continuation.yield(result)
+                    case let .failure(error):
+                        continuation.finish(throwing: PaginationError.ApiError(error: error))
+                    }
                 }
             }
         }
 
-        return AsyncThrowingStream<[PostObject], Error>([PostObject].self, stream)
+        return AsyncThrowingStream<[R], Error>([R].self, stream)
     }
 }
 

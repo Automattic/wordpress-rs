@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 use http::header::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 pub use api_error::*;
 pub use login::*;
@@ -118,6 +118,13 @@ impl WPApiHelper {
     }
 }
 
+pub struct PaginationResponse {
+    json: Vec<u8>,
+    next_page: Option<WPRestAPIURL>,
+    total: Option<u32>,
+    total_pages: Option<u32>,
+}
+
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WPAuthentication {
     AuthorizationHeader { token: String },
@@ -205,6 +212,29 @@ impl WPNetworkResponse {
 pub fn parse_post_list_response(
     response: WPNetworkResponse,
 ) -> Result<PostListResponse, WPApiError> {
+    let parsed = parse_pagination_response(response)?;
+    let posts = parse_post_list(&parsed.json)?;
+
+    Ok(PostListResponse {
+        post_list: Some(posts),
+        next_page: parsed.next_page.map(|f| f.as_str().to_string()),
+        total: parsed.total,
+        total_pages: parsed.total_pages,
+    })
+}
+
+#[uniffi::export]
+pub fn parse_post_list(json: &[u8]) -> Result<Vec<PostObject>, WPApiError> {
+    serde_json::from_slice::<Vec<PostObject>>(json)
+        .map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(json).unwrap().to_string(),
+        })
+}
+
+pub fn parse_pagination_response(
+    response: WPNetworkResponse,
+) -> Result<PaginationResponse, WPApiError> {
     // TODO: Further parse the response body to include error message
     // TODO: Lots of unwraps to get a basic setup working
     if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
@@ -240,8 +270,8 @@ pub fn parse_post_list_response(
         .map(|f| f.to_str().unwrap_or_default())
         .and_then(|f| f.parse::<u32>().ok());
 
-    Ok(PostListResponse {
-        post_list: Some(post_list),
+    Ok(PaginationResponse {
+        json: response.body,
         next_page,
         total,
         total_pages,

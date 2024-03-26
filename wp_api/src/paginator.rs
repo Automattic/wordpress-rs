@@ -68,7 +68,7 @@ impl Paginator {
         }
     }
 
-    fn next_page(&self) -> Result<PostListResponse, PaginationError> {
+    fn next_page(&self) -> Result<Vec<u8>, PaginationError> {
         let mut state = self.state.write().map_err(|_| PaginationError::Unknown)?;
 
         let pagination_params = [
@@ -83,7 +83,7 @@ impl Paginator {
             .send_request(request)
             .map_err(|err| PaginationError::NativeClientError { error: err })?;
 
-        let response = parse_post_list_response(response).map_err(|err| {
+        let response = parse_pagination_response(response).map_err(|err| {
             match err {
                 WPApiError::ClientError {
                     error_type,
@@ -110,6 +110,6 @@ impl Paginator {
         state.total_pages = response.total_pages;
 
         // TODO: filter duplicated result
-        Ok(response)
+        Ok(response.json)
     }
 }
