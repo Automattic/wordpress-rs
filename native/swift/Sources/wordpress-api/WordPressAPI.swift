@@ -5,6 +5,50 @@ import wordpress_api_wrapper
 import FoundationNetworking
 #endif
 
+public class APIClient: BlockingApiClient {
+    let urlSession: URLSession
+
+    public init(urlSession: URLSession = .shared) {
+        self.urlSession = urlSession
+    }
+
+    public func sendRequest(request: WpNetworkRequest) throws -> WpNetworkResponse {
+        let semaphore = DispatchSemaphore(value: 0)
+
+        var result: Result<WpNetworkResponse, BlockingApiClientError>?
+        let completion: (Data?, URLResponse?, (any Error)?) -> Void = { data, response, error in
+            let inner: Result<WpNetworkResponse, BlockingApiClientError>
+            defer {
+                result = inner
+                semaphore.signal()
+            }
+
+            if let error {
+                inner = .failure(.NativeClientError(data: Data()))
+                return
+            }
+            do {
+                let response = try WpNetworkResponse.from(data: data ?? Data(), response: response as! HTTPURLResponse)
+                inner = .success(response)
+            } catch {
+                inner = .failure(.NativeClientError(data: Data()))
+            }
+        }
+
+        URLSession.shared
+            .dataTask(with: request.asURLRequest()) { data, response, error in
+                DispatchQueue.global().async {
+                    completion(data, response, error)
+                }
+            }
+            .resume()
+
+        semaphore.wait()
+
+        return try (result ?? .failure(.NativeClientError(data: Data()))).get()
+    }
+}
+
 public struct WordPressAPI {
 
     enum Errors: Error {
@@ -12,7 +56,7 @@ public struct WordPressAPI {
     }
 
     private let urlSession: URLSession
-    package let helper: WpApiHelperProtocol
+    package let helper: WpApiHelper
 
     public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
         self.urlSession = urlSession
@@ -78,6 +122,41 @@ public struct WordPressAPI {
     enum ParseError: Error {
         case invalidUrl
         case invalidHtml
+    }
+}
+
+extension WordPressAPI {
+    public func listPosts(perPage: UInt32) -> AsyncThrowingStream<[PostObject], Error /* PaginationError */> {
+        let paginator = Paginator(
+            client: APIClient(urlSession: self.urlSession),
+            apiHelper: self.helper,
+            route: "wp/v2/posts",
+            query: nil,
+            perPage: perPage
+        )
+        let stream: (AsyncThrowingStream<[PostObject], Error>.Continuation) -> Void = { continuation in
+            DispatchQueue.global().async {
+                while true /* unless cancelled */ {
+                    do {
+                        let result = try paginator.nextPage()
+                        continuation.yield(result.postList ?? [])
+                    } catch let error as PaginationError {
+                        if error == .ReachedEnd {
+                            continuation.finish()
+                        } else {
+                            continuation.finish(throwing: error)
+                        }
+                        break
+                    } catch {
+                        continuation.finish(throwing: PaginationError.Unknown)
+                        break
+                    }
+
+                }
+            }
+        }
+
+        return AsyncThrowingStream<[PostObject], Error>([PostObject].self, stream)
     }
 }
 

@@ -57,6 +57,8 @@ pub struct PostDeleteRequest {
 pub struct PostListResponse {
     pub post_list: Option<Vec<PostObject>>,
     pub next_page: Option<String>,
+    pub total: Option<u32>,
+    pub total_pages: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

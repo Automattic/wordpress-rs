@@ -10,4 +10,28 @@ final class WordPressAPITests: XCTestCase {
             .postListRequest(params: .init())
         XCTAssertTrue(request.url.hasPrefix("https://wordpress.org/wp-json/wp/v2/posts"))
     }
+
+    func testAPIClient() async throws {
+        let request = WpNetworkRequest(method: .get, url: "https://google.com", headerMap: nil)
+        let response = try APIClient().sendRequest(request: request)
+        XCTAssertTrue((200..<400).contains(response.statusCode))
+    }
+
+    func testPaginator() async throws {
+        let api = WordPressAPI(urlSession: .shared, baseUrl: URL(string: "https://instant-unknown-banana.jurassic.ninja")!, authenticationStategy: .init(username: "demo", password: "OpYcWbQezJ30vk83ChE4"))
+        let pages: [[PostObject]] = try await api.listPosts(perPage: 10).reduce(into: []) { $0.append($1) }
+        let total = pages.flatMap { $0 }
+        XCTAssertEqual(pages.count, 4)
+        XCTAssertEqual(total.count, 36)
+    }
+
+    func testNativeError() async {
+        let api = WordPressAPI(urlSession: .shared, baseUrl: URL(string: "http://a-url-that-do-not-exists.local")!, authenticationStategy: .none)
+        do {
+            let _ = try await api.listPosts(perPage: 10).reduce(into: []) { $0.append($1) }
+            XCTFail("The above call should throw")
+        } catch {
+            XCTAssertTrue(error is URLError)
+        }
+    }
 }

@@ -15,6 +15,8 @@ pub enum WPApiError {
     ServerError { status_code: u16 },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ParsingError { reason: String, response: String },
+    #[error("Error while parsing. \nReason: {}", reason)]
+    RequestEncodingError { reason: String },
     #[error("Error that's not yet handled by the library")]
     UnknownError,
 }
