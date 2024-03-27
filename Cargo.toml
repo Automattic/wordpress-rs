@@ -1,15 +1,15 @@
 [workspace]
 members = [
-  "uniffi_bindgen",
   "wp_api",
   "wp_cli",
   "wp_derive",
   "wp_networking",
+  "wp_uniffi_bindgen",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-uniffi = "0.26.1"
+uniffi = "0.27.0"
 thiserror = "1.0"
 # We need to match the version used in `reqwest`: https://github.com/seanmonstar/reqwest/blob/master/Cargo.toml#L84
 # So that we can implement our own traits and it'll work with both reqwest types as well as http types
