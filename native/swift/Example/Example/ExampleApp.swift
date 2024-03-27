@@ -1,17 +1,19 @@
-//
-//  ExampleApp.swift
-//  Example
-//
-//  Created by Jeremy Massel on 2024-01-24.
-//
-
 import SwiftUI
 
 @main
 struct ExampleApp: App {
+
+    @StateObject
+    var loginManager = LoginManager()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if loginManager.isLoggedIn {
+                ContentView(viewModel: PostListViewModel(loginManager: self.loginManager))
+            } else {
+                LoginView()
+            }
         }
+        .environmentObject(loginManager)
     }
 }

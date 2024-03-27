@@ -41,6 +41,7 @@ fn request_method(method: wp_api::RequestMethod) -> http::Method {
         wp_api::RequestMethod::POST => reqwest::Method::POST,
         wp_api::RequestMethod::PUT => reqwest::Method::PUT,
         wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
+        wp_api::RequestMethod::HEAD => reqwest::Method::HEAD,
     }
 }
 
