@@ -16,7 +16,7 @@ java {
 android {
     namespace = "rs.wordpress.wp_api"
 
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 24
@@ -49,6 +49,7 @@ repositories {
 
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation "androidx.annotation:annotation:1.7.1"
 
     androidTestImplementation "androidx.test:runner:1.4.0"
     androidTestImplementation "androidx.test:rules:1.4.0"
