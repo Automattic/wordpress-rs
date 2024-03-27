@@ -41,8 +41,8 @@ bindings:
 	cargo build --release
 
 	#wp_api
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
+	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
+	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
 _test-android:

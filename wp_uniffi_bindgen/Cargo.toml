@@ -1,5 +1,5 @@
 [package]
-name = "uniffi_bindgen"
+name = "wp_uniffi_bindgen"
 version = "0.1.0"
 edition = "2021"
 
