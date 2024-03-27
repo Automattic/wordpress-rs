@@ -8,17 +8,5 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-# External traits in UDL is only available since https://github.com/mozilla/uniffi-rs/pull/1867
-# Point to a specific commit until a new version is released
 uniffi = "0.27.0"
-# We need to match the version used in `reqwest`: https://github.com/seanmonstar/reqwest/blob/master/Cargo.toml#L84
-# So that we can implement our own traits and it'll work with both reqwest types as well as http types
-#
-# For example, reqwest re-exports `http::StatusCode` as `reqwest::StatusCode` and as long as 
-# we use the same version, we'll be able to implement our trait for `http::StatusCode` and it'll
-# work for `reqwest::StatusCode` as well.
-# https://github.com/seanmonstar/reqwest/blob/master/src/lib.rs#L252
-#
-# Note that there is a WIP PR that'll update the version used in `reqwest` to `1.0.0`:
-# https://github.com/seanmonstar/reqwest/pull/2059
-http = "0.2"
+http = "1.1"
