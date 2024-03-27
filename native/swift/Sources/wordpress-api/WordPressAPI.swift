@@ -145,15 +145,16 @@ extension PostObject: Paginatable {
 
 extension WordPressAPI {
     public func list<R: Paginatable>(type: R.Type, perPage: UInt32) -> AsyncThrowingStream<[R], Error /* PaginationError */> {
-        let paginator = Paginator(
-            client: APIClient(urlSession: self.urlSession),
-            apiHelper: self.helper,
-            route: "wp/v2/posts",
-            query: nil,
-            perPage: perPage
-        )
         let stream: (AsyncThrowingStream<[R], Error>.Continuation) -> Void = { continuation in
             DispatchQueue.global().async {
+                let paginator = Paginator(
+                    client: APIClient(urlSession: self.urlSession),
+                    apiHelper: self.helper,
+                    route: "wp/v2/posts",
+                    query: nil,
+                    perPage: perPage
+                )
+
                 while true /* unless cancelled */ {
                     let pagination: Data
                     do {
