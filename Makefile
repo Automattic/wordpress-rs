@@ -41,8 +41,8 @@ bindings:
 	cargo build --release
 
 	#wp_api
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
-	cargo run --release --bin uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
+	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
+	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
 _test-android:
@@ -120,6 +120,11 @@ xcframework-headers: bindings
 	cp target/swift-bindings/*.h target/swift-bindings/headers
 	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
 
+ifeq ($(SKIP_PACKAGE_WP_API),true)
+xcframework:
+	@echo "Skip building libwordpressFFI.xcframework"
+else
+
 # Generate the xcframework
 #
 # Requires the following runtimes:
@@ -149,6 +154,8 @@ xcframework: bindings xcframework-combined-libraries xcframework-headers
 		-library target/universal-watchos/release/libwordpress.a \
 		-headers target/swift-bindings/headers \
 		-output target/libwordpressFFI.xcframework
+
+endif
 
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
