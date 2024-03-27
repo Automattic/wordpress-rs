@@ -24,7 +24,8 @@ public class APIClient: BlockingApiClient {
             }
 
             if let error {
-                inner = .failure(.NativeClientError(data: Data()))
+                let data = (try? NSKeyedArchiver.archivedData(withRootObject: error as NSError, requiringSecureCoding: false)) ?? Data()
+                inner = .failure(.NativeClientError(data: data))
                 return
             }
             do {
@@ -160,6 +161,12 @@ extension WordPressAPI {
                     } catch let error as PaginationError {
                         if error == .ReachedEnd {
                             continuation.finish()
+                        } else if case let .NativeClientError(.NativeClientError(data)) = error {
+                            if let nativeError = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSError.self, from: data) {
+                                continuation.finish(throwing: nativeError)
+                            } else {
+                                continuation.finish(throwing: error)
+                            }
                         } else {
                             continuation.finish(throwing: error)
                         }
