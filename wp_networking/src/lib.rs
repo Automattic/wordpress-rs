@@ -23,7 +23,7 @@ impl WPNetworking {
         &self,
         params: Option<PostListParams>,
     ) -> Result<PostListResponse, WPApiError> {
-        let wp_request = self.helper.post_list_request(PostListParams::default());
+        let wp_request = self.helper.post_list_request(params.unwrap_or_default());
         let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
         let response = self
             .client
