@@ -12,4 +12,4 @@ fn main() {
     let _ = FooWithViewContext { bar: 0 };
 }
 
-uniffi::setup_scaffolding!("wp_derive");
+uniffi::setup_scaffolding!();

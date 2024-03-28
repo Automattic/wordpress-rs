@@ -31,6 +31,6 @@ pub struct SparsePostGuid {
     pub rendered: Option<String>,
 }
 
-uniffi::setup_scaffolding!("wp_derive");
+uniffi::setup_scaffolding!();
 
 fn main() {}

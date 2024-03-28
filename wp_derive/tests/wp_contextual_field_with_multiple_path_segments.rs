@@ -15,4 +15,4 @@ fn main() {
     };
 }
 
-uniffi::setup_scaffolding!("wp_derive");
+uniffi::setup_scaffolding!();
