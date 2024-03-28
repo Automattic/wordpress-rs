@@ -85,28 +85,117 @@ public protocol Paginatable {
     static func parse(list: Data) -> Result<[Self], WpApiError>
 }
 
+class AsyncBlockOperation: Operation {
+    enum State: String {
+        case isReady, isExecuting, isFinished
+    }
+
+    let block: (@escaping () -> Void) -> Void
+
+    override var isAsynchronous: Bool {
+        return true
+    }
+
+    let stateLock = NSRecursiveLock()
+    var _state: State
+    var state: State {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        return _state
+    }
+
+    override var isExecuting: Bool {
+        return state == .isExecuting
+    }
+
+    override var isFinished: Bool {
+        return state == .isFinished
+    }
+
+    init(block: @escaping (@escaping () -> Void) -> Void) {
+        self.block = block
+        self._state = .isReady
+    }
+
+    override func start() {
+        if isCancelled {
+            set(state: .isFinished)
+            return
+        }
+
+        set(state: .isExecuting)
+        block {
+            self.set(state: .isFinished)
+        }
+    }
+
+    private func set(state newState: State) {
+        stateLock.lock()
+        defer {
+            stateLock.unlock()
+        }
+
+        if isCancelled || isFinished {
+            return
+        }
+
+        if newState != _state {
+            let oldKey = _state.rawValue
+            let newKey = newState.rawValue
+            willChangeValue(forKey: oldKey)
+            willChangeValue(forKey: newKey)
+            _state = newState
+            didChangeValue(forKey: oldKey)
+            didChangeValue(forKey: newKey)
+        }
+    }
+}
+
 public class Paginator<R: Paginatable> {
     let api: WordPressAPI
     let rust: wordpress_api_wrapper.Paginator
+    private let queue: OperationQueue
 
     public init(api: WordPressAPI, route: String, perPage: UInt32) {
         self.api = api
         self.rust = .init(apiHelper: api.helper, route: route, query: nil, perPage: perPage)
+        self.queue = OperationQueue()
+        self.queue.maxConcurrentOperationCount = 1
     }
 
     public func nextPage() async throws -> [R] {
-        // TODO: concurrent calls should be queued.
-        do {
-            let request = try rust.nextPage()
-            let response = try await api.perform(request: request)
-            let jsonData = try rust.receive(response: response)
-            return try R.parse(list: jsonData).get()
-        } catch let rustError as wordpress_api_wrapper.PaginationError {
-            switch rustError {
-            case .ReachedEnd, .Unknown:
-                return []
-            case .ApiError(error: let error):
-                throw error
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = self.nextPage {
+                continuation.resume(with: $0)
+            }
+            self.queue.addOperation(operation)
+        }
+    }
+
+    func nextPage(completion originalCompletion: @escaping (Result<[R], Error>) -> Void) -> AsyncBlockOperation {
+        AsyncBlockOperation { done in
+            let completion: (Result<[R], Error>) -> Void = {
+                done()
+                originalCompletion($0)
+            }
+
+            let request: WpNetworkRequest
+            do {
+                request = try self.rust.nextPage()
+            } catch {
+                return completion(.failure(error))
+            }
+
+            self.api.perform(request: request) { result in
+                completion(
+                    result.tryMap {
+                        let jsonData = try self.rust.receive(response: $0)
+                        return try R.parse(list: jsonData).get()
+                    }
+                )
             }
         }
     }

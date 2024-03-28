@@ -19,6 +19,27 @@ final class WordPressAPITests: XCTestCase {
         XCTAssertEqual(total.count, 36)
     }
 
+    func testConcurrentNextPage() async throws {
+        let api = WordPressAPI(urlSession: .shared, baseUrl: URL(string: "https://instant-unknown-banana.jurassic.ninja")!, authenticationStategy: .init(username: "demo", password: "OpYcWbQezJ30vk83ChE4"))
+        let paginator = wordpress_api.Paginator<PostObject>(
+            api: api,
+            route: "wp/v2/posts",
+            perPage: 10
+        )
+        let result = try await withThrowingTaskGroup(of: [PostObject].self) { group in
+            group.addTask {
+                try await paginator.nextPage()
+            }
+            group.addTask {
+                try await paginator.nextPage()
+            }
+            return try await group.reduce(into: [[PostObject]]()) { $0.append($1) }
+        }
+        let first = try XCTUnwrap(result.first).map { $0.id }
+        let second = try XCTUnwrap(result.last).map { $0.id }
+        XCTAssertNotEqual(first, second)
+    }
+
     func testNativeError() async {
         let api = WordPressAPI(urlSession: .shared, baseUrl: URL(string: "http://a-url-that-do-not-exists.local")!, authenticationStategy: .none)
         do {
