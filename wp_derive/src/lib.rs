@@ -235,75 +235,91 @@
 //! # struct PostContentWithViewContext {}
 //! ```
 //!
-//! Notice that the type of the `content` field is now `PostContentWithEditContext` &
-//! `PostContentWithViewContext` which are exactly the types that we used in our manually typed
+//! Notice that the types of the `content` fields are now `PostContentWithEditContext` &
+//! `PostContentWithViewContext` which are the types that we used in our manually typed
 //! example.
 //!
-//! One last bit to wrap up this example. In the manually typed example, we have replaced the
-//! `Sparse` types with the strongly typed contextual types. However, we still need to the `Sparse`
-//! types, because we still want to be able to manually filter the fields, with `_filter` argument.
-//! With that in mind, here is the full comparison:
-//!
-//! ```
-//! // Before
-//! pub struct SparsePost {
-//!     pub id: Option<u32>,
-//!     pub content: Option<SparsePostContent>,
-//! }
-//! pub struct SparsePostContent {
-//!    pub raw: Option<String>,
-//!    pub rendered: Option<String>
-//! }
-//! pub struct PostWithEditContext {
-//!     pub id: u32,
-//!     pub content: PostContentWithEditContext,
-//! }
-//! pub struct PostWithEmbedContext {
-//!     pub id: u32,
-//! }
-//! pub struct PostWithViewContext {
-//!     pub id: u32,
-//!     pub content: PostContentWithViewContext,
-//! }
-//! pub struct PostContentWithEditContext {
-//!    pub raw: String,
-//!    pub rendered: String
-//! }
-//! pub struct PostContentWithViewContext {
-//!    pub rendered: String
-//! }
-//! ```
-//!
-//! ```
-//! // After
-//! use wp_derive::WPContextual;
-//!
-//! #[derive(WPContextual)]
-//! pub struct SparsePost {
-//!     #[WPContext(edit, embed, view)]
-//!     pub id: Option<u32>,
-//!     #[WPContext(edit)]
-//!     #[WPContextualField]
-//!     pub content: Option<SparsePostContent>,
-//! }
-//!
-//! #[derive(WPContextual)]
-//! pub struct SparsePostContent {
-//!     #[WPContext(edit)]
-//!     pub raw: Option<String>,
-//!     #[WPContext(edit, view)]
-//!     pub rendered: Option<String>,
-//! }
-//! # // We need these 2 lines for UniFFI
-//! # uniffi::setup_scaffolding!();
-//! # fn main() {}
-//! ```
-//!
+//! Please see the documentation for [`WPContextual`] for technical details.
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod wp_contextual;
 
+/// Given `SparseFoo`, it will generate `FooWithEditContext`, `FooWithEmbedContext` &
+/// `FooWithViewContext` types by turning `Option<T>` fields into `T`
+///
+/// * `[WPContextual]` types have to start `Sparse` prefix. This is a design decision we have made
+/// to keep our type names descriptive and consistent.
+/// * `[WPContext]` attribute is used to describe which `context`s the field belongs to.
+/// * `[WPContextualField]` is used when a [`WPContextual`] type is a **field** of another
+/// [`WPContextual`] type. This will tell the compiler to replace the given `Option<SparseBaz>`
+/// type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
+/// `BazWithViewContext`.
+/// * Generated types will have the following derive macros:
+/// `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. These types are meant
+/// to be used for the
+/// [WordPress.org REST API](https://developer.wordpress.org/rest-api/reference/), so
+/// [`serde::Serialize`] and [`serde::Deserialize`] are needed for parsing. We also would like
+/// to use these types through FFI, so they need to derive [`uniffi::Record`].
+/// * If the generated type won't have any fields, that type will not be generated.
+/// * If a **field** type is not `Option<T>`, it'll not be altered. Only `Option<T>` fields turn
+/// into `T`.
+///
+/// Here is a full example:
+///
+/// ```
+/// use wp_derive::WPContextual;
+///
+/// #[derive(WPContextual)]
+/// pub struct SparseFoo {
+///     #[WPContext(edit, embed, view)]
+///     pub bar: Option<u32>,
+///     #[WPContext(edit)]
+///     #[WPContextualField]
+///     pub baz: Option<SparseBaz>,
+/// }
+///
+/// #[derive(WPContextual)]
+/// pub struct SparseBaz {
+///     #[WPContext(edit)]
+///     pub baz: Option<String>,
+///     #[WPContext(edit)]
+///     pub qux: Vec<u32>,
+/// }
+/// # // We need these 2 lines for UniFFI
+/// # uniffi::setup_scaffolding!();
+/// # fn main() {}
+/// ```
+///
+/// Given above, compiler will generate the following types:
+///
+/// ```
+/// #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+/// pub struct FooWithEditContext {
+///     pub bar: u32,
+///     pub baz: BazWithEditContext,
+/// }
+/// #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+/// pub struct FooWithEmbedContext {
+///     pub bar: u32,
+/// }
+/// #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+/// pub struct FooWithViewContext {
+///     pub bar: u32,
+/// }
+/// #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+/// pub struct BazWithEditContext {
+///     pub baz: String,
+///     pub qux: Vec<u32>,
+/// }
+/// # // We need these 2 lines for UniFFI
+/// # uniffi::setup_scaffolding!();
+/// # fn main() {}
+/// ```
+///
+/// * Notice that `BazWithEmbedContext` & `BazWithViewContext` types weren't generated since
+/// they wouldn't have any fields.
+/// * Notice the type for `qux: Vec<u32>` was preserved as this wasn't an `Option<T>` type.
 #[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
 pub fn derive(input: TokenStream) -> TokenStream {
     wp_contextual::wp_contextual(parse_macro_input!(input))
