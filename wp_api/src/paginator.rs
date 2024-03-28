@@ -2,20 +2,6 @@ use std::sync::*;
 
 use super::*;
 
-#[uniffi::export(with_foreign)]
-pub trait BlockingAPIClient: Send + Sync {
-    fn send_request(
-        &self,
-        request: WPNetworkRequest,
-    ) -> Result<WPNetworkResponse, BlockingAPIClientError>;
-}
-
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-pub enum BlockingAPIClientError {
-    #[error("Native clients couldn't receive a HTTP response.")]
-    NativeClientError { data: Vec<u8> },
-}
-
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum PaginationError {
     #[error("Reached the end of the list")]
@@ -24,16 +10,12 @@ pub enum PaginationError {
     #[error("A REST API error occurred")]
     APIError { error: WPApiError },
 
-    #[error("Native clients couldn't receive a HTTP response.")]
-    NativeClientError { error: BlockingAPIClientError },
-
     #[error("A unknown error occurred")]
     Unknown,
 }
 
 #[derive(uniffi::Object)]
 pub struct Paginator {
-    client: Arc<dyn BlockingAPIClient>,
     api_helper: Arc<WPApiHelper>,
     route: String,
     query: Vec<QueryItem>,
@@ -52,14 +34,12 @@ struct PaginationState {
 impl Paginator {
     #[uniffi::constructor]
     pub fn new(
-        client: Arc<dyn BlockingAPIClient>,
         api_helper: Arc<WPApiHelper>,
         route: String,
         query: Option<Vec<QueryItem>>,
         per_page: Option<u32>,
     ) -> Self {
         Self {
-            client,
             api_helper,
             per_page: per_page.unwrap_or(100),
             state: Default::default(),
@@ -68,21 +48,27 @@ impl Paginator {
         }
     }
 
-    fn next_page(&self) -> Result<Vec<u8>, PaginationError> {
-        let mut state = self.state.write().map_err(|_| PaginationError::Unknown)?;
+    fn next_page(&self) -> Result<WPNetworkRequest, PaginationError> {
+        let state = self.state.read().map_err(|_| PaginationError::Unknown)?;
 
         let pagination_params = [
-            QueryItem { name: "page".to_string(), value: (state.current_page + 1).to_string() },
-            QueryItem { name: "per_page".to_string(), value: self.per_page.to_string() },
+            QueryItem {
+                name: "page".to_string(),
+                value: (state.current_page + 1).to_string(),
+            },
+            QueryItem {
+                name: "per_page".to_string(),
+                value: self.per_page.to_string(),
+            },
         ];
         let query = self.query.iter().chain(pagination_params.iter());
-        let request = self.api_helper.request(&self.route, query, Some(RequestMethod::GET)).map_err(|err| PaginationError::APIError { error: err })?;
+        self.api_helper
+            .request(&self.route, query, Some(RequestMethod::GET))
+            .map_err(|err| PaginationError::APIError { error: err })
+    }
 
-        let response = self
-            .client
-            .send_request(request)
-            .map_err(|err| PaginationError::NativeClientError { error: err })?;
-
+    fn receive(&self, response: WPNetworkResponse) -> Result<Vec<u8>, PaginationError> {
+        let mut state = self.state.write().map_err(|_| PaginationError::Unknown)?;
         let response = parse_pagination_response(response).map_err(|err| {
             match err {
                 WPApiError::ClientError {

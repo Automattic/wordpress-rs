@@ -5,51 +5,6 @@ import wordpress_api_wrapper
 import FoundationNetworking
 #endif
 
-public class APIClient: BlockingApiClient {
-    let urlSession: URLSession
-
-    public init(urlSession: URLSession = .shared) {
-        self.urlSession = urlSession
-    }
-
-    public func sendRequest(request: WpNetworkRequest) throws -> WpNetworkResponse {
-        let semaphore = DispatchSemaphore(value: 0)
-
-        var result: Result<WpNetworkResponse, BlockingApiClientError>?
-        let completion: (Data?, URLResponse?, (any Error)?) -> Void = { data, response, error in
-            let inner: Result<WpNetworkResponse, BlockingApiClientError>
-            defer {
-                result = inner
-                semaphore.signal()
-            }
-
-            if let error {
-                let data = (try? NSKeyedArchiver.archivedData(withRootObject: error as NSError, requiringSecureCoding: false)) ?? Data()
-                inner = .failure(.NativeClientError(data: data))
-                return
-            }
-            do {
-                let response = try WpNetworkResponse.from(data: data ?? Data(), response: response as! HTTPURLResponse)
-                inner = .success(response)
-            } catch {
-                inner = .failure(.NativeClientError(data: Data()))
-            }
-        }
-
-        URLSession.shared
-            .dataTask(with: request.asURLRequest()) { data, response, error in
-                DispatchQueue.global().async {
-                    completion(data, response, error)
-                }
-            }
-            .resume()
-
-        semaphore.wait()
-
-        return try (result ?? .failure(.NativeClientError(data: Data()))).get()
-    }
-}
-
 public struct WordPressAPI {
 
     enum Errors: Error {
@@ -130,6 +85,33 @@ public protocol Paginatable {
     static func parse(list: Data) -> Result<[Self], WpApiError>
 }
 
+public class Paginator<R: Paginatable> {
+    let api: WordPressAPI
+    let rust: wordpress_api_wrapper.Paginator
+
+    public init(api: WordPressAPI, route: String, perPage: UInt32) {
+        self.api = api
+        self.rust = .init(apiHelper: api.helper, route: route, query: nil, perPage: perPage)
+    }
+
+    public func nextPage() async throws -> [R] {
+        // TODO: concurrent calls should be queued.
+        do {
+            let request = try rust.nextPage()
+            let response = try await api.perform(request: request)
+            let jsonData = try rust.receive(response: response)
+            return try R.parse(list: jsonData).get()
+        } catch let rustError as wordpress_api_wrapper.PaginationError {
+            switch rustError {
+            case .ReachedEnd, .Unknown:
+                return []
+            case .ApiError(error: let error):
+                throw error
+            }
+        }
+    }
+}
+
 extension PostObject: Paginatable {
     public static func parse(list: Data) -> Result<[PostObject], WpApiError> {
         do {
@@ -146,42 +128,19 @@ extension PostObject: Paginatable {
 extension WordPressAPI {
     public func list<R: Paginatable>(type: R.Type, perPage: UInt32) -> AsyncThrowingStream<[R], Error /* PaginationError */> {
         let stream: (AsyncThrowingStream<[R], Error>.Continuation) -> Void = { continuation in
-            DispatchQueue.global().async {
-                let paginator = Paginator(
-                    client: APIClient(urlSession: self.urlSession),
-                    apiHelper: self.helper,
+            Task.detached {
+                let paginator = Paginator<R>(
+                    api: self,
                     route: "wp/v2/posts",
-                    query: nil,
                     perPage: perPage
                 )
 
                 while true /* unless cancelled */ {
-                    let pagination: Data
-                    do {
-                        pagination = try paginator.nextPage()
-                    } catch let error as PaginationError {
-                        if error == .ReachedEnd {
-                            continuation.finish()
-                        } else if case let .NativeClientError(.NativeClientError(data)) = error {
-                            if let nativeError = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSError.self, from: data) {
-                                continuation.finish(throwing: nativeError)
-                            } else {
-                                continuation.finish(throwing: error)
-                            }
-                        } else {
-                            continuation.finish(throwing: error)
-                        }
-                        break
-                    } catch {
-                        continuation.finish(throwing: PaginationError.Unknown)
-                        break
-                    }
-
-                    switch R.parse(list: pagination) {
-                    case let .success(result):
+                    let result = try await paginator.nextPage()
+                    if result.isEmpty {
+                        continuation.finish()
+                    } else {
                         continuation.yield(result)
-                    case let .failure(error):
-                        continuation.finish(throwing: PaginationError.ApiError(error: error))
                     }
                 }
             }

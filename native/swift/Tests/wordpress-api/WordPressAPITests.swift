@@ -11,12 +11,6 @@ final class WordPressAPITests: XCTestCase {
         XCTAssertTrue(request.url.hasPrefix("https://wordpress.org/wp-json/wp/v2/posts"))
     }
 
-    func testAPIClient() async throws {
-        let request = WpNetworkRequest(method: .get, url: "https://google.com", headerMap: nil)
-        let response = try APIClient().sendRequest(request: request)
-        XCTAssertTrue((200..<400).contains(response.statusCode))
-    }
-
     func testPaginator() async throws {
         let api = WordPressAPI(urlSession: .shared, baseUrl: URL(string: "https://instant-unknown-banana.jurassic.ninja")!, authenticationStategy: .init(username: "demo", password: "OpYcWbQezJ30vk83ChE4"))
         let pages: [[PostObject]] = try await api.list(type: PostObject.self, perPage: 10).reduce(into: []) { $0.append($1) }
