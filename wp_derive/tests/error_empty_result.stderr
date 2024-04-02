@@ -1,0 +1,5 @@
+error: WPContextual didn't generate anything. Did you forget to add #[WPContext] attribute?
+ --> tests/error_empty_result.rs:4:12
+  |
+4 | pub struct SparseFoo {}
+  |            ^^^^^^^^^

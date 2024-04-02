@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ "$(uname)" == "Darwin" ] && [[ "${IS_VM_HOST:-}" == "" ]]; then
+    echo "--- 🧹 Clearing simulator cache"
+    rm -rf ~/Library/Developer/CoreSimulator/Caches
+fi

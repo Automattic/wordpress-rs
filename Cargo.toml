@@ -2,11 +2,13 @@
 members = [
   "wp_api",
   "wp_cli",
+  "wp_derive",
   "wp_networking",
   "wp_uniffi_bindgen",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-uniffi = "0.27.0"
 http = "1.1"
+thiserror = "1.0"
+uniffi = "0.27.0"

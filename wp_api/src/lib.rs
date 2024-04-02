@@ -192,4 +192,4 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     None
 }
 
-uniffi::setup_scaffolding!("wp_api");
+uniffi::setup_scaffolding!();
