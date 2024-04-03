@@ -13,6 +13,10 @@ docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
+# Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
+# The project doesn't compile with the nightly toolchain built on 2024-03-28 and onward.
+rust_nightly_toolchain := nightly-2024-03-27
+
 uname := $(shell uname | tr A-Z a-z)
 ifeq ($(uname), linux)
 	dylib_ext := so
@@ -78,7 +82,7 @@ xcframework-libraries:
 	$(MAKE) $*-combine-libraries
 
 %-xcframework-library-with-nightly:
-	cargo +nightly build --target $* --package wp_api --release -Zbuild-std
+	cargo +$(rust_nightly_toolchain) build --target $* --package wp_api --release -Zbuild-std
 	$(MAKE) $*-combine-libraries
 
 # Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
@@ -127,15 +131,7 @@ else
 
 # Generate the xcframework
 #
-# Requires the following runtimes:
-#	rustup target add x86_64-apple-ios
-#	rustup target add aarch64-apple-ios
-#	rustup target add aarch64-apple-darwin
-#	rustup target add x86_64-apple-darwin
-#	rustup target add aarch64-apple-ios-sim
-#
-#	rustup toolchain install nightly
-#	rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+# Run `make setup-rust` to install required rust toolchain.
 xcframework: bindings xcframework-combined-libraries xcframework-headers
 
 	rm -rf target/libwordpressFFI.xcframework
@@ -228,3 +224,17 @@ build-in-docker:
 dev-server:
 	mkdir -p .wordpress
 	docker-compose up
+
+setup-rust:
+	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain
+	RUST_TOOLCHAIN=$(rust_nightly_toolchain) $(MAKE) setup-rust-toolchain
+
+setup-rust-toolchain:
+	rustup toolchain install $(RUST_TOOLCHAIN)
+	rustup component add rust-src --toolchain $(RUST_TOOLCHAIN)
+	rustup target add --toolchain $(RUST_TOOLCHAIN) \
+		x86_64-apple-ios \
+		aarch64-apple-ios \
+		aarch64-apple-darwin \
+		x86_64-apple-darwin \
+		aarch64-apple-ios-sim
