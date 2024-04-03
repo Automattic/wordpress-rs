@@ -117,14 +117,6 @@ pub struct WPNetworkResponse {
 }
 
 impl WPNetworkResponse {
-    fn as_error(&self) -> Option<WPRestError> {
-        if self.status_code >= 400 {
-            WPRestError::from_slice(&self.body)
-        } else {
-            None
-        }
-    }
-
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
         if let Some(headers) = self.header_map.clone() {
             // TODO: This is inefficient
@@ -149,11 +141,13 @@ pub fn parse_post_list_response(
 ) -> Result<PostListResponse, WPApiError> {
     // TODO: Further parse the response body to include error message
     // TODO: Lots of unwraps to get a basic setup working
-    if let Some(endpoint_error) = response.as_error() {
-        return Err(WPApiError::EndpointError {
-            status_code: response.status_code,
-            error: endpoint_error,
-        });
+    if response.status_code >= 400 {
+        if let Some(error) = WPRestError::from_slice(&response.body) {
+            return Err(WPApiError::EndpointError {
+                status_code: response.status_code,
+                error,
+            });
+        }
     }
 
     if response.status_code != 200 {
