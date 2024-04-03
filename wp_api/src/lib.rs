@@ -107,6 +107,35 @@ impl WPApiHelper {
             header_map: Some(header_map),
         }
     }
+
+    pub fn user_retrieve_request(
+        &self,
+        context: WPContext,
+        params: UserRetrieveParams,
+    ) -> WPNetworkRequest {
+        let mut url = self
+            .site_url
+            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .unwrap();
+
+        let mut header_map = HashMap::new();
+
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
+
+        url.query_pairs_mut()
+            .append_pair("context", &context.to_string());
+
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: url.into(),
+            header_map: Some(header_map),
+        }
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]
@@ -274,6 +303,51 @@ pub fn parse_user_list_response_with_view_context(
     response: &WPNetworkResponse,
 ) -> Result<Vec<UserWithViewContext>, WPApiError> {
     parse_user_list_response(response)
+}
+
+pub fn parse_user_retrieve_response<'de, T: Deserialize<'de> + std::fmt::Debug>(
+    response: &'de WPNetworkResponse,
+) -> Result<T, WPApiError> {
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+
+    let user: T =
+        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })?;
+    Ok(user)
+}
+
+#[uniffi::export]
+pub fn parse_user_retrieve_response_with_edit_context(
+    response: &WPNetworkResponse,
+) -> Result<Option<UserWithEditContext>, WPApiError> {
+    parse_user_retrieve_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_user_retrieve_response_with_embed_context(
+    response: &WPNetworkResponse,
+) -> Result<Option<UserWithEmbedContext>, WPApiError> {
+    parse_user_retrieve_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_user_retrieve_response_with_view_context(
+    response: &WPNetworkResponse,
+) -> Result<Option<UserWithViewContext>, WPApiError> {
+    parse_user_retrieve_response(response)
 }
 
 #[uniffi::export]

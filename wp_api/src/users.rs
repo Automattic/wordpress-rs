@@ -130,6 +130,12 @@ impl UserListParams {
     }
 }
 
+#[derive(Default, uniffi::Record)]
+pub struct UserRetrieveParams {
+    /// Unique identifier for the user.
+    pub id: u32,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparseUser {
     #[WPContext(edit, embed, view)]
