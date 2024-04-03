@@ -1,0 +1,5 @@
+error: #[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?
+ --> tests/error_wp_contextual_field_without_wp_context.rs:5:5
+  |
+5 |     #[WPContextualField]
+  |     ^

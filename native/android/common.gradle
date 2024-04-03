@@ -10,12 +10,12 @@ ext.configureUniFFIBindgen = { moduleName ->
         def dylibFilePath = "${project.projectDir}/../../../target/release/lib${moduleName}.dylib"
         def t = tasks.register("generate${variant.name.capitalize()}UniFFIBindings", Exec) {
             workingDir project.rootDir
-            commandLine 'cargo', 'run', '--release', '--bin', 'uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
+            commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
             outputs.dir uniffiGeneratedPath
             // Re-generate if the interface definition changes.
             inputs.file dylibFilePath
             // Re-generate if our uniffi-bindgen tooling changes.
-            inputs.dir "${project.rootDir}/../../uniffi_bindgen/"
+            inputs.dir "${project.rootDir}/../../wp_uniffi_bindgen/"
             // Re-generate if our uniffi-bindgen version changes.
             inputs.file "${project.rootDir}/../../Cargo.lock"
             // Re-generate if the module source code changes

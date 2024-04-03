@@ -1,0 +1,5 @@
+error: Expected #[WPContext(edit, embed, view)], found unsupported tokens
+ --> tests/error_unexpected_wp_context_token.rs:5:17
+  |
+5 |     #[WPContext([edit])]
+  |                 ^^^^^^

@@ -1,0 +1,5 @@
+error: Expected #[WPContext(edit, embed, view)]. Try removing the quotation?
+ --> tests/error_unexpected_wp_context_literal.rs:5:17
+  |
+5 |     #[WPContext("edit")]
+  |                 ^^^^^^

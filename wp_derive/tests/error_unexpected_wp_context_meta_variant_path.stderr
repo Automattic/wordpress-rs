@@ -1,0 +1,5 @@
+error: Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?
+ --> tests/error_unexpected_wp_context_meta_variant_path.rs:5:7
+  |
+5 |     #[WPContext]
+  |       ^^^^^^^^^

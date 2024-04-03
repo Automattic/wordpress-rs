@@ -13,7 +13,7 @@ import kotlin.test.assertFailsWith
 
 class LibraryTest {
     private val siteUrl = "_omitted_"
-    private val authentication = WpAuthentication(authToken = "_omitted_")
+    private val authentication = WpAuthentication.AuthorizationHeader(token = "_omitted_")
     private val library = Library(siteUrl, authentication)
 
     @Before
@@ -36,7 +36,8 @@ class LibraryTest {
 
     @Test
     fun testBasicAuthenticationError() {
-        val unauthenticatedLibrary = Library(siteUrl, WpAuthentication("invalid_token"))
+        val unauthenticatedLibrary =
+            Library(siteUrl, WpAuthentication.AuthorizationHeader("invalid_token"))
         val exception = assertFailsWith<WpApiException.ClientException> {
             unauthenticatedLibrary.makePostListRequest()
         }
