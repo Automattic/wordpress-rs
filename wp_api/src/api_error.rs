@@ -61,16 +61,20 @@ struct WPRestErrorInternal {
 
 impl WPRestError {
     pub fn from_slice(body: &[u8]) -> Option<Self> {
-        let parsed: Option<WPRestErrorInternal> = serde_json::from_slice(body).ok();
-        parsed.map(Self::from_internal)
+        serde_json::from_slice(body)
+            .map(|f: WPRestErrorInternal| f.into())
+            .ok()
     }
 
     pub fn from_json_str(body: &str) -> Option<Self> {
-        let parsed: Option<WPRestErrorInternal> = serde_json::from_str(body).ok();
-        parsed.map(Self::from_internal)
+        serde_json::from_str(body)
+            .map(|f: WPRestErrorInternal| f.into())
+            .ok()
     }
+}
 
-    fn from_internal(internal: WPRestErrorInternal) -> Self {
+impl From<WPRestErrorInternal> for WPRestError {
+    fn from(internal: WPRestErrorInternal) -> Self {
         Self {
             code: internal.code,
             message: internal.message,
