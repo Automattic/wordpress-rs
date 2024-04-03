@@ -19,10 +19,10 @@ fn main() {
 
     let wp_request = wp_networking
         .api_helper
-        .user_list_request(WPContext::View, None);
+        .user_list_request(WPContext::Edit, None);
     println!(
         "{:?}",
-        wp_api::parse_user_list_response_with_view_context(
+        wp_api::parse_user_list_response_with_edit_context(
             &wp_networking.request(wp_request).unwrap()
         )
     );
