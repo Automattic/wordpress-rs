@@ -36,14 +36,7 @@ steps:
           source "/Users/builder/.cargo/env"
 
           echo "--- :package: Installing Rust Toolchains"
-          rustup target add x86_64-apple-ios
-          rustup target add aarch64-apple-ios
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
-          rustup target add aarch64-apple-ios-sim
-
-          rustup toolchain install nightly
-          rustup component add rust-src --toolchain nightly-aarch64-apple-darwin
+          make setup-rust
 
           echo "--- :swift: Building xcframework"
           make xcframework
