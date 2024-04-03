@@ -3,27 +3,43 @@
 use http::HeaderMap;
 use reqwest::blocking::Client;
 use wp_api::{
-    PostListParams, PostListResponse, WPApiError, WPApiHelper, WPAuthentication, WPNetworkResponse,
+    PostListParams, PostListResponse, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest,
+    WPNetworkResponse,
 };
 
 pub struct WPNetworking {
     client: Client,
-    helper: WPApiHelper,
+    pub api_helper: WPApiHelper,
 }
 
 impl WPNetworking {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         Self {
             client: reqwest::blocking::Client::new(),
-            helper: WPApiHelper::new(site_url, authentication),
+            api_helper: WPApiHelper::new(site_url, authentication),
         }
+    }
+
+    pub fn request(
+        &self,
+        wp_request: WPNetworkRequest,
+    ) -> Result<WPNetworkResponse, reqwest::Error> {
+        let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
+        let response = self
+            .client
+            .request(request_method(wp_request.method), wp_request.url)
+            .headers(request_headers)
+            .send()?;
+        Ok(wp_network_response(response))
     }
 
     pub fn list_posts(
         &self,
         params: Option<PostListParams>,
     ) -> Result<PostListResponse, WPApiError> {
-        let wp_request = self.helper.post_list_request(params.unwrap_or_default());
+        let wp_request = self
+            .api_helper
+            .post_list_request(params.unwrap_or_default());
         let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
         let response = self
             .client

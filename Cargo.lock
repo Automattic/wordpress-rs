@@ -1926,6 +1926,7 @@ dependencies = [
  "thiserror",
  "uniffi",
  "url",
+ "wp_derive",
 ]
 
 [[package]]

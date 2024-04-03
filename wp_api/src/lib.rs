@@ -1,18 +1,21 @@
 #![allow(dead_code, unused_variables)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 pub use api_error::*;
 pub use login::*;
 pub use pages::*;
 pub use posts::*;
+use serde::Deserialize;
 pub use url::*;
+pub use users::*;
 
 pub mod api_error;
 pub mod login;
 pub mod pages;
 pub mod posts;
 pub mod url;
+pub mod users;
 
 #[derive(uniffi::Object)]
 pub struct WPApiHelper {
@@ -74,6 +77,62 @@ impl WPApiHelper {
             url: url.into(),
             header_map: Some(header_map),
         }
+    }
+
+    pub fn user_list_request(
+        &self,
+        context: WPContext,
+        params: Option<UserListParams>,
+    ) -> WPNetworkRequest {
+        let mut url = self.site_url.join("/wp-json/wp/v2/users").unwrap();
+
+        let mut header_map = HashMap::new();
+
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
+
+        url.query_pairs_mut()
+            .append_pair("context", &context.to_string());
+        if let Some(params) = params {
+            url.query_pairs_mut().extend_pairs(params.query_pairs());
+        }
+
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: url.into(),
+            header_map: Some(header_map),
+        }
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum WPContext {
+    Edit,
+    Embed,
+    View,
+}
+
+impl Default for WPContext {
+    fn default() -> Self {
+        Self::View
+    }
+}
+
+impl Display for WPContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Edit => "edit",
+                Self::Embed => "embed",
+                Self::View => "view",
+            }
+        )
     }
 }
 
@@ -169,6 +228,52 @@ pub fn parse_post_list_response(
         post_list: Some(post_list),
         next_page,
     })
+}
+
+pub fn parse_user_list_response<'de, T: Deserialize<'de>>(
+    response: &'de WPNetworkResponse,
+) -> Result<Vec<T>, WPApiError> {
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+
+    let user_list: Vec<T> =
+        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })?;
+
+    Ok(user_list)
+}
+
+#[uniffi::export]
+pub fn parse_user_list_response_with_edit_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<UserWithEditContext>, WPApiError> {
+    parse_user_list_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_user_list_response_with_embed_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<UserWithEmbedContext>, WPApiError> {
+    parse_user_list_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_user_list_response_with_view_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<UserWithViewContext>, WPApiError> {
+    parse_user_list_response(response)
 }
 
 #[uniffi::export]

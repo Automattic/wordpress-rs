@@ -1,6 +1,6 @@
 use std::fs::read_to_string;
 
-use wp_api::WPAuthentication;
+use wp_api::{WPAuthentication, WPContext};
 use wp_networking::WPNetworking;
 
 fn main() {
@@ -16,6 +16,14 @@ fn main() {
     };
 
     let wp_networking = WPNetworking::new(url.into(), authentication);
-    let post_list = wp_networking.list_posts(None).unwrap();
-    println!("{:?}", post_list);
+
+    let wp_request = wp_networking
+        .api_helper
+        .user_list_request(WPContext::View, None);
+    println!(
+        "{:?}",
+        wp_api::parse_user_list_response_with_view_context(
+            &wp_networking.request(wp_request).unwrap()
+        )
+    );
 }
