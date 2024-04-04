@@ -68,16 +68,6 @@ where
     Ok(serde_json::to_string(&d).ok())
 }
 
-impl WPRestError {
-    pub fn from_slice(body: &[u8]) -> Option<Self> {
-        serde_json::from_slice(body).ok()
-    }
-
-    pub fn from_json_str(body: &str) -> Option<Self> {
-        serde_json::from_str(body).ok()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,7 +75,7 @@ mod tests {
     #[test]
     fn test_parse_rest_error() {
         let response_body = r#"{"code":"rest_post_invalid_page_number","message":"The page number requested is larger than the number of pages available.","data":{"status":400}}"#;
-        let rest_error: Option<WPRestError> = WPRestError::from_json_str(response_body);
+        let rest_error: Option<WPRestError> = serde_json::from_str(response_body).ok();
         assert!(rest_error.is_some());
 
         let unwrapped = rest_error.unwrap();
