@@ -13,6 +13,12 @@ docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
+swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
+swift_package_platform_macos := $(call swift_package_platform_version,macos)
+swift_package_platform_ios := $(call swift_package_platform_version,ios)
+swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
+swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
+
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 # The project doesn't compile with the nightly toolchain built on 2024-03-28 and onward.
 rust_nightly_toolchain := nightly-2024-03-27
@@ -72,23 +78,23 @@ _publish-android-local:
 # Builds the library for all the various architectures / systems required in an XCFramework
 xcframework-libraries:
 	# macOS
-	$(MAKE) x86_64-apple-darwin-xcframework-library
-	$(MAKE) aarch64-apple-darwin-xcframework-library
+	env MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos) $(MAKE) x86_64-apple-darwin-xcframework-library
+	env MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos) $(MAKE) aarch64-apple-darwin-xcframework-library
 
 	# iOS
-	$(MAKE) aarch64-apple-ios-xcframework-library
-	$(MAKE) x86_64-apple-ios-xcframework-library
-	$(MAKE) aarch64-apple-ios-sim-xcframework-library
+	env IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios) $(MAKE) aarch64-apple-ios-xcframework-library
+	env IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios) $(MAKE) x86_64-apple-ios-xcframework-library
+	env IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios) $(MAKE) aarch64-apple-ios-sim-xcframework-library
 
 	# tvOS
-	$(MAKE) aarch64-apple-tvos-xcframework-library-with-nightly
-	$(MAKE) aarch64-apple-tvos-sim-xcframework-library-with-nightly
-	$(MAKE) x86_64-apple-tvos-xcframework-library-with-nightly
+	env TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos) $(MAKE) aarch64-apple-tvos-xcframework-library-with-nightly
+	env TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos) $(MAKE) aarch64-apple-tvos-sim-xcframework-library-with-nightly
+	env TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos) $(MAKE) x86_64-apple-tvos-xcframework-library-with-nightly
 
 	# watchOS
-	$(MAKE) arm64_32-apple-watchos-xcframework-library-with-nightly
-	$(MAKE) aarch64-apple-watchos-sim-xcframework-library-with-nightly
-	$(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
+	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) arm64_32-apple-watchos-xcframework-library-with-nightly
+	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) aarch64-apple-watchos-sim-xcframework-library-with-nightly
+	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
 
 %-xcframework-library:
 	cargo build --target $* --package wp_api --release
