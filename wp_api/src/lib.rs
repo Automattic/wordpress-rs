@@ -183,6 +183,31 @@ impl WPApiHelper {
             body: serde_json::to_vec(&params).ok(),
         }
     }
+
+    pub fn user_delete_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
+        let mut url = self
+            .site_url
+            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .unwrap();
+
+        let mut header_map = HashMap::new();
+
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
+
+        url.query_pairs_mut().extend_pairs(params.query_pairs());
+
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: url.into(),
+            header_map: Some(header_map),
+            body: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]

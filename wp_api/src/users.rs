@@ -243,6 +243,28 @@ pub struct UserRetrieveParams {
     pub id: u32,
 }
 
+#[derive(Default, uniffi::Record)]
+pub struct UserDeleteParams {
+    /// Unique identifier for the user.
+    pub id: u32,
+    /// Reassign the deleted user's posts and links to this user ID.
+    pub reassign: u32,
+}
+
+impl UserDeleteParams {
+    pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
+        [
+            ("reassign", self.reassign.to_string()),
+            // From the [documentation](https://developer.wordpress.org/rest-api/reference/users/#delete-a-user):
+            // > Required to be true, as users do not support trashing.
+            // Since this argument always has to be `true`, we don't include it in the parameter
+            // fields
+            ("force", true.to_string()),
+        ]
+        .into_iter()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparseUser {
     #[WPContext(edit, embed, view)]

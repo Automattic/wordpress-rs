@@ -1,8 +1,8 @@
 use std::fs::read_to_string;
 
 use wp_api::{
-    UserCreateParamsBuilder, UserRetrieveParams, UserUpdateParamsBuilder, WPAuthentication,
-    WPContext,
+    UserCreateParamsBuilder, UserDeleteParams, UserRetrieveParams, UserUpdateParamsBuilder,
+    WPAuthentication, WPContext,
 };
 use wp_networking::WPNetworking;
 
@@ -29,21 +29,20 @@ fn main() {
     .unwrap();
     println!("User List: {:?}", user_list);
 
-    if let Some(first_user) = user_list.first() {
-        let user_retrieve_request = wp_networking
-            .api_helper
-            .user_retrieve_request(WPContext::Embed, UserRetrieveParams { id: first_user.id });
-        println!(
-            "{:?}",
-            wp_api::parse_user_retrieve_response_with_embed_context(
-                &wp_networking.request(user_retrieve_request).unwrap()
-            )
-        );
-    }
+    let first_user = user_list.first().unwrap();
+    let user_retrieve_request = wp_networking
+        .api_helper
+        .user_retrieve_request(WPContext::Embed, UserRetrieveParams { id: first_user.id });
+    println!(
+        "{:?}",
+        wp_api::parse_user_retrieve_response_with_embed_context(
+            &wp_networking.request(user_retrieve_request).unwrap()
+        )
+    );
 
     let user_create_params = UserCreateParamsBuilder::default()
-        .username("t_username4".to_string())
-        .email("t_email4@foo.com".to_string())
+        .username("t_username".to_string())
+        .email("t_email@foo.com".to_string())
         .password("t_password".to_string())
         .build()
         .unwrap();
@@ -61,9 +60,10 @@ fn main() {
     );
     println!("Created User: {:?}", created_user);
 
+    let created_user = created_user.unwrap().unwrap();
     let user_update_params = UserUpdateParamsBuilder::default()
-        .id(created_user.unwrap().unwrap().id)
-        .email(Some("t_email44@foo.com".to_string()))
+        .id(created_user.id)
+        .email(Some("t_email_updated@foo.com".to_string()))
         .build()
         .unwrap();
     let user_update_request = wp_networking
@@ -78,4 +78,17 @@ fn main() {
         std::str::from_utf8(&user_update_response.body)
     );
     println!("Updated User: {:?}", updated_user);
+
+    let user_delete_params = UserDeleteParams {
+        id: created_user.id,
+        reassign: first_user.id,
+    };
+    let user_delete_request = wp_networking
+        .api_helper
+        .user_delete_request(user_delete_params);
+    let user_delete_response = wp_networking.request(user_delete_request).unwrap();
+    println!(
+        "Delete user response: {:?}",
+        std::str::from_utf8(&user_delete_response.body)
+    );
 }
