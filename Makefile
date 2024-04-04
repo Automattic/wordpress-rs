@@ -53,7 +53,7 @@ bindings:
 docs:
 	rm -rf docs
 	mkdir -p docs
-	cargo doc
+	$(rust_docker_run) /bin/bash -c 'cargo doc'
 	cp -r target/doc/static.files docs/static.files
 	cp -r target/doc/wp_api docs/wp_api
 	cp -r target/doc/wp_derive docs/wp_derive
