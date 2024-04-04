@@ -133,6 +133,13 @@ impl WPNetworkResponse {
 
         None
     }
+
+    fn content_type(&self) -> Option<&String> {
+        // TODO: We should make this case insensitive, which will happen along with `header_map` refactor.
+        self.header_map
+            .as_ref()
+            .and_then(|headers| headers.get("Content-Type"))
+    }
 }
 
 #[uniffi::export]
@@ -141,17 +148,34 @@ pub fn parse_post_list_response(
 ) -> Result<PostListResponse, WPApiError> {
     // TODO: Further parse the response body to include error message
     // TODO: Lots of unwraps to get a basic setup working
-    if response.status_code >= 400 {
-        if let Ok(error) = serde_json::from_slice(&response.body) {
-            return Err(WPApiError::EndpointError {
+    if (400..500).contains(&response.status_code) {
+        let is_json_response = response
+            .content_type()
+            .map(|t| t.starts_with("application/json"))
+            .unwrap_or(false);
+        return if is_json_response {
+            match serde_json::from_slice(&response.body) {
+                Ok(error) => Err(WPApiError::ClientError {
+                    status_code: response.status_code,
+                    error,
+                }),
+                Err(err) => Err(WPApiError::ParsingError {
+                    reason: err.to_string(),
+                    response,
+                }),
+            }
+        } else {
+            Err(WPApiError::ClientError {
                 status_code: response.status_code,
-                error,
-            });
-        }
+                error: None,
+            })
+        };
     }
 
-    if response.status_code != 200 {
-        return Err(WPApiError::UnacceptableStatusCodeError { response });
+    if (500..600).contains(&response.status_code) {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
     }
 
     let parsed: Result<Vec<PostObject>, _> = serde_json::from_slice(&response.body);

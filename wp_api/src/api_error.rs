@@ -5,13 +5,13 @@ use crate::WPNetworkResponse;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum WPApiError {
-    #[error("Endpoint error with code '{}'", error.code)]
-    EndpointError {
+    #[error("Client error with status code {}", status_code)]
+    ClientError {
         status_code: u16,
-        error: WPRestError,
+        error: Option<WPRestError>,
     },
-    #[error("Unacceptable status code: {}\n", response.status_code)]
-    UnacceptableStatusCodeError { response: WPNetworkResponse },
+    #[error("Server error with status_code '{}'", status_code)]
+    ServerError { status_code: u16 },
     #[error("Error while parsing. \nReason: {}\n", reason)]
     ParsingError {
         reason: String,
