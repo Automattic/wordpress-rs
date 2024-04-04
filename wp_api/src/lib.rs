@@ -160,6 +160,29 @@ impl WPApiHelper {
             body: serde_json::to_vec(&params).ok(),
         }
     }
+
+    pub fn user_update_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
+        let url = self
+            .site_url
+            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .unwrap();
+
+        let mut header_map = HashMap::new();
+
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
+
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: Some(header_map),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]

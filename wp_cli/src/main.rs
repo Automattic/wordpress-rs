@@ -1,6 +1,9 @@
 use std::fs::read_to_string;
 
-use wp_api::{UserCreateParamsBuilder, UserRetrieveParams, WPAuthentication, WPContext};
+use wp_api::{
+    UserCreateParamsBuilder, UserRetrieveParams, UserUpdateParamsBuilder, WPAuthentication,
+    WPContext,
+};
 use wp_networking::WPNetworking;
 
 fn main() {
@@ -39,8 +42,8 @@ fn main() {
     }
 
     let user_create_params = UserCreateParamsBuilder::default()
-        .username("t_username".to_string())
-        .email("t_email@foo.com".to_string())
+        .username("t_username4".to_string())
+        .email("t_email4@foo.com".to_string())
         .password("t_password".to_string())
         .build()
         .unwrap();
@@ -49,9 +52,30 @@ fn main() {
         .api_helper
         .user_create_request(user_create_params);
     let user_create_response = wp_networking.request(user_create_request).unwrap();
+    let created_user =
+        wp_api::parse_user_retrieve_response_with_edit_context(&user_create_response);
 
     println!(
-        "Created User: {:?}",
-        wp_api::parse_user_retrieve_response_with_edit_context(&user_create_response)
+        "Create user response: {:?}",
+        std::str::from_utf8(&user_create_response.body)
     );
+    println!("Created User: {:?}", created_user);
+
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .id(created_user.unwrap().unwrap().id)
+        .email(Some("t_email44@foo.com".to_string()))
+        .build()
+        .unwrap();
+    let user_update_request = wp_networking
+        .api_helper
+        .user_update_request(user_update_params);
+    let user_update_response = wp_networking.request(user_update_request).unwrap();
+    let updated_user =
+        wp_api::parse_user_retrieve_response_with_edit_context(&user_update_response);
+
+    println!(
+        "Update user response: {:?}",
+        std::str::from_utf8(&user_update_response.body)
+    );
+    println!("Updated User: {:?}", updated_user);
 }
