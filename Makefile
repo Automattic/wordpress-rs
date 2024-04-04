@@ -55,6 +55,19 @@ bindings:
 	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
+.PHONY: docs # Rebuild docs each time we run this command
+docs:
+	rm -rf docs
+	mkdir -p docs
+	$(rust_docker_run) /bin/bash -c 'cargo doc'
+	cp -r target/doc/static.files docs/static.files
+	cp -r target/doc/wp_api docs/wp_api
+	cp -r target/doc/wp_derive docs/wp_derive
+	cp -r target/doc/wp_networking docs/wp_networking
+
+docs-archive: docs
+	tar -czvf  docs.tar.gz docs
+
 _test-android:
 	./native/android/gradlew -p ./native/android cAT
 
