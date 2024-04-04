@@ -36,19 +36,10 @@ impl WPApiHelper {
     }
 
     pub fn raw_request(&self, url: String) -> WPNetworkRequest {
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: Url::parse(url.as_str()).unwrap().into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: None,
         }
     }
@@ -59,15 +50,6 @@ impl WPApiHelper {
             .join("/wp-json/wp/v2/posts?context=edit")
             .unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         url.query_pairs_mut()
             .append_pair("page", params.page.to_string().as_str());
         url.query_pairs_mut()
@@ -76,7 +58,7 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: None,
         }
     }
@@ -88,15 +70,6 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         let mut url = self.site_url.join("/wp-json/wp/v2/users").unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         url.query_pairs_mut()
             .append_pair("context", &context.to_string());
         if let Some(params) = params {
@@ -106,7 +79,7 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: None,
         }
     }
@@ -121,22 +94,13 @@ impl WPApiHelper {
             .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
             .unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         url.query_pairs_mut()
             .append_pair("context", &context.to_string());
 
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: None,
         }
     }
@@ -144,19 +108,10 @@ impl WPApiHelper {
     pub fn user_create_request(&self, params: UserCreateParams) -> WPNetworkRequest {
         let url = self.site_url.join("/wp-json/wp/v2/users").unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
@@ -167,19 +122,10 @@ impl WPApiHelper {
             .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
             .unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
@@ -190,22 +136,23 @@ impl WPApiHelper {
             .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
             .unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         url.query_pairs_mut().extend_pairs(params.query_pairs());
 
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
             body: None,
+        }
+    }
+
+    fn header_map(&self) -> Option<HashMap<String, String>> {
+        match &self.authentication {
+            WPAuthentication::None => None,
+            WPAuthentication::AuthorizationHeader { token } => Some(HashMap::from([(
+                "Authorization".into(),
+                format!("Basic {}", token),
+            )])),
         }
     }
 }
