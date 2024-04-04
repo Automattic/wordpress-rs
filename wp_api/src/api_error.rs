@@ -51,41 +51,30 @@ impl ClientErrorType {
     }
 }
 
-#[derive(Debug, uniffi::Record)]
+#[derive(Debug, Deserialize, uniffi::Record)]
 pub struct WPRestError {
     pub code: String,
     pub message: String,
+    #[serde(deserialize_with = "deserialize_wprest_error_data")]
+    #[serde(rename = "data")]
     pub data_json: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct WPRestErrorInternal {
-    code: String,
-    message: String,
-    data: Option<serde_json::Value>,
+fn deserialize_wprest_error_data<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let d = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::to_string(&d).ok())
 }
 
 impl WPRestError {
     pub fn from_slice(body: &[u8]) -> Option<Self> {
-        serde_json::from_slice(body)
-            .map(|f: WPRestErrorInternal| f.into())
-            .ok()
+        serde_json::from_slice(body).ok()
     }
 
     pub fn from_json_str(body: &str) -> Option<Self> {
-        serde_json::from_str(body)
-            .map(|f: WPRestErrorInternal| f.into())
-            .ok()
-    }
-}
-
-impl From<WPRestErrorInternal> for WPRestError {
-    fn from(internal: WPRestErrorInternal) -> Self {
-        Self {
-            code: internal.code,
-            message: internal.message,
-            data_json: serde_json::to_string(&internal.data).ok(),
-        }
+        serde_json::from_str(body).ok()
     }
 }
 
