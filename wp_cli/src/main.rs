@@ -1,6 +1,6 @@
 use std::fs::read_to_string;
 
-use wp_api::{UserRetrieveParams, WPAuthentication, WPContext};
+use wp_api::{UserCreateParamsBuilder, UserRetrieveParams, WPAuthentication, WPContext};
 use wp_networking::WPNetworking;
 
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
         &wp_networking.request(user_list_request).unwrap(),
     )
     .unwrap();
-    println!("{:?}", user_list);
+    println!("User List: {:?}", user_list);
 
     if let Some(first_user) = user_list.first() {
         let user_retrieve_request = wp_networking
@@ -37,4 +37,21 @@ fn main() {
             )
         );
     }
+
+    let user_create_params = UserCreateParamsBuilder::default()
+        .username("t_username".to_string())
+        .email("t_email@foo.com".to_string())
+        .password("t_password".to_string())
+        .build()
+        .unwrap();
+
+    let user_create_request = wp_networking
+        .api_helper
+        .user_create_request(user_create_params);
+    let user_create_response = wp_networking.request(user_create_request).unwrap();
+
+    println!(
+        "Created User: {:?}",
+        wp_api::parse_user_retrieve_response_with_edit_context(&user_create_response)
+    );
 }

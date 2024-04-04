@@ -1,11 +1,12 @@
 use std::fmt::Display;
 
+use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
 // TODO: Should be in a centralized mod
 // TODO: Need a better name
-#[derive(uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiOrderParam {
     Asc,
     Desc,
@@ -31,7 +32,7 @@ impl Display for WPApiOrderParam {
 }
 
 // TODO: Need a better name?
-#[derive(uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum UserListParamOrderBy {
     Id,
     Include,
@@ -130,7 +131,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Default, uniffi::Record)]
+#[derive(Builder, Serialize, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,
@@ -139,50 +140,36 @@ pub struct UserCreateParams {
     /// Password for the user (never included).
     pub password: String,
     /// Display name for the user.
+    #[builder(default)]
     pub name: Option<String>,
     /// First name for the user.
+    #[builder(default)]
     pub first_name: Option<String>,
     /// Last name for the user.
+    #[builder(default)]
     pub last_name: Option<String>,
     /// URL of the user.
+    #[builder(default)]
     pub url: Option<String>,
     /// Description of the user.
+    #[builder(default)]
     pub description: Option<String>,
     /// Locale for the user.
     /// One of: , `en_US`
+    #[builder(default)]
     pub locale: Option<String>,
     /// The nickname for the user.
+    #[builder(default)]
     pub nickname: Option<String>,
     /// An alphanumeric identifier for the user.
+    #[builder(default)]
     pub slug: Option<String>,
     /// Roles assigned to the user.
+    #[builder(default)]
     pub roles: Vec<String>,
     /// Meta fields.
+    #[builder(default)]
     pub meta: Option<String>,
-}
-
-impl UserCreateParams {
-    pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
-        [
-            Some(("username", self.username.clone())),
-            Some(("email", self.email.clone())),
-            Some(("password", self.password.clone())),
-            self.name.as_ref().map(|x| ("name", x.clone())),
-            self.first_name.as_ref().map(|x| ("first_name", x.clone())),
-            self.last_name.as_ref().map(|x| ("last_name", x.clone())),
-            self.url.as_ref().map(|x| ("url", x.clone())),
-            self.description
-                .as_ref()
-                .map(|x| ("description", x.clone())),
-            self.locale.as_ref().map(|x| ("locale", x.clone())),
-            self.nickname.as_ref().map(|x| ("nickname", x.clone())),
-            self.slug.as_ref().map(|x| ("slug", x.clone())),
-            Some(("roles", self.roles.join(","))),
-            self.meta.as_ref().map(|x| ("meta", x.clone())),
-        ]
-        .into_iter()
-        .flatten()
-    }
 }
 
 #[derive(Default, uniffi::Record)]

@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use http::HeaderMap;
+use http::{header::CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::blocking::Client;
 use wp_api::{
     PostListParams, PostListResponse, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest,
@@ -24,12 +24,17 @@ impl WPNetworking {
         &self,
         wp_request: WPNetworkRequest,
     ) -> Result<WPNetworkResponse, reqwest::Error> {
-        let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
-        let response = self
+        let mut request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
+        request_headers.append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+        let mut request = self
             .client
             .request(request_method(wp_request.method), wp_request.url)
-            .headers(request_headers)
-            .send()?;
+            .headers(request_headers);
+        if let Some(body) = wp_request.body {
+            request = request.body(body);
+        }
+        let response = request.send()?;
         Ok(wp_network_response(response))
     }
 

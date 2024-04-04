@@ -49,6 +49,7 @@ impl WPApiHelper {
             method: RequestMethod::GET,
             url: Url::parse(url.as_str()).unwrap().into(),
             header_map: Some(header_map),
+            body: None,
         }
     }
 
@@ -76,6 +77,7 @@ impl WPApiHelper {
             method: RequestMethod::GET,
             url: url.into(),
             header_map: Some(header_map),
+            body: None,
         }
     }
 
@@ -105,6 +107,7 @@ impl WPApiHelper {
             method: RequestMethod::GET,
             url: url.into(),
             header_map: Some(header_map),
+            body: None,
         }
     }
 
@@ -134,6 +137,27 @@ impl WPApiHelper {
             method: RequestMethod::GET,
             url: url.into(),
             header_map: Some(header_map),
+            body: None,
+        }
+    }
+
+    pub fn user_create_request(&self, params: UserCreateParams) -> WPNetworkRequest {
+        let url = self.site_url.join("/wp-json/wp/v2/users").unwrap();
+
+        let mut header_map = HashMap::new();
+
+        match &self.authentication {
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".into(), format!("Basic {}", token));
+            }
+            WPAuthentication::None => (),
+        }
+
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: Some(header_map),
+            body: serde_json::to_vec(&params).ok(),
         }
     }
 }
@@ -190,6 +214,7 @@ pub struct WPNetworkRequest {
     // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
     // module.
     pub header_map: Option<HashMap<String, String>>,
+    pub body: Option<Vec<u8>>,
 }
 
 #[derive(uniffi::Record)]
