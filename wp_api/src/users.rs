@@ -131,6 +131,61 @@ impl UserListParams {
 }
 
 #[derive(Default, uniffi::Record)]
+pub struct UserCreateParams {
+    /// Login name for the user.
+    pub username: String,
+    /// The email address for the user.
+    pub email: String,
+    /// Password for the user (never included).
+    pub password: String,
+    /// Display name for the user.
+    pub name: Option<String>,
+    /// First name for the user.
+    pub first_name: Option<String>,
+    /// Last name for the user.
+    pub last_name: Option<String>,
+    /// URL of the user.
+    pub url: Option<String>,
+    /// Description of the user.
+    pub description: Option<String>,
+    /// Locale for the user.
+    /// One of: , `en_US`
+    pub locale: Option<String>,
+    /// The nickname for the user.
+    pub nickname: Option<String>,
+    /// An alphanumeric identifier for the user.
+    pub slug: Option<String>,
+    /// Roles assigned to the user.
+    pub roles: Vec<String>,
+    /// Meta fields.
+    pub meta: Option<String>,
+}
+
+impl UserCreateParams {
+    pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
+        [
+            Some(("username", self.username.clone())),
+            Some(("email", self.email.clone())),
+            Some(("password", self.password.clone())),
+            self.name.as_ref().map(|x| ("name", x.clone())),
+            self.first_name.as_ref().map(|x| ("first_name", x.clone())),
+            self.last_name.as_ref().map(|x| ("last_name", x.clone())),
+            self.url.as_ref().map(|x| ("url", x.clone())),
+            self.description
+                .as_ref()
+                .map(|x| ("description", x.clone())),
+            self.locale.as_ref().map(|x| ("locale", x.clone())),
+            self.nickname.as_ref().map(|x| ("nickname", x.clone())),
+            self.slug.as_ref().map(|x| ("slug", x.clone())),
+            Some(("roles", self.roles.join(","))),
+            self.meta.as_ref().map(|x| ("meta", x.clone())),
+        ]
+        .into_iter()
+        .flatten()
+    }
+}
+
+#[derive(Default, uniffi::Record)]
 pub struct UserRetrieveParams {
     /// Unique identifier for the user.
     pub id: u32,
