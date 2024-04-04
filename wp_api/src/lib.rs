@@ -68,17 +68,9 @@ impl WPApiHelper {
         context: WPContext,
         params: Option<UserListParams>,
     ) -> WPNetworkRequest {
-        let mut url = self.site_url.join("/wp-json/wp/v2/users").unwrap();
-
-        url.query_pairs_mut()
-            .append_pair("context", &context.to_string());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
-
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: url.into(),
+            url: UsersEndpoint::list_users(&self.site_url, context, params.as_ref()).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -89,58 +81,36 @@ impl WPApiHelper {
         context: WPContext,
         params: UserRetrieveParams,
     ) -> WPNetworkRequest {
-        let mut url = self
-            .site_url
-            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
-            .unwrap();
-
-        url.query_pairs_mut()
-            .append_pair("context", &context.to_string());
-
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: url.into(),
+            url: UsersEndpoint::retrieve_user(&self.site_url, context, &params).into(),
             header_map: self.header_map(),
             body: None,
         }
     }
 
     pub fn user_create_request(&self, params: UserCreateParams) -> WPNetworkRequest {
-        let url = self.site_url.join("/wp-json/wp/v2/users").unwrap();
-
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: url.into(),
+            url: UsersEndpoint::create_user(&self.site_url).into(),
             header_map: self.header_map(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
 
     pub fn user_update_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
-        let url = self
-            .site_url
-            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
-            .unwrap();
-
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: url.into(),
+            url: UsersEndpoint::update_user(&self.site_url, &params).into(),
             header_map: self.header_map(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
 
     pub fn user_delete_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
-        let mut url = self
-            .site_url
-            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
-            .unwrap();
-
-        url.query_pairs_mut().extend_pairs(params.query_pairs());
-
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: url.into(),
+            url: UsersEndpoint::delete_user(&self.site_url, &params).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -157,7 +127,7 @@ impl WPApiHelper {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, uniffi::Enum)]
 pub enum WPContext {
     Edit,
     Embed,

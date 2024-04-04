@@ -2,7 +2,51 @@ use std::fmt::Display;
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
+use url::Url;
 use wp_derive::WPContextual;
+
+use crate::WPContext;
+
+pub struct UsersEndpoint {}
+
+impl UsersEndpoint {
+    pub fn list_users(site_url: &Url, context: WPContext, params: Option<&UserListParams>) -> Url {
+        let mut url = site_url.join("/wp-json/wp/v2/users").unwrap();
+        url.query_pairs_mut()
+            .append_pair("context", &context.to_string());
+        if let Some(params) = params {
+            url.query_pairs_mut().extend_pairs(params.query_pairs());
+        }
+        url
+    }
+
+    pub fn retrieve_user(site_url: &Url, context: WPContext, params: &UserRetrieveParams) -> Url {
+        let mut url = site_url
+            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .unwrap();
+        url.query_pairs_mut()
+            .append_pair("context", &context.to_string());
+        url
+    }
+
+    pub fn create_user(site_url: &Url) -> Url {
+        site_url.join("/wp-json/wp/v2/users").unwrap()
+    }
+
+    pub fn update_user(site_url: &Url, params: &UserUpdateParams) -> Url {
+        site_url
+            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .unwrap()
+    }
+
+    pub fn delete_user(site_url: &Url, params: &UserDeleteParams) -> Url {
+        let mut url = site_url
+            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .unwrap();
+        url.query_pairs_mut().extend_pairs(params.query_pairs());
+        url
+    }
+}
 
 // TODO: Should be in a centralized mod
 // TODO: Need a better name
