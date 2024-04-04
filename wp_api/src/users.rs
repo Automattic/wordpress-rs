@@ -94,7 +94,7 @@ pub struct UserListParams {
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
     pub order_by: Option<UserListParamOrderBy>,
     /// Limit result set to users with one or more specific slugs.
-    pub slug: Option<String>,
+    pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
     pub roles: Vec<String>,
     /// Limit result set to users matching at least one specific capability provided. Accepts csv list or single capability.
@@ -117,7 +117,7 @@ impl UserListParams {
             self.offset.as_ref().map(|x| ("offset", x.to_string())),
             self.order.as_ref().map(|x| ("order", x.to_string())),
             self.order_by.as_ref().map(|x| ("order_by", x.to_string())),
-            self.slug.as_ref().map(|x| ("slug", x.clone())),
+            Some(("slug", self.slug.join(","))),
             Some(("roles", self.roles.join(","))),
             Some(("capabilities", self.capabilities.join(","))),
             self.who.as_ref().map(|x| ("who", x.clone())),
