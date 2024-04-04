@@ -21,6 +21,12 @@ steps:
 
           echo "--- :rust: Ensuring Code Conforms to rustfmt"
           make fmt-check-rust
+      - label: ":rust: Build Docs"
+        command: |
+          echo "--- :rust: Building Documentation"
+          make docs-archive
+        artifact_paths:
+          - docs.tar.gz
 
   #
   # Swift Group
