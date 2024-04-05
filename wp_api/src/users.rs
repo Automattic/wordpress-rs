@@ -29,6 +29,13 @@ impl UsersEndpoint {
         url
     }
 
+    pub fn retrieve_current_user(site_url: &Url, context: WPContext) -> Url {
+        let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
+        url.query_pairs_mut()
+            .append_pair("context", &context.to_string());
+        url
+    }
+
     pub fn create_user(site_url: &Url) -> Url {
         site_url.join("/wp-json/wp/v2/users").unwrap()
     }

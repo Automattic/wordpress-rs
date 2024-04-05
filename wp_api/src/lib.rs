@@ -89,6 +89,15 @@ impl WPApiHelper {
         }
     }
 
+    pub fn retrieve_current_user(&self, context: WPContext) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: UsersEndpoint::retrieve_current_user(&self.site_url, context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn create_user_request(&self, params: UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,

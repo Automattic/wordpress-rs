@@ -91,4 +91,16 @@ fn main() {
         "Delete user response: {:?}",
         std::str::from_utf8(&user_delete_response.body)
     );
+    println!(
+        "Retrieve current user: {:?}",
+        wp_api::parse_user_retrieve_response_with_edit_context(
+            &wp_networking
+                .request(
+                    wp_networking
+                        .api_helper
+                        .retrieve_current_user(WPContext::Edit)
+                )
+                .unwrap()
+        )
+    );
 }
