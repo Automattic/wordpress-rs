@@ -46,10 +46,20 @@ impl UsersEndpoint {
             .unwrap()
     }
 
+    pub fn update_current_user(site_url: &Url) -> Url {
+        site_url.join("/wp-json/wp/v2/users/me").unwrap()
+    }
+
     pub fn delete_user(site_url: &Url, user_id: UserId, params: &UserDeleteParams) -> Url {
         let mut url = site_url
             .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
             .unwrap();
+        url.query_pairs_mut().extend_pairs(params.query_pairs());
+        url
+    }
+
+    pub fn delete_current_user(site_url: &Url, params: &UserDeleteParams) -> Url {
+        let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
         url.query_pairs_mut().extend_pairs(params.query_pairs());
         url
     }

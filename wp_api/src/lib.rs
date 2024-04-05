@@ -116,6 +116,15 @@ impl WPApiHelper {
         }
     }
 
+    pub fn update_current_user_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: UsersEndpoint::update_current_user(&self.site_url).into(),
+            header_map: self.header_map(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
     pub fn delete_user_request(
         &self,
         user_id: UserId,
@@ -124,6 +133,15 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: UsersEndpoint::delete_user(&self.site_url, user_id, &params).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn delete_current_user_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: UsersEndpoint::delete_current_user(&self.site_url, &params).into(),
             header_map: self.header_map(),
             body: None,
         }

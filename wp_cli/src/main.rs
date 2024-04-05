@@ -100,4 +100,37 @@ fn main() {
                 .unwrap()
         )
     );
+
+    let update_current_user_params = UserUpdateParamsBuilder::default()
+        .description(Some("updated_description".to_string()))
+        .build()
+        .unwrap();
+    let update_current_user_request = wp_networking
+        .api_helper
+        .update_current_user_request(update_current_user_params);
+    let update_current_user_response = wp_networking.request(update_current_user_request).unwrap();
+    let updated_current_user =
+        wp_api::parse_user_retrieve_response_with_edit_context(&update_current_user_response);
+    println!(
+        "Update current user response: {:?}",
+        std::str::from_utf8(&update_current_user_response.body)
+    );
+    println!("Updated Current User: {:?}", updated_current_user);
+
+    // Remember to use a temporary user to test this
+    // println!(
+    //     "Delete current user: {:?}",
+    //     std::str::from_utf8(
+    //         &wp_networking
+    //             .request(
+    //                 wp_networking
+    //                     .api_helper
+    //                     .delete_current_user_request(UserDeleteParams {
+    //                         reassign: first_user.id
+    //                     })
+    //             )
+    //             .unwrap()
+    //             .body
+    //     )
+    // );
 }
