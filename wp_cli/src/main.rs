@@ -22,7 +22,7 @@ fn main() {
     let user_list_request = wp_networking
         .api_helper
         .list_users_request(WPContext::Edit, None);
-    let user_list = wp_api::parse_user_list_response_with_edit_context(
+    let user_list = wp_api::parse_list_users_response_with_edit_context(
         &wp_networking.request(user_list_request).unwrap(),
     )
     .unwrap();
@@ -34,7 +34,7 @@ fn main() {
         .retrieve_user_request(first_user.id, WPContext::Embed);
     println!(
         "{:?}",
-        wp_api::parse_user_retrieve_response_with_embed_context(
+        wp_api::parse_retrieve_user_response_with_embed_context(
             &wp_networking.request(user_retrieve_request).unwrap()
         )
     );
@@ -51,7 +51,7 @@ fn main() {
         .create_user_request(user_create_params);
     let user_create_response = wp_networking.request(user_create_request).unwrap();
     let created_user =
-        wp_api::parse_user_retrieve_response_with_edit_context(&user_create_response);
+        wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response);
 
     println!(
         "Create user response: {:?}",
@@ -69,7 +69,7 @@ fn main() {
         .update_user_request(created_user.id, user_update_params);
     let user_update_response = wp_networking.request(user_update_request).unwrap();
     let updated_user =
-        wp_api::parse_user_retrieve_response_with_edit_context(&user_update_response);
+        wp_api::parse_retrieve_user_response_with_edit_context(&user_update_response);
 
     println!(
         "Update user response: {:?}",
@@ -90,7 +90,7 @@ fn main() {
     );
     println!(
         "Retrieve current user: {:?}",
-        wp_api::parse_user_retrieve_response_with_edit_context(
+        wp_api::parse_retrieve_user_response_with_edit_context(
             &wp_networking
                 .request(
                     wp_networking
@@ -110,7 +110,7 @@ fn main() {
         .update_current_user_request(update_current_user_params);
     let update_current_user_response = wp_networking.request(update_current_user_request).unwrap();
     let updated_current_user =
-        wp_api::parse_user_retrieve_response_with_edit_context(&update_current_user_response);
+        wp_api::parse_retrieve_user_response_with_edit_context(&update_current_user_response);
     println!(
         "Update current user response: {:?}",
         std::str::from_utf8(&update_current_user_response.body)

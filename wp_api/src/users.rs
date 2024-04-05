@@ -5,7 +5,98 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use wp_derive::WPContextual;
 
-use crate::WPContext;
+use crate::{ClientErrorType, WPApiError, WPContext, WPNetworkResponse};
+
+#[uniffi::export]
+pub fn parse_list_users_response_with_edit_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<UserWithEditContext>, WPApiError> {
+    parse_list_users_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_list_users_response_with_embed_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<UserWithEmbedContext>, WPApiError> {
+    parse_list_users_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_list_users_response_with_view_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<UserWithViewContext>, WPApiError> {
+    parse_list_users_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_retrieve_user_response_with_edit_context(
+    response: &WPNetworkResponse,
+) -> Result<Option<UserWithEditContext>, WPApiError> {
+    parse_retrieve_user_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_retrieve_user_response_with_embed_context(
+    response: &WPNetworkResponse,
+) -> Result<Option<UserWithEmbedContext>, WPApiError> {
+    parse_retrieve_user_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_retrieve_user_response_with_view_context(
+    response: &WPNetworkResponse,
+) -> Result<Option<UserWithViewContext>, WPApiError> {
+    parse_retrieve_user_response(response)
+}
+
+pub fn parse_list_users_response<'de, T: Deserialize<'de>>(
+    response: &'de WPNetworkResponse,
+) -> Result<Vec<T>, WPApiError> {
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+
+    let user_list: Vec<T> =
+        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })?;
+
+    Ok(user_list)
+}
+
+pub fn parse_retrieve_user_response<'de, T: Deserialize<'de> + std::fmt::Debug>(
+    response: &'de WPNetworkResponse,
+) -> Result<T, WPApiError> {
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+
+    let user: T =
+        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        })?;
+    Ok(user)
+}
 
 pub struct UsersEndpoint {}
 
