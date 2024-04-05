@@ -157,7 +157,7 @@ impl WPApiHelper {
     }
 }
 
-#[derive(Debug, Clone, Copy, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPContext {
     Edit,
     Embed,
@@ -170,17 +170,13 @@ impl Default for WPContext {
     }
 }
 
-impl Display for WPContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Edit => "edit",
-                Self::Embed => "embed",
-                Self::View => "view",
-            }
-        )
+impl WPContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Edit => "edit",
+            Self::Embed => "embed",
+            Self::View => "view",
+        }
     }
 }
 

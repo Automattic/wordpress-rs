@@ -67,7 +67,7 @@ impl UsersEndpoint {
     pub fn list_users(site_url: &Url, context: WPContext, params: Option<&UserListParams>) -> Url {
         let mut url = site_url.join("/wp-json/wp/v2/users").unwrap();
         url.query_pairs_mut()
-            .append_pair("context", &context.to_string());
+            .append_pair("context", context.as_str());
         if let Some(params) = params {
             url.query_pairs_mut().extend_pairs(params.query_pairs());
         }
@@ -79,14 +79,14 @@ impl UsersEndpoint {
             .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
             .unwrap();
         url.query_pairs_mut()
-            .append_pair("context", &context.to_string());
+            .append_pair("context", context.as_str());
         url
     }
 
     pub fn retrieve_current_user(site_url: &Url, context: WPContext) -> Url {
         let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
         url.query_pairs_mut()
-            .append_pair("context", &context.to_string());
+            .append_pair("context", context.as_str());
         url
     }
 
