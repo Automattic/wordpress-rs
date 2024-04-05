@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -357,20 +357,10 @@ pub struct SparseUser {
     #[WPContext(edit)]
     pub roles: Option<Vec<String>>,
     #[WPContext(edit)]
-    pub capabilities: Option<UserCapabilities>,
+    pub capabilities: Option<HashMap<String, bool>>,
     #[WPContext(edit)]
-    pub extra_capabilities: Option<UserExtraCapabilities>,
+    pub extra_capabilities: Option<HashMap<String, bool>>,
     #[WPContext(edit, embed, view)]
-    pub avatar_urls: Option<UserAvatarUrls>,
-    #[WPContext(edit, view)]
-    pub meta: Option<UserMeta>,
+    pub avatar_urls: Option<HashMap<String, String>>,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
-
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct UserCapabilities {}
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct UserExtraCapabilities {}
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct UserAvatarUrls {}
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct UserMeta {}
