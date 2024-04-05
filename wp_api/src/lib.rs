@@ -63,7 +63,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn user_list_request(
+    pub fn list_users_request(
         &self,
         context: WPContext,
         params: Option<UserListParams>,
@@ -76,7 +76,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn user_retrieve_request(
+    pub fn retrieve_user_request(
         &self,
         context: WPContext,
         params: UserRetrieveParams,
@@ -89,7 +89,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn user_create_request(&self, params: UserCreateParams) -> WPNetworkRequest {
+    pub fn create_user_request(&self, params: UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::create_user(&self.site_url).into(),
@@ -98,7 +98,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn user_update_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
+    pub fn update_user_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::update_user(&self.site_url, &params).into(),
@@ -107,7 +107,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn user_delete_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
+    pub fn delete_user_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: UsersEndpoint::delete_user(&self.site_url, &params).into(),

@@ -22,7 +22,7 @@ fn main() {
 
     let user_list_request = wp_networking
         .api_helper
-        .user_list_request(WPContext::Edit, None);
+        .list_users_request(WPContext::Edit, None);
     let user_list = wp_api::parse_user_list_response_with_edit_context(
         &wp_networking.request(user_list_request).unwrap(),
     )
@@ -32,7 +32,7 @@ fn main() {
     let first_user = user_list.first().unwrap();
     let user_retrieve_request = wp_networking
         .api_helper
-        .user_retrieve_request(WPContext::Embed, UserRetrieveParams { id: first_user.id });
+        .retrieve_user_request(WPContext::Embed, UserRetrieveParams { id: first_user.id });
     println!(
         "{:?}",
         wp_api::parse_user_retrieve_response_with_embed_context(
@@ -49,7 +49,7 @@ fn main() {
 
     let user_create_request = wp_networking
         .api_helper
-        .user_create_request(user_create_params);
+        .create_user_request(user_create_params);
     let user_create_response = wp_networking.request(user_create_request).unwrap();
     let created_user =
         wp_api::parse_user_retrieve_response_with_edit_context(&user_create_response);
@@ -68,7 +68,7 @@ fn main() {
         .unwrap();
     let user_update_request = wp_networking
         .api_helper
-        .user_update_request(user_update_params);
+        .update_user_request(user_update_params);
     let user_update_response = wp_networking.request(user_update_request).unwrap();
     let updated_user =
         wp_api::parse_user_retrieve_response_with_edit_context(&user_update_response);
@@ -85,7 +85,7 @@ fn main() {
     };
     let user_delete_request = wp_networking
         .api_helper
-        .user_delete_request(user_delete_params);
+        .delete_user_request(user_delete_params);
     let user_delete_response = wp_networking.request(user_delete_request).unwrap();
     println!(
         "Delete user response: {:?}",
