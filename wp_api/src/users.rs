@@ -20,9 +20,9 @@ impl UsersEndpoint {
         url
     }
 
-    pub fn retrieve_user(site_url: &Url, context: WPContext, params: &UserRetrieveParams) -> Url {
+    pub fn retrieve_user(site_url: &Url, user_id: UserId, context: WPContext) -> Url {
         let mut url = site_url
-            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
             .unwrap();
         url.query_pairs_mut()
             .append_pair("context", &context.to_string());
@@ -40,15 +40,15 @@ impl UsersEndpoint {
         site_url.join("/wp-json/wp/v2/users").unwrap()
     }
 
-    pub fn update_user(site_url: &Url, params: &UserUpdateParams) -> Url {
+    pub fn update_user(site_url: &Url, user_id: UserId, params: &UserUpdateParams) -> Url {
         site_url
-            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
             .unwrap()
     }
 
-    pub fn delete_user(site_url: &Url, params: &UserDeleteParams) -> Url {
+    pub fn delete_user(site_url: &Url, user_id: UserId, params: &UserDeleteParams) -> Url {
         let mut url = site_url
-            .join(format!("/wp-json/wp/v2/users/{}", params.id).as_str())
+            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
             .unwrap();
         url.query_pairs_mut().extend_pairs(params.query_pairs());
         url
@@ -235,8 +235,6 @@ pub struct UserCreateParams {
 
 #[derive(Builder, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
-    /// Unique identifier for the user.
-    pub id: UserId,
     /// Display name for the user.
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -289,15 +287,7 @@ pub struct UserUpdateParams {
 }
 
 #[derive(uniffi::Record)]
-pub struct UserRetrieveParams {
-    /// Unique identifier for the user.
-    pub id: UserId,
-}
-
-#[derive(uniffi::Record)]
 pub struct UserDeleteParams {
-    /// Unique identifier for the user.
-    pub id: UserId,
     /// Reassign the deleted user's posts and links to this user ID.
     pub reassign: UserId,
 }

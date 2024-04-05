@@ -76,14 +76,10 @@ impl WPApiHelper {
         }
     }
 
-    pub fn retrieve_user_request(
-        &self,
-        context: WPContext,
-        params: UserRetrieveParams,
-    ) -> WPNetworkRequest {
+    pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: UsersEndpoint::retrieve_user(&self.site_url, context, &params).into(),
+            url: UsersEndpoint::retrieve_user(&self.site_url, user_id, context).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -107,19 +103,27 @@ impl WPApiHelper {
         }
     }
 
-    pub fn update_user_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
+    pub fn update_user_request(
+        &self,
+        user_id: UserId,
+        params: UserUpdateParams,
+    ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: UsersEndpoint::update_user(&self.site_url, &params).into(),
+            url: UsersEndpoint::update_user(&self.site_url, user_id, &params).into(),
             header_map: self.header_map(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
 
-    pub fn delete_user_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
+    pub fn delete_user_request(
+        &self,
+        user_id: UserId,
+        params: UserDeleteParams,
+    ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_user(&self.site_url, &params).into(),
+            url: UsersEndpoint::delete_user(&self.site_url, user_id, &params).into(),
             header_map: self.header_map(),
             body: None,
         }
