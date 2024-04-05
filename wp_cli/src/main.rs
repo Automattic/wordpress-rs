@@ -95,7 +95,7 @@ fn main() {
                 .request(
                     wp_networking
                         .api_helper
-                        .retrieve_current_user(WPContext::Edit)
+                        .retrieve_current_user_request(WPContext::Edit)
                 )
                 .unwrap()
         )
