@@ -2,10 +2,7 @@
 
 use http::{header::CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::blocking::Client;
-use wp_api::{
-    PostListParams, PostListResponse, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest,
-    WPNetworkResponse,
-};
+use wp_api::{WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse};
 
 pub struct WPNetworking {
     client: Client,
@@ -36,23 +33,6 @@ impl WPNetworking {
         }
         let response = request.send()?;
         Ok(wp_network_response(response))
-    }
-
-    pub fn list_posts(
-        &self,
-        params: Option<PostListParams>,
-    ) -> Result<PostListResponse, WPApiError> {
-        let wp_request = self
-            .api_helper
-            .post_list_request(params.unwrap_or_default());
-        let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
-        let response = self
-            .client
-            .request(request_method(wp_request.method), wp_request.url)
-            .headers(request_headers)
-            .send()
-            .unwrap();
-        wp_api::parse_post_list_response(wp_network_response(response))
     }
 }
 
