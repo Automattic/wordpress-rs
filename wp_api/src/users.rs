@@ -203,7 +203,9 @@ impl UserListParams {
             self.exclude.as_ref().map(|x| ("exclude", x.clone())),
             self.include.as_ref().map(|x| ("include", x.clone())),
             self.offset.as_ref().map(|x| ("offset", x.to_string())),
-            self.order.as_ref().map(|x| ("order", x.to_string())),
+            self.order
+                .as_ref()
+                .map(|x| ("order", x.as_str().to_string())),
             self.order_by.as_ref().map(|x| ("order_by", x.to_string())),
             Some(("slug", self.slug.join(","))),
             Some(("roles", self.roles.join(","))),

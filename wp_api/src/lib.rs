@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 pub use api_error::*;
 pub use login::*;
@@ -195,6 +195,27 @@ pub enum RequestMethod {
     HEAD,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WPApiParamOrder {
+    Asc,
+    Desc,
+}
+
+impl Default for WPApiParamOrder {
+    fn default() -> Self {
+        Self::Asc
+    }
+}
+
+impl WPApiParamOrder {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Asc => "asc",
+            Self::Desc => "desc",
+        }
+    }
+}
+
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
@@ -299,31 +320,6 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     }
 
     None
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum WPApiParamOrder {
-    Asc,
-    Desc,
-}
-
-impl Default for WPApiParamOrder {
-    fn default() -> Self {
-        Self::Asc
-    }
-}
-
-impl Display for WPApiParamOrder {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Asc => "asc",
-                Self::Desc => "desc",
-            }
-        )
-    }
 }
 
 uniffi::setup_scaffolding!();
