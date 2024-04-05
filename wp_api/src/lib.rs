@@ -247,20 +247,7 @@ impl WPNetworkResponse {
 pub fn parse_post_list_response(
     response: WPNetworkResponse,
 ) -> Result<PostListResponse, WPApiError> {
-    // TODO: Further parse the response body to include error message
-    // TODO: Lots of unwraps to get a basic setup working
-    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
-        return Err(WPApiError::ClientError {
-            error_type: client_error_type,
-            status_code: response.status_code,
-        });
-    }
-    let status = http::StatusCode::from_u16(response.status_code).unwrap();
-    if status.is_server_error() {
-        return Err(WPApiError::ServerError {
-            status_code: response.status_code,
-        });
-    }
+    parse_response_for_generic_errors(&response)?;
     let post_list: Vec<PostObject> =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
@@ -288,6 +275,24 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
         })?;
 
     Ok(api_details)
+}
+
+pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
+    // TODO: Further parse the response body to include error message
+    // TODO: Lots of unwraps to get a basic setup working
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+    Ok(())
 }
 
 // TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
