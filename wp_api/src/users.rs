@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use wp_derive::WPContextual;
 
-use crate::{parse_response_for_generic_errors, WPApiError, WPContext, WPNetworkResponse};
+use crate::{
+    parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPContext, WPNetworkResponse,
+};
 
 #[uniffi::export]
 pub fn parse_list_users_response_with_edit_context(
@@ -117,36 +119,8 @@ impl UsersEndpoint {
     }
 }
 
-// TODO: Should be in a centralized mod
-// TODO: Need a better name
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum WPApiOrderParam {
-    Asc,
-    Desc,
-}
-
-impl Default for WPApiOrderParam {
-    fn default() -> Self {
-        Self::Asc
-    }
-}
-
-impl Display for WPApiOrderParam {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Asc => "asc",
-                Self::Desc => "desc",
-            }
-        )
-    }
-}
-
-// TODO: Need a better name?
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum UserListParamOrderBy {
+pub enum WPApiParamUsersOrderBy {
     Id,
     Include,
     Name,
@@ -157,13 +131,13 @@ pub enum UserListParamOrderBy {
     Url,
 }
 
-impl Default for UserListParamOrderBy {
+impl Default for WPApiParamUsersOrderBy {
     fn default() -> Self {
         Self::Name
     }
 }
 
-impl Display for UserListParamOrderBy {
+impl Display for WPApiParamUsersOrderBy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -202,11 +176,11 @@ pub struct UserListParams {
     /// Order sort attribute ascending or descending.
     /// Default: `asc`
     /// One of: `asc`, `desc`
-    pub order: Option<WPApiOrderParam>,
+    pub order: Option<WPApiParamOrder>,
     /// Sort collection by user attribute.
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
-    pub order_by: Option<UserListParamOrderBy>,
+    pub order_by: Option<WPApiParamUsersOrderBy>,
     /// Limit result set to users with one or more specific slugs.
     pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.

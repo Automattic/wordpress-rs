@@ -305,4 +305,29 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     None
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum WPApiParamOrder {
+    Asc,
+    Desc,
+}
+
+impl Default for WPApiParamOrder {
+    fn default() -> Self {
+        Self::Asc
+    }
+}
+
+impl Display for WPApiParamOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Asc => "asc",
+                Self::Desc => "desc",
+            }
+        )
+    }
+}
+
 uniffi::setup_scaffolding!();
