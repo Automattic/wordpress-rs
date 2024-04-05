@@ -236,7 +236,7 @@ pub struct UserCreateParams {
 #[derive(Builder, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
     /// Unique identifier for the user.
-    pub id: u32,
+    pub id: UserId,
     /// Display name for the user.
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -288,18 +288,18 @@ pub struct UserUpdateParams {
     pub meta: Option<String>,
 }
 
-#[derive(Default, uniffi::Record)]
+#[derive(uniffi::Record)]
 pub struct UserRetrieveParams {
     /// Unique identifier for the user.
-    pub id: u32,
+    pub id: UserId,
 }
 
-#[derive(Default, uniffi::Record)]
+#[derive(uniffi::Record)]
 pub struct UserDeleteParams {
     /// Unique identifier for the user.
-    pub id: u32,
+    pub id: UserId,
     /// Reassign the deleted user's posts and links to this user ID.
-    pub reassign: u32,
+    pub reassign: UserId,
 }
 
 impl UserDeleteParams {
@@ -316,10 +316,20 @@ impl UserDeleteParams {
     }
 }
 
+uniffi::custom_newtype!(UserId, i32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserId(i32);
+
+impl std::fmt::Display for UserId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparseUser {
     #[WPContext(edit, embed, view)]
-    pub id: Option<u32>,
+    pub id: Option<UserId>,
     #[WPContext(edit)]
     pub username: Option<String>,
     #[WPContext(edit, embed, view)]
