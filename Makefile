@@ -15,6 +15,8 @@ swift_package_platform_ios := $(call swift_package_platform_version,ios)
 swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
 
+cargo_config_library = --config profile.release.debug=true --config 'profile.release.panic="abort"'
+
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 rust_nightly_toolchain := nightly-2024-04-30
 
@@ -72,11 +74,11 @@ xcframework-libraries:
 	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
 
 %-xcframework-library:
-	cargo build --target $* --package wp_api --release
+	cargo $(cargo_config_library) build --target $* --package wp_api --release
 	$(MAKE) $*-combine-libraries
 
 %-xcframework-library-with-nightly:
-	cargo +$(rust_nightly_toolchain) build --target $* --package wp_api --release -Zbuild-std
+	cargo +$(rust_nightly_toolchain) $(cargo_config_library) build --target $* --package wp_api --release -Z build-std=panic_abort,std
 	$(MAKE) $*-combine-libraries
 
 # Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
