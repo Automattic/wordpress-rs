@@ -277,7 +277,7 @@ pub fn parse_post_list_response(
     let post_list: Vec<PostObject> =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+            response: String::from_utf8_lossy(&response.body).to_string(),
         })?;
 
     let mut next_page: Option<String> = None;
@@ -297,7 +297,7 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+            response: String::from_utf8_lossy(&response.body).to_string(),
         })?;
 
     Ok(api_details)

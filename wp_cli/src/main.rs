@@ -55,7 +55,7 @@ fn main() {
 
     println!(
         "Create user response: {:?}",
-        std::str::from_utf8(&user_create_response.body)
+        String::from_utf8_lossy(&user_create_response.body)
     );
     println!("Created User: {:?}", created_user);
 
@@ -73,7 +73,7 @@ fn main() {
 
     println!(
         "Update user response: {:?}",
-        std::str::from_utf8(&user_update_response.body)
+        String::from_utf8_lossy(&user_update_response.body)
     );
     println!("Updated User: {:?}", updated_user);
 
@@ -86,7 +86,7 @@ fn main() {
     let user_delete_response = wp_networking.request(user_delete_request).unwrap();
     println!(
         "Delete user response: {:?}",
-        std::str::from_utf8(&user_delete_response.body)
+        String::from_utf8_lossy(&user_delete_response.body)
     );
     println!(
         "Retrieve current user: {:?}",
@@ -113,14 +113,14 @@ fn main() {
         wp_api::parse_retrieve_user_response_with_edit_context(&update_current_user_response);
     println!(
         "Update current user response: {:?}",
-        std::str::from_utf8(&update_current_user_response.body)
+        String::from_utf8_lossy(&update_current_user_response.body)
     );
     println!("Updated Current User: {:?}", updated_current_user);
 
     // Remember to use a temporary user to test this
     // println!(
     //     "Delete current user: {:?}",
-    //     std::str::from_utf8(
+    //     String::from_utf8_lossy(
     //         &wp_networking
     //             .request(
     //                 wp_networking

@@ -57,7 +57,7 @@ pub fn parse_users_response<'de, T: Deserialize<'de>>(
     parse_response_for_generic_errors(response)?;
     serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
         reason: err.to_string(),
-        response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        response: String::from_utf8_lossy(&response.body).to_string(),
     })
 }
 
