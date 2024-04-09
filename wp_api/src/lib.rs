@@ -97,7 +97,7 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::create_user(&self.site_url).into(),
-            header_map: self.header_map(),
+            header_map: Some(self.header_map_for_post_request()),
             body: serde_json::to_vec(&params).ok(),
         }
     }
@@ -110,7 +110,7 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::update_user(&self.site_url, user_id, &params).into(),
-            header_map: self.header_map(),
+            header_map: Some(self.header_map_for_post_request()),
             body: serde_json::to_vec(&params).ok(),
         }
     }
@@ -154,6 +154,15 @@ impl WPApiHelper {
                 format!("Basic {}", token),
             )])),
         }
+    }
+
+    fn header_map_for_post_request(&self) -> HashMap<String, String> {
+        let mut header_map = self.header_map().unwrap_or_default();
+        header_map.insert(
+            http::header::CONTENT_TYPE.to_string(),
+            "application/json".to_string(),
+        );
+        header_map
     }
 }
 
