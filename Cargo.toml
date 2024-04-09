@@ -5,6 +5,7 @@ members = [
   "wp_derive",
   "wp_networking",
   "wp_uniffi_bindgen",
+  "tools",
 ]
 resolver = "2"
 
