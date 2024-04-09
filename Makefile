@@ -84,10 +84,10 @@ xcframework-headers: bindings
 
 
 # TODO: Add arm64_32-apple-watchos to the list
-apple-platform-targets-macos	:= x86_64-apple-darwin aarch64-apple-darwin
-apple-platform-targets-ios		:= aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
-apple-platform-targets-tvos		:= aarch64-apple-tvos aarch64-apple-tvos-sim
-apple-platform-targets-watchos	:= x86_64-apple-watchos-sim aarch64-apple-watchos-sim
+apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
+apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
+apple-platform-targets-watchos := x86_64-apple-watchos-sim aarch64-apple-watchos-sim
 apple-platform-targets := \
 	$(apple-platform-targets-macos) \
 	$(apple-platform-targets-ios) \
@@ -101,10 +101,10 @@ CARGO_PROFILE ?= dev
 endif
 
 # Set deployment targets for each platform
-_build-apple-%-darwin:								export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
-_build-apple-%-ios _build-apple-%-ios-sim:			export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
-_build-apple-%-tvos _build-apple-%-tvos-sim:		export TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos)
-_build-apple-%-watchos _build-apple-%-watchos-sim:	export WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos)
+_build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
+_build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
+_build-apple-%-tvos _build-apple-%-tvos-sim: export TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos)
+_build-apple-%-watchos _build-apple-%-watchos-sim: export WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos)
 
 # Use nightly toolchain for tvOS and watchOS
 _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-%-watchos-sim: \
@@ -115,10 +115,10 @@ _build-apple-%: xcframework-headers
 	cargo $(CARGO_OPTS) build --target $* --package wp_api --profile $(CARGO_PROFILE)
 
 # Build the library for one single platform, including real device and simulator.
-build-apple-platform-macos		:= $(addprefix _build-apple-,$(apple-platform-targets-macos))
-build-apple-platform-ios		:= $(addprefix _build-apple-,$(apple-platform-targets-ios))
-build-apple-platform-tvos		:= $(addprefix _build-apple-,$(apple-platform-targets-tvos))
-build-apple-platform-watchos	:= $(addprefix _build-apple-,$(apple-platform-targets-watchos))
+build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
+build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-ios))
+build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
+build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
 
 # Creating xcframework for one single platform, including real device and simulator.
 xcframework-only-macos: $(build-apple-platform-macos)
