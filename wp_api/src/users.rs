@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -137,22 +137,18 @@ impl Default for WPApiParamUsersOrderBy {
     }
 }
 
-impl Display for WPApiParamUsersOrderBy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Id => "id",
-                Self::Include => "include",
-                Self::Name => "name",
-                Self::RegisteredDate => "registered_date",
-                Self::Slug => "slug",
-                Self::IncludeSlugs => "include_slugs",
-                Self::Email => "email",
-                Self::Url => "url",
-            }
-        )
+impl WPApiParamUsersOrderBy {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Id => "id",
+            Self::Include => "include",
+            Self::Name => "name",
+            Self::RegisteredDate => "registered_date",
+            Self::Slug => "slug",
+            Self::IncludeSlugs => "include_slugs",
+            Self::Email => "email",
+            Self::Url => "url",
+        }
     }
 }
 
@@ -206,7 +202,9 @@ impl UserListParams {
             self.order
                 .as_ref()
                 .map(|x| ("order", x.as_str().to_string())),
-            self.order_by.as_ref().map(|x| ("order_by", x.to_string())),
+            self.order_by
+                .as_ref()
+                .map(|x| ("order_by", x.as_str().to_string())),
             Some(("slug", self.slug.join(","))),
             Some(("roles", self.roles.join(","))),
             Some(("capabilities", self.capabilities.join(","))),
