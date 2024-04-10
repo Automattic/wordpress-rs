@@ -65,7 +65,7 @@ impl WPApiHelper {
     pub fn list_users_request(
         &self,
         context: WPContext,
-        params: Option<UserListParams>,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
@@ -93,7 +93,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn create_user_request(&self, params: UserCreateParams) -> WPNetworkRequest {
+    pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::create_user(&self.site_url).into(),
@@ -105,17 +105,17 @@ impl WPApiHelper {
     pub fn update_user_request(
         &self,
         user_id: UserId,
-        params: UserUpdateParams,
+        params: &UserUpdateParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: UsersEndpoint::update_user(&self.site_url, user_id, &params).into(),
+            url: UsersEndpoint::update_user(&self.site_url, user_id, params).into(),
             header_map: Some(self.header_map_for_post_request()),
             body: serde_json::to_vec(&params).ok(),
         }
     }
 
-    pub fn update_current_user_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
+    pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::update_current_user(&self.site_url).into(),
@@ -127,20 +127,20 @@ impl WPApiHelper {
     pub fn delete_user_request(
         &self,
         user_id: UserId,
-        params: UserDeleteParams,
+        params: &UserDeleteParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_user(&self.site_url, user_id, &params).into(),
+            url: UsersEndpoint::delete_user(&self.site_url, user_id, params).into(),
             header_map: self.header_map(),
             body: None,
         }
     }
 
-    pub fn delete_current_user_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
+    pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_current_user(&self.site_url, &params).into(),
+            url: UsersEndpoint::delete_current_user(&self.site_url, params).into(),
             header_map: self.header_map(),
             body: None,
         }
