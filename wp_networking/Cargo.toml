@@ -8,3 +8,8 @@ base64 = { workspace = true }
 http = { workspace = true }
 reqwest = { version = "0.12", features = ["blocking"] }
 wp_api = { path = "../wp_api" }
+
+[dev-dependencies]
+futures = "0.3"
+sqlx = { version = "0.7", features = [ "mysql", "runtime-tokio", "tls-native-tls" ]}
+tokio = { version = "1.37", features = [ "full" ] }
