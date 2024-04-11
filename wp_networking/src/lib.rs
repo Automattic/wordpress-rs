@@ -21,7 +21,7 @@ impl WPNetworking {
         &self,
         wp_request: WPNetworkRequest,
     ) -> Result<WPNetworkResponse, reqwest::Error> {
-        let request_headers: HeaderMap = (&wp_request.header_map.unwrap()).try_into().unwrap();
+        let request_headers: HeaderMap = (&wp_request.header_map).try_into().unwrap();
 
         let mut request = self
             .client
