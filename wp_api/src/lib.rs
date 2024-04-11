@@ -10,6 +10,7 @@ pub use url::*;
 pub use users::*;
 
 pub mod api_error;
+pub mod endpoint;
 pub mod login;
 pub mod pages;
 pub mod posts;
