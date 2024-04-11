@@ -50,7 +50,9 @@ final class LocalSite {
         let api = WordPressAPI(urlSession: .shared, baseUrl: siteURL, authenticationStategy: .none)
         let response: WpNetworkResponse
         do {
-            let request = WpNetworkRequest(method: .get, url: siteURL.appendingPathComponent("/wp-json").absoluteString, headerMap: nil, body: nil)
+            let request = WpNetworkRequest(
+                method: .get, url: siteURL.appendingPathComponent("/wp-json").absoluteString,
+                headerMap: nil, body: nil)
             response = try await api.perform(request: request)
         } catch {
             throw Errors.testServerNotRunning(underlyingError: error)
@@ -67,7 +69,8 @@ final class LocalSite {
         #else
         let file = URL(filePath: #filePath)
         #endif
-        let testCredentialFile = URL(string: "../../../../test_credentials", relativeTo: file)!.absoluteURL
+        let testCredentialFile = URL(string: "../../../../test_credentials", relativeTo: file)!
+            .absoluteURL
         let content: String
         do {
             content = try String(contentsOf: testCredentialFile)
