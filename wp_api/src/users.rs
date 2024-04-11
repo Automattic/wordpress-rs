@@ -119,7 +119,7 @@ impl UsersEndpoint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersOrderBy {
     Id,
     Include,
@@ -193,28 +193,26 @@ pub struct UserListParams {
 impl UserListParams {
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [
-            self.page.as_ref().map(|x| ("page", x.to_string())),
-            self.per_page.as_ref().map(|x| ("per_page", x.to_string())),
-            self.search.as_ref().map(|x| ("search", x.clone())),
-            self.exclude.as_ref().map(|x| ("exclude", x.clone())),
-            self.include.as_ref().map(|x| ("include", x.clone())),
-            self.offset.as_ref().map(|x| ("offset", x.to_string())),
-            self.order
-                .as_ref()
-                .map(|x| ("order", x.as_str().to_string())),
-            self.order_by
-                .as_ref()
-                .map(|x| ("order_by", x.as_str().to_string())),
-            Some(("slug", self.slug.join(","))),
-            Some(("roles", self.roles.join(","))),
-            Some(("capabilities", self.capabilities.join(","))),
-            self.who.as_ref().map(|x| ("who", x.clone())),
-            self.has_published_posts
-                .as_ref()
-                .map(|x| ("has_published_posts", x.to_string())),
+            ("page", self.page.map(|x| x.to_string())),
+            ("per_page", self.per_page.map(|x| x.to_string())),
+            ("search", self.search.clone()),
+            ("exclude", self.exclude.clone()),
+            ("include", self.include.clone()),
+            ("offset", self.offset.map(|x| x.to_string())),
+            ("order", self.order.map(|x| x.as_str().to_string())),
+            ("order_by", self.order_by.map(|x| x.as_str().to_string())),
+            ("slug", Some(self.slug.join(","))),
+            ("roles", Some(self.roles.join(","))),
+            ("capabilities", Some(self.capabilities.join(","))),
+            ("who", self.who.clone()),
+            (
+                "has_published_post",
+                self.has_published_posts.map(|x| x.to_string()),
+            ),
         ]
         .into_iter()
-        .flatten()
+        // Remove `None` values
+        .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
     }
 }
 
