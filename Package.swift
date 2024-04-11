@@ -2,7 +2,10 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 // Swift Package: WordpressApi
 
+import Foundation
 import PackageDescription
+
+let isCI = ProcessInfo.processInfo.environment["BUILDKITE"] == "true"
 
 #if os(Linux)
 let libwordpressFFI: Target = .systemLibrary(
@@ -12,6 +15,27 @@ let libwordpressFFI: Target = .systemLibrary(
 #elseif os(macOS)
 let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
 #endif
+
+#if os(macOS)
+let e2eTestsEnabled = !isCI
+#elseif os(Linux)
+let e2eTestsEnabled = true
+#else
+let e2eTestsEnabled = false
+#endif
+
+var additionalTestTargets = [Target]()
+
+if e2eTestsEnabled {
+    additionalTestTargets.append(.testTarget(
+        name: "End2EndTests",
+        dependencies: [
+            .target(name: "wordpress-api"),
+            .target(name: "libwordpressFFI")
+        ],
+        path: "native/swift/Tests/End2End"
+    ))
+}
 
 let package = Package(
     name: "wordpress",
@@ -54,14 +78,6 @@ let package = Package(
                 .target(name: "libwordpressFFI")
             ],
             path: "native/swift/Tests/wordpress-api"
-        ),
-        .testTarget(
-            name: "End2EndTests",
-            dependencies: [
-                .target(name: "wordpress-api"),
-                .target(name: "libwordpressFFI")
-            ],
-            path: "native/swift/Tests/End2End"
         )
-    ]
+    ] + additionalTestTargets
 )
