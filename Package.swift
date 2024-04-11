@@ -54,6 +54,14 @@ let package = Package(
                 .target(name: "libwordpressFFI")
             ],
             path: "native/swift/Tests/wordpress-api"
+        ),
+        .testTarget(
+            name: "End2EndTests",
+            dependencies: [
+                .target(name: "wordpress-api"),
+                .target(name: "libwordpressFFI")
+            ],
+            path: "native/swift/Tests/End2End"
         )
     ]
 )
