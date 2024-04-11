@@ -7,7 +7,7 @@ import FoundationNetworking
 
 public extension WordPressAPI {
     static func findRestApiEndpointRoot(forSiteUrl url: URL, using session: URLSession) async throws -> URL? {
-        let request = WpNetworkRequest(method: .head, url: url)
+        let request = WpNetworkRequest(method: .head, url: url, headerMap: [:])
         let ephemeralClient = WordPressAPI(urlSession: session, baseUrl: url, authenticationStategy: .none)
         let response = try await ephemeralClient.perform(request: request)
 
@@ -15,7 +15,7 @@ public extension WordPressAPI {
     }
 
     func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpapiDetails {
-        let wpResponse = try await self.perform(request: WpNetworkRequest(method: .get, url: url, headerMap: nil))
+        let wpResponse = try await self.perform(request: WpNetworkRequest(method: .get, url: url, headerMap: [:]))
         return try wordpress_api_wrapper.parseApiDetailsResponse(response: wpResponse)
     }
 }

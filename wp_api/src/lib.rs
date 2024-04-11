@@ -16,6 +16,8 @@ pub mod posts;
 pub mod url;
 pub mod users;
 
+const CONTENT_TYPE_JSON: &str = "application/json";
+
 #[derive(uniffi::Object)]
 pub struct WPApiHelper {
     site_url: Url,
@@ -65,7 +67,7 @@ impl WPApiHelper {
     pub fn list_users_request(
         &self,
         context: WPContext,
-        params: Option<UserListParams>,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
@@ -93,11 +95,11 @@ impl WPApiHelper {
         }
     }
 
-    pub fn create_user_request(&self, params: UserCreateParams) -> WPNetworkRequest {
+    pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::create_user(&self.site_url).into(),
-            header_map: self.header_map(),
+            header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
@@ -105,21 +107,21 @@ impl WPApiHelper {
     pub fn update_user_request(
         &self,
         user_id: UserId,
-        params: UserUpdateParams,
+        params: &UserUpdateParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: UsersEndpoint::update_user(&self.site_url, user_id, &params).into(),
-            header_map: self.header_map(),
+            url: UsersEndpoint::update_user(&self.site_url, user_id, params).into(),
+            header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
 
-    pub fn update_current_user_request(&self, params: UserUpdateParams) -> WPNetworkRequest {
+    pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::update_current_user(&self.site_url).into(),
-            header_map: self.header_map(),
+            header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
     }
@@ -127,33 +129,47 @@ impl WPApiHelper {
     pub fn delete_user_request(
         &self,
         user_id: UserId,
-        params: UserDeleteParams,
+        params: &UserDeleteParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_user(&self.site_url, user_id, &params).into(),
+            url: UsersEndpoint::delete_user(&self.site_url, user_id, params).into(),
             header_map: self.header_map(),
             body: None,
         }
     }
 
-    pub fn delete_current_user_request(&self, params: UserDeleteParams) -> WPNetworkRequest {
+    pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_current_user(&self.site_url, &params).into(),
+            url: UsersEndpoint::delete_current_user(&self.site_url, params).into(),
             header_map: self.header_map(),
             body: None,
         }
     }
 
-    fn header_map(&self) -> Option<HashMap<String, String>> {
+    fn header_map(&self) -> HashMap<String, String> {
+        let mut header_map = HashMap::new();
+        header_map.insert(
+            http::header::ACCEPT.to_string(),
+            CONTENT_TYPE_JSON.to_string(),
+        );
         match &self.authentication {
             WPAuthentication::None => None,
-            WPAuthentication::AuthorizationHeader { token } => Some(HashMap::from([(
-                "Authorization".into(),
-                format!("Basic {}", token),
-            )])),
-        }
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
+            }
+        };
+        header_map
+    }
+
+    fn header_map_for_post_request(&self) -> HashMap<String, String> {
+        let mut header_map = self.header_map();
+        header_map.insert(
+            http::header::CONTENT_TYPE.to_string(),
+            CONTENT_TYPE_JSON.to_string(),
+        );
+        header_map
     }
 }
 
@@ -225,7 +241,7 @@ pub struct WPNetworkRequest {
     //
     // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
     // module.
-    pub header_map: Option<HashMap<String, String>>,
+    pub header_map: HashMap<String, String>,
     pub body: Option<Vec<u8>>,
 }
 
@@ -268,7 +284,7 @@ pub fn parse_post_list_response(
     let post_list: Vec<PostObject> =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+            response: String::from_utf8_lossy(&response.body).to_string(),
         })?;
 
     let mut next_page: Option<String> = None;
@@ -288,7 +304,7 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+            response: String::from_utf8_lossy(&response.body).to_string(),
         })?;
 
     Ok(api_details)

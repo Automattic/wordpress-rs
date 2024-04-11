@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -33,21 +33,21 @@ pub fn parse_list_users_response_with_view_context(
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_edit_context(
     response: &WPNetworkResponse,
-) -> Result<Option<UserWithEditContext>, WPApiError> {
+) -> Result<UserWithEditContext, WPApiError> {
     parse_users_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_embed_context(
     response: &WPNetworkResponse,
-) -> Result<Option<UserWithEmbedContext>, WPApiError> {
+) -> Result<UserWithEmbedContext, WPApiError> {
     parse_users_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_view_context(
     response: &WPNetworkResponse,
-) -> Result<Option<UserWithViewContext>, WPApiError> {
+) -> Result<UserWithViewContext, WPApiError> {
     parse_users_response(response)
 }
 
@@ -57,7 +57,7 @@ pub fn parse_users_response<'de, T: Deserialize<'de>>(
     parse_response_for_generic_errors(response)?;
     serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
         reason: err.to_string(),
-        response: std::str::from_utf8(&response.body).unwrap().to_string(),
+        response: String::from_utf8_lossy(&response.body).to_string(),
     })
 }
 
@@ -119,7 +119,7 @@ impl UsersEndpoint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersOrderBy {
     Id,
     Include,
@@ -137,22 +137,18 @@ impl Default for WPApiParamUsersOrderBy {
     }
 }
 
-impl Display for WPApiParamUsersOrderBy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Id => "id",
-                Self::Include => "include",
-                Self::Name => "name",
-                Self::RegisteredDate => "registered_date",
-                Self::Slug => "slug",
-                Self::IncludeSlugs => "include_slugs",
-                Self::Email => "email",
-                Self::Url => "url",
-            }
-        )
+impl WPApiParamUsersOrderBy {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Id => "id",
+            Self::Include => "include",
+            Self::Name => "name",
+            Self::RegisteredDate => "registered_date",
+            Self::Slug => "slug",
+            Self::IncludeSlugs => "include_slugs",
+            Self::Email => "email",
+            Self::Url => "url",
+        }
     }
 }
 
@@ -197,26 +193,26 @@ pub struct UserListParams {
 impl UserListParams {
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [
-            self.page.as_ref().map(|x| ("page", x.to_string())),
-            self.per_page.as_ref().map(|x| ("per_page", x.to_string())),
-            self.search.as_ref().map(|x| ("search", x.clone())),
-            self.exclude.as_ref().map(|x| ("exclude", x.clone())),
-            self.include.as_ref().map(|x| ("include", x.clone())),
-            self.offset.as_ref().map(|x| ("offset", x.to_string())),
-            self.order
-                .as_ref()
-                .map(|x| ("order", x.as_str().to_string())),
-            self.order_by.as_ref().map(|x| ("order_by", x.to_string())),
-            Some(("slug", self.slug.join(","))),
-            Some(("roles", self.roles.join(","))),
-            Some(("capabilities", self.capabilities.join(","))),
-            self.who.as_ref().map(|x| ("who", x.clone())),
-            self.has_published_posts
-                .as_ref()
-                .map(|x| ("has_published_posts", x.to_string())),
+            ("page", self.page.map(|x| x.to_string())),
+            ("per_page", self.per_page.map(|x| x.to_string())),
+            ("search", self.search.clone()),
+            ("exclude", self.exclude.clone()),
+            ("include", self.include.clone()),
+            ("offset", self.offset.map(|x| x.to_string())),
+            ("order", self.order.map(|x| x.as_str().to_string())),
+            ("order_by", self.order_by.map(|x| x.as_str().to_string())),
+            ("slug", Some(self.slug.join(","))),
+            ("roles", Some(self.roles.join(","))),
+            ("capabilities", Some(self.capabilities.join(","))),
+            ("who", self.who.clone()),
+            (
+                "has_published_post",
+                self.has_published_posts.map(|x| x.to_string()),
+            ),
         ]
         .into_iter()
-        .flatten()
+        // Remove `None` values
+        .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
     }
 }
 
