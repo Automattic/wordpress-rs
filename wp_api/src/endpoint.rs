@@ -4,17 +4,17 @@ use crate::{UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPContex
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
-pub struct WpOrgApiBaseUrl {
-    api_base_url: Url,
+pub struct ApiEndpoint {
+    base_url: Url,
 }
 
-impl WpOrgApiBaseUrl {
+impl ApiEndpoint {
     pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
         Url::parse(site_base_url).map(|parsed_url| {
-            let api_base_url = parsed_url
+            let base_url = parsed_url
                 .extend(WP_JSON_PATH_SEGMENTS)
                 .expect("parsed_url is already parsed, so this can't result in an error");
-            Self { api_base_url }
+            Self { base_url }
         })
     }
 
@@ -23,7 +23,7 @@ impl WpOrgApiBaseUrl {
     }
 
     fn append_to_api_base_url(&self, segment: &str) -> Url {
-        self.api_base_url
+        self.base_url
             .clone()
             .append(segment)
             .expect("api_base_url is already parsed, so this can't result in an error")
@@ -34,7 +34,7 @@ impl WpOrgApiBaseUrl {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        self.api_base_url
+        self.base_url
             .clone()
             .extend(segments)
             .expect("api_base_url is already parsed, so this can't result in an error")
@@ -42,7 +42,7 @@ impl WpOrgApiBaseUrl {
 }
 
 pub struct UsersEndpoint<'a> {
-    api_base_url: &'a WpOrgApiBaseUrl,
+    api_base_url: &'a ApiEndpoint,
 }
 
 impl UsersEndpoint<'_> {
