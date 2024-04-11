@@ -87,6 +87,7 @@ public extension WpNetworkRequest {
         var request = URLRequest(url: url)
         request.httpMethod = self.method.rawValue
         request.allHTTPHeaderFields = self.headerMap
+        request.httpBody = self.body
         return request
     }
 }
@@ -178,4 +179,8 @@ extension URL {
     func asRestUrl() -> WpRestApiurl {
         WpRestApiurl(stringValue: self.absoluteString)
     }
+}
+
+public struct Namespace<T> {
+    public let api: WordPressAPI
 }
