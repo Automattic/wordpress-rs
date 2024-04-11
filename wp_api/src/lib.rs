@@ -119,7 +119,7 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: UsersEndpoint::update_current_user(&self.site_url).into(),
-            header_map: self.header_map(),
+            header_map: Some(self.header_map_for_post_request()),
             body: serde_json::to_vec(&params).ok(),
         }
     }
