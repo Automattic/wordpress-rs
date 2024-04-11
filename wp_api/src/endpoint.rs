@@ -4,6 +4,43 @@ use crate::{UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPContex
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
+pub struct WpOrgApiBaseUrl {
+    api_base_url: Url,
+}
+
+impl WpOrgApiBaseUrl {
+    pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
+        Url::parse(site_base_url).map(|parsed_url| {
+            let api_base_url = parsed_url
+                .extend(WP_JSON_PATH_SEGMENTS)
+                .expect("parsed_url is already parsed, so this can't result in an error");
+            Self { api_base_url }
+        })
+    }
+
+    pub fn users(&self) -> UsersEndpoint {
+        UsersEndpoint { api_base_url: self }
+    }
+
+    fn append_to_api_base_url(&self, segment: &str) -> Url {
+        self.api_base_url
+            .clone()
+            .append(segment)
+            .expect("api_base_url is already parsed, so this can't result in an error")
+    }
+
+    fn extend_api_base_url<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        self.api_base_url
+            .clone()
+            .extend(segments)
+            .expect("api_base_url is already parsed, so this can't result in an error")
+    }
+}
+
 pub struct UsersEndpoint<'a> {
     api_base_url: &'a WpOrgApiBaseUrl,
 }
@@ -58,46 +95,8 @@ impl UsersEndpoint<'_> {
             .extend_api_base_url(["users", &user_id.to_string()])
     }
 
-    pub fn update_me(&self) -> Url {
+    pub fn update_me(&self, params: &UserUpdateParams) -> Url {
         self.api_base_url.extend_api_base_url(["users", "me"])
-    }
-}
-
-pub struct WpOrgApiBaseUrl {
-    api_base_url: Url,
-}
-
-impl WpOrgApiBaseUrl {
-    fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
-        Url::parse(site_base_url).map(|parsed_url| Self {
-            api_base_url: parsed_url
-                .extend(WP_JSON_PATH_SEGMENTS)
-                .expect("parsed_url is already parsed, so this can't result in an error"),
-        })
-    }
-
-    fn users(&self) -> UsersEndpoint {
-        UsersEndpoint {
-            api_base_url: &self,
-        }
-    }
-
-    fn append_to_api_base_url(&self, segment: &str) -> Url {
-        self.api_base_url
-            .clone()
-            .append(segment)
-            .expect("api_base_url is already parsed, so this can't result in an error")
-    }
-
-    fn extend_api_base_url<I>(&self, segments: I) -> Url
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        self.api_base_url
-            .clone()
-            .extend(segments)
-            .expect("api_base_url is already parsed, so this can't result in an error")
     }
 }
 
