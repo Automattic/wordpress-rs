@@ -33,21 +33,21 @@ pub fn parse_list_users_response_with_view_context(
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_edit_context(
     response: &WPNetworkResponse,
-) -> Result<Option<UserWithEditContext>, WPApiError> {
+) -> Result<UserWithEditContext, WPApiError> {
     parse_users_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_embed_context(
     response: &WPNetworkResponse,
-) -> Result<Option<UserWithEmbedContext>, WPApiError> {
+) -> Result<UserWithEmbedContext, WPApiError> {
     parse_users_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_view_context(
     response: &WPNetworkResponse,
-) -> Result<Option<UserWithViewContext>, WPApiError> {
+) -> Result<UserWithViewContext, WPApiError> {
     parse_users_response(response)
 }
 

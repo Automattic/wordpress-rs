@@ -59,7 +59,7 @@ fn main() {
     );
     println!("Created User: {:?}", created_user);
 
-    let created_user = created_user.unwrap().unwrap();
+    let created_user = created_user.unwrap();
     let user_update_params = UserUpdateParamsBuilder::default()
         .email(Some("t_email_updated@foo.com".to_string()))
         .build()
