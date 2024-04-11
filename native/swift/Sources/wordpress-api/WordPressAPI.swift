@@ -181,6 +181,50 @@ extension URL {
     }
 }
 
-public struct Namespace<T> {
+public protocol Namespace {
+    associatedtype T
+
+    var api: WordPressAPI { get }
+}
+
+public struct AnyNamespace<T>: Namespace {
     public let api: WordPressAPI
 }
+
+public protocol Contextual {
+    associatedtype ID
+    associatedtype View
+    associatedtype Edit
+    associatedtype Embed
+}
+
+extension AnyNamespace where T: Contextual {
+    public var view: ViewNamespace<T> { .init(parent: self) }
+    public var edit: EditNamespace<T> { .init(parent: self) }
+    public var embed: EmbedNamespace<T> { .init(parent: self) }
+}
+
+public struct ViewNamespace<T>: Namespace {
+    let parent: AnyNamespace<T>
+
+    public var api: WordPressAPI {
+        parent.api
+    }
+}
+
+public struct EditNamespace<T>: Namespace {
+    public let parent: AnyNamespace<T>
+
+    public var api: WordPressAPI {
+        parent.api
+    }
+}
+
+public struct EmbedNamespace<T>: Namespace {
+    public let parent: AnyNamespace<T>
+
+    public var api: WordPressAPI {
+        parent.api
+    }
+}
+

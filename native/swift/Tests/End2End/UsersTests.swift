@@ -6,12 +6,12 @@ import wordpress_api
 class UsersTests: XCTestCase {
 
     func testGetCurrentUser() async throws {
-        let user = try await site.api.users.getCurrent()
+        let user = try await site.api.users.view.getCurrent()
         XCTAssertEqual(user.id, site.currentUserID)
     }
 
     func testGetUser() async throws {
-        let user = try await site.api.users.get(id: 2)
+        let user = try await site.api.users.view.get(id: 2)
         XCTAssertEqual(user.name, "Theme Buster")
     }
 
@@ -19,18 +19,18 @@ class UsersTests: XCTestCase {
         throw XCTSkip("Need to create a user with an application password for this test to work")
 
         let password = "supersecurepassword"
-        let newUser = try await createUser(password: password)
+        let newUser = try await site.createUser(password: password)
         let newUserSession = WordPressAPI(
             urlSession: .shared, baseUrl: site.siteURL,
             authenticationStategy: .init(username: newUser.username, password: password))
 
-        let user = try await newUserSession.users.getCurrent()
+        let user = try await newUserSession.users.view.getCurrent()
         XCTAssertEqual(user.id, newUser.id)
         try await newUserSession.users.deleteCurrent(reassignTo: site.currentUserID)
 
         do {
             // Should return 404
-            _ = try await site.api.users.get(id: newUser.id)
+            _ = try await site.api.users.view.get(id: newUser.id)
             XCTFail("Unexpected successful result. The user \(newUser.id) should have been deleted.")
         } catch {
             // Do nothing
@@ -38,12 +38,12 @@ class UsersTests: XCTestCase {
     }
 
     func testCreateAndDeleteUser() async throws {
-        let newUser = try await createUser()
+        let newUser = try await site.createUser()
         try await site.api.users.delete(id: newUser.id, reassignTo: site.currentUserID)
     }
 
     func testUpdateCurrentUser() async throws {
-        let currentUser = try await site.api.users.getCurrent()
+        let currentUser = try await site.api.users.view.getCurrent()
         let newDescription = currentUser.description + " and more"
         let updated = try await site.api.users.updateCurrent(
             with: .init(
@@ -54,7 +54,7 @@ class UsersTests: XCTestCase {
     }
 
     func testPatchUpdate() async throws {
-        let newUser = try await createUser()
+        let newUser = try await site.createUser()
 
         let firstUpdate = try await site.api.users.update(
             id: newUser.id,
@@ -76,18 +76,8 @@ class UsersTests: XCTestCase {
     }
 
     func testListUsers() async throws {
-        let users = try await site.api.users.list()
+        let users = try await site.api.users.view.list()
         XCTAssertTrue(users.count > 0)
-    }
-
-    private func createUser(password: String? = nil) async throws -> SparseUser.Edit {
-        let uuid = UUID().uuidString
-        return try await site.api.users.create(
-            using: .init(
-                username: uuid, email: "\(uuid)@swift-test.com", password: password ?? "badpass",
-                name: nil, firstName: "End2End", lastName: nil, url: "http://example.com",
-                description: nil, locale: nil, nickname: nil, slug: nil, roles: ["subscriber"], meta: nil)
-        )
     }
 }
 
@@ -165,6 +155,71 @@ class UserCreationErrorTests: XCTestCase {
         } catch {
             return error
         }
+    }
+
+}
+
+class UserContextTests: XCTestCase {
+
+    func testGetCurrent() async throws {
+        let users = try await site.api.users
+        let view = try await users.view.getCurrent()
+        let edit = try await users.edit.getCurrent()
+        let embed = try await users.embed.getCurrent()
+
+        XCTAssertEqual(view.id, edit.id)
+        XCTAssertEqual(edit.id, embed.id)
+
+        XCTAssertEqual(view.name, edit.name)
+        XCTAssertEqual(edit.name, embed.name)
+
+        XCTAssertNotNil(edit.email)
+    }
+
+    func testGetUser() async throws {
+        let newUser = try await site.createUser()
+        addTeardownBlock {
+            try await site.api.users.delete(id: newUser.id, reassignTo: site.currentUserID)
+        }
+
+        let users = try await site.api.users
+        let view = try await users.view.get(id: newUser.id)
+        let edit = try await users.edit.get(id: newUser.id)
+        let embed = try await users.embed.get(id: newUser.id)
+
+        XCTAssertEqual(view.id, edit.id)
+        XCTAssertEqual(edit.id, embed.id)
+
+        XCTAssertEqual(view.name, edit.name)
+        XCTAssertEqual(edit.name, embed.name)
+
+        XCTAssertNotNil(edit.email)
+    }
+
+    func testEditContext() async throws {
+        let edit = try await site.api.users.edit.getCurrent()
+        XCTAssertEqual(edit.roles, ["administrator"])
+        XCTAssertNotNil(edit.locale)
+        XCTAssertTrue(edit.capabilities.count > 0)
+    }
+
+    func testList() async throws {
+        let users = try await site.api.users
+        let view = try await users.view.list().first
+        let edit = try await users.edit.list().first
+        let embed = try await users.embed.list().first
+
+        XCTAssertNotNil(view)
+        XCTAssertNotNil(edit)
+        XCTAssertNotNil(embed)
+
+        XCTAssertEqual(view?.id, edit?.id)
+        XCTAssertEqual(edit?.id, embed?.id)
+
+        XCTAssertEqual(view?.name, edit?.name)
+        XCTAssertEqual(edit?.name, embed?.name)
+
+        XCTAssertNotNil(edit?.email)
     }
 
 }

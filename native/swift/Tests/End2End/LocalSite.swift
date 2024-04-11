@@ -83,4 +83,20 @@ final class LocalSite {
 
 }
 
+// MARK: - Helpers
+
+extension LocalSite {
+
+    func createUser(password: String? = nil) async throws -> SparseUser.Edit {
+        let uuid = UUID().uuidString
+        return try await api.users.create(
+            using: .init(
+                username: uuid, email: "\(uuid)@swift-test.com", password: password ?? "badpass",
+                name: nil, firstName: "End2End", lastName: nil, url: "http://example.com",
+                description: nil, locale: nil, nickname: nil, slug: nil, roles: ["subscriber"], meta: nil)
+        )
+    }
+
+}
+
 #endif
