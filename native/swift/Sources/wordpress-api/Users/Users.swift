@@ -56,19 +56,19 @@ extension EditNamespace where T == SparseUser {
 extension EmbedNamespace where T == SparseUser {
 
     public func get(id: T.ID) async throws -> T.Embed {
-        let request = self.api.helper.retrieveUserRequest(userId: id, context: .edit)
+        let request = self.api.helper.retrieveUserRequest(userId: id, context: .embed)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithEmbedContext(response: response)!
     }
 
     public func getCurrent() async throws -> T.Embed {
-        let request = self.api.helper.retrieveCurrentUserRequest(context: .edit)
+        let request = self.api.helper.retrieveCurrentUserRequest(context: .embed)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithEmbedContext(response: response)!
     }
 
     public func list() async throws -> [T.Embed] {
-        let request = self.api.helper.listUsersRequest(context: .edit, params: nil)
+        let request = self.api.helper.listUsersRequest(context: .embed, params: nil)
         let response = try await api.perform(request: request)
         return try parseListUsersResponseWithEmbedContext(response: response)
     }
