@@ -121,7 +121,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.users.update(user_id, params).into(),
+            url: self.api_endpoint.users.update(user_id).into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -130,7 +130,7 @@ impl WPApiHelper {
     pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.users.update_me(params).into(),
+            url: self.api_endpoint.users.update_me().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }

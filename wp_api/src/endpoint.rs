@@ -1,6 +1,6 @@
 use url::Url;
 
-use crate::{UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPContext};
+use crate::{UserDeleteParams, UserId, UserListParams, WPContext};
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
@@ -109,12 +109,12 @@ impl UsersEndpoint {
         url
     }
 
-    pub fn update(&self, user_id: UserId, params: &UserUpdateParams) -> Url {
+    pub fn update(&self, user_id: UserId) -> Url {
         self.api_base_url
             .by_extending(["users", &user_id.to_string()])
     }
 
-    pub fn update_me(&self, params: &UserUpdateParams) -> Url {
+    pub fn update_me(&self) -> Url {
         self.api_base_url.by_extending(["users", "me"])
     }
 }
@@ -146,7 +146,7 @@ impl UrlExtension for Url {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::rstest;
+    use rstest::*;
 
     #[test]
     fn append_url() {
@@ -172,10 +172,10 @@ mod tests {
             "https://f.foo.com",
             "https://foo.com/f"
         )]
-        test_url: &str,
+        test_base_url: &str,
     ) {
-        let api_base_url = ApiBaseUrl::new(test_url).unwrap();
-        let expected_wp_json_url = format!("{}/{}", test_url, WP_JSON_PATH_SEGMENTS.join("/"));
+        let api_base_url = ApiBaseUrl::new(test_base_url).unwrap();
+        let expected_wp_json_url = wp_json_endpoint(test_base_url);
         assert_eq!(expected_wp_json_url, api_base_url.url.as_str());
         assert_eq!(
             api_base_url.by_appending("bar").as_str(),
@@ -185,5 +185,39 @@ mod tests {
             api_base_url.by_extending(["bar", "baz"]).as_str(),
             format!("{}/bar/baz", expected_wp_json_url)
         );
+    }
+
+    #[rstest]
+    fn create_user_endpoint(base_url_fixture: String, users_endpoint: UsersEndpoint) {
+        assert_eq!(
+            users_endpoint.create().as_str(),
+            wp_json_endpoint_by_appending(&base_url_fixture, "/users")
+        );
+    }
+
+    #[rstest]
+    fn update_user_me_endpoint(base_url_fixture: String, users_endpoint: UsersEndpoint) {
+        assert_eq!(
+            users_endpoint.update_me().as_str(),
+            wp_json_endpoint_by_appending(&base_url_fixture, "/users/me")
+        );
+    }
+
+    #[fixture]
+    fn base_url_fixture() -> String {
+        "https://foo.com".to_string()
+    }
+
+    #[fixture]
+    fn users_endpoint(base_url_fixture: String) -> UsersEndpoint {
+        ApiEndpoint::new("https://foo.com").unwrap().users
+    }
+
+    fn wp_json_endpoint(base_url: &str) -> String {
+        format!("{}/{}", base_url, WP_JSON_PATH_SEGMENTS.join("/"))
+    }
+
+    fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
+        format!("{}{}", wp_json_endpoint(base_url), suffix)
     }
 }
