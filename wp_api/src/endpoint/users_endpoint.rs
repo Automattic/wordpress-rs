@@ -102,6 +102,42 @@ mod tests {
     }
 
     #[rstest]
+    fn list_users(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.list(WPContext::Edit, None),
+            "/users?context=edit",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn retrieve_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.retrieve(UserId(98), WPContext::View),
+            "/users/98?context=view",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn retrieve_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.retrieve_me(WPContext::Embed),
+            "/users/me?context=embed",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn update_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.update(UserId(98)),
+            "/users/98",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
     fn update_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
         validate_endpoint(users_endpoint.update_me(), "/users/me", &api_base_url);
     }
