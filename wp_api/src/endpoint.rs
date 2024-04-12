@@ -4,22 +4,23 @@ use crate::{UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPContex
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
+#[derive(Debug, Clone)]
 pub struct ApiBaseUrl {
-    base_url: Url,
+    url: Url,
 }
 
 impl ApiBaseUrl {
     pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
         Url::parse(site_base_url).map(|parsed_url| {
-            let base_url = parsed_url
+            let url = parsed_url
                 .extend(WP_JSON_PATH_SEGMENTS)
                 .expect("parsed_url is already parsed, so this can't result in an error");
-            Self { base_url }
+            Self { url }
         })
     }
 
     fn by_appending(&self, segment: &str) -> Url {
-        self.base_url
+        self.url
             .clone()
             .append(segment)
             .expect("api_base_url is already parsed, so this can't result in an error")
@@ -30,7 +31,7 @@ impl ApiBaseUrl {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        self.base_url
+        self.url
             .clone()
             .extend(segments)
             .expect("api_base_url is already parsed, so this can't result in an error")
@@ -38,26 +39,28 @@ impl ApiBaseUrl {
 }
 
 pub struct ApiEndpoint {
-    api_base_url: ApiBaseUrl,
+    pub base_url: ApiBaseUrl,
+    pub users: UsersEndpoint,
 }
 
 impl ApiEndpoint {
     pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
-        ApiBaseUrl::new(site_base_url).map(|api_base_url| Self { api_base_url })
-    }
-
-    pub fn users(&self) -> UsersEndpoint {
-        UsersEndpoint {
-            api_base_url: &self.api_base_url,
-        }
+        ApiBaseUrl::new(site_base_url).map(|api_base_url| Self {
+            base_url: api_base_url.clone(),
+            users: UsersEndpoint::new(api_base_url.clone()),
+        })
     }
 }
 
-pub struct UsersEndpoint<'a> {
-    api_base_url: &'a ApiBaseUrl,
+pub struct UsersEndpoint {
+    api_base_url: ApiBaseUrl,
 }
 
-impl UsersEndpoint<'_> {
+impl UsersEndpoint {
+    fn new(api_base_url: ApiBaseUrl) -> Self {
+        Self { api_base_url }
+    }
+
     pub fn create(&self) -> Url {
         self.api_base_url.by_appending("users")
     }
@@ -149,7 +152,7 @@ mod tests {
             Url::parse(format!("{}/{}", base_url, WP_JSON_PATH_SEGMENTS.join("/")).as_str())
                 .unwrap()
                 .as_str(),
-            api_endpoint.api_base_url.base_url.as_str()
+            api_endpoint.base_url.url.as_str()
         );
     }
 }
