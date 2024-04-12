@@ -77,6 +77,31 @@ mod tests {
     }
 
     #[rstest]
+    fn delete_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.delete(
+                UserId(54),
+                &UserDeleteParams {
+                    reassign: UserId(98),
+                },
+            ),
+            "/users/54?reassign=98&force=true",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn delete_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.delete_me(&UserDeleteParams {
+                reassign: UserId(98),
+            }),
+            "/users/me?reassign=98&force=true",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
     fn update_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
         validate_endpoint(users_endpoint.update_me(), "/users/me", &api_base_url);
     }

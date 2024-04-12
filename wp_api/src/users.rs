@@ -281,7 +281,7 @@ impl UserDeleteParams {
 
 uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserId(i32);
+pub struct UserId(pub i32);
 
 impl std::fmt::Display for UserId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
