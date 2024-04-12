@@ -144,15 +144,17 @@ mod tests {
     use super::*;
 
     #[test]
-    // This test is temporary, just using to test some stuff while working on the implementation
-    fn temporary_test() {
-        let base_url = "https://example.com/blog";
-        let api_endpoint = ApiEndpoint::new(base_url).unwrap();
+    fn append_url() {
+        let url = Url::parse("https://foo.com").unwrap();
+        assert_eq!(url.append("bar").unwrap().as_str(), "https://foo.com/bar");
+    }
+
+    #[test]
+    fn extend_url() {
+        let url = Url::parse("https://foo.com").unwrap();
         assert_eq!(
-            Url::parse(format!("{}/{}", base_url, WP_JSON_PATH_SEGMENTS.join("/")).as_str())
-                .unwrap()
-                .as_str(),
-            api_endpoint.base_url.url.as_str()
+            url.extend(["bar", "baz"]).unwrap().as_str(),
+            "https://foo.com/bar/baz"
         );
     }
 }
