@@ -36,6 +36,10 @@ impl ApiBaseUrl {
             .extend(segments)
             .expect("api_base_url is already parsed, so this can't result in an error")
     }
+
+    fn as_str(&self) -> &str {
+        self.url.as_str()
+    }
 }
 
 pub struct ApiEndpoint {
@@ -142,6 +146,7 @@ impl UrlExtension for Url {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn append_url() {
@@ -155,6 +160,30 @@ mod tests {
         assert_eq!(
             url.extend(["bar", "baz"]).unwrap().as_str(),
             "https://foo.com/bar/baz"
+        );
+    }
+
+    #[rstest]
+    fn api_base_url(
+        #[values(
+            "http://foo.com",
+            "https://foo.com",
+            "https://www.foo.com",
+            "https://f.foo.com",
+            "https://foo.com/f"
+        )]
+        test_url: &str,
+    ) {
+        let api_base_url = ApiBaseUrl::new(test_url).unwrap();
+        let expected_wp_json_url = format!("{}/{}", test_url, WP_JSON_PATH_SEGMENTS.join("/"));
+        assert_eq!(expected_wp_json_url, api_base_url.url.as_str());
+        assert_eq!(
+            api_base_url.by_appending("bar").as_str(),
+            format!("{}/bar", expected_wp_json_url)
+        );
+        assert_eq!(
+            api_base_url.by_extending(["bar", "baz"]).as_str(),
+            format!("{}/bar/baz", expected_wp_json_url)
         );
     }
 }
