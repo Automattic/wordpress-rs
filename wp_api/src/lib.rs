@@ -33,7 +33,7 @@ impl WPApiHelper {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
         // TODO: Handle the url parse error
-        let api_endpoint = ApiEndpoint::new(site_url.as_str()).unwrap();
+        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
 
         Self {
             api_endpoint,
