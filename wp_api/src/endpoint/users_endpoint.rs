@@ -67,25 +67,18 @@ impl UsersEndpoint {
 
 #[cfg(test)]
 mod tests {
-    use crate::ApiEndpoint;
-
     use super::*;
+    use crate::ApiEndpoint;
     use rstest::*;
 
     #[rstest]
-    fn create_user_endpoint(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
-        assert_eq!(
-            users_endpoint.create().as_str(),
-            wp_json_endpoint_by_appending(api_base_url, "/users")
-        );
+    fn create_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(users_endpoint.create(), "/users", &api_base_url);
     }
 
     #[rstest]
-    fn update_user_me_endpoint(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
-        assert_eq!(
-            users_endpoint.update_me().as_str(),
-            wp_json_endpoint_by_appending(api_base_url, "/users/me")
-        );
+    fn update_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(users_endpoint.update_me(), "/users/me", &api_base_url);
     }
 
     #[fixture]
@@ -98,7 +91,10 @@ mod tests {
         ApiEndpoint::new(api_base_url).users
     }
 
-    fn wp_json_endpoint_by_appending(api_base_url: ApiBaseUrl, suffix: &str) -> String {
-        format!("{}{}", api_base_url.as_str(), suffix)
+    fn validate_endpoint(endpoint_url: Url, path: &str, api_base_url: &ApiBaseUrl) {
+        assert_eq!(
+            endpoint_url.as_str(),
+            format!("{}{}", api_base_url.as_str(), path)
+        );
     }
 }
