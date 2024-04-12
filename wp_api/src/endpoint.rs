@@ -58,10 +58,7 @@ impl ApiEndpoint {
     }
 
     pub fn new_from_str(site_base_url: &str) -> Result<Self, url::ParseError> {
-        ApiBaseUrl::new(site_base_url).map(|api_base_url| Self {
-            base_url: api_base_url.clone(),
-            users: UsersEndpoint::new(api_base_url.clone()),
-        })
+        ApiBaseUrl::new(site_base_url).map(Self::new)
     }
 }
 
