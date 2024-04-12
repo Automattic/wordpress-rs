@@ -133,16 +133,6 @@ mod tests {
         );
     }
 
-    #[fixture]
-    fn base_url_fixture() -> String {
-        "https://foo.com".to_string()
-    }
-
-    #[fixture]
-    fn users_endpoint(base_url_fixture: String) -> UsersEndpoint {
-        ApiEndpoint::new_from_str("https://foo.com").unwrap().users
-    }
-
     fn wp_json_endpoint(base_url: &str) -> String {
         format!("{}/{}", base_url, WP_JSON_PATH_SEGMENTS.join("/"))
     }
