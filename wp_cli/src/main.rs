@@ -1,5 +1,6 @@
 use std::fs::read_to_string;
 
+use base64::prelude::*;
 use wp_api::{
     UserCreateParamsBuilder, UserDeleteParams, UserUpdateParamsBuilder, WPAuthentication, WPContext,
 };
@@ -10,14 +11,14 @@ fn main() {
     // soon
     let file_contents = read_to_string("test_credentials").unwrap();
     let lines: Vec<&str> = file_contents.lines().collect();
-    let url = lines[0];
-    let auth_base64_token = lines[1];
+    let site_url = lines[0];
+    let auth_base64_token = BASE64_STANDARD.encode(format!("{}:{}", lines[1], lines[2]));
 
     let authentication = WPAuthentication::AuthorizationHeader {
-        token: auth_base64_token.into(),
+        token: auth_base64_token,
     };
 
-    let wp_networking = WPNetworking::new(url.into(), authentication);
+    let wp_networking = WPNetworking::new(site_url.into(), authentication);
 
     let user_list_request = wp_networking
         .api_helper
