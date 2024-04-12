@@ -111,6 +111,30 @@ mod tests {
     }
 
     #[rstest]
+    fn list_users_with_params(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        let params = UserListParams {
+            page: Some(2),
+            per_page: Some(60),
+            search: Some("foo".to_string()),
+            exclude: None,
+            include: None,
+            offset: None,
+            order: None,
+            order_by: None,
+            slug: vec!["bar".to_string(), "baz".to_string()],
+            roles: Vec::new(),
+            capabilities: Vec::new(),
+            who: None,
+            has_published_posts: Some(true),
+        };
+        validate_endpoint(
+            users_endpoint.list(WPContext::Edit, Some(&params)),
+            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_post=true",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
     fn retrieve_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.retrieve(UserId(98), WPContext::View),
