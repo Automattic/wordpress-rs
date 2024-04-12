@@ -201,9 +201,18 @@ impl UserListParams {
             ("offset", self.offset.map(|x| x.to_string())),
             ("order", self.order.map(|x| x.as_str().to_string())),
             ("order_by", self.order_by.map(|x| x.as_str().to_string())),
-            ("slug", Some(self.slug.join(","))),
-            ("roles", Some(self.roles.join(","))),
-            ("capabilities", Some(self.capabilities.join(","))),
+            (
+                "slug",
+                (!self.slug.is_empty()).then_some(self.slug.join(",")),
+            ),
+            (
+                "roles",
+                (!self.roles.is_empty()).then_some(self.roles.join(",")),
+            ),
+            (
+                "capabilities",
+                (!self.capabilities.is_empty()).then_some(self.capabilities.join(",")),
+            ),
             ("who", self.who.clone()),
             (
                 "has_published_post",
