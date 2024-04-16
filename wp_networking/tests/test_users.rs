@@ -1,10 +1,10 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
-use wp_api::{UserWithEditContext, WPAuthentication, WPContext};
+use wp_api::{UserId, UserUpdateParamsBuilder, UserWithEditContext, WPAuthentication, WPContext};
 
-use wp_networking::WPNetworking;
+use wp_networking::AsyncWPNetworking;
 
-fn wp_networking() -> WPNetworking {
+fn wp_networking() -> AsyncWPNetworking {
     let file_contents = read_to_string("../test_credentials").unwrap();
     let lines: Vec<&str> = file_contents.lines().collect();
     let site_url = lines[0];
@@ -14,15 +14,18 @@ fn wp_networking() -> WPNetworking {
         token: auth_base64_token,
     };
 
-    WPNetworking::new(site_url.into(), authentication)
+    AsyncWPNetworking::new(site_url.into(), authentication)
 }
 
-fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
+async fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
     let user_list_request = wp_networking()
         .api_helper
         .list_users_request(WPContext::Edit, &None);
     wp_api::parse_list_users_response_with_edit_context(
-        &wp_networking().request(user_list_request).unwrap(),
+        &wp_networking()
+            .async_request(user_list_request)
+            .await
+            .unwrap(),
     )
     .unwrap()
 }
@@ -30,27 +33,50 @@ fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
 #[tokio::test]
 async fn test_list_users() {
     let users_from_db = fetch_db_users().await.unwrap();
-    let users_from_api = tokio::task::spawn_blocking(move || list_users_with_edit_context())
-        .await
-        .unwrap();
+    let users_from_api = list_users_with_edit_context().await;
     users_from_db
         .iter()
         .zip(users_from_api.iter())
         .for_each(|(db_user, api_user)| {
-            assert_eq!(wp_api::UserId(db_user.user_id as i32), api_user.id);
-            assert_eq!(db_user.user_login, api_user.username);
-            assert_eq!(db_user.user_nicename, api_user.slug);
-            assert_eq!(db_user.user_email, api_user.email);
-            assert_eq!(db_user.user_url, api_user.url);
+            assert_eq!(wp_api::UserId(db_user.id as i32), api_user.id);
+            assert_eq!(db_user.username, api_user.username);
+            assert_eq!(db_user.slug, api_user.slug);
+            assert_eq!(db_user.email, api_user.email);
+            assert_eq!(db_user.url, api_user.url);
             assert_eq!(
-                db_user.user_registered,
+                db_user.registered_date,
                 api_user
                     .registered_date
                     .parse::<chrono::DateTime<chrono::Utc>>()
                     .unwrap()
             );
-            assert_eq!(db_user.display_name, api_user.name);
+            assert_eq!(db_user.name, api_user.name);
         });
+}
+
+#[tokio::test]
+async fn test_update_user() {
+    let new_slug = "new_slug";
+
+    // Find the id of the first user from DB
+    let users_from_db = fetch_db_users().await.unwrap();
+    let first_user = users_from_db.first().unwrap();
+    let first_user_id = UserId(first_user.id as i32);
+
+    // Update the user's slug using the API and ensure it's successful
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .slug(Some(new_slug.to_string()))
+        .build()
+        .unwrap();
+    let user_update_request = wp_networking()
+        .api_helper
+        .update_user_request(first_user_id, &user_update_params);
+    let user_update_response = wp_networking().async_request(user_update_request).await;
+    assert!(user_update_response.is_ok());
+
+    // Assert that the DB record of the user is updated with the new slug
+    let first_user_after_update = fetch_db_user(first_user.id).await.unwrap();
+    assert_eq!(first_user_after_update.slug, new_slug);
 }
 
 use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
@@ -58,19 +84,33 @@ use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
 #[derive(Debug, sqlx::FromRow)]
 pub struct DbUser {
     #[sqlx(rename = "ID")]
-    user_id: u64,
-    user_login: String,
-    user_nicename: String,
-    user_email: String,
-    user_url: String,
-    user_registered: chrono::DateTime<chrono::Utc>,
-    display_name: String,
+    id: u64,
+    #[sqlx(rename = "user_login")]
+    username: String,
+    #[sqlx(rename = "user_nicename")]
+    slug: String,
+    #[sqlx(rename = "user_email")]
+    email: String,
+    #[sqlx(rename = "user_url")]
+    url: String,
+    #[sqlx(rename = "user_registered")]
+    registered_date: chrono::DateTime<chrono::Utc>,
+    #[sqlx(rename = "display_name")]
+    name: String,
 }
 
 async fn fetch_db_users() -> Result<Vec<DbUser>, sqlx::Error> {
     let mut conn = db().await?;
     sqlx::query_as("SELECT * FROM wp_users")
         .fetch_all(&mut conn)
+        .await
+}
+
+async fn fetch_db_user(user_id: u64) -> Result<DbUser, sqlx::Error> {
+    let mut conn = db().await?;
+    sqlx::query_as("SELECT * FROM wp_users WHERE ID = ?")
+        .bind(user_id)
+        .fetch_one(&mut conn)
         .await
 }
 
@@ -130,21 +170,4 @@ async fn db() -> Result<MySqlConnection, sqlx::Error> {
 //
 // #[test]
 // fn test_update_user() {
-//     let (_, created_user) = create_test_user();
-//     let user_update_params = UserUpdateParamsBuilder::default()
-//         .email(Some("t_email_updated@foo.com".to_string()))
-//         .build()
-//         .unwrap();
-//     let user_update_request = wp_networking()
-//         .api_helper
-//         .update_user_request(created_user.unwrap().unwrap().id, user_update_params);
-//     let user_update_response = wp_networking().request(user_update_request).unwrap();
-//     let updated_user =
-//         wp_api::parse_retrieve_user_response_with_edit_context(&user_update_response);
-//
-//     println!(
-//         "Update user response: {:?}",
-//         std::str::from_utf8(&user_update_response.body)
-//     );
-//     println!("Updated User: {:?}", updated_user);
 // }
