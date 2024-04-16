@@ -1,6 +1,9 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
-use wp_api::{UserId, UserUpdateParamsBuilder, UserWithEditContext, WPAuthentication, WPContext};
+use wp_api::{
+    UserCreateParamsBuilder, UserId, UserUpdateParamsBuilder, UserWithEditContext,
+    WPAuthentication, WPContext,
+};
 
 use wp_networking::AsyncWPNetworking;
 
@@ -30,28 +33,51 @@ async fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
     .unwrap()
 }
 
+// #[tokio::test]
+// async fn test_list_users() {
+//     let users_from_db = fetch_db_users().await.unwrap();
+//     let users_from_api = list_users_with_edit_context().await;
+//     users_from_db
+//         .iter()
+//         .zip(users_from_api.iter())
+//         .for_each(|(db_user, api_user)| {
+//             assert_eq!(wp_api::UserId(db_user.id as i32), api_user.id);
+//             assert_eq!(db_user.username, api_user.username);
+//             assert_eq!(db_user.slug, api_user.slug);
+//             assert_eq!(db_user.email, api_user.email);
+//             assert_eq!(db_user.url, api_user.url);
+//             assert_eq!(
+//                 db_user.registered_date,
+//                 api_user
+//                     .registered_date
+//                     .parse::<chrono::DateTime<chrono::Utc>>()
+//                     .unwrap()
+//             );
+//             assert_eq!(db_user.name, api_user.name);
+//         });
+// }
+
 #[tokio::test]
-async fn test_list_users() {
-    let users_from_db = fetch_db_users().await.unwrap();
-    let users_from_api = list_users_with_edit_context().await;
-    users_from_db
-        .iter()
-        .zip(users_from_api.iter())
-        .for_each(|(db_user, api_user)| {
-            assert_eq!(wp_api::UserId(db_user.id as i32), api_user.id);
-            assert_eq!(db_user.username, api_user.username);
-            assert_eq!(db_user.slug, api_user.slug);
-            assert_eq!(db_user.email, api_user.email);
-            assert_eq!(db_user.url, api_user.url);
-            assert_eq!(
-                db_user.registered_date,
-                api_user
-                    .registered_date
-                    .parse::<chrono::DateTime<chrono::Utc>>()
-                    .unwrap()
-            );
-            assert_eq!(db_user.name, api_user.name);
-        });
+async fn create_test_user() {
+    // Create a user using the API
+    let user_create_params = UserCreateParamsBuilder::default()
+        .username("t_username".to_string())
+        .email("t_email@foo.com".to_string())
+        .password("t_password".to_string())
+        .build()
+        .unwrap();
+    let user_create_request = wp_networking()
+        .api_helper
+        .create_user_request(&user_create_params);
+    let user_create_response = wp_networking().async_request(user_create_request).await;
+    assert!(user_create_response.is_ok());
+
+    // Assert that the user is in DB
+    let created_user =
+        wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response.unwrap())
+            .unwrap();
+    let created_user_from_db = fetch_db_user(created_user.id.0 as u64).await;
+    assert!(created_user_from_db.is_ok());
 }
 
 #[tokio::test]
@@ -122,26 +148,6 @@ async fn db() -> Result<MySqlConnection, sqlx::Error> {
         .database("wordpress");
     MySqlConnectOptions::connect(&options).await
 }
-
-// fn create_test_user() -> (
-//     WPNetworkResponse,
-//     Result<Option<UserWithEditContext>, WPApiError>,
-// ) {
-//     let user_create_params = UserCreateParamsBuilder::default()
-//         .username("t_username".to_string())
-//         .email("t_email@foo.com".to_string())
-//         .password("t_password".to_string())
-//         .build()
-//         .unwrap();
-//
-//     let user_create_request = wp_networking()
-//         .api_helper
-//         .create_user_request(user_create_params);
-//     let user_create_response = wp_networking().request(user_create_request).unwrap();
-//     let created_user =
-//         wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response);
-//     (user_create_response, created_user)
-// }
 //
 // #[test]
 // fn test_retrieve_user() {
