@@ -52,7 +52,7 @@ final class LocalSite {
         do {
             let request = WpNetworkRequest(
                 method: .get, url: siteURL.appendingPathComponent("/wp-json").absoluteString,
-                headerMap: nil, body: nil)
+                headerMap: [:], body: nil)
             response = try await api.perform(request: request)
         } catch {
             throw Errors.testServerNotRunning(underlyingError: error)
