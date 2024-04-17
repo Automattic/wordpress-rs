@@ -5,7 +5,7 @@ package rs.wordpress.wp_api
 
 import org.junit.Before
 import org.junit.Test
-import uniffi.wp_api.PostObject
+import uniffi.wp_api.SparsePost
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpAuthentication
@@ -30,7 +30,7 @@ class LibraryTest {
     @Test
     fun testMakeBasicPostListRequest() {
         val postListResponse = library.makePostListRequest()
-        val firstPost: PostObject = postListResponse.postList!!.first()
+        val firstPost: SparsePost = postListResponse.postList!!.first()
         assert(firstPost.title?.raw == "Hello world!")
     }
 

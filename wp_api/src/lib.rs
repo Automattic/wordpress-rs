@@ -173,6 +173,53 @@ impl WPApiHelper {
     }
 }
 
+#[uniffi::export]
+impl WPApiHelper {
+    pub fn retrieve_post_request(&self, post_id: PostId, context: WPContext) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: PostsEndpoint::retrieve_post(&self.site_url, post_id, context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn create_post_request(&self, params: &PostCreateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: PostsEndpoint::create_post(&self.site_url).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn update_post_request(
+        &self,
+        post_id: PostId,
+        params: &PostUpdateParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: PostsEndpoint::update_post(&self.site_url, post_id, params).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn delete_post_request(
+        &self,
+        post_id: PostId,
+        params: &PostDeleteParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: PostsEndpoint::delete_post(&self.site_url, post_id, params).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPContext {
     Edit,
@@ -281,7 +328,7 @@ pub fn parse_post_list_response(
     response: WPNetworkResponse,
 ) -> Result<PostListResponse, WPApiError> {
     parse_response_for_generic_errors(&response)?;
-    let post_list: Vec<PostObject> =
+    let post_list: Vec<SparsePost> =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
             response: String::from_utf8_lossy(&response.body).to_string(),
