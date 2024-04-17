@@ -13,18 +13,18 @@ public struct AnyNamespace<T>: Namespace {
 
 public protocol Contextual {
     associatedtype ID
-    associatedtype View
-    associatedtype Edit
-    associatedtype Embed
+    associatedtype ViewContext
+    associatedtype EditContext
+    associatedtype EmbedContext
 
     static func makeGetOneRequest(id: ID, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
     static func makeGetListRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
-    static func parseResponse(_ response: WpNetworkResponse) throws -> View
-    static func parseResponse(_ response: WpNetworkResponse) throws -> Edit
-    static func parseResponse(_ response: WpNetworkResponse) throws -> Embed
-    static func parseResponse(_ response: WpNetworkResponse) throws -> [View]
-    static func parseResponse(_ response: WpNetworkResponse) throws -> [Edit]
-    static func parseResponse(_ response: WpNetworkResponse) throws -> [Embed]
+    static func parseResponse(_ response: WpNetworkResponse) throws -> ViewContext
+    static func parseResponse(_ response: WpNetworkResponse) throws -> EditContext
+    static func parseResponse(_ response: WpNetworkResponse) throws -> EmbedContext
+    static func parseResponse(_ response: WpNetworkResponse) throws -> [ViewContext]
+    static func parseResponse(_ response: WpNetworkResponse) throws -> [EditContext]
+    static func parseResponse(_ response: WpNetworkResponse) throws -> [EmbedContext]
 }
 
 extension AnyNamespace where T: Contextual {
@@ -57,11 +57,11 @@ public struct ViewNamespace<T: Contextual>: ContextualNamespace {
         T.makeGetListRequest(using: helper, context: .view)
     }
 
-    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.View {
+    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.ViewContext {
         try T.parseResponse(response)
     }
 
-    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [T.View] {
+    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [T.ViewContext] {
         try T.parseResponse(response)
     }
 }
@@ -80,11 +80,11 @@ public struct EditNamespace<T: Contextual>: ContextualNamespace {
         T.makeGetListRequest(using: helper, context: .edit)
     }
 
-    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.Edit {
+    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.EditContext {
         try T.parseResponse(response)
     }
 
-    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [T.Edit] {
+    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [T.EditContext] {
         try T.parseResponse(response)
     }
 }
@@ -103,11 +103,11 @@ public struct EmbedNamespace<T: Contextual>: ContextualNamespace {
         T.makeGetListRequest(using: helper, context: .embed)
     }
 
-    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.Embed {
+    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.EmbedContext {
         try T.parseResponse(response)
     }
 
-    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [T.Embed] {
+    public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [T.EmbedContext] {
         try T.parseResponse(response)
     }
 }

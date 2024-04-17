@@ -87,7 +87,7 @@ final class LocalSite {
 
 extension LocalSite {
 
-    func createUser(password: String? = nil) async throws -> SparseUser.Edit {
+    func createUser(password: String? = nil) async throws -> SparseUser.EditContext {
         let uuid = UUID().uuidString
         return try await api.users.create(
             using: .init(

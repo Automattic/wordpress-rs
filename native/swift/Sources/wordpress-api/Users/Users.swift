@@ -3,9 +3,9 @@ import wordpress_api_wrapper
 
 extension SparseUser: Contextual {
     public typealias ID = UserId
-    public typealias View = UserWithViewContext
-    public typealias Edit = UserWithEditContext
-    public typealias Embed = UserWithEmbedContext
+    public typealias ViewContext = UserWithViewContext
+    public typealias EditContext = UserWithEditContext
+    public typealias EmbedContext = UserWithEmbedContext
 
     public static func makeGetOneRequest(id: UserId, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
         helper.retrieveUserRequest(userId: id, context: context)
@@ -47,7 +47,7 @@ extension WordPressAPI {
 }
 
 extension ViewNamespace where T == SparseUser {
-    public func getCurrent() async throws -> T.View {
+    public func getCurrent() async throws -> T.ViewContext {
         let request = self.api.helper.retrieveCurrentUserRequest(context: .view)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithViewContext(response: response)
@@ -55,7 +55,7 @@ extension ViewNamespace where T == SparseUser {
 }
 
 extension EditNamespace where T == SparseUser {
-    public func getCurrent() async throws -> T.Edit {
+    public func getCurrent() async throws -> T.EditContext {
         let request = self.api.helper.retrieveCurrentUserRequest(context: .edit)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithEditContext(response: response)
@@ -63,7 +63,7 @@ extension EditNamespace where T == SparseUser {
 }
 
 extension EmbedNamespace where T == SparseUser {
-    public func getCurrent() async throws -> T.Embed {
+    public func getCurrent() async throws -> T.EmbedContext {
         let request = self.api.helper.retrieveCurrentUserRequest(context: .embed)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithEmbedContext(response: response)
@@ -81,13 +81,13 @@ extension AnyNamespace where T == SparseUser {
         return
     }
 
-    public func update(id: T.ID, with params: UserUpdateParams) async throws -> T.Edit {
+    public func update(id: T.ID, with params: UserUpdateParams) async throws -> T.EditContext {
         let request = self.api.helper.updateUserRequest(userId: id, params: params)
         let response = try await self.api.perform(request: request)
         return try parseRetrieveUserResponseWithEditContext(response: response)
     }
 
-    public func create(using params: UserCreateParams) async throws -> T.Edit {
+    public func create(using params: UserCreateParams) async throws -> T.EditContext {
         let request = self.api.helper.createUserRequest(params: params)
         let response = try await self.api.perform(request: request)
         return try parseRetrieveUserResponseWithEditContext(response: response)
@@ -100,7 +100,7 @@ extension AnyNamespace where T == SparseUser {
         return
     }
 
-    public func updateCurrent(with params: UserUpdateParams) async throws -> T.Edit {
+    public func updateCurrent(with params: UserUpdateParams) async throws -> T.EditContext {
         let request = self.api.helper.updateCurrentUserRequest(params: params)
         let response = try await self.api.perform(request: request)
         return try parseRetrieveUserResponseWithEditContext(response: response)

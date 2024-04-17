@@ -3,9 +3,9 @@ import wordpress_api_wrapper
 
 extension SparsePost: Contextual {
     public typealias ID = PostId
-    public typealias View = PostWithViewContext
-    public typealias Edit = PostWithEditContext
-    public typealias Embed = PostWithEmbedContext
+    public typealias ViewContext = PostWithViewContext
+    public typealias EditContext = PostWithEditContext
+    public typealias EmbedContext = PostWithEmbedContext
 
     public static func makeGetOneRequest(id: PostId, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
         helper.retrievePostRequest(postId: id, context: context)
