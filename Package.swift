@@ -5,7 +5,7 @@
 import Foundation
 import PackageDescription
 
-let isCI = ProcessInfo.processInfo.environment["BUILDKITE"] == "true"
+let isCI = ProcessInfo.processInfo.environment["CI"] == "true"
 
 #if os(Linux)
 let libwordpressFFI: Target = .systemLibrary(
