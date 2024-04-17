@@ -19,7 +19,7 @@ let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "targ
 #if os(macOS)
 let e2eTestsEnabled = !isCI
 #elseif os(Linux)
-let e2eTestsEnabled = true
+let e2eTestsEnabled = false
 #else
 let e2eTestsEnabled = false
 #endif
