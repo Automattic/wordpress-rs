@@ -10,10 +10,6 @@ public typealias WpApiError = wordpress_api_wrapper.WpApiError
 // MARK: - Users
 
 public typealias SparseUser = wordpress_api_wrapper.SparseUser
-
-public extension SparseUser {
-    typealias ID = UserId
-    typealias View = UserWithViewContext
-    typealias Edit = UserWithEditContext
-    typealias Embed = UserWithEmbedContext
-}
+public typealias UserWithViewContext = wordpress_api_wrapper.UserWithViewContext
+public typealias UserWithEditContext = wordpress_api_wrapper.UserWithEditContext
+public typealias UserWithEmbedContext = wordpress_api_wrapper.UserWithEmbedContext

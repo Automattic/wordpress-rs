@@ -1,7 +1,44 @@
 import Foundation
 import wordpress_api_wrapper
 
-extension SparseUser: Contextual {}
+extension SparseUser: Contextual {
+    public typealias ID = UserId
+    public typealias View = UserWithViewContext
+    public typealias Edit = UserWithEditContext
+    public typealias Embed = UserWithEmbedContext
+
+    public static func makeGetOneRequest(id: UserId, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
+        helper.retrieveUserRequest(userId: id, context: context)
+    }
+
+    public static func makeGetListRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
+        helper.listUsersRequest(context: context, params: nil)
+    }
+
+    public static func parseResponse(_ response: WpNetworkResponse) throws -> UserWithViewContext {
+        try parseRetrieveUserResponseWithViewContext(response: response)
+    }
+
+    public static func parseResponse(_ response: WpNetworkResponse) throws -> UserWithEditContext {
+        try parseRetrieveUserResponseWithEditContext(response: response)
+    }
+
+    public static func parseResponse(_ response: WpNetworkResponse) throws -> UserWithEmbedContext {
+        try parseRetrieveUserResponseWithEmbedContext(response: response)
+    }
+
+    public static func parseResponse(_ response: WpNetworkResponse) throws -> [UserWithViewContext] {
+        try parseListUsersResponseWithViewContext(response: response)
+    }
+
+    public static func parseResponse(_ response: WpNetworkResponse) throws -> [UserWithEditContext] {
+        try parseListUsersResponseWithEditContext(response: response)
+    }
+
+    public static func parseResponse(_ response: WpNetworkResponse) throws -> [UserWithEmbedContext] {
+        try parseListUsersResponseWithEmbedContext(response: response)
+    }
+}
 
 extension WordPressAPI {
     public var users: AnyNamespace<SparseUser> {
@@ -10,69 +47,27 @@ extension WordPressAPI {
 }
 
 extension ViewNamespace where T == SparseUser {
-
-    public func get(id: T.ID) async throws -> T.View {
-        let request = self.api.helper.retrieveUserRequest(userId: id, context: .view)
-        let response = try await api.perform(request: request)
-        return try parseRetrieveUserResponseWithViewContext(response: response)
-    }
-
     public func getCurrent() async throws -> T.View {
         let request = self.api.helper.retrieveCurrentUserRequest(context: .view)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithViewContext(response: response)
     }
-
-    public func list() async throws -> [T.View] {
-        let request = self.api.helper.listUsersRequest(context: .view, params: nil)
-        let response = try await api.perform(request: request)
-        return try parseListUsersResponseWithViewContext(response: response)
-    }
-
 }
 
 extension EditNamespace where T == SparseUser {
-
-    public func get(id: T.ID) async throws -> T.Edit {
-        let request = self.api.helper.retrieveUserRequest(userId: id, context: .edit)
-        let response = try await api.perform(request: request)
-        return try parseRetrieveUserResponseWithEditContext(response: response)
-    }
-
     public func getCurrent() async throws -> T.Edit {
         let request = self.api.helper.retrieveCurrentUserRequest(context: .edit)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithEditContext(response: response)
     }
-
-    public func list() async throws -> [T.Edit] {
-        let request = self.api.helper.listUsersRequest(context: .edit, params: nil)
-        let response = try await api.perform(request: request)
-        return try parseListUsersResponseWithEditContext(response: response)
-    }
-
 }
 
 extension EmbedNamespace where T == SparseUser {
-
-    public func get(id: T.ID) async throws -> T.Embed {
-        let request = self.api.helper.retrieveUserRequest(userId: id, context: .embed)
-        let response = try await api.perform(request: request)
-        return try parseRetrieveUserResponseWithEmbedContext(response: response)
-    }
-
     public func getCurrent() async throws -> T.Embed {
         let request = self.api.helper.retrieveCurrentUserRequest(context: .embed)
         let response = try await api.perform(request: request)
         return try parseRetrieveUserResponseWithEmbedContext(response: response)
     }
-
-    public func list() async throws -> [T.Embed] {
-        let request = self.api.helper.listUsersRequest(context: .embed, params: nil)
-        let response = try await api.perform(request: request)
-        return try parseListUsersResponseWithEmbedContext(response: response)
-    }
-
 }
 
 // MARK: - Edit context

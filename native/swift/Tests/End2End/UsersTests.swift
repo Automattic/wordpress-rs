@@ -6,12 +6,12 @@ import wordpress_api
 class UsersTests: XCTestCase {
 
     func testGetCurrentUser() async throws {
-        let user = try await site.api.users.view.getCurrent()
+        let user = try await site.api.users.forViewing.getCurrent()
         XCTAssertEqual(user.id, site.currentUserID)
     }
 
     func testGetUser() async throws {
-        let user = try await site.api.users.view.get(id: 2)
+        let user = try await site.api.users.forViewing.get(id: 2)
         XCTAssertEqual(user.name, "Theme Buster")
     }
 
@@ -24,13 +24,13 @@ class UsersTests: XCTestCase {
             urlSession: .shared, baseUrl: site.siteURL,
             authenticationStategy: .init(username: newUser.username, password: password))
 
-        let user = try await newUserSession.users.view.getCurrent()
+        let user = try await newUserSession.users.forViewing.getCurrent()
         XCTAssertEqual(user.id, newUser.id)
         try await newUserSession.users.deleteCurrent(reassignTo: site.currentUserID)
 
         do {
             // Should return 404
-            _ = try await site.api.users.view.get(id: newUser.id)
+            _ = try await site.api.users.forViewing.get(id: newUser.id)
             XCTFail("Unexpected successful result. The user \(newUser.id) should have been deleted.")
         } catch {
             // Do nothing
@@ -43,7 +43,7 @@ class UsersTests: XCTestCase {
     }
 
     func testUpdateCurrentUser() async throws {
-        let currentUser = try await site.api.users.view.getCurrent()
+        let currentUser = try await site.api.users.forViewing.getCurrent()
         let newDescription = currentUser.description + " and more"
         let updated = try await site.api.users.updateCurrent(
             with: .init(
@@ -76,7 +76,7 @@ class UsersTests: XCTestCase {
     }
 
     func testListUsers() async throws {
-        let users = try await site.api.users.view.list()
+        let users = try await site.api.users.forViewing.list()
         XCTAssertTrue(users.count > 0)
     }
 }
@@ -163,9 +163,9 @@ class UserContextTests: XCTestCase {
 
     func testGetCurrent() async throws {
         let users = try await site.api.users
-        let view = try await users.view.getCurrent()
-        let edit = try await users.edit.getCurrent()
-        let embed = try await users.embed.getCurrent()
+        let view = try await users.forViewing.getCurrent()
+        let edit = try await users.forEditing.getCurrent()
+        let embed = try await users.forEmbedding.getCurrent()
 
         XCTAssertEqual(view.id, edit.id)
         XCTAssertEqual(edit.id, embed.id)
@@ -183,9 +183,9 @@ class UserContextTests: XCTestCase {
         }
 
         let users = try await site.api.users
-        let view = try await users.view.get(id: newUser.id)
-        let edit = try await users.edit.get(id: newUser.id)
-        let embed = try await users.embed.get(id: newUser.id)
+        let view = try await users.forViewing.get(id: newUser.id)
+        let edit = try await users.forEditing.get(id: newUser.id)
+        let embed = try await users.forEmbedding.get(id: newUser.id)
 
         XCTAssertEqual(view.id, edit.id)
         XCTAssertEqual(edit.id, embed.id)
@@ -197,7 +197,7 @@ class UserContextTests: XCTestCase {
     }
 
     func testEditContext() async throws {
-        let edit = try await site.api.users.edit.getCurrent()
+        let edit = try await site.api.users.forEditing.getCurrent()
         XCTAssertEqual(edit.roles, ["administrator"])
         XCTAssertNotNil(edit.locale)
         XCTAssertTrue(edit.capabilities.count > 0)
@@ -205,9 +205,9 @@ class UserContextTests: XCTestCase {
 
     func testList() async throws {
         let users = try await site.api.users
-        let view = try await users.view.list().first
-        let edit = try await users.edit.list().first
-        let embed = try await users.embed.list().first
+        let view = try await users.forViewing.list().first
+        let edit = try await users.forEditing.list().first
+        let embed = try await users.forEmbedding.list().first
 
         XCTAssertNotNil(view)
         XCTAssertNotNil(edit)
