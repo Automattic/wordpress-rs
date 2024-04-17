@@ -230,6 +230,12 @@ test-server: stop-server
 stop-server:
 	docker-compose down
 
+dump-mysql:
+	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysqldump --defaults-extra-file=mysql_config/config.cnf --no-tablespaces wordpress > dump.sql"
+
+restore-mysql:
+	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
+
 lint: lint-rust lint-swift
 
 lint-rust:

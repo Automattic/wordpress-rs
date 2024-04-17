@@ -1,9 +1,7 @@
 use base64::prelude::*;
-use std::fs::read_to_string;
-use wp_api::{
-    UserCreateParamsBuilder, UserId, UserUpdateParamsBuilder, UserWithEditContext,
-    WPAuthentication, WPContext,
-};
+use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
+use std::{fs::read_to_string, process::Command};
+use wp_api::{UserCreateParamsBuilder, UserId, UserUpdateParamsBuilder, WPAuthentication};
 
 use wp_networking::AsyncWPNetworking;
 
@@ -20,17 +18,26 @@ fn wp_networking() -> AsyncWPNetworking {
     AsyncWPNetworking::new(site_url.into(), authentication)
 }
 
-async fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
-    let user_list_request = wp_networking()
-        .api_helper
-        .list_users_request(WPContext::Edit, &None);
-    wp_api::parse_list_users_response_with_edit_context(
-        &wp_networking()
-            .async_request(user_list_request)
-            .await
-            .unwrap(),
-    )
-    .unwrap()
+// async fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
+//     let user_list_request = wp_networking()
+//         .api_helper
+//         .list_users_request(WPContext::Edit, &None);
+//     wp_api::parse_list_users_response_with_edit_context(
+//         &wp_networking()
+//             .async_request(user_list_request)
+//             .await
+//             .unwrap(),
+//     )
+//     .unwrap()
+// }
+
+fn restore_db() {
+    Command::new("make")
+        .arg("-C")
+        .arg("../")
+        .arg("restore-mysql")
+        .status()
+        .expect("Failed to restore db");
 }
 
 // #[tokio::test]
@@ -59,10 +66,15 @@ async fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
 
 #[tokio::test]
 async fn create_test_user() {
+    restore_db();
+
+    let username = "t_username";
+    let email = "t_email@foo.com";
+
     // Create a user using the API
     let user_create_params = UserCreateParamsBuilder::default()
-        .username("t_username".to_string())
-        .email("t_email@foo.com".to_string())
+        .username(username.to_string())
+        .email(email.to_string())
         .password("t_password".to_string())
         .build()
         .unwrap();
@@ -71,17 +83,19 @@ async fn create_test_user() {
         .create_user_request(&user_create_params);
     let user_create_response = wp_networking().async_request(user_create_request).await;
     assert!(user_create_response.is_ok());
-
-    // Assert that the user is in DB
     let created_user =
         wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response.unwrap())
             .unwrap();
-    let created_user_from_db = fetch_db_user(created_user.id.0 as u64).await;
-    assert!(created_user_from_db.is_ok());
+
+    // Assert that the user is in DB
+    let created_user_from_db = fetch_db_user(created_user.id.0 as u64).await.unwrap();
+    assert_eq!(created_user_from_db.username, username);
+    assert_eq!(created_user_from_db.email, email);
 }
 
 #[tokio::test]
 async fn test_update_user() {
+    restore_db();
     let new_slug = "new_slug";
 
     // Find the id of the first user from DB
@@ -105,8 +119,7 @@ async fn test_update_user() {
     assert_eq!(first_user_after_update.slug, new_slug);
 }
 
-use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
-
+#[allow(dead_code)]
 #[derive(Debug, sqlx::FromRow)]
 pub struct DbUser {
     #[sqlx(rename = "ID")]

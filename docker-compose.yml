@@ -55,6 +55,8 @@ services:
             MYSQL_USER: 'wordpress'
             MYSQL_PASSWORD: 'wordpress'
             MYSQL_RANDOM_ROOT_PASSWORD: true
+        volumes:
+            - ./mysql_config:/mysql_config
         healthcheck:
             test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
             interval: 4s
