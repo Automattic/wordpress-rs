@@ -8,7 +8,7 @@ extension WordPressAPI {
     /// Fetch a list of posts
     ///
     /// If you're only interested in fetching a specific page, this is a good method for that – if you
-    /// want to sync all records,  consider using the overload of this method that returns `PostObjectSequence`.
+    /// want to sync all records,  consider using the overload of this method that returns `SparsePostSequence`.
     public func listPosts(params: PostListParams = PostListParams()) async throws -> PostListResponse {
         let request = self.helper.postListRequest(params: params)
         let response = try await perform(request: request)
@@ -17,8 +17,8 @@ extension WordPressAPI {
 
     /// A good way to fetch every post (you can still specify a specific offset using `params`)
     ///
-    public func listPosts(params: PostListParams = PostListParams()) -> PostObjectSequence {
-        PostObjectSequence(api: self, initialParams: params)
+    public func listPosts(params: PostListParams = PostListParams()) -> SparsePostSequence {
+        SparsePostSequence(api: self, initialParams: params)
     }
 
     package func listPosts(url: String) async throws -> PostListResponse {

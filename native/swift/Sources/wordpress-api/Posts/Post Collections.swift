@@ -1,22 +1,14 @@
 import Foundation
 import wordpress_api_wrapper
 
-extension PostObject: Identifiable {
-    // swiftlint:disable identifier_name
-    var ID: any Hashable {
-        self.id
-    }
-    // swiftlint:enable identifier_name
-}
+public typealias PostCollection = [SparsePost]
 
-public typealias PostCollection = [PostObject]
-
-public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
-    public typealias Element = PostObject
+public struct SparsePostSequence: AsyncSequence, AsyncIteratorProtocol {
+    public typealias Element = SparsePost
 
     private let api: WordPressAPI
 
-    private var posts: [PostObject] = []
+    private var posts: [SparsePost] = []
     private var nextPage: WpNetworkRequest?
 
     enum Errors: Error {
@@ -28,7 +20,7 @@ public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
         self.nextPage = api.helper.postListRequest(params: initialParams)
     }
 
-    mutating public func next() async throws -> PostObject? {
+    mutating public func next() async throws -> SparsePost? {
         if posts.isEmpty {
             guard let nextPage = self.nextPage else {
                 return nil
@@ -57,7 +49,7 @@ public struct PostObjectSequence: AsyncSequence, AsyncIteratorProtocol {
         }
     }
 
-    public func makeAsyncIterator() -> PostObjectSequence {
+    public func makeAsyncIterator() -> SparsePostSequence {
         self
     }
 }
