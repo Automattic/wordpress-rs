@@ -333,6 +333,7 @@ pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result
     if status.is_server_error() {
         return Err(WPApiError::ServerError {
             status_code: response.status_code,
+            response: String::from_utf8_lossy(&response.body).to_string(),
         });
     }
     Ok(())

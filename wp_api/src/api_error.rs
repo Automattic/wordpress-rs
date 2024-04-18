@@ -11,8 +11,12 @@ pub enum WPApiError {
         error_type: ClientErrorType,
         status_code: u16,
     },
-    #[error("Server error with status_code '{}'", status_code)]
-    ServerError { status_code: u16 },
+    #[error(
+        "Server error with status_code \nStatus Code: {}\nResponse: {}",
+        status_code,
+        response
+    )]
+    ServerError { status_code: u16, response: String },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ParsingError { reason: String, response: String },
     #[error("Error that's not yet handled by the library")]
