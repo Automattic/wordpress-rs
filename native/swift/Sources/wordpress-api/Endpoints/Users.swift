@@ -7,12 +7,20 @@ extension SparseUser: Contextual {
     public typealias EditContext = UserWithEditContext
     public typealias EmbedContext = UserWithEmbedContext
 
-    public static func makeGetOneRequest(id: UserId, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
+    public static func retrieveRequest(id: UserId, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
         helper.retrieveUserRequest(userId: id, context: context)
     }
 
-    public static func makeGetListRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
+    public static func listRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
         helper.listUsersRequest(context: context, params: nil)
+    }
+
+    public static func updateRequest(id: PostId, params: UserUpdateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
+        helper.updateUserRequest(userId: id, params: params)
+    }
+
+    public static func createRequest(params: UserCreateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
+        helper.createUserRequest(params: params)
     }
 
     public static func parseResponse(_ response: WpNetworkResponse) throws -> UserWithViewContext {
@@ -63,18 +71,6 @@ extension AnyNamespace where T == SparseUser {
         let response = try await api.perform(request: request)
         // TODO: Missing parse response
         return
-    }
-
-    public func update(id: T.ID, with params: UserUpdateParams) async throws -> T.EditContext {
-        let request = self.api.helper.updateUserRequest(userId: id, params: params)
-        let response = try await self.api.perform(request: request)
-        return try parseRetrieveUserResponseWithEditContext(response: response)
-    }
-
-    public func create(using params: UserCreateParams) async throws -> T.EditContext {
-        let request = self.api.helper.createUserRequest(params: params)
-        let response = try await self.api.perform(request: request)
-        return try parseRetrieveUserResponseWithEditContext(response: response)
     }
 
     public func deleteCurrent(reassignTo userID: T.ID) async throws {

@@ -17,8 +17,14 @@ public protocol Contextual {
     associatedtype EditContext
     associatedtype EmbedContext
 
-    static func makeGetOneRequest(id: ID, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
-    static func makeGetListRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
+    associatedtype UpdateParams
+    associatedtype CreateParams
+
+    static func retrieveRequest(id: ID, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
+    static func listRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
+    static func updateRequest(id: ID, params: UpdateParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest
+    static func createRequest(params: CreateParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest
+
     static func parseResponse(_ response: WpNetworkResponse) throws -> ViewContext
     static func parseResponse(_ response: WpNetworkResponse) throws -> EditContext
     static func parseResponse(_ response: WpNetworkResponse) throws -> EmbedContext
@@ -95,14 +101,28 @@ public struct EmbedNamespace<T: Contextual>: ContextualNamespace {
 
 extension ContextualNamespace {
     public func get(id: T.ID) async throws -> R {
-        let request = T.makeGetOneRequest(id: id, using: api.helper, context: context)
+        let request = T.retrieveRequest(id: id, using: api.helper, context: context)
         let response = try await api.perform(request: request)
         return try parseResponse(response)
     }
 
     public func list() async throws -> [R] {
-        let request = T.makeGetListRequest(using: api.helper, context: context)
+        let request = T.listRequest(using: api.helper, context: context)
         let response = try await api.perform(request: request)
         return try parseResponse(response)
+    }
+}
+
+extension AnyNamespace where T: Contextual {
+    public func update(id: T.ID, with params: T.UpdateParams) async throws -> T.EditContext {
+        let request = T.updateRequest(id: id, params: params, using: api.helper)
+        let response = try await self.api.perform(request: request)
+        return try T.parseResponse(response)
+    }
+
+    public func create(using params: T.CreateParams) async throws -> T.EditContext {
+        let request = T.createRequest(params: params, using: api.helper)
+        let response = try await self.api.perform(request: request)
+        return try T.parseResponse(response)
     }
 }
