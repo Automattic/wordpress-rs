@@ -46,27 +46,11 @@ extension WordPressAPI {
     }
 }
 
-extension ViewNamespace where T == SparseUser {
-    public func getCurrent() async throws -> T.ViewContext {
-        let request = self.api.helper.retrieveCurrentUserRequest(context: .view)
+extension ContextualNamespace where T == SparseUser {
+    public func getCurrent() async throws -> R {
+        let request = self.api.helper.retrieveCurrentUserRequest(context: context)
         let response = try await api.perform(request: request)
-        return try parseRetrieveUserResponseWithViewContext(response: response)
-    }
-}
-
-extension EditNamespace where T == SparseUser {
-    public func getCurrent() async throws -> T.EditContext {
-        let request = self.api.helper.retrieveCurrentUserRequest(context: .edit)
-        let response = try await api.perform(request: request)
-        return try parseRetrieveUserResponseWithEditContext(response: response)
-    }
-}
-
-extension EmbedNamespace where T == SparseUser {
-    public func getCurrent() async throws -> T.EmbedContext {
-        let request = self.api.helper.retrieveCurrentUserRequest(context: .embed)
-        let response = try await api.perform(request: request)
-        return try parseRetrieveUserResponseWithEmbedContext(response: response)
+        return try parseResponse(response)
     }
 }
 

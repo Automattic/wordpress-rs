@@ -36,25 +36,18 @@ extension AnyNamespace where T: Contextual {
 public protocol ContextualNamespace: Namespace where T: Contextual {
     associatedtype R
 
-    func makeGetOneRequest(id: T.ID, using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest
-    func makeGetListRequest(using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest
+    var context: WpContext { get }
+
     func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> R
     func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> [R]
 }
 
 public struct ViewNamespace<T: Contextual>: ContextualNamespace {
+    public let context: WpContext = .view
     let parent: AnyNamespace<T>
 
     public var api: WordPressAPI {
         parent.api
-    }
-
-    public func makeGetOneRequest(id: T.ID, using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest {
-        T.makeGetOneRequest(id: id, using: helper, context: .view)
-    }
-
-    public func makeGetListRequest(using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest {
-        T.makeGetListRequest(using: helper, context: .view)
     }
 
     public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.ViewContext {
@@ -67,17 +60,11 @@ public struct ViewNamespace<T: Contextual>: ContextualNamespace {
 }
 
 public struct EditNamespace<T: Contextual>: ContextualNamespace {
+    public let context: WpContext = .edit
     let parent: AnyNamespace<T>
 
     public var api: WordPressAPI {
         parent.api
-    }
-    public func makeGetOneRequest(id: T.ID, using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest {
-        T.makeGetOneRequest(id: id, using: helper, context: .edit)
-    }
-
-    public func makeGetListRequest(using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest {
-        T.makeGetListRequest(using: helper, context: .edit)
     }
 
     public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.EditContext {
@@ -90,17 +77,11 @@ public struct EditNamespace<T: Contextual>: ContextualNamespace {
 }
 
 public struct EmbedNamespace<T: Contextual>: ContextualNamespace {
+    public let context: WpContext = .embed
     let parent: AnyNamespace<T>
 
     public var api: WordPressAPI {
         parent.api
-    }
-    public func makeGetOneRequest(id: T.ID, using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest {
-        T.makeGetOneRequest(id: id, using: helper, context: .embed)
-    }
-
-    public func makeGetListRequest(using helper: any wordpress_api_wrapper.WpApiHelperProtocol) -> wordpress_api_wrapper.WpNetworkRequest {
-        T.makeGetListRequest(using: helper, context: .embed)
     }
 
     public func parseResponse(_ response: wordpress_api_wrapper.WpNetworkResponse) throws -> T.EmbedContext {
@@ -114,13 +95,13 @@ public struct EmbedNamespace<T: Contextual>: ContextualNamespace {
 
 extension ContextualNamespace {
     public func get(id: T.ID) async throws -> R {
-        let request = makeGetOneRequest(id: id, using: api.helper)
+        let request = T.makeGetOneRequest(id: id, using: api.helper, context: context)
         let response = try await api.perform(request: request)
         return try parseResponse(response)
     }
 
     public func list() async throws -> [R] {
-        let request = makeGetListRequest(using: api.helper)
+        let request = T.makeGetListRequest(using: api.helper, context: context)
         let response = try await api.perform(request: request)
         return try parseResponse(response)
     }
