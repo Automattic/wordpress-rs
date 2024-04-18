@@ -1,9 +1,10 @@
 use base64::prelude::*;
-use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
-use std::{fs::read_to_string, process::Command};
+use std::fs::read_to_string;
 use wp_api::{UserCreateParamsBuilder, UserId, UserUpdateParamsBuilder, WPAuthentication};
 
 use wp_networking::AsyncWPNetworking;
+
+mod wp_db;
 
 fn wp_networking() -> AsyncWPNetworking {
     let file_contents = read_to_string("../test_credentials").unwrap();
@@ -31,15 +32,6 @@ fn wp_networking() -> AsyncWPNetworking {
 //     .unwrap()
 // }
 
-fn restore_db() {
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("restore-mysql")
-        .status()
-        .expect("Failed to restore db");
-}
-
 // #[tokio::test]
 // async fn test_list_users() {
 //     let users_from_db = fetch_db_users().await.unwrap();
@@ -66,101 +58,62 @@ fn restore_db() {
 
 #[tokio::test]
 async fn create_test_user() {
-    restore_db();
+    wp_db::run_and_restore(|mut db| async move {
+        let username = "t_username";
+        let email = "t_email@foo.com";
 
-    let username = "t_username";
-    let email = "t_email@foo.com";
-
-    // Create a user using the API
-    let user_create_params = UserCreateParamsBuilder::default()
-        .username(username.to_string())
-        .email(email.to_string())
-        .password("t_password".to_string())
-        .build()
-        .unwrap();
-    let user_create_request = wp_networking()
-        .api_helper
-        .create_user_request(&user_create_params);
-    let user_create_response = wp_networking().async_request(user_create_request).await;
-    assert!(user_create_response.is_ok());
-    let created_user =
-        wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response.unwrap())
+        // Create a user using the API
+        let user_create_params = UserCreateParamsBuilder::default()
+            .username(username.to_string())
+            .email(email.to_string())
+            .password("t_password".to_string())
+            .build()
             .unwrap();
+        let user_create_request = wp_networking()
+            .api_helper
+            .create_user_request(&user_create_params);
+        let user_create_response = wp_networking().async_request(user_create_request).await;
+        assert!(user_create_response.is_ok());
+        let created_user =
+            wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response.unwrap())
+                .unwrap();
 
-    // Assert that the user is in DB
-    let created_user_from_db = fetch_db_user(created_user.id.0 as u64).await.unwrap();
-    assert_eq!(created_user_from_db.username, username);
-    assert_eq!(created_user_from_db.email, email);
+        // Assert that the user is in DB
+        let created_user_from_db = db.fetch_db_user(created_user.id.0 as u64).await.unwrap();
+        assert_eq!(created_user_from_db.username, username);
+        assert_eq!(created_user_from_db.email, email);
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn test_update_user() {
-    restore_db();
-    let new_slug = "new_slug";
+    wp_db::run_and_restore(|mut db| async move {
+        let new_slug = "new_slug";
 
-    // Find the id of the first user from DB
-    let users_from_db = fetch_db_users().await.unwrap();
-    let first_user = users_from_db.first().unwrap();
-    let first_user_id = UserId(first_user.id as i32);
+        // Find the id of the first user from DB
+        let users_from_db = db.fetch_db_users().await.unwrap();
+        let first_user = users_from_db.first().unwrap();
+        let first_user_id = UserId(first_user.id as i32);
 
-    // Update the user's slug using the API and ensure it's successful
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .slug(Some(new_slug.to_string()))
-        .build()
-        .unwrap();
-    let user_update_request = wp_networking()
-        .api_helper
-        .update_user_request(first_user_id, &user_update_params);
-    let user_update_response = wp_networking().async_request(user_update_request).await;
-    assert!(user_update_response.is_ok());
+        // Update the user's slug using the API and ensure it's successful
+        let user_update_params = UserUpdateParamsBuilder::default()
+            .slug(Some(new_slug.to_string()))
+            .build()
+            .unwrap();
+        let user_update_request = wp_networking()
+            .api_helper
+            .update_user_request(first_user_id, &user_update_params);
+        let user_update_response = wp_networking().async_request(user_update_request).await;
+        assert!(user_update_response.is_ok());
 
-    // Assert that the DB record of the user is updated with the new slug
-    let first_user_after_update = fetch_db_user(first_user.id).await.unwrap();
-    assert_eq!(first_user_after_update.slug, new_slug);
+        // Assert that the DB record of the user is updated with the new slug
+        let first_user_after_update = db.fetch_db_user(first_user.id).await.unwrap();
+        assert_eq!(first_user_after_update.slug, new_slug);
+    })
+    .await;
 }
 
-#[allow(dead_code)]
-#[derive(Debug, sqlx::FromRow)]
-pub struct DbUser {
-    #[sqlx(rename = "ID")]
-    id: u64,
-    #[sqlx(rename = "user_login")]
-    username: String,
-    #[sqlx(rename = "user_nicename")]
-    slug: String,
-    #[sqlx(rename = "user_email")]
-    email: String,
-    #[sqlx(rename = "user_url")]
-    url: String,
-    #[sqlx(rename = "user_registered")]
-    registered_date: chrono::DateTime<chrono::Utc>,
-    #[sqlx(rename = "display_name")]
-    name: String,
-}
-
-async fn fetch_db_users() -> Result<Vec<DbUser>, sqlx::Error> {
-    let mut conn = db().await?;
-    sqlx::query_as("SELECT * FROM wp_users")
-        .fetch_all(&mut conn)
-        .await
-}
-
-async fn fetch_db_user(user_id: u64) -> Result<DbUser, sqlx::Error> {
-    let mut conn = db().await?;
-    sqlx::query_as("SELECT * FROM wp_users WHERE ID = ?")
-        .bind(user_id)
-        .fetch_one(&mut conn)
-        .await
-}
-
-async fn db() -> Result<MySqlConnection, sqlx::Error> {
-    let options = MySqlConnectOptions::new()
-        .host("localhost")
-        .username("wordpress")
-        .password("wordpress")
-        .database("wordpress");
-    MySqlConnectOptions::connect(&options).await
-}
 //
 // #[test]
 // fn test_retrieve_user() {
