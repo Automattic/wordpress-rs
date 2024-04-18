@@ -1,63 +1,67 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
-use wp_api::{UserCreateParamsBuilder, UserId, UserUpdateParamsBuilder, WPAuthentication};
+use wp_api::{
+    UserCreateParamsBuilder, UserId, UserListParams, UserUpdateParamsBuilder, WPApiError,
+    WPAuthentication, WPContext, WPNetworkResponse,
+};
 
 use wp_networking::AsyncWPNetworking;
 
 mod wp_db;
 
-fn wp_networking() -> AsyncWPNetworking {
-    let file_contents = read_to_string("../test_credentials").unwrap();
-    let lines: Vec<&str> = file_contents.lines().collect();
-    let site_url = lines[0];
-    let auth_base64_token = BASE64_STANDARD.encode(format!("{}:{}", lines[1], lines[2]));
-
-    let authentication = WPAuthentication::AuthorizationHeader {
-        token: auth_base64_token,
-    };
-
-    AsyncWPNetworking::new(site_url.into(), authentication)
+#[tokio::test]
+async fn test_list_users_with_edit_context() {
+    test_list_users_helper(WPContext::Edit, None, |r| {
+        wp_api::parse_list_users_response_with_edit_context(&r)
+    })
+    .await
+    .unwrap();
 }
 
-// async fn list_users_with_edit_context() -> Vec<UserWithEditContext> {
-//     let user_list_request = wp_networking()
-//         .api_helper
-//         .list_users_request(WPContext::Edit, &None);
-//     wp_api::parse_list_users_response_with_edit_context(
-//         &wp_networking()
-//             .async_request(user_list_request)
-//             .await
-//             .unwrap(),
-//     )
-//     .unwrap()
-// }
-
-// #[tokio::test]
-// async fn test_list_users() {
-//     let users_from_db = fetch_db_users().await.unwrap();
-//     let users_from_api = list_users_with_edit_context().await;
-//     users_from_db
-//         .iter()
-//         .zip(users_from_api.iter())
-//         .for_each(|(db_user, api_user)| {
-//             assert_eq!(wp_api::UserId(db_user.id as i32), api_user.id);
-//             assert_eq!(db_user.username, api_user.username);
-//             assert_eq!(db_user.slug, api_user.slug);
-//             assert_eq!(db_user.email, api_user.email);
-//             assert_eq!(db_user.url, api_user.url);
-//             assert_eq!(
-//                 db_user.registered_date,
-//                 api_user
-//                     .registered_date
-//                     .parse::<chrono::DateTime<chrono::Utc>>()
-//                     .unwrap()
-//             );
-//             assert_eq!(db_user.name, api_user.name);
-//         });
-// }
+#[tokio::test]
+async fn test_list_users_with_embed_context() {
+    test_list_users_helper(WPContext::Embed, None, |r| {
+        wp_api::parse_list_users_response_with_embed_context(&r)
+    })
+    .await
+    .unwrap();
+}
 
 #[tokio::test]
-async fn create_test_user() {
+async fn test_list_users_with_view_context() {
+    test_list_users_helper(WPContext::View, None, |r| {
+        wp_api::parse_list_users_response_with_view_context(&r)
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_list_users_with_edit_context_second_page() {
+    let params = UserListParams {
+        page: Some(2),
+        per_page: Some(2),
+        search: None,
+        exclude: None,
+        include: None,
+        offset: None,
+        order: None,
+        order_by: None,
+        slug: Vec::new(),
+        roles: Vec::new(),
+        capabilities: Vec::new(),
+        who: None,
+        has_published_posts: None,
+    };
+    test_list_users_helper(WPContext::Edit, Some(params), |r| {
+        wp_api::parse_list_users_response_with_edit_context(&r)
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn test_create_user() {
     wp_db::run_and_restore(|mut db| async move {
         let username = "t_username";
         let email = "t_email@foo.com";
@@ -143,3 +147,35 @@ async fn test_update_user() {
 // #[test]
 // fn test_update_user() {
 // }
+
+fn wp_networking() -> AsyncWPNetworking {
+    let file_contents = read_to_string("../test_credentials").unwrap();
+    let lines: Vec<&str> = file_contents.lines().collect();
+    let site_url = lines[0];
+    let auth_base64_token = BASE64_STANDARD.encode(format!("{}:{}", lines[1], lines[2]));
+
+    let authentication = WPAuthentication::AuthorizationHeader {
+        token: auth_base64_token,
+    };
+
+    AsyncWPNetworking::new(site_url.into(), authentication)
+}
+
+async fn test_list_users_helper<F, T>(
+    context: WPContext,
+    params: Option<UserListParams>,
+    parser: F,
+) -> Result<T, WPApiError>
+where
+    F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
+{
+    let user_list_request = wp_networking()
+        .api_helper
+        .list_users_request(context, &params);
+    parser(
+        wp_networking()
+            .async_request(user_list_request)
+            .await
+            .unwrap(),
+    )
+}
