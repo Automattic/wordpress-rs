@@ -6,14 +6,13 @@ import wordpress_api
 class PostsTests: XCTestCase {
     func testGetPost() async throws {
         let view = try await site.api.posts.forViewing.get(id: 1)
-        XCTAssertNil(view.content.raw)
+        XCTAssertEqual(view.title.rendered, "Hello world!")
 
         let edit = try await site.api.posts.forEditing.get(id: 1)
-        XCTAssertEqual(edit.content.raw?.contains("<!-- wp:paragraph -->"), true)
+        XCTAssertTrue(edit.content.raw.contains("<!-- wp:paragraph -->"))
 
         let embed = try await site.api.posts.forEmbedding.get(id: 1)
-        XCTAssertNil(view.content.raw)
-        XCTAssertEqual(embed.excerpt.rendered?.contains("<p>"), true)
+        XCTAssertTrue(embed.excerpt.rendered.contains("<p>"))
     }
 }
 

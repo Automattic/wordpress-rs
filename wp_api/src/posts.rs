@@ -127,6 +127,7 @@ pub struct SparsePost {
     #[WPContext(edit, view)]
     pub date_gmt: Option<String>,
     #[WPContext(edit, view)]
+    #[WPContextualField]
     pub guid: Option<SparsePostGuid>,
     #[WPContext(edit, view)]
     pub modified: Option<String>,
@@ -141,10 +142,13 @@ pub struct SparsePost {
     #[WPContext(edit, embed, view)]
     pub link: Option<String>,
     #[WPContext(edit, embed, view)]
+    #[WPContextualField]
     pub title: Option<SparsePostTitle>,
     #[WPContext(edit, view)]
+    #[WPContextualField]
     pub content: Option<SparsePostContent>,
     #[WPContext(edit, embed, view)]
+    #[WPContextualField]
     pub excerpt: Option<SparsePostExcerpt>,
     #[WPContext(edit, embed, view)]
     pub author: Option<u32>,
