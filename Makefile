@@ -218,7 +218,8 @@ test-rust-doc:
 test-rust-integration: test-server
 	docker network create wp_network
 	docker network connect wp_network wordpress
-	$(rust_docker_run_in_wp_network) cargo test --test '*' -- --nocapture
+	# Integration tests are ran sequentially as the DB needs to be reset for each run
+	$(rust_docker_run_in_wp_network) cargo test --test '*' -- --nocapture --test-threads 1
 	docker network disconnect wp_network wordpress
 	docker network rm --force wp_network
 
