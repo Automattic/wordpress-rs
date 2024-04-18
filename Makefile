@@ -185,7 +185,7 @@ test-swift:
 	$(MAKE) test-swift-$(uname)
 
 test-swift-linux: docker-image-swift
-	docker run $(docker_opts_shared) --network host -it wordpress-rs-swift make test-swift-linux-in-docker
+	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
 	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
