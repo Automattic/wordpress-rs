@@ -17,7 +17,6 @@ async fn immut_test_list_users_with_edit_context() {
         wp_api::parse_list_users_response_with_edit_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -26,7 +25,6 @@ async fn immut_test_list_users_with_embed_context() {
         wp_api::parse_list_users_response_with_embed_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -35,7 +33,6 @@ async fn immut_test_list_users_with_view_context() {
         wp_api::parse_list_users_response_with_view_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -59,7 +56,6 @@ async fn immut_test_list_users_with_edit_context_second_page() {
         wp_api::parse_list_users_response_with_edit_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -68,7 +64,6 @@ async fn immut_test_retrieve_user_with_edit_context() {
         wp_api::parse_retrieve_user_response_with_edit_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -77,7 +72,6 @@ async fn immut_test_retrieve_user_with_embed_context() {
         wp_api::parse_retrieve_user_response_with_embed_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -86,7 +80,6 @@ async fn immut_test_retrieve_user_with_view_context() {
         wp_api::parse_retrieve_user_response_with_view_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -95,7 +88,6 @@ async fn immut_test_retrieve_me_with_edit_context() {
         wp_api::parse_retrieve_user_response_with_edit_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -104,7 +96,6 @@ async fn immut_test_retrieve_me_with_embed_context() {
         wp_api::parse_retrieve_user_response_with_embed_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -113,7 +104,6 @@ async fn immut_test_retrieve_me_with_view_context() {
         wp_api::parse_retrieve_user_response_with_view_context(&r)
     })
     .await
-    .unwrap();
 }
 
 #[tokio::test]
@@ -182,40 +172,32 @@ fn wp_networking() -> AsyncWPNetworking {
     AsyncWPNetworking::new(site_url.into(), authentication)
 }
 
-async fn test_list_users_helper<F, T>(
-    context: WPContext,
-    params: Option<UserListParams>,
-    parser: F,
-) -> Result<T, WPApiError>
+async fn test_list_users_helper<F, T>(context: WPContext, params: Option<UserListParams>, parser: F)
 where
     F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
 {
     let request = wp_networking()
         .api_helper
         .list_users_request(context, &params);
-    parser(wp_networking().async_request(request).await.unwrap())
+    parser(wp_networking().async_request(request).await.unwrap()).unwrap();
 }
 
-async fn test_retrieve_user_helper<F, T>(
-    user_id: UserId,
-    context: WPContext,
-    parser: F,
-) -> Result<T, WPApiError>
+async fn test_retrieve_user_helper<F, T>(user_id: UserId, context: WPContext, parser: F)
 where
     F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
 {
     let request = wp_networking()
         .api_helper
         .retrieve_user_request(user_id, context);
-    parser(wp_networking().async_request(request).await.unwrap())
+    parser(wp_networking().async_request(request).await.unwrap()).unwrap();
 }
 
-async fn test_retrieve_me_helper<F, T>(context: WPContext, parser: F) -> Result<T, WPApiError>
+async fn test_retrieve_me_helper<F, T>(context: WPContext, parser: F)
 where
     F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
 {
     let request = wp_networking()
         .api_helper
         .retrieve_current_user_request(context);
-    parser(wp_networking().async_request(request).await.unwrap())
+    parser(wp_networking().async_request(request).await.unwrap()).unwrap();
 }
