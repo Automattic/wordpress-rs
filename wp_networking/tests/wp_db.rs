@@ -33,6 +33,7 @@ impl Drop for WordPressDb {
     }
 }
 
+#[allow(dead_code)]
 impl WordPressDb {
     pub async fn fetch_db_users(&mut self) -> Result<Vec<DbUser>, sqlx::Error> {
         sqlx::query_as("SELECT * FROM wp_users")
