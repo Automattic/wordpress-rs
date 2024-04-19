@@ -14,6 +14,17 @@ class PostsTests: XCTestCase {
         let embed = try await site.api.posts.forEmbedding.get(id: 1)
         XCTAssertTrue(embed.excerpt.rendered.contains("<p>"))
     }
+
+    func testDelete() async throws {
+        let newPost = try await site.api.posts.create(using: .init(title: "Test post", content: "This is a test post"))
+        try await site.api.posts.delete(id: newPost.id, params: .init(force: true))
+        do {
+            _ = try await site.api.posts.forViewing.get(id: newPost.id)
+            XCTFail("The post should have been deleted")
+        } catch {
+            // Do nothing
+        }
+    }
 }
 
 #endif

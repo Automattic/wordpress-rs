@@ -23,6 +23,10 @@ extension SparsePost: Contextual {
         helper.createPostRequest(params: params)
     }
 
+    public static func deleteRequest(id: ID, params: PostDeleteParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest {
+        helper.deletePostRequest(postId: id, params: params)
+    }
+
     public static func parseResponse(_ response: WpNetworkResponse) throws -> PostWithViewContext {
         try parseRetrievePostResponseWithViewContext(response: response)
     }

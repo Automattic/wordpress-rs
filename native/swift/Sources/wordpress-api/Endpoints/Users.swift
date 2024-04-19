@@ -23,6 +23,10 @@ extension SparseUser: Contextual {
         helper.createUserRequest(params: params)
     }
 
+    public static func deleteRequest(id: ID, params: UserDeleteParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest {
+        helper.deleteUserRequest(userId: id, params: params)
+    }
+
     public static func parseResponse(_ response: WpNetworkResponse) throws -> UserWithViewContext {
         try parseRetrieveUserResponseWithViewContext(response: response)
     }
@@ -67,10 +71,7 @@ extension ContextualNamespace where T == SparseUser {
 extension AnyNamespace where T == SparseUser {
 
     public func delete(id: T.ID, reassignTo userID: T.ID) async throws {
-        let request = self.api.helper.deleteUserRequest(userId: id, params: .init(reassign: userID))
-        let response = try await api.perform(request: request)
-        // TODO: Missing parse response
-        return
+        try await self.delete(id: id, params: .init(reassign: userID))
     }
 
     public func deleteCurrent(reassignTo userID: T.ID) async throws {
