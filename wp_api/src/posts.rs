@@ -108,9 +108,9 @@ pub struct PostDeleteResponse {
     pub post: Option<SparsePost>,
 }
 
-uniffi::custom_newtype!(PostId, i32);
+uniffi::custom_newtype!(PostId, u32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PostId(pub i32);
+pub struct PostId(pub u32);
 
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
