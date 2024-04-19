@@ -215,7 +215,7 @@ test-rust-lib:
 test-rust-doc:
 	$(rust_docker_run) cargo test --doc
 
-test-rust-integration: test-server
+test-rust-integration: test-server dump-mysql
 	docker network create wp_network
 	docker network connect wp_network wordpress
 	# Integration tests are ran sequentially as the DB needs to be reset for each run
