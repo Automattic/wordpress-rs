@@ -25,6 +25,14 @@ class PostsTests: XCTestCase {
             // Do nothing
         }
     }
+
+    func testUpdate() async throws {
+        let newPost = try await site.api.posts.create(using: .init(title: "Test post", content: "This is a test post"))
+        _ = try await site.api.posts.update(id: newPost.id, with: .init(title: "Updated", content: nil))
+
+        let updated = try await site.api.posts.forViewing.get(id: newPost.id)
+        XCTAssertEqual(updated.title.rendered, "Updated")
+    }
 }
 
 #endif
