@@ -1,15 +1,17 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
 use wp_api::{
-    UserCreateParamsBuilder, UserId, UserListParams, UserUpdateParamsBuilder, WPApiError,
-    WPAuthentication, WPContext, WPNetworkResponse,
+    UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams, UserUpdateParamsBuilder,
+    WPApiError, WPAuthentication, WPContext, WPNetworkResponse,
 };
 
 use wp_networking::AsyncWPNetworking;
 
 mod wp_db;
 
+// The first user is also the current user
 const FIRST_USER_ID: UserId = UserId(1);
+const SECOND_USER_ID: UserId = UserId(2);
 
 #[tokio::test]
 async fn immut_test_list_users_with_edit_context() {
@@ -155,6 +157,51 @@ async fn mut_test_update_user() {
         // Assert that the DB record of the user is updated with the new slug
         let first_user_after_update = db.fetch_db_user(FIRST_USER_ID.0 as u64).await.unwrap();
         assert_eq!(first_user_after_update.slug, new_slug);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn mut_test_delete_user() {
+    wp_db::run_and_restore(|mut db| async move {
+        // Delete the user using the API and ensure it's successful
+        let user_delete_params = UserDeleteParams {
+            reassign: FIRST_USER_ID,
+        };
+        let user_delete_request = wp_networking()
+            .api_helper
+            .delete_user_request(SECOND_USER_ID, &user_delete_params);
+        let user_delete_response = wp_networking().async_request(user_delete_request).await;
+        assert!(user_delete_response.is_ok());
+
+        // Assert that the DB doesn't have a record of the user anymore
+        assert!(matches!(
+            db.fetch_db_user(SECOND_USER_ID.0 as u64).await.unwrap_err(),
+            sqlx::Error::RowNotFound
+        ));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn mut_test_delete_current_user() {
+    wp_db::run_and_restore(|mut db| async move {
+        // Delete the user using the API and ensure it's successful
+        let user_delete_params = UserDeleteParams {
+            reassign: SECOND_USER_ID,
+        };
+        let user_delete_request = wp_networking()
+            .api_helper
+            .delete_current_user_request(&user_delete_params);
+        let user_delete_response = wp_networking().async_request(user_delete_request).await;
+        assert!(user_delete_response.is_ok());
+
+        // Assert that the DB doesn't have a record of the user anymore
+        assert!(matches!(
+            // The first user is also the current user
+            db.fetch_db_user(FIRST_USER_ID.0 as u64).await.unwrap_err(),
+            sqlx::Error::RowNotFound
+        ));
     })
     .await;
 }
