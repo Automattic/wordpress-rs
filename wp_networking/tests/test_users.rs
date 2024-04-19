@@ -113,12 +113,13 @@ async fn mut_test_create_user() {
     wp_db::run_and_restore(|mut db| async move {
         let username = "t_username";
         let email = "t_email@foo.com";
+        let password = "t_password";
 
         // Create a user using the API
         let user_create_params = UserCreateParamsBuilder::default()
             .username(username.to_string())
             .email(email.to_string())
-            .password("t_password".to_string())
+            .password(password.to_string())
             .build()
             .unwrap();
         let user_create_request = wp_networking()
