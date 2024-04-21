@@ -18,5 +18,8 @@ thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_derive = { path = "../wp_derive" }
 
+[dev-dependencies]
+rstest = "0.19"
+
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

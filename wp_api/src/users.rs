@@ -2,12 +2,9 @@ use std::collections::HashMap;
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
-use url::Url;
 use wp_derive::WPContextual;
 
-use crate::{
-    parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPContext, WPNetworkResponse,
-};
+use crate::{parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPNetworkResponse};
 
 #[uniffi::export]
 pub fn parse_list_users_response_with_edit_context(
@@ -59,64 +56,6 @@ pub fn parse_users_response<'de, T: Deserialize<'de>>(
         reason: err.to_string(),
         response: String::from_utf8_lossy(&response.body).to_string(),
     })
-}
-
-pub struct UsersEndpoint {}
-
-impl UsersEndpoint {
-    pub fn list_users(site_url: &Url, context: WPContext, params: Option<&UserListParams>) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/users").unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
-        url
-    }
-
-    pub fn retrieve_user(site_url: &Url, user_id: UserId, context: WPContext) -> Url {
-        let mut url = site_url
-            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
-            .unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        url
-    }
-
-    pub fn retrieve_current_user(site_url: &Url, context: WPContext) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        url
-    }
-
-    pub fn create_user(site_url: &Url) -> Url {
-        site_url.join("/wp-json/wp/v2/users").unwrap()
-    }
-
-    pub fn update_user(site_url: &Url, user_id: UserId, params: &UserUpdateParams) -> Url {
-        site_url
-            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
-            .unwrap()
-    }
-
-    pub fn update_current_user(site_url: &Url) -> Url {
-        site_url.join("/wp-json/wp/v2/users/me").unwrap()
-    }
-
-    pub fn delete_user(site_url: &Url, user_id: UserId, params: &UserDeleteParams) -> Url {
-        let mut url = site_url
-            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
-            .unwrap();
-        url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
-    }
-
-    pub fn delete_current_user(site_url: &Url, params: &UserDeleteParams) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
-        url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -360,7 +299,7 @@ impl UserDeleteParams {
 
 uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserId(i32);
+pub struct UserId(pub i32);
 
 impl std::fmt::Display for UserId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
