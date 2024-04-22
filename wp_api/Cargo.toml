@@ -8,6 +8,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_api"
 
 [dependencies]
+derive_builder = "0.20"
 http = { workspace = true }
 url = "2.5"
 parse_link_header = "0.3"
@@ -15,6 +16,10 @@ serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 thiserror = { workspace = true }
 uniffi = { workspace = true }
+wp_derive = { path = "../wp_derive" }
+
+[dev-dependencies]
+rstest = "0.19"
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

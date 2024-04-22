@@ -3,19 +3,26 @@
 use std::collections::HashMap;
 
 pub use api_error::*;
+pub use endpoint::*;
 pub use login::*;
 pub use pages::*;
 pub use posts::*;
 pub use url::*;
+pub use users::*;
 
 pub mod api_error;
+pub mod endpoint;
 pub mod login;
 pub mod pages;
 pub mod posts;
 pub mod url;
+pub mod users;
+
+const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(uniffi::Object)]
 pub struct WPApiHelper {
+    api_endpoint: ApiEndpoint,
     site_url: Url,
     authentication: WPAuthentication,
 }
@@ -25,27 +32,22 @@ impl WPApiHelper {
     #[uniffi::constructor]
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
+        // TODO: Handle the url parse error
+        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
 
         Self {
+            api_endpoint,
             site_url: url,
             authentication,
         }
     }
 
     pub fn raw_request(&self, url: String) -> WPNetworkRequest {
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: Url::parse(url.as_str()).unwrap().into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
+            body: None,
         }
     }
 
@@ -55,15 +57,6 @@ impl WPApiHelper {
             .join("/wp-json/wp/v2/posts?context=edit")
             .unwrap();
 
-        let mut header_map = HashMap::new();
-
-        match &self.authentication {
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".into(), format!("Basic {}", token));
-            }
-            WPAuthentication::None => (),
-        }
-
         url.query_pairs_mut()
             .append_pair("page", params.page.to_string().as_str());
         url.query_pairs_mut()
@@ -72,7 +65,143 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: Some(header_map),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn list_users_request(
+        &self,
+        context: WPContext,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .list(context, params.as_ref())
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_endpoint.users.retrieve(user_id, context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_endpoint.users.retrieve_me(context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.users.create().into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn update_user_request(
+        &self,
+        user_id: UserId,
+        params: &UserUpdateParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.users.update(user_id).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.users.update_me().into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn delete_user_request(
+        &self,
+        user_id: UserId,
+        params: &UserDeleteParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: self.api_endpoint.users.delete(user_id, params).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: self.api_endpoint.users.delete_me(params).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    fn header_map(&self) -> HashMap<String, String> {
+        let mut header_map = HashMap::new();
+        header_map.insert(
+            http::header::ACCEPT.to_string(),
+            CONTENT_TYPE_JSON.to_string(),
+        );
+        match &self.authentication {
+            WPAuthentication::None => None,
+            WPAuthentication::AuthorizationHeader { token } => {
+                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
+            }
+        };
+        header_map
+    }
+
+    fn header_map_for_post_request(&self) -> HashMap<String, String> {
+        let mut header_map = self.header_map();
+        header_map.insert(
+            http::header::CONTENT_TYPE.to_string(),
+            CONTENT_TYPE_JSON.to_string(),
+        );
+        header_map
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WPContext {
+    Edit,
+    Embed,
+    View,
+}
+
+impl Default for WPContext {
+    fn default() -> Self {
+        Self::View
+    }
+}
+
+impl WPContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Edit => "edit",
+            Self::Embed => "embed",
+            Self::View => "view",
         }
     }
 }
@@ -92,6 +221,27 @@ pub enum RequestMethod {
     HEAD,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WPApiParamOrder {
+    Asc,
+    Desc,
+}
+
+impl Default for WPApiParamOrder {
+    fn default() -> Self {
+        Self::Asc
+    }
+}
+
+impl WPApiParamOrder {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Asc => "asc",
+            Self::Desc => "desc",
+        }
+    }
+}
+
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
@@ -101,7 +251,8 @@ pub struct WPNetworkRequest {
     //
     // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
     // module.
-    pub header_map: Option<HashMap<String, String>>,
+    pub header_map: HashMap<String, String>,
+    pub body: Option<Vec<u8>>,
 }
 
 #[derive(uniffi::Record)]
@@ -139,24 +290,11 @@ impl WPNetworkResponse {
 pub fn parse_post_list_response(
     response: WPNetworkResponse,
 ) -> Result<PostListResponse, WPApiError> {
-    // TODO: Further parse the response body to include error message
-    // TODO: Lots of unwraps to get a basic setup working
-    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
-        return Err(WPApiError::ClientError {
-            error_type: client_error_type,
-            status_code: response.status_code,
-        });
-    }
-    let status = http::StatusCode::from_u16(response.status_code).unwrap();
-    if status.is_server_error() {
-        return Err(WPApiError::ServerError {
-            status_code: response.status_code,
-        });
-    }
+    parse_response_for_generic_errors(&response)?;
     let post_list: Vec<PostObject> =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+            response: String::from_utf8_lossy(&response.body).to_string(),
         })?;
 
     let mut next_page: Option<String> = None;
@@ -176,10 +314,28 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: std::str::from_utf8(&response.body).unwrap().to_string(),
+            response: String::from_utf8_lossy(&response.body).to_string(),
         })?;
 
     Ok(api_details)
+}
+
+pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
+    // TODO: Further parse the response body to include error message
+    // TODO: Lots of unwraps to get a basic setup working
+    if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
+        return Err(WPApiError::ClientError {
+            error_type: client_error_type,
+            status_code: response.status_code,
+        });
+    }
+    let status = http::StatusCode::from_u16(response.status_code).unwrap();
+    if status.is_server_error() {
+        return Err(WPApiError::ServerError {
+            status_code: response.status_code,
+        });
+    }
+    Ok(())
 }
 
 // TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI

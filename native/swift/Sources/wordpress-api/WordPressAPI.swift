@@ -159,8 +159,8 @@ extension RequestMethod {
 }
 
 extension WpNetworkRequest {
-    init(method: RequestMethod, url: URL, headerMap: [String: String]? = nil) {
-        self.init(method: method, url: url.absoluteString, headerMap: headerMap)
+    init(method: RequestMethod, url: URL, headerMap: [String: String]) {
+        self.init(method: method, url: url.absoluteString, headerMap: headerMap, body: nil)
     }
 }
 
