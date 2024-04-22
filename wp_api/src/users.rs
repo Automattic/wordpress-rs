@@ -2,12 +2,9 @@ use std::collections::HashMap;
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
-use url::Url;
 use wp_derive::WPContextual;
 
-use crate::{
-    parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPContext, WPNetworkResponse,
-};
+use crate::{parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPNetworkResponse};
 
 #[uniffi::export]
 pub fn parse_list_users_response_with_edit_context(
@@ -59,64 +56,6 @@ pub fn parse_users_response<'de, T: Deserialize<'de>>(
         reason: err.to_string(),
         response: String::from_utf8_lossy(&response.body).to_string(),
     })
-}
-
-pub struct UsersEndpoint {}
-
-impl UsersEndpoint {
-    pub fn list_users(site_url: &Url, context: WPContext, params: Option<&UserListParams>) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/users").unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
-        url
-    }
-
-    pub fn retrieve_user(site_url: &Url, user_id: UserId, context: WPContext) -> Url {
-        let mut url = site_url
-            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
-            .unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        url
-    }
-
-    pub fn retrieve_current_user(site_url: &Url, context: WPContext) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        url
-    }
-
-    pub fn create_user(site_url: &Url) -> Url {
-        site_url.join("/wp-json/wp/v2/users").unwrap()
-    }
-
-    pub fn update_user(site_url: &Url, user_id: UserId, params: &UserUpdateParams) -> Url {
-        site_url
-            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
-            .unwrap()
-    }
-
-    pub fn update_current_user(site_url: &Url) -> Url {
-        site_url.join("/wp-json/wp/v2/users/me").unwrap()
-    }
-
-    pub fn delete_user(site_url: &Url, user_id: UserId, params: &UserDeleteParams) -> Url {
-        let mut url = site_url
-            .join(format!("/wp-json/wp/v2/users/{}", user_id).as_str())
-            .unwrap();
-        url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
-    }
-
-    pub fn delete_current_user(site_url: &Url, params: &UserDeleteParams) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/users/me").unwrap();
-        url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -234,35 +173,43 @@ pub struct UserCreateParams {
     /// Password for the user (never included).
     pub password: String,
     /// Display name for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// First name for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
     /// Last name for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     /// URL of the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Description of the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Locale for the user.
     /// One of: , `en_US`
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     /// The nickname for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nickname: Option<String>,
     /// An alphanumeric identifier for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
@@ -271,6 +218,7 @@ pub struct UserCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
     /// Meta fields.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<String>,
@@ -351,7 +299,7 @@ impl UserDeleteParams {
 
 uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserId(i32);
+pub struct UserId(pub i32);
 
 impl std::fmt::Display for UserId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

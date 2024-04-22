@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 pub use api_error::*;
+pub use endpoint::*;
 pub use login::*;
 pub use pages::*;
 pub use posts::*;
@@ -10,6 +11,7 @@ pub use url::*;
 pub use users::*;
 
 pub mod api_error;
+pub mod endpoint;
 pub mod login;
 pub mod pages;
 pub mod posts;
@@ -20,6 +22,7 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(uniffi::Object)]
 pub struct WPApiHelper {
+    api_endpoint: ApiEndpoint,
     site_url: Url,
     authentication: WPAuthentication,
 }
@@ -29,8 +32,11 @@ impl WPApiHelper {
     #[uniffi::constructor]
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
+        // TODO: Handle the url parse error
+        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
 
         Self {
+            api_endpoint,
             site_url: url,
             authentication,
         }
@@ -71,7 +77,11 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: UsersEndpoint::list_users(&self.site_url, context, params.as_ref()).into(),
+            url: self
+                .api_endpoint
+                .users
+                .list(context, params.as_ref())
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -80,7 +90,7 @@ impl WPApiHelper {
     pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: UsersEndpoint::retrieve_user(&self.site_url, user_id, context).into(),
+            url: self.api_endpoint.users.retrieve(user_id, context).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -89,7 +99,7 @@ impl WPApiHelper {
     pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: UsersEndpoint::retrieve_current_user(&self.site_url, context).into(),
+            url: self.api_endpoint.users.retrieve_me(context).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -98,7 +108,7 @@ impl WPApiHelper {
     pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: UsersEndpoint::create_user(&self.site_url).into(),
+            url: self.api_endpoint.users.create().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -111,7 +121,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: UsersEndpoint::update_user(&self.site_url, user_id, params).into(),
+            url: self.api_endpoint.users.update(user_id).into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -120,7 +130,7 @@ impl WPApiHelper {
     pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: UsersEndpoint::update_current_user(&self.site_url).into(),
+            url: self.api_endpoint.users.update_me().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -133,7 +143,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_user(&self.site_url, user_id, params).into(),
+            url: self.api_endpoint.users.delete(user_id, params).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -142,7 +152,7 @@ impl WPApiHelper {
     pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: UsersEndpoint::delete_current_user(&self.site_url, params).into(),
+            url: self.api_endpoint.users.delete_me(params).into(),
             header_map: self.header_map(),
             body: None,
         }
