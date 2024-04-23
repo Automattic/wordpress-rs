@@ -173,35 +173,43 @@ pub struct UserCreateParams {
     /// Password for the user (never included).
     pub password: String,
     /// Display name for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// First name for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
     /// Last name for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     /// URL of the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Description of the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Locale for the user.
     /// One of: , `en_US`
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     /// The nickname for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nickname: Option<String>,
     /// An alphanumeric identifier for the user.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
@@ -210,6 +218,7 @@ pub struct UserCreateParams {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
     /// Meta fields.
+    #[uniffi(default = None)]
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<String>,

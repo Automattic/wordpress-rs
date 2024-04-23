@@ -16,7 +16,7 @@ impl ApiBaseUrl {
         Url::parse(site_base_url).map(|parsed_url| {
             let url = parsed_url
                 .extend(WP_JSON_PATH_SEGMENTS)
-                .expect("parsed_url is already parsed, so this can't result in an error");
+                .expect("ApiBaseUrl is already parsed, so this can't result in an error");
             Self { url }
         })
     }
@@ -25,7 +25,7 @@ impl ApiBaseUrl {
         self.url
             .clone()
             .append(segment)
-            .expect("api_base_url is already parsed, so this can't result in an error")
+            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
     fn by_extending<I>(&self, segments: I) -> Url
@@ -36,7 +36,7 @@ impl ApiBaseUrl {
         self.url
             .clone()
             .extend(segments)
-            .expect("api_base_url is already parsed, so this can't result in an error")
+            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
     fn as_str(&self) -> &str {
