@@ -1,4 +1,5 @@
 use http::StatusCode;
+use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WPApiError {
@@ -8,8 +9,10 @@ pub enum WPApiError {
         status_code
     )]
     ClientError {
+        coded_error: Option<WPCodedError>,
         error_type: ClientErrorType,
         status_code: u16,
+        response: String,
     },
     #[error(
         "Server error with status_code \nStatus Code: {}\nResponse: {}",
@@ -51,4 +54,15 @@ impl ClientErrorType {
             None
         }
     }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
+pub struct WPCodedError {
+    pub code: WPErrorCode,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
+pub enum WPErrorCode {
+    #[serde(rename = "rest_user_invalid_id")]
+    InvalidUserId,
 }

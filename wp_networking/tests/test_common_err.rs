@@ -13,14 +13,17 @@ async fn client_error_unauthorized() {
     let n = AsyncWPNetworking::new(site_url.into(), WPAuthentication::None);
     let request = n.api_helper.retrieve_current_user_request(WPContext::Edit);
     let response = wp_networking().async_request(request).await.unwrap();
-    let parsed_response = parse_retrieve_user_response_with_edit_context(&response);
-    let err = parsed_response.unwrap_err();
-    assert_eq!(
-        err,
-        WPApiError::ClientError {
-            error_type: ClientErrorType::Unauthorized,
-            status_code: 401
-        },
+    let err = parse_retrieve_user_response_with_edit_context(&response).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            WPApiError::ClientError {
+                coded_error: _,
+                error_type: ClientErrorType::Unauthorized,
+                status_code: 401,
+                response: _
+            }
+        ),
         "{:?}",
         err
     );
