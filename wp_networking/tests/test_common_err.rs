@@ -1,7 +1,7 @@
 use test_helpers::wp_networking;
 use wp_api::{
     parse_retrieve_user_response_with_edit_context, ClientErrorType, WPApiError, WPAuthentication,
-    WPContext,
+    WPCodedError, WPContext, WPErrorCode,
 };
 use wp_networking::AsyncWPNetworking;
 
@@ -18,8 +18,10 @@ async fn client_error_unauthorized() {
         matches!(
             err,
             WPApiError::ClientError {
-                coded_error: _,
-                error_type: ClientErrorType::Unauthorized,
+                coded_error: Some(WPCodedError {
+                    code: WPErrorCode::Unauthorized
+                }),
+                error_type: ClientErrorType::Other,
                 status_code: 401,
                 response: _
             }

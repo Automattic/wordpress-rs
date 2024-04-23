@@ -29,7 +29,6 @@ pub enum WPApiError {
 #[derive(Debug, PartialEq, Eq, uniffi::Enum)]
 pub enum ClientErrorType {
     BadRequest,
-    Unauthorized,
     TooManyRequests,
     Other,
 }
@@ -40,8 +39,6 @@ impl ClientErrorType {
             if status_code.is_client_error() {
                 if status_code == StatusCode::BAD_REQUEST {
                     Some(Self::BadRequest)
-                } else if status_code == StatusCode::UNAUTHORIZED {
-                    Some(Self::Unauthorized)
                 } else if status_code == StatusCode::TOO_MANY_REQUESTS {
                     Some(Self::TooManyRequests)
                 } else {
@@ -65,4 +62,6 @@ pub struct WPCodedError {
 pub enum WPErrorCode {
     #[serde(rename = "rest_user_invalid_id")]
     InvalidUserId,
+    #[serde(rename = "rest_not_logged_in")]
+    Unauthorized,
 }
