@@ -1,16 +1,8 @@
-use base64::prelude::*;
-use std::fs::read_to_string;
-use wp_api::{
-    UserCreateParamsBuilder, UserDeleteParams, UserId, UserUpdateParamsBuilder, WPAuthentication,
-};
+use test_helpers::{wp_networking, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api::{UserCreateParamsBuilder, UserDeleteParams, UserUpdateParamsBuilder};
 
-use wp_networking::AsyncWPNetworking;
-
-mod wp_db;
-
-// The first user is also the current user
-const FIRST_USER_ID: UserId = UserId(1);
-const SECOND_USER_ID: UserId = UserId(2);
+pub mod test_helpers;
+pub mod wp_db;
 
 #[tokio::test]
 async fn create_user() {
@@ -109,17 +101,4 @@ async fn delete_current_user() {
         ));
     })
     .await;
-}
-
-fn wp_networking() -> AsyncWPNetworking {
-    let file_contents = read_to_string("../test_credentials").unwrap();
-    let lines: Vec<&str> = file_contents.lines().collect();
-    let site_url = lines[0];
-    let auth_base64_token = BASE64_STANDARD.encode(format!("{}:{}", lines[1], lines[2]));
-
-    let authentication = WPAuthentication::AuthorizationHeader {
-        token: auth_base64_token,
-    };
-
-    AsyncWPNetworking::new(site_url.into(), authentication)
 }
