@@ -17,8 +17,27 @@ extension WordPressAPI {
 
     /// A good way to fetch every post (you can still specify a specific offset using `params`)
     ///
-    public func listPosts(params: PostListParams = PostListParams()) -> SparsePostSequence {
-        SparsePostSequence(api: self, initialParams: params)
+    public func listPosts(params: PostListParams = PostListParams()) -> AsyncThrowingStream<SparsePost.ViewContext, Error> {
+        AsyncThrowingStream { (continuation: AsyncThrowingStream<SparsePost.ViewContext, Error>.Continuation) in
+            var current = params
+            Task {
+                var current = params
+                while true {
+                    do {
+                        for post in try await self.posts.forViewing.list(with: current) {
+                            continuation.yield(post)
+                        }
+                        current = .init(page: current.page + 1, perPage: current.perPage)
+                    } catch is WpApiError {
+                        continuation.finish()
+                        break
+                    } catch {
+                        continuation.finish(throwing: error)
+                        break
+                    }
+                }
+            }
+        }
     }
 
     package func listPosts(url: String) async throws -> PostListResponse {

@@ -22,8 +22,8 @@ struct ContentView: View {
                 }
                 .padding()
             } else {
-                List(viewModel.posts) { post in
-                    Text(post.title?.raw ?? "")
+                List(viewModel.posts) { (post: SparsePost.ViewContext) in
+                    Text(post.title.rendered)
                 }
             }
         }

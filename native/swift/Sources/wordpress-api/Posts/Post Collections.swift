@@ -8,7 +8,7 @@ public struct SparsePostSequence: AsyncSequence, AsyncIteratorProtocol {
 
     private let api: WordPressAPI
 
-    private var posts: [SparsePost] = []
+    private var posts: [PostCollection.Element] = []
     private var nextPage: WpNetworkRequest?
 
     enum Errors: Error {

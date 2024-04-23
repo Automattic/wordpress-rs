@@ -2,9 +2,11 @@ import Foundation
 import SwiftUI
 import wordpress_api
 
+extension SparsePost.ViewContext: Identifiable {}
+
 @Observable class PostListViewModel {
 
-    var posts: PostCollection
+    var posts: [SparsePost.ViewContext]
     var fetchPostsTask: Task<Void, Never>?
     var error: MyError?
     var shouldPresentAlert = false
@@ -21,7 +23,7 @@ import wordpress_api
     }
     // swiftlint:enable force_try
 
-    init(loginManager: LoginManager, posts: PostCollection = PostCollection()) {
+    init(loginManager: LoginManager, posts: [SparsePost.ViewContext] = []) {
         self.loginManager = loginManager
         self.posts = posts
     }
