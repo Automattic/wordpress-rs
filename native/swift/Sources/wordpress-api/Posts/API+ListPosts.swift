@@ -19,7 +19,6 @@ extension WordPressAPI {
     ///
     public func listPosts(params: PostListParams = PostListParams()) -> AsyncThrowingStream<SparsePost.ViewContext, Error> {
         AsyncThrowingStream { (continuation: AsyncThrowingStream<SparsePost.ViewContext, Error>.Continuation) in
-            var current = params
             Task {
                 var current = params
                 while true {
