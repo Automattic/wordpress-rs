@@ -5,26 +5,29 @@ pub mod test_helpers;
 
 #[tokio::test]
 async fn list_users_with_edit_context() {
-    test_helpers::list_users(WPContext::Edit, None, |r| {
+    assert!(test_helpers::list_users(WPContext::Edit, None, |r| {
         wp_api::parse_list_users_response_with_edit_context(&r)
     })
     .await
+    .is_ok());
 }
 
 #[tokio::test]
 async fn list_users_with_embed_context() {
-    test_helpers::list_users(WPContext::Embed, None, |r| {
+    assert!(test_helpers::list_users(WPContext::Embed, None, |r| {
         wp_api::parse_list_users_response_with_embed_context(&r)
     })
     .await
+    .is_ok());
 }
 
 #[tokio::test]
 async fn list_users_with_view_context() {
-    test_helpers::list_users(WPContext::View, None, |r| {
+    assert!(test_helpers::list_users(WPContext::View, None, |r| {
         wp_api::parse_list_users_response_with_view_context(&r)
     })
     .await
+    .is_ok());
 }
 
 #[tokio::test]
@@ -44,56 +47,69 @@ async fn list_users_with_edit_context_second_page() {
         who: None,
         has_published_posts: None,
     };
-    test_helpers::list_users(WPContext::Edit, Some(params), |r| {
-        wp_api::parse_list_users_response_with_edit_context(&r)
-    })
-    .await
+    assert!(
+        test_helpers::list_users(WPContext::Edit, Some(params), |r| {
+            wp_api::parse_list_users_response_with_edit_context(&r)
+        })
+        .await
+        .is_ok()
+    );
 }
 
 #[tokio::test]
 async fn retrieve_user_with_edit_context() {
-    test_helpers::retrieve_user(FIRST_USER_ID, WPContext::Edit, |r| {
-        wp_api::parse_retrieve_user_response_with_edit_context(&r)
-    })
-    .await
+    assert!(
+        test_helpers::retrieve_user(FIRST_USER_ID, WPContext::Edit, |r| {
+            wp_api::parse_retrieve_user_response_with_edit_context(&r)
+        })
+        .await
+        .is_ok()
+    );
 }
 
 #[tokio::test]
 async fn retrieve_user_with_embed_context() {
-    test_helpers::retrieve_user(FIRST_USER_ID, WPContext::Embed, |r| {
-        wp_api::parse_retrieve_user_response_with_embed_context(&r)
-    })
-    .await
+    assert!(
+        test_helpers::retrieve_user(FIRST_USER_ID, WPContext::Embed, |r| {
+            wp_api::parse_retrieve_user_response_with_embed_context(&r)
+        })
+        .await
+        .is_ok()
+    );
 }
 
 #[tokio::test]
 async fn retrieve_user_with_view_context() {
-    test_helpers::retrieve_me(WPContext::View, |r| {
+    assert!(test_helpers::retrieve_me(WPContext::View, |r| {
         wp_api::parse_retrieve_user_response_with_view_context(&r)
     })
     .await
+    .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_me_with_edit_context() {
-    test_helpers::retrieve_me(WPContext::Edit, |r| {
+    assert!(test_helpers::retrieve_me(WPContext::Edit, |r| {
         wp_api::parse_retrieve_user_response_with_edit_context(&r)
     })
     .await
+    .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_me_with_embed_context() {
-    test_helpers::retrieve_me(WPContext::Embed, |r| {
+    assert!(test_helpers::retrieve_me(WPContext::Embed, |r| {
         wp_api::parse_retrieve_user_response_with_embed_context(&r)
     })
     .await
+    .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_me_with_view_context() {
-    test_helpers::retrieve_me(WPContext::View, |r| {
+    assert!(test_helpers::retrieve_me(WPContext::View, |r| {
         wp_api::parse_retrieve_user_response_with_view_context(&r)
     })
     .await
+    .is_ok());
 }
