@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
-use url::Url;
 use wp_derive::WPContextual;
 
-use crate::{parse_response_for_generic_errors, WPApiError, WPContext, WPNetworkResponse};
+use crate::{parse_response_for_generic_errors, WPApiError, WPNetworkResponse};
 
 pub trait PostNetworkingInterface: Send + Sync {}
 
@@ -56,7 +55,7 @@ pub struct PostDeleteParams {
 }
 
 impl PostDeleteParams {
-    fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
+    pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [("force", self.force.map(|x| x.to_string()))]
             .into_iter()
             // Remove `None` values
@@ -212,47 +211,6 @@ pub struct SparsePostExcerpt {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostMeta {
     pub footnotes: Option<String>,
-}
-
-pub struct PostsEndpoint {}
-
-impl PostsEndpoint {
-    pub fn list_posts(site_url: &Url, context: WPContext, params: Option<&PostListParams>) -> Url {
-        let mut url = site_url.join("/wp-json/wp/v2/posts").unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
-        url
-    }
-
-    pub fn retrieve_post(site_url: &Url, post_id: PostId, context: WPContext) -> Url {
-        let mut url = site_url
-            .join(format!("/wp-json/wp/v2/posts/{}", post_id).as_str())
-            .unwrap();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        url
-    }
-
-    pub fn create_post(site_url: &Url) -> Url {
-        site_url.join("/wp-json/wp/v2/posts").unwrap()
-    }
-
-    pub fn update_post(site_url: &Url, post_id: PostId, params: &PostUpdateParams) -> Url {
-        site_url
-            .join(format!("/wp-json/wp/v2/posts/{}", post_id).as_str())
-            .unwrap()
-    }
-
-    pub fn delete_post(site_url: &Url, post_id: PostId, params: &PostDeleteParams) -> Url {
-        let mut url = site_url
-            .join(format!("/wp-json/wp/v2/posts/{}", post_id).as_str())
-            .unwrap();
-        url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
-    }
 }
 
 #[uniffi::export]

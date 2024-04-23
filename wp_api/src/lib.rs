@@ -188,7 +188,7 @@ impl WPApiHelper {
     pub fn retrieve_post_request(&self, post_id: PostId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: PostsEndpoint::retrieve_post(&self.site_url, post_id, context).into(),
+            url: self.api_endpoint.posts.retrieve(post_id, context).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -197,7 +197,7 @@ impl WPApiHelper {
     pub fn create_post_request(&self, params: &PostCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: PostsEndpoint::create_post(&self.site_url).into(),
+            url: self.api_endpoint.posts.create().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -210,7 +210,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: PostsEndpoint::update_post(&self.site_url, post_id, params).into(),
+            url: self.api_endpoint.posts.update(post_id, params).into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -223,7 +223,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: PostsEndpoint::delete_post(&self.site_url, post_id, params).into(),
+            url: self.api_endpoint.posts.delete(post_id, params).into(),
             header_map: self.header_map(),
             body: None,
         }

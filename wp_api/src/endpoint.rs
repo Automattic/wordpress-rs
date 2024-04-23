@@ -1,7 +1,9 @@
 use url::Url;
 
+pub use posts_endpoint::*;
 pub use users_endpoint::*;
 
+mod posts_endpoint;
 mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
@@ -47,6 +49,7 @@ impl ApiBaseUrl {
 pub struct ApiEndpoint {
     pub base_url: ApiBaseUrl,
     pub users: UsersEndpoint,
+    pub posts: PostsEndpoint,
 }
 
 impl ApiEndpoint {
@@ -54,6 +57,7 @@ impl ApiEndpoint {
         Self {
             base_url: api_base_url.clone(),
             users: UsersEndpoint::new(api_base_url.clone()),
+            posts: PostsEndpoint::new(api_base_url.clone()),
         }
     }
 
