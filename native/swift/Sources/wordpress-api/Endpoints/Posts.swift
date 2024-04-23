@@ -11,8 +11,8 @@ extension SparsePost: Contextual {
         helper.retrievePostRequest(postId: id, context: context)
     }
 
-    public static func listRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
-        helper.postListRequest(params: .init())
+    public static func listRequest(params: PostListParams?, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
+        helper.postListRequest(params: params ?? .init())
     }
 
     public static func updateRequest(id: PostId, params: PostUpdateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {

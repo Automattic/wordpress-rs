@@ -11,8 +11,8 @@ extension SparseUser: Contextual {
         helper.retrieveUserRequest(userId: id, context: context)
     }
 
-    public static func listRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
-        helper.listUsersRequest(context: context, params: nil)
+    public static func listRequest(params: UserListParams?, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
+        helper.listUsersRequest(context: context, params: params)
     }
 
     public static func updateRequest(id: UserId, params: UserUpdateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {

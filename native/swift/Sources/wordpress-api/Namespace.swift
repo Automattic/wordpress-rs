@@ -17,12 +17,13 @@ public protocol Contextual {
     associatedtype EditContext
     associatedtype EmbedContext
 
+    associatedtype ListParams
     associatedtype UpdateParams
     associatedtype CreateParams
     associatedtype DeleteParams
 
     static func retrieveRequest(id: ID, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
-    static func listRequest(using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
+    static func listRequest(params: ListParams, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest
     static func updateRequest(id: ID, params: UpdateParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest
     static func createRequest(params: CreateParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest
     static func deleteRequest(id: ID, params: DeleteParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest
@@ -108,10 +109,14 @@ extension ContextualNamespace {
         return try parseResponse(response)
     }
 
-    public func list() async throws -> [R] {
-        let request = T.listRequest(using: api.helper, context: context)
+    public func list(with params: T.ListParams) async throws -> [R] {
+        let request = T.listRequest(params: params, using: api.helper, context: context)
         let response = try await api.perform(request: request)
         return try parseResponse(response)
+    }
+
+    public func list<U>() async throws -> [R] where T.ListParams == Optional<U> {
+        try await list(with: nil)
     }
 }
 
