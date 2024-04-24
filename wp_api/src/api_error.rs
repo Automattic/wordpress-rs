@@ -61,7 +61,9 @@ pub struct WPCodedError {
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WPErrorCode {
     #[serde(rename = "rest_user_invalid_id")]
-    InvalidUserId,
+    UserInvalidId,
+    #[serde(rename = "rest_user_invalid_reassign")]
+    UserInvalidReassign,
     #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
 }
