@@ -69,3 +69,14 @@ pub enum WPErrorCode {
     #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
 }
+
+impl WPErrorCode {
+    pub fn status_code(&self) -> u16 {
+        match self {
+            Self::ForbiddenContext => 403,
+            Self::UserInvalidId => 404,
+            Self::UserInvalidReassign => 400,
+            Self::Unauthorized => 401,
+        }
+    }
+}

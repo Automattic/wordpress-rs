@@ -63,11 +63,11 @@ impl WPNetworkResponseParser for WPNetworkResponse {
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {
-    fn assert_wp_error(self, expected_error_code: WPErrorCode, expected_status_code: u16);
+    fn assert_wp_error(self, expected_error_code: WPErrorCode);
 }
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
-    fn assert_wp_error(self, expected_error_code: WPErrorCode, expected_status_code: u16) {
+    fn assert_wp_error(self, expected_error_code: WPErrorCode) {
         let err = self.unwrap_err();
         if let WPApiError::ClientError {
             coded_error: Some(WPCodedError { code: error_code }),
@@ -82,9 +82,12 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
                 expected_error_code, error_code, response
             );
             assert_eq!(
-                expected_status_code, status_code,
+                expected_error_code.status_code(),
+                status_code,
                 "Incorrect status code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
-                expected_status_code, status_code, response
+                expected_error_code.status_code(),
+                status_code,
+                response
             );
         } else {
             panic!("Unexpected wp_error '{:?}'", err);

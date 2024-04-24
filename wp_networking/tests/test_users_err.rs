@@ -16,7 +16,7 @@ async fn list_users_forbidden_context() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::ForbiddenContext, 403);
+        .assert_wp_error(WPErrorCode::ForbiddenContext);
 }
 
 #[tokio::test]
@@ -27,7 +27,7 @@ async fn retrieve_user_invalid_user_id() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserInvalidId, 404);
+        .assert_wp_error(WPErrorCode::UserInvalidId);
 }
 
 #[tokio::test]
@@ -43,7 +43,7 @@ async fn delete_user_invalid_reassign() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserInvalidReassign, 400);
+        .assert_wp_error(WPErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
@@ -56,5 +56,5 @@ async fn delete_current_user_invalid_reassign() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserInvalidReassign, 400);
+        .assert_wp_error(WPErrorCode::UserInvalidReassign);
 }
