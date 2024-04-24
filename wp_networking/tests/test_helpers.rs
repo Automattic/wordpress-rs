@@ -39,7 +39,7 @@ pub trait WPNetworkRequestExecutor {
 
 impl WPNetworkRequestExecutor for WPNetworkRequest {
     async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
-        AsyncWPNetworking::new().async_request(self).await
+        AsyncWPNetworking::default().async_request(self).await
     }
 }
 

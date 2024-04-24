@@ -7,13 +7,15 @@ pub struct AsyncWPNetworking {
     client: reqwest::Client,
 }
 
-impl AsyncWPNetworking {
-    pub fn new() -> Self {
+impl Default for AsyncWPNetworking {
+    fn default() -> Self {
         Self {
             client: reqwest::Client::new(),
         }
     }
+}
 
+impl AsyncWPNetworking {
     pub async fn async_request(
         &self,
         wp_request: WPNetworkRequest,
