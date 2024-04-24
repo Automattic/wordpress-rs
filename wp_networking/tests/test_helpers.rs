@@ -1,8 +1,8 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
 use wp_api::{
-    UserId, UserListParams, WPApiError, WPApiHelper, WPAuthentication, WPCodedError, WPContext,
-    WPErrorCode, WPNetworkRequest, WPNetworkResponse,
+    UserId, WPApiError, WPApiHelper, WPAuthentication, WPCodedError, WPErrorCode, WPNetworkRequest,
+    WPNetworkResponse,
 };
 
 use wp_networking::AsyncWPNetworking;
@@ -29,50 +29,6 @@ pub fn test_credentials() -> (String, String, String) {
         lines[1].to_string(),
         lines[2].to_string(),
     )
-}
-
-pub async fn list_users<F, T>(
-    context: WPContext,
-    params: Option<UserListParams>,
-    parser: F,
-) -> Result<T, WPApiError>
-where
-    F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
-{
-    api()
-        .list_users_request(context, &params)
-        .execute()
-        .await
-        .unwrap()
-        .parse(parser)
-}
-
-pub async fn retrieve_user<F, T>(
-    user_id: UserId,
-    context: WPContext,
-    parser: F,
-) -> Result<T, WPApiError>
-where
-    F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
-{
-    api()
-        .retrieve_user_request(user_id, context)
-        .execute()
-        .await
-        .unwrap()
-        .parse(parser)
-}
-
-pub async fn retrieve_me<F, T>(context: WPContext, parser: F) -> Result<T, WPApiError>
-where
-    F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
-{
-    api()
-        .retrieve_current_user_request(context)
-        .execute()
-        .await
-        .unwrap()
-        .parse(parser)
 }
 
 pub trait WPNetworkRequestExecutor {

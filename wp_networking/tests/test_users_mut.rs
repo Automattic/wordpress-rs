@@ -1,6 +1,8 @@
 use wp_api::{UserCreateParamsBuilder, UserDeleteParams, UserUpdateParamsBuilder};
 
-use crate::test_helpers::{api, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID};
+use crate::test_helpers::{
+    api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
+};
 
 pub mod test_helpers;
 pub mod wp_db;
@@ -19,14 +21,13 @@ async fn create_user() {
             .password(password.to_string())
             .build()
             .unwrap();
-        let user_create_response = api()
+        let created_user = api()
             .create_user_request(&user_create_params)
             .execute()
-            .await;
-        assert!(user_create_response.is_ok());
-        let created_user =
-            wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response.unwrap())
-                .unwrap();
+            .await
+            .unwrap()
+            .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+            .unwrap();
 
         // Assert that the user is in DB
         let created_user_from_db = db.fetch_db_user(created_user.id.0 as u64).await.unwrap();
