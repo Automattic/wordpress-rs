@@ -39,21 +39,9 @@ async fn list_users_with_view_context() {
 
 #[tokio::test]
 async fn list_users_with_edit_context_second_page() {
-    let params = UserListParams {
-        page: Some(2),
-        per_page: Some(2),
-        search: None,
-        exclude: None,
-        include: None,
-        offset: None,
-        order: None,
-        order_by: None,
-        slug: Vec::new(),
-        roles: Vec::new(),
-        capabilities: Vec::new(),
-        who: None,
-        has_published_posts: None,
-    };
+    let mut params = UserListParams::default();
+    params.page = Some(2);
+    params.per_page = Some(2);
     assert!(api()
         .list_users_request(WPContext::Edit, &Some(params))
         .execute()
