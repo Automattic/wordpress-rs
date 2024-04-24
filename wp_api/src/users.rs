@@ -115,7 +115,7 @@ pub struct UserListParams {
     /// Sort collection by user attribute.
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
-    pub order_by: Option<WPApiParamUsersOrderBy>,
+    pub orderby: Option<WPApiParamUsersOrderBy>,
     /// Limit result set to users with one or more specific slugs.
     pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
@@ -139,7 +139,7 @@ impl UserListParams {
             ("include", self.include.clone()),
             ("offset", self.offset.map(|x| x.to_string())),
             ("order", self.order.map(|x| x.as_str().to_string())),
-            ("order_by", self.order_by.map(|x| x.as_str().to_string())),
+            ("orderby", self.orderby.map(|x| x.as_str().to_string())),
             (
                 "slug",
                 (!self.slug.is_empty()).then_some(self.slug.join(",")),

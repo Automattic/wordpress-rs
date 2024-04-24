@@ -1,4 +1,6 @@
-use wp_api::{UserDeleteParams, UserId, UserListParams, WPContext, WPErrorCode};
+use wp_api::{
+    UserDeleteParams, UserId, UserListParams, WPApiParamUsersOrderBy, WPContext, WPErrorCode,
+};
 
 use crate::test_helpers::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
@@ -43,6 +45,32 @@ async fn list_users_forbidden_context() {
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_edit_context)
         .assert_wp_error(WPErrorCode::ForbiddenContext);
+}
+
+#[tokio::test]
+async fn list_users_forbidden_orderby_email() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Email);
+    api_as_subscriber()
+        .list_users_request(WPContext::View, &Some(params))
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_list_users_response_with_view_context)
+        .assert_wp_error(WPErrorCode::ForbiddenOrderBy);
+}
+
+#[tokio::test]
+async fn list_users_forbidden_order_by_registered_date() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::RegisteredDate);
+    api_as_subscriber()
+        .list_users_request(WPContext::View, &Some(params))
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_list_users_response_with_view_context)
+        .assert_wp_error(WPErrorCode::ForbiddenOrderBy);
 }
 
 #[tokio::test]

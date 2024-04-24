@@ -120,7 +120,7 @@ mod tests {
             include: None,
             offset: None,
             order: None,
-            order_by: None,
+            orderby: None,
             slug: vec!["bar".to_string(), "baz".to_string()],
             roles: Vec::new(),
             capabilities: Vec::new(),

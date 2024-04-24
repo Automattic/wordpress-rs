@@ -62,6 +62,8 @@ pub struct WPCodedError {
 pub enum WPErrorCode {
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
+    #[serde(rename = "rest_forbidden_orderby")]
+    ForbiddenOrderBy,
     #[serde(rename = "rest_user_cannot_view")]
     UserCannotView,
     #[serde(rename = "rest_user_invalid_id")]
@@ -76,6 +78,7 @@ impl WPErrorCode {
     pub fn status_code(&self) -> u16 {
         match self {
             Self::ForbiddenContext => 403,
+            Self::ForbiddenOrderBy => 403,
             Self::UserCannotView => 403,
             Self::UserInvalidId => 404,
             Self::UserInvalidReassign => 400,
