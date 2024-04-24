@@ -1,15 +1,12 @@
-use wp_api::{
-    ClientErrorType, WPApiError, WPApiHelper, WPAuthentication, WPCodedError, WPContext,
-    WPErrorCode,
-};
+use wp_api::{WPApiHelper, WPAuthentication, WPContext, WPErrorCode};
 
-use crate::test_helpers::{WPNetworkRequestExecutor, WPNetworkResponseParser};
+use crate::test_helpers::{AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser};
 
 pub mod test_helpers;
 
 #[tokio::test]
-async fn client_error_unauthorized() {
-    let err = WPApiHelper::new(
+async fn unauthorized() {
+    WPApiHelper::new(
         test_helpers::test_credentials().site_url,
         WPAuthentication::None,
     )
@@ -18,20 +15,5 @@ async fn client_error_unauthorized() {
     .await
     .unwrap()
     .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-    .unwrap_err();
-    assert!(
-        matches!(
-            err,
-            WPApiError::ClientError {
-                coded_error: Some(WPCodedError {
-                    code: WPErrorCode::Unauthorized
-                }),
-                error_type: ClientErrorType::Other,
-                status_code: 401,
-                response: _
-            }
-        ),
-        "{:?}",
-        err
-    );
+    .assert_wp_error(WPErrorCode::Unauthorized);
 }
