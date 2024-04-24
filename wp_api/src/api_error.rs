@@ -60,6 +60,8 @@ pub struct WPCodedError {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WPErrorCode {
+    #[serde(rename = "rest_forbidden_context")]
+    ForbiddenContext,
     #[serde(rename = "rest_user_invalid_id")]
     UserInvalidId,
     #[serde(rename = "rest_user_invalid_reassign")]

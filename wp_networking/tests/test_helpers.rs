@@ -12,23 +12,27 @@ pub const FIRST_USER_ID: UserId = UserId(1);
 pub const SECOND_USER_ID: UserId = UserId(2);
 
 pub fn api() -> WPApiHelper {
-    let (site_url, username, password) = test_credentials();
-    let auth_base64_token = BASE64_STANDARD.encode(format!("{}:{}", username, password));
+    let credentials = test_credentials();
+    let auth_base64_token = BASE64_STANDARD.encode(format!(
+        "{}:{}",
+        credentials.admin_username, credentials.admin_password
+    ));
     let authentication = WPAuthentication::AuthorizationHeader {
         token: auth_base64_token,
     };
-
-    WPApiHelper::new(site_url, authentication)
+    WPApiHelper::new(credentials.site_url, authentication)
 }
 
-pub fn test_credentials() -> (String, String, String) {
-    let file_contents = read_to_string("../test_credentials").unwrap();
-    let lines: Vec<&str> = file_contents.lines().collect();
-    (
-        lines[0].to_string(),
-        lines[1].to_string(),
-        lines[2].to_string(),
-    )
+pub fn api_as_subscriber() -> WPApiHelper {
+    let credentials = test_credentials();
+    let auth_base64_token = BASE64_STANDARD.encode(format!(
+        "{}:{}",
+        credentials.subscriber_username, credentials.subscriber_password
+    ));
+    let authentication = WPAuthentication::AuthorizationHeader {
+        token: auth_base64_token,
+    };
+    WPApiHelper::new(credentials.site_url, authentication)
 }
 
 pub trait WPNetworkRequestExecutor {
@@ -83,7 +87,27 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
                 expected_status_code, status_code, response
             );
         } else {
-            panic!("Unexpected wp_error");
+            panic!("Unexpected wp_error '{:?}'", err);
         }
+    }
+}
+
+pub struct TestCredentials {
+    pub site_url: String,
+    pub admin_username: String,
+    pub admin_password: String,
+    pub subscriber_username: String,
+    pub subscriber_password: String,
+}
+
+pub fn test_credentials() -> TestCredentials {
+    let file_contents = read_to_string("../test_credentials").unwrap();
+    let lines: Vec<&str> = file_contents.lines().collect();
+    TestCredentials {
+        site_url: lines[0].to_string(),
+        admin_username: lines[1].to_string(),
+        admin_password: lines[2].to_string(),
+        subscriber_username: lines[3].to_string(),
+        subscriber_password: lines[4].to_string(),
     }
 }
