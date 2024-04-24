@@ -60,6 +60,8 @@ pub struct WPCodedError {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WPErrorCode {
+    #[serde(rename = "rest_cannot_create_user")]
+    CannotCreateUser,
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
     #[serde(rename = "rest_forbidden_orderby")]
@@ -79,6 +81,7 @@ pub enum WPErrorCode {
 impl WPErrorCode {
     pub fn status_code(&self) -> u16 {
         match self {
+            Self::CannotCreateUser => 403,
             Self::ForbiddenContext => 403,
             Self::ForbiddenOrderBy => 403,
             Self::ForbiddenWho => 403,

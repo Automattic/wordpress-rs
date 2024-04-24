@@ -1,5 +1,6 @@
 use wp_api::{
-    UserDeleteParams, UserId, UserListParams, WPApiParamUsersOrderBy, WPContext, WPErrorCode,
+    UserCreateParams, UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams,
+    WPApiParamUsersOrderBy, WPContext, WPErrorCode,
 };
 
 use crate::test_helpers::{
@@ -98,6 +99,17 @@ async fn retrieve_user_invalid_user_id() {
 }
 
 #[tokio::test]
+async fn cannot_create_user() {
+    api_as_subscriber()
+        .create_user_request(&valid_user_create_params())
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPErrorCode::CannotCreateUser);
+}
+
+#[tokio::test]
 async fn delete_user_invalid_reassign() {
     api()
         .delete_user_request(
@@ -124,4 +136,13 @@ async fn delete_current_user_invalid_reassign() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPErrorCode::UserInvalidReassign);
+}
+
+fn valid_user_create_params() -> UserCreateParams {
+    UserCreateParamsBuilder::default()
+        .username("t_username".to_string())
+        .email("t_email@foo.com".to_string())
+        .password("t_password".to_string())
+        .build()
+        .unwrap()
 }
