@@ -74,6 +74,19 @@ async fn list_users_forbidden_order_by_registered_date() {
 }
 
 #[tokio::test]
+async fn list_users_forbidden_who() {
+    let mut params = UserListParams::default();
+    params.who = Some("authors".to_string());
+    api_as_subscriber()
+        .list_users_request(WPContext::View, &Some(params))
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_list_users_response_with_view_context)
+        .assert_wp_error(WPErrorCode::ForbiddenWho);
+}
+
+#[tokio::test]
 async fn retrieve_user_invalid_user_id() {
     api()
         .retrieve_user_request(UserId(987654321), WPContext::Edit)

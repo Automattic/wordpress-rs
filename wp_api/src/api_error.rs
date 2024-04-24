@@ -64,6 +64,8 @@ pub enum WPErrorCode {
     ForbiddenContext,
     #[serde(rename = "rest_forbidden_orderby")]
     ForbiddenOrderBy,
+    #[serde(rename = "rest_forbidden_who")]
+    ForbiddenWho,
     #[serde(rename = "rest_user_cannot_view")]
     UserCannotView,
     #[serde(rename = "rest_user_invalid_id")]
@@ -79,6 +81,7 @@ impl WPErrorCode {
         match self {
             Self::ForbiddenContext => 403,
             Self::ForbiddenOrderBy => 403,
+            Self::ForbiddenWho => 403,
             Self::UserCannotView => 403,
             Self::UserInvalidId => 404,
             Self::UserInvalidReassign => 400,
