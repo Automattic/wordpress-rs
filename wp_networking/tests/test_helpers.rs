@@ -21,18 +21,6 @@ pub fn api() -> WPApiHelper {
     WPApiHelper::new(site_url, authentication)
 }
 
-pub trait WPNetworkRequestExecutor {
-    fn execute(
-        self,
-    ) -> impl std::future::Future<Output = Result<WPNetworkResponse, reqwest::Error>> + Send;
-}
-
-impl WPNetworkRequestExecutor for WPNetworkRequest {
-    async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
-        AsyncWPNetworking::new().async_request(self).await
-    }
-}
-
 pub fn test_credentials() -> (String, String, String) {
     let file_contents = read_to_string("../test_credentials").unwrap();
     let lines: Vec<&str> = file_contents.lines().collect();
@@ -49,15 +37,14 @@ pub async fn list_users<F, T>(
     parser: F,
 ) -> Result<T, WPApiError>
 where
-    F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
+    F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
 {
-    parser(
-        api()
-            .list_users_request(context, &params)
-            .execute()
-            .await
-            .unwrap(),
-    )
+    api()
+        .list_users_request(context, &params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(parser)
 }
 
 pub async fn retrieve_user<F, T>(
@@ -66,28 +53,53 @@ pub async fn retrieve_user<F, T>(
     parser: F,
 ) -> Result<T, WPApiError>
 where
-    F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
+    F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
 {
-    parser(
-        api()
-            .retrieve_user_request(user_id, context)
-            .execute()
-            .await
-            .unwrap(),
-    )
+    api()
+        .retrieve_user_request(user_id, context)
+        .execute()
+        .await
+        .unwrap()
+        .parse(parser)
 }
 
 pub async fn retrieve_me<F, T>(context: WPContext, parser: F) -> Result<T, WPApiError>
 where
-    F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
+    F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
 {
-    parser(
-        api()
-            .retrieve_current_user_request(context)
-            .execute()
-            .await
-            .unwrap(),
-    )
+    api()
+        .retrieve_current_user_request(context)
+        .execute()
+        .await
+        .unwrap()
+        .parse(parser)
+}
+
+pub trait WPNetworkRequestExecutor {
+    fn execute(
+        self,
+    ) -> impl std::future::Future<Output = Result<WPNetworkResponse, reqwest::Error>> + Send;
+}
+
+impl WPNetworkRequestExecutor for WPNetworkRequest {
+    async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
+        AsyncWPNetworking::new().async_request(self).await
+    }
+}
+
+pub trait WPNetworkResponseParser {
+    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    where
+        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>;
+}
+
+impl WPNetworkResponseParser for WPNetworkResponse {
+    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    where
+        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
+    {
+        parser(self)
+    }
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {
