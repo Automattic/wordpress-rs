@@ -110,6 +110,20 @@ async fn cannot_create_user() {
 }
 
 #[tokio::test]
+async fn user_exists() {
+    let mut request = api().create_user_request(&valid_user_create_params());
+    // There is no way to create a request that'll result in `WPErrorCode::UserExists`
+    // So, we have to manually modify the request
+    request.url.push_str("?id=1");
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPErrorCode::UserExists);
+}
+
+#[tokio::test]
 async fn delete_user_invalid_reassign() {
     api()
         .delete_user_request(
