@@ -1,18 +1,16 @@
 #![allow(dead_code, unused_variables)]
 
 use http::HeaderMap;
-use wp_api::{WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse};
+use wp_api::{WPNetworkRequest, WPNetworkResponse};
 
 pub struct AsyncWPNetworking {
     client: reqwest::Client,
-    pub api_helper: WPApiHelper,
 }
 
 impl AsyncWPNetworking {
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
+    pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
-            api_helper: WPApiHelper::new(site_url, authentication),
         }
     }
 

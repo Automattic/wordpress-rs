@@ -1,5 +1,6 @@
-use test_helpers::{wp_networking, FIRST_USER_ID, SECOND_USER_ID};
 use wp_api::{UserCreateParamsBuilder, UserDeleteParams, UserUpdateParamsBuilder};
+
+use crate::test_helpers::{api, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID};
 
 pub mod test_helpers;
 pub mod wp_db;
@@ -18,10 +19,10 @@ async fn create_user() {
             .password(password.to_string())
             .build()
             .unwrap();
-        let user_create_request = wp_networking()
-            .api_helper
-            .create_user_request(&user_create_params);
-        let user_create_response = wp_networking().async_request(user_create_request).await;
+        let user_create_response = api()
+            .create_user_request(&user_create_params)
+            .execute()
+            .await;
         assert!(user_create_response.is_ok());
         let created_user =
             wp_api::parse_retrieve_user_response_with_edit_context(&user_create_response.unwrap())
@@ -45,10 +46,10 @@ async fn update_user() {
             .slug(Some(new_slug.to_string()))
             .build()
             .unwrap();
-        let user_update_request = wp_networking()
-            .api_helper
-            .update_user_request(FIRST_USER_ID, &user_update_params);
-        let user_update_response = wp_networking().async_request(user_update_request).await;
+        let user_update_response = api()
+            .update_user_request(FIRST_USER_ID, &user_update_params)
+            .execute()
+            .await;
         assert!(user_update_response.is_ok());
 
         // Assert that the DB record of the user is updated with the new slug
@@ -65,10 +66,10 @@ async fn delete_user() {
         let user_delete_params = UserDeleteParams {
             reassign: FIRST_USER_ID,
         };
-        let user_delete_request = wp_networking()
-            .api_helper
-            .delete_user_request(SECOND_USER_ID, &user_delete_params);
-        let user_delete_response = wp_networking().async_request(user_delete_request).await;
+        let user_delete_response = api()
+            .delete_user_request(SECOND_USER_ID, &user_delete_params)
+            .execute()
+            .await;
         assert!(user_delete_response.is_ok());
 
         // Assert that the DB doesn't have a record of the user anymore
@@ -87,10 +88,10 @@ async fn delete_current_user() {
         let user_delete_params = UserDeleteParams {
             reassign: SECOND_USER_ID,
         };
-        let user_delete_request = wp_networking()
-            .api_helper
-            .delete_current_user_request(&user_delete_params);
-        let user_delete_response = wp_networking().async_request(user_delete_request).await;
+        let user_delete_response = api()
+            .delete_current_user_request(&user_delete_params)
+            .execute()
+            .await;
         assert!(user_delete_response.is_ok());
 
         // Assert that the DB doesn't have a record of the user anymore

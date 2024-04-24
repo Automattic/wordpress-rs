@@ -1,8 +1,8 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
 use wp_api::{
-    UserId, UserListParams, WPApiError, WPAuthentication, WPCodedError, WPContext, WPErrorCode,
-    WPNetworkResponse,
+    UserId, UserListParams, WPApiError, WPApiHelper, WPAuthentication, WPCodedError, WPContext,
+    WPErrorCode, WPNetworkRequest, WPNetworkResponse,
 };
 
 use wp_networking::AsyncWPNetworking;
@@ -11,15 +11,26 @@ use wp_networking::AsyncWPNetworking;
 pub const FIRST_USER_ID: UserId = UserId(1);
 pub const SECOND_USER_ID: UserId = UserId(2);
 
-pub fn wp_networking() -> AsyncWPNetworking {
+pub fn api() -> WPApiHelper {
     let (site_url, username, password) = test_credentials();
     let auth_base64_token = BASE64_STANDARD.encode(format!("{}:{}", username, password));
-
     let authentication = WPAuthentication::AuthorizationHeader {
         token: auth_base64_token,
     };
 
-    AsyncWPNetworking::new(site_url.into(), authentication)
+    WPApiHelper::new(site_url, authentication)
+}
+
+pub trait WPNetworkRequestExecutor {
+    fn execute(
+        self,
+    ) -> impl std::future::Future<Output = Result<WPNetworkResponse, reqwest::Error>> + Send;
+}
+
+impl WPNetworkRequestExecutor for WPNetworkRequest {
+    async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
+        AsyncWPNetworking::new().async_request(self).await
+    }
 }
 
 pub fn test_credentials() -> (String, String, String) {
@@ -40,10 +51,13 @@ pub async fn list_users<F, T>(
 where
     F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
 {
-    let request = wp_networking()
-        .api_helper
-        .list_users_request(context, &params);
-    parser(wp_networking().async_request(request).await.unwrap())
+    parser(
+        api()
+            .list_users_request(context, &params)
+            .execute()
+            .await
+            .unwrap(),
+    )
 }
 
 pub async fn retrieve_user<F, T>(
@@ -54,20 +68,26 @@ pub async fn retrieve_user<F, T>(
 where
     F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
 {
-    let request = wp_networking()
-        .api_helper
-        .retrieve_user_request(user_id, context);
-    parser(wp_networking().async_request(request).await.unwrap())
+    parser(
+        api()
+            .retrieve_user_request(user_id, context)
+            .execute()
+            .await
+            .unwrap(),
+    )
 }
 
 pub async fn retrieve_me<F, T>(context: WPContext, parser: F) -> Result<T, WPApiError>
 where
     F: Fn(WPNetworkResponse) -> Result<T, WPApiError>,
 {
-    let request = wp_networking()
-        .api_helper
-        .retrieve_current_user_request(context);
-    parser(wp_networking().async_request(request).await.unwrap())
+    parser(
+        api()
+            .retrieve_current_user_request(context)
+            .execute()
+            .await
+            .unwrap(),
+    )
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {

@@ -1,5 +1,6 @@
-use test_helpers::FIRST_USER_ID;
 use wp_api::{UserListParams, WPContext};
+
+use crate::test_helpers::FIRST_USER_ID;
 
 pub mod test_helpers;
 
