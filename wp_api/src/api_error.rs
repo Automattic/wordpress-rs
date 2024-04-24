@@ -26,7 +26,7 @@ pub enum WPApiError {
     UnknownError,
 }
 
-#[derive(Debug, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum ClientErrorType {
     BadRequest,
     TooManyRequests,

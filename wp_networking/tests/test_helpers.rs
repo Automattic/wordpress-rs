@@ -1,6 +1,9 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
-use wp_api::{UserId, UserListParams, WPApiError, WPAuthentication, WPContext, WPNetworkResponse};
+use wp_api::{
+    UserId, UserListParams, WPApiError, WPAuthentication, WPCodedError, WPContext, WPErrorCode,
+    WPNetworkResponse,
+};
 
 use wp_networking::AsyncWPNetworking;
 
@@ -65,4 +68,34 @@ where
         .api_helper
         .retrieve_current_user_request(context);
     parser(wp_networking().async_request(request).await.unwrap())
+}
+
+pub trait AssertWpError<T: std::fmt::Debug> {
+    fn assert_wp_error(self, expected_error_code: WPErrorCode, expected_status_code: u16);
+}
+
+impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
+    fn assert_wp_error(self, expected_error_code: WPErrorCode, expected_status_code: u16) {
+        let err = self.unwrap_err();
+        if let WPApiError::ClientError {
+            coded_error: Some(WPCodedError { code: error_code }),
+            error_type: _,
+            status_code,
+            response,
+        } = err
+        {
+            assert_eq!(
+                expected_error_code, error_code,
+                "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
+                expected_error_code, error_code, response
+            );
+            assert_eq!(
+                expected_status_code, status_code,
+                "Incorrect status code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
+                expected_status_code, status_code, response
+            );
+        } else {
+            panic!("Unexpected wp_error");
+        }
+    }
 }
