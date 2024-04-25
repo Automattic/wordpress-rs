@@ -9,7 +9,7 @@ pub enum WPApiError {
         status_code
     )]
     ClientError {
-        coded_error: Option<WPCodedError>,
+        rest_error: Option<WPRestError>,
         error_type: ClientErrorType,
         status_code: u16,
         response: String,
@@ -54,12 +54,12 @@ impl ClientErrorType {
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct WPCodedError {
-    pub code: WPErrorCode,
+pub struct WPRestError {
+    pub code: WPRestErrorCode,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WPErrorCode {
+pub enum WPRestErrorCode {
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
     #[serde(rename = "rest_cannot_edit")]
@@ -88,7 +88,7 @@ pub enum WPErrorCode {
     Unauthorized,
 }
 
-impl WPErrorCode {
+impl WPRestErrorCode {
     pub fn status_code(&self) -> u16 {
         match self {
             Self::CannotCreateUser => 403,

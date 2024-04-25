@@ -1,4 +1,4 @@
-use wp_api::{WPApiHelper, WPAuthentication, WPContext, WPErrorCode};
+use wp_api::{WPApiHelper, WPAuthentication, WPContext, WPRestErrorCode};
 
 use crate::test_helpers::{AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser};
 
@@ -15,5 +15,5 @@ async fn unauthorized() {
     .await
     .unwrap()
     .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-    .assert_wp_error(WPErrorCode::Unauthorized);
+    .assert_wp_error(WPRestErrorCode::Unauthorized);
 }

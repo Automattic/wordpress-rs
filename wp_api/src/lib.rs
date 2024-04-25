@@ -326,7 +326,7 @@ pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result
     // TODO: Lots of unwraps to get a basic setup working
     if let Some(client_error_type) = ClientErrorType::from_status_code(response.status_code) {
         return Err(WPApiError::ClientError {
-            coded_error: serde_json::from_slice(&response.body).ok(),
+            rest_error: serde_json::from_slice(&response.body).ok(),
             error_type: client_error_type,
             status_code: response.status_code,
             response: response_str,

@@ -1,8 +1,8 @@
 use base64::prelude::*;
 use std::fs::read_to_string;
 use wp_api::{
-    UserId, WPApiError, WPApiHelper, WPAuthentication, WPCodedError, WPErrorCode, WPNetworkRequest,
-    WPNetworkResponse,
+    UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
+    WPRestError, WPRestErrorCode,
 };
 
 use wp_networking::AsyncWPNetworking;
@@ -63,14 +63,14 @@ impl WPNetworkResponseParser for WPNetworkResponse {
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {
-    fn assert_wp_error(self, expected_error_code: WPErrorCode);
+    fn assert_wp_error(self, expected_error_code: WPRestErrorCode);
 }
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
-    fn assert_wp_error(self, expected_error_code: WPErrorCode) {
+    fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
         let err = self.unwrap_err();
         if let WPApiError::ClientError {
-            coded_error: Some(WPCodedError { code: error_code }),
+            rest_error: Some(WPRestError { code: error_code }),
             error_type: _,
             status_code,
             response,

@@ -1,6 +1,6 @@
 use wp_api::{
     UserCreateParams, UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams,
-    UserUpdateParamsBuilder, WPApiParamUsersOrderBy, WPContext, WPErrorCode,
+    UserUpdateParamsBuilder, WPApiParamUsersOrderBy, WPContext, WPRestErrorCode,
 };
 
 use crate::test_helpers::{
@@ -21,7 +21,7 @@ async fn list_users_with_roles_user_cannot_view() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserCannotView);
+        .assert_wp_error(WPRestErrorCode::UserCannotView);
 }
 
 #[tokio::test]
@@ -34,7 +34,7 @@ async fn list_users_with_capabilities_user_cannot_view() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserCannotView);
+        .assert_wp_error(WPRestErrorCode::UserCannotView);
 }
 
 #[tokio::test]
@@ -45,7 +45,7 @@ async fn list_users_forbidden_context() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::ForbiddenContext);
+        .assert_wp_error(WPRestErrorCode::ForbiddenContext);
 }
 
 #[tokio::test]
@@ -58,7 +58,7 @@ async fn list_users_forbidden_orderby_email() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_view_context)
-        .assert_wp_error(WPErrorCode::ForbiddenOrderBy);
+        .assert_wp_error(WPRestErrorCode::ForbiddenOrderBy);
 }
 
 #[tokio::test]
@@ -71,7 +71,7 @@ async fn list_users_forbidden_order_by_registered_date() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_view_context)
-        .assert_wp_error(WPErrorCode::ForbiddenOrderBy);
+        .assert_wp_error(WPRestErrorCode::ForbiddenOrderBy);
 }
 
 #[tokio::test]
@@ -84,7 +84,7 @@ async fn list_users_forbidden_who() {
         .await
         .unwrap()
         .parse(wp_api::parse_list_users_response_with_view_context)
-        .assert_wp_error(WPErrorCode::ForbiddenWho);
+        .assert_wp_error(WPRestErrorCode::ForbiddenWho);
 }
 
 #[tokio::test]
@@ -95,7 +95,7 @@ async fn retrieve_user_invalid_user_id() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserInvalidId);
+        .assert_wp_error(WPRestErrorCode::UserInvalidId);
 }
 
 #[tokio::test]
@@ -106,13 +106,13 @@ async fn cannot_create_user() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::CannotCreateUser);
+        .assert_wp_error(WPRestErrorCode::CannotCreateUser);
 }
 
 #[tokio::test]
 async fn user_exists() {
     let mut request = api().create_user_request(&valid_user_create_params());
-    // There is no way to create a request that'll result in `WPErrorCode::UserExists`
+    // There is no way to create a request that'll result in `WPRestErrorCode::UserExists`
     // So, we have to manually modify the request
     request.url.push_str("?id=1");
     request
@@ -120,7 +120,7 @@ async fn user_exists() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserExists);
+        .assert_wp_error(WPRestErrorCode::UserExists);
 }
 
 #[tokio::test]
@@ -136,7 +136,7 @@ async fn cannot_edit_roles() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::CannotEditRoles);
+        .assert_wp_error(WPRestErrorCode::CannotEditRoles);
 }
 
 #[tokio::test]
@@ -152,7 +152,7 @@ async fn cannot_edit() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::CannotEdit);
+        .assert_wp_error(WPRestErrorCode::CannotEdit);
 }
 
 #[tokio::test]
@@ -168,7 +168,7 @@ async fn delete_user_invalid_reassign() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserInvalidReassign);
+        .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
@@ -181,7 +181,7 @@ async fn delete_current_user_invalid_reassign() {
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPErrorCode::UserInvalidReassign);
+        .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
 }
 
 fn valid_user_create_params() -> UserCreateParams {
