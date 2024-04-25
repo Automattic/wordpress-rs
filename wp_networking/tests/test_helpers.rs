@@ -10,6 +10,7 @@ use wp_networking::AsyncWPNetworking;
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
 pub const SECOND_USER_ID: UserId = UserId(2);
+pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 
 pub fn api() -> WPApiHelper {
     let credentials = test_credentials();
