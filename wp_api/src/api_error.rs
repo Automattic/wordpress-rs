@@ -70,6 +70,10 @@ pub enum WPErrorCode {
     ForbiddenWho,
     #[serde(rename = "rest_user_cannot_view")]
     UserCannotView,
+    // TODO: Not tested because it requires multi-site?
+    // https://github.com/WordPress/WordPress/blob/master/wp-includes/rest-api/endpoints/class-wp-rest-users-controller.php#L584-L588
+    #[serde(rename = "rest_user_create")]
+    UserCreate,
     #[serde(rename = "rest_user_exists")]
     UserExists,
     #[serde(rename = "rest_user_invalid_id")]
@@ -88,6 +92,7 @@ impl WPErrorCode {
             Self::ForbiddenOrderBy => 403,
             Self::ForbiddenWho => 403,
             Self::UserCannotView => 403,
+            Self::UserCreate => 500,
             Self::UserExists => 400,
             Self::UserInvalidId => 404,
             Self::UserInvalidReassign => 400,
