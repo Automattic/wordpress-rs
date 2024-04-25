@@ -140,6 +140,22 @@ async fn cannot_edit_roles() {
 }
 
 #[tokio::test]
+async fn cannot_edit() {
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .slug(Some("new_slug".to_string()))
+        .build()
+        .unwrap();
+    // Subscribers can't update someone else's slug
+    api_as_subscriber()
+        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPErrorCode::CannotEdit);
+}
+
+#[tokio::test]
 async fn delete_user_invalid_reassign() {
     api()
         .delete_user_request(
