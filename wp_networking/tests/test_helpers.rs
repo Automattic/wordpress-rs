@@ -71,7 +71,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
         let err = self.unwrap_err();
         if let WPApiError::ClientError {
             rest_error: Some(WPRestError { code: error_code }),
-            error_type: _,
             status_code,
             response,
         } = err
