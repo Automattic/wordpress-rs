@@ -1,7 +1,8 @@
 use test_helpers::SECOND_USER_EMAIL;
 use wp_api::{
     UserCreateParams, UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams,
-    UserUpdateParamsBuilder, WPApiParamUsersOrderBy, WPContext, WPRestErrorCode,
+    UserUpdateParamsBuilder, WPApiHelper, WPApiParamUsersOrderBy, WPAuthentication, WPContext,
+    WPRestErrorCode,
 };
 
 use crate::test_helpers::{
@@ -13,7 +14,7 @@ pub mod test_helpers;
 pub mod wp_db;
 
 #[tokio::test]
-async fn list_users_with_roles_user_cannot_view() {
+async fn list_users_with_roles_err_user_cannot_view() {
     let mut params = UserListParams::default();
     params.roles = vec!["foo".to_string()];
     api_as_subscriber()
@@ -26,7 +27,7 @@ async fn list_users_with_roles_user_cannot_view() {
 }
 
 #[tokio::test]
-async fn list_users_with_capabilities_user_cannot_view() {
+async fn list_users_with_capabilities_err_user_cannot_view() {
     let mut params = UserListParams::default();
     params.capabilities = vec!["foo".to_string()];
     api_as_subscriber()
@@ -39,7 +40,7 @@ async fn list_users_with_capabilities_user_cannot_view() {
 }
 
 #[tokio::test]
-async fn list_users_forbidden_context() {
+async fn list_users_err_forbidden_context() {
     api_as_subscriber()
         .list_users_request(WPContext::Edit, &None)
         .execute()
@@ -50,7 +51,7 @@ async fn list_users_forbidden_context() {
 }
 
 #[tokio::test]
-async fn list_users_forbidden_orderby_email() {
+async fn list_users_err_forbidden_orderby_email() {
     let mut params = UserListParams::default();
     params.orderby = Some(WPApiParamUsersOrderBy::Email);
     api_as_subscriber()
@@ -63,7 +64,7 @@ async fn list_users_forbidden_orderby_email() {
 }
 
 #[tokio::test]
-async fn list_users_forbidden_order_by_registered_date() {
+async fn list_users_orderby_registered_date_err_forbidden_orderby() {
     let mut params = UserListParams::default();
     params.orderby = Some(WPApiParamUsersOrderBy::RegisteredDate);
     api_as_subscriber()
@@ -76,7 +77,7 @@ async fn list_users_forbidden_order_by_registered_date() {
 }
 
 #[tokio::test]
-async fn list_users_forbidden_who() {
+async fn list_users_err_forbidden_who() {
     let mut params = UserListParams::default();
     params.who = Some("authors".to_string());
     api_as_subscriber()
@@ -89,7 +90,7 @@ async fn list_users_forbidden_who() {
 }
 
 #[tokio::test]
-async fn retrieve_user_invalid_user_id() {
+async fn retrieve_user_err_user_invalid_id() {
     api()
         .retrieve_user_request(UserId(987654321), WPContext::Edit)
         .execute()
@@ -100,7 +101,21 @@ async fn retrieve_user_invalid_user_id() {
 }
 
 #[tokio::test]
-async fn create_user_cannot_create_user() {
+async fn retrieve_user_err_unauthorized() {
+    WPApiHelper::new(
+        test_helpers::test_credentials().site_url,
+        WPAuthentication::None,
+    )
+    .retrieve_current_user_request(WPContext::Edit)
+    .execute()
+    .await
+    .unwrap()
+    .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+    .assert_wp_error(WPRestErrorCode::Unauthorized);
+}
+
+#[tokio::test]
+async fn create_user_err_cannot_create_user() {
     api_as_subscriber()
         .create_user_request(&valid_user_create_params())
         .execute()
@@ -111,7 +126,7 @@ async fn create_user_cannot_create_user() {
 }
 
 #[tokio::test]
-async fn create_user_user_exists() {
+async fn create_user_err_user_exists() {
     let mut request = api().create_user_request(&valid_user_create_params());
     // There is no way to create a request that'll result in `WPRestErrorCode::UserExists`
     // So, we have to manually modify the request
@@ -125,7 +140,7 @@ async fn create_user_user_exists() {
 }
 
 #[tokio::test]
-async fn update_user_cannot_edit_roles() {
+async fn update_user_err_cannot_edit_roles() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .roles(vec!["new_role".to_string()])
         .build()
@@ -141,7 +156,7 @@ async fn update_user_cannot_edit_roles() {
 }
 
 #[tokio::test]
-async fn update_user_cannot_edit() {
+async fn update_user_err_cannot_edit() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .slug(Some("new_slug".to_string()))
         .build()
@@ -157,7 +172,7 @@ async fn update_user_cannot_edit() {
 }
 
 #[tokio::test]
-async fn update_user_invalid_param() {
+async fn update_user_err_invalid_param() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .email(Some("not_valid".to_string()))
         .build()
@@ -172,7 +187,7 @@ async fn update_user_invalid_param() {
 }
 
 #[tokio::test]
-async fn update_user_user_invalid_email() {
+async fn update_user_err_user_invalid_email() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .email(Some(SECOND_USER_EMAIL.to_string()))
         .build()
@@ -188,7 +203,7 @@ async fn update_user_user_invalid_email() {
 }
 
 #[tokio::test]
-async fn delete_user_invalid_reassign() {
+async fn delete_user_err_user_invalid_reassign() {
     api()
         .delete_user_request(
             FIRST_USER_ID,
@@ -204,7 +219,7 @@ async fn delete_user_invalid_reassign() {
 }
 
 #[tokio::test]
-async fn delete_current_user_invalid_reassign() {
+async fn delete_current_user_err_user_invalid_reassign() {
     api()
         .delete_current_user_request(&UserDeleteParams {
             reassign: UserId(987654321),
