@@ -27,6 +27,7 @@ pub enum WPApiError {
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
 pub struct WPRestError {
     pub code: WPRestErrorCode,
+    pub message: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]

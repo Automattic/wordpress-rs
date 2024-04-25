@@ -70,7 +70,11 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
     fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
         let err = self.unwrap_err();
         if let WPApiError::ClientError {
-            rest_error: Some(WPRestError { code: error_code }),
+            rest_error:
+                Some(WPRestError {
+                    code: error_code,
+                    message: _,
+                }),
             status_code,
             response,
         } = err
