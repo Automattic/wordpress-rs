@@ -7,7 +7,7 @@ use wp_api::{
 
 use crate::test_helpers::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
-    FIRST_USER_ID, SECOND_USER_ID,
+    FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
 };
 
 pub mod test_helpers;
@@ -128,8 +128,8 @@ async fn create_user_err_cannot_create_user() {
 #[tokio::test]
 async fn create_user_err_user_exists() {
     let mut request = api().create_user_request(&valid_user_create_params());
-    // There is no way to create a request that'll result in `WPRestErrorCode::UserExists`
-    // So, we have to manually modify the request
+    // There is no way to create a request that'll result in `WPRestErrorCode::UserExists`.
+    // So, we have to manually modify the request.
     request.url.push_str("?id=1");
     request
         .execute()
@@ -190,6 +190,8 @@ async fn update_user_err_invalid_param() {
 async fn update_user_err_user_invalid_argument() {
     let user_update_params = UserUpdateParamsBuilder::default().build().unwrap();
     let mut request = api().update_user_request(FIRST_USER_ID, &user_update_params);
+    // `UserUpdateParams` doesn't include `username because it's not editable.
+    // So, we have to manually modify the request.
     request.body = Some(
         serde_json::json!({
             "username": "new_username",
@@ -236,6 +238,22 @@ async fn delete_user_err_user_invalid_reassign() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
+}
+
+#[tokio::test]
+async fn update_user_err_user_invalid_slug() {
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .slug(Some(SECOND_USER_SLUG.to_string()))
+        .build()
+        .unwrap();
+    // Can't update user's slug to a slug that's already in use
+    api()
+        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserInvalidSlug);
 }
 
 #[tokio::test]
