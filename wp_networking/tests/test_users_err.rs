@@ -99,7 +99,7 @@ async fn retrieve_user_invalid_user_id() {
 }
 
 #[tokio::test]
-async fn cannot_create_user() {
+async fn create_user_cannot_create_user() {
     api_as_subscriber()
         .create_user_request(&valid_user_create_params())
         .execute()
@@ -110,7 +110,7 @@ async fn cannot_create_user() {
 }
 
 #[tokio::test]
-async fn user_exists() {
+async fn create_user_user_exists() {
     let mut request = api().create_user_request(&valid_user_create_params());
     // There is no way to create a request that'll result in `WPRestErrorCode::UserExists`
     // So, we have to manually modify the request
@@ -124,7 +124,7 @@ async fn user_exists() {
 }
 
 #[tokio::test]
-async fn cannot_edit_roles() {
+async fn update_user_cannot_edit_roles() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .roles(vec!["new_role".to_string()])
         .build()
@@ -140,7 +140,7 @@ async fn cannot_edit_roles() {
 }
 
 #[tokio::test]
-async fn cannot_edit() {
+async fn update_user_cannot_edit() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .slug(Some("new_slug".to_string()))
         .build()
@@ -153,6 +153,21 @@ async fn cannot_edit() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotEdit);
+}
+
+#[tokio::test]
+async fn update_user_invalid_param() {
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .email(Some("not_valid".to_string()))
+        .build()
+        .unwrap();
+    api()
+        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::InvalidParam);
 }
 
 #[tokio::test]

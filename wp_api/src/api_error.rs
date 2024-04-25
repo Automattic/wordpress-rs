@@ -44,6 +44,8 @@ pub enum WPRestErrorCode {
     ForbiddenOrderBy,
     #[serde(rename = "rest_forbidden_who")]
     ForbiddenWho,
+    #[serde(rename = "rest_invalid_param")]
+    InvalidParam,
     #[serde(rename = "rest_user_cannot_view")]
     UserCannotView,
     // TODO: Not tested because it requires multi-site?
@@ -69,6 +71,7 @@ impl WPRestErrorCode {
             Self::ForbiddenContext => 403,
             Self::ForbiddenOrderBy => 403,
             Self::ForbiddenWho => 403,
+            Self::InvalidParam => 400,
             Self::UserCannotView => 403,
             Self::UserCreate => 500,
             Self::UserExists => 400,
