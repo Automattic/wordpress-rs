@@ -71,7 +71,7 @@ pub trait AssertWpError<T: std::fmt::Debug> {
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
     fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
         let err = self.unwrap_err();
-        if let WPApiError::ClientError {
+        if let WPApiError::RestError {
             rest_error:
                 Some(WPRestError {
                     code: error_code,

@@ -2,26 +2,20 @@ use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WPApiError {
-    #[error(
-        "Client error with rest_error '{:?}' and status_code '{}'",
-        rest_error,
-        status_code
-    )]
-    ClientError {
+    #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
+    RestError {
         rest_error: Option<WPRestError>,
         status_code: u16,
         response: String,
     },
+    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
+    ParsingError { reason: String, response: String },
     #[error(
-        "Server error with status_code \nStatus Code: {}\nResponse: {}",
+        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
         status_code,
         response
     )]
-    ServerError { status_code: u16, response: String },
-    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
-    ParsingError { reason: String, response: String },
-    #[error("Error that's not yet handled by the library")]
-    UnknownError,
+    UnknownError { status_code: u16, response: String },
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]

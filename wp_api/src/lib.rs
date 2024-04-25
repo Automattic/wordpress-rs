@@ -325,20 +325,20 @@ pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result
     // TODO: Further parse the response body to include error message
     // TODO: Lots of unwraps to get a basic setup working
     let status = http::StatusCode::from_u16(response.status_code).unwrap();
-    if status.is_client_error() {
-        return Err(WPApiError::ClientError {
-            rest_error: serde_json::from_slice(&response.body).ok(),
+    if let Ok(rest_error) = serde_json::from_slice(&response.body) {
+        Err(WPApiError::RestError {
+            rest_error,
             status_code: response.status_code,
             response: response_str,
-        });
-    }
-    if status.is_server_error() {
-        return Err(WPApiError::ServerError {
+        })
+    } else if status.is_client_error() || status.is_server_error() {
+        Err(WPApiError::UnknownError {
             status_code: response.status_code,
             response: response_str,
-        });
+        })
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 // TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
