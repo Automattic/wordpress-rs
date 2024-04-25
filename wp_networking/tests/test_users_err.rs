@@ -225,22 +225,6 @@ async fn update_user_err_user_invalid_email() {
 }
 
 #[tokio::test]
-async fn delete_user_err_user_invalid_reassign() {
-    api()
-        .delete_user_request(
-            FIRST_USER_ID,
-            &UserDeleteParams {
-                reassign: UserId(987654321),
-            },
-        )
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
-}
-
-#[tokio::test]
 async fn update_user_err_user_invalid_slug() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .slug(Some(SECOND_USER_SLUG.to_string()))
@@ -254,6 +238,41 @@ async fn update_user_err_user_invalid_slug() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidSlug);
+}
+
+#[tokio::test]
+async fn delete_user_err_trash_not_supported() {
+    let mut request = api().delete_user_request(
+        FIRST_USER_ID,
+        &UserDeleteParams {
+            reassign: SECOND_USER_ID,
+        },
+    );
+    // There is no way to create a request that'll result in `WPRestErrorCode::TrashNotSupported`.
+    // So, we have to manually modify the request.
+    request.url = request.url.replace("&force=true", "");
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::TrashNotSupported);
+}
+
+#[tokio::test]
+async fn delete_user_err_user_invalid_reassign() {
+    api()
+        .delete_user_request(
+            FIRST_USER_ID,
+            &UserDeleteParams {
+                reassign: UserId(987654321),
+            },
+        )
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
