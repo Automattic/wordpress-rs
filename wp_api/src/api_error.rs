@@ -62,6 +62,8 @@ pub struct WPCodedError {
 pub enum WPErrorCode {
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
+    #[serde(rename = "rest_cannot_edit_roles")]
+    CannotEditRoles,
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
     #[serde(rename = "rest_forbidden_orderby")]
@@ -88,6 +90,7 @@ impl WPErrorCode {
     pub fn status_code(&self) -> u16 {
         match self {
             Self::CannotCreateUser => 403,
+            Self::CannotEditRoles => 403,
             Self::ForbiddenContext => 403,
             Self::ForbiddenOrderBy => 403,
             Self::ForbiddenWho => 403,

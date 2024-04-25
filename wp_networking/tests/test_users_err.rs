@@ -1,11 +1,11 @@
 use wp_api::{
     UserCreateParams, UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams,
-    WPApiParamUsersOrderBy, WPContext, WPErrorCode,
+    UserUpdateParamsBuilder, WPApiParamUsersOrderBy, WPContext, WPErrorCode,
 };
 
 use crate::test_helpers::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
-    FIRST_USER_ID,
+    FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod test_helpers;
@@ -121,6 +121,22 @@ async fn user_exists() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPErrorCode::UserExists);
+}
+
+#[tokio::test]
+async fn cannot_edit_roles() {
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .roles(vec!["new_role".to_string()])
+        .build()
+        .unwrap();
+    // Subscribers can't update their roles
+    api_as_subscriber()
+        .update_user_request(SECOND_USER_ID, &user_update_params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPErrorCode::CannotEditRoles);
 }
 
 #[tokio::test]
