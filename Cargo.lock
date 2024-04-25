@@ -3033,6 +3033,7 @@ dependencies = [
  "futures",
  "http 1.1.0",
  "reqwest",
+ "serde_json",
  "sqlx",
  "tokio",
  "wp_api",

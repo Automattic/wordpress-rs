@@ -187,6 +187,26 @@ async fn update_user_err_invalid_param() {
 }
 
 #[tokio::test]
+async fn update_user_err_user_invalid_argument() {
+    let user_update_params = UserUpdateParamsBuilder::default().build().unwrap();
+    let mut request = api().update_user_request(FIRST_USER_ID, &user_update_params);
+    request.body = Some(
+        serde_json::json!({
+            "username": "new_username",
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    // Usernames are not editable
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
+}
+
+#[tokio::test]
 async fn update_user_err_user_invalid_email() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .email(Some(SECOND_USER_EMAIL.to_string()))

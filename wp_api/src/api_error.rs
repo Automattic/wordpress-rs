@@ -54,6 +54,8 @@ pub enum WPRestErrorCode {
     UserCreate,
     #[serde(rename = "rest_user_exists")]
     UserExists,
+    #[serde(rename = "rest_user_invalid_argument")]
+    UserInvalidArgument,
     #[serde(rename = "rest_user_invalid_id")]
     UserInvalidId,
     #[serde(rename = "rest_user_invalid_email")]
@@ -77,6 +79,7 @@ impl WPRestErrorCode {
             Self::UserCannotView => 403,
             Self::UserCreate => 500,
             Self::UserExists => 400,
+            Self::UserInvalidArgument => 400,
             Self::UserInvalidId => 404,
             Self::UserInvalidEmail => 400,
             Self::UserInvalidReassign => 400,

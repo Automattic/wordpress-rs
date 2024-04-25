@@ -12,5 +12,7 @@ wp_api = { path = "../wp_api" }
 [dev-dependencies]
 chrono = { version = "0.4" }
 futures = "0.3"
+# TODO: Use workspace version
+serde_json = "1.0"
 sqlx = { version = "0.7", features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
 tokio = { version = "1.37", features = [ "full" ] }
