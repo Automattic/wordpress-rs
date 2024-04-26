@@ -241,6 +241,22 @@ async fn update_user_err_user_invalid_slug() {
 }
 
 #[tokio::test]
+async fn delete_user_err_user_cannot_delete() {
+    api_as_subscriber()
+        .delete_user_request(
+            FIRST_USER_ID,
+            &UserDeleteParams {
+                reassign: SECOND_USER_ID,
+            },
+        )
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserCannotDelete);
+}
+
+#[tokio::test]
 async fn delete_user_err_trash_not_supported() {
     let mut request = api().delete_user_request(
         FIRST_USER_ID,

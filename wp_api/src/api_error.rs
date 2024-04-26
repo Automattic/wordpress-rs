@@ -42,6 +42,8 @@ pub enum WPRestErrorCode {
     InvalidParam,
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,
+    #[serde(rename = "rest_user_cannot_delete")]
+    UserCannotDelete,
     #[serde(rename = "rest_user_cannot_view")]
     UserCannotView,
     // TODO: Not tested because it requires multi-site?
@@ -75,6 +77,7 @@ impl WPRestErrorCode {
             Self::ForbiddenWho => 403,
             Self::InvalidParam => 400,
             Self::TrashNotSupported => 501,
+            Self::UserCannotDelete => 403,
             Self::UserCannotView => 403,
             Self::UserCreate => 500,
             Self::UserExists => 400,
