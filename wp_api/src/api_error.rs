@@ -73,6 +73,8 @@ pub enum WPRestErrorCode {
     UserInvalidEmail,
     #[serde(rename = "rest_user_invalid_reassign")]
     UserInvalidReassign,
+    #[serde(rename = "rest_user_invalid_role")]
+    UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
     #[serde(rename = "rest_not_logged_in")]
@@ -98,6 +100,7 @@ impl WPRestErrorCode {
             Self::UserInvalidId => 404,
             Self::UserInvalidEmail => 400,
             Self::UserInvalidReassign => 400,
+            Self::UserInvalidRole => 400,
             Self::UserInvalidSlug => 400,
             Self::Unauthorized => 401,
         }

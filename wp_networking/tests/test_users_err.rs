@@ -225,6 +225,22 @@ async fn update_user_err_user_invalid_email() {
 }
 
 #[tokio::test]
+async fn update_user_err_user_invalid_role() {
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .roles(vec!["doesnt_exist".to_string()])
+        .build()
+        .unwrap();
+    // Can't update user's email to a role that doesn't exist
+    api()
+        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserInvalidRole);
+}
+
+#[tokio::test]
 async fn update_user_err_user_invalid_slug() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .slug(Some(SECOND_USER_SLUG.to_string()))
