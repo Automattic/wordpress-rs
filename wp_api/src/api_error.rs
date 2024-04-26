@@ -53,32 +53,35 @@ pub enum WPRestErrorCode {
     ForbiddenWho,
     #[serde(rename = "rest_invalid_param")]
     InvalidParam,
-    #[serde(rename = "rest_trash_not_supported")]
-    TrashNotSupported,
+    #[serde(rename = "rest_not_logged_in")]
+    Unauthorized,
     #[serde(rename = "rest_user_cannot_delete")]
     UserCannotDelete,
     #[serde(rename = "rest_user_cannot_view")]
     UserCannotView,
-    // TODO: Not tested because it requires multi-site?
-    // https://github.com/WordPress/WordPress/blob/master/wp-includes/rest-api/endpoints/class-wp-rest-users-controller.php#L584-L588
-    #[serde(rename = "rest_user_create")]
-    UserCreate,
-    #[serde(rename = "rest_user_exists")]
-    UserExists,
-    #[serde(rename = "rest_user_invalid_argument")]
-    UserInvalidArgument,
-    #[serde(rename = "rest_user_invalid_id")]
-    UserInvalidId,
     #[serde(rename = "rest_user_invalid_email")]
     UserInvalidEmail,
+    #[serde(rename = "rest_user_invalid_id")]
+    UserInvalidId,
     #[serde(rename = "rest_user_invalid_reassign")]
     UserInvalidReassign,
     #[serde(rename = "rest_user_invalid_role")]
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
-    #[serde(rename = "rest_not_logged_in")]
-    Unauthorized,
+    // Tested, but we believe these errors are imppossible to get unless the requests are manually modified
+    #[serde(rename = "rest_user_exists")]
+    UserExists,
+    #[serde(rename = "rest_user_invalid_argument")]
+    UserInvalidArgument,
+    #[serde(rename = "rest_trash_not_supported")]
+    TrashNotSupported,
+    // Untested, because we believe these errors require multisite
+    #[serde(rename = "rest_user_create")]
+    UserCreate,
+    // Untested, because we believe these errors are impossible to get
+    #[serde(rename = "rest_user_invalid_username")]
+    InvalidUsername,
 }
 
 impl WPRestErrorCode {
@@ -91,18 +94,19 @@ impl WPRestErrorCode {
             Self::ForbiddenOrderBy => 403,
             Self::ForbiddenWho => 403,
             Self::InvalidParam => 400,
+            Self::InvalidUsername => 400,
             Self::TrashNotSupported => 501,
+            Self::Unauthorized => 401,
             Self::UserCannotDelete => 403,
             Self::UserCannotView => 403,
             Self::UserCreate => 500,
             Self::UserExists => 400,
             Self::UserInvalidArgument => 400,
-            Self::UserInvalidId => 404,
             Self::UserInvalidEmail => 400,
+            Self::UserInvalidId => 404,
             Self::UserInvalidReassign => 400,
             Self::UserInvalidRole => 400,
             Self::UserInvalidSlug => 400,
-            Self::Unauthorized => 401,
         }
     }
 }

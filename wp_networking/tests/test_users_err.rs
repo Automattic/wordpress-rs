@@ -126,20 +126,6 @@ async fn create_user_err_cannot_create_user() {
 }
 
 #[tokio::test]
-async fn create_user_err_user_exists() {
-    let mut request = api().create_user_request(&valid_user_create_params());
-    // There is no way to create a request that'll result in `WPRestErrorCode::UserExists`.
-    // So, we have to manually modify the request.
-    request.url.push_str("?id=1");
-    request
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserExists);
-}
-
-#[tokio::test]
 async fn update_user_err_cannot_edit_roles() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .roles(vec!["new_role".to_string()])
@@ -184,28 +170,6 @@ async fn update_user_err_invalid_param() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::InvalidParam);
-}
-
-#[tokio::test]
-async fn update_user_err_user_invalid_argument() {
-    let user_update_params = UserUpdateParamsBuilder::default().build().unwrap();
-    let mut request = api().update_user_request(FIRST_USER_ID, &user_update_params);
-    // `UserUpdateParams` doesn't include `username because it's not editable.
-    // So, we have to manually modify the request.
-    request.body = Some(
-        serde_json::json!({
-            "username": "new_username",
-        })
-        .to_string()
-        .into_bytes(),
-    );
-    // Usernames are not editable
-    request
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
 }
 
 #[tokio::test]
@@ -273,25 +237,6 @@ async fn delete_user_err_user_cannot_delete() {
 }
 
 #[tokio::test]
-async fn delete_user_err_trash_not_supported() {
-    let mut request = api().delete_user_request(
-        FIRST_USER_ID,
-        &UserDeleteParams {
-            reassign: SECOND_USER_ID,
-        },
-    );
-    // There is no way to create a request that'll result in `WPRestErrorCode::TrashNotSupported`.
-    // So, we have to manually modify the request.
-    request.url = request.url.replace("&force=true", "");
-    request
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::TrashNotSupported);
-}
-
-#[tokio::test]
 async fn delete_user_err_user_invalid_reassign() {
     api()
         .delete_user_request(
@@ -319,6 +264,61 @@ async fn delete_current_user_err_user_invalid_reassign() {
         .parse(wp_api::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
 }
+
+// In the following tests, we manually modify the request because the errors they test are not
+// possible to get without it. We believe these tests are still useful as they act as a
+// documentation for how these errors might be received.
+
+#[tokio::test]
+async fn create_user_err_user_exists() {
+    let mut request = api().create_user_request(&valid_user_create_params());
+    request.url.push_str("?id=1");
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserExists);
+}
+
+#[tokio::test]
+async fn delete_user_err_trash_not_supported() {
+    let mut request = api().delete_user_request(
+        FIRST_USER_ID,
+        &UserDeleteParams {
+            reassign: SECOND_USER_ID,
+        },
+    );
+    request.url = request.url.replace("&force=true", "");
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::TrashNotSupported);
+}
+
+#[tokio::test]
+async fn update_user_err_user_invalid_argument() {
+    let user_update_params = UserUpdateParamsBuilder::default().build().unwrap();
+    let mut request = api().update_user_request(FIRST_USER_ID, &user_update_params);
+    request.body = Some(
+        serde_json::json!({
+            "username": "new_username",
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    // Usernames are not editable
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
+}
+
+// Helpers
 
 fn valid_user_create_params() -> UserCreateParams {
     UserCreateParamsBuilder::default()
