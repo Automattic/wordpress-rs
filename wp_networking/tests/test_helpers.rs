@@ -2,7 +2,7 @@ use base64::prelude::*;
 use std::fs::read_to_string;
 use wp_api::{
     UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
-    WPRestError, WPRestErrorCode,
+    WPRestError, WPRestErrorCode, WPRestErrorWrapper,
 };
 
 use wp_networking::AsyncWPNetworking;
@@ -73,7 +73,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
         let err = self.unwrap_err();
         if let WPApiError::RestError {
             rest_error:
-                Some(WPRestError {
+                WPRestErrorWrapper::Recognized(WPRestError {
                     code: error_code,
                     message: _,
                 }),
@@ -93,6 +93,16 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
                 expected_error_code.status_code(),
                 status_code,
                 response
+            );
+        } else if let WPApiError::RestError {
+            rest_error: WPRestErrorWrapper::Unrecognized(unrecognized_error),
+            status_code,
+            response,
+        } = err
+        {
+            panic!(
+                "Received unhandled WPRestError variant: '{:?}' with status_code: '{}'. Response was: '{:?}'",
+                unrecognized_error, status_code, response
             );
         } else {
             panic!("Unexpected wp_error '{:?}'", err);

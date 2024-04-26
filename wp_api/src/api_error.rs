@@ -4,7 +4,7 @@ use serde::Deserialize;
 pub enum WPApiError {
     #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
     RestError {
-        rest_error: Option<WPRestError>,
+        rest_error: WPRestErrorWrapper,
         status_code: u16,
         response: String,
     },
@@ -18,9 +18,22 @@ pub enum WPApiError {
     UnknownError { status_code: u16, response: String },
 }
 
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
+#[serde(untagged)]
+pub enum WPRestErrorWrapper {
+    Recognized(WPRestError),
+    Unrecognized(UnrecognizedWPRestError),
+}
+
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
 pub struct WPRestError {
     pub code: WPRestErrorCode,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
+pub struct UnrecognizedWPRestError {
+    pub code: String,
     pub message: String,
 }
 
