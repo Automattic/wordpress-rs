@@ -81,7 +81,9 @@ pub enum WPRestErrorCode {
     UserCreate,
     // Untested, because we believe these errors are impossible to get
     #[serde(rename = "rest_user_invalid_username")]
-    InvalidUsername,
+    UserInvalidUsername,
+    #[serde(rename = "rest_user_invalid_password")]
+    UserInvalidPassword,
 }
 
 impl WPRestErrorCode {
@@ -94,7 +96,6 @@ impl WPRestErrorCode {
             Self::ForbiddenOrderBy => 403,
             Self::ForbiddenWho => 403,
             Self::InvalidParam => 400,
-            Self::InvalidUsername => 400,
             Self::TrashNotSupported => 501,
             Self::Unauthorized => 401,
             Self::UserCannotDelete => 403,
@@ -104,9 +105,11 @@ impl WPRestErrorCode {
             Self::UserInvalidArgument => 400,
             Self::UserInvalidEmail => 400,
             Self::UserInvalidId => 404,
+            Self::UserInvalidPassword => 400,
             Self::UserInvalidReassign => 400,
             Self::UserInvalidRole => 400,
             Self::UserInvalidSlug => 400,
+            Self::UserInvalidUsername => 400,
         }
     }
 }

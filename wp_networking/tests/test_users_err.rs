@@ -219,9 +219,24 @@ async fn update_user_err_user_invalid_email() {
 }
 
 #[tokio::test]
-async fn update_user_err_invalid_param() {
+async fn update_user_email_err_invalid_param() {
     let user_update_params = UserUpdateParamsBuilder::default()
         .email(Some("not_valid".to_string()))
+        .build()
+        .unwrap();
+    api()
+        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::InvalidParam);
+}
+
+#[tokio::test]
+async fn update_user_password_err_invalid_param() {
+    let user_update_params = UserUpdateParamsBuilder::default()
+        .password(Some("".to_string()))
         .build()
         .unwrap();
     api()
