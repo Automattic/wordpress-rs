@@ -26,6 +26,7 @@ local.properties
 .swiftpm/xcode
 xcuserdata
 DerivedData
+fastlane/report.xml
 
 # Auto-generated Swift Files
 native/swift/Sources/wordpress-api-wrapper/*.swift
@@ -37,3 +38,4 @@ test_credentials
 
 # CI Cache
 .cargo
+/vendor
