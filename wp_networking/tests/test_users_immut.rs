@@ -1,6 +1,8 @@
-use wp_api::{UserListParams, WPContext};
+use wp_api::{UserListParams, WPApiParamOrder, WPContext};
 
-use crate::test_helpers::{api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID};
+use crate::test_helpers::{
+    api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
+};
 
 pub mod test_helpers;
 
@@ -38,17 +40,52 @@ async fn list_users_with_view_context() {
 }
 
 #[tokio::test]
-async fn list_users_with_edit_context_second_page() {
+async fn list_users_param_page() {
     let mut params = UserListParams::default();
     params.page = Some(2);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_per_page() {
+    let mut params = UserListParams::default();
     params.per_page = Some(2);
-    assert!(api()
-        .list_users_request(WPContext::Edit, &Some(params))
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_list_users_response_with_edit_context)
-        .is_ok());
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_search() {
+    let mut params = UserListParams::default();
+    params.search = Some("foo".to_string());
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_exclude() {
+    let mut params = UserListParams::default();
+    params.exclude = vec![FIRST_USER_ID];
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_include() {
+    let mut params = UserListParams::default();
+    params.include = vec![SECOND_USER_ID];
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_offset() {
+    let mut params = UserListParams::default();
+    params.offset = Some(2);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_order_desc() {
+    let mut params = UserListParams::default();
+    params.order = Some(WPApiParamOrder::Desc);
+    test_user_list_params(params).await;
 }
 
 #[tokio::test]
@@ -115,4 +152,18 @@ async fn retrieve_current_user_with_view_context() {
         .unwrap()
         .parse(wp_api::parse_retrieve_user_response_with_view_context)
         .is_ok());
+}
+
+async fn test_user_list_params(params: UserListParams) {
+    let parsed_response = api()
+        .list_users_request(WPContext::Edit, &Some(params))
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_list_users_response_with_edit_context);
+    assert!(
+        parsed_response.is_ok(),
+        "Response was: '{:?}'",
+        parsed_response
+    );
 }

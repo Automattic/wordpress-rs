@@ -103,9 +103,9 @@ pub struct UserListParams {
     /// Limit results to those matching a string.
     pub search: Option<String>,
     /// Ensure result set excludes specific IDs.
-    pub exclude: Option<String>,
+    pub exclude: Vec<UserId>,
     /// Limit result set to specific IDs.
-    pub include: Option<String>,
+    pub include: Vec<UserId>,
     /// Offset the result set by a specific number of items.
     pub offset: Option<u32>,
     /// Order sort attribute ascending or descending.
@@ -135,8 +135,26 @@ impl UserListParams {
             ("page", self.page.map(|x| x.to_string())),
             ("per_page", self.per_page.map(|x| x.to_string())),
             ("search", self.search.clone()),
-            ("exclude", self.exclude.clone()),
-            ("include", self.include.clone()),
+            (
+                "exclude",
+                (!self.exclude.is_empty()).then_some(
+                    self.exclude
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "include",
+                (!self.include.is_empty()).then_some(
+                    self.include
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
             ("offset", self.offset.map(|x| x.to_string())),
             ("order", self.order.map(|x| x.as_str().to_string())),
             ("orderby", self.orderby.map(|x| x.as_str().to_string())),
