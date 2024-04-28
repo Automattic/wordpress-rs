@@ -1,5 +1,5 @@
 use wp_api::{UserCreateParams, UserDeleteParams, UserUpdateParams};
-use wp_db::DbUser;
+use wp_db::{DbUser, DbUserMeta};
 
 use crate::test_helpers::{
     api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
@@ -82,19 +82,51 @@ async fn delete_current_user() {
 }
 
 #[tokio::test]
+async fn update_user_name() {
+    let new_name = "new_name";
+    let mut params = UserUpdateParams::default();
+    params.name = Some(new_name.to_string());
+    test_update_user(params, |user, _| {
+        assert_eq!(user.name, new_name);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_first_name() {
+    let new_first_name = "new_first_name";
+    let mut params = UserUpdateParams::default();
+    params.first_name = Some(new_first_name.to_string());
+    test_update_user(params, |_, meta_list| {
+        let db_first_name = meta_list
+            .into_iter()
+            .find_map(|m| {
+                if m.meta_key == "first_name" {
+                    Some(m.meta_value)
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        assert_eq!(db_first_name, new_first_name);
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn update_user_slug() {
     let new_slug = "new_slug";
     let mut params = UserUpdateParams::default();
     params.slug = Some(new_slug.to_string());
-    test_update_user(params, |db_user| {
-        assert_eq!(db_user.slug, new_slug);
+    test_update_user(params, |user, _| {
+        assert_eq!(user.slug, new_slug);
     })
     .await;
 }
 
 async fn test_update_user<F>(params: UserUpdateParams, assert: F)
 where
-    F: Fn(DbUser) -> (),
+    F: Fn(DbUser, Vec<DbUserMeta>) -> (),
 {
     wp_db::run_and_restore(|mut db| async move {
         let user_update_response = api()
@@ -103,8 +135,10 @@ where
             .await;
         assert!(user_update_response.is_ok());
 
-        let first_user_after_update = db.fetch_db_user(FIRST_USER_ID.0 as u64).await.unwrap();
-        assert(first_user_after_update);
+        let db_user_after_update = db.fetch_db_user(FIRST_USER_ID.0 as u64).await.unwrap();
+        let db_user_meta_after_update =
+            db.fetch_db_user_meta(FIRST_USER_ID.0 as u64).await.unwrap();
+        assert(db_user_after_update, db_user_meta_after_update);
     })
     .await;
 }

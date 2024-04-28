@@ -47,6 +47,16 @@ impl WordPressDb {
             .fetch_one(&mut self.conn)
             .await
     }
+
+    pub async fn fetch_db_user_meta(
+        &mut self,
+        user_id: u64,
+    ) -> Result<Vec<DbUserMeta>, sqlx::Error> {
+        sqlx::query_as("SELECT * FROM wp_usermeta WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_all(&mut self.conn)
+            .await
+    }
 }
 
 #[allow(dead_code)]
@@ -66,4 +76,12 @@ pub struct DbUser {
     pub registered_date: chrono::DateTime<chrono::Utc>,
     #[sqlx(rename = "display_name")]
     pub name: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, sqlx::FromRow)]
+pub struct DbUserMeta {
+    pub user_id: u64,
+    pub meta_key: String,
+    pub meta_value: String,
 }
