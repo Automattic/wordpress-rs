@@ -267,7 +267,7 @@ pub struct UserCreateParams {
     pub meta: Option<String>,
 }
 
-#[derive(Builder, Serialize, uniffi::Record)]
+#[derive(Builder, Default, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
     /// Display name for the user.
     #[builder(default)]
