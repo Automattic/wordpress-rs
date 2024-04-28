@@ -152,6 +152,27 @@ async fn list_users_param_orderby_url() {
 }
 
 #[tokio::test]
+async fn list_users_param_slug() {
+    let mut params = UserListParams::default();
+    params.slug = vec!["foo".to_string()];
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_roles() {
+    let mut params = UserListParams::default();
+    params.roles = vec!["foo".to_string()];
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_capabilities() {
+    let mut params = UserListParams::default();
+    params.capabilities = vec!["foo".to_string()];
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
 async fn retrieve_user_with_edit_context() {
     assert!(api()
         .retrieve_user_request(FIRST_USER_ID, WPContext::Edit)
