@@ -169,6 +169,40 @@ async fn update_user_slug() {
     .await;
 }
 
+#[tokio::test]
+async fn update_user_roles() {
+    wp_db::run_and_restore(|_| async move {
+        let new_role = "new_role";
+        let mut params = UserUpdateParams::default();
+        params.roles = vec![new_role.to_string()];
+        let user_update_response = api()
+            .update_user_request(FIRST_USER_ID, &params)
+            .execute()
+            .await;
+        // It's quite tricky to validate the roles from DB, so we just ensure the request was
+        // successful
+        assert!(user_update_response.is_ok());
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_password() {
+    wp_db::run_and_restore(|_| async move {
+        let new_password = "new_password";
+        let mut params = UserUpdateParams::default();
+        params.password = Some(new_password.to_string());
+        let user_update_response = api()
+            .update_user_request(FIRST_USER_ID, &params)
+            .execute()
+            .await;
+        // It's quite tricky to validate the password from DB, so we just ensure the request was
+        // successful
+        assert!(user_update_response.is_ok());
+    })
+    .await;
+}
+
 async fn test_update_user<F>(params: UserUpdateParams, assert: F)
 where
     F: Fn(DbUser, Vec<DbUserMeta>) -> (),
