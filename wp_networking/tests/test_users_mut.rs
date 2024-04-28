@@ -98,17 +98,62 @@ async fn update_user_first_name() {
     let mut params = UserUpdateParams::default();
     params.first_name = Some(new_first_name.to_string());
     test_update_user(params, |_, meta_list| {
-        let db_first_name = meta_list
-            .into_iter()
-            .find_map(|m| {
-                if m.meta_key == "first_name" {
-                    Some(m.meta_value)
-                } else {
-                    None
-                }
-            })
-            .unwrap();
-        assert_eq!(db_first_name, new_first_name);
+        assert_eq!(find_meta(&meta_list, "first_name"), new_first_name);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_last_name() {
+    let new_last_name = "new_last_name";
+    let mut params = UserUpdateParams::default();
+    params.last_name = Some(new_last_name.to_string());
+    test_update_user(params, |_, meta_list| {
+        assert_eq!(find_meta(&meta_list, "last_name"), new_last_name);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_email() {
+    let new_email = "new_email@foo.com";
+    let mut params = UserUpdateParams::default();
+    params.email = Some(new_email.to_string());
+    test_update_user(params, |user, _| {
+        assert_eq!(user.email, new_email);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_url() {
+    let new_url = "https://new_url";
+    let mut params = UserUpdateParams::default();
+    params.url = Some(new_url.to_string());
+    test_update_user(params, |user, _| {
+        assert_eq!(user.url, new_url);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_description() {
+    let new_description = "new_description";
+    let mut params = UserUpdateParams::default();
+    params.description = Some(new_description.to_string());
+    test_update_user(params, |_, meta_list| {
+        assert_eq!(find_meta(&meta_list, "description"), new_description);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn update_user_nickname() {
+    let new_nickname = "new_nickname";
+    let mut params = UserUpdateParams::default();
+    params.nickname = Some(new_nickname.to_string());
+    test_update_user(params, |_, meta_list| {
+        assert_eq!(find_meta(&meta_list, "nickname"), new_nickname);
     })
     .await;
 }
@@ -141,4 +186,17 @@ where
         assert(db_user_after_update, db_user_meta_after_update);
     })
     .await;
+}
+
+fn find_meta(meta_list: &Vec<DbUserMeta>, meta_key: &str) -> String {
+    meta_list
+        .iter()
+        .find_map(|m| {
+            if m.meta_key == meta_key {
+                Some(m.meta_value.clone())
+            } else {
+                None
+            }
+        })
+        .unwrap()
 }
