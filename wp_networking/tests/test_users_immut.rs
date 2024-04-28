@@ -159,9 +159,9 @@ async fn list_users_param_slug() {
 }
 
 #[tokio::test]
-async fn list_users_param_roles() {
+async fn list_users_param_roles_edit_posts() {
     let mut params = UserListParams::default();
-    params.roles = vec!["foo".to_string()];
+    params.roles = vec!["edit_posts".to_string()];
     test_user_list_params(params).await;
 }
 
@@ -169,6 +169,20 @@ async fn list_users_param_roles() {
 async fn list_users_param_capabilities() {
     let mut params = UserListParams::default();
     params.capabilities = vec!["foo".to_string()];
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_who_authors() {
+    let mut params = UserListParams::default();
+    params.who = Some("authors".to_string());
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_has_published_posts() {
+    let mut params = UserListParams::default();
+    params.has_published_posts = Some(true);
     test_user_list_params(params).await;
 }
 
