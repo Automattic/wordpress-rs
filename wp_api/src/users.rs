@@ -91,6 +91,28 @@ impl WPApiParamUsersOrderBy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WPApiParamUsersWho {
+    All,
+    Authors,
+}
+
+impl WPApiParamUsersWho {
+    // The only valid value for this parameter is "authors"
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::All => None,
+            Self::Authors => Some("authors"),
+        }
+    }
+}
+
+impl Default for WPApiParamUsersWho {
+    fn default() -> Self {
+        Self::All
+    }
+}
+
 #[derive(Default, uniffi::Record)]
 pub struct UserListParams {
     // TODO: Implement the `_filter`
@@ -124,7 +146,7 @@ pub struct UserListParams {
     pub capabilities: Vec<String>,
     /// Limit result set to users who are considered authors.
     /// One of: `authors`
-    pub who: Option<String>,
+    pub who: Option<WPApiParamUsersWho>,
     /// Limit result set to users who have published posts.
     pub has_published_posts: Option<bool>,
 }
@@ -170,7 +192,10 @@ impl UserListParams {
                 "capabilities",
                 (!self.capabilities.is_empty()).then_some(self.capabilities.join(",")),
             ),
-            ("who", self.who.clone()),
+            (
+                "who",
+                self.who.and_then(|x| x.as_str().map(|s| s.to_string())),
+            ),
             (
                 "has_published_post",
                 self.has_published_posts.map(|x| x.to_string()),

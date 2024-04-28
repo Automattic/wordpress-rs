@@ -1,8 +1,8 @@
 use test_helpers::SECOND_USER_EMAIL;
 use wp_api::{
     UserCreateParams, UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams,
-    UserUpdateParamsBuilder, WPApiHelper, WPApiParamUsersOrderBy, WPAuthentication, WPContext,
-    WPRestErrorCode,
+    UserUpdateParamsBuilder, WPApiHelper, WPApiParamUsersOrderBy, WPApiParamUsersWho,
+    WPAuthentication, WPContext, WPRestErrorCode,
 };
 
 use crate::test_helpers::{
@@ -96,7 +96,7 @@ async fn list_users_err_forbidden_orderby_email() {
 #[tokio::test]
 async fn list_users_err_forbidden_who() {
     let mut params = UserListParams::default();
-    params.who = Some("authors".to_string());
+    params.who = Some(WPApiParamUsersWho::Authors);
     api_as_subscriber()
         .list_users_request(WPContext::View, &Some(params))
         .execute()

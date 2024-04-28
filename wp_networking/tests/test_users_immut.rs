@@ -1,4 +1,6 @@
-use wp_api::{UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPContext};
+use wp_api::{
+    UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPApiParamUsersWho, WPContext,
+};
 
 use crate::test_helpers::{
     api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
@@ -173,9 +175,16 @@ async fn list_users_param_capabilities() {
 }
 
 #[tokio::test]
+async fn list_users_param_who_all() {
+    let mut params = UserListParams::default();
+    params.who = Some(WPApiParamUsersWho::All);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
 async fn list_users_param_who_authors() {
     let mut params = UserListParams::default();
-    params.who = Some("authors".to_string());
+    params.who = Some(WPApiParamUsersWho::Authors);
     test_user_list_params(params).await;
 }
 
