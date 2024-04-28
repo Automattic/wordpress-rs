@@ -1,8 +1,7 @@
 use test_helpers::SECOND_USER_EMAIL;
 use wp_api::{
-    UserCreateParams, UserCreateParamsBuilder, UserDeleteParams, UserId, UserListParams,
-    UserUpdateParamsBuilder, WPApiHelper, WPApiParamUsersOrderBy, WPApiParamUsersWho,
-    WPAuthentication, WPContext, WPRestErrorCode,
+    UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPApiHelper,
+    WPApiParamUsersOrderBy, WPApiParamUsersWho, WPAuthentication, WPContext, WPRestErrorCode,
 };
 
 use crate::test_helpers::{
@@ -172,13 +171,11 @@ async fn retrieve_user_err_unauthorized() {
 
 #[tokio::test]
 async fn update_user_err_cannot_edit() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .slug(Some("new_slug".to_string()))
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.slug = Some("new_slug".to_string());
     // Subscribers can't update someone else's slug
     api_as_subscriber()
-        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .update_user_request(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -187,14 +184,31 @@ async fn update_user_err_cannot_edit() {
 }
 
 #[tokio::test]
+async fn update_user_err_user_invalid_argument() {
+    let mut request = api().update_user_request(FIRST_USER_ID, &UserUpdateParams::default());
+    request.body = Some(
+        serde_json::json!({
+            "username": "new_username",
+        })
+        .to_string()
+        .into_bytes(),
+    );
+    // Usernames are not editable
+    request
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
+}
+
+#[tokio::test]
 async fn update_user_err_cannot_edit_roles() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .roles(vec!["new_role".to_string()])
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.roles = vec!["new_role".to_string()];
     // Subscribers can't update their roles
     api_as_subscriber()
-        .update_user_request(SECOND_USER_ID, &user_update_params)
+        .update_user_request(SECOND_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -204,13 +218,11 @@ async fn update_user_err_cannot_edit_roles() {
 
 #[tokio::test]
 async fn update_user_err_user_invalid_email() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .email(Some(SECOND_USER_EMAIL.to_string()))
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.email = Some(SECOND_USER_EMAIL.to_string());
     // Can't update user's email to an email that's already in use
     api()
-        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .update_user_request(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -220,12 +232,10 @@ async fn update_user_err_user_invalid_email() {
 
 #[tokio::test]
 async fn update_user_email_err_invalid_param() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .email(Some("not_valid".to_string()))
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.email = Some("not_valid".to_string());
     api()
-        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .update_user_request(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -235,12 +245,10 @@ async fn update_user_email_err_invalid_param() {
 
 #[tokio::test]
 async fn update_user_password_err_invalid_param() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .password(Some("".to_string()))
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.password = Some("".to_string());
     api()
-        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .update_user_request(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -250,13 +258,11 @@ async fn update_user_password_err_invalid_param() {
 
 #[tokio::test]
 async fn update_user_err_user_invalid_role() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .roles(vec!["doesnt_exist".to_string()])
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.roles = vec!["doesnt_exist".to_string()];
     // Can't update user's email to a role that doesn't exist
     api()
-        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .update_user_request(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -266,13 +272,11 @@ async fn update_user_err_user_invalid_role() {
 
 #[tokio::test]
 async fn update_user_err_user_invalid_slug() {
-    let user_update_params = UserUpdateParamsBuilder::default()
-        .slug(Some(SECOND_USER_SLUG.to_string()))
-        .build()
-        .unwrap();
+    let mut params = UserUpdateParams::default();
+    params.slug = Some(SECOND_USER_SLUG.to_string());
     // Can't update user's slug to a slug that's already in use
     api()
-        .update_user_request(FIRST_USER_ID, &user_update_params)
+        .update_user_request(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
@@ -313,33 +317,12 @@ async fn delete_user_err_trash_not_supported() {
         .assert_wp_error(WPRestErrorCode::TrashNotSupported);
 }
 
-#[tokio::test]
-async fn update_user_err_user_invalid_argument() {
-    let user_update_params = UserUpdateParamsBuilder::default().build().unwrap();
-    let mut request = api().update_user_request(FIRST_USER_ID, &user_update_params);
-    request.body = Some(
-        serde_json::json!({
-            "username": "new_username",
-        })
-        .to_string()
-        .into_bytes(),
-    );
-    // Usernames are not editable
-    request
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
-}
-
 // Helpers
 
 fn valid_user_create_params() -> UserCreateParams {
-    UserCreateParamsBuilder::default()
-        .username("t_username".to_string())
-        .email("t_email@foo.com".to_string())
-        .password("t_password".to_string())
-        .build()
-        .unwrap()
+    let mut params = UserCreateParams::default();
+    params.username = "t_username".to_string();
+    params.email = "t_email@foo.com".to_string();
+    params.password = "t_password".to_string();
+    params
 }
