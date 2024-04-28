@@ -8,7 +8,6 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_api"
 
 [dependencies]
-derive_builder = "0.20"
 http = { workspace = true }
 url = "2.5"
 parse_link_header = "0.3"

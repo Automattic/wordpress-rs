@@ -1,4 +1,4 @@
-use wp_api::{UserCreateParamsBuilder, UserDeleteParams, UserUpdateParams};
+use wp_api::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::DbUser;
 
 use crate::test_helpers::{
@@ -16,14 +16,12 @@ async fn create_user() {
         let password = "t_password";
 
         // Create a user using the API
-        let user_create_params = UserCreateParamsBuilder::default()
-            .username(username.to_string())
-            .email(email.to_string())
-            .password(password.to_string())
-            .build()
-            .unwrap();
+        let mut params = UserCreateParams::default();
+        params.username = username.to_string();
+        params.email = email.to_string();
+        params.password = password.to_string();
         let created_user = api()
-            .create_user_request(&user_create_params)
+            .create_user_request(&params)
             .execute()
             .await
             .unwrap()
