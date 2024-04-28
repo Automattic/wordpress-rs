@@ -1,4 +1,4 @@
-use wp_api::{UserListParams, WPApiParamOrder, WPContext};
+use wp_api::{UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPContext};
 
 use crate::test_helpers::{
     api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
@@ -82,9 +82,72 @@ async fn list_users_param_offset() {
 }
 
 #[tokio::test]
+async fn list_users_param_order_asc() {
+    let mut params = UserListParams::default();
+    params.order = Some(WPApiParamOrder::Asc);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
 async fn list_users_param_order_desc() {
     let mut params = UserListParams::default();
     params.order = Some(WPApiParamOrder::Desc);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_id() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Id);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_include() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Include);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_name() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Name);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_registered_date() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::RegisteredDate);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_slug() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Slug);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_include_slugs() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::IncludeSlugs);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_email() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Email);
+    test_user_list_params(params).await;
+}
+
+#[tokio::test]
+async fn list_users_param_orderby_url() {
+    let mut params = UserListParams::default();
+    params.orderby = Some(WPApiParamUsersOrderBy::Url);
     test_user_list_params(params).await;
 }
 
