@@ -11,7 +11,6 @@ swiftlint_container := ghcr.io/realm/swiftlint:0.53.0
 
 docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
-rust_docker_run_in_wp_network := docker run --network wp_network -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
@@ -214,14 +213,6 @@ test-rust-lib:
 
 test-rust-doc:
 	$(rust_docker_run) cargo test --doc
-
-test-rust-integration: test-server dump-mysql
-	docker network create wp_network
-	docker network connect wp_network wordpress
-	# Integration tests are ran sequentially as the DB needs to be reset for each run
-	$(rust_docker_run_in_wp_network) cargo test --test '*' -- --nocapture --test-threads 1
-	docker network disconnect wp_network wordpress
-	docker network rm --force wp_network
 
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
