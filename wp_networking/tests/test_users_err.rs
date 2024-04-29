@@ -320,9 +320,9 @@ async fn delete_user_err_trash_not_supported() {
 // Helpers
 
 fn valid_user_create_params() -> UserCreateParams {
-    let mut params = UserCreateParams::default();
-    params.username = "t_username".to_string();
-    params.email = "t_email@foo.com".to_string();
-    params.password = "t_password".to_string();
-    params
+    UserCreateParams::new(
+        "t_username".to_string(),
+        "t_email@foo.com".to_string(),
+        "t_password".to_string(),
+    )
 }

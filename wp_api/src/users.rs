@@ -206,7 +206,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Default, Serialize, uniffi::Record)]
+#[derive(Serialize, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,
@@ -254,6 +254,26 @@ pub struct UserCreateParams {
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<String>,
+}
+
+impl UserCreateParams {
+    pub fn new(username: String, email: String, password: String) -> Self {
+        Self {
+            username,
+            email,
+            password,
+            name: None,
+            first_name: None,
+            last_name: None,
+            url: None,
+            description: None,
+            locale: None,
+            nickname: None,
+            slug: None,
+            roles: Vec::new(),
+            meta: None,
+        }
+    }
 }
 
 #[derive(Default, Serialize, uniffi::Record)]

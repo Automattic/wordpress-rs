@@ -16,10 +16,11 @@ async fn create_user() {
         let password = "t_password";
 
         // Create a user using the API
-        let mut params = UserCreateParams::default();
-        params.username = username.to_string();
-        params.email = email.to_string();
-        params.password = password.to_string();
+        let params = UserCreateParams::new(
+            username.to_string(),
+            email.to_string(),
+            password.to_string(),
+        );
         let created_user = api()
             .create_user_request(&params)
             .execute()
