@@ -10,7 +10,6 @@ use crate::test_helpers::{
 };
 
 pub mod test_helpers;
-pub mod wp_db;
 
 #[tokio::test]
 async fn create_user_err_cannot_create_user() {

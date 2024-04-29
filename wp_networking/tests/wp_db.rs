@@ -33,25 +33,21 @@ impl Drop for WordPressDb {
     }
 }
 
-#[allow(dead_code)]
 impl WordPressDb {
-    pub async fn fetch_db_users(&mut self) -> Result<Vec<DbUser>, sqlx::Error> {
+    pub async fn users(&mut self) -> Result<Vec<DbUser>, sqlx::Error> {
         sqlx::query_as("SELECT * FROM wp_users")
             .fetch_all(&mut self.conn)
             .await
     }
 
-    pub async fn fetch_db_user(&mut self, user_id: u64) -> Result<DbUser, sqlx::Error> {
+    pub async fn user(&mut self, user_id: u64) -> Result<DbUser, sqlx::Error> {
         sqlx::query_as("SELECT * FROM wp_users WHERE ID = ?")
             .bind(user_id)
             .fetch_one(&mut self.conn)
             .await
     }
 
-    pub async fn fetch_db_user_meta(
-        &mut self,
-        user_id: u64,
-    ) -> Result<Vec<DbUserMeta>, sqlx::Error> {
+    pub async fn user_meta(&mut self, user_id: u64) -> Result<Vec<DbUserMeta>, sqlx::Error> {
         sqlx::query_as("SELECT * FROM wp_usermeta WHERE user_id = ?")
             .bind(user_id)
             .fetch_all(&mut self.conn)
@@ -59,7 +55,6 @@ impl WordPressDb {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, sqlx::FromRow)]
 pub struct DbUser {
     #[sqlx(rename = "ID")]
@@ -78,7 +73,6 @@ pub struct DbUser {
     pub name: String,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, sqlx::FromRow)]
 pub struct DbUserMeta {
     pub user_id: u64,

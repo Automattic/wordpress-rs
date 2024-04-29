@@ -30,7 +30,7 @@ async fn create_user() {
             .unwrap();
 
         // Assert that the user is in DB
-        let created_user_from_db = db.fetch_db_user(created_user.id.0 as u64).await.unwrap();
+        let created_user_from_db = db.user(created_user.id.0 as u64).await.unwrap();
         assert_eq!(created_user_from_db.username, username);
         assert_eq!(created_user_from_db.email, email);
     })
@@ -52,7 +52,7 @@ async fn delete_user() {
 
         // Assert that the DB doesn't have a record of the user anymore
         assert!(matches!(
-            db.fetch_db_user(SECOND_USER_ID.0 as u64).await.unwrap_err(),
+            db.user(SECOND_USER_ID.0 as u64).await.unwrap_err(),
             sqlx::Error::RowNotFound
         ));
     })
@@ -75,7 +75,7 @@ async fn delete_current_user() {
         // Assert that the DB doesn't have a record of the user anymore
         assert!(matches!(
             // The first user is also the current user
-            db.fetch_db_user(FIRST_USER_ID.0 as u64).await.unwrap_err(),
+            db.user(FIRST_USER_ID.0 as u64).await.unwrap_err(),
             sqlx::Error::RowNotFound
         ));
     })
@@ -215,9 +215,8 @@ where
             .await;
         assert!(user_update_response.is_ok());
 
-        let db_user_after_update = db.fetch_db_user(FIRST_USER_ID.0 as u64).await.unwrap();
-        let db_user_meta_after_update =
-            db.fetch_db_user_meta(FIRST_USER_ID.0 as u64).await.unwrap();
+        let db_user_after_update = db.user(FIRST_USER_ID.0 as u64).await.unwrap();
+        let db_user_meta_after_update = db.user_meta(FIRST_USER_ID.0 as u64).await.unwrap();
         assert(db_user_after_update, db_user_meta_after_update);
     })
     .await;
