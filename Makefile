@@ -20,8 +20,7 @@ swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
 
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
-# The project doesn't compile with the nightly toolchain built on 2024-03-28 and onward.
-rust_nightly_toolchain := nightly-2024-03-27
+rust_nightly_toolchain := nightly-2024-04-30
 
 uname := $(shell uname | tr A-Z a-z)
 ifeq ($(uname), linux)
