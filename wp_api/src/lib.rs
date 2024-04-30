@@ -87,6 +87,24 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_list_users_request(
+        &self,
+        context: WPContext,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        fields: &Vec<SparseUserField>,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,

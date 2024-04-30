@@ -6,6 +6,13 @@ use wp_derive::WPContextual;
 use crate::{parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPNetworkResponse};
 
 #[uniffi::export]
+pub fn parse_filter_users_response(
+    response: &WPNetworkResponse,
+) -> Result<Vec<SparseUser>, WPApiError> {
+    parse_users_response(response)
+}
+
+#[uniffi::export]
 pub fn parse_list_users_response_with_edit_context(
     response: &WPNetworkResponse,
 ) -> Result<Vec<UserWithEditContext>, WPApiError> {
@@ -384,4 +391,48 @@ pub struct SparseUser {
     #[WPContext(edit, embed, view)]
     pub avatar_urls: Option<HashMap<String, String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparseUserField {
+    Id,
+    Username,
+    Name,
+    LastName,
+    Email,
+    Url,
+    Description,
+    Link,
+    Locale,
+    Nickname,
+    Slug,
+    RegisteredDate,
+    Roles,
+    Capabilities,
+    ExtraCapabilities,
+    AvatarUrls,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
+}
+
+impl SparseUserField {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Id => "id",
+            Self::Username => "username",
+            Self::Name => "name",
+            Self::LastName => "last_name",
+            Self::Email => "email",
+            Self::Url => "url",
+            Self::Description => "description",
+            Self::Link => "link",
+            Self::Locale => "locale",
+            Self::Nickname => "nickname",
+            Self::Slug => "slug",
+            Self::RegisteredDate => "registered_date",
+            Self::Roles => "roles",
+            Self::Capabilities => "capabilities",
+            Self::ExtraCapabilities => "extra_capabilities",
+            Self::AvatarUrls => "avatar_urls",
+        }
+    }
 }

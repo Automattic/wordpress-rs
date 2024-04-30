@@ -1,5 +1,6 @@
 use wp_api::{
-    UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPApiParamUsersWho, WPContext,
+    SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPApiParamUsersWho,
+    WPContext,
 };
 
 use crate::test_helpers::{
@@ -7,6 +8,26 @@ use crate::test_helpers::{
 };
 
 pub mod test_helpers;
+
+#[tokio::test]
+async fn filter_users() {
+    let parsed_response = api()
+        .filter_list_users_request(
+            WPContext::Edit,
+            &None,
+            &vec![SparseUserField::Id, SparseUserField::Name],
+        )
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_users_response);
+    assert!(parsed_response.is_ok());
+    parsed_response.unwrap().iter().for_each(|x| {
+        assert!(x.id.is_some());
+        assert!(x.name.is_some());
+        assert!(x.email.is_none());
+    });
+}
 
 #[tokio::test]
 async fn list_users_with_edit_context() {

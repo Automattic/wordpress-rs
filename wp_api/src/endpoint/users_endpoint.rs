@@ -1,6 +1,6 @@
 use url::Url;
 
-use crate::{ApiBaseUrl, UserDeleteParams, UserId, UserListParams, WPContext};
+use crate::{ApiBaseUrl, SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
 pub struct UsersEndpoint {
     api_base_url: ApiBaseUrl,
@@ -36,6 +36,30 @@ impl UsersEndpoint {
         if let Some(params) = params {
             url.query_pairs_mut().extend_pairs(params.query_pairs());
         }
+        url
+    }
+
+    pub fn filter_list(
+        &self,
+        context: WPContext,
+        params: Option<&UserListParams>,
+        fields: &Vec<SparseUserField>,
+    ) -> Url {
+        let mut url = self.api_base_url.by_appending("users");
+        url.query_pairs_mut()
+            .append_pair("context", context.as_str());
+        if let Some(params) = params {
+            url.query_pairs_mut().extend_pairs(params.query_pairs());
+        }
+        url.query_pairs_mut().append_pair(
+            "_fields",
+            fields
+                .iter()
+                .map(|f| f.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+                .as_str(),
+        );
         url
     }
 
@@ -130,6 +154,30 @@ mod tests {
         validate_endpoint(
             users_endpoint.list(WPContext::Edit, Some(&params)),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_post=true",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn filter_list_users_with_params(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        let params = UserListParams {
+            page: Some(2),
+            per_page: Some(60),
+            search: Some("foo".to_string()),
+            exclude: Vec::new(),
+            include: Vec::new(),
+            offset: None,
+            order: None,
+            orderby: None,
+            slug: vec!["bar".to_string(), "baz".to_string()],
+            roles: Vec::new(),
+            capabilities: Vec::new(),
+            who: None,
+            has_published_posts: Some(true),
+        };
+        validate_endpoint(
+            users_endpoint.filter_list(WPContext::Edit, Some(&params), &vec![SparseUserField::Name, SparseUserField::Email]),
+            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_post=true&_fields=name%2Cemail",
             &api_base_url,
         );
     }
