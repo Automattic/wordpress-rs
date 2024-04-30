@@ -13,6 +13,13 @@ pub fn parse_filter_users_response(
 }
 
 #[uniffi::export]
+pub fn parse_filter_retrieve_user_response(
+    response: &WPNetworkResponse,
+) -> Result<SparseUser, WPApiError> {
+    parse_users_response(response)
+}
+
+#[uniffi::export]
 pub fn parse_list_users_response_with_edit_context(
     response: &WPNetworkResponse,
 ) -> Result<Vec<UserWithEditContext>, WPApiError> {

@@ -45,17 +45,7 @@ impl UsersEndpoint {
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
     ) -> Url {
-        let mut url = self.list(context, params);
-        url.query_pairs_mut().append_pair(
-            "_fields",
-            fields
-                .iter()
-                .map(|f| f.as_str())
-                .collect::<Vec<&str>>()
-                .join(",")
-                .as_str(),
-        );
-        url
+        self.append_filter_fields(self.list(context, params), fields)
     }
 
     pub fn retrieve(&self, user_id: UserId, context: WPContext) -> Url {
@@ -65,6 +55,15 @@ impl UsersEndpoint {
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         url
+    }
+
+    pub fn filter_retrieve(
+        &self,
+        user_id: UserId,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> Url {
+        self.append_filter_fields(self.retrieve(user_id, context), fields)
     }
 
     pub fn retrieve_me(&self, context: WPContext) -> Url {
@@ -81,6 +80,19 @@ impl UsersEndpoint {
 
     pub fn update_me(&self) -> Url {
         self.api_base_url.by_extending(["users", "me"])
+    }
+
+    fn append_filter_fields(&self, mut url: Url, fields: &[SparseUserField]) -> Url {
+        url.query_pairs_mut().append_pair(
+            "_fields",
+            fields
+                .iter()
+                .map(|f| f.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+                .as_str(),
+        );
+        url
     }
 }
 
@@ -182,6 +194,19 @@ mod tests {
         validate_endpoint(
             users_endpoint.retrieve(UserId(98), WPContext::View),
             "/users/98?context=view",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn filter_retrieve_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.filter_retrieve(
+                UserId(98),
+                WPContext::View,
+                &vec![SparseUserField::Nickname, SparseUserField::Url],
+            ),
+            "/users/98?context=view&_fields=nickname%2Curl",
             &api_base_url,
         );
     }

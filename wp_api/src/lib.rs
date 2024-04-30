@@ -114,6 +114,24 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_retrieve_user_request(
+        &self,
+        user_id: UserId,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_retrieve(user_id, context, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
