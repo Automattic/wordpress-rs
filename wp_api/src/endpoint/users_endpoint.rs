@@ -45,12 +45,7 @@ impl UsersEndpoint {
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
     ) -> Url {
-        let mut url = self.api_base_url.by_appending("users");
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
+        let mut url = self.list(context, params);
         url.query_pairs_mut().append_pair(
             "_fields",
             fields
