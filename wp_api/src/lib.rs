@@ -141,6 +141,23 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_retrieve_current_user_request(
+        &self,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_retrieve_me(context, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,

@@ -73,6 +73,10 @@ impl UsersEndpoint {
         url
     }
 
+    pub fn filter_retrieve_me(&self, context: WPContext, fields: &[SparseUserField]) -> Url {
+        self.append_filter_fields(self.retrieve_me(context), fields)
+    }
+
     pub fn update(&self, user_id: UserId) -> Url {
         self.api_base_url
             .by_extending(["users", &user_id.to_string()])
@@ -216,6 +220,18 @@ mod tests {
         validate_endpoint(
             users_endpoint.retrieve_me(WPContext::Embed),
             "/users/me?context=embed",
+            &api_base_url,
+        );
+    }
+
+    #[rstest]
+    fn filter_retrieve_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.filter_retrieve_me(
+                WPContext::Embed,
+                &vec![SparseUserField::Roles, SparseUserField::Capabilities],
+            ),
+            "/users/me?context=embed&_fields=roles%2Ccapabilities",
             &api_base_url,
         );
     }

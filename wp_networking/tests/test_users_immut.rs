@@ -40,6 +40,19 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
 
+#[apply(filter_fields_cases)]
+#[tokio::test]
+async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
+    let user_result = api()
+        .filter_retrieve_current_user_request(WPContext::Edit, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_retrieve_user_response);
+    assert!(user_result.is_ok());
+    validate_sparse_user_fields(&user_result.unwrap(), fields);
+}
+
 #[tokio::test]
 async fn list_users_with_edit_context() {
     assert!(api()
