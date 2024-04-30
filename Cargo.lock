@@ -2954,6 +2954,7 @@ dependencies = [
  "futures",
  "http 1.1.0",
  "reqwest",
+ "rstest",
  "serde_json",
  "sqlx",
  "tokio",

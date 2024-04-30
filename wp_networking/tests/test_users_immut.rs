@@ -1,3 +1,4 @@
+use rstest::*;
 use wp_api::{
     SparseUser, SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy,
     WPApiParamUsersWho, WPContext,
@@ -9,169 +10,69 @@ use crate::test_helpers::{
 
 pub mod test_helpers;
 
+#[rstest]
+#[case(&[SparseUserField::Id])]
+#[case(&[SparseUserField::Username])]
+#[case(&[SparseUserField::Name])]
+#[case(&[SparseUserField::LastName])]
+#[case(&[SparseUserField::Email])]
+#[case(&[SparseUserField::Url])]
+#[case(&[SparseUserField::Description])]
+#[case(&[SparseUserField::Link])]
+#[case(&[SparseUserField::Locale])]
+#[case(&[SparseUserField::Nickname])]
+#[case(&[SparseUserField::Slug])]
+#[case(&[SparseUserField::RegisteredDate])]
+#[case(&[SparseUserField::Roles])]
+#[case(&[SparseUserField::Capabilities])]
+#[case(&[SparseUserField::ExtraCapabilities])]
+#[case(&[SparseUserField::AvatarUrls])]
+#[case(&[SparseUserField::Id, SparseUserField::Name])]
+#[case(&[SparseUserField::Email, SparseUserField::Nickname])]
 #[tokio::test]
-async fn filter_users_id() {
-    test_filter_list_users(&[SparseUserField::Id]).await;
+async fn filter_users(#[case] fields: &[SparseUserField]) {
+    let parsed_response = api()
+        .filter_list_users_request(WPContext::Edit, &None, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_users_response);
+    assert!(parsed_response.is_ok());
+    parsed_response
+        .unwrap()
+        .iter()
+        .for_each(|user| validate_sparse_user_fields(&user, fields));
 }
 
+#[rstest]
+#[case(&[SparseUserField::Id])]
+#[case(&[SparseUserField::Username])]
+#[case(&[SparseUserField::Name])]
+#[case(&[SparseUserField::LastName])]
+#[case(&[SparseUserField::Email])]
+#[case(&[SparseUserField::Url])]
+#[case(&[SparseUserField::Description])]
+#[case(&[SparseUserField::Link])]
+#[case(&[SparseUserField::Locale])]
+#[case(&[SparseUserField::Nickname])]
+#[case(&[SparseUserField::Slug])]
+#[case(&[SparseUserField::RegisteredDate])]
+#[case(&[SparseUserField::Roles])]
+#[case(&[SparseUserField::Capabilities])]
+#[case(&[SparseUserField::ExtraCapabilities])]
+#[case(&[SparseUserField::AvatarUrls])]
+#[case(&[SparseUserField::Id, SparseUserField::Name])]
+#[case(&[SparseUserField::Email, SparseUserField::Nickname])]
 #[tokio::test]
-async fn filter_users_id_and_name() {
-    test_filter_list_users(&[SparseUserField::Id, SparseUserField::Name]).await;
-}
-
-#[tokio::test]
-async fn filter_users_username() {
-    test_filter_list_users(&[SparseUserField::Username]).await;
-}
-
-#[tokio::test]
-async fn filter_users_name() {
-    test_filter_list_users(&[SparseUserField::Name]).await;
-}
-
-#[tokio::test]
-async fn filter_users_last_name() {
-    test_filter_list_users(&[SparseUserField::LastName]).await;
-}
-
-#[tokio::test]
-async fn filter_users_email() {
-    test_filter_list_users(&[SparseUserField::Email]).await;
-}
-
-#[tokio::test]
-async fn filter_users_url() {
-    test_filter_list_users(&[SparseUserField::Url]).await;
-}
-
-#[tokio::test]
-async fn filter_users_description() {
-    test_filter_list_users(&[SparseUserField::Description]).await;
-}
-
-#[tokio::test]
-async fn filter_users_link() {
-    test_filter_list_users(&[SparseUserField::Link]).await;
-}
-
-#[tokio::test]
-async fn filter_users_locale() {
-    test_filter_list_users(&[SparseUserField::Locale]).await;
-}
-
-#[tokio::test]
-async fn filter_users_nickname() {
-    test_filter_list_users(&[SparseUserField::Nickname]).await;
-}
-
-#[tokio::test]
-async fn filter_users_slug() {
-    test_filter_list_users(&[SparseUserField::Slug]).await;
-}
-
-#[tokio::test]
-async fn filter_users_registered_date() {
-    test_filter_list_users(&[SparseUserField::RegisteredDate]).await;
-}
-
-#[tokio::test]
-async fn filter_users_roles() {
-    test_filter_list_users(&[SparseUserField::Roles]).await;
-}
-
-#[tokio::test]
-async fn filter_users_capabilities() {
-    test_filter_list_users(&[SparseUserField::Capabilities]).await;
-}
-
-#[tokio::test]
-async fn filter_users_extra_capabilities() {
-    test_filter_list_users(&[SparseUserField::ExtraCapabilities]).await;
-}
-
-#[tokio::test]
-async fn filter_users_avatar_urls() {
-    test_filter_list_users(&[SparseUserField::AvatarUrls]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_id() {
-    test_filter_retrieve_user(&[SparseUserField::Id]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_username() {
-    test_filter_retrieve_user(&[SparseUserField::Username]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_name() {
-    test_filter_retrieve_user(&[SparseUserField::Name]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_last_name() {
-    test_filter_retrieve_user(&[SparseUserField::LastName]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_email() {
-    test_filter_retrieve_user(&[SparseUserField::Email]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_url() {
-    test_filter_retrieve_user(&[SparseUserField::Url]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_description() {
-    test_filter_retrieve_user(&[SparseUserField::Description]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_link() {
-    test_filter_retrieve_user(&[SparseUserField::Link]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_locale() {
-    test_filter_retrieve_user(&[SparseUserField::Locale]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_nickname() {
-    test_filter_retrieve_user(&[SparseUserField::Nickname]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_slug() {
-    test_filter_retrieve_user(&[SparseUserField::Slug]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_registered_date() {
-    test_filter_retrieve_user(&[SparseUserField::RegisteredDate]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_roles() {
-    test_filter_retrieve_user(&[SparseUserField::Roles]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_capabilities() {
-    test_filter_retrieve_user(&[SparseUserField::Capabilities]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_extra_capabilities() {
-    test_filter_retrieve_user(&[SparseUserField::ExtraCapabilities]).await;
-}
-
-#[tokio::test]
-async fn filter_retrieve_user_avatar_urls() {
-    test_filter_retrieve_user(&[SparseUserField::AvatarUrls]).await;
+async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
+    let user_result = api()
+        .filter_retrieve_user_request(FIRST_USER_ID, WPContext::Edit, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_retrieve_user_response);
+    assert!(user_result.is_ok());
+    validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
 
 #[tokio::test]
@@ -439,31 +340,6 @@ async fn test_user_list_params(params: UserListParams) {
         "Response was: '{:?}'",
         parsed_response
     );
-}
-
-async fn test_filter_list_users(fields: &[SparseUserField]) {
-    let parsed_response = api()
-        .filter_list_users_request(WPContext::Edit, &None, fields)
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_filter_users_response);
-    assert!(parsed_response.is_ok());
-    parsed_response
-        .unwrap()
-        .iter()
-        .for_each(|user| validate_sparse_user_fields(&user, fields));
-}
-
-async fn test_filter_retrieve_user(fields: &[SparseUserField]) {
-    let user_result = api()
-        .filter_retrieve_user_request(FIRST_USER_ID, WPContext::Edit, fields)
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_filter_retrieve_user_response);
-    assert!(user_result.is_ok());
-    validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
 
 fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
