@@ -1,4 +1,5 @@
 use rstest::*;
+use rstest_reuse::{self, apply, template};
 use wp_api::{
     SparseUser, SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy,
     WPApiParamUsersWho, WPContext,
@@ -10,25 +11,7 @@ use crate::test_helpers::{
 
 pub mod test_helpers;
 
-#[rstest]
-#[case(&[SparseUserField::Id])]
-#[case(&[SparseUserField::Username])]
-#[case(&[SparseUserField::Name])]
-#[case(&[SparseUserField::LastName])]
-#[case(&[SparseUserField::Email])]
-#[case(&[SparseUserField::Url])]
-#[case(&[SparseUserField::Description])]
-#[case(&[SparseUserField::Link])]
-#[case(&[SparseUserField::Locale])]
-#[case(&[SparseUserField::Nickname])]
-#[case(&[SparseUserField::Slug])]
-#[case(&[SparseUserField::RegisteredDate])]
-#[case(&[SparseUserField::Roles])]
-#[case(&[SparseUserField::Capabilities])]
-#[case(&[SparseUserField::ExtraCapabilities])]
-#[case(&[SparseUserField::AvatarUrls])]
-#[case(&[SparseUserField::Id, SparseUserField::Name])]
-#[case(&[SparseUserField::Email, SparseUserField::Nickname])]
+#[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_users(#[case] fields: &[SparseUserField]) {
     let parsed_response = api()
@@ -44,25 +27,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
         .for_each(|user| validate_sparse_user_fields(&user, fields));
 }
 
-#[rstest]
-#[case(&[SparseUserField::Id])]
-#[case(&[SparseUserField::Username])]
-#[case(&[SparseUserField::Name])]
-#[case(&[SparseUserField::LastName])]
-#[case(&[SparseUserField::Email])]
-#[case(&[SparseUserField::Url])]
-#[case(&[SparseUserField::Description])]
-#[case(&[SparseUserField::Link])]
-#[case(&[SparseUserField::Locale])]
-#[case(&[SparseUserField::Nickname])]
-#[case(&[SparseUserField::Slug])]
-#[case(&[SparseUserField::RegisteredDate])]
-#[case(&[SparseUserField::Roles])]
-#[case(&[SparseUserField::Capabilities])]
-#[case(&[SparseUserField::ExtraCapabilities])]
-#[case(&[SparseUserField::AvatarUrls])]
-#[case(&[SparseUserField::Id, SparseUserField::Name])]
-#[case(&[SparseUserField::Email, SparseUserField::Nickname])]
+#[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
     let user_result = api()
@@ -393,3 +358,25 @@ fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
         fields.contains(&SparseUserField::AvatarUrls)
     );
 }
+
+#[template]
+#[rstest]
+#[case(&[SparseUserField::Id])]
+#[case(&[SparseUserField::Username])]
+#[case(&[SparseUserField::Name])]
+#[case(&[SparseUserField::LastName])]
+#[case(&[SparseUserField::Email])]
+#[case(&[SparseUserField::Url])]
+#[case(&[SparseUserField::Description])]
+#[case(&[SparseUserField::Link])]
+#[case(&[SparseUserField::Locale])]
+#[case(&[SparseUserField::Nickname])]
+#[case(&[SparseUserField::Slug])]
+#[case(&[SparseUserField::RegisteredDate])]
+#[case(&[SparseUserField::Roles])]
+#[case(&[SparseUserField::Capabilities])]
+#[case(&[SparseUserField::ExtraCapabilities])]
+#[case(&[SparseUserField::AvatarUrls])]
+#[case(&[SparseUserField::Id, SparseUserField::Name])]
+#[case(&[SparseUserField::Email, SparseUserField::Nickname])]
+fn filter_fields_cases(#[case] fields: &[SparseUserField]) {}
