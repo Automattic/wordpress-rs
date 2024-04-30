@@ -11,87 +11,87 @@ pub mod test_helpers;
 
 #[tokio::test]
 async fn filter_users_id() {
-    test_filter_user_list(&vec![SparseUserField::Id]).await;
+    test_filter_user_list(&[SparseUserField::Id]).await;
 }
 
 #[tokio::test]
 async fn filter_users_id_and_name() {
-    test_filter_user_list(&vec![SparseUserField::Id, SparseUserField::Name]).await;
+    test_filter_user_list(&[SparseUserField::Id, SparseUserField::Name]).await;
 }
 
 #[tokio::test]
 async fn filter_users_username() {
-    test_filter_user_list(&vec![SparseUserField::Username]).await;
+    test_filter_user_list(&[SparseUserField::Username]).await;
 }
 
 #[tokio::test]
 async fn filter_users_name() {
-    test_filter_user_list(&vec![SparseUserField::Name]).await;
+    test_filter_user_list(&[SparseUserField::Name]).await;
 }
 
 #[tokio::test]
 async fn filter_users_last_name() {
-    test_filter_user_list(&vec![SparseUserField::LastName]).await;
+    test_filter_user_list(&[SparseUserField::LastName]).await;
 }
 
 #[tokio::test]
 async fn filter_users_email() {
-    test_filter_user_list(&vec![SparseUserField::Email]).await;
+    test_filter_user_list(&[SparseUserField::Email]).await;
 }
 
 #[tokio::test]
 async fn filter_users_url() {
-    test_filter_user_list(&vec![SparseUserField::Url]).await;
+    test_filter_user_list(&[SparseUserField::Url]).await;
 }
 
 #[tokio::test]
 async fn filter_users_description() {
-    test_filter_user_list(&vec![SparseUserField::Description]).await;
+    test_filter_user_list(&[SparseUserField::Description]).await;
 }
 
 #[tokio::test]
 async fn filter_users_link() {
-    test_filter_user_list(&vec![SparseUserField::Link]).await;
+    test_filter_user_list(&[SparseUserField::Link]).await;
 }
 
 #[tokio::test]
 async fn filter_users_locale() {
-    test_filter_user_list(&vec![SparseUserField::Locale]).await;
+    test_filter_user_list(&[SparseUserField::Locale]).await;
 }
 
 #[tokio::test]
 async fn filter_users_nickname() {
-    test_filter_user_list(&vec![SparseUserField::Nickname]).await;
+    test_filter_user_list(&[SparseUserField::Nickname]).await;
 }
 
 #[tokio::test]
 async fn filter_users_slug() {
-    test_filter_user_list(&vec![SparseUserField::Slug]).await;
+    test_filter_user_list(&[SparseUserField::Slug]).await;
 }
 
 #[tokio::test]
 async fn filter_users_registered_date() {
-    test_filter_user_list(&vec![SparseUserField::RegisteredDate]).await;
+    test_filter_user_list(&[SparseUserField::RegisteredDate]).await;
 }
 
 #[tokio::test]
 async fn filter_users_roles() {
-    test_filter_user_list(&vec![SparseUserField::Roles]).await;
+    test_filter_user_list(&[SparseUserField::Roles]).await;
 }
 
 #[tokio::test]
 async fn filter_users_capabilities() {
-    test_filter_user_list(&vec![SparseUserField::Capabilities]).await;
+    test_filter_user_list(&[SparseUserField::Capabilities]).await;
 }
 
 #[tokio::test]
 async fn filter_users_extra_capabilities() {
-    test_filter_user_list(&vec![SparseUserField::ExtraCapabilities]).await;
+    test_filter_user_list(&[SparseUserField::ExtraCapabilities]).await;
 }
 
 #[tokio::test]
 async fn filter_users_avatar_urls() {
-    test_filter_user_list(&vec![SparseUserField::AvatarUrls]).await;
+    test_filter_user_list(&[SparseUserField::AvatarUrls]).await;
 }
 
 #[tokio::test]
@@ -361,7 +361,7 @@ async fn test_user_list_params(params: UserListParams) {
     );
 }
 
-async fn test_filter_user_list(fields: &Vec<SparseUserField>) {
+async fn test_filter_user_list(fields: &[SparseUserField]) {
     let parsed_response = api()
         .filter_list_users_request(WPContext::Edit, &None, fields)
         .execute()
@@ -375,7 +375,7 @@ async fn test_filter_user_list(fields: &Vec<SparseUserField>) {
         .for_each(|user| validate_sparse_user_fields(&user, fields));
 }
 
-fn validate_sparse_user_fields(user: &SparseUser, fields: &Vec<SparseUserField>) {
+fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
     assert_eq!(user.id.is_some(), fields.contains(&SparseUserField::Id));
     assert_eq!(
         user.username.is_some(),

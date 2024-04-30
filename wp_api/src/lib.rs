@@ -91,7 +91,7 @@ impl WPApiHelper {
         &self,
         context: WPContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
-        fields: &Vec<SparseUserField>,
+        fields: &[SparseUserField],
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,

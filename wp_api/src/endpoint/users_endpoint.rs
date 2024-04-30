@@ -43,7 +43,7 @@ impl UsersEndpoint {
         &self,
         context: WPContext,
         params: Option<&UserListParams>,
-        fields: &Vec<SparseUserField>,
+        fields: &[SparseUserField],
     ) -> Url {
         let mut url = self.api_base_url.by_appending("users");
         url.query_pairs_mut()
