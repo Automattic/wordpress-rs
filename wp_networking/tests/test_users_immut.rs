@@ -1,6 +1,6 @@
 use wp_api::{
-    SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPApiParamUsersWho,
-    WPContext,
+    SparseUser, SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy,
+    WPApiParamUsersWho, WPContext,
 };
 
 use crate::test_helpers::{
@@ -10,23 +10,88 @@ use crate::test_helpers::{
 pub mod test_helpers;
 
 #[tokio::test]
-async fn filter_users() {
-    let parsed_response = api()
-        .filter_list_users_request(
-            WPContext::Edit,
-            &None,
-            &vec![SparseUserField::Id, SparseUserField::Name],
-        )
-        .execute()
-        .await
-        .unwrap()
-        .parse(wp_api::parse_filter_users_response);
-    assert!(parsed_response.is_ok());
-    parsed_response.unwrap().iter().for_each(|x| {
-        assert!(x.id.is_some());
-        assert!(x.name.is_some());
-        assert!(x.email.is_none());
-    });
+async fn filter_users_id() {
+    test_filter_user_list(&vec![SparseUserField::Id]).await;
+}
+
+#[tokio::test]
+async fn filter_users_id_and_name() {
+    test_filter_user_list(&vec![SparseUserField::Id, SparseUserField::Name]).await;
+}
+
+#[tokio::test]
+async fn filter_users_username() {
+    test_filter_user_list(&vec![SparseUserField::Username]).await;
+}
+
+#[tokio::test]
+async fn filter_users_name() {
+    test_filter_user_list(&vec![SparseUserField::Name]).await;
+}
+
+#[tokio::test]
+async fn filter_users_last_name() {
+    test_filter_user_list(&vec![SparseUserField::LastName]).await;
+}
+
+#[tokio::test]
+async fn filter_users_email() {
+    test_filter_user_list(&vec![SparseUserField::Email]).await;
+}
+
+#[tokio::test]
+async fn filter_users_url() {
+    test_filter_user_list(&vec![SparseUserField::Url]).await;
+}
+
+#[tokio::test]
+async fn filter_users_description() {
+    test_filter_user_list(&vec![SparseUserField::Description]).await;
+}
+
+#[tokio::test]
+async fn filter_users_link() {
+    test_filter_user_list(&vec![SparseUserField::Link]).await;
+}
+
+#[tokio::test]
+async fn filter_users_locale() {
+    test_filter_user_list(&vec![SparseUserField::Locale]).await;
+}
+
+#[tokio::test]
+async fn filter_users_nickname() {
+    test_filter_user_list(&vec![SparseUserField::Nickname]).await;
+}
+
+#[tokio::test]
+async fn filter_users_slug() {
+    test_filter_user_list(&vec![SparseUserField::Slug]).await;
+}
+
+#[tokio::test]
+async fn filter_users_registered_date() {
+    test_filter_user_list(&vec![SparseUserField::RegisteredDate]).await;
+}
+
+#[tokio::test]
+async fn filter_users_roles() {
+    test_filter_user_list(&vec![SparseUserField::Roles]).await;
+}
+
+#[tokio::test]
+async fn filter_users_capabilities() {
+    test_filter_user_list(&vec![SparseUserField::Capabilities]).await;
+}
+
+#[tokio::test]
+async fn filter_users_extra_capabilities() {
+    test_filter_user_list(&vec![SparseUserField::ExtraCapabilities]).await;
+}
+
+#[tokio::test]
+async fn filter_users_avatar_urls() {
+    test_filter_user_list(&vec![SparseUserField::AvatarUrls]).await;
 }
 
 #[tokio::test]
@@ -293,5 +358,71 @@ async fn test_user_list_params(params: UserListParams) {
         parsed_response.is_ok(),
         "Response was: '{:?}'",
         parsed_response
+    );
+}
+
+async fn test_filter_user_list(fields: &Vec<SparseUserField>) {
+    let parsed_response = api()
+        .filter_list_users_request(WPContext::Edit, &None, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_users_response);
+    assert!(parsed_response.is_ok());
+    parsed_response
+        .unwrap()
+        .iter()
+        .for_each(|user| validate_sparse_user_fields(&user, fields));
+}
+
+fn validate_sparse_user_fields(user: &SparseUser, fields: &Vec<SparseUserField>) {
+    assert_eq!(user.id.is_some(), fields.contains(&SparseUserField::Id));
+    assert_eq!(
+        user.username.is_some(),
+        fields.contains(&SparseUserField::Username)
+    );
+    assert_eq!(user.name.is_some(), fields.contains(&SparseUserField::Name));
+    assert_eq!(
+        user.last_name.is_some(),
+        fields.contains(&SparseUserField::LastName)
+    );
+    assert_eq!(
+        user.email.is_some(),
+        fields.contains(&SparseUserField::Email)
+    );
+    assert_eq!(user.url.is_some(), fields.contains(&SparseUserField::Url));
+    assert_eq!(
+        user.description.is_some(),
+        fields.contains(&SparseUserField::Description)
+    );
+    assert_eq!(user.link.is_some(), fields.contains(&SparseUserField::Link));
+    assert_eq!(
+        user.locale.is_some(),
+        fields.contains(&SparseUserField::Locale)
+    );
+    assert_eq!(
+        user.nickname.is_some(),
+        fields.contains(&SparseUserField::Nickname)
+    );
+    assert_eq!(user.slug.is_some(), fields.contains(&SparseUserField::Slug));
+    assert_eq!(
+        user.registered_date.is_some(),
+        fields.contains(&SparseUserField::RegisteredDate)
+    );
+    assert_eq!(
+        user.roles.is_some(),
+        fields.contains(&SparseUserField::Roles)
+    );
+    assert_eq!(
+        user.capabilities.is_some(),
+        fields.contains(&SparseUserField::Capabilities)
+    );
+    assert_eq!(
+        user.extra_capabilities.is_some(),
+        fields.contains(&SparseUserField::ExtraCapabilities)
+    );
+    assert_eq!(
+        user.avatar_urls.is_some(),
+        fields.contains(&SparseUserField::AvatarUrls)
     );
 }
