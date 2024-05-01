@@ -319,6 +319,7 @@ async fn test_user_list_params(params: UserListParams) {
         parsed_response
     );
 }
+<<<<<<< HEAD
 
 fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
     assert_eq!(user.id.is_some(), fields.contains(&SparseUserField::Id));
@@ -393,3 +394,5 @@ fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
 #[case(&[SparseUserField::Id, SparseUserField::Name])]
 #[case(&[SparseUserField::Email, SparseUserField::Nickname])]
 fn filter_fields_cases(#[case] fields: &[SparseUserField]) {}
+=======
+>>>>>>> origin/trunk

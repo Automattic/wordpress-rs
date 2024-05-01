@@ -85,31 +85,3 @@ pub enum WPRestErrorCode {
     #[serde(rename = "rest_user_invalid_password")]
     UserInvalidPassword,
 }
-
-impl WPRestErrorCode {
-    pub fn status_code(&self) -> u16 {
-        match self {
-            Self::CannotCreateUser => 403,
-            Self::CannotEdit => 403,
-            Self::CannotEditRoles => 403,
-            Self::ForbiddenContext => 403,
-            Self::ForbiddenOrderBy => 403,
-            Self::ForbiddenWho => 403,
-            Self::InvalidParam => 400,
-            Self::TrashNotSupported => 501,
-            Self::Unauthorized => 401,
-            Self::UserCannotDelete => 403,
-            Self::UserCannotView => 403,
-            Self::UserCreate => 500,
-            Self::UserExists => 400,
-            Self::UserInvalidArgument => 400,
-            Self::UserInvalidEmail => 400,
-            Self::UserInvalidId => 404,
-            Self::UserInvalidPassword => 400,
-            Self::UserInvalidReassign => 400,
-            Self::UserInvalidRole => 400,
-            Self::UserInvalidSlug => 400,
-            Self::UserInvalidUsername => 400,
-        }
-    }
-}

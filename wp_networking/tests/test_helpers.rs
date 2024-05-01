@@ -70,6 +70,8 @@ pub trait AssertWpError<T: std::fmt::Debug> {
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
     fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
+        let expected_status_code =
+            expected_status_code_for_wp_rest_error_code(&expected_error_code);
         let err = self.unwrap_err();
         if let WPApiError::RestError {
             rest_error:
@@ -87,12 +89,9 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
                 expected_error_code, error_code, response
             );
             assert_eq!(
-                expected_error_code.status_code(),
-                status_code,
+                expected_status_code, status_code,
                 "Incorrect status code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
-                expected_error_code.status_code(),
-                status_code,
-                response
+                expected_status_code, status_code, response
             );
         } else if let WPApiError::RestError {
             rest_error: WPRestErrorWrapper::Unrecognized(unrecognized_error),
@@ -127,5 +126,31 @@ pub fn test_credentials() -> TestCredentials {
         admin_password: lines[2].to_string(),
         subscriber_username: lines[3].to_string(),
         subscriber_password: lines[4].to_string(),
+    }
+}
+
+fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> u16 {
+    match error_code {
+        WPRestErrorCode::CannotCreateUser => 403,
+        WPRestErrorCode::CannotEdit => 403,
+        WPRestErrorCode::CannotEditRoles => 403,
+        WPRestErrorCode::ForbiddenContext => 403,
+        WPRestErrorCode::ForbiddenOrderBy => 403,
+        WPRestErrorCode::ForbiddenWho => 403,
+        WPRestErrorCode::InvalidParam => 400,
+        WPRestErrorCode::TrashNotSupported => 501,
+        WPRestErrorCode::Unauthorized => 401,
+        WPRestErrorCode::UserCannotDelete => 403,
+        WPRestErrorCode::UserCannotView => 403,
+        WPRestErrorCode::UserCreate => 500,
+        WPRestErrorCode::UserExists => 400,
+        WPRestErrorCode::UserInvalidArgument => 400,
+        WPRestErrorCode::UserInvalidEmail => 400,
+        WPRestErrorCode::UserInvalidId => 404,
+        WPRestErrorCode::UserInvalidPassword => 400,
+        WPRestErrorCode::UserInvalidReassign => 400,
+        WPRestErrorCode::UserInvalidRole => 400,
+        WPRestErrorCode::UserInvalidSlug => 400,
+        WPRestErrorCode::UserInvalidUsername => 400,
     }
 }
