@@ -81,12 +81,10 @@ xcframework-headers: bindings
 	cp target/swift-bindings/*.h target/swift-bindings/headers
 	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
 
-
-# TODO: Add arm64_32-apple-watchos to the list
 apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
 apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
-apple-platform-targets-watchos := x86_64-apple-watchos-sim aarch64-apple-watchos-sim
+apple-platform-targets-watchos := arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
 apple-platform-targets := \
 	$(apple-platform-targets-macos) \
 	$(apple-platform-targets-ios) \
