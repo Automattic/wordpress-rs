@@ -34,7 +34,11 @@ wp import /tmp/testdata.xml --authors=create
 ## Then clean up the importer plugin
 wp plugin delete wordpress-importer
 
-printf "http://localhost\ntest@example.com\n" >> /tmp/test_credentials
-
-## Create an Application password for the admin user, and store it where it can be used by the test suite
-wp user application-password create test@example.com test --porcelain >> /tmp/test_credentials
+{
+  printf "http://localhost\ntest@example.com\n"
+  ## Create an Application password for the admin user, and store it where it can be used by the test suite
+  wp user application-password create test@example.com test --porcelain 
+  printf "themedemos\n"
+  ## Create an Application password for a subscriber user, and store it where it can be used by the test suite
+  wp user application-password create themedemos test --porcelain
+} >> /tmp/test_credentials

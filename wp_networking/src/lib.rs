@@ -1,23 +1,22 @@
 #![allow(dead_code, unused_variables)]
 
 use http::HeaderMap;
-use reqwest::blocking::Client;
-use wp_api::{WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse};
+use wp_api::{WPNetworkRequest, WPNetworkResponse};
 
-pub struct WPNetworking {
-    client: Client,
-    pub api_helper: WPApiHelper,
+pub struct AsyncWPNetworking {
+    client: reqwest::Client,
 }
 
-impl WPNetworking {
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
+impl Default for AsyncWPNetworking {
+    fn default() -> Self {
         Self {
-            client: reqwest::blocking::Client::new(),
-            api_helper: WPApiHelper::new(site_url, authentication),
+            client: reqwest::Client::new(),
         }
     }
+}
 
-    pub fn request(
+impl AsyncWPNetworking {
+    pub async fn async_request(
         &self,
         wp_request: WPNetworkRequest,
     ) -> Result<WPNetworkResponse, reqwest::Error> {
@@ -30,8 +29,13 @@ impl WPNetworking {
         if let Some(body) = wp_request.body {
             request = request.body(body);
         }
-        let response = request.send()?;
-        Ok(wp_network_response(response))
+        let response = request.send().await?;
+
+        Ok(WPNetworkResponse {
+            status_code: response.status().as_u16(),
+            body: response.bytes().await.unwrap().to_vec(),
+            header_map: None, // TODO: Properly read the headers
+        })
     }
 }
 

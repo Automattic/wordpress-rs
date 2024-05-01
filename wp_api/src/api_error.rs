@@ -1,50 +1,87 @@
-use http::StatusCode;
+use serde::Deserialize;
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WPApiError {
-    #[error(
-        "Client error with type '{:?}' and status_code '{}'",
-        error_type,
-        status_code
-    )]
-    ClientError {
-        error_type: ClientErrorType,
+    #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
+    RestError {
+        rest_error: WPRestErrorWrapper,
         status_code: u16,
+        response: String,
     },
-    #[error("Server error with status_code '{}'", status_code)]
-    ServerError { status_code: u16 },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ParsingError { reason: String, response: String },
-    #[error("Error that's not yet handled by the library")]
-    UnknownError,
+    #[error(
+        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
+        status_code,
+        response
+    )]
+    UnknownError { status_code: u16, response: String },
 }
 
-#[derive(Debug, uniffi::Enum)]
-pub enum ClientErrorType {
-    BadRequest,
+#[derive(serde::Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
+#[serde(untagged)]
+pub enum WPRestErrorWrapper {
+    Recognized(WPRestError),
+    Unrecognized(UnrecognizedWPRestError),
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
+pub struct WPRestError {
+    pub code: WPRestErrorCode,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
+pub struct UnrecognizedWPRestError {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
+pub enum WPRestErrorCode {
+    #[serde(rename = "rest_cannot_create_user")]
+    CannotCreateUser,
+    #[serde(rename = "rest_cannot_edit")]
+    CannotEdit,
+    #[serde(rename = "rest_cannot_edit_roles")]
+    CannotEditRoles,
+    #[serde(rename = "rest_forbidden_context")]
+    ForbiddenContext,
+    #[serde(rename = "rest_forbidden_orderby")]
+    ForbiddenOrderBy,
+    #[serde(rename = "rest_forbidden_who")]
+    ForbiddenWho,
+    #[serde(rename = "rest_invalid_param")]
+    InvalidParam,
+    #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
-    TooManyRequests,
-    Other,
-}
-
-impl ClientErrorType {
-    pub fn from_status_code(status_code: u16) -> Option<Self> {
-        if let Ok(status_code) = StatusCode::from_u16(status_code) {
-            if status_code.is_client_error() {
-                if status_code == StatusCode::BAD_REQUEST {
-                    Some(Self::BadRequest)
-                } else if status_code == StatusCode::UNAUTHORIZED {
-                    Some(Self::Unauthorized)
-                } else if status_code == StatusCode::TOO_MANY_REQUESTS {
-                    Some(Self::TooManyRequests)
-                } else {
-                    Some(Self::Other)
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
+    #[serde(rename = "rest_user_cannot_delete")]
+    UserCannotDelete,
+    #[serde(rename = "rest_user_cannot_view")]
+    UserCannotView,
+    #[serde(rename = "rest_user_invalid_email")]
+    UserInvalidEmail,
+    #[serde(rename = "rest_user_invalid_id")]
+    UserInvalidId,
+    #[serde(rename = "rest_user_invalid_reassign")]
+    UserInvalidReassign,
+    #[serde(rename = "rest_user_invalid_role")]
+    UserInvalidRole,
+    #[serde(rename = "rest_user_invalid_slug")]
+    UserInvalidSlug,
+    // Tested, but we believe these errors are imppossible to get unless the requests are manually modified
+    #[serde(rename = "rest_user_exists")]
+    UserExists,
+    #[serde(rename = "rest_user_invalid_argument")]
+    UserInvalidArgument,
+    #[serde(rename = "rest_trash_not_supported")]
+    TrashNotSupported,
+    // Untested, because we believe these errors require multisite
+    #[serde(rename = "rest_user_create")]
+    UserCreate,
+    // Untested, because we believe these errors are impossible to get
+    #[serde(rename = "rest_user_invalid_username")]
+    UserInvalidUsername,
+    #[serde(rename = "rest_user_invalid_password")]
+    UserInvalidPassword,
 }
