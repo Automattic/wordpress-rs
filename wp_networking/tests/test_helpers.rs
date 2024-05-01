@@ -1,0 +1,156 @@
+use base64::prelude::*;
+use std::fs::read_to_string;
+use wp_api::{
+    UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
+    WPRestError, WPRestErrorCode, WPRestErrorWrapper,
+};
+
+use wp_networking::AsyncWPNetworking;
+
+// The first user is also the current user
+pub const FIRST_USER_ID: UserId = UserId(1);
+pub const SECOND_USER_ID: UserId = UserId(2);
+pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
+pub const SECOND_USER_SLUG: &str = "themedemos";
+
+pub fn api() -> WPApiHelper {
+    let credentials = test_credentials();
+    let auth_base64_token = BASE64_STANDARD.encode(format!(
+        "{}:{}",
+        credentials.admin_username, credentials.admin_password
+    ));
+    let authentication = WPAuthentication::AuthorizationHeader {
+        token: auth_base64_token,
+    };
+    WPApiHelper::new(credentials.site_url, authentication)
+}
+
+pub fn api_as_subscriber() -> WPApiHelper {
+    let credentials = test_credentials();
+    let auth_base64_token = BASE64_STANDARD.encode(format!(
+        "{}:{}",
+        credentials.subscriber_username, credentials.subscriber_password
+    ));
+    let authentication = WPAuthentication::AuthorizationHeader {
+        token: auth_base64_token,
+    };
+    WPApiHelper::new(credentials.site_url, authentication)
+}
+
+pub trait WPNetworkRequestExecutor {
+    fn execute(
+        self,
+    ) -> impl std::future::Future<Output = Result<WPNetworkResponse, reqwest::Error>> + Send;
+}
+
+impl WPNetworkRequestExecutor for WPNetworkRequest {
+    async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
+        AsyncWPNetworking::default().async_request(self).await
+    }
+}
+
+pub trait WPNetworkResponseParser {
+    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    where
+        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>;
+}
+
+impl WPNetworkResponseParser for WPNetworkResponse {
+    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    where
+        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
+    {
+        parser(self)
+    }
+}
+
+pub trait AssertWpError<T: std::fmt::Debug> {
+    fn assert_wp_error(self, expected_error_code: WPRestErrorCode);
+}
+
+impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
+    fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
+        let expected_status_code =
+            expected_status_code_for_wp_rest_error_code(&expected_error_code);
+        let err = self.unwrap_err();
+        if let WPApiError::RestError {
+            rest_error:
+                WPRestErrorWrapper::Recognized(WPRestError {
+                    code: error_code,
+                    message: _,
+                }),
+            status_code,
+            response,
+        } = err
+        {
+            assert_eq!(
+                expected_error_code, error_code,
+                "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
+                expected_error_code, error_code, response
+            );
+            assert_eq!(
+                expected_status_code, status_code,
+                "Incorrect status code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
+                expected_status_code, status_code, response
+            );
+        } else if let WPApiError::RestError {
+            rest_error: WPRestErrorWrapper::Unrecognized(unrecognized_error),
+            status_code,
+            response,
+        } = err
+        {
+            panic!(
+                "Received unhandled WPRestError variant: '{:?}' with status_code: '{}'. Response was: '{:?}'",
+                unrecognized_error, status_code, response
+            );
+        } else {
+            panic!("Unexpected wp_error '{:?}'", err);
+        }
+    }
+}
+
+pub struct TestCredentials {
+    pub site_url: String,
+    pub admin_username: String,
+    pub admin_password: String,
+    pub subscriber_username: String,
+    pub subscriber_password: String,
+}
+
+pub fn test_credentials() -> TestCredentials {
+    let file_contents = read_to_string("../test_credentials").unwrap();
+    let lines: Vec<&str> = file_contents.lines().collect();
+    TestCredentials {
+        site_url: lines[0].to_string(),
+        admin_username: lines[1].to_string(),
+        admin_password: lines[2].to_string(),
+        subscriber_username: lines[3].to_string(),
+        subscriber_password: lines[4].to_string(),
+    }
+}
+
+fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> u16 {
+    match error_code {
+        WPRestErrorCode::CannotCreateUser => 403,
+        WPRestErrorCode::CannotEdit => 403,
+        WPRestErrorCode::CannotEditRoles => 403,
+        WPRestErrorCode::ForbiddenContext => 403,
+        WPRestErrorCode::ForbiddenOrderBy => 403,
+        WPRestErrorCode::ForbiddenWho => 403,
+        WPRestErrorCode::InvalidParam => 400,
+        WPRestErrorCode::TrashNotSupported => 501,
+        WPRestErrorCode::Unauthorized => 401,
+        WPRestErrorCode::UserCannotDelete => 403,
+        WPRestErrorCode::UserCannotView => 403,
+        WPRestErrorCode::UserCreate => 500,
+        WPRestErrorCode::UserExists => 400,
+        WPRestErrorCode::UserInvalidArgument => 400,
+        WPRestErrorCode::UserInvalidEmail => 400,
+        WPRestErrorCode::UserInvalidId => 404,
+        WPRestErrorCode::UserInvalidPassword => 400,
+        WPRestErrorCode::UserInvalidReassign => 400,
+        WPRestErrorCode::UserInvalidRole => 400,
+        WPRestErrorCode::UserInvalidSlug => 400,
+        WPRestErrorCode::UserInvalidUsername => 400,
+    }
+}

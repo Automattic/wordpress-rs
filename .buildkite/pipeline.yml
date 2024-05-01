@@ -13,7 +13,8 @@ steps:
       - label: ":rust: Build and Test"
         command: |
           echo "--- :rust: Building + Testing"
-          make test-rust
+          make test-rust-lib
+          make test-rust-doc
       - label: ":rust: Lint"
         command: |
           echo "--- :rust: Running Clippy"
