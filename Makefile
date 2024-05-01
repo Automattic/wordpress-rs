@@ -20,8 +20,7 @@ swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
 
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
-# The project doesn't compile with the nightly toolchain built on 2024-03-28 and onward.
-rust_nightly_toolchain := nightly-2024-03-27
+rust_nightly_toolchain := nightly-2024-04-30
 
 uname := $(shell uname | tr A-Z a-z)
 ifeq ($(uname), linux)
@@ -208,16 +207,25 @@ test-android: bindings _test-android
 
 publish-android-local: bindings _publish-android-local
 
-test-rust:
-	$(rust_docker_run) cargo test
+test-rust-lib:
+	$(rust_docker_run) cargo test --lib
 
-test-server:
+test-rust-doc:
+	$(rust_docker_run) cargo test --doc
+
+test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
 	docker-compose run wpcli
 
 stop-server:
 	docker-compose down
+
+dump-mysql:
+	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysqldump --defaults-extra-file=mysql_config/config.cnf --no-tablespaces wordpress > dump.sql"
+
+restore-mysql:
+	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
 
 lint: lint-rust lint-swift
 

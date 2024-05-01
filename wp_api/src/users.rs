@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
@@ -91,6 +90,28 @@ impl WPApiParamUsersOrderBy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WPApiParamUsersWho {
+    All,
+    Authors,
+}
+
+impl WPApiParamUsersWho {
+    // The only valid value for this parameter is "authors"
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::All => None,
+            Self::Authors => Some("authors"),
+        }
+    }
+}
+
+impl Default for WPApiParamUsersWho {
+    fn default() -> Self {
+        Self::All
+    }
+}
+
 #[derive(Default, uniffi::Record)]
 pub struct UserListParams {
     // TODO: Implement the `_filter`
@@ -103,9 +124,9 @@ pub struct UserListParams {
     /// Limit results to those matching a string.
     pub search: Option<String>,
     /// Ensure result set excludes specific IDs.
-    pub exclude: Option<String>,
+    pub exclude: Vec<UserId>,
     /// Limit result set to specific IDs.
-    pub include: Option<String>,
+    pub include: Vec<UserId>,
     /// Offset the result set by a specific number of items.
     pub offset: Option<u32>,
     /// Order sort attribute ascending or descending.
@@ -115,7 +136,7 @@ pub struct UserListParams {
     /// Sort collection by user attribute.
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
-    pub order_by: Option<WPApiParamUsersOrderBy>,
+    pub orderby: Option<WPApiParamUsersOrderBy>,
     /// Limit result set to users with one or more specific slugs.
     pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
@@ -124,7 +145,7 @@ pub struct UserListParams {
     pub capabilities: Vec<String>,
     /// Limit result set to users who are considered authors.
     /// One of: `authors`
-    pub who: Option<String>,
+    pub who: Option<WPApiParamUsersWho>,
     /// Limit result set to users who have published posts.
     pub has_published_posts: Option<bool>,
 }
@@ -135,11 +156,29 @@ impl UserListParams {
             ("page", self.page.map(|x| x.to_string())),
             ("per_page", self.per_page.map(|x| x.to_string())),
             ("search", self.search.clone()),
-            ("exclude", self.exclude.clone()),
-            ("include", self.include.clone()),
+            (
+                "exclude",
+                (!self.exclude.is_empty()).then_some(
+                    self.exclude
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "include",
+                (!self.include.is_empty()).then_some(
+                    self.include
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
             ("offset", self.offset.map(|x| x.to_string())),
             ("order", self.order.map(|x| x.as_str().to_string())),
-            ("order_by", self.order_by.map(|x| x.as_str().to_string())),
+            ("orderby", self.orderby.map(|x| x.as_str().to_string())),
             (
                 "slug",
                 (!self.slug.is_empty()).then_some(self.slug.join(",")),
@@ -152,7 +191,10 @@ impl UserListParams {
                 "capabilities",
                 (!self.capabilities.is_empty()).then_some(self.capabilities.join(",")),
             ),
-            ("who", self.who.clone()),
+            (
+                "who",
+                self.who.and_then(|x| x.as_str().map(|s| s.to_string())),
+            ),
             (
                 "has_published_post",
                 self.has_published_posts.map(|x| x.to_string()),
@@ -164,7 +206,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Builder, Serialize, uniffi::Record)]
+#[derive(Serialize, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,
@@ -174,105 +216,103 @@ pub struct UserCreateParams {
     pub password: String,
     /// Display name for the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// First name for the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
     /// Last name for the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     /// URL of the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Description of the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Locale for the user.
     /// One of: , `en_US`
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     /// The nickname for the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nickname: Option<String>,
     /// An alphanumeric identifier for the user.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     /// Roles assigned to the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
     /// Meta fields.
     #[uniffi(default = None)]
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<String>,
 }
 
-#[derive(Builder, Serialize, uniffi::Record)]
+impl UserCreateParams {
+    pub fn new(username: String, email: String, password: String) -> Self {
+        Self {
+            username,
+            email,
+            password,
+            name: None,
+            first_name: None,
+            last_name: None,
+            url: None,
+            description: None,
+            locale: None,
+            nickname: None,
+            slug: None,
+            roles: Vec::new(),
+            meta: None,
+        }
+    }
+}
+
+#[derive(Default, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
     /// Display name for the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// First name for the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
     /// Last name for the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     /// The email address for the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
     /// URL of the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Description of the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Locale for the user.
     /// One of: , `en_US`
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     /// The nickname for the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nickname: Option<String>,
     /// An alphanumeric identifier for the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     /// Roles assigned to the user.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<String>,
     /// Password for the user (never included).
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
     /// Meta fields.
-    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<String>,
 }
