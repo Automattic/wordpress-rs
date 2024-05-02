@@ -330,13 +330,17 @@ pub struct UserUpdateParams {
     pub meta: Option<String>,
 }
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct UserDeleteParams {
     /// Reassign the deleted user's posts and links to this user ID.
     pub reassign: UserId,
 }
 
 impl UserDeleteParams {
+    pub fn new(reassign: UserId) -> Self {
+        Self { reassign }
+    }
+
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [
             ("reassign", self.reassign.to_string()),
@@ -448,41 +452,50 @@ mod tests {
     use super::*;
     use rstest::*;
 
-    macro_rules! create_params {
-        ($t: ident) => {
-            $t::default()
+    macro_rules! user_list_params {
+        () => {
+            UserListParams::default()
         };
-        ($t: ident $(, ($f:ident, $v:expr))*) => {{
-            let mut params = $t::default();
+        ($(($f:ident, $v:expr)), *) => {{
+            let mut params = UserListParams::default();
             $(params.$f = $v;)*
             params
         }};
     }
 
     #[rstest]
-    #[case(create_params!(UserListParams), &[])]
-    #[case(create_params!(UserListParams, (page, Some(1))), &[("page", "1")])]
-    #[case(create_params!(UserListParams, (page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
-    #[case(create_params!(UserListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
-    #[case(create_params!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
-    #[case(create_params!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
-    #[case(create_params!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
-    #[case(create_params!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
-    #[case(create_params!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
-    #[case(create_params!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
-    #[case(create_params!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
-    #[case(create_params!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
-    #[case(create_params!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
-    #[case(create_params!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
-    #[case::who_all_param_should_be_empty(create_params!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
-    #[case(create_params!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
-    #[case(create_params!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[case(user_list_params!(), &[])]
+    #[case(user_list_params!((page, Some(1))), &[("page", "1")])]
+    #[case(user_list_params!((page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
+    #[case(user_list_params!((search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(user_list_params!((exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
+    #[case(user_list_params!((include, vec![UserId(1)])), &[("include", "1")])]
+    #[case(user_list_params!((per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
+    #[case(user_list_params!((order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(user_list_params!((orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(user_list_params!((order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
+    #[case(user_list_params!((roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
+    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
+    #[case(user_list_params!((capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
+    #[case::who_all_param_should_be_empty(user_list_params!((who, Some(WPApiParamUsersWho::All))), &[])]
+    #[case(user_list_params!((who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case(user_list_params!((has_published_posts, Some(true))), &[("has_published_posts", "true")])]
     #[trace]
     fn test_user_list_params(
         #[case] params: UserListParams,
         #[case] expected_pairs: &[(&str, &str)],
     ) {
         assert_expected_query_pairs(params.query_pairs(), expected_pairs);
+    }
+
+    #[test]
+    fn test_user_delete_params() {
+        let params = UserDeleteParams::new(UserId(987));
+        assert_expected_query_pairs(
+            params.query_pairs(),
+            &[("force", "true"), ("reassign", "987")],
+        );
     }
 
     fn assert_expected_query_pairs<'a>(
