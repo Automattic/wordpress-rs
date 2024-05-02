@@ -126,7 +126,7 @@ impl Default for WPApiParamUsersWho {
     }
 }
 
-#[derive(Default, uniffi::Record)]
+#[derive(Default, Debug, uniffi::Record)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -209,7 +209,7 @@ impl UserListParams {
                 self.who.and_then(|x| x.as_str().map(|s| s.to_string())),
             ),
             (
-                "has_published_post",
+                "has_published_posts",
                 self.has_published_posts.map(|x| x.to_string()),
             ),
         ]
@@ -446,14 +446,57 @@ impl SparseUserField {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
-    #[test]
-    fn test_user_list_params_default_is_empty() {
-        assert!(UserListParams::default()
-            .query_pairs()
-            .into_iter()
-            .peekable()
-            .peek()
-            .is_none());
+    macro_rules! create_params {
+        ($t: ident) => {
+            $t::default()
+        };
+        ($t: ident $(, ($f:ident, $v:expr))*) => {{
+            let mut params = $t::default();
+            $(params.$f = $v;)*
+            params
+        }};
+    }
+
+    #[rstest]
+    #[case(create_params!(UserListParams), &[])]
+    #[case(create_params!(UserListParams, (page, Some(1))), &[("page", "1")])]
+    #[case(create_params!(UserListParams, (page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
+    #[case(create_params!(UserListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(create_params!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
+    #[case(create_params!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
+    #[case(create_params!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
+    #[case(create_params!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(create_params!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(create_params!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(create_params!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
+    #[case(create_params!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
+    #[case(create_params!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
+    #[case(create_params!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
+    #[case::who_all_param_should_be_empty(create_params!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
+    #[case(create_params!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case(create_params!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[trace]
+    fn test_user_list_params(
+        #[case] params: UserListParams,
+        #[case] expected_pairs: &[(&str, &str)],
+    ) {
+        assert_expected_query_pairs(params.query_pairs(), expected_pairs);
+    }
+
+    fn assert_expected_query_pairs<'a>(
+        query_pairs: impl IntoIterator<Item = (&'a str, String)>,
+        expected_pairs: &[(&'a str, &str)],
+    ) {
+        let mut query_pairs = query_pairs.into_iter().collect::<Vec<_>>();
+        let mut expected_pairs: Vec<(&str, String)> = expected_pairs
+            .iter()
+            .map(|(k, v)| (*k, v.to_string()))
+            .collect();
+        // The order of query pairs doesn't matter
+        query_pairs.sort();
+        expected_pairs.sort();
+        assert_eq!(query_pairs, expected_pairs);
     }
 }
