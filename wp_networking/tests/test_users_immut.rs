@@ -1,5 +1,8 @@
+use rstest::*;
+use rstest_reuse::{self, apply, template};
 use wp_api::{
-    UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy, WPApiParamUsersWho, WPContext,
+    SparseUser, SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy,
+    WPApiParamUsersWho, WPContext,
 };
 
 use crate::test_helpers::{
@@ -7,6 +10,48 @@ use crate::test_helpers::{
 };
 
 pub mod test_helpers;
+
+#[apply(filter_fields_cases)]
+#[tokio::test]
+async fn filter_users(#[case] fields: &[SparseUserField]) {
+    let parsed_response = api()
+        .filter_list_users_request(WPContext::Edit, &None, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_users_response);
+    assert!(parsed_response.is_ok());
+    parsed_response
+        .unwrap()
+        .iter()
+        .for_each(|user| validate_sparse_user_fields(&user, fields));
+}
+
+#[apply(filter_fields_cases)]
+#[tokio::test]
+async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
+    let user_result = api()
+        .filter_retrieve_user_request(FIRST_USER_ID, WPContext::Edit, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_retrieve_user_response);
+    assert!(user_result.is_ok());
+    validate_sparse_user_fields(&user_result.unwrap(), fields);
+}
+
+#[apply(filter_fields_cases)]
+#[tokio::test]
+async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
+    let user_result = api()
+        .filter_retrieve_current_user_request(WPContext::Edit, fields)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_filter_retrieve_user_response);
+    assert!(user_result.is_ok());
+    validate_sparse_user_fields(&user_result.unwrap(), fields);
+}
 
 #[tokio::test]
 async fn list_users_with_edit_context() {
@@ -274,3 +319,77 @@ async fn test_user_list_params(params: UserListParams) {
         parsed_response
     );
 }
+
+fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
+    assert_eq!(user.id.is_some(), fields.contains(&SparseUserField::Id));
+    assert_eq!(
+        user.username.is_some(),
+        fields.contains(&SparseUserField::Username)
+    );
+    assert_eq!(user.name.is_some(), fields.contains(&SparseUserField::Name));
+    assert_eq!(
+        user.last_name.is_some(),
+        fields.contains(&SparseUserField::LastName)
+    );
+    assert_eq!(
+        user.email.is_some(),
+        fields.contains(&SparseUserField::Email)
+    );
+    assert_eq!(user.url.is_some(), fields.contains(&SparseUserField::Url));
+    assert_eq!(
+        user.description.is_some(),
+        fields.contains(&SparseUserField::Description)
+    );
+    assert_eq!(user.link.is_some(), fields.contains(&SparseUserField::Link));
+    assert_eq!(
+        user.locale.is_some(),
+        fields.contains(&SparseUserField::Locale)
+    );
+    assert_eq!(
+        user.nickname.is_some(),
+        fields.contains(&SparseUserField::Nickname)
+    );
+    assert_eq!(user.slug.is_some(), fields.contains(&SparseUserField::Slug));
+    assert_eq!(
+        user.registered_date.is_some(),
+        fields.contains(&SparseUserField::RegisteredDate)
+    );
+    assert_eq!(
+        user.roles.is_some(),
+        fields.contains(&SparseUserField::Roles)
+    );
+    assert_eq!(
+        user.capabilities.is_some(),
+        fields.contains(&SparseUserField::Capabilities)
+    );
+    assert_eq!(
+        user.extra_capabilities.is_some(),
+        fields.contains(&SparseUserField::ExtraCapabilities)
+    );
+    assert_eq!(
+        user.avatar_urls.is_some(),
+        fields.contains(&SparseUserField::AvatarUrls)
+    );
+}
+
+#[template]
+#[rstest]
+#[case(&[SparseUserField::Id])]
+#[case(&[SparseUserField::Username])]
+#[case(&[SparseUserField::Name])]
+#[case(&[SparseUserField::LastName])]
+#[case(&[SparseUserField::Email])]
+#[case(&[SparseUserField::Url])]
+#[case(&[SparseUserField::Description])]
+#[case(&[SparseUserField::Link])]
+#[case(&[SparseUserField::Locale])]
+#[case(&[SparseUserField::Nickname])]
+#[case(&[SparseUserField::Slug])]
+#[case(&[SparseUserField::RegisteredDate])]
+#[case(&[SparseUserField::Roles])]
+#[case(&[SparseUserField::Capabilities])]
+#[case(&[SparseUserField::ExtraCapabilities])]
+#[case(&[SparseUserField::AvatarUrls])]
+#[case(&[SparseUserField::Id, SparseUserField::Name])]
+#[case(&[SparseUserField::Email, SparseUserField::Nickname])]
+fn filter_fields_cases(#[case] fields: &[SparseUserField]) {}

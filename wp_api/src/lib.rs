@@ -87,6 +87,24 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_list_users_request(
+        &self,
+        context: WPContext,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
@@ -96,10 +114,45 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_retrieve_user_request(
+        &self,
+        user_id: UserId,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_retrieve(user_id, context, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.users.retrieve_me(context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn filter_retrieve_current_user_request(
+        &self,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_retrieve_me(context, fields)
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
