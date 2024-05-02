@@ -164,7 +164,7 @@ mod tests {
         };
         validate_endpoint(
             users_endpoint.list(WPContext::Edit, Some(&params)),
-            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_post=true",
+            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true",
             &api_base_url,
         );
     }
@@ -188,7 +188,7 @@ mod tests {
         };
         validate_endpoint(
             users_endpoint.filter_list(WPContext::Edit, Some(&params), &vec![SparseUserField::Name, SparseUserField::Email]),
-            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_post=true&_fields=name%2Cemail",
+            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true&_fields=name%2Cemail",
             &api_base_url,
         );
     }

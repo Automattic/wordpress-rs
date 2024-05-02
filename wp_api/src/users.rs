@@ -126,9 +126,8 @@ impl Default for WPApiParamUsersWho {
     }
 }
 
-#[derive(Default, uniffi::Record)]
+#[derive(Default, Debug, uniffi::Record)]
 pub struct UserListParams {
-    // TODO: Implement the `_filter`
     /// Current page of the collection.
     /// Default: `1`
     pub page: Option<u32>,
@@ -210,7 +209,7 @@ impl UserListParams {
                 self.who.and_then(|x| x.as_str().map(|s| s.to_string())),
             ),
             (
-                "has_published_post",
+                "has_published_posts",
                 self.has_published_posts.map(|x| x.to_string()),
             ),
         ]
@@ -331,13 +330,17 @@ pub struct UserUpdateParams {
     pub meta: Option<String>,
 }
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct UserDeleteParams {
     /// Reassign the deleted user's posts and links to this user ID.
     pub reassign: UserId,
 }
 
 impl UserDeleteParams {
+    pub fn new(reassign: UserId) -> Self {
+        Self { reassign }
+    }
+
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [
             ("reassign", self.reassign.to_string()),
@@ -441,5 +444,72 @@ impl SparseUserField {
             Self::ExtraCapabilities => "extra_capabilities",
             Self::AvatarUrls => "avatar_urls",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    macro_rules! user_list_params {
+        () => {
+            UserListParams::default()
+        };
+        ($(($f:ident, $v:expr)), *) => {{
+            let mut params = UserListParams::default();
+            $(params.$f = $v;)*
+            params
+        }};
+    }
+
+    #[rstest]
+    #[case(user_list_params!(), &[])]
+    #[case(user_list_params!((page, Some(1))), &[("page", "1")])]
+    #[case(user_list_params!((page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
+    #[case(user_list_params!((search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(user_list_params!((exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
+    #[case(user_list_params!((include, vec![UserId(1)])), &[("include", "1")])]
+    #[case(user_list_params!((per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
+    #[case(user_list_params!((order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(user_list_params!((orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(user_list_params!((order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
+    #[case(user_list_params!((roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
+    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
+    #[case(user_list_params!((capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
+    #[case::who_all_param_should_be_empty(user_list_params!((who, Some(WPApiParamUsersWho::All))), &[])]
+    #[case(user_list_params!((who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case(user_list_params!((has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[trace]
+    fn test_user_list_params(
+        #[case] params: UserListParams,
+        #[case] expected_pairs: &[(&str, &str)],
+    ) {
+        assert_expected_query_pairs(params.query_pairs(), expected_pairs);
+    }
+
+    #[test]
+    fn test_user_delete_params() {
+        let params = UserDeleteParams::new(UserId(987));
+        assert_expected_query_pairs(
+            params.query_pairs(),
+            &[("force", "true"), ("reassign", "987")],
+        );
+    }
+
+    fn assert_expected_query_pairs<'a>(
+        query_pairs: impl IntoIterator<Item = (&'a str, String)>,
+        expected_pairs: &[(&'a str, &str)],
+    ) {
+        let mut query_pairs = query_pairs.into_iter().collect::<Vec<_>>();
+        let mut expected_pairs: Vec<(&str, String)> = expected_pairs
+            .iter()
+            .map(|(k, v)| (*k, v.to_string()))
+            .collect();
+        // The order of query pairs doesn't matter
+        query_pairs.sort();
+        expected_pairs.sort();
+        assert_eq!(query_pairs, expected_pairs);
     }
 }
