@@ -208,10 +208,10 @@ test-android: bindings _test-android
 publish-android-local: bindings _publish-android-local
 
 test-rust-lib:
-	$(rust_docker_run) cargo test --lib
+	$(rust_docker_run) cargo test --lib -- --nocapture
 
 test-rust-doc:
-	$(rust_docker_run) cargo test --doc
+	$(rust_docker_run) cargo test --doc -- --nocapture
 
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
