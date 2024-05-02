@@ -128,7 +128,6 @@ impl Default for WPApiParamUsersWho {
 
 #[derive(Default, uniffi::Record)]
 pub struct UserListParams {
-    // TODO: Implement the `_filter`
     /// Current page of the collection.
     /// Default: `1`
     pub page: Option<u32>,
@@ -441,5 +440,20 @@ impl SparseUserField {
             Self::ExtraCapabilities => "extra_capabilities",
             Self::AvatarUrls => "avatar_urls",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_list_params_default_is_empty() {
+        assert!(UserListParams::default()
+            .query_pairs()
+            .into_iter()
+            .peekable()
+            .peek()
+            .is_none());
     }
 }
