@@ -447,21 +447,22 @@ impl SparseUserField {
     }
 }
 
+#[macro_export]
+macro_rules! user_list_params {
+    () => {
+        UserListParams::default()
+    };
+    ($(($f:ident, $v:expr)), *) => {{
+        let mut params = UserListParams::default();
+        $(params.$f = $v;)*
+        params
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rstest::*;
-
-    macro_rules! user_list_params {
-        () => {
-            UserListParams::default()
-        };
-        ($(($f:ident, $v:expr)), *) => {{
-            let mut params = UserListParams::default();
-            $(params.$f = $v;)*
-            params
-        }};
-    }
 
     #[rstest]
     #[case(user_list_params!(), &[])]
