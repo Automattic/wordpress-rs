@@ -1,5 +1,5 @@
 import Foundation
-import wordpress_api_wrapper
+import WordPressAPIInternal
 
 #if os(Linux)
 import FoundationNetworking
@@ -71,7 +71,7 @@ public struct WordPressAPI {
         }
 
         public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
-            return wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
+            return WordPressAPIInternal.extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
 

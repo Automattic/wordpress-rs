@@ -1,5 +1,5 @@
 import Foundation
-import wordpress_api_wrapper
+import WordPressAPIInternal
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -11,11 +11,11 @@ public extension WordPressAPI {
         let ephemeralClient = WordPressAPI(urlSession: session, baseUrl: url, authenticationStategy: .none)
         let response = try await ephemeralClient.perform(request: request)
 
-        return wordpress_api_wrapper.getLinkHeader(response: response, name: "https://api.w.org/")?.asUrl()
+        return WordPressAPIInternal.getLinkHeader(response: response, name: "https://api.w.org/")?.asUrl()
     }
 
     func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpapiDetails {
         let wpResponse = try await self.perform(request: WpNetworkRequest(method: .get, url: url, headerMap: [:]))
-        return try wordpress_api_wrapper.parseApiDetailsResponse(response: wpResponse)
+        return try WordPressAPIInternal.parseApiDetailsResponse(response: wpResponse)
     }
 }

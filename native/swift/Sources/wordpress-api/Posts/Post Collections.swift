@@ -1,5 +1,5 @@
 import Foundation
-import wordpress_api_wrapper
+import WordPressAPIInternal
 
 extension PostObject: Identifiable {
     // swiftlint:disable identifier_name
