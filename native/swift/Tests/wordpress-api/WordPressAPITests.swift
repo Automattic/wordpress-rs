@@ -1,6 +1,6 @@
 import XCTest
 import Foundation
-import wordpress_api
+import WordPressAPI
 import WordPressAPIInternal
 
 final class WordPressAPITests: XCTestCase {
