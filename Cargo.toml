@@ -15,4 +15,4 @@ rstest_reuse = "0.6.0"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 thiserror = "1.0"
-uniffi = "0.27.0"
+uniffi = "0.27.1"
