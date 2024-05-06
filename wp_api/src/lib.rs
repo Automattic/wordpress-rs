@@ -28,6 +28,14 @@ pub struct WPApiHelper {
 }
 
 #[uniffi::export]
+fn wp_authentication_from_username_and_password(
+    username: String,
+    password: String,
+) -> WPAuthentication {
+    WPAuthentication::from_username_and_password(username, password)
+}
+
+#[uniffi::export]
 impl WPApiHelper {
     #[uniffi::constructor]
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
@@ -263,6 +271,15 @@ impl WPContext {
 pub enum WPAuthentication {
     AuthorizationHeader { token: String },
     None,
+}
+
+impl WPAuthentication {
+    pub fn from_username_and_password(username: String, password: String) -> Self {
+        use base64::prelude::*;
+        WPAuthentication::AuthorizationHeader {
+            token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
+        }
+    }
 }
 
 #[derive(uniffi::Enum)]

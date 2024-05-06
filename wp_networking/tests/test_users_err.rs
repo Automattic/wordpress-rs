@@ -157,7 +157,7 @@ async fn retrieve_user_err_user_invalid_id() {
 #[tokio::test]
 async fn retrieve_user_err_unauthorized() {
     WPApiHelper::new(
-        test_helpers::test_credentials().site_url,
+        test_helpers::read_test_credentials_from_file().site_url,
         WPAuthentication::None,
     )
     .retrieve_current_user_request(WPContext::Edit)
