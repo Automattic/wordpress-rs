@@ -9,11 +9,18 @@ import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpAuthentication
+import uniffi.wp_api.WpRestErrorCode
+import uniffi.wp_api.WpRestErrorWrapper
+import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class LibraryTest {
-    private val siteUrl = "_omitted_"
-    private val authentication = WpAuthentication.AuthorizationHeader(token = "_omitted_")
+    private val siteUrl = BuildConfig.TEST_SITE_URL
+    private val authentication = wpAuthenticationFromUsernameAndPassword(
+        username = BuildConfig.TEST_ADMIN_USERNAME,
+        password = BuildConfig.TEST_ADMIN_PASSWORD
+    )
     private val library = Library(siteUrl, authentication)
 
     @Before
@@ -35,13 +42,16 @@ class LibraryTest {
     }
 
     @Test
-    fun testBasicAuthenticationError() {
+    fun testPostListRequestForbiddenContext() {
         val unauthenticatedLibrary =
             Library(siteUrl, WpAuthentication.AuthorizationHeader("invalid_token"))
-        val exception = assertFailsWith<WpApiException.ClientException> {
+        val exception = assertFailsWith<WpApiException.RestException> {
             unauthenticatedLibrary.makePostListRequest()
         }
-        val expectedStatusCode: UShort = 401u
-        assert(exception.statusCode == expectedStatusCode)
+        assertEquals(401u, exception.statusCode)
+        assertEquals(
+            WpRestErrorCode.ForbiddenContext,
+            (exception.restError as WpRestErrorWrapper.Recognized).v1.code
+        )
     }
 }

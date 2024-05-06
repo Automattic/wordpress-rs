@@ -2,7 +2,7 @@ pluginManagement {
     plugins {
         id("com.android.library") version "8.3.0"
         id("org.jetbrains.kotlin.android") version "1.8.20"
-        id("org.mozilla.rust-android-gradle.rust-android") version "0.9.3"
+        id("org.mozilla.rust-android-gradle.rust-android") version "0.9.4"
         id("com.automattic.android.publish-to-s3") version "0.9.0"
     }
     repositories {
@@ -16,9 +16,6 @@ pluginManagement {
         gradlePluginPortal()
         google()
     }
-}
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.7.0"
 }
 
 rootProject.name = "wordpress-rs"

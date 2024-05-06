@@ -8,6 +8,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_api"
 
 [dependencies]
+base64 = { workspace = true }
 http = { workspace = true }
 url = "2.5"
 parse_link_header = "0.3"

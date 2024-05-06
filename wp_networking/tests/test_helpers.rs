@@ -1,4 +1,3 @@
-use base64::prelude::*;
 use std::fs::read_to_string;
 use wp_api::{
     UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
@@ -14,26 +13,20 @@ pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 pub const SECOND_USER_SLUG: &str = "themedemos";
 
 pub fn api() -> WPApiHelper {
-    let credentials = test_credentials();
-    let auth_base64_token = BASE64_STANDARD.encode(format!(
-        "{}:{}",
-        credentials.admin_username, credentials.admin_password
-    ));
-    let authentication = WPAuthentication::AuthorizationHeader {
-        token: auth_base64_token,
-    };
+    let credentials = read_test_credentials_from_file();
+    let authentication = WPAuthentication::from_username_and_password(
+        credentials.admin_username,
+        credentials.admin_password,
+    );
     WPApiHelper::new(credentials.site_url, authentication)
 }
 
 pub fn api_as_subscriber() -> WPApiHelper {
-    let credentials = test_credentials();
-    let auth_base64_token = BASE64_STANDARD.encode(format!(
-        "{}:{}",
-        credentials.subscriber_username, credentials.subscriber_password
-    ));
-    let authentication = WPAuthentication::AuthorizationHeader {
-        token: auth_base64_token,
-    };
+    let credentials = read_test_credentials_from_file();
+    let authentication = WPAuthentication::from_username_and_password(
+        credentials.subscriber_username,
+        credentials.subscriber_password,
+    );
     WPApiHelper::new(credentials.site_url, authentication)
 }
 
@@ -117,7 +110,7 @@ pub struct TestCredentials {
     pub subscriber_password: String,
 }
 
-pub fn test_credentials() -> TestCredentials {
+pub fn read_test_credentials_from_file() -> TestCredentials {
     let file_contents = read_to_string("../test_credentials").unwrap();
     let lines: Vec<&str> = file_contents.lines().collect();
     TestCredentials {
