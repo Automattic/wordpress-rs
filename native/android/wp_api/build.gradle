@@ -66,18 +66,20 @@ repositories {
 dependencies {
     implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
     implementation "androidx.annotation:annotation:$androidxAnnotationVersion"
+    implementation "net.java.dev.jna:jna:$jnaVersion@aar"
 
     androidTestImplementation "androidx.test:runner:$androidxTestRunnerVersion"
     androidTestImplementation "androidx.test:rules:$androidxTestRulesVersion"
     androidTestImplementation "junit:junit:$junitVersion"
     androidTestImplementation 'org.jetbrains.kotlin:kotlin-test'
+    androidTestImplementation "net.java.dev.jna:jna:$jnaVersion@aar"
 
     testImplementation "junit:junit:$junitVersion"
+    testImplementation "net.java.dev.jna:jna:$jnaVersion"
 }
 
 ext.setupCargo("wp_api", ext.getNativeRustTarget(com.sun.jna.Platform.RESOURCE_PREFIX))
 ext.configureUniFFIBindgen("wp_api")
-ext.addJnaDependencies()
 
 project.afterEvaluate {
     publishing {

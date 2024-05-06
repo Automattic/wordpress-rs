@@ -1,0 +1,69 @@
+plugins {
+    id("java-library")
+    id("org.jetbrains.kotlin.jvm")
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+apply from: '../common.gradle'
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+project.ext.testCredentials = ext.readTestCredentialsFromFile()
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
+    implementation "net.java.dev.jna:jna:$jnaVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation "net.java.dev.jna:$jnaVersion"
+}
+
+def moduleName = "wp_api"
+def cargoProjectRoot = "${project.rootDir}/../.."
+def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
+    workingDir cargoProjectRoot
+    commandLine 'cargo', 'build', '--package', moduleName, '--release'
+    // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
+}
+
+def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/java"
+def dylibFilePath = "$cargoProjectRoot/target/release/lib${moduleName}.dylib"
+def t = tasks.register("generate_${moduleName}_UniFFIBindings", Exec) {
+    dependsOn cargoBuildLibraryReleaseTask
+    workingDir project.rootDir
+    commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
+    outputs.dir uniffiGeneratedPath
+    // Re-generate if the interface definition changes.
+    inputs.file dylibFilePath
+    // Re-generate if our uniffi-bindgen tooling changes.
+    inputs.dir "$cargoProjectRoot/wp_uniffi_bindgen/"
+    // Re-generate if our uniffi-bindgen version changes.
+    inputs.file "$cargoProjectRoot/Cargo.lock"
+    // Re-generate if the module source code changes
+    inputs.dir "$cargoProjectRoot/${moduleName}/"
+}
+
+sourceSets {
+   main {
+      java {
+         srcDir "${buildDir}/generated/source/uniffi/java/uniffi"
+      }
+   }
+}
+
+tasks.named("compileKotlin").configure {
+    dependsOn t
+}

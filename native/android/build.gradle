@@ -8,5 +8,6 @@ ext {
     androidxAnnotationVersion = '1.7.1'
     androidxTestRunnerVersion = '1.5.2'
     androidxTestRulesVersion = '1.5.0'
+    jnaVersion = '5.13.0'
     junitVersion = '4.13.2'
 }
