@@ -5,21 +5,28 @@
 // for the provided `moduleName`'s `.dylib` file in order to generate Kotlin language
 // bindings and include them in the source set for the project.
 ext.configureUniFFIBindgen = { moduleName ->
+    def cargoProjectRoot = "${project.rootDir}/../.."
+    def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
+        workingDir cargoProjectRoot
+        commandLine 'cargo', 'build', '--package', moduleName, '--release'
+        // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
+    }
     android.libraryVariants.all { variant ->
         def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/${variant.name}/java"
-        def dylibFilePath = "${project.projectDir}/../../../target/release/lib${moduleName}.dylib"
+        def dylibFilePath = "$cargoProjectRoot/target/release/lib${moduleName}.dylib"
         def t = tasks.register("generate${variant.name.capitalize()}UniFFIBindings", Exec) {
+            dependsOn cargoBuildLibraryReleaseTask
             workingDir project.rootDir
             commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
             outputs.dir uniffiGeneratedPath
             // Re-generate if the interface definition changes.
             inputs.file dylibFilePath
             // Re-generate if our uniffi-bindgen tooling changes.
-            inputs.dir "${project.rootDir}/../../wp_uniffi_bindgen/"
+            inputs.dir "$cargoProjectRoot/wp_uniffi_bindgen/"
             // Re-generate if our uniffi-bindgen version changes.
-            inputs.file "${project.rootDir}/../../Cargo.lock"
+            inputs.file "$cargoProjectRoot/Cargo.lock"
             // Re-generate if the module source code changes
-            inputs.dir "${project.rootDir}/../../${moduleName}/"
+            inputs.dir "$cargoProjectRoot/${moduleName}/"
         }
         variant.registerJavaGeneratingTask(t.get(), new File(buildDir, uniffiGeneratedPath))
         def sourceSet = variant.sourceSets.find { it.name == variant.name }
