@@ -48,15 +48,15 @@ repositories {
 }
 
 dependencies {
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation "androidx.annotation:annotation:1.7.1"
+    implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
+    implementation "androidx.annotation:annotation:$androidxAnnotationVersion"
 
-    androidTestImplementation "androidx.test:runner:1.4.0"
-    androidTestImplementation "androidx.test:rules:1.4.0"
-    androidTestImplementation "junit:junit:4.13.2"
+    androidTestImplementation "androidx.test:runner:$androidxTestRunnerVersion"
+    androidTestImplementation "androidx.test:rules:$androidxTestRulesVersion"
+    androidTestImplementation "junit:junit:$junitVersion"
     androidTestImplementation 'org.jetbrains.kotlin:kotlin-test'
 
-    testImplementation "junit:junit:4.13.2"
+    testImplementation "junit:junit:$junitVersion"
 }
 
 ext.setupCargo("wp_api", ext.getNativeRustTarget(com.sun.jna.Platform.RESOURCE_PREFIX))
