@@ -78,3 +78,24 @@ ext.getNativeRustTarget = { resourcePrefix ->
             return 'win32-x86-64-gnu'
     }
 }
+
+ext.readTestCredentialsFromFile = {
+    def lines = rootProject.file("../../test_credentials").text.readLines()
+    // https://developer.android.com/studio/run/emulator-networking
+    def siteUrl = lines[0] == "http://localhost" ? "http://10.0.2.2" : lines[0]
+    new TestCredentials(
+        siteUrl: siteUrl,
+        adminUsername: lines[1],
+        adminPassword: lines[2],
+        subscriberUsername: lines[3],
+        subscriberPassword: lines[4]
+    )
+}
+
+class TestCredentials {
+    String siteUrl
+    String adminUsername
+    String adminPassword
+    String subscriberUsername
+    String subscriberPassword
+}

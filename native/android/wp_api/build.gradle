@@ -13,6 +13,8 @@ java {
     }
 }
 
+project.ext.testCredentials = ext.readTestCredentialsFromFile()
+
 android {
     namespace = "rs.wordpress.wp_api"
 
@@ -22,6 +24,18 @@ android {
         minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField("String", "TEST_SITE_URL", "\"${project.ext.testCredentials.siteUrl}\"")
+            buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${project.ext.testCredentials.adminUsername}\"")
+            buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${project.ext.testCredentials.adminPassword}\"")
+        }
     }
 
     lintOptions {
