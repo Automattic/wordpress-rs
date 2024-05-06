@@ -64,6 +64,9 @@ repositories {
 }
 
 dependencies {
+    api (project(":wp_api_kotlin")) {
+        exclude group: "net.java.dev.jna"
+    }
     implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
     implementation "androidx.annotation:annotation:$androidxAnnotationVersion"
     implementation "net.java.dev.jna:jna:$jnaVersion@aar"
@@ -79,7 +82,6 @@ dependencies {
 }
 
 ext.setupCargo("wp_api", ext.getNativeRustTarget(com.sun.jna.Platform.RESOURCE_PREFIX))
-ext.configureUniFFIBindgen("wp_api")
 
 project.afterEvaluate {
     publishing {

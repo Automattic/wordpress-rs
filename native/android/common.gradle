@@ -2,8 +2,7 @@
 //
 // A convenience function for configuring a `uniffi-bindgen` task,
 // with appropriate dependency info. This will call `uniffi-bindgen`
-// for the provided `moduleName`'s `.dylib` file in order to generate Kotlin language
-// bindings and include them in the source set for the project.
+// for the provided `moduleName`'s `.dylib` file in order to generate Kotlin language bindings
 ext.configureUniFFIBindgen = { moduleName ->
     def cargoProjectRoot = "${project.rootDir}/../.."
     def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
@@ -11,27 +10,25 @@ ext.configureUniFFIBindgen = { moduleName ->
         commandLine 'cargo', 'build', '--package', moduleName, '--release'
         // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
     }
-    android.libraryVariants.all { variant ->
-        def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/${variant.name}/java"
-        def dylibFilePath = "$cargoProjectRoot/target/release/lib${moduleName}.dylib"
-        def t = tasks.register("generate${variant.name.capitalize()}UniFFIBindings", Exec) {
-            dependsOn cargoBuildLibraryReleaseTask
-            workingDir project.rootDir
-            commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
-            outputs.dir uniffiGeneratedPath
-            // Re-generate if the interface definition changes.
-            inputs.file dylibFilePath
-            // Re-generate if our uniffi-bindgen tooling changes.
-            inputs.dir "$cargoProjectRoot/wp_uniffi_bindgen/"
-            // Re-generate if our uniffi-bindgen version changes.
-            inputs.file "$cargoProjectRoot/Cargo.lock"
-            // Re-generate if the module source code changes
-            inputs.dir "$cargoProjectRoot/${moduleName}/"
-        }
-        variant.registerJavaGeneratingTask(t.get(), new File(buildDir, uniffiGeneratedPath))
-        def sourceSet = variant.sourceSets.find { it.name == variant.name }
-        sourceSet.java.srcDir new File(buildDir, "generated/source/uniffi/${variant.name}/java/uniffi")
+
+    def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/java"
+    def dylibFilePath = "$cargoProjectRoot/target/release/lib${moduleName}.dylib"
+    def taskName = "generate_${moduleName}_UniFFIBindings"
+    tasks.register(taskName, Exec) {
+        dependsOn cargoBuildLibraryReleaseTask
+        workingDir project.rootDir
+        commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
+        outputs.dir uniffiGeneratedPath
+        // Re-generate if the interface definition changes.
+        inputs.file dylibFilePath
+        // Re-generate if our uniffi-bindgen tooling changes.
+        inputs.dir "$cargoProjectRoot/wp_uniffi_bindgen/"
+        // Re-generate if our uniffi-bindgen version changes.
+        inputs.file "$cargoProjectRoot/Cargo.lock"
+        // Re-generate if the module source code changes
+        inputs.dir "$cargoProjectRoot/${moduleName}/"
     }
+    taskName
 }
 
 ext.setupCargo = { moduleName, nativeRustTarget ->

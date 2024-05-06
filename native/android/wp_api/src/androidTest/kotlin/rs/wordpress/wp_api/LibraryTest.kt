@@ -5,6 +5,7 @@ package rs.wordpress.wp_api
 
 import org.junit.Before
 import org.junit.Test
+import rs.wordpress.wp_api_kotlin.MyClass
 import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpApiException
@@ -21,7 +22,7 @@ class LibraryTest {
         username = BuildConfig.TEST_ADMIN_USERNAME,
         password = BuildConfig.TEST_ADMIN_PASSWORD
     )
-    private val library = Library(siteUrl, authentication)
+    private val library = MyClass(siteUrl, authentication)
 
     @Before
     fun setup() {
@@ -44,7 +45,7 @@ class LibraryTest {
     @Test
     fun testPostListRequestForbiddenContext() {
         val unauthenticatedLibrary =
-            Library(siteUrl, WpAuthentication.AuthorizationHeader("invalid_token"))
+            MyClass(siteUrl, WpAuthentication.AuthorizationHeader("invalid_token"))
         val exception = assertFailsWith<WpApiException.RestException> {
             unauthenticatedLibrary.makePostListRequest()
         }
