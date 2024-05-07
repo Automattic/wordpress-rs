@@ -1,7 +1,6 @@
 package rs.wordpress.wp_api_kotlin
 
 import org.junit.Assert.assertEquals
-import org.junit.Before
 import org.junit.Test
 import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
@@ -27,15 +26,15 @@ class MyClassTest {
     @Test
     fun testBasicPostListRequest() {
         val request = library.postListRequest()
-        assert(request.method == RequestMethod.GET)
-        assert(request.url == "$siteUrl/wp-json/wp/v2/posts?context=edit&page=1&per_page=10")
+        assertEquals(RequestMethod.GET, request.method)
+        assertEquals("$siteUrl/wp-json/wp/v2/posts?context=edit&page=1&per_page=10", request.url)
     }
 
     @Test
     fun testMakeBasicPostListRequest() {
         val postListResponse = library.makePostListRequest()
         val firstPost: PostObject = postListResponse.postList!!.first()
-        assert(firstPost.title?.raw == "Hello world!")
+        assertEquals("Hello world!", firstPost.title?.raw )
     }
 
     @Test
