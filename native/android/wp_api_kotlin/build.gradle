@@ -28,18 +28,31 @@ dependencies {
     implementation "net.java.dev.jna:jna:$jnaVersion"
 
     testImplementation "junit:junit:$junitVersion"
-    testImplementation "net.java.dev.jna:$jnaVersion"
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 
 sourceSets {
-   main {
-      java {
-         srcDir "${buildDir}/generated/source/uniffi/java/uniffi"
-      }
-   }
+    main {
+        java {
+            srcDir "${buildDir}/generated/source/uniffi/java/uniffi"
+        }
+    }
+    test {
+        resources {
+            srcDir "${buildDir}/jniLibs/desktop"
+        }
+    }
 }
 
 def configureUniFFIBindgenTaskName = project.ext.configureUniFFIBindgen("wp_api")
 tasks.named("compileKotlin").configure {
     dependsOn tasks.named(configureUniFFIBindgenTaskName)
+}
+tasks.register("copyDesktopJniLibs", Copy) {
+    dependsOn tasks.named("cargoBuildLibraryRelease")
+    from "$project.rootDir/../../target/release/libwp_api.dylib"
+    into "${buildDir}/jniLibs/desktop"
+}
+tasks.named("processTestResources").configure {
+    dependsOn tasks.named("copyDesktopJniLibs")
 }
