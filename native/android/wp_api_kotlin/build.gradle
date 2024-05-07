@@ -8,15 +8,11 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-apply from: '../common.gradle'
-
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
-
-project.ext.testCredentials = ext.readTestCredentialsFromFile()
 
 repositories {
     mavenCentral()
@@ -44,15 +40,47 @@ sourceSets {
     }
 }
 
-def configureUniFFIBindgenTaskName = project.ext.configureUniFFIBindgen("wp_api")
-tasks.named("compileKotlin").configure {
-    dependsOn tasks.named(configureUniFFIBindgenTaskName)
-}
-tasks.register("copyDesktopJniLibs", Copy) {
-    dependsOn tasks.named("cargoBuildLibraryRelease")
-    from "$project.rootDir/../../target/release/libwp_api.dylib"
-    into "${buildDir}/jniLibs/desktop"
-}
-tasks.named("processTestResources").configure {
-    dependsOn tasks.named("copyDesktopJniLibs")
+setupJniAndBindings()
+
+// Separated as a function to have everything in a scope and keep it contained
+def setupJniAndBindings() {
+    def moduleName = "wp_api"
+    def cargoProjectRoot = "${project.rootDir}/../.."
+    def cargoTargetPath = "$cargoProjectRoot/target/release"
+    def dylibFilePath = "$cargoTargetPath/lib${moduleName}.dylib"
+    def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/java"
+    def jniLibsPath = "${buildDir}/jniLibs/desktop"
+
+    def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
+        workingDir cargoProjectRoot
+        commandLine 'cargo', 'build', '--package', moduleName, '--release'
+        // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
+    }
+
+    def generateUniFFIBindingsTask = tasks.register("generate_${moduleName}_UniFFIBindings", Exec) {
+        dependsOn cargoBuildLibraryReleaseTask
+        workingDir project.rootDir
+        commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
+        outputs.dir uniffiGeneratedPath
+        // Re-generate if the interface definition changes.
+        inputs.file dylibFilePath
+        // Re-generate if our uniffi-bindgen tooling changes.
+        inputs.dir "$cargoProjectRoot/wp_uniffi_bindgen/"
+        // Re-generate if our uniffi-bindgen version changes.
+        inputs.file "$cargoProjectRoot/Cargo.lock"
+        // Re-generate if the module source code changes
+        inputs.dir "$cargoProjectRoot/${moduleName}/"
+    }
+
+    tasks.named("compileKotlin").configure {
+        dependsOn generateUniFFIBindingsTask
+    }
+    def copyDesktopJniLibsTask = tasks.register("copyDesktopJniLibs", Copy) {
+        dependsOn cargoBuildLibraryReleaseTask
+        from dylibFilePath
+        into jniLibsPath
+    }
+    tasks.named("processTestResources").configure {
+        dependsOn copyDesktopJniLibsTask
+    }
 }
