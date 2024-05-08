@@ -10,14 +10,15 @@ data class TestCredentials(
     val subscriberPassword: String
 ) {
     companion object {
-        fun get(): TestCredentials {
+        val INSTANCE: TestCredentials by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
             val lineList = mutableListOf<String>()
-            File(Companion::class.java.classLoader.getResource("test_credentials")!!.file).useLines { lines ->
+            val file = File(Companion::class.java.classLoader.getResource("test_credentials")!!.file)
+            file.useLines { lines ->
                 lines.forEach {
                     lineList.add(it)
                 }
             }
-            return TestCredentials(
+            TestCredentials(
                 siteUrl = lineList[0],
                 adminUsername = lineList[1],
                 adminPassword = lineList[2],

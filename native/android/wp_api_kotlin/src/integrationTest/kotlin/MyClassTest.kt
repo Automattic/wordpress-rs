@@ -12,7 +12,7 @@ import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertFailsWith
 
 class MyClassTest {
-    private val testCredentials = TestCredentials.get()
+    private val testCredentials = TestCredentials.INSTANCE
     private val siteUrl = testCredentials.siteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
