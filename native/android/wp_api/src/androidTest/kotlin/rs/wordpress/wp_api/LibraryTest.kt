@@ -3,7 +3,6 @@
  */
 package rs.wordpress.wp_api
 
-import org.junit.Before
 import org.junit.Test
 import rs.wordpress.wp_api_kotlin.MyClass
 import uniffi.wp_api.PostObject

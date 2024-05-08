@@ -11,15 +11,11 @@ import uniffi.wp_api.WpRestErrorWrapper
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertFailsWith
 
-private const val TEST_SITE_URL = "http://localhost"
-private const val TEST_ADMIN_USERNAME = "test@example.com"
-private const val TEST_ADMIN_PASSWORD = "ToHiS58ds1Bodfx4stAxS7q7"
-
 class MyClassTest {
-    private val siteUrl = TEST_SITE_URL
+    private val testCredentials = TestCredentials.get()
+    private val siteUrl = testCredentials.siteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
-        username = TEST_ADMIN_USERNAME,
-        password = TEST_ADMIN_PASSWORD
+        username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
     private val library = MyClass(siteUrl, authentication)
 
@@ -34,7 +30,7 @@ class MyClassTest {
     fun testMakeBasicPostListRequest() {
         val postListResponse = library.makePostListRequest()
         val firstPost: PostObject = postListResponse.postList!!.first()
-        assertEquals("Hello world!", firstPost.title?.raw )
+        assertEquals("Hello world!", firstPost.title?.raw)
     }
 
     @Test

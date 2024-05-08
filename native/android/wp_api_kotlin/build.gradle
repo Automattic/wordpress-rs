@@ -5,6 +5,7 @@ plugins {
 }
 
 ext.jniLibsPath = "${buildDir}/jniLibs/"
+ext.generatedTestResourcesPath = "${buildDir}/generatedTestResources/"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -69,6 +70,7 @@ sourceSets {
     integrationTest {
         resources {
             srcDir project.ext.jniLibsPath
+            srcDir project.ext.generatedTestResourcesPath
         }
     }
 }
@@ -112,7 +114,12 @@ def setupJniAndBindings() {
         from dylibFilePath
         into project.ext.jniLibsPath
     }
+    def copyTestCredentialsTask = tasks.register("copyTestCredentials", Copy) {
+        from "$cargoProjectRoot/test_credentials"
+        into project.ext.generatedTestResourcesPath
+    }
     tasks.named("processIntegrationTestResources").configure {
         dependsOn copyDesktopJniLibsTask
+        dependsOn copyTestCredentialsTask
     }
 }
