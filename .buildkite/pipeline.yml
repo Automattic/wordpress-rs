@@ -80,6 +80,43 @@ steps:
           echo "--- :swift: Swiftlint"
           make lint-swift
   #
+  # Kotlin Group
+  - group: ":kotlin: Kotlin Wrapper"
+    key: "kotlin"
+    steps:
+      - label: ":kotlin: Publish wp_api_kotlin"
+        key: "publish-wp_api_kotlin"
+        if: build.tag != null || build.pull_request.id != null || build.branch == "trunk"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "/Users/builder/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          .buildkite/publish-wp_api-kotlin.sh
+        agents:
+          queue: android
+      - label: ":kotlin: Publish wp_api_android"
+        key: "publish-wp_api_android"
+        if: build.tag != null || build.pull_request.id != null || build.branch == "trunk"
+        depends_on:
+          - "publish-wp_api_kotlin"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "/Users/builder/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          .buildkite/publish-wp_api-android.sh
+        agents:
+          queue: android
+  #
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
