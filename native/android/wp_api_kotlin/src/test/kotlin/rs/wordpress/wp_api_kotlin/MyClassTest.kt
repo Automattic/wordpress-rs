@@ -13,7 +13,7 @@ import kotlin.test.assertFailsWith
 
 private const val TEST_SITE_URL = "http://localhost"
 private const val TEST_ADMIN_USERNAME = "test@example.com"
-private const val TEST_ADMIN_PASSWORD = "iKeooKWpAKsjTrU3xWgqL7HB"
+private const val TEST_ADMIN_PASSWORD = "ToHiS58ds1Bodfx4stAxS7q7"
 
 class MyClassTest {
     private val siteUrl = TEST_SITE_URL

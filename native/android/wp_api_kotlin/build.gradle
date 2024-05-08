@@ -3,12 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.jvm")
 }
 
+ext.jniLibsPath = "${buildDir}/jniLibs/"
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
-}
-
-java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
@@ -35,7 +34,7 @@ sourceSets {
     }
     test {
         resources {
-            srcDir "${buildDir}/jniLibs/desktop"
+            srcDir project.ext.jniLibsPath
         }
     }
 }
@@ -49,7 +48,6 @@ def setupJniAndBindings() {
     def cargoTargetPath = "$cargoProjectRoot/target/release"
     def dylibFilePath = "$cargoTargetPath/lib${moduleName}.dylib"
     def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/java"
-    def jniLibsPath = "${buildDir}/jniLibs/desktop"
 
     def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
         workingDir cargoProjectRoot
@@ -78,7 +76,7 @@ def setupJniAndBindings() {
     def copyDesktopJniLibsTask = tasks.register("copyDesktopJniLibs", Copy) {
         dependsOn cargoBuildLibraryReleaseTask
         from dylibFilePath
-        into jniLibsPath
+        into project.ext.jniLibsPath
     }
     tasks.named("processTestResources").configure {
         dependsOn copyDesktopJniLibsTask
