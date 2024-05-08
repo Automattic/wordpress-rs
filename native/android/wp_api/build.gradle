@@ -64,7 +64,7 @@ repositories {
 }
 
 dependencies {
-    api (project(":wp_api_kotlin")) {
+    api (wpApiKotlinProjectDependency) {
         exclude group: "net.java.dev.jna"
     }
     implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
@@ -89,8 +89,8 @@ project.afterEvaluate {
             MavenPublication(MavenPublication) {
                 from components.release
 
-                groupId "rs.wordpress"
-                artifactId "wp_api"
+                groupId "rs.wordpress.wp_api"
+                artifactId "android"
                 // version is set by 'publish-to-s3' plugin
             }
         }

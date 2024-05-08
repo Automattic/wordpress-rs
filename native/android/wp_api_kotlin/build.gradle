@@ -2,6 +2,7 @@ plugins {
     id("java-library")
     id("org.jetbrains.kotlin.jvm")
     id("jvm-test-suite")
+    id("com.automattic.android.publish-to-s3")
 }
 
 ext.jniLibsPath = "${buildDir}/jniLibs/"
@@ -116,4 +117,18 @@ def setupJniAndBindings() {
         dependsOn copyDesktopJniLibsTask
         dependsOn copyTestCredentialsTask
     }
+}
+
+project.afterEvaluate {
+    publishing {
+        publications {
+            MavenPublication(MavenPublication) {
+                from components.java
+
+                groupId "rs.wordpress.wp_api"
+                artifactId "kotlin"
+                // version is set by 'publish-to-s3' plugin
+            }
+        }
+   }
 }
