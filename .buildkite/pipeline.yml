@@ -91,7 +91,7 @@ steps:
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
 
-          source "/Users/builder/.cargo/env"
+          source "$$HOME/.cargo/env"
 
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
@@ -108,7 +108,7 @@ steps:
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
 
-          source "/Users/builder/.cargo/env"
+          source "$$HOME/.cargo/env"
 
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
