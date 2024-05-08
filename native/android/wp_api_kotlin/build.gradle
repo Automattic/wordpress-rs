@@ -24,12 +24,6 @@ testing {
         integrationTest(JvmTestSuite) {
             testType = TestSuiteType.INTEGRATION_TEST
 
-            sources {
-                java {
-                    srcDirs = ['integrationTest']
-                }
-            }
-
             dependencies {
                 implementation project()
 
