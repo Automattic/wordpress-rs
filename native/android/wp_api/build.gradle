@@ -32,11 +32,13 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "TEST_SITE_URL", "\"${project.ext.testCredentials.siteUrl}\"")
-            buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${project.ext.testCredentials.adminUsername}\"")
-            buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${project.ext.testCredentials.adminPassword}\"")
-            buildConfigField("String", "TEST_SUBSCRIBER_USERNAME", "\"${project.ext.testCredentials.subscriberUsername}\"")
-            buildConfigField("String", "TEST_SUBSCRIBER_PASSWORD", "\"${project.ext.testCredentials.subscriberPassword}\"")
+            if (project.ext.testCredentials) {
+                buildConfigField("String", "TEST_SITE_URL", "\"${project.ext.testCredentials.siteUrl}\"")
+                buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${project.ext.testCredentials.adminUsername}\"")
+                buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${project.ext.testCredentials.adminPassword}\"")
+                buildConfigField("String", "TEST_SUBSCRIBER_USERNAME", "\"${project.ext.testCredentials.subscriberUsername}\"")
+                buildConfigField("String", "TEST_SUBSCRIBER_PASSWORD", "\"${project.ext.testCredentials.subscriberPassword}\"")
+            }
         }
     }
 

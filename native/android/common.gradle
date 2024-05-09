@@ -44,7 +44,11 @@ ext.getNativeRustTarget = { resourcePrefix ->
 }
 
 ext.readTestCredentialsFromFile = {
-    def lines = rootProject.file("../../test_credentials").text.readLines()
+    def credentials_file = rootProject.file("../../test_credentials")
+    if (!credentials_file.exists()) {
+        return null
+    }
+    def lines = credentials_file.text.readLines()
     // https://developer.android.com/studio/run/emulator-networking
     def siteUrl = lines[0] == "http://localhost" ? "http://10.0.2.2" : lines[0]
     new TestCredentials(
