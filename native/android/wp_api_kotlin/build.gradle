@@ -77,7 +77,7 @@ def setupJniAndBindings() {
     def moduleName = "wp_api"
     def cargoProjectRoot = "${project.rootDir}/../.."
     def cargoTargetPath = "$cargoProjectRoot/target/release"
-    def dylibFilePath = "$cargoTargetPath/lib${moduleName}.dylib"
+    def nativeLibraryPath = "$cargoTargetPath/lib${moduleName}${getNativeLibraryExtension()}"
     def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/java"
 
     def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
@@ -89,10 +89,10 @@ def setupJniAndBindings() {
     def generateUniFFIBindingsTask = tasks.register("generate_${moduleName}_UniFFIBindings", Exec) {
         dependsOn cargoBuildLibraryReleaseTask
         workingDir project.rootDir
-        commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', dylibFilePath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
+        commandLine 'cargo', 'run', '--release', '--bin', 'wp_uniffi_bindgen', 'generate', '--library', nativeLibraryPath, '--out-dir', uniffiGeneratedPath, '--language', 'kotlin'
         outputs.dir uniffiGeneratedPath
         // Re-generate if the interface definition changes.
-        inputs.file dylibFilePath
+        inputs.file nativeLibraryPath
         // Re-generate if our uniffi-bindgen tooling changes.
         inputs.dir "$cargoProjectRoot/wp_uniffi_bindgen/"
         // Re-generate if our uniffi-bindgen version changes.
@@ -106,7 +106,7 @@ def setupJniAndBindings() {
     }
     def copyDesktopJniLibsTask = tasks.register("copyDesktopJniLibs", Copy) {
         dependsOn cargoBuildLibraryReleaseTask
-        from dylibFilePath
+        from nativeLibraryPath
         into project.ext.jniLibsPath
     }
     def copyTestCredentialsTask = tasks.register("copyTestCredentials", Copy) {
@@ -131,4 +131,15 @@ project.afterEvaluate {
             }
         }
    }
+}
+
+def getNativeLibraryExtension() {
+    def currentOS = org.gradle.internal.os.OperatingSystem.current()
+    if (currentOS.isLinux()) {
+        ".so"
+    } else if (currentOS.isMacOsX()) {
+        ".dylib"
+    } else {
+        throw new GradleException("Unsupported Operating System: $currentOS")
+    }
 }
