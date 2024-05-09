@@ -97,6 +97,7 @@ steps:
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
 
+          echo "--- :kotlin: Publishing wp_api Kotlin"
           .buildkite/publish-wp_api-kotlin.sh
         agents:
           queue: android
@@ -115,6 +116,7 @@ steps:
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
 
+          echo "--- :kotlin: Publishing wp_api Android"
           .buildkite/publish-wp_api-android.sh
         agents:
           queue: android
