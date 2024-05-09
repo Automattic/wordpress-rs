@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+cd ./native/android
 ./gradlew \
     :wp_api_kotlin:prepareToPublishToS3 "$(prepare_to_publish_to_s3_params)" \
     :wp_api_kotlin:publish
