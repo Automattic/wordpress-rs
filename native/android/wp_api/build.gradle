@@ -61,6 +61,12 @@ android {
 }
 
 repositories {
+    maven {
+        url "https://a8c-libs.s3.amazonaws.com/android"
+        content {
+            includeGroup "rs.wordpress.wp_api"
+        }
+    }
     mavenCentral()
     google()
 }
