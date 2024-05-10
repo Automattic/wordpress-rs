@@ -8,4 +8,4 @@ cd ./native/kotlin
     :api:kotlin:publish
 
 # Add meta-data for the published version so we can use it in subsequent steps
-buildkite-agent meta-data set "PUBLISHED_WP_API_KOTLIN_VERSION" < ./wp_api_kotlin/build/published-version.txt
+buildkite-agent meta-data set "PUBLISHED_WP_API_KOTLIN_VERSION" < ./api/kotlin/build/published-version.txt
