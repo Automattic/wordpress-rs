@@ -11,5 +11,6 @@ ext {
     jnaVersion = '5.13.0'
     junitVersion = '4.13.2'
 
-    wpApiKotlinProjectDependency = project.hasProperty("wpApiKotlinVersion") ? "rs.wordpress.wp_api:kotlin:${project.getProperty("wpApiKotlinVersion")}" : project(":wp_api_kotlin")
+    cargoProjectRoot = "${project.rootDir}/../.."
+    wpApiKotlinProjectDependency = project.hasProperty("wpApiKotlinVersion") ? "rs.wordpress.api:kotlin:${project.getProperty("wpApiKotlinVersion")}" : project(":api:kotlin")
 }

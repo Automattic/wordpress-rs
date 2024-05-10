@@ -1,11 +1,11 @@
 
 ext.setupCargo = { moduleName, nativeRustTarget ->
     cargo {
-        module  = "../../../$moduleName/"
+        module  = "$cargoProjectRoot/$moduleName/"
         libname = moduleName
         profile = "release"
         targets = ["arm", "arm64", "x86", "x86_64", nativeRustTarget]
-        targetDirectory = '../../../target'
+        targetDirectory = "$cargoProjectRoot/target"
 
         exec { spec, toolchain ->
             // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
@@ -44,7 +44,7 @@ ext.getNativeRustTarget = { resourcePrefix ->
 }
 
 ext.readTestCredentialsFromFile = {
-    def credentials_file = rootProject.file("../../test_credentials")
+    def credentials_file = rootProject.file("$cargoProjectRoot/test_credentials")
     if (!credentials_file.exists()) {
         return null
     }

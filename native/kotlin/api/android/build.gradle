@@ -5,7 +5,7 @@ plugins {
     id("com.automattic.android.publish-to-s3")
 }
 
-apply from: '../common.gradle'
+apply from: "$project.rootDir/common.gradle"
 
 java {
     toolchain {
@@ -16,7 +16,7 @@ java {
 project.ext.testCredentials = ext.readTestCredentialsFromFile()
 
 android {
-    namespace = "rs.wordpress.wp_api"
+    namespace = "rs.wordpress.api.android"
 
     compileSdk = 34
 
@@ -64,7 +64,7 @@ repositories {
     maven {
         url "https://a8c-libs.s3.amazonaws.com/android"
         content {
-            includeGroup "rs.wordpress.wp_api"
+            includeGroup "rs.wordpress.api"
         }
     }
     mavenCentral()
@@ -97,7 +97,7 @@ project.afterEvaluate {
             MavenPublication(MavenPublication) {
                 from components.release
 
-                groupId "rs.wordpress.wp_api"
+                groupId "rs.wordpress.api"
                 artifactId "android"
                 // version is set by 'publish-to-s3' plugin
             }

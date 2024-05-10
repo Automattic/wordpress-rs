@@ -75,9 +75,7 @@ setupJniAndBindings()
 // Separated as a function to have everything in a scope and keep it contained
 def setupJniAndBindings() {
     def moduleName = "wp_api"
-    def cargoProjectRoot = "${project.rootDir}/../.."
-    def cargoTargetPath = "$cargoProjectRoot/target/release"
-    def nativeLibraryPath = "$cargoTargetPath/lib${moduleName}${getNativeLibraryExtension()}"
+    def nativeLibraryPath = "$cargoProjectRoot/target/release/lib${moduleName}${getNativeLibraryExtension()}"
     def uniffiGeneratedPath = "$buildDir/generated/source/uniffi/java"
 
     def cargoBuildLibraryReleaseTask = tasks.register("cargoBuildLibraryRelease", Exec) {
@@ -125,7 +123,7 @@ project.afterEvaluate {
             MavenPublication(MavenPublication) {
                 from components.java
 
-                groupId "rs.wordpress.wp_api"
+                groupId "rs.wordpress.api"
                 artifactId "kotlin"
                 // version is set by 'publish-to-s3' plugin
             }

@@ -1,4 +1,4 @@
-package rs.wordpress.wp_api_kotlin
+package rs.wordpress.api.kotlin
 
 import java.io.File
 

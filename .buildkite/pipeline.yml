@@ -84,8 +84,8 @@ steps:
   - group: ":kotlin: Kotlin Wrapper"
     key: "kotlin"
     steps:
-      - label: ":kotlin: Publish `rs.wordpress.wp_api:kotlin`"
-        key: "publish-wp_api-kotlin"
+      - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
+        key: "publish-wp-api-kotlin"
         plugins: *common_plugins
         command: |
           echo "--- :rust: Installing Rust"
@@ -96,15 +96,15 @@ steps:
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
 
-          echo "--- :kotlin: Publishing `rs.wordpress.wp_api:kotlin`"
-          .buildkite/publish-wp_api-kotlin.sh
+          echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
+          .buildkite/publish-wp-api-kotlin.sh
         agents:
           queue: android
-      - label: ":kotlin: Publish `rs.wordpress.wp_api:android`"
-        key: "publish-wp_api-android"
+      - label: ":kotlin: Publish `rs.wordpress.api:android`"
+        key: "publish-wp-api-android"
         plugins: *common_plugins
         depends_on:
-          - "publish-wp_api-kotlin"
+          - "publish-wp-api-kotlin"
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
@@ -115,8 +115,8 @@ steps:
           make setup-rust
           make setup-rust-android-targets
 
-          echo "--- :kotlin: Publishing `rs.wordpress.wp_api:android`"
-          .buildkite/publish-wp_api-android.sh
+          echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
+          .buildkite/publish-wp-api-android.sh
         agents:
           queue: android
   #
