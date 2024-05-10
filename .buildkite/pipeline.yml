@@ -115,6 +115,7 @@ steps:
 
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
+          make setup-rust-android-toolchain
 
           echo "--- :kotlin: Publishing wp_api Android"
           .buildkite/publish-wp_api-android.sh
