@@ -238,7 +238,7 @@ setup-rust-toolchain:
 		x86_64-apple-darwin \
 		aarch64-apple-ios-sim
 
-setup-rust-android-toolchain:
+setup-rust-android-targets:
 	rustup target add \
 		x86_64-linux-android \
 		i686-linux-android \
