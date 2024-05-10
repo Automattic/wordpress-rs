@@ -32,11 +32,13 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "TEST_SITE_URL", "\"${project.ext.testCredentials.siteUrl}\"")
-            buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${project.ext.testCredentials.adminUsername}\"")
-            buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${project.ext.testCredentials.adminPassword}\"")
-            buildConfigField("String", "TEST_SUBSCRIBER_USERNAME", "\"${project.ext.testCredentials.subscriberUsername}\"")
-            buildConfigField("String", "TEST_SUBSCRIBER_PASSWORD", "\"${project.ext.testCredentials.subscriberPassword}\"")
+            if (project.ext.testCredentials) {
+                buildConfigField("String", "TEST_SITE_URL", "\"${project.ext.testCredentials.siteUrl}\"")
+                buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${project.ext.testCredentials.adminUsername}\"")
+                buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${project.ext.testCredentials.adminPassword}\"")
+                buildConfigField("String", "TEST_SUBSCRIBER_USERNAME", "\"${project.ext.testCredentials.subscriberUsername}\"")
+                buildConfigField("String", "TEST_SUBSCRIBER_PASSWORD", "\"${project.ext.testCredentials.subscriberPassword}\"")
+            }
         }
     }
 
@@ -59,25 +61,35 @@ android {
 }
 
 repositories {
+    maven {
+        url "https://a8c-libs.s3.amazonaws.com/android"
+        content {
+            includeGroup "rs.wordpress.wp_api"
+        }
+    }
     mavenCentral()
     google()
 }
 
 dependencies {
+    api (wpApiKotlinProjectDependency) {
+        exclude group: "net.java.dev.jna"
+    }
     implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
     implementation "androidx.annotation:annotation:$androidxAnnotationVersion"
+    implementation "net.java.dev.jna:jna:$jnaVersion@aar"
 
     androidTestImplementation "androidx.test:runner:$androidxTestRunnerVersion"
     androidTestImplementation "androidx.test:rules:$androidxTestRulesVersion"
     androidTestImplementation "junit:junit:$junitVersion"
     androidTestImplementation 'org.jetbrains.kotlin:kotlin-test'
+    androidTestImplementation "net.java.dev.jna:jna:$jnaVersion@aar"
 
     testImplementation "junit:junit:$junitVersion"
+    testImplementation "net.java.dev.jna:jna:$jnaVersion"
 }
 
 ext.setupCargo("wp_api", ext.getNativeRustTarget(com.sun.jna.Platform.RESOURCE_PREFIX))
-ext.configureUniFFIBindgen("wp_api")
-ext.addJnaDependencies()
 
 project.afterEvaluate {
     publishing {
@@ -85,8 +97,8 @@ project.afterEvaluate {
             MavenPublication(MavenPublication) {
                 from components.release
 
-                groupId "rs.wordpress"
-                artifactId "wp_api"
+                groupId "rs.wordpress.wp_api"
+                artifactId "android"
                 // version is set by 'publish-to-s3' plugin
             }
         }
