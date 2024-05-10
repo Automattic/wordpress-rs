@@ -84,7 +84,7 @@ steps:
   - group: ":kotlin: Kotlin Wrapper"
     key: "kotlin"
     steps:
-      - label: ":kotlin: `rs.wordpress.wp_api:kotlin`"
+      - label: ":kotlin: Publish `rs.wordpress.wp_api:kotlin`"
         key: "publish-wp_api-kotlin"
         plugins: *common_plugins
         command: |
