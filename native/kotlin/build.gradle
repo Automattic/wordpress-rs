@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library") apply false
     id("org.jetbrains.kotlin.android") apply false
+    id("io.gitlab.arturbosch.detekt") apply false
 }
 
 ext {
@@ -13,4 +14,37 @@ ext {
 
     cargoProjectRoot = "${project.rootDir}/../.."
     wpApiKotlinProjectDependency = project.hasProperty("wpApiKotlinVersion") ? "rs.wordpress.api:kotlin:${project.getProperty("wpApiKotlinVersion")}" : project(":api:kotlin")
+}
+
+allprojects {
+    apply plugin: 'io.gitlab.arturbosch.detekt'
+
+    detekt {
+        toolVersion = gradle.ext.detektVersion
+        buildUponDefaultConfig = true
+        config = files("${project.rootDir}/config/detekt/detekt.yml")
+        allRules = false
+    }
+
+    tasks.withType(io.gitlab.arturbosch.detekt.Detekt).configureEach {
+        jvmTarget = "1.8"
+        reports {
+            html.required.set(true)
+            xml.required.set(true)
+        }
+
+        // Exclude generated bindings
+        exclude("**/wp_api.kt")
+    }
+
+    tasks.withType(io.gitlab.arturbosch.detekt.DetektCreateBaselineTask).configureEach {
+        jvmTarget = "1.8"
+
+        // Exclude generated bindings
+        exclude("**/wp_api.kt")
+    }
+
+    dependencies {
+        detektPlugins "io.gitlab.arturbosch.detekt:detekt-formatting:$gradle.ext.detektVersion"
+    }
 }

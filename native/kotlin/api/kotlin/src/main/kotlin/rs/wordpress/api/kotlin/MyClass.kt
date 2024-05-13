@@ -31,7 +31,7 @@ class MyClass(siteUrl: String, authentication: WpAuthentication) {
 
         client.newCall(requestBuilder.build()).execute().use { response ->
             return WpNetworkResponse(
-                body = response.body!!.bytes(),
+                body = response.body?.bytes() ?: ByteArray(0),
                 statusCode = response.code.toUShort(),
                 headerMap = null
             )
