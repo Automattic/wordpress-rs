@@ -1,5 +1,6 @@
 package rs.wordpress.api.kotlin
 
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import uniffi.wp_api.WpApiHelper
@@ -15,7 +16,7 @@ class UsersEndpointTest {
     private val requestHandler = WpRequestHandler(networkHandler)
 
     @Test
-    fun testUserListRequest() {
+    fun testUserListRequest() = runTest {
         val usersEndpoint = WPUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
         val result = usersEndpoint.listWithEditContext(params = null)
         assert(result is WpRequestSuccess)

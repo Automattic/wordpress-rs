@@ -10,7 +10,7 @@ class WPUsersEndpoint(
     private val requestHandler: WpRequestHandler,
     private val apiHelper: WpApiHelper
 ) : UsersEndpoint {
-    override fun listWithEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>> =
+    override suspend fun listWithEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>> =
         requestHandler.execute(
             request = apiHelper.listUsersRequest(
                 context = WpContext.EDIT,

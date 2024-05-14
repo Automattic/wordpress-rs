@@ -4,5 +4,5 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 
 interface NetworkHandler {
-    fun request(request: WpNetworkRequest): WpNetworkResponse
+    suspend fun request(request: WpNetworkRequest): WpNetworkResponse
 }

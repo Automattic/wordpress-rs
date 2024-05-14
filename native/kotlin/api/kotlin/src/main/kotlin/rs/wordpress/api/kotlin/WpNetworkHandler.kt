@@ -8,7 +8,7 @@ import uniffi.wp_api.WpNetworkResponse
 class WpNetworkHandler : NetworkHandler {
     private val client = OkHttpClient()
 
-    override fun request(request: WpNetworkRequest): WpNetworkResponse {
+    override suspend fun request(request: WpNetworkRequest): WpNetworkResponse {
         val requestBuilder = Request.Builder().url(request.url)
         request.headerMap.forEach { (key, value) ->
             requestBuilder.header(key, value)

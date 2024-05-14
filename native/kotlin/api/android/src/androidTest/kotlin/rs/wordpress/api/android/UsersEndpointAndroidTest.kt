@@ -3,6 +3,7 @@
  */
 package rs.wordpress.api.android
 
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
 import rs.wordpress.api.kotlin.WPUsersEndpoint
@@ -21,7 +22,7 @@ class UsersEndpointAndroidTest {
     private val requestHandler = WpRequestHandler(networkHandler = WpNetworkHandler())
 
     @Test
-    fun testUserListRequest() {
+    fun testUserListRequest() = runTest {
         val usersEndpoint = WPUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
         val result = usersEndpoint.listWithEditContext(params = null)
         assert(result is WpRequestSuccess)

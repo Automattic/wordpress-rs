@@ -84,6 +84,7 @@ dependencies {
     androidTestImplementation "junit:junit:$junitVersion"
     androidTestImplementation 'org.jetbrains.kotlin:kotlin-test'
     androidTestImplementation "net.java.dev.jna:jna:$jnaVersion@aar"
+    androidTestImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion"
 
     testImplementation "junit:junit:$junitVersion"
     testImplementation "net.java.dev.jna:jna:$jnaVersion"
