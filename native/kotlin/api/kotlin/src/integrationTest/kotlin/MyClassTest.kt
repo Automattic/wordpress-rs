@@ -18,7 +18,7 @@ class MyClassTest {
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val networkHandler = WPNetworkHandler()
+    private val networkHandler = WpNetworkHandler()
     private val requestHandler = WpRequestHandler(networkHandler)
     private val library = MyClass(networkHandler, siteUrl, authentication)
 

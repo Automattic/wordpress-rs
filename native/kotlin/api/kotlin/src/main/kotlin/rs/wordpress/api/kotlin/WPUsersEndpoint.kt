@@ -12,11 +12,7 @@ sealed class WpRequestResult<T>
 class WpRequestSuccess<T>(val value: T) : WpRequestResult<T>()
 class RecognizedRestError<T>(val error: WpRestError) : WpRequestResult<T>()
 class UnrecognizedRestError<T>(val error: UnrecognizedWpRestError) : WpRequestResult<T>()
-class UncaughtException<T>(val exception: Exception) : WpRequestResult<T>()
-
-interface UsersEndpoint {
-    fun listWithEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>>
-}
+class WpRequestInternalException<T>(val exception: Exception) : WpRequestResult<T>()
 
 class WPUsersEndpoint(
     private val requestHandler: WpRequestHandler,
@@ -27,5 +23,7 @@ class WPUsersEndpoint(
             request = apiHelper.listUsersRequest(
                 context = WpContext.EDIT,
                 params = params
-            ), parser = ::parseListUsersResponseWithEditContext)
+            ),
+            parser = ::parseListUsersResponseWithEditContext
+        )
 }

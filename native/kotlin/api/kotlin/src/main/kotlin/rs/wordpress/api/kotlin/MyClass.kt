@@ -2,6 +2,7 @@ package rs.wordpress.api.kotlin
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import uniffi.wp_api.InternalException
 import uniffi.wp_api.PostListParams
 import uniffi.wp_api.PostListResponse
 import uniffi.wp_api.WpApiException
@@ -16,12 +17,11 @@ interface NetworkHandler {
     fun request(request: WpNetworkRequest): WpNetworkResponse
 }
 
-class WPNetworkHandler: NetworkHandler {
+class WpNetworkHandler : NetworkHandler {
     private val client = OkHttpClient()
 
     override fun request(request: WpNetworkRequest): WpNetworkResponse {
-        val requestBuilder = Request.Builder()
-            .url(request.url)
+        val requestBuilder = Request.Builder().url(request.url)
         request.headerMap.forEach { (key, value) ->
             requestBuilder.header(key, value)
         }
@@ -37,22 +37,24 @@ class WPNetworkHandler: NetworkHandler {
 }
 
 class WpRequestHandler(private val networkHandler: NetworkHandler) {
-    fun<T> execute(request: WpNetworkRequest, parser: (response: WpNetworkResponse) -> T): WpRequestResult<T> {
-        try {
-            val response = networkHandler.request(request)
-            return WpRequestSuccess(value = parser(response))
-        } catch (restException: WpApiException.RestException) {
-            return when(restException.restError) {
-                is WpRestErrorWrapper.Recognized -> {
-                    RecognizedRestError(error = restException.restError.v1)
-                }
-                is WpRestErrorWrapper.Unrecognized -> {
-                    UnrecognizedRestError(error = restException.restError.v1)
-                }
+    fun <T> execute(
+        request: WpNetworkRequest,
+        parser: (response: WpNetworkResponse) -> T
+    ): WpRequestResult<T> = try {
+        val response = networkHandler.request(request)
+        WpRequestSuccess(value = parser(response))
+    } catch (restException: WpApiException.RestException) {
+        when (restException.restError) {
+            is WpRestErrorWrapper.Recognized -> {
+                RecognizedRestError(error = restException.restError.v1)
             }
-        } catch (e: Exception) {
-            return UncaughtException(exception = e)
+
+            is WpRestErrorWrapper.Unrecognized -> {
+                UnrecognizedRestError(error = restException.restError.v1)
+            }
         }
+    } catch (e: InternalException) {
+        WpRequestInternalException(exception = e)
     }
 }
 
@@ -63,8 +65,7 @@ class MyClass(
 ) {
     private val wpApiHelper = WpApiHelper(siteUrl, authentication)
 
-    fun postListRequest(): WpNetworkRequest =
-        wpApiHelper.postListRequest(PostListParams())
+    fun postListRequest(): WpNetworkRequest = wpApiHelper.postListRequest(PostListParams())
 
     fun makePostListRequest(): PostListResponse {
         val wpNetworkRequest = postListRequest()
