@@ -61,6 +61,13 @@ pub fn parse_retrieve_user_response_with_view_context(
     parse_users_response(response)
 }
 
+#[uniffi::export]
+pub fn parse_delete_user_response(
+    response: &WPNetworkResponse,
+) -> Result<UserDeleteResponse, WPApiError> {
+    parse_users_response(response)
+}
+
 pub fn parse_users_response<'de, T: Deserialize<'de>>(
     response: &'de WPNetworkResponse,
 ) -> Result<T, WPApiError> {
@@ -352,6 +359,12 @@ impl UserDeleteParams {
         ]
         .into_iter()
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct UserDeleteResponse {
+    pub deleted: bool,
+    pub previous: UserWithEditContext,
 }
 
 uniffi::custom_newtype!(UserId, i32);

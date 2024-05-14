@@ -4,6 +4,7 @@ import uniffi.wp_api.SparseUser
 import uniffi.wp_api.SparseUserField
 import uniffi.wp_api.UserCreateParams
 import uniffi.wp_api.UserDeleteParams
+import uniffi.wp_api.UserDeleteResponse
 import uniffi.wp_api.UserId
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserUpdateParams
@@ -13,6 +14,7 @@ import uniffi.wp_api.UserWithViewContext
 import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.WpNetworkResponse
+import uniffi.wp_api.parseDeleteUserResponse
 import uniffi.wp_api.parseFilterRetrieveUserResponse
 import uniffi.wp_api.parseFilterUsersResponse
 import uniffi.wp_api.parseListUsersResponseWithEditContext
@@ -178,15 +180,15 @@ private class WpUsersEndpointDelete(
     override suspend fun withId(
         userId: UserId,
         params: UserDeleteParams
-    ): WpRequestResult<UserWithEditContext> =
+    ): WpRequestResult<UserDeleteResponse> =
         requestHandler.execute(
             request = apiHelper.deleteUserRequest(userId, params),
-            ::parseRetrieveUserResponseWithEditContext
+            ::parseDeleteUserResponse
         )
 
-    override suspend fun current(params: UserDeleteParams): WpRequestResult<UserWithEditContext> =
+    override suspend fun current(params: UserDeleteParams): WpRequestResult<UserDeleteResponse> =
         requestHandler.execute(
             request = apiHelper.deleteCurrentUserRequest(params),
-            ::parseRetrieveUserResponseWithEditContext
+            ::parseDeleteUserResponse
         )
 }

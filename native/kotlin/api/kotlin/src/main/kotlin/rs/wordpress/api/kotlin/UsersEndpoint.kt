@@ -4,6 +4,7 @@ import uniffi.wp_api.SparseUser
 import uniffi.wp_api.SparseUserField
 import uniffi.wp_api.UserCreateParams
 import uniffi.wp_api.UserDeleteParams
+import uniffi.wp_api.UserDeleteResponse
 import uniffi.wp_api.UserId
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserUpdateParams
@@ -63,6 +64,6 @@ interface UsersEndpointUpdate {
 }
 
 interface UsersEndpointDelete {
-    suspend fun withId(userId: UserId, params: UserDeleteParams): WpRequestResult<UserWithEditContext>
-    suspend fun current(params: UserDeleteParams): WpRequestResult<UserWithEditContext>
+    suspend fun withId(userId: UserId, params: UserDeleteParams): WpRequestResult<UserDeleteResponse>
+    suspend fun current(params: UserDeleteParams): WpRequestResult<UserDeleteResponse>
 }
