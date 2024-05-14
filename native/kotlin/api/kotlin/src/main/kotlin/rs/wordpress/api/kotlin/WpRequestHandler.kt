@@ -5,7 +5,7 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.WpRestErrorWrapper
 
-class WpRequestHandler(private val networkHandler: NetworkHandler) {
+internal class WpRequestHandler(private val networkHandler: NetworkHandler) {
     suspend fun <T> execute(
         request: WpNetworkRequest,
         parser: (response: WpNetworkResponse) -> T

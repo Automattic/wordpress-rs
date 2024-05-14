@@ -25,21 +25,29 @@ import uniffi.wp_api.parseRetrieveUserResponseWithEmbedContext
 import uniffi.wp_api.parseRetrieveUserResponseWithViewContext
 
 class WpUsersEndpoint(
-    private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper
+    networkHandler: NetworkHandler,
+    apiHelper: WpApiHelper
 ) : UsersEndpoint {
-    override val list: UsersEndpointList
-        get() = WpUsersEndpointList(requestHandler, apiHelper)
-    override val retrieve: UsersEndpointRetrieve
-        get() = WpUsersEndpointRetrieve(requestHandler, apiHelper)
-    override val me: UsersEndpointRetrieveMe
-        get() = WpUsersEndpointRetrieveMe(requestHandler, apiHelper)
-    override val create: UsersEndpointCreate
-        get() = WpUsersEndpointCreate(requestHandler, apiHelper)
-    override val update: UsersEndpointUpdate
-        get() = WpUsersEndpointUpdate(requestHandler, apiHelper)
-    override val delete: UsersEndpointDelete
-        get() = WpUsersEndpointDelete(requestHandler, apiHelper)
+    private val requestHandler = WpRequestHandler(networkHandler)
+
+    override val list: UsersEndpointList by lazy {
+        WpUsersEndpointList(requestHandler, apiHelper)
+    }
+    override val retrieve: UsersEndpointRetrieve by lazy {
+        WpUsersEndpointRetrieve(requestHandler, apiHelper)
+    }
+    override val me: UsersEndpointRetrieveMe by lazy {
+        WpUsersEndpointRetrieveMe(requestHandler, apiHelper)
+    }
+    override val create: UsersEndpointCreate by lazy {
+        WpUsersEndpointCreate(requestHandler, apiHelper)
+    }
+    override val update: UsersEndpointUpdate by lazy {
+        WpUsersEndpointUpdate(requestHandler, apiHelper)
+    }
+    override val delete: UsersEndpointDelete by lazy {
+        WpUsersEndpointDelete(requestHandler, apiHelper)
+    }
 }
 
 private class WpUsersEndpointList(

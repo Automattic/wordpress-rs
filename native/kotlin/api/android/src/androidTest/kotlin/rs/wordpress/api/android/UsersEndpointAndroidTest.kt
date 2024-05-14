@@ -7,7 +7,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
 import rs.wordpress.api.kotlin.WpNetworkHandler
-import rs.wordpress.api.kotlin.WpRequestHandler
 import rs.wordpress.api.kotlin.WpRequestSuccess
 import rs.wordpress.api.kotlin.WpUsersEndpoint
 import uniffi.wp_api.WpApiHelper
@@ -22,12 +21,12 @@ class UsersEndpointAndroidTest {
         username = BuildConfig.TEST_ADMIN_USERNAME,
         password = BuildConfig.TEST_ADMIN_PASSWORD
     )
-    private val requestHandler = WpRequestHandler(networkHandler = WpNetworkHandler())
+    private val users =
+        WpUsersEndpoint(WpNetworkHandler(), apiHelper = WpApiHelper(siteUrl, authentication))
 
     @Test
     fun testUserListRequest() = runTest {
-        val usersEndpoint = WpUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
-        val result = usersEndpoint.list.withEditContext(params = null)
+        val result = users.list.withEditContext(params = null)
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         Assert.assertEquals(NUMBER_OF_USERS, userList.count())
