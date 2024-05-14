@@ -55,4 +55,16 @@ class UsersEndpointTest {
         assertEquals("test@example.com", sparseUser.email)
         assertNull(sparseUser.slug)
     }
+
+    @Test
+    fun testFilterRetrieveCurrentUserRequest() = runTest {
+        val result = usersEndpoint.filterRetrieveCurrentUser(
+            WpContext.EDIT,
+            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+        )
+        assert(result is WpRequestSuccess)
+        val sparseUser = (result as WpRequestSuccess).data
+        assertEquals("test@example.com", sparseUser.email)
+        assertNull(sparseUser.slug)
+    }
 }

@@ -61,6 +61,24 @@ class WPUsersEndpoint(
             ::parseFilterRetrieveUserResponse
         )
 
+    override suspend fun retrieveCurrentUserWithEditContext(): WpRequestResult<UserWithEditContext> =
+        retrieveCurrentUser(WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
+
+    override suspend fun retrieveCurrentUserWithEmbedContext(): WpRequestResult<UserWithEmbedContext> =
+        retrieveCurrentUser(WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
+
+    override suspend fun retrieveCurrentUserWithViewContext(): WpRequestResult<UserWithViewContext> =
+        retrieveCurrentUser(WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
+
+    override suspend fun filterRetrieveCurrentUser(
+        context: WpContext,
+        fields: List<SparseUserField>
+    ): WpRequestResult<SparseUser> =
+        requestHandler.execute(
+            request = apiHelper.filterRetrieveCurrentUserRequest(context, fields),
+            ::parseFilterRetrieveUserResponse
+        )
+
     private suspend fun <T> listUsers(
         context: WpContext,
         params: UserListParams?,
@@ -78,6 +96,15 @@ class WPUsersEndpoint(
     ): WpRequestResult<T> =
         requestHandler.execute(
             request = apiHelper.retrieveUserRequest(userId, context),
+            parser
+        )
+
+    private suspend fun <T> retrieveCurrentUser(
+        context: WpContext,
+        parser: (response: WpNetworkResponse) -> T
+    ): WpRequestResult<T> =
+        requestHandler.execute(
+            request = apiHelper.retrieveCurrentUserRequest(context),
             parser
         )
 }

@@ -26,4 +26,11 @@ interface UsersEndpoint {
         context: WpContext,
         fields: List<SparseUserField>
     ): WpRequestResult<SparseUser>
+    suspend fun retrieveCurrentUserWithEditContext(): WpRequestResult<UserWithEditContext>
+    suspend fun retrieveCurrentUserWithEmbedContext(): WpRequestResult<UserWithEmbedContext>
+    suspend fun retrieveCurrentUserWithViewContext(): WpRequestResult<UserWithViewContext>
+    suspend fun filterRetrieveCurrentUser(
+        context: WpContext,
+        fields: List<SparseUserField>
+    ): WpRequestResult<SparseUser>
 }
