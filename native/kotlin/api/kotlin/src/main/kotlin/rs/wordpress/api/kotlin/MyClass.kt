@@ -10,22 +10,17 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parsePostListResponse
 
-class MyClass(siteUrl: String, authentication: WpAuthentication) {
-    private val wpApiHelper = WpApiHelper(siteUrl, authentication)
+interface NetworkHandler {
+    fun request(request: WpNetworkRequest): WpNetworkResponse
+}
+
+class WPNetworkHandler: NetworkHandler {
     private val client = OkHttpClient()
 
-    fun postListRequest(): WpNetworkRequest =
-        wpApiHelper.postListRequest(PostListParams())
-
-    fun makePostListRequest(): PostListResponse {
-        val wpNetworkRequest = postListRequest()
-        return parsePostListResponse(request(wpNetworkRequest))
-    }
-
-    private fun request(wpNetworkRequest: WpNetworkRequest): WpNetworkResponse {
+    override fun request(request: WpNetworkRequest): WpNetworkResponse {
         val requestBuilder = Request.Builder()
-            .url(wpNetworkRequest.url)
-        wpNetworkRequest.headerMap.forEach { (key, value) ->
+            .url(request.url)
+        request.headerMap.forEach { (key, value) ->
             requestBuilder.header(key, value)
         }
 
@@ -36,5 +31,21 @@ class MyClass(siteUrl: String, authentication: WpAuthentication) {
                 headerMap = null
             )
         }
+    }
+}
+
+class MyClass(
+    private val networkHandler: NetworkHandler,
+    siteUrl: String,
+    authentication: WpAuthentication,
+) {
+    private val wpApiHelper = WpApiHelper(siteUrl, authentication)
+
+    fun postListRequest(): WpNetworkRequest =
+        wpApiHelper.postListRequest(PostListParams())
+
+    fun makePostListRequest(): PostListResponse {
+        val wpNetworkRequest = postListRequest()
+        return parsePostListResponse(networkHandler.request(wpNetworkRequest))
     }
 }

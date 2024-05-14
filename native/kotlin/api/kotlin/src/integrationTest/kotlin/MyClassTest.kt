@@ -17,7 +17,8 @@ class MyClassTest {
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val library = MyClass(siteUrl, authentication)
+    private val networkHandler = WPNetworkHandler()
+    private val library = MyClass(networkHandler, siteUrl, authentication)
 
     @Test
     fun testBasicPostListRequest() {
@@ -36,7 +37,7 @@ class MyClassTest {
     @Test
     fun testPostListRequestForbiddenContext() {
         val unauthenticatedLibrary =
-            MyClass(siteUrl, WpAuthentication.AuthorizationHeader("invalid_token"))
+            MyClass(networkHandler, siteUrl, WpAuthentication.AuthorizationHeader("invalid_token"))
         val exception = assertFailsWith<WpApiException.RestException> {
             unauthenticatedLibrary.makePostListRequest()
         }
