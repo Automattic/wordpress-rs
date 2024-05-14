@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
-import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpAuthentication
@@ -20,6 +19,7 @@ class MyClassTest {
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
     private val networkHandler = WPNetworkHandler()
+    private val requestHandler = WpRequestHandler(networkHandler)
     private val library = MyClass(networkHandler, siteUrl, authentication)
 
     @Test
@@ -53,7 +53,7 @@ class MyClassTest {
 
     @Test
     fun testUserListRequest() {
-        val usersEndpoint = WPUsersEndpoint(networkHandler, apiHelper = WpApiHelper(siteUrl, authentication))
+        val usersEndpoint = WPUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
         val result = usersEndpoint.listWithEditContext(params = null)
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).value
