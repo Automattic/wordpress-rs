@@ -34,7 +34,7 @@ class LibraryTest {
     fun testMakeBasicPostListRequest() {
         val postListResponse = library.makePostListRequest()
         val firstPost: PostObject = postListResponse.postList!!.first()
-        assertEquals("Hello world!", firstPost.title?.raw )
+        assertEquals("Hello world!", firstPost.title?.raw)
     }
 
     @Test
