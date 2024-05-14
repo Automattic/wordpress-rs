@@ -19,20 +19,32 @@ import uniffi.wp_api.parseRetrieveUserResponseWithEditContext
 import uniffi.wp_api.parseRetrieveUserResponseWithEmbedContext
 import uniffi.wp_api.parseRetrieveUserResponseWithViewContext
 
-class WPUsersEndpoint(
+class WpUsersEndpoint(
     private val requestHandler: WpRequestHandler,
     private val apiHelper: WpApiHelper
 ) : UsersEndpoint {
-    override suspend fun listWithEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>> =
+    override val list: UsersEndpointList
+        get() = WpUsersEndpointList(requestHandler, apiHelper)
+    override val retrieve: UsersEndpointRetrieve
+        get() = WpUsersEndpointRetrieve(requestHandler, apiHelper)
+    override val retrieveCurrent: UsersEndpointRetrieveCurrent
+        get() = WpUsersEndpointRetrieveCurrent(requestHandler, apiHelper)
+}
+
+private class WpUsersEndpointList(
+    private val requestHandler: WpRequestHandler,
+    private val apiHelper: WpApiHelper
+) : UsersEndpointList {
+    override suspend fun withEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>> =
         listUsers(WpContext.EDIT, params, ::parseListUsersResponseWithEditContext)
 
-    override suspend fun listWithEmbedContext(params: UserListParams?): WpRequestResult<List<UserWithEmbedContext>> =
+    override suspend fun withEmbedContext(params: UserListParams?): WpRequestResult<List<UserWithEmbedContext>> =
         listUsers(WpContext.EMBED, params, ::parseListUsersResponseWithEmbedContext)
 
-    override suspend fun listWithViewContext(params: UserListParams?): WpRequestResult<List<UserWithViewContext>> =
+    override suspend fun withViewContext(params: UserListParams?): WpRequestResult<List<UserWithViewContext>> =
         listUsers(WpContext.VIEW, params, ::parseListUsersResponseWithViewContext)
 
-    override suspend fun filterListUsers(
+    override suspend fun filter(
         context: WpContext,
         params: UserListParams?,
         fields: List<SparseUserField>
@@ -40,43 +52,6 @@ class WPUsersEndpoint(
         requestHandler.execute(
             request = apiHelper.filterListUsersRequest(context, params, fields),
             ::parseFilterUsersResponse
-        )
-
-    override suspend fun retrieveWithEditContext(userId: UserId): WpRequestResult<UserWithEditContext> =
-        retrieveUser(userId, WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
-
-    override suspend fun retrieveWithEmbedContext(userId: UserId): WpRequestResult<UserWithEmbedContext> =
-        retrieveUser(userId, WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
-
-    override suspend fun retrieveWithViewContext(userId: UserId): WpRequestResult<UserWithViewContext> =
-        retrieveUser(userId, WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
-
-    override suspend fun filterRetrieveUser(
-        userId: UserId,
-        context: WpContext,
-        fields: List<SparseUserField>
-    ): WpRequestResult<SparseUser> =
-        requestHandler.execute(
-            request = apiHelper.filterRetrieveUserRequest(userId, context, fields),
-            ::parseFilterRetrieveUserResponse
-        )
-
-    override suspend fun retrieveCurrentUserWithEditContext(): WpRequestResult<UserWithEditContext> =
-        retrieveCurrentUser(WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
-
-    override suspend fun retrieveCurrentUserWithEmbedContext(): WpRequestResult<UserWithEmbedContext> =
-        retrieveCurrentUser(WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
-
-    override suspend fun retrieveCurrentUserWithViewContext(): WpRequestResult<UserWithViewContext> =
-        retrieveCurrentUser(WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
-
-    override suspend fun filterRetrieveCurrentUser(
-        context: WpContext,
-        fields: List<SparseUserField>
-    ): WpRequestResult<SparseUser> =
-        requestHandler.execute(
-            request = apiHelper.filterRetrieveCurrentUserRequest(context, fields),
-            ::parseFilterRetrieveUserResponse
         )
 
     private suspend fun <T> listUsers(
@@ -88,6 +63,30 @@ class WPUsersEndpoint(
             request = apiHelper.listUsersRequest(context, params),
             parser
         )
+}
+
+class WpUsersEndpointRetrieve(
+    private val requestHandler: WpRequestHandler,
+    private val apiHelper: WpApiHelper
+) : UsersEndpointRetrieve {
+    override suspend fun withEditContext(userId: UserId): WpRequestResult<UserWithEditContext> =
+        retrieveUser(userId, WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
+
+    override suspend fun withEmbedContext(userId: UserId): WpRequestResult<UserWithEmbedContext> =
+        retrieveUser(userId, WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
+
+    override suspend fun withViewContext(userId: UserId): WpRequestResult<UserWithViewContext> =
+        retrieveUser(userId, WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
+
+    override suspend fun filter(
+        userId: UserId,
+        context: WpContext,
+        fields: List<SparseUserField>
+    ): WpRequestResult<SparseUser> =
+        requestHandler.execute(
+            request = apiHelper.filterRetrieveUserRequest(userId, context, fields),
+            ::parseFilterRetrieveUserResponse
+        )
 
     private suspend fun <T> retrieveUser(
         userId: UserId,
@@ -97,6 +96,29 @@ class WPUsersEndpoint(
         requestHandler.execute(
             request = apiHelper.retrieveUserRequest(userId, context),
             parser
+        )
+}
+
+class WpUsersEndpointRetrieveCurrent(
+    private val requestHandler: WpRequestHandler,
+    private val apiHelper: WpApiHelper
+) : UsersEndpointRetrieveCurrent {
+    override suspend fun withEditContext(): WpRequestResult<UserWithEditContext> =
+        retrieveCurrentUser(WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
+
+    override suspend fun withEmbedContext(): WpRequestResult<UserWithEmbedContext> =
+        retrieveCurrentUser(WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
+
+    override suspend fun userWithViewContext(): WpRequestResult<UserWithViewContext> =
+        retrieveCurrentUser(WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
+
+    override suspend fun filter(
+        context: WpContext,
+        fields: List<SparseUserField>
+    ): WpRequestResult<SparseUser> =
+        requestHandler.execute(
+            request = apiHelper.filterRetrieveCurrentUserRequest(context, fields),
+            ::parseFilterRetrieveUserResponse
         )
 
     private suspend fun <T> retrieveCurrentUser(

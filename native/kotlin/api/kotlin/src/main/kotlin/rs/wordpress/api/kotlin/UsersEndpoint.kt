@@ -10,26 +10,38 @@ import uniffi.wp_api.UserWithViewContext
 import uniffi.wp_api.WpContext
 
 interface UsersEndpoint {
-    suspend fun listWithEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>>
-    suspend fun listWithEmbedContext(params: UserListParams?): WpRequestResult<List<UserWithEmbedContext>>
-    suspend fun listWithViewContext(params: UserListParams?): WpRequestResult<List<UserWithViewContext>>
-    suspend fun filterListUsers(
+    val list: UsersEndpointList
+    val retrieve: UsersEndpointRetrieve
+    val retrieveCurrent: UsersEndpointRetrieveCurrent
+}
+
+interface UsersEndpointList {
+    suspend fun withEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>>
+    suspend fun withEmbedContext(params: UserListParams?): WpRequestResult<List<UserWithEmbedContext>>
+    suspend fun withViewContext(params: UserListParams?): WpRequestResult<List<UserWithViewContext>>
+    suspend fun filter(
         context: WpContext,
         params: UserListParams?,
         fields: List<SparseUserField>
     ): WpRequestResult<List<SparseUser>>
-    suspend fun retrieveWithEditContext(userId: UserId): WpRequestResult<UserWithEditContext>
-    suspend fun retrieveWithEmbedContext(userId: UserId): WpRequestResult<UserWithEmbedContext>
-    suspend fun retrieveWithViewContext(userId: UserId): WpRequestResult<UserWithViewContext>
-    suspend fun filterRetrieveUser(
+}
+
+interface UsersEndpointRetrieve {
+    suspend fun withEditContext(userId: UserId): WpRequestResult<UserWithEditContext>
+    suspend fun withEmbedContext(userId: UserId): WpRequestResult<UserWithEmbedContext>
+    suspend fun withViewContext(userId: UserId): WpRequestResult<UserWithViewContext>
+    suspend fun filter(
         userId: UserId,
         context: WpContext,
         fields: List<SparseUserField>
     ): WpRequestResult<SparseUser>
-    suspend fun retrieveCurrentUserWithEditContext(): WpRequestResult<UserWithEditContext>
-    suspend fun retrieveCurrentUserWithEmbedContext(): WpRequestResult<UserWithEmbedContext>
-    suspend fun retrieveCurrentUserWithViewContext(): WpRequestResult<UserWithViewContext>
-    suspend fun filterRetrieveCurrentUser(
+}
+
+interface UsersEndpointRetrieveCurrent {
+    suspend fun withEditContext(): WpRequestResult<UserWithEditContext>
+    suspend fun withEmbedContext(): WpRequestResult<UserWithEmbedContext>
+    suspend fun userWithViewContext(): WpRequestResult<UserWithViewContext>
+    suspend fun filter(
         context: WpContext,
         fields: List<SparseUserField>
     ): WpRequestResult<SparseUser>

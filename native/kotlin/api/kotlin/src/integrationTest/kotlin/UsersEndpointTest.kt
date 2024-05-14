@@ -18,11 +18,11 @@ class UsersEndpointTest {
     )
     private val networkHandler = WpNetworkHandler()
     private val requestHandler = WpRequestHandler(networkHandler)
-    private val usersEndpoint = WPUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
+    private val usersEndpoint = WpUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
 
     @Test
     fun testUserListRequest() = runTest {
-        val result = usersEndpoint.listWithEditContext(params = null)
+        val result = usersEndpoint.list.withEditContext(params = null)
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(3, userList.count())
@@ -31,7 +31,7 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterUserListRequest() = runTest {
-        val result = usersEndpoint.filterListUsers(
+        val result = usersEndpoint.list.filter(
             WpContext.EDIT,
             params = null,
             fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
@@ -45,7 +45,7 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
-        val result = usersEndpoint.filterRetrieveUser(
+        val result = usersEndpoint.retrieve.filter(
             1 as UserId,
             WpContext.EDIT,
             fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
@@ -58,7 +58,7 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveCurrentUserRequest() = runTest {
-        val result = usersEndpoint.filterRetrieveCurrentUser(
+        val result = usersEndpoint.retrieveCurrent.filter(
             WpContext.EDIT,
             fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
         )
