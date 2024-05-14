@@ -2,6 +2,7 @@ package rs.wordpress.api.kotlin
 
 import uniffi.wp_api.SparseUser
 import uniffi.wp_api.SparseUserField
+import uniffi.wp_api.UserId
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserWithEditContext
 import uniffi.wp_api.UserWithEmbedContext
@@ -17,4 +18,12 @@ interface UsersEndpoint {
         params: UserListParams?,
         fields: List<SparseUserField>
     ): WpRequestResult<List<SparseUser>>
+    suspend fun retrieveWithEditContext(userId: UserId): WpRequestResult<UserWithEditContext>
+    suspend fun retrieveWithEmbedContext(userId: UserId): WpRequestResult<UserWithEmbedContext>
+    suspend fun retrieveWithViewContext(userId: UserId): WpRequestResult<UserWithViewContext>
+    suspend fun filterRetrieveUser(
+        userId: UserId,
+        context: WpContext,
+        fields: List<SparseUserField>
+    ): WpRequestResult<SparseUser>
 }
