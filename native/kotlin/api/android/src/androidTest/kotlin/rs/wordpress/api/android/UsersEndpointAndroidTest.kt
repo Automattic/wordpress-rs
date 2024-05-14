@@ -25,7 +25,7 @@ class UsersEndpointAndroidTest {
         val usersEndpoint = WPUsersEndpoint(requestHandler, apiHelper = WpApiHelper(siteUrl, authentication))
         val result = usersEndpoint.listWithEditContext(params = null)
         assert(result is WpRequestSuccess)
-        val userList = (result as WpRequestSuccess).value
+        val userList = (result as WpRequestSuccess).data
         Assert.assertEquals(3, userList.count())
         Assert.assertEquals("test@example.com", userList.first().email)
     }

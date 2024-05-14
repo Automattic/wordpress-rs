@@ -12,7 +12,7 @@ class WpRequestHandler(private val networkHandler: NetworkHandler) {
         parser: (response: WpNetworkResponse) -> T
     ): WpRequestResult<T> = try {
         val response = networkHandler.request(request)
-        WpRequestSuccess(value = parser(response))
+        WpRequestSuccess(data = parser(response))
     } catch (restException: WpApiException.RestException) {
         when (restException.restError) {
             is WpRestErrorWrapper.Recognized -> {
