@@ -32,8 +32,8 @@ class WpUsersEndpoint(
         get() = WpUsersEndpointList(requestHandler, apiHelper)
     override val retrieve: UsersEndpointRetrieve
         get() = WpUsersEndpointRetrieve(requestHandler, apiHelper)
-    override val retrieveCurrent: UsersEndpointRetrieveCurrent
-        get() = WpUsersEndpointRetrieveCurrent(requestHandler, apiHelper)
+    override val me: UsersEndpointRetrieveMe
+        get() = WpUsersEndpointRetrieveMe(requestHandler, apiHelper)
     override val create: UsersEndpointCreate
         get() = WpUsersEndpointCreate(requestHandler, apiHelper)
     override val update: UsersEndpointUpdate
@@ -110,18 +110,18 @@ private class WpUsersEndpointRetrieve(
         )
 }
 
-private class WpUsersEndpointRetrieveCurrent(
+private class WpUsersEndpointRetrieveMe(
     private val requestHandler: WpRequestHandler,
     private val apiHelper: WpApiHelper
-) : UsersEndpointRetrieveCurrent {
+) : UsersEndpointRetrieveMe {
     override suspend fun withEditContext(): WpRequestResult<UserWithEditContext> =
-        retrieveCurrentUser(WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
+        retrieveMe(WpContext.EDIT, ::parseRetrieveUserResponseWithEditContext)
 
     override suspend fun withEmbedContext(): WpRequestResult<UserWithEmbedContext> =
-        retrieveCurrentUser(WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
+        retrieveMe(WpContext.EMBED, ::parseRetrieveUserResponseWithEmbedContext)
 
-    override suspend fun userWithViewContext(): WpRequestResult<UserWithViewContext> =
-        retrieveCurrentUser(WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
+    override suspend fun withViewContext(): WpRequestResult<UserWithViewContext> =
+        retrieveMe(WpContext.VIEW, ::parseRetrieveUserResponseWithViewContext)
 
     override suspend fun filter(
         context: WpContext,
@@ -132,7 +132,7 @@ private class WpUsersEndpointRetrieveCurrent(
             ::parseFilterRetrieveUserResponse
         )
 
-    private suspend fun <T> retrieveCurrentUser(
+    private suspend fun <T> retrieveMe(
         context: WpContext,
         parser: (response: WpNetworkResponse) -> T
     ): WpRequestResult<T> =

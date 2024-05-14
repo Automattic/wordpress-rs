@@ -16,7 +16,7 @@ import uniffi.wp_api.WpContext
 interface UsersEndpoint {
     val list: UsersEndpointList
     val retrieve: UsersEndpointRetrieve
-    val retrieveCurrent: UsersEndpointRetrieveCurrent
+    val me: UsersEndpointRetrieveMe
     val create: UsersEndpointCreate
     val update: UsersEndpointUpdate
     val delete: UsersEndpointDelete
@@ -44,10 +44,10 @@ interface UsersEndpointRetrieve {
     ): WpRequestResult<SparseUser>
 }
 
-interface UsersEndpointRetrieveCurrent {
+interface UsersEndpointRetrieveMe {
     suspend fun withEditContext(): WpRequestResult<UserWithEditContext>
     suspend fun withEmbedContext(): WpRequestResult<UserWithEmbedContext>
-    suspend fun userWithViewContext(): WpRequestResult<UserWithViewContext>
+    suspend fun withViewContext(): WpRequestResult<UserWithViewContext>
     suspend fun filter(
         context: WpContext,
         fields: List<SparseUserField>
