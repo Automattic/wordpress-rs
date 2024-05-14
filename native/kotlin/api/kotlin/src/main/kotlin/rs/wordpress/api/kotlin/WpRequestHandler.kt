@@ -1,6 +1,5 @@
 package rs.wordpress.api.kotlin
 
-import uniffi.wp_api.InternalException
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
@@ -23,7 +22,5 @@ class WpRequestHandler(private val networkHandler: NetworkHandler) {
                 UnrecognizedRestError(error = restException.restError.v1)
             }
         }
-    } catch (e: InternalException) {
-        WpRequestInternalException(exception = e)
     }
 }
