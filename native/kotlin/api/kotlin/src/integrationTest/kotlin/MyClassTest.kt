@@ -4,7 +4,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import uniffi.wp_api.PostObject
 import uniffi.wp_api.RequestMethod
+import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiException
+import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.WpRestErrorWrapper
@@ -47,5 +49,15 @@ class MyClassTest {
             WpRestErrorCode.ForbiddenContext,
             (exception.restError as WpRestErrorWrapper.Recognized).v1.code
         )
+    }
+
+    @Test
+    fun testUserListRequest() {
+        val usersEndpoint = WPUsersEndpoint(networkHandler, apiHelper = WpApiHelper(siteUrl, authentication))
+        val result = usersEndpoint.listWithEditContext(params = null)
+        assert(result is WpRequestSuccess)
+        val userList = (result as WpRequestSuccess).value
+        assertEquals(3, userList.count())
+        assertEquals("test@example.com", userList.first().email)
     }
 }
