@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import uniffi.wp_api.SparseUserField
-import uniffi.wp_api.UserId
 import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
@@ -25,8 +24,8 @@ class UsersEndpointTest {
         val result = usersEndpoint.list.withEditContext(params = null)
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
-        assertEquals(3, userList.count())
-        assertEquals("test@example.com", userList.first().email)
+        assertEquals(NUMBER_OF_USERS, userList.count())
+        assertEquals(FIRST_USER_EMAIL, userList.first().email)
     }
 
     @Test
@@ -38,21 +37,21 @@ class UsersEndpointTest {
         )
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
-        assertEquals(3, userList.count())
-        assertEquals("test@example.com", userList.first().email)
+        assertEquals(NUMBER_OF_USERS, userList.count())
+        assertEquals(FIRST_USER_EMAIL, userList.first().email)
         assertNull(userList.first().slug)
     }
 
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
         val result = usersEndpoint.retrieve.filter(
-            1 as UserId,
+            FIRST_USER_ID,
             WpContext.EDIT,
             fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
         )
         assert(result is WpRequestSuccess)
         val sparseUser = (result as WpRequestSuccess).data
-        assertEquals("test@example.com", sparseUser.email)
+        assertEquals(FIRST_USER_EMAIL, sparseUser.email)
         assertNull(sparseUser.slug)
     }
 
@@ -64,7 +63,7 @@ class UsersEndpointTest {
         )
         assert(result is WpRequestSuccess)
         val sparseUser = (result as WpRequestSuccess).data
-        assertEquals("test@example.com", sparseUser.email)
+        assertEquals(FIRST_USER_EMAIL, sparseUser.email)
         assertNull(sparseUser.slug)
     }
 }

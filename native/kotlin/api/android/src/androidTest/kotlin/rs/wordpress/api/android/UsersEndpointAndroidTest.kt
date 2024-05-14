@@ -13,6 +13,9 @@ import rs.wordpress.api.kotlin.WpUsersEndpoint
 import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
+private const val FIRST_USER_EMAIL = "test@example.com"
+private const val NUMBER_OF_USERS = 3
+
 class UsersEndpointAndroidTest {
     private val siteUrl = BuildConfig.TEST_SITE_URL
     private val authentication = wpAuthenticationFromUsernameAndPassword(
@@ -27,7 +30,7 @@ class UsersEndpointAndroidTest {
         val result = usersEndpoint.list.withEditContext(params = null)
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
-        Assert.assertEquals(3, userList.count())
-        Assert.assertEquals("test@example.com", userList.first().email)
+        Assert.assertEquals(NUMBER_OF_USERS, userList.count())
+        Assert.assertEquals(FIRST_USER_EMAIL, userList.first().email)
     }
 }
