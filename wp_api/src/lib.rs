@@ -15,6 +15,7 @@ pub mod api_error;
 pub mod endpoint;
 pub mod login;
 pub mod pages;
+pub mod plugins;
 pub mod posts;
 pub mod url;
 pub mod users;
