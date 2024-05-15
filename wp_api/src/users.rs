@@ -3,70 +3,37 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
-use crate::{parse_wp_response, WPApiError, WPApiParamOrder, WPNetworkResponse};
+use crate::{
+    add_uniffi_exported_parser, parse_wp_response, WPApiError, WPApiParamOrder, WPNetworkResponse,
+};
 
-#[uniffi::export]
-pub fn parse_filter_users_response(
-    response: &WPNetworkResponse,
-) -> Result<Vec<SparseUser>, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_filter_retrieve_user_response(
-    response: &WPNetworkResponse,
-) -> Result<SparseUser, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_users_response_with_edit_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<UserWithEditContext>, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_users_response_with_embed_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<UserWithEmbedContext>, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_users_response_with_view_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<UserWithViewContext>, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_retrieve_user_response_with_edit_context(
-    response: &WPNetworkResponse,
-) -> Result<UserWithEditContext, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_retrieve_user_response_with_embed_context(
-    response: &WPNetworkResponse,
-) -> Result<UserWithEmbedContext, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_retrieve_user_response_with_view_context(
-    response: &WPNetworkResponse,
-) -> Result<UserWithViewContext, WPApiError> {
-    parse_wp_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_delete_user_response(
-    response: &WPNetworkResponse,
-) -> Result<UserDeleteResponse, WPApiError> {
-    parse_wp_response(response)
-}
+add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
+add_uniffi_exported_parser!(parse_filter_retrieve_user_response, SparseUser);
+add_uniffi_exported_parser!(
+    parse_list_users_response_with_edit_context,
+    Vec<UserWithEditContext>
+);
+add_uniffi_exported_parser!(
+    parse_list_users_response_with_embed_context,
+    Vec<UserWithEmbedContext>
+);
+add_uniffi_exported_parser!(
+    parse_list_users_response_with_view_context,
+    Vec<UserWithViewContext>
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_user_response_with_edit_context,
+    UserWithEditContext
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_user_response_with_embed_context,
+    UserWithEmbedContext
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_user_response_with_view_context,
+    UserWithViewContext
+);
+add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersOrderBy {

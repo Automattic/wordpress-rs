@@ -432,4 +432,14 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     None
 }
 
+#[macro_export]
+macro_rules! add_uniffi_exported_parser {
+    ($fn_name:ident, $return_type: ty) => {
+        #[uniffi::export]
+        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
+            parse_wp_response(response)
+        }
+    };
+}
+
 uniffi::setup_scaffolding!();
