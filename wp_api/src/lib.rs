@@ -7,6 +7,7 @@ pub use api_error::*;
 pub use endpoint::*;
 pub use login::*;
 pub use pages::*;
+pub use plugins::*;
 pub use posts::*;
 pub use url::*;
 pub use users::*;
@@ -219,6 +220,23 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: self.api_endpoint.users.delete_me(params).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .list(context, params.as_ref())
+                .into(),
             header_map: self.header_map(),
             body: None,
         }

@@ -1,0 +1,49 @@
+use rstest::*;
+use wp_api::{plugin_list_params, plugins::PluginListParams, plugins::PluginStatus, WPContext};
+
+use crate::test_helpers::{api, WPNetworkRequestExecutor};
+
+pub mod test_helpers;
+#[rstest]
+#[case(plugin_list_params!())]
+#[case(plugin_list_params!((search, Some("foo".to_string()))))]
+#[case(plugin_list_params!((status, Some(PluginStatus::Active))))]
+#[case(plugin_list_params!((search, Some("foo".to_string()))))]
+#[trace]
+#[tokio::test]
+async fn test_plugin_list_params_parametrized(
+    #[case] params: PluginListParams,
+    #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
+) {
+    let response = api()
+        .list_plugins_request(context, &Some(params))
+        .execute()
+        .await
+        .unwrap();
+    match context {
+        WPContext::Edit => {
+            let parsed_response = wp_api::parse_list_plugins_response_with_edit_context(&response);
+            assert!(
+                parsed_response.is_ok(),
+                "Response was: '{:?}'",
+                parsed_response
+            );
+        }
+        WPContext::Embed => {
+            let parsed_response = wp_api::parse_list_plugins_response_with_embed_context(&response);
+            assert!(
+                parsed_response.is_ok(),
+                "Response was: '{:?}'",
+                parsed_response
+            );
+        }
+        WPContext::View => {
+            let parsed_response = wp_api::parse_list_plugins_response_with_view_context(&response);
+            assert!(
+                parsed_response.is_ok(),
+                "Response was: '{:?}'",
+                parsed_response
+            );
+        }
+    };
+}

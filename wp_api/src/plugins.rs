@@ -1,6 +1,40 @@
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
+use crate::{parse_response_for_generic_errors, WPApiError, WPNetworkResponse};
+
+#[uniffi::export]
+pub fn parse_list_plugins_response_with_edit_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<PluginWithEditContext>, WPApiError> {
+    parse_plugins_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_list_plugins_response_with_embed_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<PluginWithEmbedContext>, WPApiError> {
+    parse_plugins_response(response)
+}
+
+#[uniffi::export]
+pub fn parse_list_plugins_response_with_view_context(
+    response: &WPNetworkResponse,
+) -> Result<Vec<PluginWithViewContext>, WPApiError> {
+    parse_plugins_response(response)
+}
+
+// TODO: Duplicate
+pub fn parse_plugins_response<'de, T: Deserialize<'de>>(
+    response: &'de WPNetworkResponse,
+) -> Result<T, WPApiError> {
+    parse_response_for_generic_errors(response)?;
+    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+        reason: err.to_string(),
+        response: String::from_utf8_lossy(&response.body).to_string(),
+    })
+}
+
 #[derive(Default, Debug, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
@@ -33,7 +67,7 @@ pub struct SparsePlugin {
     // TODO: Custom URI type?
     pub plugin_uri: Option<String>,
     #[WPContext(edit, view)]
-    pub author: Option<PluginAuthor>,
+    pub author: Option<String>,
     #[WPContext(edit, view)]
     pub description: Option<PluginDescription>,
     #[WPContext(edit, view)]
@@ -48,7 +82,9 @@ pub struct SparsePlugin {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, uniffi::Enum)]
 pub enum PluginStatus {
+    #[serde(rename = "active")]
     Active,
+    #[serde(rename = "inactive")]
     Inactive,
 }
 
@@ -68,5 +104,54 @@ pub struct PluginAuthor {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PluginDescription {
-    pub name: Option<String>,
+    pub raw: String,
+    pub rendered: String,
+}
+
+// TODO: Duplicate
+#[macro_export]
+macro_rules! plugin_list_params {
+    () => {
+        PluginListParams::default()
+    };
+    ($(($f:ident, $v:expr)), *) => {{
+        let mut params = PluginListParams::default();
+        $(params.$f = $v;)*
+        params
+    }};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case(plugin_list_params!(), &[])]
+    #[case(plugin_list_params!((search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(plugin_list_params!((status, Some(PluginStatus::Active))), &[("status", "active")])]
+    #[case(plugin_list_params!((search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), &[("search", "foo"), ("status", "inactive")])]
+    #[trace]
+    fn test_plugin_list_params(
+        #[case] params: PluginListParams,
+        #[case] expected_pairs: &[(&str, &str)],
+    ) {
+        assert_expected_query_pairs(params.query_pairs(), expected_pairs);
+    }
+
+    // TODO: Duplicate
+    fn assert_expected_query_pairs<'a>(
+        query_pairs: impl IntoIterator<Item = (&'a str, String)>,
+        expected_pairs: &[(&'a str, &str)],
+    ) {
+        let mut query_pairs = query_pairs.into_iter().collect::<Vec<_>>();
+        let mut expected_pairs: Vec<(&str, String)> = expected_pairs
+            .iter()
+            .map(|(k, v)| (*k, v.to_string()))
+            .collect();
+        // The order of query pairs doesn't matter
+        query_pairs.sort();
+        expected_pairs.sort();
+        assert_eq!(query_pairs, expected_pairs);
+    }
 }
