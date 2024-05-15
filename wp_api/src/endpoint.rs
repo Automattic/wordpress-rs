@@ -137,4 +137,11 @@ mod tests {
     fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
         format!("{}{}", wp_json_endpoint(base_url), suffix)
     }
+
+    pub fn validate_endpoint(endpoint_url: Url, path: &str, api_base_url: &ApiBaseUrl) {
+        assert_eq!(
+            endpoint_url.as_str(),
+            format!("{}{}", api_base_url.as_str(), path)
+        );
+    }
 }

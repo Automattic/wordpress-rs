@@ -103,7 +103,7 @@ impl UsersEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ApiEndpoint;
+    use crate::{endpoint::tests::validate_endpoint, ApiEndpoint};
     use rstest::*;
 
     #[rstest]
@@ -258,12 +258,5 @@ mod tests {
     #[fixture]
     fn users_endpoint(api_base_url: ApiBaseUrl) -> UsersEndpoint {
         ApiEndpoint::new(api_base_url).users
-    }
-
-    fn validate_endpoint(endpoint_url: Url, path: &str, api_base_url: &ApiBaseUrl) {
-        assert_eq!(
-            endpoint_url.as_str(),
-            format!("{}{}", api_base_url.as_str(), path)
-        );
     }
 }
