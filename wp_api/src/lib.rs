@@ -19,6 +19,9 @@ pub mod posts;
 pub mod url;
 pub mod users;
 
+#[cfg(test)]
+mod test_helpers;
+
 const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(uniffi::Object)]
