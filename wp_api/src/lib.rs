@@ -442,4 +442,16 @@ macro_rules! add_uniffi_exported_parser {
     };
 }
 
+#[macro_export]
+macro_rules! generate {
+    ($type_name:ident) => {
+        $type_name::default()
+    };
+    ($type_name:ident, $(($f:ident, $v:expr)), *) => {{
+        let mut obj = $type_name::default();
+        $(obj.$f = $v;)*
+        obj
+    }};
+}
+
 uniffi::setup_scaffolding!();
