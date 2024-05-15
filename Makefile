@@ -1,7 +1,3 @@
-android_project_root := ./native/android
-android_generated_source_path := $(android_project_root)/lib/build/generated/source
-jni_libs_root := $(android_project_root)/lib/src/main/jniLibs
-
 # The directory where the git repo is mounted in the docker container
 docker_container_repo_dir=/app
 
@@ -33,24 +29,11 @@ endif
 clean:
 	git clean -ffXd
 
-_generate-jni-libs:
-	rm -rf $(jni_libs_root)
-	cargo build --release --lib --target x86_64-linux-android --target i686-linux-android --target armv7-linux-androideabi --target aarch64-linux-android
-	mkdir -p $(jni_libs_root)/arm64-v8a
-	mkdir -p $(jni_libs_root)/armeabi-v7a
-	mkdir -p $(jni_libs_root)/x86
-	mkdir -p $(jni_libs_root)/x86_64
-	cp ./target/aarch64-linux-android/release/libwp_api.so $(jni_libs_root)/arm64-v8a/libuniffi_wp_api.so
-	cp ./target/armv7-linux-androideabi/release/libwp_api.so $(jni_libs_root)/armeabi-v7a/libuniffi_wp_api.so
-	cp ./target/i686-linux-android/release/libwp_api.so $(jni_libs_root)/x86/libuniffi_wp_api.so
-	cp ./target/x86_64-linux-android/release/libwp_api.so $(jni_libs_root)/x86_64/libuniffi_wp_api.so
-
 bindings:
-	rm -rf $(android_generated_source_path) target/swift-bindings
+	rm -rf target/swift-bindings
 	cargo build --release
 
 	#wp_api
-	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
 	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
@@ -66,12 +49,6 @@ docs:
 
 docs-archive: docs
 	tar -czvf  docs.tar.gz docs
-
-_test-android:
-	./native/android/gradlew -p ./native/android cAT
-
-_publish-android-local:
-	./native/android/gradlew -p ./native/android publishToMavenLocal -exclude-task prepareToPublishToS3
 
 # An XCFramework relies on the .h file and the modulemap to interact with the precompiled binary
 xcframework-headers: bindings
@@ -168,15 +145,11 @@ test-swift-tvOS: xcframework
 test-swift-watchOS: xcframework
 	scripts/xcodebuild-test.sh watchOS-10-4
 
-test-android: bindings _test-android
-
-publish-android-local: bindings _publish-android-local
-
 test-rust-lib:
-	$(rust_docker_run) cargo test --lib
+	$(rust_docker_run) cargo test --lib -- --nocapture
 
 test-rust-doc:
-	$(rust_docker_run) cargo test --doc
+	$(rust_docker_run) cargo test --doc -- --nocapture
 
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
@@ -230,3 +203,10 @@ setup-rust-toolchain:
 		aarch64-apple-darwin \
 		x86_64-apple-darwin \
 		aarch64-apple-ios-sim
+
+setup-rust-android-targets:
+	rustup target add \
+		x86_64-linux-android \
+		i686-linux-android \
+		armv7-linux-androideabi \
+		aarch64-linux-android

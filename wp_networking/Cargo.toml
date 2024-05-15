@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-base64 = { workspace = true }
 http = { workspace = true }
 reqwest = { version = "0.12", features = ["blocking"] }
 wp_api = { path = "../wp_api" }
@@ -12,6 +11,8 @@ wp_api = { path = "../wp_api" }
 [dev-dependencies]
 chrono = { version = "0.4" }
 futures = "0.3"
+rstest = { workspace = true }
+rstest_reuse = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { version = "0.7", features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
 tokio = { version = "1.37", features = [ "full" ] }

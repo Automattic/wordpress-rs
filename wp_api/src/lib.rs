@@ -28,6 +28,14 @@ pub struct WPApiHelper {
 }
 
 #[uniffi::export]
+fn wp_authentication_from_username_and_password(
+    username: String,
+    password: String,
+) -> WPAuthentication {
+    WPAuthentication::from_username_and_password(username, password)
+}
+
+#[uniffi::export]
 impl WPApiHelper {
     #[uniffi::constructor]
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
@@ -87,6 +95,24 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_list_users_request(
+        &self,
+        context: WPContext,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
@@ -96,10 +122,45 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_retrieve_user_request(
+        &self,
+        user_id: UserId,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_retrieve(user_id, context, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.users.retrieve_me(context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn filter_retrieve_current_user_request(
+        &self,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .users
+                .filter_retrieve_me(context, fields)
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -210,6 +271,15 @@ impl WPContext {
 pub enum WPAuthentication {
     AuthorizationHeader { token: String },
     None,
+}
+
+impl WPAuthentication {
+    pub fn from_username_and_password(username: String, password: String) -> Self {
+        use base64::prelude::*;
+        WPAuthentication::AuthorizationHeader {
+            token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
+        }
+    }
 }
 
 #[derive(uniffi::Enum)]

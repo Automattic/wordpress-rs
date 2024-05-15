@@ -80,6 +80,72 @@ steps:
           echo "--- :swift: Swiftlint"
           make lint-swift
   #
+  # Kotlin Group
+  - group: ":kotlin: Kotlin Wrapper"
+    key: "kotlin"
+    steps:
+      - label: ":kotlin: Detekt"
+        key: "kotlin-detekt"
+        plugins: *common_plugins
+        artifact_paths:
+          - "**/build/reports/detekt/detekt.html"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+          make setup-rust-android-targets
+
+          echo "--- 🧹 Linting"
+
+          # This is a temporary step until we implement a more graceful way to handle missing credentials
+          printf "site_url\nadmin_username\nadmin_password\nsubscriber_username\nsubscriber_password\n" > test_credentials
+
+          cd ./native/kotlin
+          ./gradlew detektMain detektTest
+        agents:
+          queue: android
+      - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
+        key: "publish-wp-api-kotlin"
+        plugins: *common_plugins
+        depends_on:
+          - "kotlin-detekt"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
+          .buildkite/publish-wp-api-kotlin.sh
+        agents:
+          queue: android
+      - label: ":kotlin: Publish `rs.wordpress.api:android`"
+        key: "publish-wp-api-android"
+        plugins: *common_plugins
+        depends_on:
+          - "publish-wp-api-kotlin"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+          make setup-rust-android-targets
+
+          echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
+          .buildkite/publish-wp-api-android.sh
+        agents:
+          queue: android
+  #
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
