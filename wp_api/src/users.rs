@@ -3,79 +3,69 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
-use crate::{parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPNetworkResponse};
+use crate::{parse_wp_response, WPApiError, WPApiParamOrder, WPNetworkResponse};
 
 #[uniffi::export]
 pub fn parse_filter_users_response(
     response: &WPNetworkResponse,
 ) -> Result<Vec<SparseUser>, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_filter_retrieve_user_response(
     response: &WPNetworkResponse,
 ) -> Result<SparseUser, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_list_users_response_with_edit_context(
     response: &WPNetworkResponse,
 ) -> Result<Vec<UserWithEditContext>, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_list_users_response_with_embed_context(
     response: &WPNetworkResponse,
 ) -> Result<Vec<UserWithEmbedContext>, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_list_users_response_with_view_context(
     response: &WPNetworkResponse,
 ) -> Result<Vec<UserWithViewContext>, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_edit_context(
     response: &WPNetworkResponse,
 ) -> Result<UserWithEditContext, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_embed_context(
     response: &WPNetworkResponse,
 ) -> Result<UserWithEmbedContext, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_retrieve_user_response_with_view_context(
     response: &WPNetworkResponse,
 ) -> Result<UserWithViewContext, WPApiError> {
-    parse_users_response(response)
+    parse_wp_response(response)
 }
 
 #[uniffi::export]
 pub fn parse_delete_user_response(
     response: &WPNetworkResponse,
 ) -> Result<UserDeleteResponse, WPApiError> {
-    parse_users_response(response)
-}
-
-pub fn parse_users_response<'de, T: Deserialize<'de>>(
-    response: &'de WPNetworkResponse,
-) -> Result<T, WPApiError> {
-    parse_response_for_generic_errors(response)?;
-    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-        reason: err.to_string(),
-        response: String::from_utf8_lossy(&response.body).to_string(),
-    })
+    parse_wp_response(response)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
