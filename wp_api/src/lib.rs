@@ -443,7 +443,7 @@ macro_rules! add_uniffi_exported_parser {
 }
 
 #[macro_export]
-macro_rules! modified {
+macro_rules! generate {
     ($type_name:ident) => {
         $type_name::default()
     };

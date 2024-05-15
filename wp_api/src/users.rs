@@ -420,27 +420,27 @@ impl SparseUserField {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modified;
+    use crate::generate;
     use rstest::*;
 
     #[rstest]
     #[case(UserListParams::default(), &[])]
-    #[case(modified!(UserListParams, (page, Some(1))), &[("page", "1")])]
-    #[case(modified!(UserListParams, (page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
-    #[case(modified!(UserListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
-    #[case(modified!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
-    #[case(modified!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
-    #[case(modified!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
-    #[case(modified!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
-    #[case(modified!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
-    #[case(modified!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
-    #[case(modified!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
-    #[case(modified!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
-    #[case(modified!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
-    #[case(modified!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
-    #[case::who_all_param_should_be_empty(modified!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
-    #[case(modified!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
-    #[case(modified!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[case(generate!(UserListParams, (page, Some(1))), &[("page", "1")])]
+    #[case(generate!(UserListParams, (page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
+    #[case(generate!(UserListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(generate!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
+    #[case(generate!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
+    #[case(generate!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
+    #[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(generate!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
+    #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
+    #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
+    #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
+    #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
+    #[case(generate!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case(generate!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
     #[trace]
     fn test_user_list_params(
         #[case] params: UserListParams,
