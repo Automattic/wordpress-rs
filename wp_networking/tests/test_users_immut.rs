@@ -1,8 +1,8 @@
 use rstest::*;
 use rstest_reuse::{self, apply, template};
 use wp_api::{
-    user_list_params, SparseUser, SparseUserField, UserListParams, WPApiParamOrder,
-    WPApiParamUsersOrderBy, WPApiParamUsersWho, WPContext,
+    modified, SparseUser, SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy,
+    WPApiParamUsersWho, WPContext,
 };
 
 use crate::test_helpers::{
@@ -54,23 +54,23 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 }
 
 #[rstest]
-#[case(user_list_params!())]
-#[case(user_list_params!((page, Some(1))))]
-#[case(user_list_params!((page, Some(2)), (per_page, Some(5))))]
-#[case(user_list_params!((search, Some("foo".to_string()))))]
-#[case(user_list_params!((exclude, vec![FIRST_USER_ID, SECOND_USER_ID])))]
-#[case(user_list_params!((include, vec![FIRST_USER_ID])))]
-#[case(user_list_params!((per_page, Some(100)), (offset, Some(20))))]
-#[case(user_list_params!((order, Some(WPApiParamOrder::Asc))))]
-#[case(user_list_params!((orderby, Some(WPApiParamUsersOrderBy::Id))))]
-#[case(user_list_params!((order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))))]
-#[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()])))]
-#[case(user_list_params!((roles, vec!["author".to_string(), "editor".to_string()])))]
-#[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])))]
-#[case(user_list_params!((capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])))]
-#[case::who_all_param_should_be_empty(user_list_params!((who, Some(WPApiParamUsersWho::All))))]
-#[case(user_list_params!((who, Some(WPApiParamUsersWho::Authors))))]
-#[case(user_list_params!((has_published_posts, Some(true))))]
+#[case(UserListParams::default())]
+#[case(modified!(UserListParams, (page, Some(1))))]
+#[case(modified!(UserListParams, (page, Some(2)), (per_page, Some(5))))]
+#[case(modified!(UserListParams, (search, Some("foo".to_string()))))]
+#[case(modified!(UserListParams, (exclude, vec![FIRST_USER_ID, SECOND_USER_ID])))]
+#[case(modified!(UserListParams, (include, vec![FIRST_USER_ID])))]
+#[case(modified!(UserListParams, (per_page, Some(100)), (offset, Some(20))))]
+#[case(modified!(UserListParams, (order, Some(WPApiParamOrder::Asc))))]
+#[case(modified!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))))]
+#[case(modified!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))))]
+#[case(modified!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
+#[case(modified!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])))]
+#[case(modified!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])))]
+#[case(modified!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])))]
+#[case::who_all_param_should_be_empty(modified!(UserListParams, (who, Some(WPApiParamUsersWho::All))))]
+#[case(modified!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))))]
+#[case(modified!(UserListParams, (has_published_posts, Some(true))))]
 #[trace]
 #[tokio::test]
 async fn test_user_list_params_parametrized(

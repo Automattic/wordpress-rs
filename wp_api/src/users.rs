@@ -417,41 +417,30 @@ impl SparseUserField {
     }
 }
 
-#[macro_export]
-macro_rules! user_list_params {
-    () => {
-        UserListParams::default()
-    };
-    ($(($f:ident, $v:expr)), *) => {{
-        let mut params = UserListParams::default();
-        $(params.$f = $v;)*
-        params
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modified;
     use rstest::*;
 
     #[rstest]
-    #[case(user_list_params!(), &[])]
-    #[case(user_list_params!((page, Some(1))), &[("page", "1")])]
-    #[case(user_list_params!((page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
-    #[case(user_list_params!((search, Some("foo".to_string()))), &[("search", "foo")])]
-    #[case(user_list_params!((exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
-    #[case(user_list_params!((include, vec![UserId(1)])), &[("include", "1")])]
-    #[case(user_list_params!((per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
-    #[case(user_list_params!((order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
-    #[case(user_list_params!((orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
-    #[case(user_list_params!((order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
-    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
-    #[case(user_list_params!((roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
-    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
-    #[case(user_list_params!((capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
-    #[case::who_all_param_should_be_empty(user_list_params!((who, Some(WPApiParamUsersWho::All))), &[])]
-    #[case(user_list_params!((who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
-    #[case(user_list_params!((has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[case(UserListParams::default(), &[])]
+    #[case(modified!(UserListParams, (page, Some(1))), &[("page", "1")])]
+    #[case(modified!(UserListParams, (page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
+    #[case(modified!(UserListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(modified!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
+    #[case(modified!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
+    #[case(modified!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
+    #[case(modified!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(modified!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(modified!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(modified!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
+    #[case(modified!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
+    #[case(modified!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
+    #[case(modified!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
+    #[case::who_all_param_should_be_empty(modified!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
+    #[case(modified!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case(modified!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
     #[trace]
     fn test_user_list_params(
         #[case] params: UserListParams,
