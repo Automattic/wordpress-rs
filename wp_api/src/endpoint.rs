@@ -93,27 +93,30 @@ mod tests {
 
     #[test]
     fn append_url() {
-        let url = Url::parse("https://foo.com").unwrap();
-        assert_eq!(url.append("bar").unwrap().as_str(), "https://foo.com/bar");
+        let url = Url::parse("https://example.com").unwrap();
+        assert_eq!(
+            url.append("bar").unwrap().as_str(),
+            "https://example.com/bar"
+        );
     }
 
     #[test]
     fn extend_url() {
-        let url = Url::parse("https://foo.com").unwrap();
+        let url = Url::parse("https://example.com").unwrap();
         assert_eq!(
             url.extend(["bar", "baz"]).unwrap().as_str(),
-            "https://foo.com/bar/baz"
+            "https://example.com/bar/baz"
         );
     }
 
     #[rstest]
     fn api_base_url(
         #[values(
-            "http://foo.com",
-            "https://foo.com",
-            "https://www.foo.com",
-            "https://f.foo.com",
-            "https://foo.com/f"
+            "http://example.com",
+            "https://example.com",
+            "https://www.example.com",
+            "https://f.example.com",
+            "https://example.com/f"
         )]
         test_base_url: &str,
     ) {
@@ -140,7 +143,7 @@ mod tests {
 
     #[fixture]
     pub fn fixture_api_base_url() -> ApiBaseUrl {
-        ApiBaseUrl::new("https://foo.com").unwrap()
+        ApiBaseUrl::new("https://example.com").unwrap()
     }
 
     pub fn validate_endpoint(endpoint_url: Url, path: &str) {
