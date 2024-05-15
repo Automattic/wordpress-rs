@@ -1,39 +1,20 @@
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
-use crate::{parse_response_for_generic_errors, WPApiError, WPNetworkResponse};
+use crate::{add_uniffi_exported_parser, parse_wp_response, WPApiError, WPNetworkResponse};
 
-#[uniffi::export]
-pub fn parse_list_plugins_response_with_edit_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<PluginWithEditContext>, WPApiError> {
-    parse_plugins_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_plugins_response_with_embed_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<PluginWithEmbedContext>, WPApiError> {
-    parse_plugins_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_plugins_response_with_view_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<PluginWithViewContext>, WPApiError> {
-    parse_plugins_response(response)
-}
-
-// TODO: Duplicate
-pub fn parse_plugins_response<'de, T: Deserialize<'de>>(
-    response: &'de WPNetworkResponse,
-) -> Result<T, WPApiError> {
-    parse_response_for_generic_errors(response)?;
-    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-        reason: err.to_string(),
-        response: String::from_utf8_lossy(&response.body).to_string(),
-    })
-}
+add_uniffi_exported_parser!(
+    parse_list_plugins_response_with_edit_context,
+    Vec<PluginWithEditContext>
+);
+add_uniffi_exported_parser!(
+    parse_list_plugins_response_with_embed_context,
+    Vec<PluginWithEmbedContext>
+);
+add_uniffi_exported_parser!(
+    parse_list_plugins_response_with_view_context,
+    Vec<PluginWithViewContext>
+);
 
 #[derive(Default, Debug, uniffi::Record)]
 pub struct PluginListParams {
