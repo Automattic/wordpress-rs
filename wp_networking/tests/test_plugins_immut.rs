@@ -1,14 +1,14 @@
 use rstest::*;
-use wp_api::{plugin_list_params, plugins::PluginListParams, plugins::PluginStatus, WPContext};
+use wp_api::{modified, plugins::PluginListParams, plugins::PluginStatus, WPContext};
 
 use crate::test_helpers::{api, WPNetworkRequestExecutor};
 
 pub mod test_helpers;
 #[rstest]
-#[case(plugin_list_params!())]
-#[case(plugin_list_params!((search, Some("foo".to_string()))))]
-#[case(plugin_list_params!((status, Some(PluginStatus::Active))))]
-#[case(plugin_list_params!((search, Some("foo".to_string()))))]
+#[case(PluginListParams::default())]
+#[case(modified!(PluginListParams, (search, Some("foo".to_string()))))]
+#[case(modified!(PluginListParams, (status, Some(PluginStatus::Active))))]
+#[case(modified!(PluginListParams, (search, Some("foo".to_string()))))]
 #[trace]
 #[tokio::test]
 async fn test_plugin_list_params_parametrized(

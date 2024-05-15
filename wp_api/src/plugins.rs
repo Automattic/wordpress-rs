@@ -89,29 +89,17 @@ pub struct PluginDescription {
     pub rendered: String,
 }
 
-// TODO: Duplicate
-#[macro_export]
-macro_rules! plugin_list_params {
-    () => {
-        PluginListParams::default()
-    };
-    ($(($f:ident, $v:expr)), *) => {{
-        let mut params = PluginListParams::default();
-        $(params.$f = $v;)*
-        params
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::generate;
     use rstest::*;
 
     #[rstest]
-    #[case(plugin_list_params!(), &[])]
-    #[case(plugin_list_params!((search, Some("foo".to_string()))), &[("search", "foo")])]
-    #[case(plugin_list_params!((status, Some(PluginStatus::Active))), &[("status", "active")])]
-    #[case(plugin_list_params!((search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), &[("search", "foo"), ("status", "inactive")])]
+    #[case(PluginListParams::default(), &[])]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(generate!(PluginListParams, (status, Some(PluginStatus::Active))), &[("status", "active")])]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), &[("search", "foo"), ("status", "inactive")])]
     #[trace]
     fn test_plugin_list_params(
         #[case] params: PluginListParams,
