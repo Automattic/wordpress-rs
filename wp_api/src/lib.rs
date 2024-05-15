@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
+use serde::Deserialize;
 use std::collections::HashMap;
 
 pub use api_error::*;
@@ -388,6 +389,16 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
         })?;
 
     Ok(api_details)
+}
+
+pub fn parse_wp_response<'de, T: Deserialize<'de>>(
+    response: &'de WPNetworkResponse,
+) -> Result<T, WPApiError> {
+    parse_response_for_generic_errors(response)?;
+    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+        reason: err.to_string(),
+        response: String::from_utf8_lossy(&response.body).to_string(),
+    })
 }
 
 pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
