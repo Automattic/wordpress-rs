@@ -15,8 +15,7 @@ class UsersEndpointTest {
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val networkHandler = WpNetworkHandler()
-    private val users = WpUsersEndpoint(networkHandler, apiHelper = WpApiHelper(siteUrl, authentication))
+    private val users = WpApiClient(siteUrl, authentication).users
 
     @Test
     fun testUserListRequest() = runTest {

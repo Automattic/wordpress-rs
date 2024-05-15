@@ -6,10 +6,8 @@ package rs.wordpress.api.android
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
-import rs.wordpress.api.kotlin.WpNetworkHandler
+import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestSuccess
-import rs.wordpress.api.kotlin.WpUsersEndpoint
-import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
 private const val FIRST_USER_EMAIL = "test@example.com"
@@ -21,8 +19,7 @@ class UsersEndpointAndroidTest {
         username = BuildConfig.TEST_ADMIN_USERNAME,
         password = BuildConfig.TEST_ADMIN_PASSWORD
     )
-    private val users =
-        WpUsersEndpoint(WpNetworkHandler(), apiHelper = WpApiHelper(siteUrl, authentication))
+    private val users = WpApiClient(siteUrl, authentication).users
 
     @Test
     fun testUserListRequest() = runTest {

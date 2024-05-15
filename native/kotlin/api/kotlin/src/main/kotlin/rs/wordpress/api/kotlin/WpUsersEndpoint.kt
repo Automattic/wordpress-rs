@@ -1,7 +1,6 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.wp_api.SparseUser
 import uniffi.wp_api.SparseUserField
@@ -27,10 +26,10 @@ import uniffi.wp_api.parseRetrieveUserResponseWithEditContext
 import uniffi.wp_api.parseRetrieveUserResponseWithEmbedContext
 import uniffi.wp_api.parseRetrieveUserResponseWithViewContext
 
-class WpUsersEndpoint(
-    networkHandler: NetworkHandler,
+internal class WpUsersEndpoint(
     apiHelper: WpApiHelper,
-    dispatcher: CoroutineDispatcher = Dispatchers.IO
+    networkHandler: NetworkHandler,
+    dispatcher: CoroutineDispatcher
 ) : UsersEndpoint {
     private val requestHandler = WpRequestHandler(networkHandler, dispatcher)
 
