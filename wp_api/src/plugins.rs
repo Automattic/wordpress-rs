@@ -15,6 +15,18 @@ add_uniffi_exported_parser!(
     parse_list_plugins_response_with_view_context,
     Vec<PluginWithViewContext>
 );
+add_uniffi_exported_parser!(
+    parse_retrieve_plugin_response_with_edit_context,
+    PluginWithEditContext
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_plugin_response_with_embed_context,
+    PluginWithEmbedContext
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_plugin_response_with_view_context,
+    PluginWithViewContext
+);
 
 #[derive(Default, Debug, uniffi::Record)]
 pub struct PluginListParams {
@@ -22,6 +34,14 @@ pub struct PluginListParams {
     pub search: Option<String>,
     /// Limits results to plugins with the given status.
     pub status: Option<PluginStatus>,
+}
+
+#[derive(Serialize, Debug, uniffi::Record)]
+pub struct PluginCreateParams {
+    /// WordPress.org plugin directory slug.
+    pub slug: String,
+    /// The plugin activation status.
+    pub status: PluginStatus,
 }
 
 impl PluginListParams {

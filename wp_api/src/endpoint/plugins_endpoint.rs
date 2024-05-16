@@ -11,6 +11,10 @@ impl PluginsEndpoint {
         Self { api_base_url }
     }
 
+    pub fn create(&self) -> Url {
+        self.api_base_url.by_appending("plugins")
+    }
+
     pub fn list(&self, context: WPContext, params: Option<&PluginListParams>) -> Url {
         let mut url = self.api_base_url.by_appending("plugins");
         url.query_pairs_mut()
@@ -31,6 +35,11 @@ mod tests {
         ApiEndpoint,
     };
     use rstest::*;
+
+    #[rstest]
+    fn create_plugin(plugins_endpoint: PluginsEndpoint) {
+        validate_endpoint(plugins_endpoint.create(), "/plugins");
+    }
 
     #[rstest]
     fn list_plugins_with_params(plugins_endpoint: PluginsEndpoint) {

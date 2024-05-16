@@ -183,7 +183,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Serialize, uniffi::Record)]
+#[derive(Serialize, Debug, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,

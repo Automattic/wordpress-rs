@@ -242,6 +242,15 @@ impl WPApiHelper {
         }
     }
 
+    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.create().into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
     fn header_map(&self) -> HashMap<String, String> {
         let mut header_map = HashMap::new();
         header_map.insert(
