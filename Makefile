@@ -208,7 +208,7 @@ restore-wp-content-plugins:
 	docker exec -it wordpress /bin/bash -c "rm -rf ./wp-content/plugins &&  cp -R /tmp/backup_wp_plugins ./wp-content/plugins"
 
 delete-wp-plugins-backup:
-	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins"
+	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
 lint: lint-rust lint-swift
 
