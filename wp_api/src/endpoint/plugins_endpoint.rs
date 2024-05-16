@@ -56,8 +56,7 @@ mod tests {
     use super::*;
     use crate::{
         endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        plugins::PluginStatus,
-        ApiEndpoint,
+        generate, ApiEndpoint, PluginStatus,
     };
     use rstest::*;
 
@@ -67,39 +66,67 @@ mod tests {
     }
 
     #[rstest]
-    fn delete_plugin(plugins_endpoint: PluginsEndpoint) {
+    #[case("hello-dolly/hello", "/plugins/hello-dolly/hello")]
+    #[case(
+        "classic-editor/classic-editor",
+        "/plugins/classic-editor/classic-editor"
+    )]
+    fn delete_plugin(
+        plugins_endpoint: PluginsEndpoint,
+        #[case] plugin_slug: &str,
+        #[case] expected_path: &str,
+    ) {
+        validate_endpoint(plugins_endpoint.delete(plugin_slug), expected_path);
+    }
+
+    #[rstest]
+    #[case(WPContext::Edit, generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=edit&search=foo")]
+    #[case(WPContext::Embed, generate!(PluginListParams, (status, Some(PluginStatus::Active))), "/plugins?context=embed&status=active")]
+    #[case(WPContext::View, generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "/plugins?context=view&search=foo&status=inactive")]
+    fn list_plugins_with_params(
+        plugins_endpoint: PluginsEndpoint,
+        #[case] context: WPContext,
+        #[case] params: PluginListParams,
+        #[case] expected_path: &str,
+    ) {
+        validate_endpoint(plugins_endpoint.list(context, Some(&params)), expected_path);
+    }
+
+    #[rstest]
+    #[case(
+        "hello-dolly/hello",
+        WPContext::View,
+        "/plugins/hello-dolly/hello?context=view"
+    )]
+    #[case(
+        "classic-editor/classic-editor",
+        WPContext::Embed,
+        "/plugins/classic-editor/classic-editor?context=embed"
+    )]
+    fn retrieve_plugin(
+        plugins_endpoint: PluginsEndpoint,
+        #[case] plugin_slug: &str,
+        #[case] context: WPContext,
+        #[case] expected_path: &str,
+    ) {
         validate_endpoint(
-            plugins_endpoint.delete("hello-dolly/hello"),
-            "/plugins/hello-dolly/hello",
+            plugins_endpoint.retrieve(context, plugin_slug),
+            expected_path,
         );
     }
 
     #[rstest]
-    fn list_plugins_with_params(plugins_endpoint: PluginsEndpoint) {
-        let params = PluginListParams {
-            search: Some("foo".to_string()),
-            status: Some(PluginStatus::Active),
-        };
-        validate_endpoint(
-            plugins_endpoint.list(WPContext::Edit, Some(&params)),
-            "/plugins?context=edit&search=foo&status=active",
-        );
-    }
-
-    #[rstest]
-    fn retrieve_plugin(plugins_endpoint: PluginsEndpoint) {
-        validate_endpoint(
-            plugins_endpoint.retrieve(WPContext::View, "hello-dolly/hello"),
-            "/plugins/hello-dolly/hello?context=view",
-        );
-    }
-
-    #[rstest]
-    fn update_plugin(plugins_endpoint: PluginsEndpoint) {
-        validate_endpoint(
-            plugins_endpoint.update("hello-dolly/hello"),
-            "/plugins/hello-dolly/hello",
-        );
+    #[case("hello-dolly/hello", "/plugins/hello-dolly/hello")]
+    #[case(
+        "classic-editor/classic-editor",
+        "/plugins/classic-editor/classic-editor"
+    )]
+    fn update_plugin(
+        plugins_endpoint: PluginsEndpoint,
+        #[case] plugin_slug: &str,
+        #[case] expected_path: &str,
+    ) {
+        validate_endpoint(plugins_endpoint.update(plugin_slug), expected_path);
     }
 
     #[fixture]

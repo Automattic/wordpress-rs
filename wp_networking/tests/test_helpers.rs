@@ -13,6 +13,7 @@ pub const SECOND_USER_ID: UserId = UserId(2);
 pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 pub const SECOND_USER_SLUG: &str = "themedemos";
 pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
+pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 
 pub fn api() -> WPApiHelper {
     let credentials = read_test_credentials_from_file();

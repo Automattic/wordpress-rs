@@ -1,14 +1,17 @@
 use rstest::*;
 use wp_api::{generate, plugins::PluginListParams, plugins::PluginStatus, WPContext};
 
-use crate::test_helpers::{api, WPNetworkRequestExecutor, WPNetworkResponseParser};
+use crate::test_helpers::{
+    api, WPNetworkRequestExecutor, WPNetworkResponseParser, CLASSIC_EDITOR_PLUGIN_SLUG,
+    HELLO_DOLLY_PLUGIN_SLUG,
+};
 
 pub mod test_helpers;
 #[rstest]
 #[case(PluginListParams::default())]
 #[case(generate!(PluginListParams, (search, Some("foo".to_string()))))]
 #[case(generate!(PluginListParams, (status, Some(PluginStatus::Active))))]
-#[case(generate!(PluginListParams, (search, Some("foo".to_string()))))]
+#[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))))]
 #[trace]
 #[tokio::test]
 async fn test_plugin_list_params_parametrized(
@@ -48,17 +51,26 @@ async fn test_plugin_list_params_parametrized(
     };
 }
 
+#[rstest]
+#[case(CLASSIC_EDITOR_PLUGIN_SLUG)]
+#[case(HELLO_DOLLY_PLUGIN_SLUG)]
+#[trace]
 #[tokio::test]
-async fn retrieve_plugin_with_edit_context() {
+async fn retrieve_plugin_with_edit_context(
+    #[case] plugin_slug: &str,
+    #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
+) {
     let parsed_response = api()
-        .retrieve_plugin_request(WPContext::Edit, "hello-dolly/hello")
+        .retrieve_plugin_request(context, plugin_slug)
         .execute()
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_plugin_response_with_edit_context);
     assert!(
         parsed_response.is_ok(),
-        "Response was: '{:?}'",
+        "Retrievew plugin failed!\nContext: {:?}\nPlugin: {}\nResponse was: '{:?}'",
+        context,
+        plugin_slug,
         parsed_response
     );
 }

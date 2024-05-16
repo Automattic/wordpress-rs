@@ -78,7 +78,6 @@ pub struct SparsePlugin {
     #[WPContext(edit, embed, view)]
     pub name: Option<String>,
     #[WPContext(edit, view)]
-    // TODO: Custom URI type?
     pub plugin_uri: Option<String>,
     #[WPContext(edit, view)]
     pub author: Option<String>,
