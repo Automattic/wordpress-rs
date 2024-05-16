@@ -1,5 +1,5 @@
 use futures::Future;
-use std::{fs::read_to_string, process::Command};
+use std::fs::read_to_string;
 use wp_api::{
     UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
     WPRestError, WPRestErrorCode, WPRestErrorWrapper,
@@ -155,11 +155,12 @@ where
     Fut: Future<Output = ()>,
 {
     f().await;
-    println!("Restoring wp-content/plugins..");
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("restore-wp-content-plugins")
-        .status()
-        .expect("Failed to restore wp-content/plugins");
+    // Temporarily disable the restoration
+    // println!("Restoring wp-content/plugins..");
+    // Command::new("make")
+    //     .arg("-C")
+    //     .arg("../")
+    //     .arg("restore-wp-content-plugins")
+    //     .status()
+    //     .expect("Failed to restore wp-content/plugins");
 }
