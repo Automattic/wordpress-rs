@@ -42,3 +42,7 @@ wp plugin delete wordpress-importer
   ## Create an Application password for a subscriber user, and store it where it can be used by the test suite
   wp user application-password create themedemos test --porcelain
 } >> /tmp/test_credentials
+
+## Used for integration tests
+wp plugin install hello-dolly --activate
+wp plugin install classic-editor
