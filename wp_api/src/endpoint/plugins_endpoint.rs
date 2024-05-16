@@ -25,9 +25,11 @@ impl PluginsEndpoint {
         url
     }
 
-    pub fn retrieve(&self, plugin: String, context: WPContext) -> Url {
-        let mut url = self.plugins_base_url();
-        url.query_pairs_mut().append_key_only(plugin.as_str());
+    pub fn retrieve(&self, context: WPContext, plugin: String) -> Url {
+        let mut url = self
+            .api_base_url
+            // The '/' character in `plugin` has to be preserved
+            .by_extending(["plugins"].into_iter().chain(plugin.split('/')));
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         url
@@ -68,8 +70,8 @@ mod tests {
     #[rstest]
     fn retrieve_plugin(plugins_endpoint: PluginsEndpoint) {
         validate_endpoint(
-            plugins_endpoint.retrieve("hello-dolly/hello".to_string(), WPContext::View),
-            "/plugins?hello-dolly%2Fhello&context=view",
+            plugins_endpoint.retrieve(WPContext::View, "hello-dolly/hello".to_string()),
+            "/plugins/hello-dolly/hello?context=view",
         );
     }
 

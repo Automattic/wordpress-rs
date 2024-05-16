@@ -251,10 +251,10 @@ impl WPApiHelper {
         }
     }
 
-    pub fn retrieve_plugin_request(&self, plugin: String, context: WPContext) -> WPNetworkRequest {
+    pub fn retrieve_plugin_request(&self, context: WPContext, plugin: String) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: self.api_endpoint.plugins.retrieve(plugin, context).into(),
+            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
             header_map: self.header_map(),
             body: None,
         }
