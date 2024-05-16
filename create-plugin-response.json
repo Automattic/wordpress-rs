@@ -1,0 +1,24 @@
+{
+  "plugin": "jetpack/jetpack",
+  "status": "inactive",
+  "name": "Jetpack",
+  "plugin_uri": "https://jetpack.com",
+  "author": "Automattic",
+  "author_uri": "https://jetpack.com",
+  "description": {
+    "raw": "Security, performance, and marketing tools made by WordPress experts. Jetpack keeps your site protected so you can focus on more important things.",
+    "rendered": "Security, performance, and marketing tools made by WordPress experts. Jetpack keeps your site protected so you can focus on more important things. <cite>By <a href=\"https://jetpack.com\">Automattic</a>.</cite>"
+  },
+  "version": "13.4.3",
+  "network_only": false,
+  "requires_wp": "6.4",
+  "requires_php": "7.0",
+  "textdomain": "jetpack",
+  "_links": {
+    "self": [
+      {
+        "href": "http://localhost/wp-json/wp/v2/plugins/jetpack/jetpack"
+      }
+    ]
+  }
+}

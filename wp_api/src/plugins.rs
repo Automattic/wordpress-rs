@@ -27,6 +27,7 @@ add_uniffi_exported_parser!(
     parse_retrieve_plugin_response_with_view_context,
     Vec<PluginWithViewContext>
 );
+add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext);
 
 #[derive(Default, Debug, uniffi::Record)]
 pub struct PluginListParams {

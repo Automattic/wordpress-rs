@@ -20,7 +20,7 @@ async fn create_plugin() {
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::parse_retrieve_plugin_response_with_edit_context)
+                .parse(wp_api::parse_create_plugin_response)
                 .unwrap();
             println!("Created Plugin: {:?}", created_plugin);
         })
