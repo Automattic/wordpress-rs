@@ -251,7 +251,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn retrieve_plugin_request(&self, context: WPContext, plugin: String) -> WPNetworkRequest {
+    pub fn retrieve_plugin_request(&self, context: WPContext, plugin: &str) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
@@ -262,7 +262,7 @@ impl WPApiHelper {
 
     pub fn update_plugin_request(
         &self,
-        plugin: String,
+        plugin: &str,
         params: PluginUpdateParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
@@ -270,6 +270,15 @@ impl WPApiHelper {
             url: self.api_endpoint.plugins.update(plugin).into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn delete_plugin_request(&self, plugin: &str) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: self.api_endpoint.plugins.delete(plugin).into(),
+            header_map: self.header_map(),
+            body: None,
         }
     }
 

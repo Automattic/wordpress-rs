@@ -15,6 +15,10 @@ impl PluginsEndpoint {
         self.plugins_base_url()
     }
 
+    pub fn delete(&self, plugin: &str) -> Url {
+        self.plugins_url_with_slug(plugin)
+    }
+
     pub fn list(&self, context: WPContext, params: Option<&PluginListParams>) -> Url {
         let mut url = self.plugins_base_url();
         url.query_pairs_mut()
@@ -25,14 +29,14 @@ impl PluginsEndpoint {
         url
     }
 
-    pub fn retrieve(&self, context: WPContext, plugin: String) -> Url {
+    pub fn retrieve(&self, context: WPContext, plugin: &str) -> Url {
         let mut url = self.plugins_url_with_slug(plugin);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         url
     }
 
-    pub fn update(&self, plugin: String) -> Url {
+    pub fn update(&self, plugin: &str) -> Url {
         self.plugins_url_with_slug(plugin)
     }
 
@@ -40,7 +44,7 @@ impl PluginsEndpoint {
         self.api_base_url.by_appending("plugins")
     }
 
-    fn plugins_url_with_slug(&self, plugin: String) -> Url {
+    fn plugins_url_with_slug(&self, plugin: &str) -> Url {
         self.api_base_url
             // The '/' character has to be preserved and not get encoded
             .by_extending(["plugins"].into_iter().chain(plugin.split('/')))
@@ -63,6 +67,14 @@ mod tests {
     }
 
     #[rstest]
+    fn delete_plugin(plugins_endpoint: PluginsEndpoint) {
+        validate_endpoint(
+            plugins_endpoint.delete("hello-dolly/hello"),
+            "/plugins/hello-dolly/hello",
+        );
+    }
+
+    #[rstest]
     fn list_plugins_with_params(plugins_endpoint: PluginsEndpoint) {
         let params = PluginListParams {
             search: Some("foo".to_string()),
@@ -77,8 +89,16 @@ mod tests {
     #[rstest]
     fn retrieve_plugin(plugins_endpoint: PluginsEndpoint) {
         validate_endpoint(
-            plugins_endpoint.retrieve(WPContext::View, "hello-dolly/hello".to_string()),
+            plugins_endpoint.retrieve(WPContext::View, "hello-dolly/hello"),
             "/plugins/hello-dolly/hello?context=view",
+        );
+    }
+
+    #[rstest]
+    fn update_plugin(plugins_endpoint: PluginsEndpoint) {
+        validate_endpoint(
+            plugins_endpoint.update("hello-dolly/hello"),
+            "/plugins/hello-dolly/hello",
         );
     }
 

@@ -51,7 +51,7 @@ async fn test_plugin_list_params_parametrized(
 #[tokio::test]
 async fn retrieve_plugin_with_edit_context() {
     let parsed_response = api()
-        .retrieve_plugin_request(WPContext::Edit, "hello-dolly/hello".to_string())
+        .retrieve_plugin_request(WPContext::Edit, "hello-dolly/hello")
         .execute()
         .await
         .unwrap()

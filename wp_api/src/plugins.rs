@@ -29,6 +29,7 @@ add_uniffi_exported_parser!(
 );
 add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext);
 add_uniffi_exported_parser!(parse_update_plugin_response, PluginWithEditContext);
+add_uniffi_exported_parser!(parse_delete_plugin_response, PluginDeleteResponse);
 
 #[derive(Default, Debug, uniffi::Record)]
 pub struct PluginListParams {
@@ -91,6 +92,12 @@ pub struct SparsePlugin {
     pub requires_php: Option<String>,
     #[WPContext(edit, view)]
     pub textdomain: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct PluginDeleteResponse {
+    pub deleted: bool,
+    pub previous: PluginWithEditContext,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, uniffi::Enum)]
