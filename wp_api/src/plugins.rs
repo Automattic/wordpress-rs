@@ -28,6 +28,7 @@ add_uniffi_exported_parser!(
     PluginWithViewContext
 );
 add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext);
+add_uniffi_exported_parser!(parse_update_plugin_response, PluginWithEditContext);
 
 #[derive(Default, Debug, uniffi::Record)]
 pub struct PluginListParams {
@@ -49,12 +50,22 @@ impl PluginListParams {
     }
 }
 
-#[derive(Serialize, Debug, uniffi::Record)]
+#[derive(Debug, Serialize, uniffi::Record)]
 pub struct PluginCreateParams {
     /// WordPress.org plugin directory slug.
     pub slug: String,
     /// The plugin activation status.
     pub status: PluginStatus,
+}
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct PluginUpdateParams {
+    /// The plugin activation status.
+    pub status: PluginStatus,
+    // According to the documentation: https://developer.wordpress.org/rest-api/reference/plugins/#update-a-plugin
+    // There is supposed to be a `context` parameter as well, but this parameter doesn't seem to
+    // modify the response fields as promised in the documentation.
+    // In order to avoid confusion, this parameter is not included in this implementation.
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]

@@ -26,22 +26,24 @@ impl PluginsEndpoint {
     }
 
     pub fn retrieve(&self, context: WPContext, plugin: String) -> Url {
-        let mut url = self
-            .api_base_url
-            // The '/' character in `plugin` has to be preserved
-            .by_extending(["plugins"].into_iter().chain(plugin.split('/')));
+        let mut url = self.plugins_url_with_slug(plugin);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         url
     }
 
-    pub fn update(&self, context: WPContext, plugin: String) -> Url {
-        // Retrieve & update has the same url (GET vs POST request)
-        self.retrieve(context, plugin)
+    pub fn update(&self, plugin: String) -> Url {
+        self.plugins_url_with_slug(plugin)
     }
 
     fn plugins_base_url(&self) -> Url {
         self.api_base_url.by_appending("plugins")
+    }
+
+    fn plugins_url_with_slug(&self, plugin: String) -> Url {
+        self.api_base_url
+            // The '/' character has to be preserved and not get encoded
+            .by_extending(["plugins"].into_iter().chain(plugin.split('/')))
     }
 }
 
