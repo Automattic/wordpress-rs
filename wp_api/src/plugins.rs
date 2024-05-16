@@ -37,14 +37,6 @@ pub struct PluginListParams {
     pub status: Option<PluginStatus>,
 }
 
-#[derive(Serialize, Debug, uniffi::Record)]
-pub struct PluginCreateParams {
-    /// WordPress.org plugin directory slug.
-    pub slug: String,
-    /// The plugin activation status.
-    pub status: PluginStatus,
-}
-
 impl PluginListParams {
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [
@@ -55,6 +47,14 @@ impl PluginListParams {
         // Remove `None` values
         .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
     }
+}
+
+#[derive(Serialize, Debug, uniffi::Record)]
+pub struct PluginCreateParams {
+    /// WordPress.org plugin directory slug.
+    pub slug: String,
+    /// The plugin activation status.
+    pub status: PluginStatus,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]

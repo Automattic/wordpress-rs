@@ -35,6 +35,11 @@ impl PluginsEndpoint {
         url
     }
 
+    pub fn update(&self, context: WPContext, plugin: String) -> Url {
+        // Retrieve & update has the same url (GET vs POST request)
+        self.retrieve(context, plugin)
+    }
+
     fn plugins_base_url(&self) -> Url {
         self.api_base_url.by_appending("plugins")
     }

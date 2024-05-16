@@ -260,6 +260,20 @@ impl WPApiHelper {
         }
     }
 
+    pub fn update_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: String,
+        status: PluginStatus,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.update(context, plugin).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&status).ok(),
+        }
+    }
+
     fn header_map(&self) -> HashMap<String, String> {
         let mut header_map = HashMap::new();
         header_map.insert(
