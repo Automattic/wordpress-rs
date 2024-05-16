@@ -201,6 +201,12 @@ dump-mysql:
 restore-mysql:
 	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
 
+backup-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "mkdir -p backup_plugins && cp -a ./wp-content/plugins/. ./backup_plugins"
+
+restore-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "rm -r ./wp-content/plugins/* &&  cp -a ./backup_plugins ./wp-content/plugins/."
+
 lint: lint-rust lint-swift
 
 lint-rust:

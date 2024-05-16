@@ -1,4 +1,5 @@
-use std::fs::read_to_string;
+use futures::Future;
+use std::{fs::read_to_string, process::Command};
 use wp_api::{
     UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
     WPRestError, WPRestErrorCode, WPRestErrorWrapper,
@@ -146,4 +147,19 @@ fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> 
         WPRestErrorCode::UserInvalidSlug => 400,
         WPRestErrorCode::UserInvalidUsername => 400,
     }
+}
+
+pub async fn run_and_restore_wp_content_plugins<F, Fut>(f: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = ()>,
+{
+    f().await;
+    println!("Restoring wp-content/plugins..");
+    Command::new("make")
+        .arg("-C")
+        .arg("../")
+        .arg("restore-wp-content-plugins")
+        .status()
+        .expect("Failed to restore wp-content/plugins");
 }
