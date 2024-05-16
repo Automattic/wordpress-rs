@@ -117,11 +117,6 @@ impl PluginStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct PluginAuthor {
-    pub name: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PluginDescription {
     pub raw: String,
     pub rendered: String,

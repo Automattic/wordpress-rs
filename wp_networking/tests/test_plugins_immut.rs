@@ -7,6 +7,7 @@ use crate::test_helpers::{
 };
 
 pub mod test_helpers;
+
 #[rstest]
 #[case(PluginListParams::default())]
 #[case(generate!(PluginListParams, (search, Some("foo".to_string()))))]
@@ -68,7 +69,7 @@ async fn retrieve_plugin_with_edit_context(
         .parse(wp_api::parse_retrieve_plugin_response_with_edit_context);
     assert!(
         parsed_response.is_ok(),
-        "Retrievew plugin failed!\nContext: {:?}\nPlugin: {}\nResponse was: '{:?}'",
+        "Retrieve plugin failed!\nContext: {:?}\nPlugin: {}\nResponse was: '{:?}'",
         context,
         plugin_slug,
         parsed_response
