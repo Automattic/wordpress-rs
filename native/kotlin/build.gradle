@@ -11,6 +11,7 @@ ext {
     androidxTestRulesVersion = '1.5.0'
     jnaVersion = '5.13.0'
     junitVersion = '4.13.2'
+    kotlinxCoroutinesVersion = '1.8.1'
 
     cargoProjectRoot = "${project.rootDir}/../.."
     wpApiKotlinProjectDependency = project.hasProperty("wpApiKotlinVersion") ? "rs.wordpress.api:kotlin:${project.getProperty("wpApiKotlinVersion")}" : project(":api:kotlin")

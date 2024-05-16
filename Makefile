@@ -74,6 +74,8 @@ else
 CARGO_PROFILE ?= dev
 endif
 
+cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'profile.$(CARGO_PROFILE).panic="abort"'
+
 # Set deployment targets for each platform
 _build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
 _build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
@@ -86,7 +88,7 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 
 # Build the library for a specific target
 _build-apple-%: xcframework-headers
-	cargo $(CARGO_OPTS) build --target $* --package wp_api --profile $(CARGO_PROFILE)
+	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
 
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))

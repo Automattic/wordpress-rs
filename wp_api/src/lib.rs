@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
+use serde::Deserialize;
 use std::collections::HashMap;
 
 pub use api_error::*;
@@ -17,6 +18,9 @@ pub mod pages;
 pub mod posts;
 pub mod url;
 pub mod users;
+
+#[cfg(test)]
+mod test_helpers;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 
@@ -390,6 +394,16 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     Ok(api_details)
 }
 
+pub fn parse_wp_response<'de, T: Deserialize<'de>>(
+    response: &'de WPNetworkResponse,
+) -> Result<T, WPApiError> {
+    parse_response_for_generic_errors(response)?;
+    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+        reason: err.to_string(),
+        response: String::from_utf8_lossy(&response.body).to_string(),
+    })
+}
+
 pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
     let response_str = String::from_utf8_lossy(&response.body).to_string();
     // TODO: Further parse the response body to include error message
@@ -419,6 +433,28 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     }
 
     None
+}
+
+#[macro_export]
+macro_rules! add_uniffi_exported_parser {
+    ($fn_name:ident, $return_type: ty) => {
+        #[uniffi::export]
+        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
+            parse_wp_response(response)
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! generate {
+    ($type_name:ident) => {
+        $type_name::default()
+    };
+    ($type_name:ident, $(($f:ident, $v:expr)), *) => {{
+        let mut obj = $type_name::default();
+        $(obj.$f = $v;)*
+        obj
+    }};
 }
 
 uniffi::setup_scaffolding!();
