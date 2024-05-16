@@ -24,6 +24,15 @@ impl PluginsEndpoint {
         }
         url
     }
+
+    pub fn retrieve(&self, plugin: String, context: WPContext) -> Url {
+        let mut url = self
+            .api_base_url
+            .by_extending(["plugins", format!("{}?", plugin).as_str()]);
+        url.query_pairs_mut()
+            .append_pair("context", context.as_str());
+        url
+    }
 }
 
 #[cfg(test)]
@@ -50,6 +59,14 @@ mod tests {
         validate_endpoint(
             plugins_endpoint.list(WPContext::Edit, Some(&params)),
             "/plugins?context=edit&search=foo&status=active",
+        );
+    }
+
+    #[rstest]
+    fn retrieve_user(plugins_endpoint: PluginsEndpoint) {
+        validate_endpoint(
+            plugins_endpoint.retrieve("foo".to_string(), WPContext::View),
+            "/plugins/foo%3F?context=view",
         );
     }
 

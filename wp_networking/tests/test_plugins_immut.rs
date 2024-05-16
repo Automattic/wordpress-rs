@@ -1,7 +1,7 @@
 use rstest::*;
 use wp_api::{generate, plugins::PluginListParams, plugins::PluginStatus, WPContext};
 
-use crate::test_helpers::{api, WPNetworkRequestExecutor};
+use crate::test_helpers::{api, WPNetworkRequestExecutor, WPNetworkResponseParser};
 
 pub mod test_helpers;
 #[rstest]
@@ -46,4 +46,19 @@ async fn test_plugin_list_params_parametrized(
             );
         }
     };
+}
+
+#[tokio::test]
+async fn retrieve_plugin_with_edit_context() {
+    let parsed_response = api()
+        .retrieve_plugin_request("hello".to_string(), WPContext::Edit)
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_plugin_response_with_edit_context);
+    assert!(
+        parsed_response.is_ok(),
+        "Response was: '{:?}'",
+        parsed_response
+    );
 }

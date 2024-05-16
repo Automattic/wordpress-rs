@@ -251,6 +251,15 @@ impl WPApiHelper {
         }
     }
 
+    pub fn retrieve_plugin_request(&self, plugin: String, context: WPContext) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_endpoint.plugins.retrieve(plugin, context).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     fn header_map(&self) -> HashMap<String, String> {
         let mut header_map = HashMap::new();
         header_map.insert(
