@@ -17,15 +17,15 @@ add_uniffi_exported_parser!(
 );
 add_uniffi_exported_parser!(
     parse_retrieve_plugin_response_with_edit_context,
-    PluginWithEditContext
+    Vec<PluginWithEditContext>
 );
 add_uniffi_exported_parser!(
     parse_retrieve_plugin_response_with_embed_context,
-    PluginWithEmbedContext
+    Vec<PluginWithEmbedContext>
 );
 add_uniffi_exported_parser!(
     parse_retrieve_plugin_response_with_view_context,
-    PluginWithViewContext
+    Vec<PluginWithViewContext>
 );
 
 #[derive(Default, Debug, uniffi::Record)]

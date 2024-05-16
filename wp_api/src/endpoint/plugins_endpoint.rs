@@ -12,11 +12,11 @@ impl PluginsEndpoint {
     }
 
     pub fn create(&self) -> Url {
-        self.api_base_url.by_appending("plugins")
+        self.plugins_base_url()
     }
 
     pub fn list(&self, context: WPContext, params: Option<&PluginListParams>) -> Url {
-        let mut url = self.api_base_url.by_appending("plugins");
+        let mut url = self.plugins_base_url();
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         if let Some(params) = params {
@@ -26,12 +26,15 @@ impl PluginsEndpoint {
     }
 
     pub fn retrieve(&self, plugin: String, context: WPContext) -> Url {
-        let mut url = self
-            .api_base_url
-            .by_extending(["plugins", format!("{}?", plugin).as_str()]);
+        let mut url = self.plugins_base_url();
+        url.query_pairs_mut().append_key_only(plugin.as_str());
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         url
+    }
+
+    fn plugins_base_url(&self) -> Url {
+        self.api_base_url.by_appending("plugins")
     }
 }
 
@@ -63,10 +66,10 @@ mod tests {
     }
 
     #[rstest]
-    fn retrieve_user(plugins_endpoint: PluginsEndpoint) {
+    fn retrieve_plugin(plugins_endpoint: PluginsEndpoint) {
         validate_endpoint(
-            plugins_endpoint.retrieve("foo".to_string(), WPContext::View),
-            "/plugins/foo%3F?context=view",
+            plugins_endpoint.retrieve("hello-dolly/hello".to_string(), WPContext::View),
+            "/plugins?hello-dolly%2Fhello&context=view",
         );
     }
 
