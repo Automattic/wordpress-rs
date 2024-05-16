@@ -1,0 +1,24 @@
+{
+  "plugin": "hello-dolly/hello",
+  "status": "active",
+  "name": "Hello Dolly",
+  "plugin_uri": "http://wordpress.org/plugins/hello-dolly/",
+  "author": "Matt Mullenweg",
+  "author_uri": "http://ma.tt/",
+  "description": {
+    "raw": "This is not just a plugin, it symbolizes the hope and enthusiasm of an entire generation summed up in two words sung most famously by Louis Armstrong: Hello, Dolly. When activated you will randomly see a lyric from Hello, Dolly in the upper right of your admin screen on every page.",
+    "rendered": "This is not just a plugin, it symbolizes the hope and enthusiasm of an entire generation summed up in two words sung most famously by Louis Armstrong: Hello, Dolly. When activated you will randomly see a lyric from Hello, Dolly in the upper right of your admin screen on every page. <cite>By <a href=\"http://ma.tt/\">Matt Mullenweg</a>.</cite>"
+  },
+  "version": "1.7.2",
+  "network_only": false,
+  "requires_wp": "",
+  "requires_php": "",
+  "textdomain": "hello-dolly",
+  "_links": {
+    "self": [
+      {
+        "href": "http://localhost/wp-json/wp/v2/plugins/hello-dolly/hello"
+      }
+    ]
+  }
+}
