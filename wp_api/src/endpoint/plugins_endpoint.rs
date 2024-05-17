@@ -71,6 +71,8 @@ mod tests {
         "classic-editor/classic-editor",
         "/plugins/classic-editor/classic-editor"
     )]
+    #[case("foo/bar%baz", "/plugins/foo/bar%25baz")]
+    #[case("foo/です", "/plugins/foo/%E3%81%A7%E3%81%99")]
     fn delete_plugin(
         plugins_endpoint: PluginsEndpoint,
         #[case] plugin_slug: &str,
@@ -103,6 +105,12 @@ mod tests {
         WPContext::Embed,
         "/plugins/classic-editor/classic-editor?context=embed"
     )]
+    #[case("foo/bar%baz", WPContext::Edit, "/plugins/foo/bar%25baz?context=edit")]
+    #[case(
+        "foo/です",
+        WPContext::View,
+        "/plugins/foo/%E3%81%A7%E3%81%99?context=view"
+    )]
     fn retrieve_plugin(
         plugins_endpoint: PluginsEndpoint,
         #[case] plugin_slug: &str,
@@ -121,6 +129,8 @@ mod tests {
         "classic-editor/classic-editor",
         "/plugins/classic-editor/classic-editor"
     )]
+    #[case("foo/bar%baz", "/plugins/foo/bar%25baz")]
+    #[case("foo/です", "/plugins/foo/%E3%81%A7%E3%81%99")]
     fn update_plugin(
         plugins_endpoint: PluginsEndpoint,
         #[case] plugin_slug: &str,
