@@ -12,7 +12,7 @@ pub mod wp_db;
 async fn create_user() {
     wp_db::run_and_restore(|mut db| async move {
         let username = "t_username";
-        let email = "t_email@foo.com";
+        let email = "t_email@example.com";
         let password = "t_password";
 
         // Create a user using the API
@@ -121,7 +121,7 @@ async fn update_user_last_name() {
 
 #[tokio::test]
 async fn update_user_email() {
-    let new_email = "new_email@foo.com";
+    let new_email = "new_email@example.com";
     let mut params = UserUpdateParams::default();
     params.email = Some(new_email.to_string());
     test_update_user(params, |user, _| {
