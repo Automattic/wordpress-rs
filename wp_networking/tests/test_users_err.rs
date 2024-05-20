@@ -321,7 +321,7 @@ async fn delete_user_err_trash_not_supported() {
 fn valid_user_create_params() -> UserCreateParams {
     UserCreateParams::new(
         "t_username".to_string(),
-        "t_email@foo.com".to_string(),
+        "t_email@example.com".to_string(),
         "t_password".to_string(),
     )
 }
