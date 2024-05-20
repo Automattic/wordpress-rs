@@ -1,5 +1,5 @@
 use rstest::*;
-use wp_api::{generate, plugins::PluginListParams, plugins::PluginStatus, WPContext};
+use wp_api::{generate, plugins::PluginListParams, plugins::PluginStatus, PluginSlug, WPContext};
 
 use crate::test_helpers::{
     api, WPNetworkRequestExecutor, WPNetworkResponseParser, CLASSIC_EDITOR_PLUGIN_SLUG,
@@ -53,24 +53,24 @@ async fn test_plugin_list_params_parametrized(
 }
 
 #[rstest]
-#[case(CLASSIC_EDITOR_PLUGIN_SLUG, "WordPress Contributors")]
-#[case(HELLO_DOLLY_PLUGIN_SLUG, "Matt Mullenweg")]
+#[case(CLASSIC_EDITOR_PLUGIN_SLUG.into(), "WordPress Contributors")]
+#[case(HELLO_DOLLY_PLUGIN_SLUG.into(), "Matt Mullenweg")]
 #[trace]
 #[tokio::test]
-async fn retrieve_plugin(
-    #[case] plugin_slug: &str,
+async fn retrieve_plugin_with_edit_context(
+    #[case] plugin_slug: PluginSlug,
     #[case] expected_author: &str,
     #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
 ) {
     let parsed_response = api()
-        .retrieve_plugin_request(context, plugin_slug)
+        .retrieve_plugin_request(context, &plugin_slug)
         .execute()
         .await
         .unwrap()
         .parse(wp_api::parse_retrieve_plugin_response_with_edit_context);
     assert!(
         parsed_response.is_ok(),
-        "Retrieve plugin failed!\nContext: {:?}\nPlugin: {}\nResponse was: '{:?}'",
+        "Retrieve plugin failed!\nContext: {:?}\nPlugin: {:?}\nResponse was: '{:?}'",
         context,
         plugin_slug,
         parsed_response

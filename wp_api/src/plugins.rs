@@ -54,7 +54,7 @@ impl PluginListParams {
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct PluginCreateParams {
     /// WordPress.org plugin directory slug.
-    pub slug: String,
+    pub slug: PluginWpOrgDirectorySlug,
     /// The plugin activation status.
     pub status: PluginStatus,
 }
@@ -72,7 +72,7 @@ pub struct PluginUpdateParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparsePlugin {
     #[WPContext(edit, embed, view)]
-    pub plugin: Option<String>,
+    pub plugin: Option<PluginSlug>,
     #[WPContext(edit, embed, view)]
     pub status: Option<PluginStatus>,
     #[WPContext(edit, embed, view)]
@@ -97,6 +97,34 @@ pub struct SparsePlugin {
 pub struct PluginDeleteResponse {
     pub deleted: bool,
     pub previous: PluginWithEditContext,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct PluginSlug {
+    pub slug: String,
+}
+
+impl From<&str> for PluginSlug {
+    fn from(value: &str) -> Self {
+        Self {
+            slug: value.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct PluginWpOrgDirectorySlug {
+    pub slug: String,
+}
+
+impl From<&str> for PluginWpOrgDirectorySlug {
+    fn from(value: &str) -> Self {
+        Self {
+            slug: value.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, uniffi::Enum)]

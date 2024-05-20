@@ -251,7 +251,11 @@ impl WPApiHelper {
         }
     }
 
-    pub fn retrieve_plugin_request(&self, context: WPContext, plugin: &str) -> WPNetworkRequest {
+    pub fn retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+    ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
@@ -262,7 +266,7 @@ impl WPApiHelper {
 
     pub fn update_plugin_request(
         &self,
-        plugin: &str,
+        plugin: &PluginSlug,
         params: PluginUpdateParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
@@ -273,7 +277,7 @@ impl WPApiHelper {
         }
     }
 
-    pub fn delete_plugin_request(&self, plugin: &str) -> WPNetworkRequest {
+    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: self.api_endpoint.plugins.delete(plugin).into(),
