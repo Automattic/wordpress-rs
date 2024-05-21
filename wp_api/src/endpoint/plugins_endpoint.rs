@@ -1,6 +1,6 @@
 use url::Url;
 
-use crate::{plugins::PluginListParams, ApiBaseUrl, PluginSlug, WPContext};
+use crate::{plugins::PluginListParams, ApiBaseUrl, PluginSlug, SparsePluginField, WPContext};
 
 pub struct PluginsEndpoint {
     api_base_url: ApiBaseUrl,
@@ -29,11 +29,29 @@ impl PluginsEndpoint {
         url
     }
 
+    pub fn filter_list(
+        &self,
+        context: WPContext,
+        params: Option<&PluginListParams>,
+        fields: &[SparsePluginField],
+    ) -> Url {
+        self.append_filter_fields(self.list(context, params), fields)
+    }
+
     pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> Url {
         let mut url = self.plugins_url_with_slug(plugin);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         url
+    }
+
+    pub fn filter_retrieve(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+        fields: &[SparsePluginField],
+    ) -> Url {
+        self.append_filter_fields(self.retrieve(context, plugin), fields)
     }
 
     pub fn update(&self, plugin: &PluginSlug) -> Url {
@@ -48,6 +66,19 @@ impl PluginsEndpoint {
         self.api_base_url
             // The '/' character has to be preserved and not get encoded
             .by_extending(["plugins"].into_iter().chain(plugin.slug.split('/')))
+    }
+
+    fn append_filter_fields(&self, mut url: Url, fields: &[SparsePluginField]) -> Url {
+        url.query_pairs_mut().append_pair(
+            "_fields",
+            fields
+                .iter()
+                .map(|f| f.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+                .as_str(),
+        );
+        url
     }
 }
 
