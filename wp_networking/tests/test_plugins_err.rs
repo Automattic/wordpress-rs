@@ -63,3 +63,14 @@ async fn update_plugin_err_cannot_manage_plugins() {
         .parse(wp_api::parse_update_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotManagePlugins);
 }
+
+#[tokio::test]
+async fn delete_plugin_err_cannot_delete_active_plugin() {
+    api()
+        .delete_plugin_request(&HELLO_DOLLY_PLUGIN_SLUG.into())
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_delete_plugin_response)
+        .assert_wp_error(WPRestErrorCode::CannotDeleteActivePlugin);
+}

@@ -41,6 +41,8 @@ pub struct UnrecognizedWPRestError {
 pub enum WPRestErrorCode {
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
+    #[serde(rename = "rest_cannot_delete_active_plugin")]
+    CannotDeleteActivePlugin,
     #[serde(rename = "rest_cannot_edit")]
     CannotEdit,
     #[serde(rename = "rest_cannot_edit_roles")]
