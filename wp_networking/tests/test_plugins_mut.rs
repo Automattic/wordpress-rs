@@ -14,7 +14,7 @@ async fn create_plugin() {
         wp_db::run_and_restore(|mut _db| async move {
             let status = PluginStatus::Active;
             let params = PluginCreateParams {
-                slug: WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS.to_string(),
+                slug: WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS.into(),
                 status,
             };
             let created_plugin = api()
@@ -36,7 +36,10 @@ async fn update_plugin() {
         wp_db::run_and_restore(|mut _db| async move {
             let status = PluginStatus::Active;
             let updated_plugin = api()
-                .update_plugin_request(HELLO_DOLLY_PLUGIN_SLUG, PluginUpdateParams { status })
+                .update_plugin_request(
+                    &HELLO_DOLLY_PLUGIN_SLUG.into(),
+                    PluginUpdateParams { status },
+                )
                 .execute()
                 .await
                 .unwrap()
@@ -53,7 +56,7 @@ async fn delete_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
             let deleted_plugin = api()
-                .delete_plugin_request(CLASSIC_EDITOR_PLUGIN_SLUG)
+                .delete_plugin_request(&CLASSIC_EDITOR_PLUGIN_SLUG.into())
                 .execute()
                 .await
                 .unwrap()
