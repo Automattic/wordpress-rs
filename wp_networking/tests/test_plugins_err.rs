@@ -2,7 +2,7 @@ use wp_api::{PluginCreateParams, PluginStatus, PluginUpdateParams, WPContext, WP
 
 use crate::test_helpers::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
-    WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
+    HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
 pub mod test_helpers;
@@ -46,4 +46,20 @@ async fn update_plugin_err_plugin_not_found() {
         .unwrap()
         .parse(wp_api::parse_update_plugin_response)
         .assert_wp_error(WPRestErrorCode::PluginNotFound);
+}
+
+#[tokio::test]
+async fn update_plugin_err_cannot_manage_plugins() {
+    api_as_subscriber()
+        .update_plugin_request(
+            &HELLO_DOLLY_PLUGIN_SLUG.into(),
+            &PluginUpdateParams {
+                status: PluginStatus::Active,
+            },
+        )
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_update_plugin_response)
+        .assert_wp_error(WPRestErrorCode::CannotManagePlugins);
 }
