@@ -49,6 +49,8 @@ pub enum WPRestErrorCode {
     CannotEditRoles,
     #[serde(rename = "rest_cannot_install_plugin")]
     CannotInstallPlugin,
+    #[serde(rename = "rest_cannot_manage_network_plugins")]
+    CannotManageNetworkPlugins,
     #[serde(rename = "rest_cannot_manage_plugins")]
     CannotManagePlugins,
     #[serde(rename = "rest_cannot_view_plugins")]
