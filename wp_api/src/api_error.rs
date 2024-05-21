@@ -93,6 +93,8 @@ pub enum WPRestErrorCode {
     // ---
     // Untested, because we don't have the necessary setup for it
     // ---
+    #[serde(rename = "fs_unavailable")]
+    FsUnavailable,
     #[serde(rename = "unable_to_connect_to_filesystem")]
     UnableToConnectToFilesystem,
     #[serde(rename = "unable_to_determine_installed_plugin")]
@@ -102,6 +104,8 @@ pub enum WPRestErrorCode {
     // ---
     #[serde(rename = "rest_cannot_manage_network_plugins")]
     CannotManageNetworkPlugins,
+    #[serde(rename = "rest_network_only_plugin")]
+    NetworkOnlyPlugin,
     #[serde(rename = "rest_user_create")]
     UserCreate,
     // ---

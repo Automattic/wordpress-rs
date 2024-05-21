@@ -142,6 +142,8 @@ fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> 
         WPRestErrorCode::ForbiddenContext => 403,
         WPRestErrorCode::ForbiddenOrderBy => 403,
         WPRestErrorCode::ForbiddenWho => 403,
+        WPRestErrorCode::FsUnavailable => 500,
+        WPRestErrorCode::NetworkOnlyPlugin => 400,
         WPRestErrorCode::PluginNotFound => 404,
         WPRestErrorCode::InvalidParam => 400,
         WPRestErrorCode::TrashNotSupported => 501,
