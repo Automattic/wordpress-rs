@@ -53,12 +53,13 @@ async fn test_plugin_list_params_parametrized(
 }
 
 #[rstest]
-#[case(CLASSIC_EDITOR_PLUGIN_SLUG)]
-#[case(HELLO_DOLLY_PLUGIN_SLUG)]
+#[case(CLASSIC_EDITOR_PLUGIN_SLUG, "WordPress Contributors")]
+#[case(HELLO_DOLLY_PLUGIN_SLUG, "Matt Mullenweg")]
 #[trace]
 #[tokio::test]
-async fn retrieve_plugin_with_edit_context(
+async fn retrieve_plugin(
     #[case] plugin_slug: &str,
+    #[case] expected_author: &str,
     #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
 ) {
     let parsed_response = api()
@@ -74,4 +75,5 @@ async fn retrieve_plugin_with_edit_context(
         plugin_slug,
         parsed_response
     );
+    assert_eq!(expected_author, parsed_response.unwrap().author);
 }
