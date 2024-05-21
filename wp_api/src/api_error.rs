@@ -51,6 +51,8 @@ pub enum WPRestErrorCode {
     CannotInstallPlugin,
     #[serde(rename = "rest_cannot_manage_plugins")]
     CannotManagePlugins,
+    #[serde(rename = "rest_cannot_view_plugin")]
+    CannotViewPlugin,
     #[serde(rename = "rest_cannot_view_plugins")]
     CannotViewPlugins,
     #[serde(rename = "rest_forbidden_context")]

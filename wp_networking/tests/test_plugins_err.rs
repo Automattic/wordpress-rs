@@ -44,6 +44,17 @@ async fn list_plugins_err_cannot_view_plugins() {
 }
 
 #[tokio::test]
+async fn retrieve_plugin_err_cannot_view_plugin() {
+    api_as_subscriber()
+        .retrieve_plugin_request(WPContext::Edit, &HELLO_DOLLY_PLUGIN_SLUG.into())
+        .execute()
+        .await
+        .unwrap()
+        .parse(wp_api::parse_retrieve_plugin_response_with_edit_context)
+        .assert_wp_error(WPRestErrorCode::CannotViewPlugin);
+}
+
+#[tokio::test]
 async fn update_plugin_err_plugin_not_found() {
     api()
         .update_plugin_request(

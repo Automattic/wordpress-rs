@@ -137,6 +137,7 @@ fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> 
         WPRestErrorCode::CannotInstallPlugin => 403,
         WPRestErrorCode::CannotManageNetworkPlugins => 403,
         WPRestErrorCode::CannotManagePlugins => 403,
+        WPRestErrorCode::CannotViewPlugin => 403,
         WPRestErrorCode::CannotViewPlugins => 403,
         WPRestErrorCode::ForbiddenContext => 403,
         WPRestErrorCode::ForbiddenOrderBy => 403,
