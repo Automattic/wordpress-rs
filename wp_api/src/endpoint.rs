@@ -3,6 +3,8 @@ use url::Url;
 pub use plugins_endpoint::*;
 pub use users_endpoint::*;
 
+use crate::SparseField;
+
 mod plugins_endpoint;
 mod users_endpoint;
 
@@ -72,6 +74,7 @@ trait UrlExtension {
     where
         I: IntoIterator,
         I::Item: AsRef<str>;
+    fn append_filter_fields(self, fields: &[impl SparseField]) -> Url;
 }
 
 impl UrlExtension for Url {
@@ -87,6 +90,19 @@ impl UrlExtension for Url {
     {
         self.path_segments_mut()?.extend(segments);
         Ok(self)
+    }
+
+    fn append_filter_fields(mut self, fields: &[impl SparseField]) -> Url {
+        self.query_pairs_mut().append_pair(
+            "_fields",
+            fields
+                .iter()
+                .map(|f| f.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+                .as_str(),
+        );
+        self
     }
 }
 

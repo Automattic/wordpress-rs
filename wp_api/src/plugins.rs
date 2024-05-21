@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
-use crate::{add_uniffi_exported_parser, parse_wp_response, WPApiError, WPNetworkResponse};
+use crate::{
+    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPNetworkResponse,
+};
 
 add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
 add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);
@@ -109,8 +111,8 @@ pub enum SparsePluginField {
     Version,
 }
 
-impl SparsePluginField {
-    pub fn as_str(&self) -> &str {
+impl SparseField for SparsePluginField {
+    fn as_str(&self) -> &str {
         match self {
             Self::Author => "author",
             Self::Description => "description",
