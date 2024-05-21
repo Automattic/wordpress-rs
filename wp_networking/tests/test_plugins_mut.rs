@@ -38,7 +38,7 @@ async fn update_plugin() {
             let updated_plugin = api()
                 .update_plugin_request(
                     &HELLO_DOLLY_PLUGIN_SLUG.into(),
-                    PluginUpdateParams { status },
+                    &PluginUpdateParams { status },
                 )
                 .execute()
                 .await
