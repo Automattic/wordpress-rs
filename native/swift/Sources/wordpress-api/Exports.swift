@@ -13,10 +13,3 @@ public typealias SparseUser = wordpress_api_wrapper.SparseUser
 public typealias UserWithViewContext = wordpress_api_wrapper.UserWithViewContext
 public typealias UserWithEditContext = wordpress_api_wrapper.UserWithEditContext
 public typealias UserWithEmbedContext = wordpress_api_wrapper.UserWithEmbedContext
-
-// MARK: - Posts
-
-public typealias SparsePost = wordpress_api_wrapper.SparsePost
-public typealias PostWithViewContext = wordpress_api_wrapper.PostWithViewContext
-public typealias PostWithEditContext = wordpress_api_wrapper.PostWithEditContext
-public typealias PostWithEmbedContext = wordpress_api_wrapper.PostWithEmbedContext

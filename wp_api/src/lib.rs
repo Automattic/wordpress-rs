@@ -6,18 +6,14 @@ use std::collections::HashMap;
 pub use api_error::*;
 pub use endpoint::*;
 pub use login::*;
-pub use pages::*;
 pub use plugins::*;
-pub use posts::*;
 pub use url::*;
 pub use users::*;
 
 pub mod api_error;
 pub mod endpoint;
 pub mod login;
-pub mod pages;
 pub mod plugins;
-pub mod posts;
 pub mod url;
 pub mod users;
 
@@ -60,25 +56,6 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: Url::parse(url.as_str()).unwrap().into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn post_list_request(&self, params: PostListParams) -> WPNetworkRequest {
-        let mut url = self
-            .site_url
-            .join("/wp-json/wp/v2/posts?context=edit")
-            .unwrap();
-
-        url.query_pairs_mut()
-            .append_pair("page", params.page.to_string().as_str());
-        url.query_pairs_mut()
-            .append_pair("per_page", params.per_page.to_string().as_str());
-
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: url.into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -311,53 +288,6 @@ impl WPApiHelper {
     }
 }
 
-#[uniffi::export]
-impl WPApiHelper {
-    pub fn retrieve_post_request(&self, post_id: PostId, context: WPContext) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.api_endpoint.posts.retrieve(post_id, context).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn create_post_request(&self, params: &PostCreateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.posts.create().into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
-    }
-
-    pub fn update_post_request(
-        &self,
-        post_id: PostId,
-        params: &PostUpdateParams,
-    ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.posts.update(post_id, params).into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
-    }
-
-    pub fn delete_post_request(
-        &self,
-        post_id: PostId,
-        params: &PostDeleteParams,
-    ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: self.api_endpoint.posts.delete(post_id, params).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPContext {
     Edit,
@@ -468,29 +398,6 @@ impl WPNetworkResponse {
 
         None
     }
-}
-
-#[uniffi::export]
-pub fn parse_post_list_response(
-    response: WPNetworkResponse,
-) -> Result<PostListResponse, WPApiError> {
-    parse_response_for_generic_errors(&response)?;
-    let post_list: Vec<SparsePost> =
-        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-            reason: err.to_string(),
-            response: String::from_utf8_lossy(&response.body).to_string(),
-        })?;
-
-    let mut next_page: Option<String> = None;
-
-    if let Some(link_header) = response.get_link_header("next") {
-        next_page = Some(link_header.to_string())
-    }
-
-    Ok(PostListResponse {
-        post_list: Some(post_list),
-        next_page,
-    })
 }
 
 #[uniffi::export]
