@@ -91,15 +91,6 @@ pub enum WPRestErrorCode {
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,
     // ---
-    // Untested, because we don't have the necessary setup for it
-    // ---
-    #[serde(rename = "fs_unavailable")]
-    FsUnavailable,
-    #[serde(rename = "unable_to_connect_to_filesystem")]
-    UnableToConnectToFilesystem,
-    #[serde(rename = "unable_to_determine_installed_plugin")]
-    UnableToDetermineInstalledPlugin,
-    // ---
     // Untested, because we believe these errors require multisite
     // ---
     #[serde(rename = "rest_cannot_manage_network_plugins")]
@@ -125,4 +116,47 @@ pub enum WPRestErrorCode {
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]
     UserInvalidPassword,
+}
+
+// All internal errors _should_ be wrapped as a `WPRestErrorCode` by the server. However, there
+// is a good chance that some internal errors do make it into the response, so these error types
+// are provided.
+//
+// Currently, we don't parse the response for these error types, but we could consider adding it
+// as a fallback. For the moment, clients can manually try parsing an `Unrecognized` error
+// into this type.
+#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
+pub enum WPInternalErrorCode {
+    #[serde(rename = "fs_error")]
+    FsError,
+    #[serde(rename = "fs_no_plugins_dir")]
+    FsNoPluginsDir,
+    #[serde(rename = "fs_unavailable")]
+    FsUnavailable,
+    #[serde(rename = "could_not_remove_plugin")]
+    CouldNotRemovePlugin,
+    #[serde(rename = "could_not_resume_plugin")]
+    CouldNotResumePlugin,
+    #[serde(rename = "no_plugin_header")]
+    NoPluginHeader,
+    #[serde(rename = "plugin_missing_dependencies")]
+    PluginMissingDependencies,
+    #[serde(rename = "plugin_not_found")]
+    PluginNotFound,
+    #[serde(rename = "plugin_invalid")]
+    PluginInvalid,
+    #[serde(rename = "plugin_php_incompatible")]
+    PluginPhpIncompatible,
+    #[serde(rename = "plugin_wp_incompatible")]
+    PluginWpIncompatible,
+    #[serde(rename = "plugin_wp_php_incompatible")]
+    PluginWpPhpIncompatible,
+    #[serde(rename = "plugins_invalid")]
+    PluginsInvalid,
+    #[serde(rename = "unable_to_connect_to_filesystem")]
+    UnableToConnectToFilesystem,
+    #[serde(rename = "unable_to_determine_installed_plugin")]
+    UnableToDetermineInstalledPlugin,
+    #[serde(rename = "unexpected_output")]
+    UnexpectedOutput,
 }
