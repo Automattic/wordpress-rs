@@ -57,6 +57,8 @@ pub enum WPRestErrorCode {
     ForbiddenWho,
     #[serde(rename = "rest_invalid_param")]
     InvalidParam,
+    #[serde(rename = "rest_plugin_not_found")]
+    PluginNotFound,
     #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
     #[serde(rename = "rest_user_cannot_delete")]

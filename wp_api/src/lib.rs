@@ -267,7 +267,7 @@ impl WPApiHelper {
     pub fn update_plugin_request(
         &self,
         plugin: &PluginSlug,
-        params: PluginUpdateParams,
+        params: &PluginUpdateParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
