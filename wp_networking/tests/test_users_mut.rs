@@ -12,7 +12,7 @@ pub mod wp_db;
 async fn create_user() {
     wp_db::run_and_restore(|mut db| async move {
         let username = "t_username";
-        let email = "t_email@foo.com";
+        let email = "t_email@example.com";
         let password = "t_password";
 
         // Create a user using the API
@@ -66,11 +66,15 @@ async fn delete_current_user() {
         let user_delete_params = UserDeleteParams {
             reassign: SECOND_USER_ID,
         };
-        let user_delete_response = api()
+        let deleted_user = api()
             .delete_current_user_request(&user_delete_params)
             .execute()
-            .await;
-        assert!(user_delete_response.is_ok());
+            .await
+            .unwrap()
+            .parse(wp_api::parse_delete_user_response)
+            .unwrap();
+        assert_eq!(true, deleted_user.deleted);
+        assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
 
         // Assert that the DB doesn't have a record of the user anymore
         assert!(matches!(
@@ -117,7 +121,7 @@ async fn update_user_last_name() {
 
 #[tokio::test]
 async fn update_user_email() {
-    let new_email = "new_email@foo.com";
+    let new_email = "new_email@example.com";
     let mut params = UserUpdateParams::default();
     params.email = Some(new_email.to_string());
     test_update_user(params, |user, _| {

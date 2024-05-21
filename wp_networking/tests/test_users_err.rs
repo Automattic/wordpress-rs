@@ -157,7 +157,7 @@ async fn retrieve_user_err_user_invalid_id() {
 #[tokio::test]
 async fn retrieve_user_err_unauthorized() {
     WPApiHelper::new(
-        test_helpers::test_credentials().site_url,
+        test_helpers::read_test_credentials_from_file().site_url,
         WPAuthentication::None,
     )
     .retrieve_current_user_request(WPContext::Edit)
@@ -321,7 +321,7 @@ async fn delete_user_err_trash_not_supported() {
 fn valid_user_create_params() -> UserCreateParams {
     UserCreateParams::new(
         "t_username".to_string(),
-        "t_email@foo.com".to_string(),
+        "t_email@example.com".to_string(),
         "t_password".to_string(),
     )
 }

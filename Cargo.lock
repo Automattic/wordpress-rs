@@ -2942,6 +2942,7 @@ dependencies = [
 name = "wp_api"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "http 1.1.0",
  "parse_link_header",
  "rstest",
@@ -2970,7 +2971,6 @@ dependencies = [
 name = "wp_networking"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "chrono",
  "futures",
  "http 1.1.0",
