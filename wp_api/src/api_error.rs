@@ -98,11 +98,16 @@ pub enum WPRestErrorCode {
     // ---
     // Untested, because we believe these errors are impossible to get
     // ---
-    // Happens while activating a plugin without the `activate_plugin` permission.
-    // However, in a default setup a prior check of `activate_plugins` will fail
-    // resulting in `CannotManagePlugins` error instead.
+    /// Happens while activating a plugin without the `activate_plugin` permission.
+    /// However, in a default setup a prior check of `activate_plugins` will fail
+    /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_activate_plugin")]
     CannotActivatePlugin,
+    /// Happens while deactivating a plugin without the `deactivate_plugin` permission.
+    /// However, in a default setup a prior check of `activate_plugins` will fail
+    /// resulting in `CannotManagePlugins` error instead.
+    #[serde(rename = "rest_cannot_deactivate_plugin")]
+    CannotDeactivatePlugin,
     #[serde(rename = "rest_user_invalid_username")]
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]

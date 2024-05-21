@@ -130,6 +130,7 @@ fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> 
     match error_code {
         WPRestErrorCode::CannotActivatePlugin => 403,
         WPRestErrorCode::CannotCreateUser => 403,
+        WPRestErrorCode::CannotDeactivatePlugin => 403,
         WPRestErrorCode::CannotDeleteActivePlugin => 400,
         WPRestErrorCode::CannotEdit => 403,
         WPRestErrorCode::CannotEditRoles => 403,
