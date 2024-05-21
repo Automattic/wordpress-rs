@@ -190,7 +190,7 @@ test-rust-doc:
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
-	docker-compose run wpcli
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
 stop-server: delete-wp-plugins-backup
 	docker-compose down
@@ -234,6 +234,9 @@ build-in-docker:
 dev-server:
 	mkdir -p .wordpress
 	docker-compose up
+
+prepare-dev-server:
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
 setup-rust:
 	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain

@@ -8,6 +8,13 @@ set -e
 # for each WordPress version – if there are issues with DB migrations, different default themes
 # available, etc we don't want to have to deal with them.
 
+curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar --output /usr/bin/wp
+chmod +x /usr/bin/wp
+
+# Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
+# be any weird permissions issues)
+su -s /bin/bash www-data
+
 ## Install WordPress
 wp core download --force
 
@@ -32,7 +39,10 @@ wp plugin install wordpress-importer --activate
 wp import /tmp/testdata.xml --authors=create
 
 ## Then clean up the importer plugin
+wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
+
+wp plugin install classic-editor --activate
 
 {
   printf "http://localhost\ntest@example.com\n"
