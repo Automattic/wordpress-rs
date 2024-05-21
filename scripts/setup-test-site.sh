@@ -42,7 +42,6 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-wp plugin install classic-editor --activate
 
 {
   printf "http://localhost\ntest@example.com\n"
