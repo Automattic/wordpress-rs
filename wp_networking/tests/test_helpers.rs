@@ -128,6 +128,7 @@ pub fn read_test_credentials_from_file() -> TestCredentials {
 
 fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> u16 {
     match error_code {
+        WPRestErrorCode::CannotActivatePlugin => 403,
         WPRestErrorCode::CannotCreateUser => 403,
         WPRestErrorCode::CannotDeleteActivePlugin => 400,
         WPRestErrorCode::CannotEdit => 403,

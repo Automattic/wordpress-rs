@@ -49,8 +49,6 @@ pub enum WPRestErrorCode {
     CannotEditRoles,
     #[serde(rename = "rest_cannot_install_plugin")]
     CannotInstallPlugin,
-    #[serde(rename = "rest_cannot_manage_network_plugins")]
-    CannotManageNetworkPlugins,
     #[serde(rename = "rest_cannot_manage_plugins")]
     CannotManagePlugins,
     #[serde(rename = "rest_cannot_view_plugins")]
@@ -81,17 +79,30 @@ pub enum WPRestErrorCode {
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
+    // ---
     // Tested, but we believe these errors are imppossible to get unless the requests are manually modified
+    // ---
     #[serde(rename = "rest_user_exists")]
     UserExists,
     #[serde(rename = "rest_user_invalid_argument")]
     UserInvalidArgument,
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,
+    // ---
     // Untested, because we believe these errors require multisite
+    // ---
+    #[serde(rename = "rest_cannot_manage_network_plugins")]
+    CannotManageNetworkPlugins,
     #[serde(rename = "rest_user_create")]
     UserCreate,
+    // ---
     // Untested, because we believe these errors are impossible to get
+    // ---
+    // Happens while activating a plugin without the `activate_plugin` permission.
+    // However, in a default setup a prior check of `activate_plugins` will fail
+    // resulting in `CannotManagePlugins` error instead.
+    #[serde(rename = "rest_cannot_activate_plugin")]
+    CannotActivatePlugin,
     #[serde(rename = "rest_user_invalid_username")]
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]
