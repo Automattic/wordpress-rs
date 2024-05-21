@@ -7,6 +7,7 @@ pub use api_error::*;
 pub use endpoint::*;
 pub use login::*;
 pub use pages::*;
+pub use plugins::*;
 pub use posts::*;
 pub use url::*;
 pub use users::*;
@@ -15,6 +16,7 @@ pub mod api_error;
 pub mod endpoint;
 pub mod login;
 pub mod pages;
+pub mod plugins;
 pub mod posts;
 pub mod url;
 pub mod users;
@@ -218,6 +220,63 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: self.api_endpoint.users.delete_me(params).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .list(context, params.as_ref())
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.create().into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn retrieve_plugin_request(&self, context: WPContext, plugin: &str) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn update_plugin_request(
+        &self,
+        plugin: &str,
+        params: PluginUpdateParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.update(plugin).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn delete_plugin_request(&self, plugin: &str) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: self.api_endpoint.plugins.delete(plugin).into(),
             header_map: self.header_map(),
             body: None,
         }

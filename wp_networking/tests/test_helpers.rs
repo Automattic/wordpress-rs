@@ -1,4 +1,5 @@
-use std::fs::read_to_string;
+use futures::Future;
+use std::{fs::read_to_string, process::Command};
 use wp_api::{
     UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
     WPRestError, WPRestErrorCode, WPRestErrorWrapper,
@@ -11,6 +12,9 @@ pub const FIRST_USER_ID: UserId = UserId(1);
 pub const SECOND_USER_ID: UserId = UserId(2);
 pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 pub const SECOND_USER_SLUG: &str = "themedemos";
+pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
+pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
+pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 
 pub fn api() -> WPApiHelper {
     let credentials = read_test_credentials_from_file();
@@ -146,4 +150,19 @@ fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> 
         WPRestErrorCode::UserInvalidSlug => 400,
         WPRestErrorCode::UserInvalidUsername => 400,
     }
+}
+
+pub async fn run_and_restore_wp_content_plugins<F, Fut>(f: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = ()>,
+{
+    f().await;
+    println!("Restoring wp-content/plugins..");
+    Command::new("make")
+        .arg("-C")
+        .arg("../")
+        .arg("restore-wp-content-plugins")
+        .status()
+        .expect("Failed to restore wp-content/plugins");
 }

@@ -192,7 +192,7 @@ test-server: stop-server
 	docker-compose up -d
 	docker-compose run wpcli
 
-stop-server:
+stop-server: delete-wp-plugins-backup
 	docker-compose down
 
 dump-mysql:
@@ -200,6 +200,15 @@ dump-mysql:
 
 restore-mysql:
 	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
+
+backup-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
+
+restore-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "rm -rf ./wp-content/plugins &&  cp -R /tmp/backup_wp_plugins ./wp-content/plugins"
+
+delete-wp-plugins-backup:
+	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
 lint: lint-rust lint-swift
 
