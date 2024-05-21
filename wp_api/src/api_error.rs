@@ -91,6 +91,13 @@ pub enum WPRestErrorCode {
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,
     // ---
+    // Untested, because we don't have the necessary setup for it
+    // ---
+    #[serde(rename = "unable_to_connect_to_filesystem")]
+    UnableToConnectToFilesystem,
+    #[serde(rename = "unable_to_determine_installed_plugin")]
+    UnableToDetermineInstalledPlugin,
+    // ---
     // Untested, because we believe these errors require multisite
     // ---
     #[serde(rename = "rest_cannot_manage_network_plugins")]

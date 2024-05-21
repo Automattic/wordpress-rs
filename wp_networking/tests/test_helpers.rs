@@ -145,6 +145,8 @@ fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> 
         WPRestErrorCode::PluginNotFound => 404,
         WPRestErrorCode::InvalidParam => 400,
         WPRestErrorCode::TrashNotSupported => 501,
+        WPRestErrorCode::UnableToConnectToFilesystem => 500,
+        WPRestErrorCode::UnableToDetermineInstalledPlugin => 500,
         WPRestErrorCode::Unauthorized => 401,
         WPRestErrorCode::UserCannotDelete => 403,
         WPRestErrorCode::UserCannotView => 403,
