@@ -71,6 +71,10 @@ fn struct_fields(
 // contexts.
 // * `WPContextualParseError::WPContextualFieldWithoutWPContext`: #[WPContextualField] is added to
 // a field that doesn't have the #[WPContext] attribute.
+// * `WPContextualParseError::WPContextualOptionWithoutWPContext`: #[WPContextualOption] is added to
+// a field that doesn't have the #[WPContext] attribute.
+// * `WPContextualParseError::WPContextualBothOptionAndField`: #[WPContextualField] and
+// #[WPContextualOption] was used together.
 //
 // It'll also handle incorrectly formatted #[WPContext] attribute through
 // `parse_contexts_from_tokens` helper.
@@ -120,24 +124,38 @@ fn parse_fields(
         })
         .collect::<Result<Vec<WPParsedField>, syn::Error>>()?;
 
+    let assert_has_wp_context_attribute_if_it_has_given_attribute =
+        |attribute_to_check: WPParsedAttr, error_type: WPContextualParseError| {
+            if let Some(pf) = parsed_fields
+                .iter()
+                .filter(|pf| pf.parsed_attrs.contains(&attribute_to_check))
+                .find(|pf| {
+                    !pf.parsed_attrs.iter().any(|pf| match pf {
+                        WPParsedAttr::ParsedWPContext { contexts } => !contexts.is_empty(),
+                        _ => false,
+                    })
+                })
+            {
+                Err(error_type.into_syn_error(pf.field.span()))
+            } else {
+                Ok(())
+            }
+        };
+
     // Check if there are any fields that has #[WPContextualField] attribute,
     // but not the #[WPContext] attribute
-    if let Some(pf) = parsed_fields
-        .iter()
-        .filter(|pf| {
-            pf.parsed_attrs
-                .contains(&WPParsedAttr::ParsedWPContextualField)
-        })
-        .find(|pf| {
-            !pf.parsed_attrs.iter().any(|pf| match pf {
-                WPParsedAttr::ParsedWPContext { contexts } => !contexts.is_empty(),
-                _ => false,
-            })
-        })
-    {
-        return Err(WPContextualParseError::WPContextualFieldWithoutWPContext
-            .into_syn_error(pf.field.span()));
-    };
+    assert_has_wp_context_attribute_if_it_has_given_attribute(
+        WPParsedAttr::ParsedWPContextualField,
+        WPContextualParseError::WPContextualFieldWithoutWPContext,
+    )?;
+
+    // Check if there are any fields that has #[WPContextualField] attribute,
+    // but not the #[WPContext] attribute
+    assert_has_wp_context_attribute_if_it_has_given_attribute(
+        WPParsedAttr::ParsedWPContextualOption,
+        WPContextualParseError::WPContextualOptionWithoutWPContext,
+    )?;
+
     // Check if there are any fields that has both #[WPContextualField] & #[WPContextualOption]
     // attributes and return an error. These attributes are incompatible with each other because
     // #[WPContextualOption] will leave the type as is, whereas #[WPContextualField] will modify it
@@ -534,6 +552,8 @@ enum WPContextualParseError {
     WPContextualMissingSparsePrefix,
     #[error("#[WPContextual] is only implemented for Structs")]
     WPContextualNotAStruct,
+    #[error("#[WPContextualOption] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
+    WPContextualOptionWithoutWPContext,
 }
 
 impl WPContextualParseError {

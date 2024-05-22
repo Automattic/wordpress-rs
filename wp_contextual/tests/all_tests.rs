@@ -17,5 +17,6 @@ fn tests() {
     t.compile_fail("tests/error_unexpected_wp_context_literal.rs");
     t.compile_fail("tests/error_unexpected_wp_context_token.rs");
     t.compile_fail("tests/error_wp_contextual_field_without_wp_context.rs");
+    t.compile_fail("tests/error_wp_contextual_option_without_wp_context.rs");
     t.compile_fail("tests/error_wp_contextual_not_a_struct.rs");
 }
