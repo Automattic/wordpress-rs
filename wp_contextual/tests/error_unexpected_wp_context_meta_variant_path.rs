@@ -1,8 +1,8 @@
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 #[derive(WPContextual)]
 pub struct SparseFoo {
-    #[WPContext(Edit)]
+    #[WPContext]
     pub bar: Option<u32>,
 }
 

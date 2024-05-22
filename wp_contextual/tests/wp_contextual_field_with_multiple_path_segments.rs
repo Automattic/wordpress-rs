@@ -1,4 +1,4 @@
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 mod wp_contextual_field_with_multiple_segments_helper;
 

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
 pub struct SparsePostObject {

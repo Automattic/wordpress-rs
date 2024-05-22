@@ -1,7 +1,7 @@
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 #[derive(WPContextual)]
-pub struct SparseFoo {}
+pub struct Foo {}
 
 fn main() {}
 

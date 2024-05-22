@@ -1,6 +1,6 @@
 // If a field is marked with `#[WPContextualField]` it needs to be a Sparse type
 
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 #[derive(WPContextual)]
 pub struct SparseFoo {
