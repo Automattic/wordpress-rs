@@ -4,31 +4,31 @@ import wordpress_api
 struct ContentView: View {
 
     @State
-    private var viewModel: PostListViewModel
+    private var viewModel: UserListViewModel
 
     @EnvironmentObject
     var loginManager: LoginManager
 
-    init(viewModel: PostListViewModel) {
+    init(viewModel: UserListViewModel) {
         self.viewModel = viewModel
     }
 
     var body: some View {
         Group {
-            if viewModel.posts.isEmpty {
+            if viewModel.users.isEmpty {
                 VStack {
                     ProgressView().progressViewStyle(.circular)
-                    Text("Fetching Posts")
+                    Text("Fetching users")
                 }
                 .padding()
             } else {
-                List(viewModel.posts) { (post: SparsePost.ViewContext) in
-                    Text(post.title.rendered)
+                List(viewModel.users) {
+                    Text($0.name)
                 }
             }
         }
-        .onAppear(perform: viewModel.startFetchingPosts)
-//        .onDisappear(perform: viewModel.stopFetchingPost)
+        .onAppear(perform: viewModel.startFetching)
+//        .onDisappear(perform: viewModel.stopFetching)
         .alert(
             isPresented: $viewModel.shouldPresentAlert,
             error: viewModel.error,

@@ -9,7 +9,7 @@ struct ExampleApp: App {
     var body: some Scene {
         WindowGroup {
             if loginManager.isLoggedIn {
-                ContentView(viewModel: PostListViewModel(loginManager: self.loginManager))
+                ContentView(viewModel: UserListViewModel(loginManager: self.loginManager))
             } else {
                 LoginView()
             }

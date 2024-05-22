@@ -2,12 +2,12 @@ import Foundation
 import SwiftUI
 import wordpress_api
 
-extension SparsePost.ViewContext: Identifiable {}
+extension SparseUser.ViewContext: Identifiable {}
 
-@Observable class PostListViewModel {
+@Observable class UserListViewModel {
 
-    var posts: [SparsePost.ViewContext]
-    var fetchPostsTask: Task<Void, Never>?
+    var users: [SparseUser.ViewContext]
+    var fetchUsersTask: Task<Void, Never>?
     var error: MyError?
     var shouldPresentAlert = false
 
@@ -23,20 +23,18 @@ extension SparsePost.ViewContext: Identifiable {}
     }
     // swiftlint:enable force_try
 
-    init(loginManager: LoginManager, posts: [SparsePost.ViewContext] = []) {
+    init(loginManager: LoginManager, users: [SparseUser.ViewContext] = []) {
         self.loginManager = loginManager
-        self.posts = posts
+        self.users = users
     }
 
-    func startFetchingPosts() {
+    func startFetching() {
         self.error = nil
         self.shouldPresentAlert = false
 
-        self.fetchPostsTask = Task { @MainActor in
+        self.fetchUsersTask = Task { @MainActor in
             do {
-                for try await post in api.listPosts() {
-                    posts.append(post)
-                }
+                users = try await api.users.forViewing.list()
             } catch let error {
                 shouldPresentAlert = true
                 self.error = MyError(underlyingError: error)
@@ -45,8 +43,8 @@ extension SparsePost.ViewContext: Identifiable {}
         }
     }
 
-    func stopFetchingPost() {
-        self.fetchPostsTask?.cancel()
+    func stopFetching() {
+        self.fetchUsersTask?.cancel()
     }
 }
 
@@ -58,7 +56,7 @@ struct MyError: LocalizedError {
     }
 
     var errorDescription: String? {
-        "Unable to fetch posts"
+        "Unable to fetch users"
     }
 
     var failureReason: String? {
