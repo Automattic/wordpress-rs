@@ -1,7 +1,3 @@
-android_project_root := ./native/android
-android_generated_source_path := $(android_project_root)/lib/build/generated/source
-jni_libs_root := $(android_project_root)/lib/src/main/jniLibs
-
 # The directory where the git repo is mounted in the docker container
 docker_container_repo_dir=/app
 
@@ -19,9 +15,10 @@ swift_package_platform_ios := $(call swift_package_platform_version,ios)
 swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
 
+cargo_config_library = --config profile.release.debug=true --config 'profile.release.panic="abort"'
+
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
-# The project doesn't compile with the nightly toolchain built on 2024-03-28 and onward.
-rust_nightly_toolchain := nightly-2024-03-27
+rust_nightly_toolchain := nightly-2024-04-30
 
 uname := $(shell uname | tr A-Z a-z)
 ifeq ($(uname), linux)
@@ -34,24 +31,11 @@ endif
 clean:
 	git clean -ffXd
 
-_generate-jni-libs:
-	rm -rf $(jni_libs_root)
-	cargo build --release --lib --target x86_64-linux-android --target i686-linux-android --target armv7-linux-androideabi --target aarch64-linux-android
-	mkdir -p $(jni_libs_root)/arm64-v8a
-	mkdir -p $(jni_libs_root)/armeabi-v7a
-	mkdir -p $(jni_libs_root)/x86
-	mkdir -p $(jni_libs_root)/x86_64
-	cp ./target/aarch64-linux-android/release/libwp_api.so $(jni_libs_root)/arm64-v8a/libuniffi_wp_api.so
-	cp ./target/armv7-linux-androideabi/release/libwp_api.so $(jni_libs_root)/armeabi-v7a/libuniffi_wp_api.so
-	cp ./target/i686-linux-android/release/libwp_api.so $(jni_libs_root)/x86/libuniffi_wp_api.so
-	cp ./target/x86_64-linux-android/release/libwp_api.so $(jni_libs_root)/x86_64/libuniffi_wp_api.so
-
 bindings:
-	rm -rf $(android_generated_source_path) target/swift-bindings
+	rm -rf target/swift-bindings
 	cargo build --release
 
 	#wp_api
-	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir $(android_generated_source_path) --language kotlin
 	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
 	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
@@ -62,18 +46,10 @@ docs:
 	$(rust_docker_run) /bin/bash -c 'cargo doc'
 	cp -r target/doc/static.files docs/static.files
 	cp -r target/doc/wp_api docs/wp_api
-	cp -r target/doc/wp_derive docs/wp_derive
-	cp -r target/doc/wp_networking docs/wp_networking
+	cp -r target/doc/wp_contextual docs/wp_contextual
 
 docs-archive: docs
 	tar -czvf  docs.tar.gz docs
-
-_test-android:
-	./native/android/gradlew -p ./native/android cAT
-
-_publish-android-local:
-	./native/android/gradlew -p ./native/android publishToMavenLocal -exclude-task prepareToPublishToS3
-
 
 # Builds the library for all the various architectures / systems required in an XCFramework
 xcframework-libraries:
@@ -97,17 +73,17 @@ xcframework-libraries:
 	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
 
 %-xcframework-library:
-	cargo build --target $* --package wp_api --release
+	cargo $(cargo_config_library) build --target $* --package wp_api --release
 	$(MAKE) $*-combine-libraries
 
 %-xcframework-library-with-nightly:
-	cargo +$(rust_nightly_toolchain) build --target $* --package wp_api --release -Zbuild-std
+	cargo +$(rust_nightly_toolchain) $(cargo_config_library) build --target $* --package wp_api --release -Z build-std=panic_abort,std
 	$(MAKE) $*-combine-libraries
 
 # Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
 # to combine the binaries
 %-combine-libraries:
-	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a #target/$*/release/libwp_networking.a
+	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a
 
 # Some libraries need to be created in a multi-binary format, so we combine them here
 xcframework-combined-libraries: xcframework-libraries
@@ -204,20 +180,34 @@ test-swift-tvOS: xcframework
 test-swift-watchOS: xcframework
 	scripts/xcodebuild-test.sh watchOS-10-4
 
-test-android: bindings _test-android
+test-rust-lib:
+	$(rust_docker_run) cargo test --lib -- --nocapture
 
-publish-android-local: bindings _publish-android-local
+test-rust-doc:
+	$(rust_docker_run) cargo test --doc -- --nocapture
 
-test-rust:
-	$(rust_docker_run) cargo test
-
-test-server:
+test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
-	docker-compose run wpcli
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server:
+stop-server: delete-wp-plugins-backup
 	docker-compose down
+
+dump-mysql:
+	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysqldump --defaults-extra-file=mysql_config/config.cnf --no-tablespaces wordpress > dump.sql"
+
+restore-mysql:
+	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
+
+backup-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
+
+restore-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "rm -rf ./wp-content/plugins &&  cp -R /tmp/backup_wp_plugins ./wp-content/plugins"
+
+delete-wp-plugins-backup:
+	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
 lint: lint-rust lint-swift
 
@@ -244,6 +234,9 @@ dev-server:
 	mkdir -p .wordpress
 	docker-compose up
 
+prepare-dev-server:
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
+
 setup-rust:
 	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain
 	RUST_TOOLCHAIN=$(rust_nightly_toolchain) $(MAKE) setup-rust-toolchain
@@ -257,3 +250,10 @@ setup-rust-toolchain:
 		aarch64-apple-darwin \
 		x86_64-apple-darwin \
 		aarch64-apple-ios-sim
+
+setup-rust-android-targets:
+	rustup target add \
+		x86_64-linux-android \
+		i686-linux-android \
+		armv7-linux-androideabi \
+		aarch64-linux-android

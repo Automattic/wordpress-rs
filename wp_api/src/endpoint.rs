@@ -1,7 +1,11 @@
 use url::Url;
 
+pub use plugins_endpoint::*;
 pub use users_endpoint::*;
 
+use crate::SparseField;
+
+mod plugins_endpoint;
 mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
@@ -47,6 +51,7 @@ impl ApiBaseUrl {
 pub struct ApiEndpoint {
     pub base_url: ApiBaseUrl,
     pub users: UsersEndpoint,
+    pub plugins: PluginsEndpoint,
 }
 
 impl ApiEndpoint {
@@ -54,6 +59,7 @@ impl ApiEndpoint {
         Self {
             base_url: api_base_url.clone(),
             users: UsersEndpoint::new(api_base_url.clone()),
+            plugins: PluginsEndpoint::new(api_base_url.clone()),
         }
     }
 
@@ -68,6 +74,7 @@ trait UrlExtension {
     where
         I: IntoIterator,
         I::Item: AsRef<str>;
+    fn append_filter_fields(self, fields: &[impl SparseField]) -> Url;
 }
 
 impl UrlExtension for Url {
@@ -84,6 +91,19 @@ impl UrlExtension for Url {
         self.path_segments_mut()?.extend(segments);
         Ok(self)
     }
+
+    fn append_filter_fields(mut self, fields: &[impl SparseField]) -> Url {
+        self.query_pairs_mut().append_pair(
+            "_fields",
+            fields
+                .iter()
+                .map(|f| f.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+                .as_str(),
+        );
+        self
+    }
 }
 
 #[cfg(test)]
@@ -93,27 +113,30 @@ mod tests {
 
     #[test]
     fn append_url() {
-        let url = Url::parse("https://foo.com").unwrap();
-        assert_eq!(url.append("bar").unwrap().as_str(), "https://foo.com/bar");
+        let url = Url::parse("https://example.com").unwrap();
+        assert_eq!(
+            url.append("bar").unwrap().as_str(),
+            "https://example.com/bar"
+        );
     }
 
     #[test]
     fn extend_url() {
-        let url = Url::parse("https://foo.com").unwrap();
+        let url = Url::parse("https://example.com").unwrap();
         assert_eq!(
             url.extend(["bar", "baz"]).unwrap().as_str(),
-            "https://foo.com/bar/baz"
+            "https://example.com/bar/baz"
         );
     }
 
     #[rstest]
     fn api_base_url(
         #[values(
-            "http://foo.com",
-            "https://foo.com",
-            "https://www.foo.com",
-            "https://f.foo.com",
-            "https://foo.com/f"
+            "http://example.com",
+            "https://example.com",
+            "https://www.example.com",
+            "https://f.example.com",
+            "https://example.com/f"
         )]
         test_base_url: &str,
     ) {
@@ -136,5 +159,17 @@ mod tests {
 
     fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
         format!("{}{}", wp_json_endpoint(base_url), suffix)
+    }
+
+    #[fixture]
+    pub fn fixture_api_base_url() -> ApiBaseUrl {
+        ApiBaseUrl::new("https://example.com").unwrap()
+    }
+
+    pub fn validate_endpoint(endpoint_url: Url, path: &str) {
+        assert_eq!(
+            endpoint_url.as_str(),
+            format!("{}{}", fixture_api_base_url().as_str(), path)
+        );
     }
 }

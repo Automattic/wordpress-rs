@@ -1,9 +1,0 @@
-[package]
-name = "wp_networking"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-http = { workspace = true }
-reqwest = { version = "0.12", features = ["blocking"] }
-wp_api = { path = "../wp_api" }

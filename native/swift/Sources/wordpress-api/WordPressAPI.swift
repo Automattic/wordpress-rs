@@ -1,5 +1,5 @@
 import Foundation
-import wordpress_api_wrapper
+import WordPressAPIInternal
 
 #if os(Linux)
 import FoundationNetworking
@@ -71,7 +71,7 @@ public struct WordPressAPI {
         }
 
         public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
-            return wordpress_api_wrapper.extractLoginDetailsFromUrl(url: url.asRestUrl())
+            return WordPressAPIInternal.extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
 
@@ -87,8 +87,22 @@ public extension WpNetworkRequest {
         var request = URLRequest(url: url)
         request.httpMethod = self.method.rawValue
         request.allHTTPHeaderFields = self.headerMap
+        request.httpBody = self.body
         return request
     }
+
+    #if DEBUG
+    func debugPrint() {
+        print("\(method.rawValue) \(url)")
+        for (name, value) in headerMap {
+            print("\(name): \(value)")
+        }
+        print("")
+        if let body, let text = String(data: body, encoding: .utf8) {
+            print(text)
+        }
+    }
+    #endif
 }
 
 extension Result {
