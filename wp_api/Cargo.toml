@@ -16,10 +16,17 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
-wp_derive = { path = "../wp_derive" }
+wp_contextual = { path = "../wp_contextual" }
 
 [dev-dependencies]
+chrono = { version = "0.4" }
+futures = "0.3"
+reqwest = "0.12"
 rstest = { workspace = true }
+rstest_reuse = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { version = "0.7", features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
+tokio = { version = "1.37", features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

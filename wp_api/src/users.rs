@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 use crate::{
-    add_uniffi_exported_parser, parse_wp_response, WPApiError, WPApiParamOrder, WPNetworkResponse,
+    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPApiParamOrder,
+    WPNetworkResponse,
 };
 
 add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
@@ -394,8 +395,8 @@ pub enum SparseUserField {
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
 
-impl SparseUserField {
-    pub fn as_str(&self) -> &str {
+impl SparseField for SparseUserField {
+    fn as_str(&self) -> &str {
         match self {
             Self::Id => "id",
             Self::Username => "username",
@@ -420,7 +421,7 @@ impl SparseUserField {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, test_helpers::assert_expected_query_pairs};
+    use crate::{generate, unit_test_common::assert_expected_query_pairs};
     use rstest::*;
 
     #[rstest]

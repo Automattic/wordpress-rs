@@ -3,14 +3,14 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-pub use api_error::*;
+pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
 pub use endpoint::*;
 pub use login::*;
 pub use plugins::*;
 pub use url::*;
 pub use users::*;
 
-pub mod api_error;
+mod api_error; // re-exported relevant types
 pub mod endpoint;
 pub mod login;
 pub mod plugins;
@@ -18,7 +18,7 @@ pub mod url;
 pub mod users;
 
 #[cfg(test)]
-mod test_helpers;
+mod unit_test_common;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 
@@ -219,6 +219,24 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
@@ -241,10 +259,28 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_retrieve(context, plugin, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn update_plugin_request(
         &self,
         plugin: &PluginSlug,
-        params: PluginUpdateParams,
+        params: &PluginUpdateParams,
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
@@ -450,6 +486,10 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     }
 
     None
+}
+
+trait SparseField {
+    fn as_str(&self) -> &str;
 }
 
 #[macro_export]

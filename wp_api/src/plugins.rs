@@ -1,8 +1,12 @@
 use serde::{Deserialize, Serialize};
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
-use crate::{add_uniffi_exported_parser, parse_wp_response, WPApiError, WPNetworkResponse};
+use crate::{
+    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPNetworkResponse,
+};
 
+add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
+add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);
 add_uniffi_exported_parser!(
     parse_list_plugins_response_with_edit_context,
     Vec<PluginWithEditContext>
@@ -93,6 +97,37 @@ pub struct SparsePlugin {
     pub textdomain: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparsePluginField {
+    Author,
+    Description,
+    Name,
+    NetworkOnly,
+    Plugin,
+    PluginUri,
+    RequiresPhp,
+    Status,
+    Textdomain,
+    Version,
+}
+
+impl SparseField for SparsePluginField {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Author => "author",
+            Self::Description => "description",
+            Self::Name => "name",
+            Self::NetworkOnly => "network_only",
+            Self::Plugin => "plugin",
+            Self::PluginUri => "plugin_uri",
+            Self::RequiresPhp => "requires_php",
+            Self::Status => "status",
+            Self::Textdomain => "textdomain",
+            Self::Version => "version",
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PluginDeleteResponse {
     pub deleted: bool,
@@ -153,7 +188,7 @@ pub struct PluginDescription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, test_helpers::assert_expected_query_pairs};
+    use crate::{generate, unit_test_common::assert_expected_query_pairs};
     use rstest::*;
 
     #[rstest]
