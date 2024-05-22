@@ -128,12 +128,22 @@ pub fn read_test_credentials_from_file() -> TestCredentials {
 
 fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> u16 {
     match error_code {
+        WPRestErrorCode::CannotActivatePlugin => 403,
         WPRestErrorCode::CannotCreateUser => 403,
+        WPRestErrorCode::CannotDeactivatePlugin => 403,
+        WPRestErrorCode::CannotDeleteActivePlugin => 400,
         WPRestErrorCode::CannotEdit => 403,
         WPRestErrorCode::CannotEditRoles => 403,
+        WPRestErrorCode::CannotInstallPlugin => 403,
+        WPRestErrorCode::CannotManageNetworkPlugins => 403,
+        WPRestErrorCode::CannotManagePlugins => 403,
+        WPRestErrorCode::CannotViewPlugin => 403,
+        WPRestErrorCode::CannotViewPlugins => 403,
         WPRestErrorCode::ForbiddenContext => 403,
         WPRestErrorCode::ForbiddenOrderBy => 403,
         WPRestErrorCode::ForbiddenWho => 403,
+        WPRestErrorCode::NetworkOnlyPlugin => 400,
+        WPRestErrorCode::PluginNotFound => 404,
         WPRestErrorCode::InvalidParam => 400,
         WPRestErrorCode::TrashNotSupported => 501,
         WPRestErrorCode::Unauthorized => 401,
