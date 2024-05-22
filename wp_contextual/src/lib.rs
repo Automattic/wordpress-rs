@@ -320,7 +320,10 @@ mod wp_contextual;
 /// * Notice that `BazWithEmbedContext` & `BazWithViewContext` types weren't generated since
 /// they wouldn't have any fields.
 /// * Notice the type for `qux: Vec<u32>` was preserved as this wasn't an `Option<T>` type.
-#[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
+#[proc_macro_derive(
+    WPContextual,
+    attributes(WPContext, WPContextualField, WPContextualOption)
+)]
 pub fn derive(input: TokenStream) -> TokenStream {
     wp_contextual::wp_contextual(parse_macro_input!(input))
         .unwrap_or_else(|err| err.into_compile_error().into())
