@@ -35,6 +35,7 @@ native/swift/Sources/wordpress-api-wrapper/*.swift
 .wordpress
 test_credentials
 /logs
+dump.sql
 
 # CI Cache
 .cargo
