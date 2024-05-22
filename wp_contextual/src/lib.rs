@@ -246,6 +246,7 @@
 //!
 //! ```
 //! # use wp_contextual::WPContextual;
+//! # use std::collections::HashMap;
 //! #[derive(WPContextual)]
 //! pub struct SparseUser {
 //!     #[WPContext(edit)]
@@ -260,6 +261,7 @@
 //! This will generate the following:
 //!
 //! ```
+//! # use std::collections::HashMap;
 //! pub struct UserWithEditContext {
 //!     pub avatar_urls: Option<HashMap<String, String>>,
 //! }
