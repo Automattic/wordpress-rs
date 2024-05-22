@@ -85,7 +85,7 @@ wp plugin delete wordpress-importer
 
 touch /tmp/test_credentials
 {
-  printf "http://localhost\ntest@example.com\n"
+  printf "http://host.docker.internal\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
   wp user application-password create test@example.com test --porcelain 
   wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p'

@@ -189,7 +189,7 @@ steps:
           make test-server
 
           echo "--- 🧪 Running Tests"
-          curl -u $(cat test_credentials | sed -n '2 p'):$(cat test_credentials | sed -n '3 p') 'http://localhost/wp-json/wp/v2/posts?context=edit' --fail-with-body | jq
+          make test-rust-integration
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix:

@@ -1,7 +1,6 @@
-use std::process::Command;
-
 use futures::Future;
 use sqlx::types::chrono;
+use sqlx::Executor;
 use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
 
 pub async fn run_and_restore<F, Fut>(f: F)
@@ -9,21 +8,32 @@ where
     F: FnOnce(WordPressDb) -> Fut,
     Fut: Future<Output = ()>,
 {
+    let hostname = std::env::var("DB_HOSTNAME").unwrap_or("host.docker.internal".to_string());
+    let wp_content_path =
+        std::env::var("WP_CONTENT_PATH").unwrap_or("/app/.wordpress/wp-content".to_string());
+    let db_dump_path = wp_content_path + "/dump.sql";
+
     let options = MySqlConnectOptions::new()
-        .host("localhost")
+        .host(hostname.as_str())
         .username("wordpress")
         .password("wordpress")
         .database("wordpress");
     let conn = MySqlConnectOptions::connect(&options).await.unwrap();
-    f(WordPressDb { conn }).await;
+    let db = WordPressDb { conn };
 
-    // Restore WordPressDB from backup
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("restore-mysql")
-        .status()
-        .expect("Failed to restore db");
+    let result = f(db).await;
+
+    let mut cleanup_conn = MySqlConnectOptions::connect(&options).await.unwrap();
+    println!("Restoring WordPressDB from {:?}", db_dump_path);
+
+    let db_schema = std::fs::read_to_string(db_dump_path).expect("Failed to read SQL dump");
+
+    let _ = &mut cleanup_conn
+        .execute(db_schema.as_str())
+        .await
+        .expect("Failed to restore database");
+
+    return result;
 }
 
 #[derive(Debug)]
