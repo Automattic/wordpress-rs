@@ -1,22 +1,24 @@
 #![allow(dead_code, unused_variables)]
 
+use serde::Deserialize;
 use std::collections::HashMap;
 
-pub use api_error::*;
-pub use endpoint::*;
-pub use login::*;
-pub use pages::*;
-pub use posts::*;
-pub use url::*;
-pub use users::*;
+pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
+use endpoint::*;
+use login::*;
+use plugins::*;
+use url::*;
+use users::*;
 
-pub mod api_error;
+mod api_error; // re-exported relevant types
 pub mod endpoint;
 pub mod login;
-pub mod pages;
-pub mod posts;
+pub mod plugins;
 pub mod url;
 pub mod users;
+
+#[cfg(test)]
+mod unit_test_common;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 
@@ -25,6 +27,14 @@ pub struct WPApiHelper {
     api_endpoint: ApiEndpoint,
     site_url: Url,
     authentication: WPAuthentication,
+}
+
+#[uniffi::export]
+fn wp_authentication_from_username_and_password(
+    username: String,
+    password: String,
+) -> WPAuthentication {
+    WPAuthentication::from_username_and_password(username, password)
 }
 
 #[uniffi::export]
@@ -46,25 +56,6 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: Url::parse(url.as_str()).unwrap().into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn post_list_request(&self, params: PostListParams) -> WPNetworkRequest {
-        let mut url = self
-            .site_url
-            .join("/wp-json/wp/v2/posts?context=edit")
-            .unwrap();
-
-        url.query_pairs_mut()
-            .append_pair("page", params.page.to_string().as_str());
-        url.query_pairs_mut()
-            .append_pair("per_page", params.per_page.to_string().as_str());
-
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: url.into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -211,6 +202,103 @@ impl WPApiHelper {
         }
     }
 
+    pub fn list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .list(context, params.as_ref())
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn filter_list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.create().into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn filter_retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_retrieve(context, plugin, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn update_plugin_request(
+        &self,
+        plugin: &PluginSlug,
+        params: &PluginUpdateParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.update(plugin).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: self.api_endpoint.plugins.delete(plugin).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     fn header_map(&self) -> HashMap<String, String> {
         let mut header_map = HashMap::new();
         header_map.insert(
@@ -263,6 +351,15 @@ impl WPContext {
 pub enum WPAuthentication {
     AuthorizationHeader { token: String },
     None,
+}
+
+impl WPAuthentication {
+    pub fn from_username_and_password(username: String, password: String) -> Self {
+        use base64::prelude::*;
+        WPAuthentication::AuthorizationHeader {
+            token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
+        }
+    }
 }
 
 #[derive(uniffi::Enum)]
@@ -340,29 +437,6 @@ impl WPNetworkResponse {
 }
 
 #[uniffi::export]
-pub fn parse_post_list_response(
-    response: WPNetworkResponse,
-) -> Result<PostListResponse, WPApiError> {
-    parse_response_for_generic_errors(&response)?;
-    let post_list: Vec<PostObject> =
-        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-            reason: err.to_string(),
-            response: String::from_utf8_lossy(&response.body).to_string(),
-        })?;
-
-    let mut next_page: Option<String> = None;
-
-    if let Some(link_header) = response.get_link_header("next") {
-        next_page = Some(link_header.to_string())
-    }
-
-    Ok(PostListResponse {
-        post_list: Some(post_list),
-        next_page,
-    })
-}
-
-#[uniffi::export]
 pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
@@ -371,6 +445,16 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
         })?;
 
     Ok(api_details)
+}
+
+pub fn parse_wp_response<'de, T: Deserialize<'de>>(
+    response: &'de WPNetworkResponse,
+) -> Result<T, WPApiError> {
+    parse_response_for_generic_errors(response)?;
+    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+        reason: err.to_string(),
+        response: String::from_utf8_lossy(&response.body).to_string(),
+    })
 }
 
 pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
@@ -402,6 +486,32 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
     }
 
     None
+}
+
+trait SparseField {
+    fn as_str(&self) -> &str;
+}
+
+#[macro_export]
+macro_rules! add_uniffi_exported_parser {
+    ($fn_name:ident, $return_type: ty) => {
+        #[uniffi::export]
+        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
+            parse_wp_response(response)
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! generate {
+    ($type_name:ident) => {
+        $type_name::default()
+    };
+    ($type_name:ident, $(($f:ident, $v:expr)), *) => {{
+        let mut obj = $type_name::default();
+        $(obj.$f = $v;)*
+        obj
+    }};
 }
 
 uniffi::setup_scaffolding!();

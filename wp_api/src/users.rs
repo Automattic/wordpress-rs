@@ -1,75 +1,40 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
-use crate::{parse_response_for_generic_errors, WPApiError, WPApiParamOrder, WPNetworkResponse};
+use crate::{
+    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPApiParamOrder,
+    WPNetworkResponse,
+};
 
-#[uniffi::export]
-pub fn parse_filter_users_response(
-    response: &WPNetworkResponse,
-) -> Result<Vec<SparseUser>, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_filter_retrieve_user_response(
-    response: &WPNetworkResponse,
-) -> Result<SparseUser, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_users_response_with_edit_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<UserWithEditContext>, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_users_response_with_embed_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<UserWithEmbedContext>, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_list_users_response_with_view_context(
-    response: &WPNetworkResponse,
-) -> Result<Vec<UserWithViewContext>, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_retrieve_user_response_with_edit_context(
-    response: &WPNetworkResponse,
-) -> Result<UserWithEditContext, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_retrieve_user_response_with_embed_context(
-    response: &WPNetworkResponse,
-) -> Result<UserWithEmbedContext, WPApiError> {
-    parse_users_response(response)
-}
-
-#[uniffi::export]
-pub fn parse_retrieve_user_response_with_view_context(
-    response: &WPNetworkResponse,
-) -> Result<UserWithViewContext, WPApiError> {
-    parse_users_response(response)
-}
-
-pub fn parse_users_response<'de, T: Deserialize<'de>>(
-    response: &'de WPNetworkResponse,
-) -> Result<T, WPApiError> {
-    parse_response_for_generic_errors(response)?;
-    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-        reason: err.to_string(),
-        response: String::from_utf8_lossy(&response.body).to_string(),
-    })
-}
+add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
+add_uniffi_exported_parser!(parse_filter_retrieve_user_response, SparseUser);
+add_uniffi_exported_parser!(
+    parse_list_users_response_with_edit_context,
+    Vec<UserWithEditContext>
+);
+add_uniffi_exported_parser!(
+    parse_list_users_response_with_embed_context,
+    Vec<UserWithEmbedContext>
+);
+add_uniffi_exported_parser!(
+    parse_list_users_response_with_view_context,
+    Vec<UserWithViewContext>
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_user_response_with_edit_context,
+    UserWithEditContext
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_user_response_with_embed_context,
+    UserWithEmbedContext
+);
+add_uniffi_exported_parser!(
+    parse_retrieve_user_response_with_view_context,
+    UserWithViewContext
+);
+add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersOrderBy {
@@ -219,7 +184,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Serialize, uniffi::Record)]
+#[derive(Serialize, Debug, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,
@@ -354,6 +319,12 @@ impl UserDeleteParams {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct UserDeleteResponse {
+    pub deleted: bool,
+    pub previous: UserWithEditContext,
+}
+
 uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserId(pub i32);
@@ -424,8 +395,8 @@ pub enum SparseUserField {
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
 
-impl SparseUserField {
-    pub fn as_str(&self) -> &str {
+impl SparseField for SparseUserField {
+    fn as_str(&self) -> &str {
         match self {
             Self::Id => "id",
             Self::Username => "username",
@@ -447,41 +418,30 @@ impl SparseUserField {
     }
 }
 
-#[macro_export]
-macro_rules! user_list_params {
-    () => {
-        UserListParams::default()
-    };
-    ($(($f:ident, $v:expr)), *) => {{
-        let mut params = UserListParams::default();
-        $(params.$f = $v;)*
-        params
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{generate, unit_test_common::assert_expected_query_pairs};
     use rstest::*;
 
     #[rstest]
-    #[case(user_list_params!(), &[])]
-    #[case(user_list_params!((page, Some(1))), &[("page", "1")])]
-    #[case(user_list_params!((page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
-    #[case(user_list_params!((search, Some("foo".to_string()))), &[("search", "foo")])]
-    #[case(user_list_params!((exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
-    #[case(user_list_params!((include, vec![UserId(1)])), &[("include", "1")])]
-    #[case(user_list_params!((per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
-    #[case(user_list_params!((order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
-    #[case(user_list_params!((orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
-    #[case(user_list_params!((order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
-    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
-    #[case(user_list_params!((roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
-    #[case(user_list_params!((slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
-    #[case(user_list_params!((capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
-    #[case::who_all_param_should_be_empty(user_list_params!((who, Some(WPApiParamUsersWho::All))), &[])]
-    #[case(user_list_params!((who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
-    #[case(user_list_params!((has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[case(UserListParams::default(), &[])]
+    #[case(generate!(UserListParams, (page, Some(1))), &[("page", "1")])]
+    #[case(generate!(UserListParams, (page, Some(2)), (per_page, Some(5))), &[("page", "2"), ("per_page", "5")])]
+    #[case(generate!(UserListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
+    #[case(generate!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
+    #[case(generate!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
+    #[case(generate!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
+    #[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(generate!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
+    #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
+    #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
+    #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
+    #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
+    #[case(generate!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case(generate!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
     #[trace]
     fn test_user_list_params(
         #[case] params: UserListParams,
@@ -497,20 +457,5 @@ mod tests {
             params.query_pairs(),
             &[("force", "true"), ("reassign", "987")],
         );
-    }
-
-    fn assert_expected_query_pairs<'a>(
-        query_pairs: impl IntoIterator<Item = (&'a str, String)>,
-        expected_pairs: &[(&'a str, &str)],
-    ) {
-        let mut query_pairs = query_pairs.into_iter().collect::<Vec<_>>();
-        let mut expected_pairs: Vec<(&str, String)> = expected_pairs
-            .iter()
-            .map(|(k, v)| (*k, v.to_string()))
-            .collect();
-        // The order of query pairs doesn't matter
-        query_pairs.sort();
-        expected_pairs.sort();
-        assert_eq!(query_pairs, expected_pairs);
     }
 }

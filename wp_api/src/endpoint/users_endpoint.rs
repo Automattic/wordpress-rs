@@ -2,6 +2,8 @@ use url::Url;
 
 use crate::{ApiBaseUrl, SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
+use super::UrlExtension;
+
 pub struct UsersEndpoint {
     api_base_url: ApiBaseUrl,
 }
@@ -45,7 +47,7 @@ impl UsersEndpoint {
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
     ) -> Url {
-        self.append_filter_fields(self.list(context, params), fields)
+        self.list(context, params).append_filter_fields(fields)
     }
 
     pub fn retrieve(&self, user_id: UserId, context: WPContext) -> Url {
@@ -63,7 +65,7 @@ impl UsersEndpoint {
         context: WPContext,
         fields: &[SparseUserField],
     ) -> Url {
-        self.append_filter_fields(self.retrieve(user_id, context), fields)
+        self.retrieve(user_id, context).append_filter_fields(fields)
     }
 
     pub fn retrieve_me(&self, context: WPContext) -> Url {
@@ -74,7 +76,7 @@ impl UsersEndpoint {
     }
 
     pub fn filter_retrieve_me(&self, context: WPContext, fields: &[SparseUserField]) -> Url {
-        self.append_filter_fields(self.retrieve_me(context), fields)
+        self.retrieve_me(context).append_filter_fields(fields)
     }
 
     pub fn update(&self, user_id: UserId) -> Url {
@@ -85,34 +87,24 @@ impl UsersEndpoint {
     pub fn update_me(&self) -> Url {
         self.api_base_url.by_extending(["users", "me"])
     }
-
-    fn append_filter_fields(&self, mut url: Url, fields: &[SparseUserField]) -> Url {
-        url.query_pairs_mut().append_pair(
-            "_fields",
-            fields
-                .iter()
-                .map(|f| f.as_str())
-                .collect::<Vec<&str>>()
-                .join(",")
-                .as_str(),
-        );
-        url
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ApiEndpoint;
+    use crate::{
+        endpoint::tests::{fixture_api_base_url, validate_endpoint},
+        ApiEndpoint,
+    };
     use rstest::*;
 
     #[rstest]
-    fn create_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
-        validate_endpoint(users_endpoint.create(), "/users", &api_base_url);
+    fn create_user(users_endpoint: UsersEndpoint) {
+        validate_endpoint(users_endpoint.create(), "/users");
     }
 
     #[rstest]
-    fn delete_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn delete_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.delete(
                 UserId(54),
@@ -121,32 +113,29 @@ mod tests {
                 },
             ),
             "/users/54?reassign=98&force=true",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn delete_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn delete_current_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.delete_me(&UserDeleteParams {
                 reassign: UserId(98),
             }),
             "/users/me?reassign=98&force=true",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn list_users(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn list_users(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.list(WPContext::Edit, None),
             "/users?context=edit",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn list_users_with_params(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn list_users_with_params(users_endpoint: UsersEndpoint) {
         let params = UserListParams {
             page: Some(2),
             per_page: Some(60),
@@ -165,12 +154,11 @@ mod tests {
         validate_endpoint(
             users_endpoint.list(WPContext::Edit, Some(&params)),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn filter_list_users_with_params(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn filter_list_users_with_params(users_endpoint: UsersEndpoint) {
         let params = UserListParams {
             page: Some(2),
             per_page: Some(60),
@@ -189,21 +177,19 @@ mod tests {
         validate_endpoint(
             users_endpoint.filter_list(WPContext::Edit, Some(&params), &vec![SparseUserField::Name, SparseUserField::Email]),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true&_fields=name%2Cemail",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn retrieve_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn retrieve_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.retrieve(UserId(98), WPContext::View),
             "/users/98?context=view",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn filter_retrieve_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn filter_retrieve_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.filter_retrieve(
                 UserId(98),
@@ -211,59 +197,40 @@ mod tests {
                 &vec![SparseUserField::Nickname, SparseUserField::Url],
             ),
             "/users/98?context=view&_fields=nickname%2Curl",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn retrieve_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn retrieve_current_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.retrieve_me(WPContext::Embed),
             "/users/me?context=embed",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn filter_retrieve_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
+    fn filter_retrieve_current_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.filter_retrieve_me(
                 WPContext::Embed,
                 &vec![SparseUserField::Roles, SparseUserField::Capabilities],
             ),
             "/users/me?context=embed&_fields=roles%2Ccapabilities",
-            &api_base_url,
         );
     }
 
     #[rstest]
-    fn update_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
-        validate_endpoint(
-            users_endpoint.update(UserId(98)),
-            "/users/98",
-            &api_base_url,
-        );
+    fn update_user(users_endpoint: UsersEndpoint) {
+        validate_endpoint(users_endpoint.update(UserId(98)), "/users/98");
     }
 
     #[rstest]
-    fn update_current_user(api_base_url: ApiBaseUrl, users_endpoint: UsersEndpoint) {
-        validate_endpoint(users_endpoint.update_me(), "/users/me", &api_base_url);
+    fn update_current_user(users_endpoint: UsersEndpoint) {
+        validate_endpoint(users_endpoint.update_me(), "/users/me");
     }
 
     #[fixture]
-    fn api_base_url() -> ApiBaseUrl {
-        ApiBaseUrl::new("https://foo.com").unwrap()
-    }
-
-    #[fixture]
-    fn users_endpoint(api_base_url: ApiBaseUrl) -> UsersEndpoint {
-        ApiEndpoint::new(api_base_url).users
-    }
-
-    fn validate_endpoint(endpoint_url: Url, path: &str, api_base_url: &ApiBaseUrl) {
-        assert_eq!(
-            endpoint_url.as_str(),
-            format!("{}{}", api_base_url.as_str(), path)
-        );
+    fn users_endpoint(fixture_api_base_url: ApiBaseUrl) -> UsersEndpoint {
+        ApiEndpoint::new(fixture_api_base_url).users
     }
 }

@@ -15,6 +15,8 @@ swift_package_platform_ios := $(call swift_package_platform_version,ios)
 swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
 
+cargo_config_library = --config profile.release.debug=true --config 'profile.release.panic="abort"'
+
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 rust_nightly_toolchain := nightly-2024-04-30
 
@@ -44,8 +46,7 @@ docs:
 	$(rust_docker_run) /bin/bash -c 'cargo doc'
 	cp -r target/doc/static.files docs/static.files
 	cp -r target/doc/wp_api docs/wp_api
-	cp -r target/doc/wp_derive docs/wp_derive
-	cp -r target/doc/wp_networking docs/wp_networking
+	cp -r target/doc/wp_contextual docs/wp_contextual
 
 docs-archive: docs
 	tar -czvf  docs.tar.gz docs
@@ -72,17 +73,17 @@ xcframework-libraries:
 	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
 
 %-xcframework-library:
-	cargo build --target $* --package wp_api --release
+	cargo $(cargo_config_library) build --target $* --package wp_api --release
 	$(MAKE) $*-combine-libraries
 
 %-xcframework-library-with-nightly:
-	cargo +$(rust_nightly_toolchain) build --target $* --package wp_api --release -Zbuild-std
+	cargo +$(rust_nightly_toolchain) $(cargo_config_library) build --target $* --package wp_api --release -Z build-std=panic_abort,std
 	$(MAKE) $*-combine-libraries
 
 # Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
 # to combine the binaries
 %-combine-libraries:
-	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a #target/$*/release/libwp_networking.a
+	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a
 
 # Some libraries need to be created in a multi-binary format, so we combine them here
 xcframework-combined-libraries: xcframework-libraries
@@ -188,9 +189,9 @@ test-rust-doc:
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
-	docker-compose run wpcli
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server:
+stop-server: delete-wp-plugins-backup
 	docker-compose down
 
 dump-mysql:
@@ -198,6 +199,15 @@ dump-mysql:
 
 restore-mysql:
 	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
+
+backup-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
+
+restore-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "rm -rf ./wp-content/plugins &&  cp -R /tmp/backup_wp_plugins ./wp-content/plugins"
+
+delete-wp-plugins-backup:
+	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
 lint: lint-rust lint-swift
 
@@ -224,6 +234,9 @@ dev-server:
 	mkdir -p .wordpress
 	docker-compose up
 
+prepare-dev-server:
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
+
 setup-rust:
 	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain
 	RUST_TOOLCHAIN=$(rust_nightly_toolchain) $(MAKE) setup-rust-toolchain
@@ -237,3 +250,10 @@ setup-rust-toolchain:
 		aarch64-apple-darwin \
 		x86_64-apple-darwin \
 		aarch64-apple-ios-sim
+
+setup-rust-android-targets:
+	rustup target add \
+		x86_64-linux-android \
+		i686-linux-android \
+		armv7-linux-androideabi \
+		aarch64-linux-android

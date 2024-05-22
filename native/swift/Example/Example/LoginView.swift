@@ -74,9 +74,8 @@ struct LoginView: View {
                     appNameValue += " - (\(deviceName))"
                 }
                 #else
-                if let deviceName = UIDevice.current.name {
-                    appNameValue += " - (\(deviceName))"
-                }
+                let deviceName = UIDevice.current.name
+                appNameValue += " - (\(deviceName))"
                 #endif
 
                 authURL.append(queryItems: [

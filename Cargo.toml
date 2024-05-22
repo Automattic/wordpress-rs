@@ -1,8 +1,7 @@
 [workspace]
 members = [
   "wp_api",
-  "wp_derive",
-  "wp_networking",
+  "wp_contextual",
   "wp_uniffi_bindgen",
 ]
 resolver = "2"
@@ -15,4 +14,4 @@ rstest_reuse = "0.6.0"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 thiserror = "1.0"
-uniffi = "0.27.0"
+uniffi = "0.27.1"

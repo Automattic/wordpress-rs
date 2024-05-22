@@ -1,5 +1,6 @@
 [bindings.kotlin]
-android_cleaner = true
+android = false
+android_cleaner = false
 cdylib_name = "wp_api"
 generate_immutable_records = true
 

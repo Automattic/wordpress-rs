@@ -87,8 +87,22 @@ public extension WpNetworkRequest {
         var request = URLRequest(url: url)
         request.httpMethod = self.method.rawValue
         request.allHTTPHeaderFields = self.headerMap
+        request.httpBody = self.body
         return request
     }
+
+    #if DEBUG
+    func debugPrint() {
+        print("\(method.rawValue) \(url)")
+        for (name, value) in headerMap {
+            print("\(name): \(value)")
+        }
+        print("")
+        if let body, let text = String(data: body, encoding: .utf8) {
+            print(text)
+        }
+    }
+    #endif
 }
 
 extension Result {
