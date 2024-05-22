@@ -7,16 +7,13 @@ pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper
 use endpoint::*;
 use login::*;
 use plugins::*;
-use posts::*;
 use url::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
 pub mod endpoint;
 pub mod login;
-pub mod pages;
 pub mod plugins;
-pub mod posts;
 pub mod url;
 pub mod users;
 
@@ -59,25 +56,6 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: Url::parse(url.as_str()).unwrap().into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn post_list_request(&self, params: PostListParams) -> WPNetworkRequest {
-        let mut url = self
-            .site_url
-            .join("/wp-json/wp/v2/posts?context=edit")
-            .unwrap();
-
-        url.query_pairs_mut()
-            .append_pair("page", params.page.to_string().as_str());
-        url.query_pairs_mut()
-            .append_pair("per_page", params.per_page.to_string().as_str());
-
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: url.into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -456,29 +434,6 @@ impl WPNetworkResponse {
 
         None
     }
-}
-
-#[uniffi::export]
-pub fn parse_post_list_response(
-    response: WPNetworkResponse,
-) -> Result<PostListResponse, WPApiError> {
-    parse_response_for_generic_errors(&response)?;
-    let post_list: Vec<PostObject> =
-        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-            reason: err.to_string(),
-            response: String::from_utf8_lossy(&response.body).to_string(),
-        })?;
-
-    let mut next_page: Option<String> = None;
-
-    if let Some(link_header) = response.get_link_header("next") {
-        next_page = Some(link_header.to_string())
-    }
-
-    Ok(PostListResponse {
-        post_list: Some(post_list),
-        next_page,
-    })
 }
 
 #[uniffi::export]
