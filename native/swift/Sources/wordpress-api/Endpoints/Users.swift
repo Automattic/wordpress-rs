@@ -91,3 +91,29 @@ extension AnyNamespace where T == SparseUser {
     }
 
 }
+
+// MARK: - Filter
+
+// Note: Once the Rust library adds support of passing fields to all routes (get, list, update, create, etc), we can
+// consider generalizing these functions and moving them to Namespace.swift.
+extension ContextualNamespace where T == SparseUser {
+
+    public func list(with params: T.ListParams, fields: [SparseUserField]) async throws -> [T] {
+        let request = api.helper.filterListUsersRequest(context: context, params: params, fields: fields)
+        let response = try await api.perform(request: request)
+        return try parseFilterUsersResponse(response: response)
+    }
+
+    public func get(id: T.ID, fields: [SparseUserField]) async throws -> T {
+        let request = api.helper.filterRetrieveUserRequest(userId: id, context: context, fields: fields)
+        let response = try await api.perform(request: request)
+        return try parseFilterRetrieveUserResponse(response: response)
+    }
+
+    public func getCurrent(fields: [SparseUserField]) async throws -> T {
+        let request = api.helper.filterRetrieveCurrentUserRequest(context: context, fields: fields)
+        let response = try await api.perform(request: request)
+        return try parseFilterRetrieveUserResponse(response: response)
+    }
+
+}
