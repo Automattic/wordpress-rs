@@ -50,6 +50,10 @@ extension SparseUser: Contextual {
     public static func parseResponse(_ response: WpNetworkResponse) throws -> [UserWithEmbedContext] {
         try parseListUsersResponseWithEmbedContext(response: response)
     }
+
+    public static func parseDeletionResponse(_ response: WpNetworkResponse) throws -> UserDeleteResponse {
+        try parseDeleteUserResponse(response: response)
+    }
 }
 
 extension WordPressAPI {
@@ -70,15 +74,14 @@ extension ContextualNamespace where T == SparseUser {
 
 extension AnyNamespace where T == SparseUser {
 
-    public func delete(id: T.ID, reassignTo userID: T.ID) async throws {
+    public func delete(id: T.ID, reassignTo userID: T.ID) async throws -> T.DeleteResult {
         try await self.delete(id: id, params: .init(reassign: userID))
     }
 
-    public func deleteCurrent(reassignTo userID: T.ID) async throws {
+    public func deleteCurrent(reassignTo userID: T.ID) async throws -> T.DeleteResult {
         let request = self.api.helper.deleteCurrentUserRequest(params: .init(reassign: userID))
         let response = try await api.perform(request: request)
-        // TODO: Parse response to check if there is any error
-        return
+        return try T.parseDeletionResponse(response)
     }
 
     public func updateCurrent(with params: UserUpdateParams) async throws -> T.EditContext {

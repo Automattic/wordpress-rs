@@ -17,6 +17,8 @@ public protocol Contextual {
     associatedtype EditContext
     associatedtype EmbedContext
 
+    associatedtype DeleteResult
+
     associatedtype ListParams
     associatedtype UpdateParams
     associatedtype CreateParams
@@ -34,6 +36,8 @@ public protocol Contextual {
     static func parseResponse(_ response: WpNetworkResponse) throws -> [ViewContext]
     static func parseResponse(_ response: WpNetworkResponse) throws -> [EditContext]
     static func parseResponse(_ response: WpNetworkResponse) throws -> [EmbedContext]
+
+    static func parseDeletionResponse(_ response: WpNetworkResponse) throws -> DeleteResult
 }
 
 extension AnyNamespace where T: Contextual {
@@ -133,10 +137,9 @@ extension AnyNamespace where T: Contextual {
         return try T.parseResponse(response)
     }
 
-    public func delete(id: T.ID, params: T.DeleteParams) async throws {
+    public func delete(id: T.ID, params: T.DeleteParams) async throws -> T.DeleteResult {
         let request = T.deleteRequest(id: id, params: params, using: api.helper)
         let response = try await api.perform(request: request)
-        // TODO: Missing parse response
-        return
+        return try T.parseDeletionResponse(response)
     }
 }
