@@ -4,12 +4,11 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
-pub use endpoint::*;
-pub use login::*;
-pub use pages::*;
+use endpoint::*;
+use login::*;
 pub use plugins::*;
-pub use posts::*;
-pub use url::*;
+use posts::*;
+use url::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
