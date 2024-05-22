@@ -242,6 +242,24 @@ impl WPApiHelper {
         }
     }
 
+    pub fn filter_list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
@@ -259,6 +277,24 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn filter_retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_retrieve(context, plugin, fields)
+                .into(),
             header_map: self.header_map(),
             body: None,
         }

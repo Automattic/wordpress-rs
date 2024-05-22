@@ -3,6 +3,8 @@ use wp_derive::WPContextual;
 
 use crate::{add_uniffi_exported_parser, parse_wp_response, WPApiError, WPNetworkResponse};
 
+add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
+add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);
 add_uniffi_exported_parser!(
     parse_list_plugins_response_with_edit_context,
     Vec<PluginWithEditContext>
@@ -91,6 +93,37 @@ pub struct SparsePlugin {
     pub requires_php: Option<String>,
     #[WPContext(edit, view)]
     pub textdomain: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparsePluginField {
+    Author,
+    Description,
+    Name,
+    NetworkOnly,
+    Plugin,
+    PluginUri,
+    RequiresPhp,
+    Status,
+    Textdomain,
+    Version,
+}
+
+impl SparsePluginField {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Author => "author",
+            Self::Description => "description",
+            Self::Name => "name",
+            Self::NetworkOnly => "network_only",
+            Self::Plugin => "plugin",
+            Self::PluginUri => "plugin_uri",
+            Self::RequiresPhp => "requires_php",
+            Self::Status => "status",
+            Self::Textdomain => "textdomain",
+            Self::Version => "version",
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
