@@ -9,7 +9,7 @@ services:
             - .wordpress:/var/www/html
             - ./test_credentials:/tmp/test_credentials
         environment:
-            WORDPRESS_DB_HOST: mysql
+            WORDPRESS_DB_HOST: database
             WORDPRESS_DB_USER: wordpress
             WORDPRESS_DB_PASSWORD: wordpress
             WORDPRESS_DB_NAME: wordpress
@@ -22,7 +22,7 @@ services:
             timeout: 1s
             retries: 30
 
-    mysql:
+    database:
         image: 'public.ecr.aws/docker/library/mariadb:11.2'
         ports:
             - '3306:3306'

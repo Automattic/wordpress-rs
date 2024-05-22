@@ -195,10 +195,10 @@ stop-server: delete-wp-plugins-backup
 	docker-compose down
 
 dump-mysql:
-	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysqldump --defaults-extra-file=mysql_config/config.cnf --no-tablespaces wordpress > dump.sql"
+	docker exec -it wordpress-rs-database-1 mariadb-dump -u wordpress -pwordpress --no-tablespaces wordpress > dump.sql
 
 restore-mysql:
-	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
+	cat dump.sql | docker exec -i wordpress-rs-database-1 mariadb -u wordpress -pwordpress --database wordpress
 
 backup-wp-content-plugins:
 	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
