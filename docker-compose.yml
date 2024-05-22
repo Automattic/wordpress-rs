@@ -16,10 +16,6 @@ services:
             WORDPRESS_CONFIG_EXTRA: |
                 # Allow application passwords to be used without HTTPS
                 define( 'WP_ENVIRONMENT_TYPE', 'local' );
-
-        depends_on:
-            mysql:
-                condition: service_healthy
         healthcheck:
             test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
             interval: 4s
@@ -27,7 +23,7 @@ services:
             retries: 30
 
     mysql:
-        image: 'public.ecr.aws/docker/library/mysql:8.0'
+        image: 'public.ecr.aws/docker/library/mariadb:11.2'
         ports:
             - '3306:3306'
         environment:
@@ -35,10 +31,3 @@ services:
             MYSQL_USER: 'wordpress'
             MYSQL_PASSWORD: 'wordpress'
             MYSQL_RANDOM_ROOT_PASSWORD: true
-        volumes:
-            - ./mysql_config:/mysql_config
-        healthcheck:
-            test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-            interval: 4s
-            timeout: 1s
-            retries: 30

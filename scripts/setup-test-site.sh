@@ -11,13 +11,46 @@ set -e
 curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar --output /usr/bin/wp
 chmod +x /usr/bin/wp
 
+# Install `mysqlcheck` – needed for `wp db check`
+apt update && apt install -y default-mysql-client
+
+# Create wpcli working directory (it can't be created by the `www-data` user`)
+mkdir -p /var/www/.wp-cli
+chown -R www-data:www-data /var/www/.wp-cli/
+
 # Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
 # be any weird permissions issues)
 su -s /bin/bash www-data
 
-## Install WordPress
+## Download WordPress
 wp core download --force
 
+## Wait for the DB to be ready before attempting install – Docker can do this for us, but we get way better
+## diagnostic information from `wp db check`, whereas if `wp core install` fails it won't tell us about issues
+## like incompatible SSL cipher suites (which is a problem in the WP 5.7 image when used with MySQL 8+)
+tries=0
+while true; do
+
+	code=0
+	wp db check || code=$?
+
+	if [ $code == 0 ]; then
+		echo 'Database Ready'
+		break;
+	fi
+
+	if [ $tries -gt 5 ]; then
+		echo 'Unable to connect to database'
+		exit 1
+	fi
+
+	echo 'The database is not ready yet – waiting 5 seconds'
+	sleep 5
+
+	tries=$(( $tries + 1 ))
+done
+
+## Install WordPress
 wp core install \
 	--url=localhost \
 	--title=my-test-site \
