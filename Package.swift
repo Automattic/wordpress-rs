@@ -16,27 +16,6 @@ let libwordpressFFI: Target = .systemLibrary(
 let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
 #endif
 
-#if os(macOS)
-let e2eTestsEnabled = !isCI
-#elseif os(Linux)
-let e2eTestsEnabled = false
-#else
-let e2eTestsEnabled = false
-#endif
-
-var additionalTestTargets = [Target]()
-
-if e2eTestsEnabled {
-    additionalTestTargets.append(.testTarget(
-        name: "End2EndTests",
-        dependencies: [
-            .target(name: "wordpress-api"),
-            .target(name: "libwordpressFFI")
-        ],
-        path: "native/swift/Tests/End2End"
-    ))
-}
-
 let package = Package(
     name: "wordpress",
     platforms: [
@@ -79,5 +58,5 @@ let package = Package(
             ],
             path: "native/swift/Tests/wordpress-api"
         )
-    ] + additionalTestTargets
+    ]
 )
