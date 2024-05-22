@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use wp_derive::WPContextual;
 
 use crate::{
-    add_uniffi_exported_parser, parse_wp_response, WPApiError, WPApiParamOrder, WPNetworkResponse,
+    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPApiParamOrder,
+    WPNetworkResponse,
 };
 
 add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
@@ -394,8 +395,8 @@ pub enum SparseUserField {
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
 
-impl SparseUserField {
-    pub fn as_str(&self) -> &str {
+impl SparseField for SparseUserField {
+    fn as_str(&self) -> &str {
         match self {
             Self::Id => "id",
             Self::Username => "username",
