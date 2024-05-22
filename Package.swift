@@ -14,7 +14,7 @@ let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "targ
 #endif
 
 let package = Package(
-    name: "wordpress",
+    name: "WordPress",
     platforms: [
         .iOS(.v13),
         .macOS(.v11),
@@ -23,23 +23,23 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "wordpress-api",
-            targets: ["wordpress-api"]
+            name: "WordPressAPI",
+            targets: ["WordPressAPI"]
         )
     ],
     dependencies: [],
     targets: [
         .target(
-            name: "wordpress-api",
+            name: "WordPressAPI",
             dependencies: [
-                .target(name: "wordpress-api-wrapper")
+                .target(name: "WordPressAPIInternal")
             ],
             path: "native/swift/Sources/wordpress-api"
         ),
         .target(
-            name: "wordpress-api-wrapper",
+            name: "WordPressAPIInternal",
             dependencies: [
-                .target(name: "libwordpressFFI")
+                .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Sources/wordpress-api-wrapper",
             exclude: [
@@ -48,10 +48,10 @@ let package = Package(
         ),
         libwordpressFFI,
         .testTarget(
-            name: "wordpress-api-tests",
+            name: "WordPressAPITests",
             dependencies: [
-                .target(name: "wordpress-api"),
-                .target(name: "libwordpressFFI")
+                .target(name: "WordPressAPI"),
+                .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api"
         )

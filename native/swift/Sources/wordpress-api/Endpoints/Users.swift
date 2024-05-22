@@ -1,5 +1,5 @@
 import Foundation
-import wordpress_api_wrapper
+import WordPressAPIInternal
 
 extension SparseUser: Contextual {
     public typealias ID = UserId

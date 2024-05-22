@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-import wordpress_api
+import WordPressAPI
 
 extension SparseUser.ViewContext: Identifiable {}
 

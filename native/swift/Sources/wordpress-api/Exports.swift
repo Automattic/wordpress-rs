@@ -3,13 +3,13 @@
 // We could export all of them using `@_exported import`, but that probably puts
 // us in a position where we need to make major releases due to Rust code changes.
 
-import wordpress_api_wrapper
+import WordPressAPIInternal
 
-public typealias WpApiError = wordpress_api_wrapper.WpApiError
+public typealias WpApiError = WordPressAPIInternal.WpApiError
 
 // MARK: - Users
 
-public typealias SparseUser = wordpress_api_wrapper.SparseUser
-public typealias UserWithViewContext = wordpress_api_wrapper.UserWithViewContext
-public typealias UserWithEditContext = wordpress_api_wrapper.UserWithEditContext
-public typealias UserWithEmbedContext = wordpress_api_wrapper.UserWithEmbedContext
+public typealias SparseUser = WordPressAPIInternal.SparseUser
+public typealias UserWithViewContext = WordPressAPIInternal.UserWithViewContext
+public typealias UserWithEditContext = WordPressAPIInternal.UserWithEditContext
+public typealias UserWithEmbedContext = WordPressAPIInternal.UserWithEmbedContext

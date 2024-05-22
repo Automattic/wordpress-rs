@@ -11,7 +11,7 @@
 		2479BF832B621CB60014A01D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2479BF822B621CB60014A01D /* ContentView.swift */; };
 		2479BF852B621CB70014A01D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2479BF842B621CB70014A01D /* Assets.xcassets */; };
 		2479BF892B621CB70014A01D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2479BF882B621CB70014A01D /* Preview Assets.xcassets */; };
-		2479BF912B621CCA0014A01D /* wordpress-api in Frameworks */ = {isa = PBXBuildFile; productRef = 2479BF902B621CCA0014A01D /* wordpress-api */; };
+		2479BF912B621CCA0014A01D /* WordPressAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 2479BF902B621CCA0014A01D /* WordPressAPI */; };
 		2479BF932B621E9B0014A01D /* UserListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2479BF922B621E9B0014A01D /* UserListViewModel.swift */; };
 		24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C32E2BA8F96F00162AD1 /* LoginView.swift */; };
 		24A3C3362BAA874C00162AD1 /* LoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C3352BAA874C00162AD1 /* LoginManager.swift */; };
@@ -34,7 +34,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2479BF912B621CCA0014A01D /* wordpress-api in Frameworks */,
+				2479BF912B621CCA0014A01D /* WordPressAPI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -97,7 +97,7 @@
 			);
 			name = Example;
 			packageProductDependencies = (
-				2479BF902B621CCA0014A01D /* wordpress-api */,
+				2479BF902B621CCA0014A01D /* WordPressAPI */,
 			);
 			productName = Example;
 			productReference = 2479BF7D2B621CB60014A01D /* Example.app */;
@@ -388,9 +388,9 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		2479BF902B621CCA0014A01D /* wordpress-api */ = {
+		2479BF902B621CCA0014A01D /* WordPressAPI */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = "wordpress-api";
+			productName = "WordPressAPI";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

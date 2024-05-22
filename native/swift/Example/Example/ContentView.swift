@@ -1,5 +1,5 @@
 import SwiftUI
-import wordpress_api
+import WordPressAPI
 
 struct ContentView: View {
 
