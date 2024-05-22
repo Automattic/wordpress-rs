@@ -282,7 +282,7 @@ mod wp_contextual;
 /// [`WPContextual`] type. This will tell the compiler to replace the given `Option<SparseBaz>`
 /// type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
 /// `BazWithViewContext`.
-/// * `[WPContextualOption]` is used to tell the compiler to keep the field as an `Option`.
+/// * `[WPContextualOption]` is used to tell the compiler to keep the field's `Option` type.
 /// * Generated types will have the following derive macros:
 /// `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. These types are meant
 /// to be used for the

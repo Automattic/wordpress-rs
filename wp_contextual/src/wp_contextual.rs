@@ -74,7 +74,7 @@ fn struct_fields(
 // * `WPContextualParseError::WPContextualOptionWithoutWPContext`: #[WPContextualOption] is added to
 // a field that doesn't have the #[WPContext] attribute.
 // * `WPContextualParseError::WPContextualBothOptionAndField`: #[WPContextualField] and
-// #[WPContextualOption] was used together.
+// #[WPContextualOption] attributes were used together.
 //
 // It'll also handle incorrectly formatted #[WPContext] attribute through
 // `parse_contexts_from_tokens` helper.
@@ -158,7 +158,8 @@ fn parse_fields(
 
     // Check if there are any fields that has both #[WPContextualField] & #[WPContextualOption]
     // attributes and return an error. These attributes are incompatible with each other because
-    // #[WPContextualOption] will leave the type as is, whereas #[WPContextualField] will modify it
+    // #[WPContextualOption] will leave the type as is, whereas #[WPContextualField] will modify
+    // it.
     if let Some(pf) = parsed_fields.iter().find(|pf| {
         pf.parsed_attrs
             .contains(&WPParsedAttr::ParsedWPContextualField)
