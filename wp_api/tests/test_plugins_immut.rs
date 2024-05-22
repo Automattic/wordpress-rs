@@ -6,12 +6,12 @@ use wp_api::{
     PluginSlug, SparsePlugin, SparsePluginField, WPContext,
 };
 
-use crate::test_helpers::{
+use crate::integration_test_common::{
     api, WPNetworkRequestExecutor, WPNetworkResponseParser, CLASSIC_EDITOR_PLUGIN_SLUG,
     HELLO_DOLLY_PLUGIN_SLUG,
 };
 
-pub mod test_helpers;
+pub mod integration_test_common;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]

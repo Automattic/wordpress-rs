@@ -1,11 +1,11 @@
 use wp_api::{PluginCreateParams, PluginStatus, PluginUpdateParams, WPContext, WPRestErrorCode};
 
-use crate::test_helpers::{
+use crate::integration_test_common::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
     HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
-pub mod test_helpers;
+pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_plugin_err_cannot_install_plugin() {

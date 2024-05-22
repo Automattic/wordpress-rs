@@ -1,11 +1,11 @@
 use wp_api::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
-use crate::test_helpers::{
+use crate::integration_test_common::{
     api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
 };
 
-pub mod test_helpers;
+pub mod integration_test_common;
 pub mod wp_db;
 
 #[tokio::test]

@@ -1,15 +1,15 @@
-use test_helpers::SECOND_USER_EMAIL;
+use integration_test_common::SECOND_USER_EMAIL;
 use wp_api::{
     UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPApiHelper,
     WPApiParamUsersOrderBy, WPApiParamUsersWho, WPAuthentication, WPContext, WPRestErrorCode,
 };
 
-use crate::test_helpers::{
+use crate::integration_test_common::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
     FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
 };
 
-pub mod test_helpers;
+pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_user_err_cannot_create_user() {
@@ -157,7 +157,7 @@ async fn retrieve_user_err_user_invalid_id() {
 #[tokio::test]
 async fn retrieve_user_err_unauthorized() {
     WPApiHelper::new(
-        test_helpers::read_test_credentials_from_file().site_url,
+        integration_test_common::read_test_credentials_from_file().site_url,
         WPAuthentication::None,
     )
     .retrieve_current_user_request(WPContext::Edit)
