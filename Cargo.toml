@@ -2,7 +2,6 @@
 members = [
   "wp_api",
   "wp_contextual",
-  "wp_networking",
   "wp_uniffi_bindgen",
 ]
 resolver = "2"

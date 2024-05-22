@@ -47,7 +47,6 @@ docs:
 	cp -r target/doc/static.files docs/static.files
 	cp -r target/doc/wp_api docs/wp_api
 	cp -r target/doc/wp_contextual docs/wp_contextual
-	cp -r target/doc/wp_networking docs/wp_networking
 
 docs-archive: docs
 	tar -czvf  docs.tar.gz docs
@@ -84,7 +83,7 @@ xcframework-libraries:
 # Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
 # to combine the binaries
 %-combine-libraries:
-	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a #target/$*/release/libwp_networking.a
+	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a
 
 # Some libraries need to be created in a multi-binary format, so we combine them here
 xcframework-combined-libraries: xcframework-libraries
