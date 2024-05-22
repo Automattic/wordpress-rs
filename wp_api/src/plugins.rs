@@ -168,6 +168,8 @@ pub enum PluginStatus {
     Active,
     #[serde(rename = "inactive")]
     Inactive,
+    #[serde(rename = "network-active")]
+    NetworkActive,
 }
 
 impl PluginStatus {
@@ -175,6 +177,7 @@ impl PluginStatus {
         match self {
             Self::Active => "active",
             Self::Inactive => "inactive",
+            Self::NetworkActive => "network-active",
         }
     }
 }
