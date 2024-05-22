@@ -188,7 +188,7 @@ pub struct PluginDescription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, test_helpers::assert_expected_query_pairs};
+    use crate::{generate, unit_test_common::assert_expected_query_pairs};
     use rstest::*;
 
     #[rstest]

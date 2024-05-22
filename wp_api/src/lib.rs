@@ -22,7 +22,7 @@ pub mod url;
 pub mod users;
 
 #[cfg(test)]
-mod test_helpers;
+mod unit_test_common;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 
