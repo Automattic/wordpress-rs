@@ -1,8 +1,11 @@
 use rstest::*;
 use rstest_reuse::{self, apply, template};
 use wp_api::{
-    generate, SparseUser, SparseUserField, UserListParams, WPApiParamOrder, WPApiParamUsersOrderBy,
-    WPApiParamUsersWho, WPContext,
+    generate,
+    users::{
+        SparseUser, SparseUserField, UserListParams, WPApiParamUsersOrderBy, WPApiParamUsersWho,
+    },
+    WPApiParamOrder, WPContext,
 };
 
 use crate::integration_test_common::{
@@ -19,7 +22,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_filter_users_response);
+        .parse(wp_api::users::parse_filter_users_response);
     assert!(parsed_response.is_ok());
     parsed_response
         .unwrap()
@@ -35,7 +38,7 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_filter_retrieve_user_response);
+        .parse(wp_api::users::parse_filter_retrieve_user_response);
     assert!(user_result.is_ok());
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
@@ -48,7 +51,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_filter_retrieve_user_response);
+        .parse(wp_api::users::parse_filter_retrieve_user_response);
     assert!(user_result.is_ok());
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
@@ -84,7 +87,8 @@ async fn test_user_list_params_parametrized(
         .unwrap();
     match context {
         WPContext::Edit => {
-            let parsed_response = wp_api::parse_list_users_response_with_edit_context(&response);
+            let parsed_response =
+                wp_api::users::parse_list_users_response_with_edit_context(&response);
             assert!(
                 parsed_response.is_ok(),
                 "Response was: '{:?}'",
@@ -92,7 +96,8 @@ async fn test_user_list_params_parametrized(
             );
         }
         WPContext::Embed => {
-            let parsed_response = wp_api::parse_list_users_response_with_embed_context(&response);
+            let parsed_response =
+                wp_api::users::parse_list_users_response_with_embed_context(&response);
             assert!(
                 parsed_response.is_ok(),
                 "Response was: '{:?}'",
@@ -100,7 +105,8 @@ async fn test_user_list_params_parametrized(
             );
         }
         WPContext::View => {
-            let parsed_response = wp_api::parse_list_users_response_with_view_context(&response);
+            let parsed_response =
+                wp_api::users::parse_list_users_response_with_view_context(&response);
             assert!(
                 parsed_response.is_ok(),
                 "Response was: '{:?}'",
@@ -117,7 +123,7 @@ async fn retrieve_user_with_edit_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .is_ok());
 }
 
@@ -128,7 +134,7 @@ async fn retrieve_user_with_embed_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_embed_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_embed_context)
         .is_ok());
 }
 
@@ -139,7 +145,7 @@ async fn retrieve_user_with_view_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_view_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_view_context)
         .is_ok());
 }
 
@@ -150,7 +156,7 @@ async fn retrieve_current_user_with_edit_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .is_ok());
 }
 
@@ -161,7 +167,7 @@ async fn retrieve_current_user_with_embed_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_embed_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_embed_context)
         .is_ok());
 }
 
@@ -172,7 +178,7 @@ async fn retrieve_current_user_with_view_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_view_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_view_context)
         .is_ok());
 }
 

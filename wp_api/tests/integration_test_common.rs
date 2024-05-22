@@ -2,7 +2,7 @@ use futures::Future;
 use http::HeaderMap;
 use std::{fs::read_to_string, process::Command};
 use wp_api::{
-    UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
+    users::UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
     WPRestError, WPRestErrorCode, WPRestErrorWrapper,
 };
 

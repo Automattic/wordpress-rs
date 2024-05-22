@@ -1,7 +1,10 @@
 use integration_test_common::SECOND_USER_EMAIL;
 use wp_api::{
-    UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams, WPApiHelper,
-    WPApiParamUsersOrderBy, WPApiParamUsersWho, WPAuthentication, WPContext, WPRestErrorCode,
+    users::{
+        UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
+        WPApiParamUsersOrderBy, WPApiParamUsersWho,
+    },
+    WPApiHelper, WPAuthentication, WPContext, WPRestErrorCode,
 };
 
 use crate::integration_test_common::{
@@ -18,7 +21,7 @@ async fn create_user_err_cannot_create_user() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotCreateUser);
 }
 
@@ -34,7 +37,7 @@ async fn delete_user_err_user_cannot_delete() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserCannotDelete);
 }
 
@@ -50,7 +53,7 @@ async fn delete_user_err_user_invalid_reassign() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
 }
 
@@ -63,7 +66,7 @@ async fn delete_current_user_err_user_invalid_reassign() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
 }
 
@@ -74,7 +77,7 @@ async fn list_users_err_forbidden_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_list_users_response_with_edit_context)
+        .parse(wp_api::users::parse_list_users_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::ForbiddenContext);
 }
 
@@ -87,7 +90,7 @@ async fn list_users_err_forbidden_orderby_email() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_list_users_response_with_view_context)
+        .parse(wp_api::users::parse_list_users_response_with_view_context)
         .assert_wp_error(WPRestErrorCode::ForbiddenOrderBy);
 }
 
@@ -100,7 +103,7 @@ async fn list_users_err_forbidden_who() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_list_users_response_with_view_context)
+        .parse(wp_api::users::parse_list_users_response_with_view_context)
         .assert_wp_error(WPRestErrorCode::ForbiddenWho);
 }
 
@@ -113,7 +116,7 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_list_users_response_with_edit_context)
+        .parse(wp_api::users::parse_list_users_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserCannotView);
 }
 
@@ -126,7 +129,7 @@ async fn list_users_with_roles_err_user_cannot_view() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_list_users_response_with_edit_context)
+        .parse(wp_api::users::parse_list_users_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserCannotView);
 }
 
@@ -139,7 +142,7 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_list_users_response_with_view_context)
+        .parse(wp_api::users::parse_list_users_response_with_view_context)
         .assert_wp_error(WPRestErrorCode::ForbiddenOrderBy);
 }
 
@@ -150,7 +153,7 @@ async fn retrieve_user_err_user_invalid_id() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidId);
 }
 
@@ -164,7 +167,7 @@ async fn retrieve_user_err_unauthorized() {
     .execute()
     .await
     .unwrap()
-    .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+    .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
     .assert_wp_error(WPRestErrorCode::Unauthorized);
 }
 
@@ -178,7 +181,7 @@ async fn update_user_err_cannot_edit() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotEdit);
 }
 
@@ -197,7 +200,7 @@ async fn update_user_err_user_invalid_argument() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
 }
 
@@ -211,7 +214,7 @@ async fn update_user_err_cannot_edit_roles() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotEditRoles);
 }
 
@@ -225,7 +228,7 @@ async fn update_user_err_user_invalid_email() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidEmail);
 }
 
@@ -238,7 +241,7 @@ async fn update_user_email_err_invalid_param() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::InvalidParam);
 }
 
@@ -251,7 +254,7 @@ async fn update_user_password_err_invalid_param() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::InvalidParam);
 }
 
@@ -265,7 +268,7 @@ async fn update_user_err_user_invalid_role() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidRole);
 }
 
@@ -279,7 +282,7 @@ async fn update_user_err_user_invalid_slug() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserInvalidSlug);
 }
 
@@ -295,7 +298,7 @@ async fn create_user_err_user_exists() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::UserExists);
 }
 
@@ -312,7 +315,7 @@ async fn delete_user_err_trash_not_supported() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::TrashNotSupported);
 }
 

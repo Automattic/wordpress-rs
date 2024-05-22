@@ -1,4 +1,4 @@
-use wp_api::{UserCreateParams, UserDeleteParams, UserUpdateParams};
+use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
 use crate::integration_test_common::{
@@ -26,7 +26,7 @@ async fn create_user() {
             .execute()
             .await
             .unwrap()
-            .parse(wp_api::parse_retrieve_user_response_with_edit_context)
+            .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
             .unwrap();
 
         // Assert that the user is in DB
@@ -71,7 +71,7 @@ async fn delete_current_user() {
             .execute()
             .await
             .unwrap()
-            .parse(wp_api::parse_delete_user_response)
+            .parse(wp_api::users::parse_delete_user_response)
             .unwrap();
         assert_eq!(true, deleted_user.deleted);
         assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
