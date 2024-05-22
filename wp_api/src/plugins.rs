@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 use crate::{
     add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPNetworkResponse,

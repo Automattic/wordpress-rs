@@ -511,11 +511,11 @@ impl WPContextualParseError {
 
 #[derive(Debug, thiserror::Error)]
 enum WPContextualParseAttrError {
-    // It's possible to trigger this error by using something like `#[wp_derive::WPContext]`,
+    // It's possible to trigger this error by using something like `#[wp_contextual::WPContext]`,
     // however that's not a valid syntax. There is probably no valid syntax that uses `::` in the
     // current setup, but in case we are missing anything, we should be able to improve the
     // messaging by asking it to be reported.
-    #[error("Expected #[WPContext] or #[WPContextualField], found multi-segment path.\nPlease report this case to the `wp_derive` developers.")]
+    #[error("Expected #[WPContext] or #[WPContextualField], found multi-segment path.\nPlease report this case to the `wp_contextual` developers.")]
     UnexpectedAttrPathSegmentCount,
     #[error("Did you mean ','?")]
     UnexpectedPunct,

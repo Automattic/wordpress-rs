@@ -78,7 +78,7 @@
 //! build up to the example:
 //!
 //! ```
-//! # use wp_derive::WPContextual;
+//! # use wp_contextual::WPContextual;
 //! #[derive(WPContextual)]
 //! pub struct SparsePostContent {
 //!     #[WPContext(edit)]
@@ -115,7 +115,7 @@
 //! why we also need the `WPContext` attribute. Here is what the compiler will generate for this
 //! type:
 //! ```
-//! # use wp_derive::WPContextual;
+//! # use wp_contextual::WPContextual;
 //! #[derive(WPContextual)]
 //! pub struct SparsePostContent {
 //!     #[WPContext(edit)]
@@ -152,7 +152,7 @@
 //! Let's do the same for `Post` type as well:
 //!
 //! ```
-//! # use wp_derive::WPContextual;
+//! # use wp_contextual::WPContextual;
 //! #[derive(WPContextual)]
 //! pub struct SparsePost {
 //!     #[WPContext(edit, embed, view)]
@@ -196,7 +196,7 @@
 //! [`WPContextual`] type. We can help the compiler by adding the `WPContextualField` attribute:
 //!
 //! ```
-//! # use wp_derive::WPContextual;
+//! # use wp_contextual::WPContextual;
 //! #[derive(WPContextual)]
 //! pub struct SparsePost {
 //!     #[WPContext(edit, embed, view)]
@@ -268,7 +268,7 @@ mod wp_contextual;
 /// Here is a full example:
 ///
 /// ```
-/// use wp_derive::WPContextual;
+/// use wp_contextual::WPContextual;
 ///
 /// #[derive(WPContextual)]
 /// pub struct SparseFoo {

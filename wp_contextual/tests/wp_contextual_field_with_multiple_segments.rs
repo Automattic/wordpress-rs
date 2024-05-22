@@ -1,4 +1,4 @@
-use wp_derive::WPContextual;
+use wp_contextual::WPContextual;
 
 // This test is validating that we are able to handle `#[WPContextualField]`s if its type
 // has multiple path segments. That's why we use a helper mod and use fully qualified paths

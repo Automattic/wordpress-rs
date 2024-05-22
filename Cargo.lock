@@ -2951,11 +2951,11 @@ dependencies = [
  "thiserror",
  "uniffi",
  "url",
- "wp_derive",
+ "wp_contextual",
 ]
 
 [[package]]
-name = "wp_derive"
+name = "wp_contextual"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
