@@ -10,7 +10,7 @@ pub use pages::*;
 pub use plugins::*;
 pub use posts::*;
 pub use url::*;
-pub use users::*;
+use users::*;
 
 pub mod api_error;
 pub mod endpoint;
