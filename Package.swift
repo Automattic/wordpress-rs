@@ -2,10 +2,7 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 // Swift Package: WordpressApi
 
-import Foundation
 import PackageDescription
-
-let isCI = ProcessInfo.processInfo.environment["CI"] == "true"
 
 #if os(Linux)
 let libwordpressFFI: Target = .systemLibrary(
