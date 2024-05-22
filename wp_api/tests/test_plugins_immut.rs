@@ -2,8 +2,8 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use wp_api::{
     generate,
-    plugins::{PluginListParams, PluginStatus},
-    PluginSlug, SparsePlugin, SparsePluginField, WPContext,
+    plugins::{PluginListParams, PluginSlug, PluginStatus, SparsePlugin, SparsePluginField},
+    WPContext,
 };
 
 use crate::integration_test_common::{
@@ -29,7 +29,7 @@ async fn filter_plugins(
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_filter_plugins_response);
+        .parse(wp_api::plugins::parse_filter_plugins_response);
     assert!(parsed_response.is_ok());
     parsed_response
         .unwrap()
@@ -48,7 +48,7 @@ async fn filter_retrieve_plugin(
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_filter_retrieve_plugin_response);
+        .parse(wp_api::plugins::parse_filter_retrieve_plugin_response);
     assert!(plugin_result.is_ok());
     validate_sparse_plugin_fields(&plugin_result.unwrap(), fields);
 }
@@ -71,7 +71,8 @@ async fn plugin_list_params_parametrized(
         .unwrap();
     match context {
         WPContext::Edit => {
-            let parsed_response = wp_api::parse_list_plugins_response_with_edit_context(&response);
+            let parsed_response =
+                wp_api::plugins::parse_list_plugins_response_with_edit_context(&response);
             assert!(
                 parsed_response.is_ok(),
                 "Response was: '{:?}'",
@@ -79,7 +80,8 @@ async fn plugin_list_params_parametrized(
             );
         }
         WPContext::Embed => {
-            let parsed_response = wp_api::parse_list_plugins_response_with_embed_context(&response);
+            let parsed_response =
+                wp_api::plugins::parse_list_plugins_response_with_embed_context(&response);
             assert!(
                 parsed_response.is_ok(),
                 "Response was: '{:?}'",
@@ -87,7 +89,8 @@ async fn plugin_list_params_parametrized(
             );
         }
         WPContext::View => {
-            let parsed_response = wp_api::parse_list_plugins_response_with_view_context(&response);
+            let parsed_response =
+                wp_api::plugins::parse_list_plugins_response_with_view_context(&response);
             assert!(
                 parsed_response.is_ok(),
                 "Response was: '{:?}'",
@@ -112,7 +115,7 @@ async fn retrieve_plugin_with_edit_context(
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_plugin_response_with_edit_context);
+        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context);
     assert!(
         parsed_response.is_ok(),
         "Retrieve plugin failed!\nContext: {:?}\nPlugin: {:?}\nResponse was: '{:?}'",

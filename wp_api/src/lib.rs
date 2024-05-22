@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
 use endpoint::*;
 use login::*;
-pub use plugins::*;
+use plugins::*;
 use posts::*;
 use url::*;
 use users::*;

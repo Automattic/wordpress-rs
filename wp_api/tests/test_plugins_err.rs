@@ -1,4 +1,5 @@
-use wp_api::{PluginCreateParams, PluginStatus, PluginUpdateParams, WPContext, WPRestErrorCode};
+use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
+use wp_api::{WPContext, WPRestErrorCode};
 
 use crate::integration_test_common::{
     api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
@@ -17,7 +18,7 @@ async fn create_plugin_err_cannot_install_plugin() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_create_plugin_response)
+        .parse(wp_api::plugins::parse_create_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotInstallPlugin);
 }
 
@@ -28,7 +29,7 @@ async fn delete_plugin_err_cannot_delete_active_plugin() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_delete_plugin_response)
+        .parse(wp_api::plugins::parse_delete_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotDeleteActivePlugin);
 }
 
@@ -39,7 +40,7 @@ async fn list_plugins_err_cannot_view_plugins() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_plugin_response_with_edit_context)
+        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotViewPlugins);
 }
 
@@ -50,7 +51,7 @@ async fn retrieve_plugin_err_cannot_view_plugin() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_retrieve_plugin_response_with_edit_context)
+        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotViewPlugin);
 }
 
@@ -66,7 +67,7 @@ async fn update_plugin_err_plugin_not_found() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_update_plugin_response)
+        .parse(wp_api::plugins::parse_update_plugin_response)
         .assert_wp_error(WPRestErrorCode::PluginNotFound);
 }
 
@@ -82,6 +83,6 @@ async fn update_plugin_err_cannot_manage_plugins() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::parse_update_plugin_response)
+        .parse(wp_api::plugins::parse_update_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotManagePlugins);
 }
