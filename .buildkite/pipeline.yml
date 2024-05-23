@@ -192,8 +192,7 @@ steps:
   - label: ":rocket: Publish release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
     depends_on: swift
-    plugins:
-      - automattic/a8c-ci-toolkit#3.3.0
+    plugins: *common_plugins
     env:
       IMAGE_ID: xcode-15.4
     agents:
