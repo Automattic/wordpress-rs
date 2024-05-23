@@ -7,47 +7,23 @@ services:
             - '80:80'
         volumes:
             - .wordpress:/var/www/html
+            - ./test_credentials:/tmp/test_credentials
         environment:
-            WORDPRESS_DB_HOST: mysql
+            WORDPRESS_DB_HOST: database
             WORDPRESS_DB_USER: wordpress
             WORDPRESS_DB_PASSWORD: wordpress
             WORDPRESS_DB_NAME: wordpress
             WORDPRESS_CONFIG_EXTRA: |
                 # Allow application passwords to be used without HTTPS
                 define( 'WP_ENVIRONMENT_TYPE', 'local' );
-
-        depends_on:
-            mysql:
-                condition: service_healthy
         healthcheck:
             test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
             interval: 4s
             timeout: 1s
             retries: 30
 
-    wpcli:
-        image: 'public.ecr.aws/docker/library/wordpress:cli'
-        user: 33:33 # Fixes permissions issues with writing files
-        volumes:
-            - ./.buildkite/setup-test-site.sh:/setup-test-site.sh:ro
-            - ./.wordpress/wp-config.php:/var/www/html/wp-config.php:ro
-            - ./test_credentials:/tmp/test_credentials
-        environment:
-            WORDPRESS_DB_HOST: mysql
-            WORDPRESS_DB_USER: wordpress
-            WORDPRESS_DB_PASSWORD: wordpress
-            WORDPRESS_DB_NAME: wordpress
-        depends_on:
-            mysql:
-                condition: service_healthy
-            wordpress:
-                condition: service_healthy
-        entrypoint: ["/setup-test-site.sh"]
-        profiles:
-            - donotstart
-
-    mysql:
-        image: 'public.ecr.aws/docker/library/mysql:8.0'
+    database:
+        image: 'public.ecr.aws/docker/library/mariadb:11.2'
         ports:
             - '3306:3306'
         environment:
@@ -55,10 +31,3 @@ services:
             MYSQL_USER: 'wordpress'
             MYSQL_PASSWORD: 'wordpress'
             MYSQL_RANDOM_ROOT_PASSWORD: true
-        volumes:
-            - ./mysql_config:/mysql_config
-        healthcheck:
-            test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-            interval: 4s
-            timeout: 1s
-            retries: 30

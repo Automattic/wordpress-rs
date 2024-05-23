@@ -44,8 +44,7 @@ docs:
 	$(rust_docker_run) /bin/bash -c 'cargo doc'
 	cp -r target/doc/static.files docs/static.files
 	cp -r target/doc/wp_api docs/wp_api
-	cp -r target/doc/wp_derive docs/wp_derive
-	cp -r target/doc/wp_networking docs/wp_networking
+	cp -r target/doc/wp_contextual docs/wp_contextual
 
 docs-archive: docs
 	tar -czvf  docs.tar.gz docs
@@ -156,16 +155,25 @@ test-rust-doc:
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
-	docker-compose run wpcli
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server:
+stop-server: delete-wp-plugins-backup
 	docker-compose down
 
 dump-mysql:
-	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysqldump --defaults-extra-file=mysql_config/config.cnf --no-tablespaces wordpress > dump.sql"
+	docker exec -it wordpress-rs-database-1 mariadb-dump -u wordpress -pwordpress --no-tablespaces wordpress > dump.sql
 
 restore-mysql:
-	docker exec -it wordpress-rs-mysql-1 /bin/bash -c "mysql --defaults-extra-file=mysql_config/config.cnf --database wordpress < dump.sql"
+	cat dump.sql | docker exec -i wordpress-rs-database-1 mariadb -u wordpress -pwordpress --database wordpress
+
+backup-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
+
+restore-wp-content-plugins:
+	docker exec -it wordpress /bin/bash -c "rm -rf ./wp-content/plugins &&  cp -R /tmp/backup_wp_plugins ./wp-content/plugins"
+
+delete-wp-plugins-backup:
+	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
 lint: lint-rust lint-swift
 
@@ -191,6 +199,9 @@ build-in-docker:
 dev-server:
 	mkdir -p .wordpress
 	docker-compose up
+
+prepare-dev-server:
+	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
 setup-rust:
 	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain

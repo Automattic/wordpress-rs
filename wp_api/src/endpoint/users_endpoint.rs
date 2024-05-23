@@ -2,6 +2,8 @@ use url::Url;
 
 use crate::{ApiBaseUrl, SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
+use super::UrlExtension;
+
 pub struct UsersEndpoint {
     api_base_url: ApiBaseUrl,
 }
@@ -45,7 +47,7 @@ impl UsersEndpoint {
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
     ) -> Url {
-        self.append_filter_fields(self.list(context, params), fields)
+        self.list(context, params).append_filter_fields(fields)
     }
 
     pub fn retrieve(&self, user_id: UserId, context: WPContext) -> Url {
@@ -63,7 +65,7 @@ impl UsersEndpoint {
         context: WPContext,
         fields: &[SparseUserField],
     ) -> Url {
-        self.append_filter_fields(self.retrieve(user_id, context), fields)
+        self.retrieve(user_id, context).append_filter_fields(fields)
     }
 
     pub fn retrieve_me(&self, context: WPContext) -> Url {
@@ -74,7 +76,7 @@ impl UsersEndpoint {
     }
 
     pub fn filter_retrieve_me(&self, context: WPContext, fields: &[SparseUserField]) -> Url {
-        self.append_filter_fields(self.retrieve_me(context), fields)
+        self.retrieve_me(context).append_filter_fields(fields)
     }
 
     pub fn update(&self, user_id: UserId) -> Url {
@@ -84,19 +86,6 @@ impl UsersEndpoint {
 
     pub fn update_me(&self) -> Url {
         self.api_base_url.by_extending(["users", "me"])
-    }
-
-    fn append_filter_fields(&self, mut url: Url, fields: &[SparseUserField]) -> Url {
-        url.query_pairs_mut().append_pair(
-            "_fields",
-            fields
-                .iter()
-                .map(|f| f.as_str())
-                .collect::<Vec<&str>>()
-                .join(",")
-                .as_str(),
-        );
-        url
     }
 }
 

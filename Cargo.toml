@@ -1,8 +1,7 @@
 [workspace]
 members = [
   "wp_api",
-  "wp_derive",
-  "wp_networking",
+  "wp_contextual",
   "wp_uniffi_bindgen",
   "tools",
 ]

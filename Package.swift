@@ -4,17 +4,34 @@
 
 import PackageDescription
 
+enum WordPressRSVersion {
+    case local
+    case release(version: String, checksum: String)
+}
+
+let libwordpressFFIVersion: WordPressRSVersion = .local
+
 #if os(Linux)
 let libwordpressFFI: Target = .systemLibrary(
         name: "libwordpressFFI",
         path: "target/swift-bindings/libwordpressFFI-linux/"
     )
 #elseif os(macOS)
-let libwordpressFFI: Target = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
+let libwordpressFFI: Target
+switch libwordpressFFIVersion {
+    case .local:
+        libwordpressFFI = .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
+    case let .release(version, checksum):
+        libwordpressFFI = .binaryTarget(
+            name: "libwordpressFFI",
+            url: "https://github.com/Automattic/wordpress-rs/releases/download/\(version)/libwordpressFFI.xcframework.zip",
+            checksum: checksum
+        )
+}
 #endif
 
 let package = Package(
-    name: "wordpress",
+    name: "WordPress",
     platforms: [
         .iOS(.v13),
         .macOS(.v11),
@@ -23,23 +40,23 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "wordpress-api",
-            targets: ["wordpress-api"]
+            name: "WordPressAPI",
+            targets: ["WordPressAPI"]
         )
     ],
     dependencies: [],
     targets: [
         .target(
-            name: "wordpress-api",
+            name: "WordPressAPI",
             dependencies: [
-                .target(name: "wordpress-api-wrapper")
+                .target(name: "WordPressAPIInternal")
             ],
             path: "native/swift/Sources/wordpress-api"
         ),
         .target(
-            name: "wordpress-api-wrapper",
+            name: "WordPressAPIInternal",
             dependencies: [
-                .target(name: "libwordpressFFI")
+                .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Sources/wordpress-api-wrapper",
             exclude: [
@@ -48,10 +65,10 @@ let package = Package(
         ),
         libwordpressFFI,
         .testTarget(
-            name: "wordpress-api-tests",
+            name: "WordPressAPITests",
             dependencies: [
-                .target(name: "wordpress-api"),
-                .target(name: "libwordpressFFI")
+                .target(name: "WordPressAPI"),
+                .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api"
         )
