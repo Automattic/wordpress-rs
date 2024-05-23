@@ -73,7 +73,7 @@ async fn delete_current_user() {
             .unwrap()
             .parse(wp_api::users::parse_delete_user_response)
             .unwrap();
-        assert_eq!(true, deleted_user.deleted);
+        assert!(deleted_user.deleted);
         assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
 
         // Assert that the DB doesn't have a record of the user anymore
@@ -230,7 +230,7 @@ async fn update_user_password() {
 
 async fn test_update_user<F>(params: UserUpdateParams, assert: F)
 where
-    F: Fn(DbUser, Vec<DbUserMeta>) -> (),
+    F: Fn(DbUser, Vec<DbUserMeta>),
 {
     wp_db::run_and_restore(|mut db| async move {
         let user_update_response = api()
@@ -246,7 +246,7 @@ where
     .await;
 }
 
-fn find_meta(meta_list: &Vec<DbUserMeta>, meta_key: &str) -> String {
+fn find_meta(meta_list: &[DbUserMeta], meta_key: &str) -> String {
     meta_list
         .iter()
         .find_map(|m| {

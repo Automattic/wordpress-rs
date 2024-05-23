@@ -176,7 +176,7 @@ mod tests {
             has_published_posts: Some(true),
         };
         validate_endpoint(
-            users_endpoint.filter_list(WPContext::Edit, Some(&params), &vec![SparseUserField::Name, SparseUserField::Email]),
+            users_endpoint.filter_list(WPContext::Edit, Some(&params), &[SparseUserField::Name, SparseUserField::Email]),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true&_fields=name%2Cemail",
         );
     }
@@ -195,7 +195,7 @@ mod tests {
             users_endpoint.filter_retrieve(
                 UserId(98),
                 WPContext::View,
-                &vec![SparseUserField::Nickname, SparseUserField::Url],
+                &[SparseUserField::Nickname, SparseUserField::Url],
             ),
             "/users/98?context=view&_fields=nickname%2Curl",
         );
@@ -214,7 +214,7 @@ mod tests {
         validate_endpoint(
             users_endpoint.filter_retrieve_me(
                 WPContext::Embed,
-                &vec![SparseUserField::Roles, SparseUserField::Capabilities],
+                &[SparseUserField::Roles, SparseUserField::Capabilities],
             ),
             "/users/me?context=embed&_fields=roles%2Ccapabilities",
         );
