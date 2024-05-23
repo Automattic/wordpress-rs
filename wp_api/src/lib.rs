@@ -1,7 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
 use request::{endpoint::ApiEndpoint, WPNetworkRequest, WPNetworkResponse};
-use serde::Deserialize;
 use std::collections::HashMap;
 use url::Url;
 
@@ -386,41 +385,10 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: String::from_utf8_lossy(&response.body).to_string(),
+            response: response.body_as_string(),
         })?;
 
     Ok(api_details)
-}
-
-pub fn parse_wp_response<'de, T: Deserialize<'de>>(
-    response: &'de WPNetworkResponse,
-) -> Result<T, WPApiError> {
-    parse_response_for_generic_errors(response)?;
-    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-        reason: err.to_string(),
-        response: String::from_utf8_lossy(&response.body).to_string(),
-    })
-}
-
-pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
-    let response_str = String::from_utf8_lossy(&response.body).to_string();
-    // TODO: Further parse the response body to include error message
-    // TODO: Lots of unwraps to get a basic setup working
-    let status = http::StatusCode::from_u16(response.status_code).unwrap();
-    if let Ok(rest_error) = serde_json::from_slice(&response.body) {
-        Err(WPApiError::RestError {
-            rest_error,
-            status_code: response.status_code,
-            response: response_str,
-        })
-    } else if status.is_client_error() || status.is_server_error() {
-        Err(WPApiError::UnknownError {
-            status_code: response.status_code,
-            response: response_str,
-        })
-    } else {
-        Ok(())
-    }
 }
 
 // TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
@@ -435,16 +403,6 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
 
 trait SparseField {
     fn as_str(&self) -> &str;
-}
-
-#[macro_export]
-macro_rules! add_uniffi_exported_parser {
-    ($fn_name:ident, $return_type: ty) => {
-        #[uniffi::export]
-        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
-            parse_wp_response(response)
-        }
-    };
 }
 
 #[macro_export]

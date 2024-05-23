@@ -46,21 +46,6 @@ impl WPNetworkRequestExecutor for WPNetworkRequest {
     }
 }
 
-pub trait WPNetworkResponseParser {
-    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
-    where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>;
-}
-
-impl WPNetworkResponseParser for WPNetworkResponse {
-    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
-    where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
-    {
-        parser(self)
-    }
-}
-
 pub trait AssertWpError<T: std::fmt::Debug> {
     fn assert_wp_error(self, expected_error_code: WPRestErrorCode);
 }
