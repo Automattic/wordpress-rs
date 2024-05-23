@@ -35,7 +35,7 @@ add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext)
 add_uniffi_exported_parser!(parse_update_plugin_response, PluginWithEditContext);
 add_uniffi_exported_parser!(parse_delete_plugin_response, PluginDeleteResponse);
 
-#[derive(Default, Debug, uniffi::Record)]
+#[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
     pub search: Option<String>,

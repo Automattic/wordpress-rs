@@ -91,7 +91,7 @@ impl Default for WPApiParamUsersWho {
     }
 }
 
-#[derive(Default, Debug, uniffi::Record)]
+#[derive(Debug, Default, uniffi::Record)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -184,7 +184,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Serialize, Debug, uniffi::Record)]
+#[derive(Debug, Serialize, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,
@@ -254,7 +254,7 @@ impl UserCreateParams {
     }
 }
 
-#[derive(Default, Serialize, uniffi::Record)]
+#[derive(Debug, Default, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
     /// Display name for the user.
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -6,7 +6,7 @@ use crate::RequestMethod;
 
 pub mod endpoint;
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
@@ -19,7 +19,8 @@ pub struct WPNetworkRequest {
     pub body: Option<Vec<u8>>,
 }
 
-#[derive(uniffi::Record)]
+// TODO: Customize debug
+#[derive(Debug, uniffi::Record)]
 pub struct WPNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,

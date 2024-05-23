@@ -4,6 +4,7 @@ use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext
 
 use super::{ApiBaseUrl, UrlExtension};
 
+#[derive(Debug)]
 pub struct UsersEndpoint {
     api_base_url: ApiBaseUrl,
 }
