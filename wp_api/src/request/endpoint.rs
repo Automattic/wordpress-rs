@@ -48,6 +48,7 @@ impl ApiBaseUrl {
     }
 }
 
+#[derive(Debug)]
 pub struct ApiEndpoint {
     pub base_url: ApiBaseUrl,
     pub users: UsersEndpoint,

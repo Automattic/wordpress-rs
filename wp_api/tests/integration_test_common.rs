@@ -106,6 +106,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
     }
 }
 
+#[derive(Debug)]
 pub struct TestCredentials {
     pub site_url: String,
     pub admin_username: String,
@@ -177,6 +178,7 @@ where
         .expect("Failed to restore wp-content/plugins");
 }
 
+#[derive(Debug)]
 pub struct AsyncWPNetworking {
     client: reqwest::Client,
 }

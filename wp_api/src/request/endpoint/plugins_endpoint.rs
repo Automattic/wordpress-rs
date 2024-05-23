@@ -4,6 +4,7 @@ use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WPContext}
 
 use super::{ApiBaseUrl, UrlExtension};
 
+#[derive(Debug)]
 pub struct PluginsEndpoint {
     api_base_url: ApiBaseUrl,
 }

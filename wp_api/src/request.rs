@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use url::Url;
 
@@ -6,6 +6,7 @@ use crate::RequestMethod;
 
 pub mod endpoint;
 
+// Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
@@ -19,6 +20,34 @@ pub struct WPNetworkRequest {
     pub body: Option<Vec<u8>>,
 }
 
+impl WPNetworkRequest {
+    pub fn body_as_string(&self) -> Option<String> {
+        self.body.as_ref().map(|b| body_as_string(b))
+    }
+}
+
+impl Debug for WPNetworkRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = format!(
+            indoc::indoc! {"
+                WPNetworkRequest {{
+                    method: '{:?}',
+                    url: '{}',
+                    header_map: '{:?}',
+                    body: '{:?}'
+                }}
+                "},
+            self.method,
+            self.url,
+            self.header_map,
+            self.body_as_string()
+        );
+        s.pop(); // Remove the new line at the end
+        write!(f, "{}", s)
+    }
+}
+
+// Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
 pub struct WPNetworkResponse {
     pub body: Vec<u8>,
@@ -45,7 +74,33 @@ impl WPNetworkResponse {
                 }
             }
         }
-
         None
     }
+
+    pub fn body_as_string(&self) -> String {
+        body_as_string(&self.body)
+    }
+}
+
+impl Debug for WPNetworkResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = format!(
+            indoc::indoc! {"
+                WPNetworkResponse {{
+                    status_code: '{}',
+                    header_map: '{:?}',
+                    body: '{}'
+                }}
+                "},
+            self.status_code,
+            self.header_map,
+            self.body_as_string()
+        );
+        s.pop(); // Remove the new line at the end
+        write!(f, "{}", s)
+    }
+}
+
+fn body_as_string(body: &[u8]) -> String {
+    String::from_utf8_lossy(body).to_string()
 }

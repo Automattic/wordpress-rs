@@ -21,7 +21,7 @@ mod unit_test_common;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 
-#[derive(uniffi::Object)]
+#[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     api_endpoint: ApiEndpoint,
     site_url: Url,
@@ -361,7 +361,7 @@ impl WPAuthentication {
     }
 }
 
-#[derive(uniffi::Enum)]
+#[derive(Debug, uniffi::Enum)]
 pub enum RequestMethod {
     GET,
     POST,
