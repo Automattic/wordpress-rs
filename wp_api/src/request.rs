@@ -6,7 +6,8 @@ use crate::RequestMethod;
 
 pub mod endpoint;
 
-#[derive(Debug, uniffi::Record)]
+// Has custom `Debug` trait implementation
+#[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
     pub url: String,
@@ -17,6 +18,33 @@ pub struct WPNetworkRequest {
     // module.
     pub header_map: HashMap<String, String>,
     pub body: Option<Vec<u8>>,
+}
+
+impl WPNetworkRequest {
+    pub fn body_as_string(&self) -> Option<String> {
+        self.body.as_ref().map(|b| body_as_string(b))
+    }
+}
+
+impl Debug for WPNetworkRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = format!(
+            indoc::indoc! {"
+                WPNetworkRequest {{
+                    method: '{:?}',
+                    url: '{}',
+                    header_map: '{:?}',
+                    body: '{:?}'
+                }}
+                "},
+            self.method,
+            self.url,
+            self.header_map,
+            self.body_as_string()
+        );
+        s.pop(); // Remove the new line at the end
+        write!(f, "{}", s)
+    }
 }
 
 // Has custom `Debug` trait implementation
@@ -50,14 +78,13 @@ impl WPNetworkResponse {
     }
 
     pub fn body_as_string(&self) -> String {
-        String::from_utf8_lossy(&self.body).to_string()
+        body_as_string(&self.body)
     }
 }
 
 impl Debug for WPNetworkResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
+        let mut s = format!(
             indoc::indoc! {"
                 WPNetworkResponse {{
                     status_code: '{}',
@@ -68,6 +95,12 @@ impl Debug for WPNetworkResponse {
             self.status_code,
             self.header_map,
             self.body_as_string()
-        )
+        );
+        s.pop(); // Remove the new line at the end
+        write!(f, "{}", s)
     }
+}
+
+fn body_as_string(body: &[u8]) -> String {
+    String::from_utf8_lossy(body).to_string()
 }
