@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 public protocol Namespace {
     associatedtype T
@@ -51,8 +53,8 @@ public protocol ContextualNamespace: Namespace where T: Contextual {
 
     var context: WpContext { get }
 
-    func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> R
-    func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> [R]
+    func parseResponse(_ response: WpNetworkResponse) throws -> R
+    func parseResponse(_ response: WpNetworkResponse) throws -> [R]
 }
 
 public struct ViewNamespace<T: Contextual>: ContextualNamespace {
@@ -63,11 +65,11 @@ public struct ViewNamespace<T: Contextual>: ContextualNamespace {
         parent.api
     }
 
-    public func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> T.ViewContext {
+    public func parseResponse(_ response: WpNetworkResponse) throws -> T.ViewContext {
         try T.parseResponse(response)
     }
 
-    public func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> [T.ViewContext] {
+    public func parseResponse(_ response: WpNetworkResponse) throws -> [T.ViewContext] {
         try T.parseResponse(response)
     }
 }
@@ -80,11 +82,11 @@ public struct EditNamespace<T: Contextual>: ContextualNamespace {
         parent.api
     }
 
-    public func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> T.EditContext {
+    public func parseResponse(_ response: WpNetworkResponse) throws -> T.EditContext {
         try T.parseResponse(response)
     }
 
-    public func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> [T.EditContext] {
+    public func parseResponse(_ response: WpNetworkResponse) throws -> [T.EditContext] {
         try T.parseResponse(response)
     }
 }
@@ -97,11 +99,11 @@ public struct EmbedNamespace<T: Contextual>: ContextualNamespace {
         parent.api
     }
 
-    public func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> T.EmbedContext {
+    public func parseResponse(_ response: WpNetworkResponse) throws -> T.EmbedContext {
         try T.parseResponse(response)
     }
 
-    public func parseResponse(_ response: WordPressAPIInternal.WpNetworkResponse) throws -> [T.EmbedContext] {
+    public func parseResponse(_ response: WpNetworkResponse) throws -> [T.EmbedContext] {
         try T.parseResponse(response)
     }
 }

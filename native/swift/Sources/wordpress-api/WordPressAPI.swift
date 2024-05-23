@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 #if os(Linux)
 import FoundationNetworking
@@ -71,7 +73,7 @@ public struct WordPressAPI {
         }
 
         public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
-            return WordPressAPIInternal.extractLoginDetailsFromUrl(url: url.asRestUrl())
+            return extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
 
