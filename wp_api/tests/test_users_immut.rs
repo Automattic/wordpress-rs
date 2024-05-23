@@ -27,7 +27,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
     parsed_response
         .unwrap()
         .iter()
-        .for_each(|user| validate_sparse_user_fields(&user, fields));
+        .for_each(|user| validate_sparse_user_fields(user, fields));
 }
 
 #[apply(filter_fields_cases)]

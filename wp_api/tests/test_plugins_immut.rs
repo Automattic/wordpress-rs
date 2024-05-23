@@ -34,7 +34,7 @@ async fn filter_plugins(
     parsed_response
         .unwrap()
         .iter()
-        .for_each(|plugin| validate_sparse_plugin_fields(&plugin, fields));
+        .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
 }
 
 #[apply(filter_fields_cases)]
