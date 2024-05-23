@@ -1,8 +1,8 @@
 use url::Url;
 
-use crate::{ApiBaseUrl, SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
+use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
-use super::UrlExtension;
+use super::{ApiBaseUrl, UrlExtension};
 
 pub struct UsersEndpoint {
     api_base_url: ApiBaseUrl,
@@ -93,7 +93,7 @@ impl UsersEndpoint {
 mod tests {
     use super::*;
     use crate::{
-        endpoint::tests::{fixture_api_base_url, validate_endpoint},
+        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
         ApiEndpoint,
     };
     use rstest::*;

@@ -1,18 +1,16 @@
 #![allow(dead_code, unused_variables)]
 
-use request::{WPNetworkRequest, WPNetworkResponse};
+use request::{endpoint::ApiEndpoint, WPNetworkRequest, WPNetworkResponse};
 use serde::Deserialize;
 use std::collections::HashMap;
 use url::Url;
 
 pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
-use endpoint::*;
 use login::*;
 use plugins::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
-pub mod endpoint;
 pub mod login;
 pub mod plugins;
 pub mod request;

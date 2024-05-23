@@ -4,6 +4,8 @@ use url::Url;
 
 use crate::RequestMethod;
 
+pub mod endpoint;
+
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
