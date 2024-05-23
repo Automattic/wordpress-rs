@@ -36,22 +36,17 @@ add_uniffi_exported_parser!(
 );
 add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersOrderBy {
     Id,
     Include,
+    #[default]
     Name,
     RegisteredDate,
     Slug,
     IncludeSlugs,
     Email,
     Url,
-}
-
-impl Default for WPApiParamUsersOrderBy {
-    fn default() -> Self {
-        Self::Name
-    }
 }
 
 impl WPApiParamUsersOrderBy {
@@ -69,8 +64,9 @@ impl WPApiParamUsersOrderBy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersWho {
+    #[default]
     All,
     Authors,
 }
@@ -82,12 +78,6 @@ impl WPApiParamUsersWho {
             Self::All => None,
             Self::Authors => Some("authors"),
         }
-    }
-}
-
-impl Default for WPApiParamUsersWho {
-    fn default() -> Self {
-        Self::All
     }
 }
 

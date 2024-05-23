@@ -323,17 +323,12 @@ impl WPApiHelper {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPContext {
     Edit,
     Embed,
+    #[default]
     View,
-}
-
-impl Default for WPContext {
-    fn default() -> Self {
-        Self::View
-    }
 }
 
 impl WPContext {
@@ -370,16 +365,11 @@ pub enum RequestMethod {
     HEAD,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamOrder {
+    #[default]
     Asc,
     Desc,
-}
-
-impl Default for WPApiParamOrder {
-    fn default() -> Self {
-        Self::Asc
-    }
 }
 
 impl WPApiParamOrder {
