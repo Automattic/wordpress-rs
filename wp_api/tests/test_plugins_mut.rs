@@ -1,8 +1,8 @@
 use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
 
 use crate::integration_test_common::{
-    api, run_and_restore_wp_content_plugins, WPNetworkRequestExecutor, WPNetworkResponseParser,
-    CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
+    api, run_and_restore_wp_content_plugins, WPNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG,
+    HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
 pub mod integration_test_common;
@@ -22,7 +22,7 @@ async fn create_plugin() {
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::plugins::parse_create_plugin_response)
+                .parse_with(wp_api::plugins::parse_create_plugin_response)
                 .unwrap();
             println!("Created Plugin: {:?}", created_plugin);
         })
@@ -43,7 +43,7 @@ async fn update_plugin() {
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::plugins::parse_update_plugin_response)
+                .parse_with(wp_api::plugins::parse_update_plugin_response)
                 .unwrap();
             println!("Updated Plugin: {:?}", updated_plugin);
         })
@@ -60,7 +60,7 @@ async fn delete_plugin() {
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::plugins::parse_delete_plugin_response)
+                .parse_with(wp_api::plugins::parse_delete_plugin_response)
                 .unwrap();
             println!("Deleted Plugin: {:?}", deleted_plugin);
         })

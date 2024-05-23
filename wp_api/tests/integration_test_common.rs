@@ -2,7 +2,7 @@ use futures::Future;
 use http::HeaderMap;
 use std::{fs::read_to_string, process::Command};
 use wp_api::{
-    request::{WPNetworkRequest, WPNetworkResponse},
+    request::{RequestMethod, WPNetworkRequest, WPNetworkResponse},
     users::UserId,
     WPApiError, WPApiHelper, WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper,
 };
@@ -43,21 +43,6 @@ pub trait WPNetworkRequestExecutor {
 impl WPNetworkRequestExecutor for WPNetworkRequest {
     async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
         AsyncWPNetworking::default().async_request(self).await
-    }
-}
-
-pub trait WPNetworkResponseParser {
-    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
-    where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>;
-}
-
-impl WPNetworkResponseParser for WPNetworkResponse {
-    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
-    where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
-    {
-        parser(self)
     }
 }
 
@@ -214,13 +199,13 @@ impl AsyncWPNetworking {
         })
     }
 
-    fn request_method(method: wp_api::RequestMethod) -> http::Method {
+    fn request_method(method: RequestMethod) -> http::Method {
         match method {
-            wp_api::RequestMethod::GET => reqwest::Method::GET,
-            wp_api::RequestMethod::POST => reqwest::Method::POST,
-            wp_api::RequestMethod::PUT => reqwest::Method::PUT,
-            wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
-            wp_api::RequestMethod::HEAD => reqwest::Method::HEAD,
+            RequestMethod::GET => reqwest::Method::GET,
+            RequestMethod::POST => reqwest::Method::POST,
+            RequestMethod::PUT => reqwest::Method::PUT,
+            RequestMethod::DELETE => reqwest::Method::DELETE,
+            RequestMethod::HEAD => reqwest::Method::HEAD,
         }
     }
 }

@@ -7,8 +7,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    api, WPNetworkRequestExecutor, WPNetworkResponseParser, CLASSIC_EDITOR_PLUGIN_SLUG,
-    HELLO_DOLLY_PLUGIN_SLUG,
+    api, WPNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -29,7 +28,7 @@ async fn filter_plugins(
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_filter_plugins_response);
+        .parse_with(wp_api::plugins::parse_filter_plugins_response);
     assert!(parsed_response.is_ok());
     parsed_response
         .unwrap()
@@ -48,7 +47,7 @@ async fn filter_retrieve_plugin(
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_filter_retrieve_plugin_response);
+        .parse_with(wp_api::plugins::parse_filter_retrieve_plugin_response);
     assert!(plugin_result.is_ok());
     validate_sparse_plugin_fields(&plugin_result.unwrap(), fields);
 }
@@ -115,7 +114,7 @@ async fn retrieve_plugin_with_edit_context(
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context);
+        .parse_with(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context);
     assert!(
         parsed_response.is_ok(),
         "Retrieve plugin failed!\nContext: {:?}\nPlugin: {:?}\nResponse was: '{:?}'",

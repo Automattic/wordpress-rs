@@ -1,8 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
+use serde::Deserialize;
 use url::Url;
 
-use crate::RequestMethod;
+use crate::WPApiError;
 
 pub mod endpoint;
 
@@ -80,6 +81,41 @@ impl WPNetworkResponse {
     pub fn body_as_string(&self) -> String {
         body_as_string(&self.body)
     }
+
+    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WPApiError> {
+        self.parse_response_for_generic_errors()?;
+        serde_json::from_slice(&self.body).map_err(|err| WPApiError::ParsingError {
+            reason: err.to_string(),
+            response: self.body_as_string(),
+        })
+    }
+
+    pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    where
+        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
+    {
+        parser(self)
+    }
+
+    fn parse_response_for_generic_errors(&self) -> Result<(), WPApiError> {
+        // TODO: Further parse the response body to include error message
+        // TODO: Lots of unwraps to get a basic setup working
+        let status = http::StatusCode::from_u16(self.status_code).unwrap();
+        if let Ok(rest_error) = serde_json::from_slice(&self.body) {
+            Err(WPApiError::RestError {
+                rest_error,
+                status_code: self.status_code,
+                response: self.body_as_string(),
+            })
+        } else if status.is_client_error() || status.is_server_error() {
+            Err(WPApiError::UnknownError {
+                status_code: self.status_code,
+                response: self.body_as_string(),
+            })
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Debug for WPNetworkResponse {
@@ -101,6 +137,25 @@ impl Debug for WPNetworkResponse {
     }
 }
 
+#[derive(Debug, uniffi::Enum)]
+pub enum RequestMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
+}
+
 fn body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
+}
+
+#[macro_export]
+macro_rules! add_uniffi_exported_parser {
+    ($fn_name:ident, $return_type: ty) => {
+        #[uniffi::export]
+        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
+            response.parse::<$return_type>()
+        }
+    };
 }
