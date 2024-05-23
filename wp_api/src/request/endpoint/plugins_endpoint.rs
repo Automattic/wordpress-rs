@@ -1,8 +1,8 @@
 use url::Url;
 
-use crate::{plugins::PluginListParams, ApiBaseUrl, PluginSlug, SparsePluginField, WPContext};
+use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WPContext};
 
-use super::UrlExtension;
+use super::{ApiBaseUrl, UrlExtension};
 
 pub struct PluginsEndpoint {
     api_base_url: ApiBaseUrl,
@@ -75,8 +75,9 @@ impl PluginsEndpoint {
 mod tests {
     use super::*;
     use crate::{
-        endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        generate, ApiEndpoint, PluginStatus,
+        generate,
+        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
+        ApiEndpoint, PluginStatus,
     };
     use rstest::*;
 
