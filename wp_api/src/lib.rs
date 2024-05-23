@@ -23,7 +23,6 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     api_endpoint: ApiEndpoint,
-    site_url: Url,
     authentication: WPAuthentication,
 }
 
@@ -45,7 +44,6 @@ impl WPApiHelper {
 
         Self {
             api_endpoint,
-            site_url: url,
             authentication,
         }
     }
