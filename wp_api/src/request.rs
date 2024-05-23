@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use serde::Deserialize;
 use url::Url;
 
-use crate::{RequestMethod, WPApiError};
+use crate::WPApiError;
 
 pub mod endpoint;
 
@@ -135,6 +135,15 @@ impl Debug for WPNetworkResponse {
         s.pop(); // Remove the new line at the end
         write!(f, "{}", s)
     }
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum RequestMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
 }
 
 fn body_as_string(body: &[u8]) -> String {

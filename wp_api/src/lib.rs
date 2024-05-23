@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use request::{endpoint::ApiEndpoint, WPNetworkRequest, WPNetworkResponse};
+use request::{endpoint::ApiEndpoint, RequestMethod, WPNetworkRequest, WPNetworkResponse};
 use std::collections::HashMap;
 use url::Url;
 
@@ -353,15 +353,6 @@ impl WPAuthentication {
             token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
         }
     }
-}
-
-#[derive(Debug, uniffi::Enum)]
-pub enum RequestMethod {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    HEAD,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
