@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use url::Url;
 
@@ -19,8 +19,8 @@ pub struct WPNetworkRequest {
     pub body: Option<Vec<u8>>,
 }
 
-// TODO: Customize debug
-#[derive(Debug, uniffi::Record)]
+// Has custom `Debug` trait implementation
+#[derive(uniffi::Record)]
 pub struct WPNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
@@ -46,7 +46,28 @@ impl WPNetworkResponse {
                 }
             }
         }
-
         None
+    }
+
+    pub fn body_as_string(&self) -> String {
+        String::from_utf8_lossy(&self.body).to_string()
+    }
+}
+
+impl Debug for WPNetworkResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            indoc::indoc! {"
+                WPNetworkResponse {{
+                    status_code: '{}',
+                    header_map: '{:?}',
+                    body: '{}'
+                }}
+                "},
+            self.status_code,
+            self.header_map,
+            self.body_as_string()
+        )
     }
 }
