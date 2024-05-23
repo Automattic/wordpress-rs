@@ -360,6 +360,9 @@ pub struct SparseUser {
     #[WPContext(edit)]
     pub extra_capabilities: Option<HashMap<String, bool>>,
     #[WPContext(edit, embed, view)]
+    // According to our tests, `avatar_urls` is not available for all site types. It's marked with
+    // `#[WPContextualOption]` which will make it an `Option` in the generated contextual types.
+    #[WPContextualOption]
     pub avatar_urls: Option<HashMap<String, String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
