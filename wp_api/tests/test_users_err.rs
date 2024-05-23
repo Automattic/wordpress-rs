@@ -83,8 +83,10 @@ async fn list_users_err_forbidden_context() {
 
 #[tokio::test]
 async fn list_users_err_forbidden_orderby_email() {
-    let mut params = UserListParams::default();
-    params.orderby = Some(WPApiParamUsersOrderBy::Email);
+    let params = UserListParams {
+        orderby: Some(WPApiParamUsersOrderBy::Email),
+        ..Default::default()
+    };
     api_as_subscriber()
         .list_users_request(WPContext::View, &Some(params))
         .execute()
@@ -96,8 +98,10 @@ async fn list_users_err_forbidden_orderby_email() {
 
 #[tokio::test]
 async fn list_users_err_forbidden_who() {
-    let mut params = UserListParams::default();
-    params.who = Some(WPApiParamUsersWho::Authors);
+    let params = UserListParams {
+        who: Some(WPApiParamUsersWho::Authors),
+        ..Default::default()
+    };
     api_as_subscriber()
         .list_users_request(WPContext::View, &Some(params))
         .execute()
@@ -109,8 +113,10 @@ async fn list_users_err_forbidden_who() {
 
 #[tokio::test]
 async fn list_users_with_capabilities_err_user_cannot_view() {
-    let mut params = UserListParams::default();
-    params.capabilities = vec!["foo".to_string()];
+    let params = UserListParams {
+        capabilities: vec!["foo".to_string()],
+        ..Default::default()
+    };
     api_as_subscriber()
         .list_users_request(WPContext::Edit, &Some(params))
         .execute()
@@ -122,8 +128,10 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
 
 #[tokio::test]
 async fn list_users_with_roles_err_user_cannot_view() {
-    let mut params = UserListParams::default();
-    params.roles = vec!["foo".to_string()];
+    let params = UserListParams {
+        roles: vec!["foo".to_string()],
+        ..Default::default()
+    };
     api_as_subscriber()
         .list_users_request(WPContext::Edit, &Some(params))
         .execute()
@@ -135,8 +143,10 @@ async fn list_users_with_roles_err_user_cannot_view() {
 
 #[tokio::test]
 async fn list_users_orderby_registered_date_err_forbidden_orderby() {
-    let mut params = UserListParams::default();
-    params.orderby = Some(WPApiParamUsersOrderBy::RegisteredDate);
+    let params = UserListParams {
+        orderby: Some(WPApiParamUsersOrderBy::RegisteredDate),
+        ..Default::default()
+    };
     api_as_subscriber()
         .list_users_request(WPContext::View, &Some(params))
         .execute()
@@ -173,8 +183,10 @@ async fn retrieve_user_err_unauthorized() {
 
 #[tokio::test]
 async fn update_user_err_cannot_edit() {
-    let mut params = UserUpdateParams::default();
-    params.slug = Some("new_slug".to_string());
+    let params = UserUpdateParams {
+        slug: Some("new_slug".to_string()),
+        ..Default::default()
+    };
     // Subscribers can't update someone else's slug
     api_as_subscriber()
         .update_user_request(FIRST_USER_ID, &params)
@@ -206,8 +218,10 @@ async fn update_user_err_user_invalid_argument() {
 
 #[tokio::test]
 async fn update_user_err_cannot_edit_roles() {
-    let mut params = UserUpdateParams::default();
-    params.roles = vec!["new_role".to_string()];
+    let params = UserUpdateParams {
+        roles: vec!["new_role".to_string()],
+        ..Default::default()
+    };
     // Subscribers can't update their roles
     api_as_subscriber()
         .update_user_request(SECOND_USER_ID, &params)
@@ -220,8 +234,10 @@ async fn update_user_err_cannot_edit_roles() {
 
 #[tokio::test]
 async fn update_user_err_user_invalid_email() {
-    let mut params = UserUpdateParams::default();
-    params.email = Some(SECOND_USER_EMAIL.to_string());
+    let params = UserUpdateParams {
+        email: Some(SECOND_USER_EMAIL.to_string()),
+        ..Default::default()
+    };
     // Can't update user's email to an email that's already in use
     api()
         .update_user_request(FIRST_USER_ID, &params)
@@ -234,8 +250,10 @@ async fn update_user_err_user_invalid_email() {
 
 #[tokio::test]
 async fn update_user_email_err_invalid_param() {
-    let mut params = UserUpdateParams::default();
-    params.email = Some("not_valid".to_string());
+    let params = UserUpdateParams {
+        email: Some("not_valid".to_string()),
+        ..Default::default()
+    };
     api()
         .update_user_request(FIRST_USER_ID, &params)
         .execute()
@@ -247,8 +265,10 @@ async fn update_user_email_err_invalid_param() {
 
 #[tokio::test]
 async fn update_user_password_err_invalid_param() {
-    let mut params = UserUpdateParams::default();
-    params.password = Some("".to_string());
+    let params = UserUpdateParams {
+        password: Some("".to_string()),
+        ..Default::default()
+    };
     api()
         .update_user_request(FIRST_USER_ID, &params)
         .execute()
@@ -260,8 +280,10 @@ async fn update_user_password_err_invalid_param() {
 
 #[tokio::test]
 async fn update_user_err_user_invalid_role() {
-    let mut params = UserUpdateParams::default();
-    params.roles = vec!["doesnt_exist".to_string()];
+    let params = UserUpdateParams {
+        roles: vec!["doesnt_exist".to_string()],
+        ..Default::default()
+    };
     // Can't update user's email to a role that doesn't exist
     api()
         .update_user_request(FIRST_USER_ID, &params)
@@ -274,8 +296,10 @@ async fn update_user_err_user_invalid_role() {
 
 #[tokio::test]
 async fn update_user_err_user_invalid_slug() {
-    let mut params = UserUpdateParams::default();
-    params.slug = Some(SECOND_USER_SLUG.to_string());
+    let params = UserUpdateParams {
+        slug: Some(SECOND_USER_SLUG.to_string()),
+        ..Default::default()
+    };
     // Can't update user's slug to a slug that's already in use
     api()
         .update_user_request(FIRST_USER_ID, &params)
