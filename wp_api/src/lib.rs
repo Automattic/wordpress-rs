@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
+use ::url::Url;
 use serde::Deserialize;
 use std::collections::HashMap;
 

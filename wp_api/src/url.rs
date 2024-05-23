@@ -1,4 +1,4 @@
-pub use url::Url;
+use url::Url;
 
 // A type that's guaranteed to represent a valid URL
 //
