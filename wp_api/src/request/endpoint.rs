@@ -10,13 +10,17 @@ mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
+uniffi::custom_newtype!(ApiEndpointUrlResult, String);
+#[derive(Debug)]
+pub struct ApiEndpointUrlResult(String);
+
 #[derive(Debug, uniffi::Object)]
-pub struct ApiEndpointUrl {
+pub(crate) struct ApiEndpointUrl {
     url: Url,
 }
 
 impl ApiEndpointUrl {
-    fn new(url: Url) -> Self {
+    pub fn new(url: Url) -> Self {
         Self { url }
     }
 
@@ -35,6 +39,12 @@ impl ApiEndpointUrl {
 impl From<Url> for ApiEndpointUrl {
     fn from(url: Url) -> Self {
         Self::new(url)
+    }
+}
+
+impl From<ApiEndpointUrl> for ApiEndpointUrlResult {
+    fn from(value: ApiEndpointUrl) -> Self {
+        Self(value.as_string())
     }
 }
 

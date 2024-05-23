@@ -1,6 +1,9 @@
 #![allow(dead_code, unused_variables)]
 
-use request::{endpoint::ApiEndpoint, RequestMethod, WPNetworkRequest, WPNetworkResponse};
+use request::{
+    endpoint::{ApiEndpoint, ApiEndpointUrl},
+    RequestMethod, WPNetworkRequest, WPNetworkResponse,
+};
 use std::collections::HashMap;
 use url::Url;
 
@@ -52,7 +55,7 @@ impl WPApiHelper {
     pub fn raw_request(&self, url: String) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: Url::parse(url.as_str()).unwrap().into(),
+            url: ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -69,7 +72,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .users
                 .list(context, params.as_ref())
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -87,7 +90,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .users
                 .filter_list(context, params.as_ref(), fields)
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -96,11 +99,7 @@ impl WPApiHelper {
     pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .users
-                .retrieve(user_id, context)
-                .as_string(),
+            url: self.api_endpoint.users.retrieve(user_id, context).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -118,7 +117,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .users
                 .filter_retrieve(user_id, context, fields)
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -127,7 +126,7 @@ impl WPApiHelper {
     pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: self.api_endpoint.users.retrieve_me(context).as_string(),
+            url: self.api_endpoint.users.retrieve_me(context).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -144,7 +143,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .users
                 .filter_retrieve_me(context, fields)
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -153,7 +152,7 @@ impl WPApiHelper {
     pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.users.create().as_string(),
+            url: self.api_endpoint.users.create().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -166,7 +165,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.users.update(user_id).as_string(),
+            url: self.api_endpoint.users.update(user_id).into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -175,7 +174,7 @@ impl WPApiHelper {
     pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.users.update_me().as_string(),
+            url: self.api_endpoint.users.update_me().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -188,7 +187,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: self.api_endpoint.users.delete(user_id, params).as_string(),
+            url: self.api_endpoint.users.delete(user_id, params).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -197,7 +196,7 @@ impl WPApiHelper {
     pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: self.api_endpoint.users.delete_me(params).as_string(),
+            url: self.api_endpoint.users.delete_me(params).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -214,7 +213,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .plugins
                 .list(context, params.as_ref())
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -232,7 +231,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .plugins
                 .filter_list(context, params.as_ref(), fields)
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -241,7 +240,7 @@ impl WPApiHelper {
     pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.plugins.create().as_string(),
+            url: self.api_endpoint.plugins.create().into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -254,11 +253,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .retrieve(context, plugin)
-                .as_string(),
+            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -276,7 +271,7 @@ impl WPApiHelper {
                 .api_endpoint
                 .plugins
                 .filter_retrieve(context, plugin, fields)
-                .as_string(),
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -289,7 +284,7 @@ impl WPApiHelper {
     ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
-            url: self.api_endpoint.plugins.update(plugin).as_string(),
+            url: self.api_endpoint.plugins.update(plugin).into(),
             header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(&params).ok(),
         }
@@ -298,7 +293,7 @@ impl WPApiHelper {
     pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: self.api_endpoint.plugins.delete(plugin).as_string(),
+            url: self.api_endpoint.plugins.delete(plugin).into(),
             header_map: self.header_map(),
             body: None,
         }
