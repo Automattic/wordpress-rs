@@ -33,7 +33,7 @@ impl Debug for WPNetworkRequest {
             indoc::indoc! {"
                 WPNetworkRequest {{
                     method: '{:?}',
-                    url: '{}',
+                    url: '{:?}',
                     header_map: '{:?}',
                     body: '{:?}'
                 }}
@@ -137,7 +137,7 @@ impl Debug for WPNetworkResponse {
     }
 }
 
-#[derive(Debug, uniffi::Enum)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum RequestMethod {
     GET,
     POST,

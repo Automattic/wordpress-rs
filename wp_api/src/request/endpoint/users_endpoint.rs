@@ -1,11 +1,9 @@
-use url::Url;
-
 use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
-use super::{ApiBaseUrl, UrlExtension};
+use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
 #[derive(Debug)]
-pub struct UsersEndpoint {
+pub(crate) struct UsersEndpoint {
     api_base_url: ApiBaseUrl,
 }
 
@@ -14,32 +12,32 @@ impl UsersEndpoint {
         Self { api_base_url }
     }
 
-    pub fn create(&self) -> Url {
-        self.api_base_url.by_appending("users")
+    pub fn create(&self) -> ApiEndpointUrl {
+        self.api_base_url.by_appending("users").into()
     }
 
-    pub fn delete(&self, user_id: UserId, params: &UserDeleteParams) -> Url {
+    pub fn delete(&self, user_id: UserId, params: &UserDeleteParams) -> ApiEndpointUrl {
         let mut url = self
             .api_base_url
             .by_extending(["users", &user_id.to_string()]);
         url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
+        url.into()
     }
 
-    pub fn delete_me(&self, params: &UserDeleteParams) -> Url {
+    pub fn delete_me(&self, params: &UserDeleteParams) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_extending(["users", "me"]);
         url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
+        url.into()
     }
 
-    pub fn list(&self, context: WPContext, params: Option<&UserListParams>) -> Url {
+    pub fn list(&self, context: WPContext, params: Option<&UserListParams>) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_appending("users");
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         if let Some(params) = params {
             url.query_pairs_mut().extend_pairs(params.query_pairs());
         }
-        url
+        url.into()
     }
 
     pub fn filter_list(
@@ -47,17 +45,20 @@ impl UsersEndpoint {
         context: WPContext,
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
-    ) -> Url {
-        self.list(context, params).append_filter_fields(fields)
+    ) -> ApiEndpointUrl {
+        self.list(context, params)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> Url {
+    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> ApiEndpointUrl {
         let mut url = self
             .api_base_url
             .by_extending(["users", &user_id.to_string()]);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        url
+        url.into()
     }
 
     pub fn filter_retrieve(
@@ -65,28 +66,39 @@ impl UsersEndpoint {
         user_id: UserId,
         context: WPContext,
         fields: &[SparseUserField],
-    ) -> Url {
-        self.retrieve(user_id, context).append_filter_fields(fields)
+    ) -> ApiEndpointUrl {
+        self.retrieve(user_id, context)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn retrieve_me(&self, context: WPContext) -> Url {
+    pub fn retrieve_me(&self, context: WPContext) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_extending(["users", "me"]);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        url
+        url.into()
     }
 
-    pub fn filter_retrieve_me(&self, context: WPContext, fields: &[SparseUserField]) -> Url {
-        self.retrieve_me(context).append_filter_fields(fields)
+    pub fn filter_retrieve_me(
+        &self,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> ApiEndpointUrl {
+        self.retrieve_me(context)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn update(&self, user_id: UserId) -> Url {
+    pub fn update(&self, user_id: UserId) -> ApiEndpointUrl {
         self.api_base_url
             .by_extending(["users", &user_id.to_string()])
+            .into()
     }
 
-    pub fn update_me(&self) -> Url {
-        self.api_base_url.by_extending(["users", "me"])
+    pub fn update_me(&self) -> ApiEndpointUrl {
+        self.api_base_url.by_extending(["users", "me"]).into()
     }
 }
 

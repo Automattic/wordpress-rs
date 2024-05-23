@@ -10,6 +10,34 @@ mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
+#[derive(Debug, uniffi::Object)]
+pub struct ApiEndpointUrl {
+    url: Url,
+}
+
+impl ApiEndpointUrl {
+    fn new(url: Url) -> Self {
+        Self { url }
+    }
+
+    fn url(&self) -> &Url {
+        &self.url
+    }
+}
+
+#[uniffi::export]
+impl ApiEndpointUrl {
+    pub fn as_string(&self) -> String {
+        self.url.clone().into()
+    }
+}
+
+impl From<Url> for ApiEndpointUrl {
+    fn from(url: Url) -> Self {
+        Self::new(url)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ApiBaseUrl {
     url: Url,
@@ -49,7 +77,7 @@ impl ApiBaseUrl {
 }
 
 #[derive(Debug)]
-pub struct ApiEndpoint {
+pub(crate) struct ApiEndpoint {
     pub base_url: ApiBaseUrl,
     pub users: UsersEndpoint,
     pub plugins: PluginsEndpoint,
@@ -167,9 +195,9 @@ mod tests {
         ApiBaseUrl::new("https://example.com").unwrap()
     }
 
-    pub fn validate_endpoint(endpoint_url: Url, path: &str) {
+    pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
-            endpoint_url.as_str(),
+            endpoint_url.as_string(),
             format!("{}{}", fixture_api_base_url().as_str(), path)
         );
     }
