@@ -5,8 +5,8 @@ use users_endpoint::*;
 
 use crate::SparseField;
 
-mod plugins_endpoint;
-mod users_endpoint;
+pub(crate) mod plugins_endpoint;
+pub(crate) mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 

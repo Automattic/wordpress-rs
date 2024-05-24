@@ -2,6 +2,8 @@
 
 use request::{
     endpoint::{ApiEndpoint, ApiEndpointUrl},
+    plugins_request::PluginsRequest,
+    users_request::UsersRequest,
     RequestMethod, WPNetworkRequest, WPNetworkResponse,
 };
 use std::collections::HashMap;
@@ -25,8 +27,9 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
-    api_endpoint: ApiEndpoint,
     authentication: WPAuthentication,
+    users_request: UsersRequest,
+    plugins_request: PluginsRequest,
 }
 
 #[uniffi::export]
@@ -46,8 +49,17 @@ impl WPApiHelper {
         let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
 
         Self {
-            api_endpoint,
-            authentication,
+            authentication: authentication.clone(),
+            users_request: UsersRequest {
+                endpoint: api_endpoint.users,
+                header_map: header_map(&authentication),
+                header_map_for_post_request: header_map_for_post_request(&authentication),
+            },
+            plugins_request: PluginsRequest {
+                endpoint: api_endpoint.plugins,
+                header_map: header_map(&authentication),
+                header_map_for_post_request: header_map_for_post_request(&authentication),
+            },
         }
     }
 
@@ -56,34 +68,155 @@ impl WPApiHelper {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()).into(),
-            header_map: self.header_map(),
+            header_map: header_map(&self.authentication),
             body: None,
         }
     }
 
-    fn header_map(&self) -> HashMap<String, String> {
-        let mut header_map = HashMap::new();
-        header_map.insert(
-            http::header::ACCEPT.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
-        );
-        match &self.authentication {
-            WPAuthentication::None => None,
-            WPAuthentication::AuthorizationHeader { token } => {
-                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
-            }
-        };
-        header_map
+    pub fn list_users_request(
+        &self,
+        context: WPContext,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
+        self.users_request.list(context, params)
     }
 
-    fn header_map_for_post_request(&self) -> HashMap<String, String> {
-        let mut header_map = self.header_map();
-        header_map.insert(
-            http::header::CONTENT_TYPE.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
-        );
-        header_map
+    pub fn filter_list_users_request(
+        &self,
+        context: WPContext,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        self.users_request.filter_list(context, params, fields)
     }
+
+    pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
+        self.users_request.retrieve(user_id, context)
+    }
+
+    pub fn filter_retrieve_user_request(
+        &self,
+        user_id: UserId,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        self.users_request.filter_retrieve(user_id, context, fields)
+    }
+
+    pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
+        self.users_request.retrieve_me(context)
+    }
+
+    pub fn filter_retrieve_current_user_request(
+        &self,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> WPNetworkRequest {
+        self.users_request.filter_retrieve_me(context, fields)
+    }
+
+    pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
+        self.users_request.create(params)
+    }
+
+    pub fn update_user_request(
+        &self,
+        user_id: UserId,
+        params: &UserUpdateParams,
+    ) -> WPNetworkRequest {
+        self.users_request.update(user_id, params)
+    }
+
+    pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
+        self.users_request.update_me(params)
+    }
+
+    pub fn delete_user_request(
+        &self,
+        user_id: UserId,
+        params: &UserDeleteParams,
+    ) -> WPNetworkRequest {
+        self.users_request.delete(user_id, params)
+    }
+
+    pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
+        self.users_request.delete_me(params)
+    }
+
+    pub fn list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
+        self.plugins_request.list(context, params)
+    }
+
+    pub fn filter_list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        self.plugins_request.filter_list(context, params, fields)
+    }
+
+    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+        self.plugins_request.create(params)
+    }
+
+    pub fn retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+    ) -> WPNetworkRequest {
+        self.plugins_request.retrieve(context, plugin)
+    }
+
+    pub fn filter_retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        self.plugins_request
+            .filter_retrieve(context, plugin, fields)
+    }
+
+    pub fn update_plugin_request(
+        &self,
+        plugin: &PluginSlug,
+        params: &PluginUpdateParams,
+    ) -> WPNetworkRequest {
+        self.plugins_request.update(plugin, params)
+    }
+
+    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
+        self.plugins_request.delete(plugin)
+    }
+}
+
+fn header_map(authentication: &WPAuthentication) -> HashMap<String, String> {
+    let mut header_map = HashMap::new();
+    header_map.insert(
+        http::header::ACCEPT.to_string(),
+        CONTENT_TYPE_JSON.to_string(),
+    );
+    match authentication {
+        WPAuthentication::None => None,
+        WPAuthentication::AuthorizationHeader { ref token } => {
+            header_map.insert("Authorization".to_string(), format!("Basic {}", token))
+        }
+    };
+    header_map
+}
+
+fn header_map_for_post_request(authentication: &WPAuthentication) -> HashMap<String, String> {
+    let mut header_map = header_map(authentication);
+    header_map.insert(
+        http::header::CONTENT_TYPE.to_string(),
+        CONTENT_TYPE_JSON.to_string(),
+    );
+    header_map
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
