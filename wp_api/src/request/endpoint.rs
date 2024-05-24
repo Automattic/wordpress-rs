@@ -46,7 +46,7 @@ impl From<ApiEndpointUrl> for WpEndpointUrl {
 }
 
 #[derive(Debug, Clone)]
-pub struct ApiBaseUrl {
+pub(crate) struct ApiBaseUrl {
     url: Url,
 }
 
