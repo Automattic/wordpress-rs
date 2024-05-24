@@ -11,12 +11,12 @@ use super::{
 };
 
 #[derive(Debug)]
-pub(crate) struct PluginsRequest {
+pub(crate) struct PluginsRequestBuilder {
     endpoint: PluginsEndpoint,
     request_builder: Arc<RequestBuilder>,
 }
 
-impl PluginsRequest {
+impl PluginsRequestBuilder {
     pub fn new(api_base_url: Arc<ApiBaseUrl>, request_builder: Arc<RequestBuilder>) -> Self {
         Self {
             endpoint: PluginsEndpoint::new(api_base_url),

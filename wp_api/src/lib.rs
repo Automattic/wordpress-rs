@@ -2,8 +2,8 @@
 
 use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
-    plugins_request::PluginsRequest,
-    users_request::UsersRequest,
+    plugins_request_builder::PluginsRequestBuilder,
+    users_request_builder::UsersRequestBuilder,
     RequestMethod, WPNetworkRequest, WPNetworkResponse,
 };
 use serde::Serialize;
@@ -29,8 +29,8 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     request_builder: Arc<RequestBuilder>,
-    users_request: UsersRequest,
-    plugins_request: PluginsRequest,
+    users_request: UsersRequestBuilder,
+    plugins_request: PluginsRequestBuilder,
 }
 
 #[uniffi::export]
@@ -54,8 +54,11 @@ impl WPApiHelper {
 
         Self {
             request_builder: request_builder.clone(),
-            users_request: UsersRequest::new(api_base_url.clone(), request_builder.clone()),
-            plugins_request: PluginsRequest::new(api_base_url.clone(), request_builder.clone()),
+            users_request: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
+            plugins_request: PluginsRequestBuilder::new(
+                api_base_url.clone(),
+                request_builder.clone(),
+            ),
         }
     }
 
