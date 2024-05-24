@@ -200,7 +200,7 @@ impl RequestBuilder {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: header_map(&self.authentication),
+            header_map: self.header_map(),
             body: None,
         }
     }
@@ -212,7 +212,7 @@ impl RequestBuilder {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: url.into(),
-            header_map: header_map_for_post_request(&self.authentication),
+            header_map: self.header_map_for_post_request(),
             body: serde_json::to_vec(json_body).ok(),
         }
     }
@@ -221,34 +221,34 @@ impl RequestBuilder {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
-            header_map: header_map(&self.authentication),
+            header_map: self.header_map(),
             body: None,
         }
     }
-}
 
-fn header_map(authentication: &WPAuthentication) -> HashMap<String, String> {
-    let mut header_map = HashMap::new();
-    header_map.insert(
-        http::header::ACCEPT.to_string(),
-        CONTENT_TYPE_JSON.to_string(),
-    );
-    match authentication {
-        WPAuthentication::None => None,
-        WPAuthentication::AuthorizationHeader { ref token } => {
-            header_map.insert("Authorization".to_string(), format!("Basic {}", token))
-        }
-    };
-    header_map
-}
+    fn header_map(&self) -> HashMap<String, String> {
+        let mut header_map = HashMap::new();
+        header_map.insert(
+            http::header::ACCEPT.to_string(),
+            CONTENT_TYPE_JSON.to_string(),
+        );
+        match self.authentication {
+            WPAuthentication::None => None,
+            WPAuthentication::AuthorizationHeader { ref token } => {
+                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
+            }
+        };
+        header_map
+    }
 
-fn header_map_for_post_request(authentication: &WPAuthentication) -> HashMap<String, String> {
-    let mut header_map = header_map(authentication);
-    header_map.insert(
-        http::header::CONTENT_TYPE.to_string(),
-        CONTENT_TYPE_JSON.to_string(),
-    );
-    header_map
+    fn header_map_for_post_request(&self) -> HashMap<String, String> {
+        let mut header_map = self.header_map();
+        header_map.insert(
+            http::header::CONTENT_TYPE.to_string(),
+            CONTENT_TYPE_JSON.to_string(),
+        );
+        header_map
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
