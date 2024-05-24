@@ -37,30 +37,112 @@ fn wp_authentication_from_username_and_password(
     WPAuthentication::from_username_and_password(username, password)
 }
 
-#[uniffi::export]
-impl WPApiHelper {
-    #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
-        let url = Url::parse(site_url.as_str()).unwrap();
-        // TODO: Handle the url parse error
-        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
+struct RequestBuilder {}
 
-        Self {
-            api_endpoint,
-            authentication,
-        }
-    }
+struct PluginRequestBuilder {}
 
-    // TODO: Remove this because we want to build all requests within the crate
-    pub fn raw_request(&self, url: String) -> WPNetworkRequest {
+impl PluginRequestBuilder {
+    pub fn list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+    ) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()).into(),
+            url: self
+                .api_endpoint
+                .plugins
+                .list(context, params.as_ref())
+                .into(),
             header_map: self.header_map(),
             body: None,
         }
     }
 
+    pub fn filter_list_plugins_request(
+        &self,
+        context: WPContext,
+        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_list(context, params.as_ref(), fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.create().into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn filter_retrieve_plugin_request(
+        &self,
+        context: WPContext,
+        plugin: &PluginSlug,
+        fields: &[SparsePluginField],
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: self
+                .api_endpoint
+                .plugins
+                .filter_retrieve(context, plugin, fields)
+                .into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    pub fn update_plugin_request(
+        &self,
+        plugin: &PluginSlug,
+        params: &PluginUpdateParams,
+    ) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: self.api_endpoint.plugins.update(plugin).into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(&params).ok(),
+        }
+    }
+
+    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: self.api_endpoint.plugins.delete(plugin).into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+}
+
+struct UserRequestBuilder {}
+
+impl UserRequestBuilder {
     pub fn list_users_request(
         &self,
         context: WPContext,
@@ -201,99 +283,27 @@ impl WPApiHelper {
             body: None,
         }
     }
+}
 
-    pub fn list_plugins_request(
-        &self,
-        context: WPContext,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
-    ) -> WPNetworkRequest {
+#[uniffi::export]
+impl WPApiHelper {
+    #[uniffi::constructor]
+    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
+        let url = Url::parse(site_url.as_str()).unwrap();
+        // TODO: Handle the url parse error
+        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
+
+        Self {
+            api_endpoint,
+            authentication,
+        }
+    }
+
+    // TODO: Remove this because we want to build all requests within the crate
+    pub fn raw_request(&self, url: String) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .list(context, params.as_ref())
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn filter_list_plugins_request(
-        &self,
-        context: WPContext,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
-        fields: &[SparsePluginField],
-    ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .filter_list(context, params.as_ref(), fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.plugins.create().into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
-    }
-
-    pub fn retrieve_plugin_request(
-        &self,
-        context: WPContext,
-        plugin: &PluginSlug,
-    ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn filter_retrieve_plugin_request(
-        &self,
-        context: WPContext,
-        plugin: &PluginSlug,
-        fields: &[SparsePluginField],
-    ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .filter_retrieve(context, plugin, fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    pub fn update_plugin_request(
-        &self,
-        plugin: &PluginSlug,
-        params: &PluginUpdateParams,
-    ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.plugins.update(plugin).into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
-    }
-
-    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: self.api_endpoint.plugins.delete(plugin).into(),
+            url: ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()).into(),
             header_map: self.header_map(),
             body: None,
         }
