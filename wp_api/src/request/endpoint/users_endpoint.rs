@@ -105,10 +105,7 @@ impl UsersEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        ApiEndpoint,
-    };
+    use crate::request::endpoint::tests::{fixture_api_base_url, validate_endpoint};
     use rstest::*;
 
     #[rstest]
@@ -244,6 +241,6 @@ mod tests {
 
     #[fixture]
     fn users_endpoint(fixture_api_base_url: ApiBaseUrl) -> UsersEndpoint {
-        ApiEndpoint::new(fixture_api_base_url).users
+        UsersEndpoint::new(fixture_api_base_url)
     }
 }

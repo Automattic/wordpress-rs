@@ -6,7 +6,8 @@ use request::{
     users_request::UsersRequest,
     RequestMethod, WPNetworkRequest, WPNetworkResponse,
 };
-use std::collections::HashMap;
+use serde::Serialize;
+use std::{collections::HashMap, sync::Arc};
 use url::Url;
 
 pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
@@ -28,6 +29,7 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     authentication: WPAuthentication,
+    request_builder: Arc<RequestBuilder>,
     users_request: UsersRequest,
     plugins_request: PluginsRequest,
 }
@@ -47,14 +49,14 @@ impl WPApiHelper {
         let url = Url::parse(site_url.as_str()).unwrap();
         // TODO: Handle the url parse error
         let api_base_url = ApiBaseUrl::new(site_url.as_str()).unwrap();
+        let request_builder = Arc::new(RequestBuilder {
+            authentication: authentication.clone(),
+        });
 
         Self {
             authentication: authentication.clone(),
-            users_request: UsersRequest::new(
-                api_base_url.clone(),
-                header_map(&authentication),
-                header_map_for_post_request(&authentication),
-            ),
+            request_builder: request_builder.clone(),
+            users_request: UsersRequest::new(api_base_url.clone(), request_builder.clone()),
             plugins_request: PluginsRequest::new(
                 api_base_url.clone(),
                 header_map(&authentication),
@@ -192,6 +194,43 @@ impl WPApiHelper {
 
     pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
         self.plugins_request.delete(plugin)
+    }
+}
+
+#[derive(Debug)]
+struct RequestBuilder {
+    authentication: WPAuthentication,
+}
+
+impl RequestBuilder {
+    fn get(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: url.into(),
+            header_map: header_map(&self.authentication),
+            body: None,
+        }
+    }
+
+    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WPNetworkRequest
+    where
+        T: ?Sized + Serialize,
+    {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: header_map_for_post_request(&self.authentication),
+            body: serde_json::to_vec(json_body).ok(),
+        }
+    }
+
+    fn delete(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: url.into(),
+            header_map: header_map(&self.authentication),
+            body: None,
+        }
     }
 }
 

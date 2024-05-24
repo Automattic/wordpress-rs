@@ -84,7 +84,7 @@ mod tests {
     use crate::{
         generate,
         request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        ApiEndpoint, PluginStatus,
+        PluginStatus,
     };
     use rstest::*;
 
@@ -239,6 +239,6 @@ mod tests {
 
     #[fixture]
     fn plugins_endpoint(fixture_api_base_url: ApiBaseUrl) -> PluginsEndpoint {
-        ApiEndpoint::new(fixture_api_base_url).plugins
+        PluginsEndpoint::new(fixture_api_base_url)
     }
 }
