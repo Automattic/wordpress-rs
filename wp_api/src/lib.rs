@@ -29,7 +29,6 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     authentication: WPAuthentication,
-    request_builder: Arc<RequestBuilder>,
     users_request: UsersRequest,
     plugins_request: PluginsRequest,
 }
@@ -55,13 +54,8 @@ impl WPApiHelper {
 
         Self {
             authentication: authentication.clone(),
-            request_builder: request_builder.clone(),
             users_request: UsersRequest::new(api_base_url.clone(), request_builder.clone()),
-            plugins_request: PluginsRequest::new(
-                api_base_url.clone(),
-                header_map(&authentication),
-                header_map_for_post_request(&authentication),
-            ),
+            plugins_request: PluginsRequest::new(api_base_url.clone(), request_builder.clone()),
         }
     }
 

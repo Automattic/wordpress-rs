@@ -1,32 +1,26 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::{
-    PluginCreateParams, PluginListParams, PluginSlug, PluginUpdateParams, SparsePluginField,
-    WPContext,
+    PluginCreateParams, PluginListParams, PluginSlug, PluginUpdateParams, RequestBuilder,
+    SparsePluginField, WPContext,
 };
 
 use super::{
     endpoint::{plugins_endpoint::PluginsEndpoint, ApiBaseUrl},
-    RequestMethod, WPNetworkRequest,
+    WPNetworkRequest,
 };
 
 #[derive(Debug)]
 pub(crate) struct PluginsRequest {
     endpoint: PluginsEndpoint,
-    header_map: HashMap<String, String>,
-    header_map_for_post_request: HashMap<String, String>,
+    request_builder: Arc<RequestBuilder>,
 }
 
 impl PluginsRequest {
-    pub fn new(
-        api_base_url: ApiBaseUrl,
-        header_map: HashMap<String, String>,
-        header_map_for_post_request: HashMap<String, String>,
-    ) -> Self {
+    pub fn new(api_base_url: ApiBaseUrl, request_builder: Arc<RequestBuilder>) -> Self {
         Self {
             endpoint: PluginsEndpoint::new(api_base_url),
-            header_map,
-            header_map_for_post_request,
+            request_builder,
         }
     }
 
@@ -35,12 +29,8 @@ impl PluginsRequest {
         context: WPContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.endpoint.list(context, params.as_ref()).into(),
-            header_map: self.header_map.clone(),
-            body: None,
-        }
+        self.request_builder
+            .get(self.endpoint.list(context, params.as_ref()))
     }
 
     pub fn filter_list(
@@ -49,33 +39,17 @@ impl PluginsRequest {
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparsePluginField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .endpoint
-                .filter_list(context, params.as_ref(), fields)
-                .into(),
-            header_map: self.header_map.clone(),
-            body: None,
-        }
+        self.request_builder
+            .get(self.endpoint.filter_list(context, params.as_ref(), fields))
     }
 
     pub fn create(&self, params: &PluginCreateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.endpoint.create().into(),
-            header_map: self.header_map_for_post_request.clone(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.request_builder.post(self.endpoint.create(), params)
     }
 
     pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.endpoint.retrieve(context, plugin).into(),
-            header_map: self.header_map.clone(),
-            body: None,
-        }
+        self.request_builder
+            .get(self.endpoint.retrieve(context, plugin))
     }
 
     pub fn filter_retrieve(
@@ -84,32 +58,16 @@ impl PluginsRequest {
         plugin: &PluginSlug,
         fields: &[SparsePluginField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .endpoint
-                .filter_retrieve(context, plugin, fields)
-                .into(),
-            header_map: self.header_map.clone(),
-            body: None,
-        }
+        self.request_builder
+            .get(self.endpoint.filter_retrieve(context, plugin, fields))
     }
 
     pub fn update(&self, plugin: &PluginSlug, params: &PluginUpdateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.endpoint.update(plugin).into(),
-            header_map: self.header_map_for_post_request.clone(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.request_builder
+            .post(self.endpoint.update(plugin), params)
     }
 
     pub fn delete(&self, plugin: &PluginSlug) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: self.endpoint.delete(plugin).into(),
-            header_map: self.header_map.clone(),
-            body: None,
-        }
+        self.request_builder.delete(self.endpoint.delete(plugin))
     }
 }
