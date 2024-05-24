@@ -200,7 +200,7 @@ test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
 
 test-rust-integration:
-	docker run -v $(PWD):/app -w /app -i $(rust_docker_container) /bin/bash < ./scripts/docker-integration-tests.sh
+	docker run -v $(PWD):/app -w /app -i --add-host=host.docker.internal:host-gateway $(rust_docker_container) /bin/bash < ./scripts/docker-integration-tests.sh
 
 test-rust-integration-local:
 	./scripts/local-integration-tests.sh
