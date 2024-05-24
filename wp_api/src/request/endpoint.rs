@@ -1,8 +1,5 @@
 use url::Url;
 
-use plugins_endpoint::*;
-use users_endpoint::*;
-
 use crate::SparseField;
 
 pub(crate) mod plugins_endpoint;
@@ -80,27 +77,6 @@ impl ApiBaseUrl {
 
     fn as_str(&self) -> &str {
         self.url.as_str()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ApiEndpoint {
-    pub base_url: ApiBaseUrl,
-    pub users: UsersEndpoint,
-    pub plugins: PluginsEndpoint,
-}
-
-impl ApiEndpoint {
-    pub fn new(api_base_url: ApiBaseUrl) -> Self {
-        Self {
-            base_url: api_base_url.clone(),
-            users: UsersEndpoint::new(api_base_url.clone()),
-            plugins: PluginsEndpoint::new(api_base_url.clone()),
-        }
-    }
-
-    pub fn new_from_str(site_base_url: &str) -> Result<Self, url::ParseError> {
-        ApiBaseUrl::new(site_base_url).map(Self::new)
     }
 }
 

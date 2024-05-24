@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 use request::{
-    endpoint::{ApiEndpoint, ApiEndpointUrl},
+    endpoint::{ApiBaseUrl, ApiEndpointUrl},
     plugins_request::PluginsRequest,
     users_request::UsersRequest,
     RequestMethod, WPNetworkRequest, WPNetworkResponse,
@@ -46,20 +46,20 @@ impl WPApiHelper {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
         // TODO: Handle the url parse error
-        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
+        let api_base_url = ApiBaseUrl::new(site_url.as_str()).unwrap();
 
         Self {
             authentication: authentication.clone(),
-            users_request: UsersRequest {
-                endpoint: api_endpoint.users,
-                header_map: header_map(&authentication),
-                header_map_for_post_request: header_map_for_post_request(&authentication),
-            },
-            plugins_request: PluginsRequest {
-                endpoint: api_endpoint.plugins,
-                header_map: header_map(&authentication),
-                header_map_for_post_request: header_map_for_post_request(&authentication),
-            },
+            users_request: UsersRequest::new(
+                api_base_url.clone(),
+                header_map(&authentication),
+                header_map_for_post_request(&authentication),
+            ),
+            plugins_request: PluginsRequest::new(
+                api_base_url.clone(),
+                header_map(&authentication),
+                header_map_for_post_request(&authentication),
+            ),
         }
     }
 

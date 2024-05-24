@@ -5,16 +5,31 @@ use crate::{
     WPContext,
 };
 
-use super::{endpoint::users_endpoint::UsersEndpoint, RequestMethod, WPNetworkRequest};
+use super::{
+    endpoint::{users_endpoint::UsersEndpoint, ApiBaseUrl},
+    RequestMethod, WPNetworkRequest,
+};
 
 #[derive(Debug)]
 pub(crate) struct UsersRequest {
-    pub endpoint: UsersEndpoint,
-    pub header_map: HashMap<String, String>,
-    pub header_map_for_post_request: HashMap<String, String>,
+    endpoint: UsersEndpoint,
+    header_map: HashMap<String, String>,
+    header_map_for_post_request: HashMap<String, String>,
 }
 
 impl UsersRequest {
+    pub fn new(
+        api_base_url: ApiBaseUrl,
+        header_map: HashMap<String, String>,
+        header_map_for_post_request: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            endpoint: UsersEndpoint::new(api_base_url),
+            header_map,
+            header_map_for_post_request,
+        }
+    }
+
     pub fn list(
         &self,
         context: WPContext,
