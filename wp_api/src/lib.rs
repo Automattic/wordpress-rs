@@ -42,7 +42,7 @@ struct RequestBuilder {}
 struct PluginRequestBuilder {}
 
 impl PluginRequestBuilder {
-    pub fn list_plugins_request(
+    pub fn list(
         &self,
         context: WPContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
@@ -59,7 +59,7 @@ impl PluginRequestBuilder {
         }
     }
 
-    pub fn filter_list_plugins_request(
+    pub fn filter_list(
         &self,
         context: WPContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
@@ -77,7 +77,7 @@ impl PluginRequestBuilder {
         }
     }
 
-    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+    pub fn create(&self, params: &PluginCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_endpoint.plugins.create().into(),
@@ -86,11 +86,7 @@ impl PluginRequestBuilder {
         }
     }
 
-    pub fn retrieve_plugin_request(
-        &self,
-        context: WPContext,
-        plugin: &PluginSlug,
-    ) -> WPNetworkRequest {
+    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
@@ -99,7 +95,7 @@ impl PluginRequestBuilder {
         }
     }
 
-    pub fn filter_retrieve_plugin_request(
+    pub fn filter_retrieve(
         &self,
         context: WPContext,
         plugin: &PluginSlug,
@@ -117,11 +113,7 @@ impl PluginRequestBuilder {
         }
     }
 
-    pub fn update_plugin_request(
-        &self,
-        plugin: &PluginSlug,
-        params: &PluginUpdateParams,
-    ) -> WPNetworkRequest {
+    pub fn update(&self, plugin: &PluginSlug, params: &PluginUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_endpoint.plugins.update(plugin).into(),
@@ -130,7 +122,7 @@ impl PluginRequestBuilder {
         }
     }
 
-    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
+    pub fn delete(&self, plugin: &PluginSlug) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: self.api_endpoint.plugins.delete(plugin).into(),
@@ -143,7 +135,7 @@ impl PluginRequestBuilder {
 struct UserRequestBuilder {}
 
 impl UserRequestBuilder {
-    pub fn list_users_request(
+    pub fn list(
         &self,
         context: WPContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
@@ -160,7 +152,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn filter_list_users_request(
+    pub fn filter_list(
         &self,
         context: WPContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
@@ -178,7 +170,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
+    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.users.retrieve(user_id, context).into(),
@@ -187,7 +179,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn filter_retrieve_user_request(
+    pub fn filter_retrieve(
         &self,
         user_id: UserId,
         context: WPContext,
@@ -205,7 +197,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
+    pub fn retrieve_me(&self, context: WPContext) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
             url: self.api_endpoint.users.retrieve_me(context).into(),
@@ -214,7 +206,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn filter_retrieve_current_user_request(
+    pub fn filter_retrieve_me(
         &self,
         context: WPContext,
         fields: &[SparseUserField],
@@ -231,7 +223,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
+    pub fn create(&self, params: &UserCreateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_endpoint.users.create().into(),
@@ -240,11 +232,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn update_user_request(
-        &self,
-        user_id: UserId,
-        params: &UserUpdateParams,
-    ) -> WPNetworkRequest {
+    pub fn update(&self, user_id: UserId, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_endpoint.users.update(user_id).into(),
@@ -253,7 +241,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
+    pub fn update_me(&self, params: &UserUpdateParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_endpoint.users.update_me().into(),
@@ -262,11 +250,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn delete_user_request(
-        &self,
-        user_id: UserId,
-        params: &UserDeleteParams,
-    ) -> WPNetworkRequest {
+    pub fn delete(&self, user_id: UserId, params: &UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: self.api_endpoint.users.delete(user_id, params).into(),
@@ -275,7 +259,7 @@ impl UserRequestBuilder {
         }
     }
 
-    pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
+    pub fn delete_me(&self, params: &UserDeleteParams) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
             url: self.api_endpoint.users.delete_me(params).into(),
