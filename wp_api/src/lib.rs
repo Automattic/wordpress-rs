@@ -27,6 +27,39 @@ mod unit_test_common;
 const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(Debug, uniffi::Object)]
+pub struct WpRequestBuilder {
+    users: Arc<UsersRequestBuilder>,
+    plugins: Arc<PluginsRequestBuilder>,
+}
+
+#[uniffi::export]
+impl WpRequestBuilder {
+    #[uniffi::constructor]
+    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
+        let url = Url::parse(site_url.as_str()).unwrap();
+        // TODO: Handle the url parse error
+        let api_base_url = Arc::new(ApiBaseUrl::new(site_url.as_str()).unwrap());
+        let request_builder = Arc::new(RequestBuilder {
+            authentication: authentication.clone(),
+        });
+
+        Self {
+            users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
+            plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
+                .into(),
+        }
+    }
+
+    pub fn users(&self) -> Arc<UsersRequestBuilder> {
+        self.users.clone()
+    }
+
+    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+        self.plugins.clone()
+    }
+}
+
+#[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     request_builder: Arc<RequestBuilder>,
     users_request: UsersRequestBuilder,

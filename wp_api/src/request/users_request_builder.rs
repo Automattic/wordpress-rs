@@ -10,20 +10,23 @@ use super::{
     WPNetworkRequest,
 };
 
-#[derive(Debug)]
-pub(crate) struct UsersRequestBuilder {
+#[derive(Debug, uniffi::Object)]
+pub struct UsersRequestBuilder {
     endpoint: UsersEndpoint,
     request_builder: Arc<RequestBuilder>,
 }
 
 impl UsersRequestBuilder {
-    pub fn new(api_base_url: Arc<ApiBaseUrl>, request_builder: Arc<RequestBuilder>) -> Self {
+    pub(crate) fn new(api_base_url: Arc<ApiBaseUrl>, request_builder: Arc<RequestBuilder>) -> Self {
         Self {
             endpoint: UsersEndpoint::new(api_base_url),
             request_builder,
         }
     }
+}
 
+#[uniffi::export]
+impl UsersRequestBuilder {
     pub fn list(
         &self,
         context: WPContext,
