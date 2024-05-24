@@ -10,11 +10,11 @@ mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
-uniffi::custom_newtype!(ApiEndpointUrlResult, String);
+uniffi::custom_newtype!(WpEndpointUrl, String);
 #[derive(Debug)]
-pub struct ApiEndpointUrlResult(String);
+pub struct WpEndpointUrl(pub String);
 
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug)]
 pub(crate) struct ApiEndpointUrl {
     url: Url,
 }
@@ -27,12 +27,9 @@ impl ApiEndpointUrl {
     fn url(&self) -> &Url {
         &self.url
     }
-}
 
-#[uniffi::export]
-impl ApiEndpointUrl {
-    pub fn as_string(&self) -> String {
-        self.url.clone().into()
+    pub fn as_str(&self) -> &str {
+        self.url.as_str()
     }
 }
 
@@ -42,9 +39,9 @@ impl From<Url> for ApiEndpointUrl {
     }
 }
 
-impl From<ApiEndpointUrl> for ApiEndpointUrlResult {
-    fn from(value: ApiEndpointUrl) -> Self {
-        Self(value.as_string())
+impl From<ApiEndpointUrl> for WpEndpointUrl {
+    fn from(url: ApiEndpointUrl) -> Self {
+        Self(url.as_str().to_string())
     }
 }
 
@@ -207,7 +204,7 @@ mod tests {
 
     pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
-            endpoint_url.as_string(),
+            endpoint_url.as_str(),
             format!("{}{}", fixture_api_base_url().as_str(), path)
         );
     }

@@ -5,7 +5,7 @@ use url::Url;
 
 use crate::WPApiError;
 
-use self::endpoint::ApiEndpointUrlResult;
+use self::endpoint::WpEndpointUrl;
 
 pub mod endpoint;
 
@@ -13,7 +13,7 @@ pub mod endpoint;
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
-    pub url: ApiEndpointUrlResult,
+    pub url: WpEndpointUrl,
     // TODO: We probably want to implement a specific type for these headers instead of using a
     // regular HashMap.
     //
