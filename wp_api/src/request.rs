@@ -8,6 +8,8 @@ use crate::WPApiError;
 use self::endpoint::WpEndpointUrl;
 
 pub mod endpoint;
+pub mod plugins_request;
+pub mod users_request;
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
