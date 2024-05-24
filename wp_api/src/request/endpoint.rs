@@ -120,6 +120,8 @@ impl UrlExtension for Url {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use rstest::*;
 
@@ -174,8 +176,8 @@ mod tests {
     }
 
     #[fixture]
-    pub fn fixture_api_base_url() -> ApiBaseUrl {
-        ApiBaseUrl::new("https://example.com").unwrap()
+    pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
+        ApiBaseUrl::new("https://example.com").unwrap().into()
     }
 
     pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {

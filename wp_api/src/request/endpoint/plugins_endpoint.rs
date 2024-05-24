@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use url::Url;
 
 use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WPContext};
@@ -6,11 +8,11 @@ use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
 #[derive(Debug)]
 pub(crate) struct PluginsEndpoint {
-    api_base_url: ApiBaseUrl,
+    api_base_url: Arc<ApiBaseUrl>,
 }
 
 impl PluginsEndpoint {
-    pub fn new(api_base_url: ApiBaseUrl) -> Self {
+    pub fn new(api_base_url: Arc<ApiBaseUrl>) -> Self {
         Self { api_base_url }
     }
 
@@ -238,7 +240,7 @@ mod tests {
     }
 
     #[fixture]
-    fn plugins_endpoint(fixture_api_base_url: ApiBaseUrl) -> PluginsEndpoint {
+    fn plugins_endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> PluginsEndpoint {
         PluginsEndpoint::new(fixture_api_base_url)
     }
 }

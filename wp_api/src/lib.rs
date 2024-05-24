@@ -47,13 +47,13 @@ impl WPApiHelper {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
         // TODO: Handle the url parse error
-        let api_base_url = ApiBaseUrl::new(site_url.as_str()).unwrap();
+        let api_base_url = Arc::new(ApiBaseUrl::new(site_url.as_str()).unwrap());
         let request_builder = Arc::new(RequestBuilder {
             authentication: authentication.clone(),
         });
 
         Self {
-            authentication: authentication.clone(),
+            authentication,
             users_request: UsersRequest::new(api_base_url.clone(), request_builder.clone()),
             plugins_request: PluginsRequest::new(api_base_url.clone(), request_builder.clone()),
         }

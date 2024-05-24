@@ -17,7 +17,7 @@ pub(crate) struct PluginsRequest {
 }
 
 impl PluginsRequest {
-    pub fn new(api_base_url: ApiBaseUrl, request_builder: Arc<RequestBuilder>) -> Self {
+    pub fn new(api_base_url: Arc<ApiBaseUrl>, request_builder: Arc<RequestBuilder>) -> Self {
         Self {
             endpoint: PluginsEndpoint::new(api_base_url),
             request_builder,

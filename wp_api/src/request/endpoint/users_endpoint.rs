@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
 use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
 use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
 #[derive(Debug)]
 pub(crate) struct UsersEndpoint {
-    api_base_url: ApiBaseUrl,
+    api_base_url: Arc<ApiBaseUrl>,
 }
 
 impl UsersEndpoint {
-    pub fn new(api_base_url: ApiBaseUrl) -> Self {
+    pub fn new(api_base_url: Arc<ApiBaseUrl>) -> Self {
         Self { api_base_url }
     }
 
@@ -240,7 +242,7 @@ mod tests {
     }
 
     #[fixture]
-    fn users_endpoint(fixture_api_base_url: ApiBaseUrl) -> UsersEndpoint {
+    fn users_endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> UsersEndpoint {
         UsersEndpoint::new(fixture_api_base_url)
     }
 }

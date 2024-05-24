@@ -17,7 +17,7 @@ pub(crate) struct UsersRequest {
 }
 
 impl UsersRequest {
-    pub fn new(api_base_url: ApiBaseUrl, request_builder: Arc<RequestBuilder>) -> Self {
+    pub fn new(api_base_url: Arc<ApiBaseUrl>, request_builder: Arc<RequestBuilder>) -> Self {
         Self {
             endpoint: UsersEndpoint::new(api_base_url),
             request_builder,
