@@ -185,7 +185,7 @@ impl AsyncWPNetworking {
 
         let mut request = self
             .client
-            .request(Self::request_method(wp_request.method), wp_request.url)
+            .request(Self::request_method(wp_request.method), wp_request.url.0)
             .headers(request_headers);
         if let Some(body) = wp_request.body {
             request = request.body(body);

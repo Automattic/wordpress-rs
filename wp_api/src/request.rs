@@ -5,13 +5,15 @@ use url::Url;
 
 use crate::WPApiError;
 
+use self::endpoint::WpEndpointUrl;
+
 pub mod endpoint;
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
     pub method: RequestMethod,
-    pub url: String,
+    pub url: WpEndpointUrl,
     // TODO: We probably want to implement a specific type for these headers instead of using a
     // regular HashMap.
     //
@@ -33,7 +35,7 @@ impl Debug for WPNetworkRequest {
             indoc::indoc! {"
                 WPNetworkRequest {{
                     method: '{:?}',
-                    url: '{}',
+                    url: '{:?}',
                     header_map: '{:?}',
                     body: '{:?}'
                 }}
@@ -137,7 +139,7 @@ impl Debug for WPNetworkResponse {
     }
 }
 
-#[derive(Debug, uniffi::Enum)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum RequestMethod {
     GET,
     POST,

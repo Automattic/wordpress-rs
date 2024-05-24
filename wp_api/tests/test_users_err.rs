@@ -1,5 +1,6 @@
 use integration_test_common::SECOND_USER_EMAIL;
 use wp_api::{
+    request::endpoint::WpEndpointUrl,
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
         WPApiParamUsersOrderBy, WPApiParamUsersWho,
@@ -317,7 +318,7 @@ async fn update_user_err_user_invalid_slug() {
 #[tokio::test]
 async fn create_user_err_user_exists() {
     let mut request = api().create_user_request(&valid_user_create_params());
-    request.url.push_str("?id=1");
+    request.url.0.push_str("?id=1");
     request
         .execute()
         .await
@@ -334,7 +335,7 @@ async fn delete_user_err_trash_not_supported() {
             reassign: SECOND_USER_ID,
         },
     );
-    request.url = request.url.replace("&force=true", "");
+    request.url = WpEndpointUrl(request.url.0.replace("&force=true", ""));
     request
         .execute()
         .await

@@ -1,6 +1,9 @@
 #![allow(dead_code, unused_variables)]
 
-use request::{endpoint::ApiEndpoint, RequestMethod, WPNetworkRequest, WPNetworkResponse};
+use request::{
+    endpoint::{ApiEndpoint, ApiEndpointUrl},
+    RequestMethod, WPNetworkRequest, WPNetworkResponse,
+};
 use std::collections::HashMap;
 use url::Url;
 
@@ -23,7 +26,6 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
     api_endpoint: ApiEndpoint,
-    site_url: Url,
     authentication: WPAuthentication,
 }
 
@@ -45,15 +47,15 @@ impl WPApiHelper {
 
         Self {
             api_endpoint,
-            site_url: url,
             authentication,
         }
     }
 
+    // TODO: Remove this because we want to build all requests within the crate
     pub fn raw_request(&self, url: String) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::GET,
-            url: Url::parse(url.as_str()).unwrap().into(),
+            url: ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()).into(),
             header_map: self.header_map(),
             body: None,
         }
