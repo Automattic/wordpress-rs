@@ -2,7 +2,7 @@ use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
 use crate::integration_test_common::{
-    api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
+    api, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod integration_test_common;
@@ -26,7 +26,7 @@ async fn create_user() {
             .execute()
             .await
             .unwrap()
-            .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
+            .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
             .unwrap();
 
         // Assert that the user is in DB
@@ -71,9 +71,9 @@ async fn delete_current_user() {
             .execute()
             .await
             .unwrap()
-            .parse(wp_api::users::parse_delete_user_response)
+            .parse_with(wp_api::users::parse_delete_user_response)
             .unwrap();
-        assert_eq!(true, deleted_user.deleted);
+        assert!(deleted_user.deleted);
         assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
 
         // Assert that the DB doesn't have a record of the user anymore
@@ -89,8 +89,10 @@ async fn delete_current_user() {
 #[tokio::test]
 async fn update_user_name() {
     let new_name = "new_name";
-    let mut params = UserUpdateParams::default();
-    params.name = Some(new_name.to_string());
+    let params = UserUpdateParams {
+        name: Some(new_name.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |user, _| {
         assert_eq!(user.name, new_name);
     })
@@ -100,8 +102,10 @@ async fn update_user_name() {
 #[tokio::test]
 async fn update_user_first_name() {
     let new_first_name = "new_first_name";
-    let mut params = UserUpdateParams::default();
-    params.first_name = Some(new_first_name.to_string());
+    let params = UserUpdateParams {
+        first_name: Some(new_first_name.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |_, meta_list| {
         assert_eq!(find_meta(&meta_list, "first_name"), new_first_name);
     })
@@ -111,8 +115,10 @@ async fn update_user_first_name() {
 #[tokio::test]
 async fn update_user_last_name() {
     let new_last_name = "new_last_name";
-    let mut params = UserUpdateParams::default();
-    params.last_name = Some(new_last_name.to_string());
+    let params = UserUpdateParams {
+        last_name: Some(new_last_name.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |_, meta_list| {
         assert_eq!(find_meta(&meta_list, "last_name"), new_last_name);
     })
@@ -122,8 +128,10 @@ async fn update_user_last_name() {
 #[tokio::test]
 async fn update_user_email() {
     let new_email = "new_email@example.com";
-    let mut params = UserUpdateParams::default();
-    params.email = Some(new_email.to_string());
+    let params = UserUpdateParams {
+        email: Some(new_email.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |user, _| {
         assert_eq!(user.email, new_email);
     })
@@ -133,8 +141,10 @@ async fn update_user_email() {
 #[tokio::test]
 async fn update_user_url() {
     let new_url = "https://new_url";
-    let mut params = UserUpdateParams::default();
-    params.url = Some(new_url.to_string());
+    let params = UserUpdateParams {
+        url: Some(new_url.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |user, _| {
         assert_eq!(user.url, new_url);
     })
@@ -144,8 +154,10 @@ async fn update_user_url() {
 #[tokio::test]
 async fn update_user_description() {
     let new_description = "new_description";
-    let mut params = UserUpdateParams::default();
-    params.description = Some(new_description.to_string());
+    let params = UserUpdateParams {
+        description: Some(new_description.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |_, meta_list| {
         assert_eq!(find_meta(&meta_list, "description"), new_description);
     })
@@ -155,8 +167,10 @@ async fn update_user_description() {
 #[tokio::test]
 async fn update_user_nickname() {
     let new_nickname = "new_nickname";
-    let mut params = UserUpdateParams::default();
-    params.nickname = Some(new_nickname.to_string());
+    let params = UserUpdateParams {
+        nickname: Some(new_nickname.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |_, meta_list| {
         assert_eq!(find_meta(&meta_list, "nickname"), new_nickname);
     })
@@ -166,8 +180,10 @@ async fn update_user_nickname() {
 #[tokio::test]
 async fn update_user_slug() {
     let new_slug = "new_slug";
-    let mut params = UserUpdateParams::default();
-    params.slug = Some(new_slug.to_string());
+    let params = UserUpdateParams {
+        slug: Some(new_slug.to_string()),
+        ..Default::default()
+    };
     test_update_user(params, |user, _| {
         assert_eq!(user.slug, new_slug);
     })
@@ -178,8 +194,10 @@ async fn update_user_slug() {
 async fn update_user_roles() {
     wp_db::run_and_restore(|_| async move {
         let new_role = "new_role";
-        let mut params = UserUpdateParams::default();
-        params.roles = vec![new_role.to_string()];
+        let params = UserUpdateParams {
+            roles: vec![new_role.to_string()],
+            ..Default::default()
+        };
         let user_update_response = api()
             .update_user_request(FIRST_USER_ID, &params)
             .execute()
@@ -195,8 +213,10 @@ async fn update_user_roles() {
 async fn update_user_password() {
     wp_db::run_and_restore(|_| async move {
         let new_password = "new_password";
-        let mut params = UserUpdateParams::default();
-        params.password = Some(new_password.to_string());
+        let params = UserUpdateParams {
+            password: Some(new_password.to_string()),
+            ..Default::default()
+        };
         let user_update_response = api()
             .update_user_request(FIRST_USER_ID, &params)
             .execute()
@@ -210,7 +230,7 @@ async fn update_user_password() {
 
 async fn test_update_user<F>(params: UserUpdateParams, assert: F)
 where
-    F: Fn(DbUser, Vec<DbUserMeta>) -> (),
+    F: Fn(DbUser, Vec<DbUserMeta>),
 {
     wp_db::run_and_restore(|mut db| async move {
         let user_update_response = api()
@@ -226,7 +246,7 @@ where
     .await;
 }
 
-fn find_meta(meta_list: &Vec<DbUserMeta>, meta_key: &str) -> String {
+fn find_meta(meta_list: &[DbUserMeta], meta_key: &str) -> String {
     meta_list
         .iter()
         .find_map(|m| {

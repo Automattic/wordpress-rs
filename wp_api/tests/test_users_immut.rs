@@ -9,7 +9,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
+    api, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod integration_test_common;
@@ -22,12 +22,12 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_filter_users_response);
+        .parse_with(wp_api::users::parse_filter_users_response);
     assert!(parsed_response.is_ok());
     parsed_response
         .unwrap()
         .iter()
-        .for_each(|user| validate_sparse_user_fields(&user, fields));
+        .for_each(|user| validate_sparse_user_fields(user, fields));
 }
 
 #[apply(filter_fields_cases)]
@@ -38,7 +38,7 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_filter_retrieve_user_response);
+        .parse_with(wp_api::users::parse_filter_retrieve_user_response);
     assert!(user_result.is_ok());
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
@@ -51,7 +51,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_filter_retrieve_user_response);
+        .parse_with(wp_api::users::parse_filter_retrieve_user_response);
     assert!(user_result.is_ok());
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
@@ -123,7 +123,7 @@ async fn retrieve_user_with_edit_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .is_ok());
 }
 
@@ -134,7 +134,7 @@ async fn retrieve_user_with_embed_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_embed_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_embed_context)
         .is_ok());
 }
 
@@ -145,7 +145,7 @@ async fn retrieve_user_with_view_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_view_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_view_context)
         .is_ok());
 }
 
@@ -156,7 +156,7 @@ async fn retrieve_current_user_with_edit_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .is_ok());
 }
 
@@ -167,7 +167,7 @@ async fn retrieve_current_user_with_embed_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_embed_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_embed_context)
         .is_ok());
 }
 
@@ -178,7 +178,7 @@ async fn retrieve_current_user_with_view_context() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_view_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_view_context)
         .is_ok());
 }
 

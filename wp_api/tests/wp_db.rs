@@ -17,6 +17,7 @@ where
     f(WordPressDb { conn }).await
 }
 
+#[derive(Debug)]
 pub struct WordPressDb {
     conn: MySqlConnection,
 }

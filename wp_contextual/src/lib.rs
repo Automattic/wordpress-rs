@@ -239,6 +239,35 @@
 //! `PostContentWithViewContext` which are the types that we used in our manually typed
 //! example.
 //!
+//! ---
+//!
+//! In some instances, we might need a field to be included in contextual types, but still be an
+//! `Option`. In these cases, `WPContextualOption` attribute can be used:
+//!
+//! ```
+//! # use wp_contextual::WPContextual;
+//! # use std::collections::HashMap;
+//! #[derive(WPContextual)]
+//! pub struct SparseUser {
+//!     #[WPContext(edit)]
+//!     #[WPContextualOption]
+//!     pub avatar_urls: Option<HashMap<String, String>>,
+//! }
+//! # // We need these 2 lines for UniFFI
+//! # uniffi::setup_scaffolding!();
+//! # fn main() {}
+//! ```
+//!
+//! This will generate the following:
+//!
+//! ```
+//! # use std::collections::HashMap;
+//! pub struct UserWithEditContext {
+//!     pub avatar_urls: Option<HashMap<String, String>>,
+//! }
+//! ```
+//! ---
+//!
 //! Please see the documentation for [`WPContextual`] for technical details.
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -255,6 +284,7 @@ mod wp_contextual;
 /// [`WPContextual`] type. This will tell the compiler to replace the given `Option<SparseBaz>`
 /// type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
 /// `BazWithViewContext`.
+/// * `[WPContextualOption]` is used to tell the compiler to keep the field's `Option` type.
 /// * Generated types will have the following derive macros:
 /// `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. These types are meant
 /// to be used for the
@@ -277,6 +307,9 @@ mod wp_contextual;
 ///     #[WPContext(edit)]
 ///     #[WPContextualField]
 ///     pub baz: Option<SparseBaz>,
+///     #[WPContext(view)]
+///     #[WPContextualOption]
+///     pub foo_bar: Option<String>,
 /// }
 ///
 /// #[derive(WPContextual)]
@@ -306,6 +339,7 @@ mod wp_contextual;
 /// #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
 /// pub struct FooWithViewContext {
 ///     pub bar: u32,
+///     pub foo_bar: Option<String>
 /// }
 /// #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
 /// pub struct BazWithEditContext {
@@ -320,7 +354,12 @@ mod wp_contextual;
 /// * Notice that `BazWithEmbedContext` & `BazWithViewContext` types weren't generated since
 /// they wouldn't have any fields.
 /// * Notice the type for `qux: Vec<u32>` was preserved as this wasn't an `Option<T>` type.
-#[proc_macro_derive(WPContextual, attributes(WPContext, WPContextualField))]
+/// * Notice the type for `foo_bar: Option<String>` was preserved since it's marked with
+/// `#[WPContextualOption]`.
+#[proc_macro_derive(
+    WPContextual,
+    attributes(WPContext, WPContextualField, WPContextualOption)
+)]
 pub fn derive(input: TokenStream) -> TokenStream {
     wp_contextual::wp_contextual(parse_macro_input!(input))
         .unwrap_or_else(|err| err.into_compile_error().into())

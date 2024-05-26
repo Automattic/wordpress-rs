@@ -1,20 +1,24 @@
 #![allow(dead_code, unused_variables)]
 
-use serde::Deserialize;
-use std::collections::HashMap;
+use request::{
+    endpoint::{ApiBaseUrl, ApiEndpointUrl},
+    plugins_request_builder::PluginsRequestBuilder,
+    users_request_builder::UsersRequestBuilder,
+    RequestMethod, WPNetworkRequest, WPNetworkResponse,
+};
+use serde::Serialize;
+use std::{collections::HashMap, sync::Arc};
+use url::Url;
 
 pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
-use endpoint::*;
 use login::*;
 use plugins::*;
-use url::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
-pub mod endpoint;
 pub mod login;
 pub mod plugins;
-pub mod url;
+pub mod request;
 pub mod users;
 
 #[cfg(test)]
@@ -22,11 +26,11 @@ mod unit_test_common;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 
-#[derive(uniffi::Object)]
+#[derive(Debug, uniffi::Object)]
 pub struct WPApiHelper {
-    api_endpoint: ApiEndpoint,
-    site_url: Url,
-    authentication: WPAuthentication,
+    request_builder: Arc<RequestBuilder>,
+    users_request: UsersRequestBuilder,
+    plugins_request: PluginsRequestBuilder,
 }
 
 #[uniffi::export]
@@ -43,22 +47,25 @@ impl WPApiHelper {
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
         // TODO: Handle the url parse error
-        let api_endpoint = ApiEndpoint::new_from_str(site_url.as_str()).unwrap();
+        let api_base_url = Arc::new(ApiBaseUrl::new(site_url.as_str()).unwrap());
+        let request_builder = Arc::new(RequestBuilder {
+            authentication: authentication.clone(),
+        });
 
         Self {
-            api_endpoint,
-            site_url: url,
-            authentication,
+            request_builder: request_builder.clone(),
+            users_request: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
+            plugins_request: PluginsRequestBuilder::new(
+                api_base_url.clone(),
+                request_builder.clone(),
+            ),
         }
     }
 
+    // TODO: Remove this because we want to build all requests within the crate
     pub fn raw_request(&self, url: String) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: Url::parse(url.as_str()).unwrap().into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.request_builder
+            .get(ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()))
     }
 
     pub fn list_users_request(
@@ -66,16 +73,7 @@ impl WPApiHelper {
         context: WPContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .users
-                .list(context, params.as_ref())
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.list(context, params)
     }
 
     pub fn filter_list_users_request(
@@ -84,25 +82,11 @@ impl WPApiHelper {
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparseUserField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .users
-                .filter_list(context, params.as_ref(), fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.filter_list(context, params, fields)
     }
 
     pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.api_endpoint.users.retrieve(user_id, context).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.retrieve(user_id, context)
     }
 
     pub fn filter_retrieve_user_request(
@@ -111,25 +95,11 @@ impl WPApiHelper {
         context: WPContext,
         fields: &[SparseUserField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .users
-                .filter_retrieve(user_id, context, fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.filter_retrieve(user_id, context, fields)
     }
 
     pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.api_endpoint.users.retrieve_me(context).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.retrieve_me(context)
     }
 
     pub fn filter_retrieve_current_user_request(
@@ -137,25 +107,11 @@ impl WPApiHelper {
         context: WPContext,
         fields: &[SparseUserField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .users
-                .filter_retrieve_me(context, fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.filter_retrieve_me(context, fields)
     }
 
     pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.users.create().into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.users_request.create(params)
     }
 
     pub fn update_user_request(
@@ -163,21 +119,11 @@ impl WPApiHelper {
         user_id: UserId,
         params: &UserUpdateParams,
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.users.update(user_id).into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.users_request.update(user_id, params)
     }
 
     pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.users.update_me().into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.users_request.update_me(params)
     }
 
     pub fn delete_user_request(
@@ -185,21 +131,11 @@ impl WPApiHelper {
         user_id: UserId,
         params: &UserDeleteParams,
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: self.api_endpoint.users.delete(user_id, params).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.delete(user_id, params)
     }
 
     pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: self.api_endpoint.users.delete_me(params).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.users_request.delete_me(params)
     }
 
     pub fn list_plugins_request(
@@ -207,16 +143,7 @@ impl WPApiHelper {
         context: WPContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .list(context, params.as_ref())
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.plugins_request.list(context, params)
     }
 
     pub fn filter_list_plugins_request(
@@ -225,25 +152,11 @@ impl WPApiHelper {
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparsePluginField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .filter_list(context, params.as_ref(), fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.plugins_request.filter_list(context, params, fields)
     }
 
     pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.plugins.create().into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.plugins_request.create(params)
     }
 
     pub fn retrieve_plugin_request(
@@ -251,12 +164,7 @@ impl WPApiHelper {
         context: WPContext,
         plugin: &PluginSlug,
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self.api_endpoint.plugins.retrieve(context, plugin).into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.plugins_request.retrieve(context, plugin)
     }
 
     pub fn filter_retrieve_plugin_request(
@@ -265,16 +173,8 @@ impl WPApiHelper {
         plugin: &PluginSlug,
         fields: &[SparsePluginField],
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::GET,
-            url: self
-                .api_endpoint
-                .plugins
-                .filter_retrieve(context, plugin, fields)
-                .into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+        self.plugins_request
+            .filter_retrieve(context, plugin, fields)
     }
 
     pub fn update_plugin_request(
@@ -282,18 +182,45 @@ impl WPApiHelper {
         plugin: &PluginSlug,
         params: &PluginUpdateParams,
     ) -> WPNetworkRequest {
-        WPNetworkRequest {
-            method: RequestMethod::POST,
-            url: self.api_endpoint.plugins.update(plugin).into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(&params).ok(),
-        }
+        self.plugins_request.update(plugin, params)
     }
 
     pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
+        self.plugins_request.delete(plugin)
+    }
+}
+
+#[derive(Debug)]
+struct RequestBuilder {
+    authentication: WPAuthentication,
+}
+
+impl RequestBuilder {
+    fn get(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
+        WPNetworkRequest {
+            method: RequestMethod::GET,
+            url: url.into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
+    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WPNetworkRequest
+    where
+        T: ?Sized + Serialize,
+    {
+        WPNetworkRequest {
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(json_body).ok(),
+        }
+    }
+
+    fn delete(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
         WPNetworkRequest {
             method: RequestMethod::DELETE,
-            url: self.api_endpoint.plugins.delete(plugin).into(),
+            url: url.into(),
             header_map: self.header_map(),
             body: None,
         }
@@ -305,9 +232,9 @@ impl WPApiHelper {
             http::header::ACCEPT.to_string(),
             CONTENT_TYPE_JSON.to_string(),
         );
-        match &self.authentication {
+        match self.authentication {
             WPAuthentication::None => None,
-            WPAuthentication::AuthorizationHeader { token } => {
+            WPAuthentication::AuthorizationHeader { ref token } => {
                 header_map.insert("Authorization".to_string(), format!("Basic {}", token))
             }
         };
@@ -324,17 +251,12 @@ impl WPApiHelper {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPContext {
     Edit,
     Embed,
+    #[default]
     View,
-}
-
-impl Default for WPContext {
-    fn default() -> Self {
-        Self::View
-    }
 }
 
 impl WPContext {
@@ -362,25 +284,11 @@ impl WPAuthentication {
     }
 }
 
-#[derive(uniffi::Enum)]
-pub enum RequestMethod {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    HEAD,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamOrder {
+    #[default]
     Asc,
     Desc,
-}
-
-impl Default for WPApiParamOrder {
-    fn default() -> Self {
-        Self::Asc
-    }
 }
 
 impl WPApiParamOrder {
@@ -392,90 +300,15 @@ impl WPApiParamOrder {
     }
 }
 
-#[derive(uniffi::Record)]
-pub struct WPNetworkRequest {
-    pub method: RequestMethod,
-    pub url: String,
-    // TODO: We probably want to implement a specific type for these headers instead of using a
-    // regular HashMap.
-    //
-    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
-    // module.
-    pub header_map: HashMap<String, String>,
-    pub body: Option<Vec<u8>>,
-}
-
-#[derive(uniffi::Record)]
-pub struct WPNetworkResponse {
-    pub body: Vec<u8>,
-    pub status_code: u16,
-    // TODO: We probably want to implement a specific type for these headers instead of using a
-    // regular HashMap.
-    //
-    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
-    // module.
-    pub header_map: Option<HashMap<String, String>>,
-}
-
-impl WPNetworkResponse {
-    pub fn get_link_header(&self, name: &str) -> Option<Url> {
-        if let Some(headers) = self.header_map.clone() {
-            // TODO: This is inefficient
-            if headers.contains_key("Link") {
-                if let Ok(res) = parse_link_header::parse_with_rel(&headers["Link"]) {
-                    if let Some(next) = res.get(name) {
-                        if let Ok(url) = Url::parse(next.raw_uri.as_str()) {
-                            return Some(url);
-                        }
-                    }
-                }
-            }
-        }
-
-        None
-    }
-}
-
 #[uniffi::export]
 pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
-            response: String::from_utf8_lossy(&response.body).to_string(),
+            response: response.body_as_string(),
         })?;
 
     Ok(api_details)
-}
-
-pub fn parse_wp_response<'de, T: Deserialize<'de>>(
-    response: &'de WPNetworkResponse,
-) -> Result<T, WPApiError> {
-    parse_response_for_generic_errors(response)?;
-    serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
-        reason: err.to_string(),
-        response: String::from_utf8_lossy(&response.body).to_string(),
-    })
-}
-
-pub fn parse_response_for_generic_errors(response: &WPNetworkResponse) -> Result<(), WPApiError> {
-    let response_str = String::from_utf8_lossy(&response.body).to_string();
-    // TODO: Further parse the response body to include error message
-    // TODO: Lots of unwraps to get a basic setup working
-    let status = http::StatusCode::from_u16(response.status_code).unwrap();
-    if let Ok(rest_error) = serde_json::from_slice(&response.body) {
-        Err(WPApiError::RestError {
-            rest_error,
-            status_code: response.status_code,
-            response: response_str,
-        })
-    } else if status.is_client_error() || status.is_server_error() {
-        Err(WPApiError::UnknownError {
-            status_code: response.status_code,
-            response: response_str,
-        })
-    } else {
-        Ok(())
-    }
 }
 
 // TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
@@ -490,16 +323,6 @@ pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRes
 
 trait SparseField {
     fn as_str(&self) -> &str;
-}
-
-#[macro_export]
-macro_rules! add_uniffi_exported_parser {
-    ($fn_name:ident, $return_type: ty) => {
-        #[uniffi::export]
-        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
-            parse_wp_response(response)
-        }
-    };
 }
 
 #[macro_export]
