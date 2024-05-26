@@ -62,6 +62,18 @@ extension SparsePlugin: Contextual {
     }
 }
 
+// MARK: - Convenience Methods
+
+public extension AnyNamespace where T == SparsePlugin {
+    func install(slug: PluginWpOrgDirectorySlug, status: PluginStatus) async throws -> PluginWithEditContext {
+        try await create(using: .init(slug: slug, status: status))
+    }
+
+    func uninstall(slug: PluginSlug) async throws -> PluginDeleteResponse {
+        try await delete(id: slug)
+    }
+}
+
 // MARK: - Filter
 
 extension ContextualNamespace where T == SparsePlugin {
