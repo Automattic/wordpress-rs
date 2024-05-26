@@ -71,6 +71,14 @@ steps:
         plugins: *common_plugins
         agents:
           queue: mac
+      - label: ":swift: :cocoapods: [Test] CocoaPods"
+        command: .buildkite/validate-cocoapods.sh
+        env:
+          IMAGE_ID: xcode-15.3
+        depends_on: xcframework
+        plugins: *common_plugins
+        agents:
+          queue: mac
       - label: ":swift: :linux: Build and Test"
         command: |
           echo "--- :swift: Building + Testing"
