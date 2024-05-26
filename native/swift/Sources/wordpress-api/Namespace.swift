@@ -142,4 +142,8 @@ extension AnyNamespace where T: Contextual {
         let response = try await api.perform(request: request)
         return try T.parseDeletionResponse(response)
     }
+
+    public func delete(id: T.ID) async throws -> T.DeleteResult where T.DeleteParams == Void {
+        return try await delete(id: id, params: ())
+    }
 }
