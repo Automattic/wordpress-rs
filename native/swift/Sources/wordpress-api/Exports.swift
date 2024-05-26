@@ -13,3 +13,10 @@ public typealias SparseUser = WordPressAPIInternal.SparseUser
 public typealias UserWithViewContext = WordPressAPIInternal.UserWithViewContext
 public typealias UserWithEditContext = WordPressAPIInternal.UserWithEditContext
 public typealias UserWithEmbedContext = WordPressAPIInternal.UserWithEmbedContext
+
+// MARK: - Plugins
+
+public typealias SparsePlugin = WordPressAPIInternal.SparsePlugin
+public typealias PluginWithViewContext = WordPressAPIInternal.PluginWithViewContext
+public typealias PluginWithEditContext = WordPressAPIInternal.PluginWithEditContext
+public typealias PluginWithEmbedContext = WordPressAPIInternal.PluginWithEmbedContext
