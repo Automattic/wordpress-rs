@@ -162,30 +162,44 @@ macro_rules! add_uniffi_exported_parser {
     };
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claim::assert_none;
+    use rstest::*;
 
-    #[test]
-    fn test_link_header_can_be_parsed_for_first_page() {
-        let response = WPNetworkResponse{ body: Vec::with_capacity(0), status_code: 200, header_map: Some(HashMap::from([("Link".to_string(), "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\"".to_string())])) };
-        assert_eq!(response.get_link_header("next").unwrap(), Url::parse("http://localhost/wp-json/wp/v2/posts?page=2").unwrap());
-        assert_none!(response.get_link_header("prev"));
-    }
+    #[rstest]
+    #[case(
+        "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\"",
+        None,
+        Some("http://localhost/wp-json/wp/v2/posts?page=2")
+    )]
+    #[case("<http://localhost/wp-json/wp/v2/posts?page=1>; rel=\"prev\", <http://localhost/wp-json/wp/v2/posts?page=3>; rel=\"next\"",
+            Some("http://localhost/wp-json/wp/v2/posts?page=1"),
+            Some("http://localhost/wp-json/wp/v2/posts?page=3")
+        )]
+    #[case(
+        "<http://localhost/wp-json/wp/v2/posts?page=5>; rel=\"prev\"",
+        Some("http://localhost/wp-json/wp/v2/posts?page=5"),
+        None
+    )]
+    fn test_link_header_can_be_parsed(
+        #[case] link: &str,
+        #[case] expected_prev_link_header: Option<&str>,
+        #[case] expected_next_link_header: Option<&str>,
+    ) {
+        let response = WPNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 200,
+            header_map: Some([("Link".to_string(), link.to_string())].into()),
+        };
 
-    #[test]
-    fn test_link_header_can_be_parsed_for_intermediate_pages() {
-        let response = WPNetworkResponse{ body: Vec::with_capacity(0), status_code: 200, header_map: Some(HashMap::from([("Link".to_string(), "<http://localhost/wp-json/wp/v2/posts?page=1>; rel=\"prev\", <http://localhost/wp-json/wp/v2/posts?page=3>; rel=\"next\"".to_string())])) };
-        assert_eq!(response.get_link_header("prev").unwrap(), Url::parse("http://localhost/wp-json/wp/v2/posts?page=1").unwrap());
-        assert_eq!(response.get_link_header("next").unwrap(), Url::parse("http://localhost/wp-json/wp/v2/posts?page=3").unwrap());
-    }
-
-    #[test]
-    fn test_link_header_can_be_parsed_for_last_page() {
-        let response = WPNetworkResponse{ body: Vec::with_capacity(0), status_code: 200, header_map: Some(HashMap::from([("Link".to_string(), "<http://localhost/wp-json/wp/v2/posts?page=5>; rel=\"prev\"".to_string())])) };
-        assert_none!(response.get_link_header("next"));
-        assert_eq!(response.get_link_header("prev").unwrap(), Url::parse("http://localhost/wp-json/wp/v2/posts?page=5").unwrap());
+        assert_eq!(
+            expected_prev_link_header.and_then(|s| Url::parse(s).ok()),
+            response.get_link_header("prev")
+        );
+        assert_eq!(
+            expected_next_link_header.and_then(|s| Url::parse(s).ok()),
+            response.get_link_header("next")
+        );
     }
 }
