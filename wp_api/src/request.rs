@@ -11,6 +11,8 @@ pub mod endpoint;
 pub mod plugins_request_builder;
 pub mod users_request_builder;
 
+const LINK_HEADER_KEY: &str = "Link";
+
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
 pub struct WPNetworkRequest {
@@ -67,19 +69,15 @@ pub struct WPNetworkResponse {
 
 impl WPNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
-        if let Some(headers) = self.header_map.clone() {
-            // TODO: This is inefficient
-            if headers.contains_key("Link") {
-                if let Ok(res) = parse_link_header::parse_with_rel(&headers["Link"]) {
-                    if let Some(next) = res.get(name) {
-                        if let Ok(url) = Url::parse(next.raw_uri.as_str()) {
-                            return Some(url);
-                        }
-                    }
-                }
-            }
-        }
-        None
+        self.header_map
+            .as_ref()
+            .map(|h_map| h_map.get(LINK_HEADER_KEY))?
+            .and_then(|link_header| parse_link_header::parse_with_rel(link_header).ok())
+            .and_then(|link_map| {
+                link_map
+                    .get(name)
+                    .and_then(|link| Url::parse(link.raw_uri.as_str()).ok())
+            })
     }
 
     pub fn body_as_string(&self) -> String {
