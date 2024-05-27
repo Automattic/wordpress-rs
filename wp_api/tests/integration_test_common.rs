@@ -4,7 +4,8 @@ use std::{fs::read_to_string, process::Command};
 use wp_api::{
     request::{RequestMethod, WPNetworkRequest, WPNetworkResponse},
     users::UserId,
-    WPApiError, WPApiHelper, WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper,
+    WPApiError, WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper,
+    WpRequestBuilder,
 };
 
 // The first user is also the current user
@@ -16,22 +17,22 @@ pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 
-pub fn api() -> WPApiHelper {
+pub fn request_builder() -> WpRequestBuilder {
     let credentials = read_test_credentials_from_file();
     let authentication = WPAuthentication::from_username_and_password(
         credentials.admin_username,
         credentials.admin_password,
     );
-    WPApiHelper::new(credentials.site_url, authentication)
+    WpRequestBuilder::new(credentials.site_url, authentication)
 }
 
-pub fn api_as_subscriber() -> WPApiHelper {
+pub fn request_builder_as_subscriber() -> WpRequestBuilder {
     let credentials = read_test_credentials_from_file();
     let authentication = WPAuthentication::from_username_and_password(
         credentials.subscriber_username,
         credentials.subscriber_password,
     );
-    WPApiHelper::new(credentials.site_url, authentication)
+    WpRequestBuilder::new(credentials.site_url, authentication)
 }
 
 pub trait WPNetworkRequestExecutor {

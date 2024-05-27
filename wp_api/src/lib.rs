@@ -27,22 +27,13 @@ mod unit_test_common;
 const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(Debug, uniffi::Object)]
-pub struct WPApiHelper {
-    request_builder: Arc<RequestBuilder>,
-    users_request: UsersRequestBuilder,
-    plugins_request: PluginsRequestBuilder,
+pub struct WpRequestBuilder {
+    users: Arc<UsersRequestBuilder>,
+    plugins: Arc<PluginsRequestBuilder>,
 }
 
 #[uniffi::export]
-fn wp_authentication_from_username_and_password(
-    username: String,
-    password: String,
-) -> WPAuthentication {
-    WPAuthentication::from_username_and_password(username, password)
-}
-
-#[uniffi::export]
-impl WPApiHelper {
+impl WpRequestBuilder {
     #[uniffi::constructor]
     pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
         let url = Url::parse(site_url.as_str()).unwrap();
@@ -53,141 +44,27 @@ impl WPApiHelper {
         });
 
         Self {
-            request_builder: request_builder.clone(),
-            users_request: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
-            plugins_request: PluginsRequestBuilder::new(
-                api_base_url.clone(),
-                request_builder.clone(),
-            ),
+            users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
+            plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
+                .into(),
         }
     }
 
-    // TODO: Remove this because we want to build all requests within the crate
-    pub fn raw_request(&self, url: String) -> WPNetworkRequest {
-        self.request_builder
-            .get(ApiEndpointUrl::new(Url::parse(url.as_str()).unwrap()))
+    pub fn users(&self) -> Arc<UsersRequestBuilder> {
+        self.users.clone()
     }
 
-    pub fn list_users_request(
-        &self,
-        context: WPContext,
-        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
-    ) -> WPNetworkRequest {
-        self.users_request.list(context, params)
+    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+        self.plugins.clone()
     }
+}
 
-    pub fn filter_list_users_request(
-        &self,
-        context: WPContext,
-        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
-        fields: &[SparseUserField],
-    ) -> WPNetworkRequest {
-        self.users_request.filter_list(context, params, fields)
-    }
-
-    pub fn retrieve_user_request(&self, user_id: UserId, context: WPContext) -> WPNetworkRequest {
-        self.users_request.retrieve(user_id, context)
-    }
-
-    pub fn filter_retrieve_user_request(
-        &self,
-        user_id: UserId,
-        context: WPContext,
-        fields: &[SparseUserField],
-    ) -> WPNetworkRequest {
-        self.users_request.filter_retrieve(user_id, context, fields)
-    }
-
-    pub fn retrieve_current_user_request(&self, context: WPContext) -> WPNetworkRequest {
-        self.users_request.retrieve_me(context)
-    }
-
-    pub fn filter_retrieve_current_user_request(
-        &self,
-        context: WPContext,
-        fields: &[SparseUserField],
-    ) -> WPNetworkRequest {
-        self.users_request.filter_retrieve_me(context, fields)
-    }
-
-    pub fn create_user_request(&self, params: &UserCreateParams) -> WPNetworkRequest {
-        self.users_request.create(params)
-    }
-
-    pub fn update_user_request(
-        &self,
-        user_id: UserId,
-        params: &UserUpdateParams,
-    ) -> WPNetworkRequest {
-        self.users_request.update(user_id, params)
-    }
-
-    pub fn update_current_user_request(&self, params: &UserUpdateParams) -> WPNetworkRequest {
-        self.users_request.update_me(params)
-    }
-
-    pub fn delete_user_request(
-        &self,
-        user_id: UserId,
-        params: &UserDeleteParams,
-    ) -> WPNetworkRequest {
-        self.users_request.delete(user_id, params)
-    }
-
-    pub fn delete_current_user_request(&self, params: &UserDeleteParams) -> WPNetworkRequest {
-        self.users_request.delete_me(params)
-    }
-
-    pub fn list_plugins_request(
-        &self,
-        context: WPContext,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
-    ) -> WPNetworkRequest {
-        self.plugins_request.list(context, params)
-    }
-
-    pub fn filter_list_plugins_request(
-        &self,
-        context: WPContext,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
-        fields: &[SparsePluginField],
-    ) -> WPNetworkRequest {
-        self.plugins_request.filter_list(context, params, fields)
-    }
-
-    pub fn create_plugin_request(&self, params: &PluginCreateParams) -> WPNetworkRequest {
-        self.plugins_request.create(params)
-    }
-
-    pub fn retrieve_plugin_request(
-        &self,
-        context: WPContext,
-        plugin: &PluginSlug,
-    ) -> WPNetworkRequest {
-        self.plugins_request.retrieve(context, plugin)
-    }
-
-    pub fn filter_retrieve_plugin_request(
-        &self,
-        context: WPContext,
-        plugin: &PluginSlug,
-        fields: &[SparsePluginField],
-    ) -> WPNetworkRequest {
-        self.plugins_request
-            .filter_retrieve(context, plugin, fields)
-    }
-
-    pub fn update_plugin_request(
-        &self,
-        plugin: &PluginSlug,
-        params: &PluginUpdateParams,
-    ) -> WPNetworkRequest {
-        self.plugins_request.update(plugin, params)
-    }
-
-    pub fn delete_plugin_request(&self, plugin: &PluginSlug) -> WPNetworkRequest {
-        self.plugins_request.delete(plugin)
-    }
+#[uniffi::export]
+fn wp_authentication_from_username_and_password(
+    username: String,
+    password: String,
+) -> WPAuthentication {
+    WPAuthentication::from_username_and_password(username, password)
 }
 
 #[derive(Debug)]
