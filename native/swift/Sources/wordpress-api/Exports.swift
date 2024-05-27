@@ -13,6 +13,11 @@ public typealias SparseUser = WordPressAPIInternal.SparseUser
 public typealias UserWithViewContext = WordPressAPIInternal.UserWithViewContext
 public typealias UserWithEditContext = WordPressAPIInternal.UserWithEditContext
 public typealias UserWithEmbedContext = WordPressAPIInternal.UserWithEmbedContext
+public typealias UserListParams = WordPressAPIInternal.UserListParams
+public typealias UserUpdateParams = WordPressAPIInternal.UserUpdateParams
+public typealias UserCreateParams = WordPressAPIInternal.UserCreateParams
+public typealias UserDeleteParams = WordPressAPIInternal.UserDeleteParams
+public typealias UserDeleteResponse = WordPressAPIInternal.UserDeleteResponse
 
 // MARK: - Plugins
 
@@ -20,3 +25,9 @@ public typealias SparsePlugin = WordPressAPIInternal.SparsePlugin
 public typealias PluginWithViewContext = WordPressAPIInternal.PluginWithViewContext
 public typealias PluginWithEditContext = WordPressAPIInternal.PluginWithEditContext
 public typealias PluginWithEmbedContext = WordPressAPIInternal.PluginWithEmbedContext
+public typealias PluginSlug = WordPressAPIInternal.PluginSlug
+public typealias PluginWpOrgDirectorySlug = WordPressAPIInternal.PluginWpOrgDirectorySlug
+public typealias PluginListParams = WordPressAPIInternal.PluginListParams
+public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
+public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
+public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
