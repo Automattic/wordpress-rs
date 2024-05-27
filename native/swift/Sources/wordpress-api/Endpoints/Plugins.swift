@@ -72,6 +72,15 @@ public extension AnyNamespace where T == SparsePlugin {
     func uninstall(slug: PluginSlug) async throws -> PluginDeleteResponse {
         try await delete(id: slug)
     }
+
+    func activate(slug: PluginSlug) async throws -> PluginWithEditContext {
+        // We don't support activate the plugin on all sites in the network yet.
+        try await update(id: slug, with: .init(status: .active))
+    }
+
+    func deactivate(slug: PluginSlug) async throws -> PluginWithEditContext {
+        try await update(id: slug, with: .init(status: .inactive))
+    }
 }
 
 // MARK: - Filter
