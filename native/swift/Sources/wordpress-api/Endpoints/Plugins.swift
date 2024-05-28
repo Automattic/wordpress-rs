@@ -13,24 +13,24 @@ extension SparsePlugin: Contextual {
     public typealias EditContext = PluginWithEditContext
     public typealias EmbedContext = PluginWithEmbedContext
 
-    public static func retrieveRequest(id: PluginSlug, using helper: any WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
-        helper.retrievePluginRequest(context: context, plugin: id)
+    public static func retrieveRequest(id: PluginSlug, using requestBuilder: any WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest {
+        requestBuilder.plugins().retrieve(context: context, plugin: id)
     }
 
-    public static func listRequest(params: PluginListParams?, using helper: any WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
-        helper.listPluginsRequest(context: context, params: params)
+    public static func listRequest(params: PluginListParams?, using requestBuilder: any WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest {
+        requestBuilder.plugins().list(context: context, params: params)
     }
 
-    public static func updateRequest(id: PluginSlug, params: PluginUpdateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
-        helper.updatePluginRequest(plugin: id, params: params)
+    public static func updateRequest(id: PluginSlug, params: PluginUpdateParams, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+        requestBuilder.plugins().update(plugin: id, params: params)
     }
 
-    public static func createRequest(params: PluginCreateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
-        helper.createPluginRequest(params: params)
+    public static func createRequest(params: PluginCreateParams, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+        requestBuilder.plugins().create(params: params)
     }
 
-    public static func deleteRequest(id: PluginSlug, params: Void, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
-        helper.deletePluginRequest(plugin: id)
+    public static func deleteRequest(id: PluginSlug, params: Void, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+        requestBuilder.plugins().delete(plugin: id)
     }
 
     public static func parseResponse(_ response: WpNetworkResponse) throws -> PluginWithViewContext {
@@ -87,13 +87,13 @@ public extension AnyNamespace where T == SparsePlugin {
 
 extension ContextualNamespace where T == SparsePlugin {
     public func list(with params: T.ListParams, fields: [SparsePluginField]) async throws -> [T] {
-        let request = api.helper.filterListPluginsRequest(context: context, params: params, fields: fields)
+        let request = api.requestBuilder.plugins().filterList(context: context, params: params, fields: fields)
         let response = try await api.perform(request: request)
         return try parseFilterPluginsResponse(response: response)
     }
 
     public func get(id: T.ID, fields: [SparsePluginField]) async throws -> T {
-        let request = api.helper.filterRetrievePluginRequest(context: context, plugin: id, fields: fields)
+        let request = api.requestBuilder.plugins().filterRetrieve(context: context, plugin: id, fields: fields)
         let response = try await api.perform(request: request)
         return try parseFilterRetrievePluginResponse(response: response)
     }
