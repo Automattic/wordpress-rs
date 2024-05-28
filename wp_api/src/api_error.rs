@@ -8,6 +8,8 @@ pub enum WPApiError {
         status_code: u16,
         response: String,
     },
+    #[error("Error while parsing site url: {}", reason)]
+    SiteUrlParsingError { reason: String },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ParsingError { reason: String, response: String },
     #[error(
