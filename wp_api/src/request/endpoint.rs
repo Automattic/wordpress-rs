@@ -1,17 +1,49 @@
 use url::Url;
 
-pub use plugins_endpoint::*;
-pub use users_endpoint::*;
-
 use crate::SparseField;
 
-mod plugins_endpoint;
-mod users_endpoint;
+pub(crate) mod plugins_endpoint;
+pub(crate) mod users_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
+uniffi::custom_newtype!(WpEndpointUrl, String);
+#[derive(Debug)]
+pub struct WpEndpointUrl(pub String);
+
+#[derive(Debug)]
+pub(crate) struct ApiEndpointUrl {
+    url: Url,
+}
+
+impl ApiEndpointUrl {
+    pub fn new(url: Url) -> Self {
+        Self { url }
+    }
+
+    fn url(&self) -> &Url {
+        &self.url
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.url.as_str()
+    }
+}
+
+impl From<Url> for ApiEndpointUrl {
+    fn from(url: Url) -> Self {
+        Self::new(url)
+    }
+}
+
+impl From<ApiEndpointUrl> for WpEndpointUrl {
+    fn from(url: ApiEndpointUrl) -> Self {
+        Self(url.as_str().to_string())
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct ApiBaseUrl {
+pub(crate) struct ApiBaseUrl {
     url: Url,
 }
 
@@ -45,26 +77,6 @@ impl ApiBaseUrl {
 
     fn as_str(&self) -> &str {
         self.url.as_str()
-    }
-}
-
-pub struct ApiEndpoint {
-    pub base_url: ApiBaseUrl,
-    pub users: UsersEndpoint,
-    pub plugins: PluginsEndpoint,
-}
-
-impl ApiEndpoint {
-    pub fn new(api_base_url: ApiBaseUrl) -> Self {
-        Self {
-            base_url: api_base_url.clone(),
-            users: UsersEndpoint::new(api_base_url.clone()),
-            plugins: PluginsEndpoint::new(api_base_url.clone()),
-        }
-    }
-
-    pub fn new_from_str(site_base_url: &str) -> Result<Self, url::ParseError> {
-        ApiBaseUrl::new(site_base_url).map(Self::new)
     }
 }
 
@@ -108,6 +120,8 @@ impl UrlExtension for Url {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use rstest::*;
 
@@ -162,11 +176,11 @@ mod tests {
     }
 
     #[fixture]
-    pub fn fixture_api_base_url() -> ApiBaseUrl {
-        ApiBaseUrl::new("https://example.com").unwrap()
+    pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
+        ApiBaseUrl::new("https://example.com").unwrap().into()
     }
 
-    pub fn validate_endpoint(endpoint_url: Url, path: &str) {
+    pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
             endpoint_url.as_str(),
             format!("{}{}", fixture_api_base_url().as_str(), path)

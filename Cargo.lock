@@ -985,6 +985,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indoc"
+version = "2.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
+
+[[package]]
 name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2950,6 +2956,7 @@ dependencies = [
  "chrono",
  "futures",
  "http 1.1.0",
+ "indoc",
  "parse_link_header",
  "reqwest",
  "rstest",

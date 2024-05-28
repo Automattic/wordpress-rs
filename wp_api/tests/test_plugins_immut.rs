@@ -7,8 +7,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    api, WPNetworkRequestExecutor, WPNetworkResponseParser, CLASSIC_EDITOR_PLUGIN_SLUG,
-    HELLO_DOLLY_PLUGIN_SLUG,
+    request_builder, WPNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -24,17 +23,18 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    let parsed_response = api()
-        .filter_list_plugins_request(WPContext::Edit, &Some(params), fields)
+    let parsed_response = request_builder()
+        .plugins()
+        .filter_list(WPContext::Edit, &Some(params), fields)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_filter_plugins_response);
+        .parse_with(wp_api::plugins::parse_filter_plugins_response);
     assert!(parsed_response.is_ok());
     parsed_response
         .unwrap()
         .iter()
-        .for_each(|plugin| validate_sparse_plugin_fields(&plugin, fields));
+        .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
 }
 
 #[apply(filter_fields_cases)]
@@ -43,12 +43,13 @@ async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let plugin_result = api()
-        .filter_retrieve_plugin_request(WPContext::Edit, &slug.into(), fields)
+    let plugin_result = request_builder()
+        .plugins()
+        .filter_retrieve(WPContext::Edit, &slug.into(), fields)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_filter_retrieve_plugin_response);
+        .parse_with(wp_api::plugins::parse_filter_retrieve_plugin_response);
     assert!(plugin_result.is_ok());
     validate_sparse_plugin_fields(&plugin_result.unwrap(), fields);
 }
@@ -64,8 +65,9 @@ async fn plugin_list_params_parametrized(
     #[case] params: PluginListParams,
     #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
 ) {
-    let response = api()
-        .list_plugins_request(context, &Some(params))
+    let response = request_builder()
+        .plugins()
+        .list(context, &Some(params))
         .execute()
         .await
         .unwrap();
@@ -110,12 +112,13 @@ async fn retrieve_plugin_with_edit_context(
     #[case] expected_author: &str,
     #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
 ) {
-    let parsed_response = api()
-        .retrieve_plugin_request(context, &plugin_slug)
+    let parsed_response = request_builder()
+        .plugins()
+        .retrieve(context, &plugin_slug)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context);
+        .parse_with(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context);
     assert!(
         parsed_response.is_ok(),
         "Retrieve plugin failed!\nContext: {:?}\nPlugin: {:?}\nResponse was: '{:?}'",

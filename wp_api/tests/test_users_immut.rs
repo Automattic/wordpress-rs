@@ -9,7 +9,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    api, WPNetworkRequestExecutor, WPNetworkResponseParser, FIRST_USER_ID, SECOND_USER_ID,
+    request_builder, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod integration_test_common;
@@ -17,28 +17,30 @@ pub mod integration_test_common;
 #[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_users(#[case] fields: &[SparseUserField]) {
-    let parsed_response = api()
-        .filter_list_users_request(WPContext::Edit, &None, fields)
+    let parsed_response = request_builder()
+        .users()
+        .filter_list(WPContext::Edit, &None, fields)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_filter_users_response);
+        .parse_with(wp_api::users::parse_filter_users_response);
     assert!(parsed_response.is_ok());
     parsed_response
         .unwrap()
         .iter()
-        .for_each(|user| validate_sparse_user_fields(&user, fields));
+        .for_each(|user| validate_sparse_user_fields(user, fields));
 }
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
-    let user_result = api()
-        .filter_retrieve_user_request(FIRST_USER_ID, WPContext::Edit, fields)
+    let user_result = request_builder()
+        .users()
+        .filter_retrieve(FIRST_USER_ID, WPContext::Edit, fields)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_filter_retrieve_user_response);
+        .parse_with(wp_api::users::parse_filter_retrieve_user_response);
     assert!(user_result.is_ok());
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
@@ -46,12 +48,13 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
 #[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
-    let user_result = api()
-        .filter_retrieve_current_user_request(WPContext::Edit, fields)
+    let user_result = request_builder()
+        .users()
+        .filter_retrieve_me(WPContext::Edit, fields)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_filter_retrieve_user_response);
+        .parse_with(wp_api::users::parse_filter_retrieve_user_response);
     assert!(user_result.is_ok());
     validate_sparse_user_fields(&user_result.unwrap(), fields);
 }
@@ -80,8 +83,9 @@ async fn test_user_list_params_parametrized(
     #[case] params: UserListParams,
     #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
 ) {
-    let response = api()
-        .list_users_request(context, &Some(params))
+    let response = request_builder()
+        .users()
+        .list(context, &Some(params))
         .execute()
         .await
         .unwrap();
@@ -118,67 +122,73 @@ async fn test_user_list_params_parametrized(
 
 #[tokio::test]
 async fn retrieve_user_with_edit_context() {
-    assert!(api()
-        .retrieve_user_request(FIRST_USER_ID, WPContext::Edit)
+    assert!(request_builder()
+        .users()
+        .retrieve(FIRST_USER_ID, WPContext::Edit)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_user_with_embed_context() {
-    assert!(api()
-        .retrieve_user_request(FIRST_USER_ID, WPContext::Embed)
+    assert!(request_builder()
+        .users()
+        .retrieve(FIRST_USER_ID, WPContext::Embed)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_embed_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_embed_context)
         .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_user_with_view_context() {
-    assert!(api()
-        .retrieve_user_request(FIRST_USER_ID, WPContext::View)
+    assert!(request_builder()
+        .users()
+        .retrieve(FIRST_USER_ID, WPContext::View)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_view_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_view_context)
         .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_current_user_with_edit_context() {
-    assert!(api()
-        .retrieve_current_user_request(WPContext::Edit)
+    assert!(request_builder()
+        .users()
+        .retrieve_me(WPContext::Edit)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_edit_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
         .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_current_user_with_embed_context() {
-    assert!(api()
-        .retrieve_current_user_request(WPContext::Embed)
+    assert!(request_builder()
+        .users()
+        .retrieve_me(WPContext::Embed)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_embed_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_embed_context)
         .is_ok());
 }
 
 #[tokio::test]
 async fn retrieve_current_user_with_view_context() {
-    assert!(api()
-        .retrieve_current_user_request(WPContext::View)
+    assert!(request_builder()
+        .users()
+        .retrieve_me(WPContext::View)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::users::parse_retrieve_user_response_with_view_context)
+        .parse_with(wp_api::users::parse_retrieve_user_response_with_view_context)
         .is_ok());
 }
 

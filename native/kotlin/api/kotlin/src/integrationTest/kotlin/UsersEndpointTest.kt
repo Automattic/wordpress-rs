@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import uniffi.wp_api.SparseUserField
-import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 

@@ -1,34 +1,37 @@
+use std::sync::Arc;
+
 use url::Url;
 
-use crate::{plugins::PluginListParams, ApiBaseUrl, PluginSlug, SparsePluginField, WPContext};
+use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WPContext};
 
-use super::UrlExtension;
+use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
-pub struct PluginsEndpoint {
-    api_base_url: ApiBaseUrl,
+#[derive(Debug)]
+pub(crate) struct PluginsEndpoint {
+    api_base_url: Arc<ApiBaseUrl>,
 }
 
 impl PluginsEndpoint {
-    pub fn new(api_base_url: ApiBaseUrl) -> Self {
+    pub fn new(api_base_url: Arc<ApiBaseUrl>) -> Self {
         Self { api_base_url }
     }
 
-    pub fn create(&self) -> Url {
-        self.plugins_base_url()
+    pub fn create(&self) -> ApiEndpointUrl {
+        self.plugins_base_url().into()
     }
 
-    pub fn delete(&self, plugin: &PluginSlug) -> Url {
-        self.plugins_url_with_slug(plugin)
+    pub fn delete(&self, plugin: &PluginSlug) -> ApiEndpointUrl {
+        self.plugins_url_with_slug(plugin).into()
     }
 
-    pub fn list(&self, context: WPContext, params: Option<&PluginListParams>) -> Url {
+    pub fn list(&self, context: WPContext, params: Option<&PluginListParams>) -> ApiEndpointUrl {
         let mut url = self.plugins_base_url();
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         if let Some(params) = params {
             url.query_pairs_mut().extend_pairs(params.query_pairs());
         }
-        url
+        url.into()
     }
 
     pub fn filter_list(
@@ -36,15 +39,18 @@ impl PluginsEndpoint {
         context: WPContext,
         params: Option<&PluginListParams>,
         fields: &[SparsePluginField],
-    ) -> Url {
-        self.list(context, params).append_filter_fields(fields)
+    ) -> ApiEndpointUrl {
+        self.list(context, params)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> Url {
+    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> ApiEndpointUrl {
         let mut url = self.plugins_url_with_slug(plugin);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        url
+        url.into()
     }
 
     pub fn filter_retrieve(
@@ -52,12 +58,15 @@ impl PluginsEndpoint {
         context: WPContext,
         plugin: &PluginSlug,
         fields: &[SparsePluginField],
-    ) -> Url {
-        self.retrieve(context, plugin).append_filter_fields(fields)
+    ) -> ApiEndpointUrl {
+        self.retrieve(context, plugin)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn update(&self, plugin: &PluginSlug) -> Url {
-        self.plugins_url_with_slug(plugin)
+    pub fn update(&self, plugin: &PluginSlug) -> ApiEndpointUrl {
+        self.plugins_url_with_slug(plugin).into()
     }
 
     fn plugins_base_url(&self) -> Url {
@@ -75,8 +84,9 @@ impl PluginsEndpoint {
 mod tests {
     use super::*;
     use crate::{
-        endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        generate, ApiEndpoint, PluginStatus,
+        generate,
+        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
+        PluginStatus,
     };
     use rstest::*;
 
@@ -230,7 +240,7 @@ mod tests {
     }
 
     #[fixture]
-    fn plugins_endpoint(fixture_api_base_url: ApiBaseUrl) -> PluginsEndpoint {
-        ApiEndpoint::new(fixture_api_base_url).plugins
+    fn plugins_endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> PluginsEndpoint {
+        PluginsEndpoint::new(fixture_api_base_url)
     }
 }

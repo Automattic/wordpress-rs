@@ -2,7 +2,7 @@ use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
 use wp_api::{WPContext, WPRestErrorCode};
 
 use crate::integration_test_common::{
-    api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, WPNetworkResponseParser,
+    request_builder, request_builder_as_subscriber, AssertWpError, WPNetworkRequestExecutor,
     HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
@@ -10,55 +10,60 @@ pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_plugin_err_cannot_install_plugin() {
-    api_as_subscriber()
-        .create_plugin_request(&PluginCreateParams {
+    request_builder_as_subscriber()
+        .plugins()
+        .create(&PluginCreateParams {
             slug: WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS.into(),
             status: PluginStatus::Active,
         })
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_create_plugin_response)
+        .parse_with(wp_api::plugins::parse_create_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotInstallPlugin);
 }
 
 #[tokio::test]
 async fn delete_plugin_err_cannot_delete_active_plugin() {
-    api()
-        .delete_plugin_request(&HELLO_DOLLY_PLUGIN_SLUG.into())
+    request_builder()
+        .plugins()
+        .delete(&HELLO_DOLLY_PLUGIN_SLUG.into())
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_delete_plugin_response)
+        .parse_with(wp_api::plugins::parse_delete_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotDeleteActivePlugin);
 }
 
 #[tokio::test]
 async fn list_plugins_err_cannot_view_plugins() {
-    api_as_subscriber()
-        .list_plugins_request(WPContext::Edit, &None)
+    request_builder_as_subscriber()
+        .plugins()
+        .list(WPContext::Edit, &None)
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context)
+        .parse_with(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotViewPlugins);
 }
 
 #[tokio::test]
 async fn retrieve_plugin_err_cannot_view_plugin() {
-    api_as_subscriber()
-        .retrieve_plugin_request(WPContext::Edit, &HELLO_DOLLY_PLUGIN_SLUG.into())
+    request_builder_as_subscriber()
+        .plugins()
+        .retrieve(WPContext::Edit, &HELLO_DOLLY_PLUGIN_SLUG.into())
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context)
+        .parse_with(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context)
         .assert_wp_error(WPRestErrorCode::CannotViewPlugin);
 }
 
 #[tokio::test]
 async fn update_plugin_err_plugin_not_found() {
-    api()
-        .update_plugin_request(
+    request_builder()
+        .plugins()
+        .update(
             &"foo".into(),
             &PluginUpdateParams {
                 status: PluginStatus::Active,
@@ -67,14 +72,15 @@ async fn update_plugin_err_plugin_not_found() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_update_plugin_response)
+        .parse_with(wp_api::plugins::parse_update_plugin_response)
         .assert_wp_error(WPRestErrorCode::PluginNotFound);
 }
 
 #[tokio::test]
 async fn update_plugin_err_cannot_manage_plugins() {
-    api_as_subscriber()
-        .update_plugin_request(
+    request_builder_as_subscriber()
+        .plugins()
+        .update(
             &HELLO_DOLLY_PLUGIN_SLUG.into(),
             &PluginUpdateParams {
                 status: PluginStatus::Active,
@@ -83,6 +89,6 @@ async fn update_plugin_err_cannot_manage_plugins() {
         .execute()
         .await
         .unwrap()
-        .parse(wp_api::plugins::parse_update_plugin_response)
+        .parse_with(wp_api::plugins::parse_update_plugin_response)
         .assert_wp_error(WPRestErrorCode::CannotManagePlugins);
 }

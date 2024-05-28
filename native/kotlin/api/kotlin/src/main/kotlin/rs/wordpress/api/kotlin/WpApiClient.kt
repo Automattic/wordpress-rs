@@ -2,8 +2,8 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import uniffi.wp_api.WpApiHelper
 import uniffi.wp_api.WpAuthentication
+import uniffi.wp_api.WpRequestBuilder
 
 class WpApiClient(
     siteUrl: String,
@@ -11,8 +11,8 @@ class WpApiClient(
     networkHandler: NetworkHandler = WpNetworkHandler(),
     dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    private val apiHelper = WpApiHelper(siteUrl, authentication)
+    private val requestBuilder = WpRequestBuilder(siteUrl, authentication)
     val users: UsersEndpoint by lazy {
-        WpUsersEndpoint(apiHelper, networkHandler, dispatcher)
+        WpUsersEndpoint(requestBuilder.users(), networkHandler, dispatcher)
     }
 }

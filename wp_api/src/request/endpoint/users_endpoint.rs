@@ -1,44 +1,45 @@
-use url::Url;
+use std::sync::Arc;
 
-use crate::{ApiBaseUrl, SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
+use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
 
-use super::UrlExtension;
+use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
-pub struct UsersEndpoint {
-    api_base_url: ApiBaseUrl,
+#[derive(Debug)]
+pub(crate) struct UsersEndpoint {
+    api_base_url: Arc<ApiBaseUrl>,
 }
 
 impl UsersEndpoint {
-    pub fn new(api_base_url: ApiBaseUrl) -> Self {
+    pub fn new(api_base_url: Arc<ApiBaseUrl>) -> Self {
         Self { api_base_url }
     }
 
-    pub fn create(&self) -> Url {
-        self.api_base_url.by_appending("users")
+    pub fn create(&self) -> ApiEndpointUrl {
+        self.api_base_url.by_appending("users").into()
     }
 
-    pub fn delete(&self, user_id: UserId, params: &UserDeleteParams) -> Url {
+    pub fn delete(&self, user_id: UserId, params: &UserDeleteParams) -> ApiEndpointUrl {
         let mut url = self
             .api_base_url
             .by_extending(["users", &user_id.to_string()]);
         url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
+        url.into()
     }
 
-    pub fn delete_me(&self, params: &UserDeleteParams) -> Url {
+    pub fn delete_me(&self, params: &UserDeleteParams) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_extending(["users", "me"]);
         url.query_pairs_mut().extend_pairs(params.query_pairs());
-        url
+        url.into()
     }
 
-    pub fn list(&self, context: WPContext, params: Option<&UserListParams>) -> Url {
+    pub fn list(&self, context: WPContext, params: Option<&UserListParams>) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_appending("users");
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
         if let Some(params) = params {
             url.query_pairs_mut().extend_pairs(params.query_pairs());
         }
-        url
+        url.into()
     }
 
     pub fn filter_list(
@@ -46,17 +47,20 @@ impl UsersEndpoint {
         context: WPContext,
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
-    ) -> Url {
-        self.list(context, params).append_filter_fields(fields)
+    ) -> ApiEndpointUrl {
+        self.list(context, params)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> Url {
+    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> ApiEndpointUrl {
         let mut url = self
             .api_base_url
             .by_extending(["users", &user_id.to_string()]);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        url
+        url.into()
     }
 
     pub fn filter_retrieve(
@@ -64,38 +68,46 @@ impl UsersEndpoint {
         user_id: UserId,
         context: WPContext,
         fields: &[SparseUserField],
-    ) -> Url {
-        self.retrieve(user_id, context).append_filter_fields(fields)
+    ) -> ApiEndpointUrl {
+        self.retrieve(user_id, context)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn retrieve_me(&self, context: WPContext) -> Url {
+    pub fn retrieve_me(&self, context: WPContext) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_extending(["users", "me"]);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        url
+        url.into()
     }
 
-    pub fn filter_retrieve_me(&self, context: WPContext, fields: &[SparseUserField]) -> Url {
-        self.retrieve_me(context).append_filter_fields(fields)
+    pub fn filter_retrieve_me(
+        &self,
+        context: WPContext,
+        fields: &[SparseUserField],
+    ) -> ApiEndpointUrl {
+        self.retrieve_me(context)
+            .url
+            .append_filter_fields(fields)
+            .into()
     }
 
-    pub fn update(&self, user_id: UserId) -> Url {
+    pub fn update(&self, user_id: UserId) -> ApiEndpointUrl {
         self.api_base_url
             .by_extending(["users", &user_id.to_string()])
+            .into()
     }
 
-    pub fn update_me(&self) -> Url {
-        self.api_base_url.by_extending(["users", "me"])
+    pub fn update_me(&self) -> ApiEndpointUrl {
+        self.api_base_url.by_extending(["users", "me"]).into()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        ApiEndpoint,
-    };
+    use crate::request::endpoint::tests::{fixture_api_base_url, validate_endpoint};
     use rstest::*;
 
     #[rstest]
@@ -175,7 +187,7 @@ mod tests {
             has_published_posts: Some(true),
         };
         validate_endpoint(
-            users_endpoint.filter_list(WPContext::Edit, Some(&params), &vec![SparseUserField::Name, SparseUserField::Email]),
+            users_endpoint.filter_list(WPContext::Edit, Some(&params), &[SparseUserField::Name, SparseUserField::Email]),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true&_fields=name%2Cemail",
         );
     }
@@ -194,7 +206,7 @@ mod tests {
             users_endpoint.filter_retrieve(
                 UserId(98),
                 WPContext::View,
-                &vec![SparseUserField::Nickname, SparseUserField::Url],
+                &[SparseUserField::Nickname, SparseUserField::Url],
             ),
             "/users/98?context=view&_fields=nickname%2Curl",
         );
@@ -213,7 +225,7 @@ mod tests {
         validate_endpoint(
             users_endpoint.filter_retrieve_me(
                 WPContext::Embed,
-                &vec![SparseUserField::Roles, SparseUserField::Capabilities],
+                &[SparseUserField::Roles, SparseUserField::Capabilities],
             ),
             "/users/me?context=embed&_fields=roles%2Ccapabilities",
         );
@@ -230,7 +242,7 @@ mod tests {
     }
 
     #[fixture]
-    fn users_endpoint(fixture_api_base_url: ApiBaseUrl) -> UsersEndpoint {
-        ApiEndpoint::new(fixture_api_base_url).users
+    fn users_endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> UsersEndpoint {
+        UsersEndpoint::new(fixture_api_base_url)
     }
 }

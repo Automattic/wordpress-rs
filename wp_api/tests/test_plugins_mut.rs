@@ -1,7 +1,7 @@
 use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
 
 use crate::integration_test_common::{
-    api, run_and_restore_wp_content_plugins, WPNetworkRequestExecutor, WPNetworkResponseParser,
+    request_builder, run_and_restore_wp_content_plugins, WPNetworkRequestExecutor,
     CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
@@ -17,12 +17,13 @@ async fn create_plugin() {
                 slug: WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS.into(),
                 status,
             };
-            let created_plugin = api()
-                .create_plugin_request(&params)
+            let created_plugin = request_builder()
+                .plugins()
+                .create(&params)
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::plugins::parse_create_plugin_response)
+                .parse_with(wp_api::plugins::parse_create_plugin_response)
                 .unwrap();
             println!("Created Plugin: {:?}", created_plugin);
         })
@@ -35,15 +36,16 @@ async fn update_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
             let status = PluginStatus::Active;
-            let updated_plugin = api()
-                .update_plugin_request(
+            let updated_plugin = request_builder()
+                .plugins()
+                .update(
                     &HELLO_DOLLY_PLUGIN_SLUG.into(),
                     &PluginUpdateParams { status },
                 )
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::plugins::parse_update_plugin_response)
+                .parse_with(wp_api::plugins::parse_update_plugin_response)
                 .unwrap();
             println!("Updated Plugin: {:?}", updated_plugin);
         })
@@ -55,12 +57,13 @@ async fn update_plugin() {
 async fn delete_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
-            let deleted_plugin = api()
-                .delete_plugin_request(&CLASSIC_EDITOR_PLUGIN_SLUG.into())
+            let deleted_plugin = request_builder()
+                .plugins()
+                .delete(&CLASSIC_EDITOR_PLUGIN_SLUG.into())
                 .execute()
                 .await
                 .unwrap()
-                .parse(wp_api::plugins::parse_delete_plugin_response)
+                .parse_with(wp_api::plugins::parse_delete_plugin_response)
                 .unwrap();
             println!("Deleted Plugin: {:?}", deleted_plugin);
         })
