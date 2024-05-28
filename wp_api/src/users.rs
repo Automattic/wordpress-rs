@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 use wp_contextual::WPContextual;
 
 use crate::{
-    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPApiParamOrder,
-    WPNetworkResponse,
+    add_uniffi_exported_parser, SparseField, WPApiError, WPApiParamOrder, WPNetworkResponse,
 };
 
 add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
@@ -36,22 +35,17 @@ add_uniffi_exported_parser!(
 );
 add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersOrderBy {
     Id,
     Include,
+    #[default]
     Name,
     RegisteredDate,
     Slug,
     IncludeSlugs,
     Email,
     Url,
-}
-
-impl Default for WPApiParamUsersOrderBy {
-    fn default() -> Self {
-        Self::Name
-    }
 }
 
 impl WPApiParamUsersOrderBy {
@@ -69,8 +63,9 @@ impl WPApiParamUsersOrderBy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WPApiParamUsersWho {
+    #[default]
     All,
     Authors,
 }
@@ -85,13 +80,7 @@ impl WPApiParamUsersWho {
     }
 }
 
-impl Default for WPApiParamUsersWho {
-    fn default() -> Self {
-        Self::All
-    }
-}
-
-#[derive(Default, Debug, uniffi::Record)]
+#[derive(Debug, Default, uniffi::Record)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -184,7 +173,7 @@ impl UserListParams {
     }
 }
 
-#[derive(Serialize, Debug, uniffi::Record)]
+#[derive(Debug, Serialize, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
     pub username: String,
@@ -254,7 +243,7 @@ impl UserCreateParams {
     }
 }
 
-#[derive(Default, Serialize, uniffi::Record)]
+#[derive(Debug, Default, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
     /// Display name for the user.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -370,6 +359,9 @@ pub struct SparseUser {
     #[WPContext(edit)]
     pub extra_capabilities: Option<HashMap<String, bool>>,
     #[WPContext(edit, embed, view)]
+    // According to our tests, `avatar_urls` is not available for all site types. It's marked with
+    // `#[WPContextualOption]` which will make it an `Option` in the generated contextual types.
+    #[WPContextualOption]
     pub avatar_urls: Option<HashMap<String, String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }

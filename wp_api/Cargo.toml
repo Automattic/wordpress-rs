@@ -10,6 +10,7 @@ name = "wp_api"
 [dependencies]
 base64 = { workspace = true }
 http = { workspace = true }
+indoc = "2.0"
 url = "2.5"
 parse_link_header = "0.3"
 serde = { workspace = true }

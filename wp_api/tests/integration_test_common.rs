@@ -2,8 +2,10 @@ use futures::Future;
 use http::HeaderMap;
 use std::{fs::read_to_string, process::Command};
 use wp_api::{
-    users::UserId, WPApiError, WPApiHelper, WPAuthentication, WPNetworkRequest, WPNetworkResponse,
-    WPRestError, WPRestErrorCode, WPRestErrorWrapper,
+    request::{RequestMethod, WPNetworkRequest, WPNetworkResponse},
+    users::UserId,
+    WPApiError, WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper,
+    WpRequestBuilder,
 };
 
 // The first user is also the current user
@@ -15,22 +17,22 @@ pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 
-pub fn api() -> WPApiHelper {
+pub fn request_builder() -> WpRequestBuilder {
     let credentials = read_test_credentials_from_file();
     let authentication = WPAuthentication::from_username_and_password(
         credentials.admin_username,
         credentials.admin_password,
     );
-    WPApiHelper::new(credentials.site_url, authentication)
+    WpRequestBuilder::new(credentials.site_url, authentication)
 }
 
-pub fn api_as_subscriber() -> WPApiHelper {
+pub fn request_builder_as_subscriber() -> WpRequestBuilder {
     let credentials = read_test_credentials_from_file();
     let authentication = WPAuthentication::from_username_and_password(
         credentials.subscriber_username,
         credentials.subscriber_password,
     );
-    WPApiHelper::new(credentials.site_url, authentication)
+    WpRequestBuilder::new(credentials.site_url, authentication)
 }
 
 pub trait WPNetworkRequestExecutor {
@@ -42,21 +44,6 @@ pub trait WPNetworkRequestExecutor {
 impl WPNetworkRequestExecutor for WPNetworkRequest {
     async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
         AsyncWPNetworking::default().async_request(self).await
-    }
-}
-
-pub trait WPNetworkResponseParser {
-    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
-    where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>;
-}
-
-impl WPNetworkResponseParser for WPNetworkResponse {
-    fn parse<F, T>(&self, parser: F) -> Result<T, WPApiError>
-    where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
-    {
-        parser(self)
     }
 }
 
@@ -105,6 +92,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
     }
 }
 
+#[derive(Debug)]
 pub struct TestCredentials {
     pub site_url: String,
     pub admin_username: String,
@@ -176,6 +164,7 @@ where
         .expect("Failed to restore wp-content/plugins");
 }
 
+#[derive(Debug)]
 pub struct AsyncWPNetworking {
     client: reqwest::Client,
 }
@@ -197,7 +186,7 @@ impl AsyncWPNetworking {
 
         let mut request = self
             .client
-            .request(Self::request_method(wp_request.method), wp_request.url)
+            .request(Self::request_method(wp_request.method), wp_request.url.0)
             .headers(request_headers);
         if let Some(body) = wp_request.body {
             request = request.body(body);
@@ -211,13 +200,13 @@ impl AsyncWPNetworking {
         })
     }
 
-    fn request_method(method: wp_api::RequestMethod) -> http::Method {
+    fn request_method(method: RequestMethod) -> http::Method {
         match method {
-            wp_api::RequestMethod::GET => reqwest::Method::GET,
-            wp_api::RequestMethod::POST => reqwest::Method::POST,
-            wp_api::RequestMethod::PUT => reqwest::Method::PUT,
-            wp_api::RequestMethod::DELETE => reqwest::Method::DELETE,
-            wp_api::RequestMethod::HEAD => reqwest::Method::HEAD,
+            RequestMethod::GET => reqwest::Method::GET,
+            RequestMethod::POST => reqwest::Method::POST,
+            RequestMethod::PUT => reqwest::Method::PUT,
+            RequestMethod::DELETE => reqwest::Method::DELETE,
+            RequestMethod::HEAD => reqwest::Method::HEAD,
         }
     }
 }

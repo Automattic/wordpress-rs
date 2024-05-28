@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WPContextual;
 
-use crate::{
-    add_uniffi_exported_parser, parse_wp_response, SparseField, WPApiError, WPNetworkResponse,
-};
+use crate::{add_uniffi_exported_parser, SparseField, WPApiError, WPNetworkResponse};
 
 add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
 add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);
@@ -35,7 +33,7 @@ add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext)
 add_uniffi_exported_parser!(parse_update_plugin_response, PluginWithEditContext);
 add_uniffi_exported_parser!(parse_delete_plugin_response, PluginDeleteResponse);
 
-#[derive(Default, Debug, uniffi::Record)]
+#[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
     pub search: Option<String>,
@@ -168,6 +166,8 @@ pub enum PluginStatus {
     Active,
     #[serde(rename = "inactive")]
     Inactive,
+    #[serde(rename = "network-active")]
+    NetworkActive,
 }
 
 impl PluginStatus {
@@ -175,6 +175,7 @@ impl PluginStatus {
         match self {
             Self::Active => "active",
             Self::Inactive => "inactive",
+            Self::NetworkActive => "network-active",
         }
     }
 }

@@ -178,7 +178,7 @@ delete-wp-plugins-backup:
 lint: lint-rust lint-swift
 
 lint-rust:
-	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings"
+	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all -- -D warnings"
 
 lint-swift:
 	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint
