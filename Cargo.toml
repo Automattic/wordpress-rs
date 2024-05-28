@@ -3,6 +3,7 @@ members = [
   "wp_api",
   "wp_contextual",
   "wp_uniffi_bindgen",
+  "xcframework",
 ]
 resolver = "2"
 
