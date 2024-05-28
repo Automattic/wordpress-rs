@@ -71,7 +71,7 @@ steps:
         plugins: *common_plugins
         agents:
           queue: mac
-      - label: ":swift: :cocoapods: [Test] CocoaPods"
+      - label: ":swift: :cocoapods: Validate CocoaPods Support"
         command: .buildkite/validate-cocoapods.sh
         env:
           IMAGE_ID: xcode-15.3

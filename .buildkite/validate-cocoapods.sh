@@ -14,6 +14,7 @@ Pod::Spec.new do |spec|
   spec.description  = "WordPress API in Swift."
   spec.homepage     = "https://github.com/automattic/wordpress-rs"
   spec.license      = "MIT"
+  spec.author       = { 'The WordPress Mobile Team' => 'mobile@wordpress.org' }
 
   spec.ios.deployment_target = '13.0'
   spec.osx.deployment_target = '11.0'
