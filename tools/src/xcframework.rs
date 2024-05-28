@@ -1,4 +1,4 @@
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use clap::*;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -7,7 +7,9 @@ use std::process::Command;
 
 use crate::Action;
 
-static LIBRARY_FILENAME: &str = "libwordpress.a";
+const XCFRAMEWORK_OUTPUT_PATH: &str = "target/libwordpressFFI.xcframework";
+const SWIFT_BINDINGS_HEADER_DIR: &str = "target/swift-bindings/headers";
+const LIBRARY_FILENAME: &str = "libwordpress.a";
 
 #[derive(Debug, Args)]
 pub struct CreateXCFramework {
@@ -63,12 +65,9 @@ struct Slice {
 
 impl XCFramework {
     fn new(targets: &Vec<String>, profile: &str) -> Result<Self> {
-        let headers = PathBuf::from("target/swift-bindings/headers");
+        let headers = PathBuf::from(SWIFT_BINDINGS_HEADER_DIR);
         if !headers.exists() {
-            return Err(Error::msg(format!(
-                "Headers not found: {}",
-                headers.display()
-            )));
+            anyhow::bail!("Headers not found: {}", headers.display())
         }
 
         let mut groups = HashMap::<LibraryGroupId, LibraryGroup>::new();
@@ -100,7 +99,7 @@ impl XCFramework {
         let libraries = self.combine_libraries(temp_dir)?;
         let temp_dest = self.create_xcframework(&libraries, temp_dir)?;
 
-        let dest = PathBuf::from("target/libwordpressFFI.xcframework");
+        let dest = PathBuf::from(XCFRAMEWORK_OUTPUT_PATH);
         recreate_directory(&dest)?;
         std::fs::rename(temp_dest, &dest).with_context(|| "Failed to move xcframework")?;
 
@@ -119,11 +118,10 @@ impl XCFramework {
     }
 
     fn combine_libraries(&self, temp_dir: &Path) -> Result<Vec<PathBuf>> {
-        let mut libraries: Vec<PathBuf> = Vec::new();
-        for lib in &self.libraries {
-            libraries.push(lib.create(temp_dir)?);
-        }
-        Ok(libraries)
+        self.libraries
+            .iter()
+            .map(|lib| lib.create(temp_dir))
+            .collect()
     }
 
     fn create_xcframework(&self, libraries: &[PathBuf], temp_dir: &Path) -> Result<PathBuf> {
@@ -185,7 +183,7 @@ impl Slice {
 
         let lib = &libs[0];
         if !lib.exists() {
-            return Err(Error::msg(format!("Library not found: {}", lib.display())));
+            anyhow::bail!("Library not found: {}", lib.display())
         }
 
         let dir = temp_dir.join(&self.target);
@@ -225,6 +223,20 @@ enum ApplePlatform {
     WatchOS,
 }
 
+impl TryFrom<&str> for ApplePlatform {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> std::result::Result<Self, anyhow::Error> {
+        match s {
+            "darwin" => Ok(ApplePlatform::MacOS),
+            "ios" => Ok(ApplePlatform::IOS),
+            "tvos" => Ok(ApplePlatform::TvOS),
+            "watchos" => Ok(ApplePlatform::WatchOS),
+            _ => anyhow::bail!("Unknown Apple platform: {}", s),
+        }
+    }
+}
+
 impl Display for ApplePlatform {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name = match self {
@@ -242,16 +254,13 @@ impl LibraryGroupId {
         let mut parts = target.split('-');
         _ /* arch */= parts.next();
         if parts.next() != Some("apple") {
-            return Err(Error::msg(format!("{} is not an Apple platform", target)));
+            anyhow::bail!("{} is not an Apple platform", target)
         }
 
-        let os = match parts.next() {
-            Some("darwin") => ApplePlatform::MacOS,
-            Some("ios") => ApplePlatform::IOS,
-            Some("tvos") => ApplePlatform::TvOS,
-            Some("watchos") => ApplePlatform::WatchOS,
-            _ => return Err(Error::msg(format!("Unknown OS in target: {}", target))),
-        };
+        let os: ApplePlatform = parts
+            .next()
+            .with_context(|| format!("No OS in target: {}", target))?
+            .try_into()?;
 
         let output = Command::new("rustc")
             .env("RUSTC_BOOTSTRAP", "1")
@@ -269,7 +278,7 @@ impl LibraryGroupId {
         let llvm_target = json
             .get("llvm-target")
             .and_then(|t| t.as_str())
-            .ok_or(Error::msg("No llvm-target in command output"))?;
+            .with_context(|| "No llvm-target in command output")?;
 
         Ok(Self {
             os,
@@ -302,10 +311,11 @@ impl ExecuteCommand for Command {
         if output.status.success() {
             Ok(output)
         } else {
-            Err(Error::msg(format!(
+            anyhow::bail!(
                 "Command failed with exit code: {}\n$ {:?}",
-                output.status, self
-            )))
+                output.status,
+                self
+            )
         }
     }
 }
@@ -316,8 +326,5 @@ fn recreate_directory(dir: &PathBuf) -> Result<()> {
             .with_context(|| format!("Failed to remove directory at {:?}", dir))?;
     }
 
-    std::fs::create_dir_all(dir)
-        .with_context(|| format!("Failed to create directory: {:?}", dir))?;
-
-    Ok(())
+    std::fs::create_dir_all(dir).with_context(|| format!("Failed to create directory: {:?}", dir))
 }
