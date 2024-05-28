@@ -5,13 +5,15 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::Action;
-
 const XCFRAMEWORK_OUTPUT_PATH: &str = "target/libwordpressFFI.xcframework";
 const SWIFT_BINDINGS_HEADER_DIR: &str = "target/swift-bindings/headers";
 const LIBRARY_FILENAME: &str = "libwordpress.a";
 
-#[derive(Debug, Args)]
+fn main() -> Result<()> {
+    CreateXCFramework::parse().run()
+}
+
+#[derive(Debug, Parser)]
 pub struct CreateXCFramework {
     // Non-empty list of targets
     #[clap(
@@ -30,7 +32,7 @@ pub struct CreateXCFramework {
     profile: String,
 }
 
-impl Action for CreateXCFramework {
+impl CreateXCFramework {
     fn run(&self) -> Result<()> {
         let temp_dir = std::env::temp_dir().join("wp-rs-xcframework");
         recreate_directory(&temp_dir)?;

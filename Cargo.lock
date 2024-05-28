@@ -2347,15 +2347,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tools"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde_json",
-]
-
-[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2998,6 +2989,15 @@ name = "wp_uniffi_bindgen"
 version = "0.1.0"
 dependencies = [
  "uniffi",
+]
+
+[[package]]
+name = "xcframework"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde_json",
 ]
 
 [[package]]

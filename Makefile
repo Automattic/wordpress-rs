@@ -101,11 +101,11 @@ xcframework-only-ios: $(build-apple-platform-ios)
 xcframework-only-tvos: $(build-apple-platform-tvos)
 xcframework-only-watchos: $(build-apple-platform-watchos)
 xcframework-only-%:
-	cargo run --quiet --bin tools -- create-xcframework --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
 
 # Creating xcframework for all platforms.
 xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
-	cargo run --quiet --bin tools -- create-xcframework --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 ifeq ($(SKIP_PACKAGE_WP_API),true)
 xcframework:
