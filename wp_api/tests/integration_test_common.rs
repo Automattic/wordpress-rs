@@ -4,8 +4,8 @@ use std::{fs::read_to_string, process::Command};
 use wp_api::{
     request::{RequestMethod, WpNetworkRequest, WpNetworkResponse},
     users::UserId,
-    WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper, WpApiError,
-    WpRequestBuilder,
+    WPAuthentication, WpApiError, WpRequestBuilder, WpRestError, WpRestErrorCode,
+    WpRestErrorWrapper,
 };
 
 // The first user is also the current user
@@ -50,17 +50,17 @@ impl WpNetworkRequestExecutor for WpNetworkRequest {
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {
-    fn assert_wp_error(self, expected_error_code: WPRestErrorCode);
+    fn assert_wp_error(self, expected_error_code: WpRestErrorCode);
 }
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
-    fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
+    fn assert_wp_error(self, expected_error_code: WpRestErrorCode) {
         let expected_status_code =
             expected_status_code_for_wp_rest_error_code(&expected_error_code);
         let err = self.unwrap_err();
         if let WpApiError::RestError {
             rest_error:
-                WPRestErrorWrapper::Recognized(WPRestError {
+                WpRestErrorWrapper::Recognized(WpRestError {
                     code: error_code,
                     message: _,
                 }),
@@ -79,7 +79,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
                 expected_status_code, status_code, response
             );
         } else if let WpApiError::RestError {
-            rest_error: WPRestErrorWrapper::Unrecognized(unrecognized_error),
+            rest_error: WpRestErrorWrapper::Unrecognized(unrecognized_error),
             status_code,
             response,
         } = err
@@ -115,39 +115,39 @@ pub fn read_test_credentials_from_file() -> TestCredentials {
     }
 }
 
-fn expected_status_code_for_wp_rest_error_code(error_code: &WPRestErrorCode) -> u16 {
+fn expected_status_code_for_wp_rest_error_code(error_code: &WpRestErrorCode) -> u16 {
     match error_code {
-        WPRestErrorCode::CannotActivatePlugin => 403,
-        WPRestErrorCode::CannotCreateUser => 403,
-        WPRestErrorCode::CannotDeactivatePlugin => 403,
-        WPRestErrorCode::CannotDeleteActivePlugin => 400,
-        WPRestErrorCode::CannotEdit => 403,
-        WPRestErrorCode::CannotEditRoles => 403,
-        WPRestErrorCode::CannotInstallPlugin => 403,
-        WPRestErrorCode::CannotManageNetworkPlugins => 403,
-        WPRestErrorCode::CannotManagePlugins => 403,
-        WPRestErrorCode::CannotViewPlugin => 403,
-        WPRestErrorCode::CannotViewPlugins => 403,
-        WPRestErrorCode::ForbiddenContext => 403,
-        WPRestErrorCode::ForbiddenOrderBy => 403,
-        WPRestErrorCode::ForbiddenWho => 403,
-        WPRestErrorCode::NetworkOnlyPlugin => 400,
-        WPRestErrorCode::PluginNotFound => 404,
-        WPRestErrorCode::InvalidParam => 400,
-        WPRestErrorCode::TrashNotSupported => 501,
-        WPRestErrorCode::Unauthorized => 401,
-        WPRestErrorCode::UserCannotDelete => 403,
-        WPRestErrorCode::UserCannotView => 403,
-        WPRestErrorCode::UserCreate => 500,
-        WPRestErrorCode::UserExists => 400,
-        WPRestErrorCode::UserInvalidArgument => 400,
-        WPRestErrorCode::UserInvalidEmail => 400,
-        WPRestErrorCode::UserInvalidId => 404,
-        WPRestErrorCode::UserInvalidPassword => 400,
-        WPRestErrorCode::UserInvalidReassign => 400,
-        WPRestErrorCode::UserInvalidRole => 400,
-        WPRestErrorCode::UserInvalidSlug => 400,
-        WPRestErrorCode::UserInvalidUsername => 400,
+        WpRestErrorCode::CannotActivatePlugin => 403,
+        WpRestErrorCode::CannotCreateUser => 403,
+        WpRestErrorCode::CannotDeactivatePlugin => 403,
+        WpRestErrorCode::CannotDeleteActivePlugin => 400,
+        WpRestErrorCode::CannotEdit => 403,
+        WpRestErrorCode::CannotEditRoles => 403,
+        WpRestErrorCode::CannotInstallPlugin => 403,
+        WpRestErrorCode::CannotManageNetworkPlugins => 403,
+        WpRestErrorCode::CannotManagePlugins => 403,
+        WpRestErrorCode::CannotViewPlugin => 403,
+        WpRestErrorCode::CannotViewPlugins => 403,
+        WpRestErrorCode::ForbiddenContext => 403,
+        WpRestErrorCode::ForbiddenOrderBy => 403,
+        WpRestErrorCode::ForbiddenWho => 403,
+        WpRestErrorCode::NetworkOnlyPlugin => 400,
+        WpRestErrorCode::PluginNotFound => 404,
+        WpRestErrorCode::InvalidParam => 400,
+        WpRestErrorCode::TrashNotSupported => 501,
+        WpRestErrorCode::Unauthorized => 401,
+        WpRestErrorCode::UserCannotDelete => 403,
+        WpRestErrorCode::UserCannotView => 403,
+        WpRestErrorCode::UserCreate => 500,
+        WpRestErrorCode::UserExists => 400,
+        WpRestErrorCode::UserInvalidArgument => 400,
+        WpRestErrorCode::UserInvalidEmail => 400,
+        WpRestErrorCode::UserInvalidId => 404,
+        WpRestErrorCode::UserInvalidPassword => 400,
+        WpRestErrorCode::UserInvalidReassign => 400,
+        WpRestErrorCode::UserInvalidRole => 400,
+        WpRestErrorCode::UserInvalidSlug => 400,
+        WpRestErrorCode::UserInvalidUsername => 400,
     }
 }
 

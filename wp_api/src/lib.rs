@@ -9,7 +9,7 @@ use request::{
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
 
-pub use api_error::{WPRestError, WPRestErrorCode, WPRestErrorWrapper, WpApiError};
+pub use api_error::{WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper};
 use login::*;
 use plugins::*;
 use users::*;
