@@ -34,7 +34,7 @@ pub struct WpRequestBuilder {
 #[uniffi::export]
 impl WpRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Result<Self, WpApiError> {
+    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
             .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
@@ -64,13 +64,13 @@ impl WpRequestBuilder {
 fn wp_authentication_from_username_and_password(
     username: String,
     password: String,
-) -> WPAuthentication {
-    WPAuthentication::from_username_and_password(username, password)
+) -> WpAuthentication {
+    WpAuthentication::from_username_and_password(username, password)
 }
 
 #[derive(Debug)]
 struct RequestBuilder {
-    authentication: WPAuthentication,
+    authentication: WpAuthentication,
 }
 
 impl RequestBuilder {
@@ -111,8 +111,8 @@ impl RequestBuilder {
             CONTENT_TYPE_JSON.to_string(),
         );
         match self.authentication {
-            WPAuthentication::None => None,
-            WPAuthentication::AuthorizationHeader { ref token } => {
+            WpAuthentication::None => None,
+            WpAuthentication::AuthorizationHeader { ref token } => {
                 header_map.insert("Authorization".to_string(), format!("Basic {}", token))
             }
         };
@@ -148,15 +148,15 @@ impl WpContext {
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]
-pub enum WPAuthentication {
+pub enum WpAuthentication {
     AuthorizationHeader { token: String },
     None,
 }
 
-impl WPAuthentication {
+impl WpAuthentication {
     pub fn from_username_and_password(username: String, password: String) -> Self {
         use base64::prelude::*;
-        WPAuthentication::AuthorizationHeader {
+        WpAuthentication::AuthorizationHeader {
             token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
         }
     }
