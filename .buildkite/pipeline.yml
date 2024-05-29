@@ -1,7 +1,7 @@
 # Nodes with values to reuse in the pipeline.
 common_params:
   plugins: &common_plugins
-    - automattic/a8c-ci-toolkit#2.17.0
+    - automattic/a8c-ci-toolkit#3.4.1
   # Common environment values to use with the `env` key.
 
 steps:
@@ -65,6 +65,14 @@ steps:
           queue: mac
       - label: ":swift: :darwin: Build for Real Devices"
         command: .buildkite/swift-test.sh build_for_real_device
+        env:
+          IMAGE_ID: xcode-15.3
+        depends_on: xcframework
+        plugins: *common_plugins
+        agents:
+          queue: mac
+      - label: ":swift: :cocoapods: Validate CocoaPods Support"
+        command: .buildkite/validate-cocoapods.sh
         env:
           IMAGE_ID: xcode-15.3
         depends_on: xcframework

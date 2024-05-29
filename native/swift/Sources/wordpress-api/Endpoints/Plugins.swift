@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 extension WordPressAPI {
     public var plugins: AnyNamespace<SparsePlugin> {

@@ -1,7 +1,9 @@
 import XCTest
 import Foundation
 import WordPressAPI
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 final class WordPressAPITests: XCTestCase {
 

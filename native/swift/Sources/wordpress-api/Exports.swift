@@ -3,6 +3,8 @@
 // We could export all of them using `@_exported import`, but that probably puts
 // us in a position where we need to make major releases due to Rust code changes.
 
+#if canImport(WordPressAPIInternal)
+
 import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
@@ -31,3 +33,5 @@ public typealias PluginListParams = WordPressAPIInternal.PluginListParams
 public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
+
+#endif
