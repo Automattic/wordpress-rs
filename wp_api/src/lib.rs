@@ -163,13 +163,13 @@ impl WpAuthentication {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum WPApiParamOrder {
+pub enum WpApiParamOrder {
     #[default]
     Asc,
     Desc,
 }
 
-impl WPApiParamOrder {
+impl WpApiParamOrder {
     fn as_str(&self) -> &str {
         match self {
             Self::Asc => "asc",

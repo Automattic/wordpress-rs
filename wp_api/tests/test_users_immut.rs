@@ -3,9 +3,9 @@ use rstest_reuse::{self, apply, template};
 use wp_api::{
     generate,
     users::{
-        SparseUser, SparseUserField, UserListParams, WPApiParamUsersOrderBy, WPApiParamUsersWho,
+        SparseUser, SparseUserField, UserListParams, WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
-    WPApiParamOrder, WpContext,
+    WpApiParamOrder, WpContext,
 };
 
 use crate::integration_test_common::{
@@ -67,15 +67,15 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 #[case(generate!(UserListParams, (exclude, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case(generate!(UserListParams, (include, vec![FIRST_USER_ID])))]
 #[case(generate!(UserListParams, (per_page, Some(100)), (offset, Some(20))))]
-#[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Asc))))]
-#[case(generate!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))))]
-#[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))))]
+#[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Asc))))]
+#[case(generate!(UserListParams, (orderby, Some(WpApiParamUsersOrderBy::Id))))]
+#[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Desc)), (orderby, Some(WpApiParamUsersOrderBy::Email))))]
 #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
 #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])))]
 #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])))]
 #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])))]
-#[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WPApiParamUsersWho::All))))]
-#[case(generate!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))))]
+#[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))))]
+#[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))))]
 #[case(generate!(UserListParams, (has_published_posts, Some(true))))]
 #[trace]
 #[tokio::test]

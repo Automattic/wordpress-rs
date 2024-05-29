@@ -3,7 +3,7 @@ use wp_api::{
     request::endpoint::WpEndpointUrl,
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
-        WPApiParamUsersOrderBy, WPApiParamUsersWho,
+        WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
     WpAuthentication, WpContext, WpRestErrorCode,
 };
@@ -90,7 +90,7 @@ async fn list_users_err_forbidden_context() {
 #[tokio::test]
 async fn list_users_err_forbidden_orderby_email() {
     let params = UserListParams {
-        orderby: Some(WPApiParamUsersOrderBy::Email),
+        orderby: Some(WpApiParamUsersOrderBy::Email),
         ..Default::default()
     };
     request_builder_as_subscriber()
@@ -106,7 +106,7 @@ async fn list_users_err_forbidden_orderby_email() {
 #[tokio::test]
 async fn list_users_err_forbidden_who() {
     let params = UserListParams {
-        who: Some(WPApiParamUsersWho::Authors),
+        who: Some(WpApiParamUsersWho::Authors),
         ..Default::default()
     };
     request_builder_as_subscriber()
@@ -154,7 +154,7 @@ async fn list_users_with_roles_err_user_cannot_view() {
 #[tokio::test]
 async fn list_users_orderby_registered_date_err_forbidden_orderby() {
     let params = UserListParams {
-        orderby: Some(WPApiParamUsersOrderBy::RegisteredDate),
+        orderby: Some(WpApiParamUsersOrderBy::RegisteredDate),
         ..Default::default()
     };
     request_builder_as_subscriber()
