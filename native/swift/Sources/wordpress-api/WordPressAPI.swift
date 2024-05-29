@@ -73,7 +73,7 @@ public struct WordPressAPI {
             throw ParseError.invalidUrl
         }
 
-        public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
+        public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
             return extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
@@ -181,7 +181,7 @@ extension WpNetworkRequest {
     }
 }
 
-extension WpRestApiurl {
+extension WpRestApiUrl {
     func asUrl() -> URL {
         guard let url = URL(string: stringValue) else {
             preconditionFailure("Invalid URL: \(stringValue)")
@@ -192,7 +192,7 @@ extension WpRestApiurl {
 }
 
 extension URL {
-    func asRestUrl() -> WpRestApiurl {
-        WpRestApiurl(stringValue: self.absoluteString)
+    func asRestUrl() -> WpRestApiUrl {
+        WpRestApiUrl(stringValue: self.absoluteString)
     }
 }

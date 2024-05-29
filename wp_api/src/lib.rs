@@ -179,7 +179,7 @@ impl WpApiParamOrder {
 }
 
 #[uniffi::export]
-pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WPAPIDetails, WpApiError> {
+pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WpApiDetails, WpApiError> {
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
             reason: err.to_string(),
@@ -189,9 +189,8 @@ pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WPAPIDe
     Ok(api_details)
 }
 
-// TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
 #[uniffi::export]
-pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WPRestAPIURL> {
+pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WpRestApiUrl> {
     if let Some(url) = response.get_link_header(name) {
         return Some(url.into());
     }

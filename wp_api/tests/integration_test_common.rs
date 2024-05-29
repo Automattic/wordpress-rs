@@ -85,7 +85,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         } = err
         {
             panic!(
-                "Received unhandled WPRestError variant: '{:?}' with status_code: '{}'. Response was: '{:?}'",
+                "Received unhandled WpRestError variant: '{:?}' with status_code: '{}'. Response was: '{:?}'",
                 unrecognized_error, status_code, response
             );
         } else {

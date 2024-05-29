@@ -7,8 +7,8 @@ use url::Url;
 // embedded as query params. This function parses that URL and extracts the login details as an object.
 #[uniffi::export]
 pub fn extract_login_details_from_url(
-    url: WPRestAPIURL,
-) -> Option<WPAPIApplicationPasswordDetails> {
+    url: WpRestApiUrl,
+) -> Option<WpApiApplicationPasswordDetails> {
     if let (Some(site_url), Some(user_login), Some(password)) =
         url.as_url()
             .query_pairs()
@@ -21,7 +21,7 @@ pub fn extract_login_details_from_url(
                 }
             })
     {
-        Some(WPAPIApplicationPasswordDetails {
+        Some(WpApiApplicationPasswordDetails {
             site_url,
             user_login,
             password,
@@ -32,7 +32,7 @@ pub fn extract_login_details_from_url(
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct WPAPIDetails {
+pub struct WpApiDetails {
     pub name: String,
     pub description: String,
     pub url: String,
@@ -40,22 +40,22 @@ pub struct WPAPIDetails {
     pub gmt_offset: String,
     pub timezone_string: String,
     pub namespaces: Vec<String>,
-    pub authentication: HashMap<String, WPRestAPIAuthenticationScheme>,
+    pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
     pub site_icon_url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct WPRestAPIAuthenticationScheme {
-    pub endpoints: WPRestApiAuthenticationEndpoint,
+pub struct WpRestApiAuthenticationScheme {
+    pub endpoints: WpRestApiAuthenticationEndpoint,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct WPRestApiAuthenticationEndpoint {
+pub struct WpRestApiAuthenticationEndpoint {
     pub authorization: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct WPAPIApplicationPasswordDetails {
+pub struct WpApiApplicationPasswordDetails {
     pub site_url: String,
     pub user_login: String,
     pub password: String,
@@ -65,11 +65,11 @@ pub struct WPAPIApplicationPasswordDetails {
 //
 // It is a programmer error to instantiate this object with an invalid URL
 #[derive(Debug, uniffi::Record)]
-pub struct WPRestAPIURL {
+pub struct WpRestApiUrl {
     pub string_value: String,
 }
 
-impl WPRestAPIURL {
+impl WpRestApiUrl {
     pub fn as_str(&self) -> &str {
         self.string_value.as_str()
     }
@@ -79,16 +79,16 @@ impl WPRestAPIURL {
     }
 }
 
-impl From<Url> for WPRestAPIURL {
+impl From<Url> for WpRestApiUrl {
     fn from(url: url::Url) -> Self {
-        WPRestAPIURL {
+        WpRestApiUrl {
             string_value: url.into(),
         }
     }
 }
 
-impl From<WPRestAPIURL> for String {
-    fn from(url: WPRestAPIURL) -> Self {
+impl From<WpRestApiUrl> for String {
+    fn from(url: WpRestApiUrl) -> Self {
         url.string_value
     }
 }

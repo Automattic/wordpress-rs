@@ -16,7 +16,7 @@ public extension WordPressAPI {
         return getLinkHeader(response: response, name: "https://api.w.org/")?.asUrl()
     }
 
-    func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpapiDetails {
+    func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpApiDetails {
         let wpResponse = try await self.perform(request: WpNetworkRequest(method: .get, url: url, headerMap: [:]))
         return try parseApiDetailsResponse(response: wpResponse)
     }
