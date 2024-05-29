@@ -4,7 +4,7 @@ use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
     plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
-    RequestMethod, WPNetworkResponse, WpNetworkRequest,
+    RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
@@ -179,7 +179,7 @@ impl WPApiParamOrder {
 }
 
 #[uniffi::export]
-pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
+pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
     let api_details =
         serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
             reason: err.to_string(),
@@ -191,7 +191,7 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
 
 // TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
 #[uniffi::export]
-pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRestAPIURL> {
+pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WPRestAPIURL> {
     if let Some(url) = response.get_link_header(name) {
         return Some(url.into());
     }

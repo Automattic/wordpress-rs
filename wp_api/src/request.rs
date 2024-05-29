@@ -56,7 +56,7 @@ impl Debug for WpNetworkRequest {
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
-pub struct WPNetworkResponse {
+pub struct WpNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
     // TODO: We probably want to implement a specific type for these headers instead of using a
@@ -67,7 +67,7 @@ pub struct WPNetworkResponse {
     pub header_map: Option<HashMap<String, String>>,
 }
 
-impl WPNetworkResponse {
+impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
         self.header_map
             .as_ref()
@@ -94,7 +94,7 @@ impl WPNetworkResponse {
 
     pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WPApiError>
     where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
+        F: Fn(&WpNetworkResponse) -> Result<T, WPApiError>,
     {
         parser(self)
     }
@@ -120,11 +120,11 @@ impl WPNetworkResponse {
     }
 }
 
-impl Debug for WPNetworkResponse {
+impl Debug for WpNetworkResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = format!(
             indoc::indoc! {"
-                WPNetworkResponse {{
+                WpNetworkResponse {{
                     status_code: '{}',
                     header_map: '{:?}',
                     body: '{}'
@@ -156,7 +156,7 @@ fn body_as_string(body: &[u8]) -> String {
 macro_rules! add_uniffi_exported_parser {
     ($fn_name:ident, $return_type: ty) => {
         #[uniffi::export]
-        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
+        pub fn $fn_name(response: &WpNetworkResponse) -> Result<$return_type, WPApiError> {
             response.parse::<$return_type>()
         }
     };
@@ -187,7 +187,7 @@ mod tests {
         #[case] expected_prev_link_header: Option<&str>,
         #[case] expected_next_link_header: Option<&str>,
     ) {
-        let response = WPNetworkResponse {
+        let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 200,
             header_map: Some([("Link".to_string(), link.to_string())].into()),

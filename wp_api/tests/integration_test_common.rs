@@ -2,7 +2,7 @@ use futures::Future;
 use http::HeaderMap;
 use std::{fs::read_to_string, process::Command};
 use wp_api::{
-    request::{RequestMethod, WPNetworkResponse, WpNetworkRequest},
+    request::{RequestMethod, WpNetworkRequest, WpNetworkResponse},
     users::UserId,
     WPApiError, WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper,
     WpRequestBuilder,
@@ -40,11 +40,11 @@ pub fn request_builder_as_subscriber() -> WpRequestBuilder {
 pub trait WpNetworkRequestExecutor {
     fn execute(
         self,
-    ) -> impl std::future::Future<Output = Result<WPNetworkResponse, reqwest::Error>> + Send;
+    ) -> impl std::future::Future<Output = Result<WpNetworkResponse, reqwest::Error>> + Send;
 }
 
 impl WpNetworkRequestExecutor for WpNetworkRequest {
-    async fn execute(self) -> Result<WPNetworkResponse, reqwest::Error> {
+    async fn execute(self) -> Result<WpNetworkResponse, reqwest::Error> {
         AsyncWPNetworking::default().async_request(self).await
     }
 }
@@ -183,7 +183,7 @@ impl AsyncWPNetworking {
     pub async fn async_request(
         &self,
         wp_request: WpNetworkRequest,
-    ) -> Result<WPNetworkResponse, reqwest::Error> {
+    ) -> Result<WpNetworkResponse, reqwest::Error> {
         let request_headers: HeaderMap = (&wp_request.header_map).try_into().unwrap();
 
         let mut request = self
@@ -195,7 +195,7 @@ impl AsyncWPNetworking {
         }
         let response = request.send().await?;
 
-        Ok(WPNetworkResponse {
+        Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
             header_map: None, // TODO: Properly read the headers
