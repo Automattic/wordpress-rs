@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WPContext};
+use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WpContext};
 
 use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
@@ -32,7 +32,7 @@ impl UsersEndpoint {
         url.into()
     }
 
-    pub fn list(&self, context: WPContext, params: Option<&UserListParams>) -> ApiEndpointUrl {
+    pub fn list(&self, context: WpContext, params: Option<&UserListParams>) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_appending("users");
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
@@ -44,7 +44,7 @@ impl UsersEndpoint {
 
     pub fn filter_list(
         &self,
-        context: WPContext,
+        context: WpContext,
         params: Option<&UserListParams>,
         fields: &[SparseUserField],
     ) -> ApiEndpointUrl {
@@ -54,7 +54,7 @@ impl UsersEndpoint {
             .into()
     }
 
-    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> ApiEndpointUrl {
+    pub fn retrieve(&self, user_id: UserId, context: WpContext) -> ApiEndpointUrl {
         let mut url = self
             .api_base_url
             .by_extending(["users", &user_id.to_string()]);
@@ -66,7 +66,7 @@ impl UsersEndpoint {
     pub fn filter_retrieve(
         &self,
         user_id: UserId,
-        context: WPContext,
+        context: WpContext,
         fields: &[SparseUserField],
     ) -> ApiEndpointUrl {
         self.retrieve(user_id, context)
@@ -75,7 +75,7 @@ impl UsersEndpoint {
             .into()
     }
 
-    pub fn retrieve_me(&self, context: WPContext) -> ApiEndpointUrl {
+    pub fn retrieve_me(&self, context: WpContext) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_extending(["users", "me"]);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
@@ -84,7 +84,7 @@ impl UsersEndpoint {
 
     pub fn filter_retrieve_me(
         &self,
-        context: WPContext,
+        context: WpContext,
         fields: &[SparseUserField],
     ) -> ApiEndpointUrl {
         self.retrieve_me(context)
@@ -107,7 +107,10 @@ impl UsersEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::tests::{fixture_api_base_url, validate_endpoint};
+    use crate::{
+        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
+        WpApiParamUsersHasPublishedPosts,
+    };
     use rstest::*;
 
     #[rstest]
@@ -141,7 +144,7 @@ mod tests {
     #[rstest]
     fn list_users(users_endpoint: UsersEndpoint) {
         validate_endpoint(
-            users_endpoint.list(WPContext::Edit, None),
+            users_endpoint.list(WpContext::Edit, None),
             "/users?context=edit",
         );
     }
@@ -161,10 +164,10 @@ mod tests {
             roles: Vec::new(),
             capabilities: Vec::new(),
             who: None,
-            has_published_posts: Some(true),
+            has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
         };
         validate_endpoint(
-            users_endpoint.list(WPContext::Edit, Some(&params)),
+            users_endpoint.list(WpContext::Edit, Some(&params)),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true",
         );
     }
@@ -184,18 +187,21 @@ mod tests {
             roles: Vec::new(),
             capabilities: Vec::new(),
             who: None,
-            has_published_posts: Some(true),
+            has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
+                "post".to_string(),
+                "page".to_string(),
+            ])),
         };
         validate_endpoint(
-            users_endpoint.filter_list(WPContext::Edit, Some(&params), &[SparseUserField::Name, SparseUserField::Email]),
-            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true&_fields=name%2Cemail",
+            users_endpoint.filter_list(WpContext::Edit, Some(&params), &[SparseUserField::Name, SparseUserField::Email]),
+            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=post%2Cpage&_fields=name%2Cemail",
         );
     }
 
     #[rstest]
     fn retrieve_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
-            users_endpoint.retrieve(UserId(98), WPContext::View),
+            users_endpoint.retrieve(UserId(98), WpContext::View),
             "/users/98?context=view",
         );
     }
@@ -205,7 +211,7 @@ mod tests {
         validate_endpoint(
             users_endpoint.filter_retrieve(
                 UserId(98),
-                WPContext::View,
+                WpContext::View,
                 &[SparseUserField::Nickname, SparseUserField::Url],
             ),
             "/users/98?context=view&_fields=nickname%2Curl",
@@ -215,7 +221,7 @@ mod tests {
     #[rstest]
     fn retrieve_current_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
-            users_endpoint.retrieve_me(WPContext::Embed),
+            users_endpoint.retrieve_me(WpContext::Embed),
             "/users/me?context=embed",
         );
     }
@@ -224,7 +230,7 @@ mod tests {
     fn filter_retrieve_current_user(users_endpoint: UsersEndpoint) {
         validate_endpoint(
             users_endpoint.filter_retrieve_me(
-                WPContext::Embed,
+                WpContext::Embed,
                 &[SparseUserField::Roles, SparseUserField::Capabilities],
             ),
             "/users/me?context=embed&_fields=roles%2Ccapabilities",

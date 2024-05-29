@@ -13,7 +13,7 @@ import uniffi.wp_api.UserUpdateParams
 import uniffi.wp_api.UserWithEditContext
 import uniffi.wp_api.UserWithEmbedContext
 import uniffi.wp_api.UserWithViewContext
-import uniffi.wp_api.WpApiHelper
+import uniffi.wp_api.UsersRequestBuilder
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseDeleteUserResponse
@@ -27,35 +27,35 @@ import uniffi.wp_api.parseRetrieveUserResponseWithEmbedContext
 import uniffi.wp_api.parseRetrieveUserResponseWithViewContext
 
 internal class WpUsersEndpoint(
-    apiHelper: WpApiHelper,
+    usersRequestBuilder: UsersRequestBuilder,
     networkHandler: NetworkHandler,
     dispatcher: CoroutineDispatcher
 ) : UsersEndpoint {
     private val requestHandler = WpRequestHandler(networkHandler, dispatcher)
 
     override val list: UsersEndpointList by lazy {
-        WpUsersEndpointList(requestHandler, apiHelper, dispatcher)
+        WpUsersEndpointList(requestHandler, usersRequestBuilder, dispatcher)
     }
     override val retrieve: UsersEndpointRetrieve by lazy {
-        WpUsersEndpointRetrieve(requestHandler, apiHelper, dispatcher)
+        WpUsersEndpointRetrieve(requestHandler, usersRequestBuilder, dispatcher)
     }
     override val me: UsersEndpointRetrieveMe by lazy {
-        WpUsersEndpointRetrieveMe(requestHandler, apiHelper, dispatcher)
+        WpUsersEndpointRetrieveMe(requestHandler, usersRequestBuilder, dispatcher)
     }
     override val create: UsersEndpointCreate by lazy {
-        WpUsersEndpointCreate(requestHandler, apiHelper, dispatcher)
+        WpUsersEndpointCreate(requestHandler, usersRequestBuilder, dispatcher)
     }
     override val update: UsersEndpointUpdate by lazy {
-        WpUsersEndpointUpdate(requestHandler, apiHelper, dispatcher)
+        WpUsersEndpointUpdate(requestHandler, usersRequestBuilder, dispatcher)
     }
     override val delete: UsersEndpointDelete by lazy {
-        WpUsersEndpointDelete(requestHandler, apiHelper, dispatcher)
+        WpUsersEndpointDelete(requestHandler, usersRequestBuilder, dispatcher)
     }
 }
 
 private class WpUsersEndpointList(
     private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper,
+    private val usersRequestBuilder: UsersRequestBuilder,
     private val dispatcher: CoroutineDispatcher
 ) : UsersEndpointList {
     override suspend fun withEditContext(params: UserListParams?): WpRequestResult<List<UserWithEditContext>> =
@@ -73,7 +73,7 @@ private class WpUsersEndpointList(
         fields: List<SparseUserField>
     ): WpRequestResult<List<SparseUser>> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.filterListUsersRequest(context, params, fields),
+            request = usersRequestBuilder.filterList(context, params, fields),
             ::parseFilterUsersResponse
         )
     }
@@ -84,7 +84,7 @@ private class WpUsersEndpointList(
         parser: (response: WpNetworkResponse) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.listUsersRequest(context, params),
+            request = usersRequestBuilder.list(context, params),
             parser
         )
     }
@@ -92,7 +92,7 @@ private class WpUsersEndpointList(
 
 private class WpUsersEndpointRetrieve(
     private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper,
+    private val usersRequestBuilder: UsersRequestBuilder,
     private val dispatcher: CoroutineDispatcher
 ) : UsersEndpointRetrieve {
     override suspend fun withEditContext(userId: UserId): WpRequestResult<UserWithEditContext> =
@@ -110,7 +110,7 @@ private class WpUsersEndpointRetrieve(
         fields: List<SparseUserField>
     ): WpRequestResult<SparseUser> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.filterRetrieveUserRequest(userId, context, fields),
+            request = usersRequestBuilder.filterRetrieve(userId, context, fields),
             ::parseFilterRetrieveUserResponse
         )
     }
@@ -121,7 +121,7 @@ private class WpUsersEndpointRetrieve(
         parser: (response: WpNetworkResponse) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.retrieveUserRequest(userId, context),
+            request = usersRequestBuilder.retrieve(userId, context),
             parser
         )
     }
@@ -129,7 +129,7 @@ private class WpUsersEndpointRetrieve(
 
 private class WpUsersEndpointRetrieveMe(
     private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper,
+    private val usersRequestBuilder: UsersRequestBuilder,
     private val dispatcher: CoroutineDispatcher
 ) : UsersEndpointRetrieveMe {
     override suspend fun withEditContext(): WpRequestResult<UserWithEditContext> =
@@ -146,7 +146,7 @@ private class WpUsersEndpointRetrieveMe(
         fields: List<SparseUserField>
     ): WpRequestResult<SparseUser> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.filterRetrieveCurrentUserRequest(context, fields),
+            request = usersRequestBuilder.filterRetrieveMe(context, fields),
             ::parseFilterRetrieveUserResponse
         )
     }
@@ -156,7 +156,7 @@ private class WpUsersEndpointRetrieveMe(
         parser: (response: WpNetworkResponse) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.retrieveCurrentUserRequest(context),
+            request = usersRequestBuilder.retrieveMe(context),
             parser
         )
     }
@@ -164,13 +164,13 @@ private class WpUsersEndpointRetrieveMe(
 
 private class WpUsersEndpointCreate(
     private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper,
+    private val usersRequestBuilder: UsersRequestBuilder,
     private val dispatcher: CoroutineDispatcher
 ) : UsersEndpointCreate {
     override suspend fun new(params: UserCreateParams): WpRequestResult<UserWithEditContext> =
         withContext(dispatcher) {
             requestHandler.execute(
-                request = apiHelper.createUserRequest(params),
+                request = usersRequestBuilder.create(params),
                 ::parseRetrieveUserResponseWithEditContext
             )
         }
@@ -178,7 +178,7 @@ private class WpUsersEndpointCreate(
 
 private class WpUsersEndpointUpdate(
     private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper,
+    private val usersRequestBuilder: UsersRequestBuilder,
     private val dispatcher: CoroutineDispatcher
 ) : UsersEndpointUpdate {
     override suspend fun withId(
@@ -186,15 +186,15 @@ private class WpUsersEndpointUpdate(
         params: UserUpdateParams
     ): WpRequestResult<UserWithEditContext> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.updateUserRequest(userId, params),
+            request = usersRequestBuilder.update(userId, params),
             ::parseRetrieveUserResponseWithEditContext
         )
     }
 
-    override suspend fun current(params: UserUpdateParams): WpRequestResult<UserWithEditContext> =
+    override suspend fun me(params: UserUpdateParams): WpRequestResult<UserWithEditContext> =
         withContext(dispatcher) {
             requestHandler.execute(
-                request = apiHelper.updateCurrentUserRequest(params),
+                request = usersRequestBuilder.updateMe(params),
                 ::parseRetrieveUserResponseWithEditContext
             )
         }
@@ -202,7 +202,7 @@ private class WpUsersEndpointUpdate(
 
 private class WpUsersEndpointDelete(
     private val requestHandler: WpRequestHandler,
-    private val apiHelper: WpApiHelper,
+    private val usersRequestBuilder: UsersRequestBuilder,
     private val dispatcher: CoroutineDispatcher
 ) : UsersEndpointDelete {
     override suspend fun withId(
@@ -210,15 +210,15 @@ private class WpUsersEndpointDelete(
         params: UserDeleteParams
     ): WpRequestResult<UserDeleteResponse> = withContext(dispatcher) {
         requestHandler.execute(
-            request = apiHelper.deleteUserRequest(userId, params),
+            request = usersRequestBuilder.delete(userId, params),
             ::parseDeleteUserResponse
         )
     }
 
-    override suspend fun current(params: UserDeleteParams): WpRequestResult<UserDeleteResponse> =
+    override suspend fun me(params: UserDeleteParams): WpRequestResult<UserDeleteResponse> =
         withContext(dispatcher) {
             requestHandler.execute(
-                request = apiHelper.deleteCurrentUserRequest(params),
+                request = usersRequestBuilder.deleteMe(params),
                 ::parseDeleteUserResponse
             )
         }

@@ -15,8 +15,6 @@ swift_package_platform_ios := $(call swift_package_platform_version,ios)
 swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
 
-cargo_config_library = --config profile.release.debug=true --config 'profile.release.panic="abort"'
-
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 rust_nightly_toolchain := nightly-2024-04-30
 
@@ -75,66 +73,6 @@ release-on-ci:
 	@echo "Swift package will be released by https://buildkite.com/automattic/wordpress-rs/builds/$$(jq -r '.number' .build/buildkite_release_job_response.json)"
 	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
 
-# Builds the library for all the various architectures / systems required in an XCFramework
-xcframework-libraries:
-	# macOS
-	env MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos) $(MAKE) x86_64-apple-darwin-xcframework-library
-	env MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos) $(MAKE) aarch64-apple-darwin-xcframework-library
-
-	# iOS
-	env IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios) $(MAKE) aarch64-apple-ios-xcframework-library
-	env IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios) $(MAKE) x86_64-apple-ios-xcframework-library
-	env IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios) $(MAKE) aarch64-apple-ios-sim-xcframework-library
-
-	# tvOS
-	env TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos) $(MAKE) aarch64-apple-tvos-xcframework-library-with-nightly
-	env TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos) $(MAKE) aarch64-apple-tvos-sim-xcframework-library-with-nightly
-	env TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos) $(MAKE) x86_64-apple-tvos-xcframework-library-with-nightly
-
-	# watchOS
-	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) arm64_32-apple-watchos-xcframework-library-with-nightly
-	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) aarch64-apple-watchos-sim-xcframework-library-with-nightly
-	env WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos) $(MAKE) x86_64-apple-watchos-sim-xcframework-library-with-nightly
-
-%-xcframework-library:
-	cargo $(cargo_config_library) build --target $* --package wp_api --release
-	$(MAKE) $*-combine-libraries
-
-%-xcframework-library-with-nightly:
-	cargo +$(rust_nightly_toolchain) $(cargo_config_library) build --target $* --package wp_api --release -Z build-std=panic_abort,std
-	$(MAKE) $*-combine-libraries
-
-# Xcode doesn't properly support multiple XCFrameworks being used by the same target, so we need
-# to combine the binaries
-%-combine-libraries:
-	xcrun libtool -static -o target/$*/release/libwordpress.a target/$*/release/libwp_api.a
-
-# Some libraries need to be created in a multi-binary format, so we combine them here
-xcframework-combined-libraries: xcframework-libraries
-
-	rm -rf target/universal-*
-	mkdir -p target/universal-macos/release target/universal-ios/release target/universal-tvos/release target/universal-watchos/release
-
-	# Combine the macOS Binaries
-	lipo -create target/aarch64-apple-darwin/release/libwordpress.a target/x86_64-apple-darwin/release/libwordpress.a \
-		-output target/universal-macos/release/libwordpress.a
-	lipo -info target/universal-macos/release/libwordpress.a
-
-	# Combine iOS Simulator Binaries
-	lipo -create target/aarch64-apple-ios-sim/release/libwordpress.a target/x86_64-apple-ios/release/libwordpress.a \
-		-output target/universal-ios/release/libwordpress.a
-	lipo -info target/universal-ios/release/libwordpress.a
-
-	# Combine tvOS Simulator Binaries
-	lipo -create target/aarch64-apple-tvos-sim/release/libwordpress.a target/x86_64-apple-tvos/release/libwordpress.a \
-		-output target/universal-tvos/release/libwordpress.a
-	lipo -info target/universal-tvos/release/libwordpress.a
-
-	# Combine watchOS Simulator Binaries
-	lipo -create target/aarch64-apple-watchos-sim/release/libwordpress.a target/x86_64-apple-watchos-sim/release/libwordpress.a \
-		-output target/universal-watchos/release/libwordpress.a
-	lipo -info target/universal-watchos/release/libwordpress.a
-
 # An XCFramework relies on the .h file and the modulemap to interact with the precompiled binary
 xcframework-headers: bindings
 	rm -rvf target/swift-bindings/headers
@@ -143,33 +81,61 @@ xcframework-headers: bindings
 	cp target/swift-bindings/*.h target/swift-bindings/headers
 	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
 
+apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
+apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
+apple-platform-targets-watchos := arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
+apple-platform-targets := \
+	$(apple-platform-targets-macos) \
+	$(apple-platform-targets-ios) \
+	$(apple-platform-targets-tvos) \
+	$(apple-platform-targets-watchos)
+
+ifeq ($(BUILDKITE), true)
+CARGO_PROFILE ?= release
+else
+CARGO_PROFILE ?= dev
+endif
+
+cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'profile.$(CARGO_PROFILE).panic="abort"'
+
+# Set deployment targets for each platform
+_build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
+_build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
+_build-apple-%-tvos _build-apple-%-tvos-sim: export TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos)
+_build-apple-%-watchos _build-apple-%-watchos-sim: export WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos)
+
+# Use nightly toolchain for tvOS and watchOS
+_build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-%-watchos-sim: \
+	CARGO_OPTS = +$(rust_nightly_toolchain) -Z build-std=panic_abort,std
+
+# Build the library for a specific target
+_build-apple-%: xcframework-headers
+	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
+
+# Build the library for one single platform, including real device and simulator.
+build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
+build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-ios))
+build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
+build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
+
+# Creating xcframework for one single platform, including real device and simulator.
+xcframework-only-macos: $(build-apple-platform-macos)
+xcframework-only-ios: $(build-apple-platform-ios)
+xcframework-only-tvos: $(build-apple-platform-tvos)
+xcframework-only-watchos: $(build-apple-platform-watchos)
+xcframework-only-%:
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+
+# Creating xcframework for all platforms.
+xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
+
 ifeq ($(SKIP_PACKAGE_WP_API),true)
 xcframework:
 	@echo "Skip building libwordpressFFI.xcframework"
 else
-
-# Generate the xcframework
-#
-# Run `make setup-rust` to install required rust toolchain.
-xcframework: bindings xcframework-combined-libraries xcframework-headers
-
-	rm -rf target/libwordpressFFI.xcframework
-
-	xcodebuild -create-xcframework \
-		-library target/aarch64-apple-ios/release/libwordpress.a \
-		-headers target/swift-bindings/headers \
-		-library target/universal-macos/release/libwordpress.a \
-		-headers target/swift-bindings/headers \
-		-library target/universal-ios/release/libwordpress.a \
-		-headers target/swift-bindings/headers \
-		-library target/aarch64-apple-tvos/release/libwordpress.a \
-		-headers target/swift-bindings/headers \
-		-library target/universal-tvos/release/libwordpress.a \
-		-headers target/swift-bindings/headers \
-		-library target/universal-watchos/release/libwordpress.a \
-		-headers target/swift-bindings/headers \
-		-output target/libwordpressFFI.xcframework
-
+xcframework: xcframework-all
 endif
 
 docker-image-swift:

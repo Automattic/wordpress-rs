@@ -1,5 +1,5 @@
-error: #[WPContextualField] & #[WPContextualOption] can't be used together
+error: #[WpContextualField] & #[WpContextualOption] can't be used together
  --> tests/error_both_wp_contextual_field_and_wp_contextual_option.rs:5:5
   |
-5 |     #[WPContext(edit)]
+5 |     #[WpContext(edit)]
   |     ^

@@ -60,10 +60,10 @@ interface UsersEndpointCreate {
 
 interface UsersEndpointUpdate {
     suspend fun withId(userId: UserId, params: UserUpdateParams): WpRequestResult<UserWithEditContext>
-    suspend fun current(params: UserUpdateParams): WpRequestResult<UserWithEditContext>
+    suspend fun me(params: UserUpdateParams): WpRequestResult<UserWithEditContext>
 }
 
 interface UsersEndpointDelete {
     suspend fun withId(userId: UserId, params: UserDeleteParams): WpRequestResult<UserDeleteResponse>
-    suspend fun current(params: UserDeleteParams): WpRequestResult<UserDeleteResponse>
+    suspend fun me(params: UserDeleteParams): WpRequestResult<UserDeleteResponse>
 }

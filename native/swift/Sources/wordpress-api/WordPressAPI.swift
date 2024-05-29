@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 #if os(Linux)
 import FoundationNetworking
@@ -12,11 +14,12 @@ public struct WordPressAPI {
     }
 
     private let urlSession: URLSession
-    package let helper: WpApiHelperProtocol
+    package let requestBuilder: WpRequestBuilderProtocol
 
-    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
+    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) throws {
         self.urlSession = urlSession
-        self.helper = WpApiHelper(siteUrl: baseUrl.absoluteString, authentication: authenticationStategy)
+        self.requestBuilder = try WpRequestBuilder(siteUrl: baseUrl.absoluteString,
+            authentication: authenticationStategy)
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
@@ -70,8 +73,8 @@ public struct WordPressAPI {
             throw ParseError.invalidUrl
         }
 
-        public static func extractLoginDetails(from url: URL) -> WpapiApplicationPasswordDetails? {
-            return WordPressAPIInternal.extractLoginDetailsFromUrl(url: url.asRestUrl())
+        public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
+            return extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
     }
 
@@ -178,7 +181,7 @@ extension WpNetworkRequest {
     }
 }
 
-extension WpRestApiurl {
+extension WpRestApiUrl {
     func asUrl() -> URL {
         guard let url = URL(string: stringValue) else {
             preconditionFailure("Invalid URL: \(stringValue)")
@@ -189,7 +192,7 @@ extension WpRestApiurl {
 }
 
 extension URL {
-    func asRestUrl() -> WpRestApiurl {
-        WpRestApiurl(stringValue: self.absoluteString)
+    func asRestUrl() -> WpRestApiUrl {
+        WpRestApiUrl(stringValue: self.absoluteString)
     }
 }

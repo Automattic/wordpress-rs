@@ -2,7 +2,7 @@ use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
 use crate::integration_test_common::{
-    api, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
+    request_builder, WpNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod integration_test_common;
@@ -21,8 +21,9 @@ async fn create_user() {
             email.to_string(),
             password.to_string(),
         );
-        let created_user = api()
-            .create_user_request(&params)
+        let created_user = request_builder()
+            .users()
+            .create(&params)
             .execute()
             .await
             .unwrap()
@@ -44,8 +45,9 @@ async fn delete_user() {
         let user_delete_params = UserDeleteParams {
             reassign: FIRST_USER_ID,
         };
-        let user_delete_response = api()
-            .delete_user_request(SECOND_USER_ID, &user_delete_params)
+        let user_delete_response = request_builder()
+            .users()
+            .delete(SECOND_USER_ID, &user_delete_params)
             .execute()
             .await;
         assert!(user_delete_response.is_ok());
@@ -66,8 +68,9 @@ async fn delete_current_user() {
         let user_delete_params = UserDeleteParams {
             reassign: SECOND_USER_ID,
         };
-        let deleted_user = api()
-            .delete_current_user_request(&user_delete_params)
+        let deleted_user = request_builder()
+            .users()
+            .delete_me(&user_delete_params)
             .execute()
             .await
             .unwrap()
@@ -198,8 +201,9 @@ async fn update_user_roles() {
             roles: vec![new_role.to_string()],
             ..Default::default()
         };
-        let user_update_response = api()
-            .update_user_request(FIRST_USER_ID, &params)
+        let user_update_response = request_builder()
+            .users()
+            .update(FIRST_USER_ID, &params)
             .execute()
             .await;
         // It's quite tricky to validate the roles from DB, so we just ensure the request was
@@ -217,8 +221,9 @@ async fn update_user_password() {
             password: Some(new_password.to_string()),
             ..Default::default()
         };
-        let user_update_response = api()
-            .update_user_request(FIRST_USER_ID, &params)
+        let user_update_response = request_builder()
+            .users()
+            .update(FIRST_USER_ID, &params)
             .execute()
             .await;
         // It's quite tricky to validate the password from DB, so we just ensure the request was
@@ -233,8 +238,9 @@ where
     F: Fn(DbUser, Vec<DbUserMeta>),
 {
     wp_db::run_and_restore(|mut db| async move {
-        let user_update_response = api()
-            .update_user_request(FIRST_USER_ID, &params)
+        let user_update_response = request_builder()
+            .users()
+            .update(FIRST_USER_ID, &params)
             .execute()
             .await;
         assert!(user_update_response.is_ok());

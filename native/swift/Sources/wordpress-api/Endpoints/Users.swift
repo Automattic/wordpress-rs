@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 extension SparseUser: Contextual {
     public typealias ID = UserId
@@ -7,24 +9,43 @@ extension SparseUser: Contextual {
     public typealias EditContext = UserWithEditContext
     public typealias EmbedContext = UserWithEmbedContext
 
-    public static func retrieveRequest(id: UserId, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
-        helper.retrieveUserRequest(userId: id, context: context)
+    public static func retrieveRequest(
+        id: UserId,
+        using requestBuilder: WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest {
+        requestBuilder.users().retrieve(userId: id, context: context)
     }
 
-    public static func listRequest(params: UserListParams?, using helper: WpApiHelperProtocol, context: WpContext) -> WpNetworkRequest {
-        helper.listUsersRequest(context: context, params: params)
+    public static func listRequest(
+        params: UserListParams?,
+        using requestBuilder: WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest {
+        requestBuilder.users().list(context: context, params: params)
     }
 
-    public static func updateRequest(id: UserId, params: UserUpdateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
-        helper.updateUserRequest(userId: id, params: params)
+    public static func updateRequest(
+        id: UserId,
+        params: UserUpdateParams,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
+        requestBuilder.users().update(userId: id, params: params)
     }
 
-    public static func createRequest(params: UserCreateParams, using helper: any WpApiHelperProtocol) -> WpNetworkRequest {
-        helper.createUserRequest(params: params)
+    public static func createRequest(
+        params: UserCreateParams,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
+        requestBuilder.users().create(params: params)
     }
 
-    public static func deleteRequest(id: ID, params: UserDeleteParams, using helper: WpApiHelperProtocol) -> WpNetworkRequest {
-        helper.deleteUserRequest(userId: id, params: params)
+    public static func deleteRequest(
+        id: ID,
+        params: UserDeleteParams,
+        using requestBuilder: WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
+        requestBuilder.users().delete(userId: id, params: params)
     }
 
     public static func parseResponse(_ response: WpNetworkResponse) throws -> UserWithViewContext {
@@ -63,8 +84,8 @@ extension WordPressAPI {
 }
 
 extension ContextualNamespace where T == SparseUser {
-    public func getCurrent() async throws -> R {
-        let request = self.api.helper.retrieveCurrentUserRequest(context: context)
+    public func getMe() async throws -> R {
+        let request = self.api.requestBuilder.users().retrieveMe(context: context)
         let response = try await api.perform(request: request)
         return try parseResponse(response)
     }
@@ -78,14 +99,14 @@ extension AnyNamespace where T == SparseUser {
         try await self.delete(id: id, params: .init(reassign: userID))
     }
 
-    public func deleteCurrent(reassignTo userID: T.ID) async throws -> T.DeleteResult {
-        let request = self.api.helper.deleteCurrentUserRequest(params: .init(reassign: userID))
+    public func deleteMe(reassignTo userID: T.ID) async throws -> T.DeleteResult {
+        let request = self.api.requestBuilder.users().deleteMe(params: .init(reassign: userID))
         let response = try await api.perform(request: request)
         return try T.parseDeletionResponse(response)
     }
 
-    public func updateCurrent(with params: UserUpdateParams) async throws -> T.EditContext {
-        let request = self.api.helper.updateCurrentUserRequest(params: params)
+    public func updateMe(with params: UserUpdateParams) async throws -> T.EditContext {
+        let request = self.api.requestBuilder.users().updateMe(params: params)
         let response = try await self.api.perform(request: request)
         return try parseRetrieveUserResponseWithEditContext(response: response)
     }
@@ -99,19 +120,19 @@ extension AnyNamespace where T == SparseUser {
 extension ContextualNamespace where T == SparseUser {
 
     public func list(with params: T.ListParams, fields: [SparseUserField]) async throws -> [T] {
-        let request = api.helper.filterListUsersRequest(context: context, params: params, fields: fields)
+        let request = api.requestBuilder.users().filterList(context: context, params: params, fields: fields)
         let response = try await api.perform(request: request)
         return try parseFilterUsersResponse(response: response)
     }
 
     public func get(id: T.ID, fields: [SparseUserField]) async throws -> T {
-        let request = api.helper.filterRetrieveUserRequest(userId: id, context: context, fields: fields)
+        let request = api.requestBuilder.users().filterRetrieve(userId: id, context: context, fields: fields)
         let response = try await api.perform(request: request)
         return try parseFilterRetrieveUserResponse(response: response)
     }
 
-    public func getCurrent(fields: [SparseUserField]) async throws -> T {
-        let request = api.helper.filterRetrieveCurrentUserRequest(context: context, fields: fields)
+    public func getMe(fields: [SparseUserField]) async throws -> T {
+        let request = api.requestBuilder.users().filterRetrieveMe(context: context, fields: fields)
         let response = try await api.perform(request: request)
         return try parseFilterRetrieveUserResponse(response: response)
     }

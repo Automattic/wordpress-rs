@@ -1,14 +1,14 @@
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
-// This test is validating that we are able to handle `#[WPContextualField]`s if its type
+// This test is validating that we are able to handle `#[WpContextualField]`s if its type
 // has multiple path segments. That's why we use a helper mod and use fully qualified paths
 // rather than the importing the mod.
 mod wp_contextual_field_with_multiple_path_segments_helper;
 
-#[derive(WPContextual)]
+#[derive(WpContextual)]
 pub struct SparseFoo {
-    #[WPContext(edit)]
-    #[WPContextualField]
+    #[WpContext(edit)]
+    #[WpContextualField]
     pub bar: Option<wp_contextual_field_with_multiple_path_segments_helper::SparseBar>,
 }
 

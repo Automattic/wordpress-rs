@@ -1,13 +1,15 @@
 use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum WPApiError {
+pub enum WpApiError {
     #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
     RestError {
-        rest_error: WPRestErrorWrapper,
+        rest_error: WpRestErrorWrapper,
         status_code: u16,
         response: String,
     },
+    #[error("Error while parsing site url: {}", reason)]
+    SiteUrlParsingError { reason: String },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ParsingError { reason: String, response: String },
     #[error(
@@ -20,25 +22,25 @@ pub enum WPApiError {
 
 #[derive(serde::Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
 #[serde(untagged)]
-pub enum WPRestErrorWrapper {
-    Recognized(WPRestError),
-    Unrecognized(UnrecognizedWPRestError),
+pub enum WpRestErrorWrapper {
+    Recognized(WpRestError),
+    Unrecognized(UnrecognizedWpRestError),
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct WPRestError {
-    pub code: WPRestErrorCode,
+pub struct WpRestError {
+    pub code: WpRestErrorCode,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct UnrecognizedWPRestError {
+pub struct UnrecognizedWpRestError {
     pub code: String,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WPRestErrorCode {
+pub enum WpRestErrorCode {
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
     #[serde(rename = "rest_cannot_delete_active_plugin")]
@@ -118,7 +120,7 @@ pub enum WPRestErrorCode {
     UserInvalidPassword,
 }
 
-// All internal errors _should_ be wrapped as a `WPRestErrorCode` by the server. However, there
+// All internal errors _should_ be wrapped as a `WpRestErrorCode` by the server. However, there
 // is a good chance that some internal errors do make it into the response, so these error types
 // are provided.
 //
@@ -126,7 +128,7 @@ pub enum WPRestErrorCode {
 // as a fallback. For the moment, clients can manually try parsing an `Unrecognized` error
 // into this type.
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WPInternalErrorCode {
+pub enum WpInternalErrorCode {
     #[serde(rename = "fs_error")]
     FsError,
     #[serde(rename = "fs_no_plugins_dir")]

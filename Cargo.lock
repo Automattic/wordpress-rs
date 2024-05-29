@@ -2992,6 +2992,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "xcframework"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde_json",
+]
+
+[[package]]
 name = "zerocopy"
 version = "0.7.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"

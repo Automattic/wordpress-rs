@@ -1,4 +1,4 @@
-error: #[WPContextual] is only implemented for Structs
+error: #[WpContextual] is only implemented for Structs
  --> tests/error_wp_contextual_not_a_struct.rs:4:10
   |
 4 | pub enum SparseFoo {}

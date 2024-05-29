@@ -3,33 +3,35 @@ use wp_api::{
     request::endpoint::WpEndpointUrl,
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
-        WPApiParamUsersOrderBy, WPApiParamUsersWho,
+        WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
-    WPApiHelper, WPAuthentication, WPContext, WPRestErrorCode,
+    WpAuthentication, WpContext, WpRestErrorCode,
 };
 
 use crate::integration_test_common::{
-    api, api_as_subscriber, AssertWpError, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
-    SECOND_USER_SLUG,
+    request_builder, request_builder_as_subscriber, AssertWpError, WpNetworkRequestExecutor,
+    FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
 };
 
 pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_user_err_cannot_create_user() {
-    api_as_subscriber()
-        .create_user_request(&valid_user_create_params())
+    request_builder_as_subscriber()
+        .users()
+        .create(&valid_user_create_params())
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::CannotCreateUser);
+        .assert_wp_error(WpRestErrorCode::CannotCreateUser);
 }
 
 #[tokio::test]
 async fn delete_user_err_user_cannot_delete() {
-    api_as_subscriber()
-        .delete_user_request(
+    request_builder_as_subscriber()
+        .users()
+        .delete(
             FIRST_USER_ID,
             &UserDeleteParams {
                 reassign: SECOND_USER_ID,
@@ -39,13 +41,14 @@ async fn delete_user_err_user_cannot_delete() {
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserCannotDelete);
+        .assert_wp_error(WpRestErrorCode::UserCannotDelete);
 }
 
 #[tokio::test]
 async fn delete_user_err_user_invalid_reassign() {
-    api()
-        .delete_user_request(
+    request_builder()
+        .users()
+        .delete(
             FIRST_USER_ID,
             &UserDeleteParams {
                 reassign: UserId(987654321),
@@ -55,61 +58,65 @@ async fn delete_user_err_user_invalid_reassign() {
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
+        .assert_wp_error(WpRestErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
 async fn delete_current_user_err_user_invalid_reassign() {
-    api()
-        .delete_current_user_request(&UserDeleteParams {
+    request_builder()
+        .users()
+        .delete_me(&UserDeleteParams {
             reassign: UserId(987654321),
         })
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidReassign);
+        .assert_wp_error(WpRestErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
 async fn list_users_err_forbidden_context() {
-    api_as_subscriber()
-        .list_users_request(WPContext::Edit, &None)
+    request_builder_as_subscriber()
+        .users()
+        .list(WpContext::Edit, &None)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::ForbiddenContext);
+        .assert_wp_error(WpRestErrorCode::ForbiddenContext);
 }
 
 #[tokio::test]
 async fn list_users_err_forbidden_orderby_email() {
     let params = UserListParams {
-        orderby: Some(WPApiParamUsersOrderBy::Email),
+        orderby: Some(WpApiParamUsersOrderBy::Email),
         ..Default::default()
     };
-    api_as_subscriber()
-        .list_users_request(WPContext::View, &Some(params))
+    request_builder_as_subscriber()
+        .users()
+        .list(WpContext::View, &Some(params))
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_view_context)
-        .assert_wp_error(WPRestErrorCode::ForbiddenOrderBy);
+        .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
 }
 
 #[tokio::test]
 async fn list_users_err_forbidden_who() {
     let params = UserListParams {
-        who: Some(WPApiParamUsersWho::Authors),
+        who: Some(WpApiParamUsersWho::Authors),
         ..Default::default()
     };
-    api_as_subscriber()
-        .list_users_request(WPContext::View, &Some(params))
+    request_builder_as_subscriber()
+        .users()
+        .list(WpContext::View, &Some(params))
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_view_context)
-        .assert_wp_error(WPRestErrorCode::ForbiddenWho);
+        .assert_wp_error(WpRestErrorCode::ForbiddenWho);
 }
 
 #[tokio::test]
@@ -118,13 +125,14 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
         capabilities: vec!["foo".to_string()],
         ..Default::default()
     };
-    api_as_subscriber()
-        .list_users_request(WPContext::Edit, &Some(params))
+    request_builder_as_subscriber()
+        .users()
+        .list(WpContext::Edit, &Some(params))
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserCannotView);
+        .assert_wp_error(WpRestErrorCode::UserCannotView);
 }
 
 #[tokio::test]
@@ -133,53 +141,78 @@ async fn list_users_with_roles_err_user_cannot_view() {
         roles: vec!["foo".to_string()],
         ..Default::default()
     };
-    api_as_subscriber()
-        .list_users_request(WPContext::Edit, &Some(params))
+    request_builder_as_subscriber()
+        .users()
+        .list(WpContext::Edit, &Some(params))
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserCannotView);
+        .assert_wp_error(WpRestErrorCode::UserCannotView);
 }
 
 #[tokio::test]
 async fn list_users_orderby_registered_date_err_forbidden_orderby() {
     let params = UserListParams {
-        orderby: Some(WPApiParamUsersOrderBy::RegisteredDate),
+        orderby: Some(WpApiParamUsersOrderBy::RegisteredDate),
         ..Default::default()
     };
-    api_as_subscriber()
-        .list_users_request(WPContext::View, &Some(params))
+    request_builder_as_subscriber()
+        .users()
+        .list(WpContext::View, &Some(params))
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_view_context)
-        .assert_wp_error(WPRestErrorCode::ForbiddenOrderBy);
+        .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
+}
+
+#[tokio::test]
+async fn list_users_has_published_posts_err_invalid_param() {
+    request_builder()
+        .users()
+        .list(
+            WpContext::Edit,
+            &Some(UserListParams {
+                has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
+                    "foo".to_string()
+                ])),
+                ..Default::default()
+            }),
+        )
+        .execute()
+        .await
+        .unwrap()
+        .parse_with(wp_api::users::parse_list_users_response_with_edit_context)
+        .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
 
 #[tokio::test]
 async fn retrieve_user_err_user_invalid_id() {
-    api()
-        .retrieve_user_request(UserId(987654321), WPContext::Edit)
+    request_builder()
+        .users()
+        .retrieve(UserId(987654321), WpContext::Edit)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidId);
+        .assert_wp_error(WpRestErrorCode::UserInvalidId);
 }
 
 #[tokio::test]
 async fn retrieve_user_err_unauthorized() {
-    WPApiHelper::new(
+    wp_api::WpRequestBuilder::new(
         integration_test_common::read_test_credentials_from_file().site_url,
-        WPAuthentication::None,
+        WpAuthentication::None,
     )
-    .retrieve_current_user_request(WPContext::Edit)
+    .expect("Site url is generated by our tooling")
+    .users()
+    .retrieve_me(WpContext::Edit)
     .execute()
     .await
     .unwrap()
     .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-    .assert_wp_error(WPRestErrorCode::Unauthorized);
+    .assert_wp_error(WpRestErrorCode::Unauthorized);
 }
 
 #[tokio::test]
@@ -189,18 +222,21 @@ async fn update_user_err_cannot_edit() {
         ..Default::default()
     };
     // Subscribers can't update someone else's slug
-    api_as_subscriber()
-        .update_user_request(FIRST_USER_ID, &params)
+    request_builder_as_subscriber()
+        .users()
+        .update(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::CannotEdit);
+        .assert_wp_error(WpRestErrorCode::CannotEdit);
 }
 
 #[tokio::test]
 async fn update_user_err_user_invalid_argument() {
-    let mut request = api().update_user_request(FIRST_USER_ID, &UserUpdateParams::default());
+    let mut request = request_builder()
+        .users()
+        .update(FIRST_USER_ID, &UserUpdateParams::default());
     request.body = Some(
         serde_json::json!({
             "username": "new_username",
@@ -214,7 +250,7 @@ async fn update_user_err_user_invalid_argument() {
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidArgument);
+        .assert_wp_error(WpRestErrorCode::UserInvalidArgument);
 }
 
 #[tokio::test]
@@ -224,13 +260,14 @@ async fn update_user_err_cannot_edit_roles() {
         ..Default::default()
     };
     // Subscribers can't update their roles
-    api_as_subscriber()
-        .update_user_request(SECOND_USER_ID, &params)
+    request_builder_as_subscriber()
+        .users()
+        .update(SECOND_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::CannotEditRoles);
+        .assert_wp_error(WpRestErrorCode::CannotEditRoles);
 }
 
 #[tokio::test]
@@ -240,13 +277,14 @@ async fn update_user_err_user_invalid_email() {
         ..Default::default()
     };
     // Can't update user's email to an email that's already in use
-    api()
-        .update_user_request(FIRST_USER_ID, &params)
+    request_builder()
+        .users()
+        .update(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidEmail);
+        .assert_wp_error(WpRestErrorCode::UserInvalidEmail);
 }
 
 #[tokio::test]
@@ -255,13 +293,14 @@ async fn update_user_email_err_invalid_param() {
         email: Some("not_valid".to_string()),
         ..Default::default()
     };
-    api()
-        .update_user_request(FIRST_USER_ID, &params)
+    request_builder()
+        .users()
+        .update(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::InvalidParam);
+        .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
 
 #[tokio::test]
@@ -270,13 +309,14 @@ async fn update_user_password_err_invalid_param() {
         password: Some("".to_string()),
         ..Default::default()
     };
-    api()
-        .update_user_request(FIRST_USER_ID, &params)
+    request_builder()
+        .users()
+        .update(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::InvalidParam);
+        .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
 
 #[tokio::test]
@@ -286,13 +326,14 @@ async fn update_user_err_user_invalid_role() {
         ..Default::default()
     };
     // Can't update user's email to a role that doesn't exist
-    api()
-        .update_user_request(FIRST_USER_ID, &params)
+    request_builder()
+        .users()
+        .update(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidRole);
+        .assert_wp_error(WpRestErrorCode::UserInvalidRole);
 }
 
 #[tokio::test]
@@ -302,13 +343,14 @@ async fn update_user_err_user_invalid_slug() {
         ..Default::default()
     };
     // Can't update user's slug to a slug that's already in use
-    api()
-        .update_user_request(FIRST_USER_ID, &params)
+    request_builder()
+        .users()
+        .update(FIRST_USER_ID, &params)
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserInvalidSlug);
+        .assert_wp_error(WpRestErrorCode::UserInvalidSlug);
 }
 
 // In the following tests, we manually modify the request because the errors they test are not
@@ -317,19 +359,21 @@ async fn update_user_err_user_invalid_slug() {
 
 #[tokio::test]
 async fn create_user_err_user_exists() {
-    let mut request = api().create_user_request(&valid_user_create_params());
+    let mut request = request_builder()
+        .users()
+        .create(&valid_user_create_params());
     request.url.0.push_str("?id=1");
     request
         .execute()
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::UserExists);
+        .assert_wp_error(WpRestErrorCode::UserExists);
 }
 
 #[tokio::test]
 async fn delete_user_err_trash_not_supported() {
-    let mut request = api().delete_user_request(
+    let mut request = request_builder().users().delete(
         FIRST_USER_ID,
         &UserDeleteParams {
             reassign: SECOND_USER_ID,
@@ -341,7 +385,7 @@ async fn delete_user_err_trash_not_supported() {
         .await
         .unwrap()
         .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .assert_wp_error(WPRestErrorCode::TrashNotSupported);
+        .assert_wp_error(WpRestErrorCode::TrashNotSupported);
 }
 
 // Helpers
