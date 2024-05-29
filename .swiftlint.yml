@@ -7,3 +7,5 @@ disabled_rules:
   # Don't think we should enable this rule.
   # See https://github.com/realm/SwiftLint/issues/5263 for context.
   - non_optional_string_data_conversion
+  # Allow using short names (i.e. T, U, ID) for generic types.
+  - type_name
