@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
 use crate::{
     add_uniffi_exported_parser, SparseField, WPApiError, WPApiParamOrder, WpNetworkResponse,
@@ -324,44 +324,44 @@ impl std::fmt::Display for UserId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseUser {
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub id: Option<UserId>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub username: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub name: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub first_name: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub last_name: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub email: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub url: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub description: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub link: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub locale: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub nickname: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub registered_date: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub roles: Option<Vec<String>>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub capabilities: Option<HashMap<String, bool>>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub extra_capabilities: Option<HashMap<String, bool>>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     // According to our tests, `avatar_urls` is not available for all site types. It's marked with
-    // `#[WPContextualOption]` which will make it an `Option` in the generated contextual types.
-    #[WPContextualOption]
+    // `#[WpContextual]` which will make it an `Option` in the generated contextual types.
+    #[WpContextualOption]
     pub avatar_urls: Option<HashMap<String, String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }

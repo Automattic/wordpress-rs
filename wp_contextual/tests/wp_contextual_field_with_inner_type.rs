@@ -1,21 +1,21 @@
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
-#[derive(WPContextual)]
+#[derive(WpContextual)]
 pub struct SparseFoo {
-    #[WPContext(edit)]
-    #[WPContextualField]
+    #[WpContext(edit)]
+    #[WpContextualField]
     pub bar: Option<Vec<SparseBar>>,
-    #[WPContext(edit)]
-    #[WPContextualField]
+    #[WpContext(edit)]
+    #[WpContextualField]
     pub bar_2: Option<std::vec::Vec<SparseBar>>,
-    #[WPContext(edit)]
-    #[WPContextualField]
+    #[WpContext(edit)]
+    #[WpContextualField]
     pub bar_3: Option<std::vec::Vec<Vec<SparseBar>>>,
 }
 
-#[derive(WPContextual)]
+#[derive(WpContextual)]
 pub struct SparseBar {
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub baz: u32,
 }
 

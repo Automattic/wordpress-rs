@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
 use crate::{add_uniffi_exported_parser, SparseField, WPApiError, WpNetworkResponse};
 
@@ -71,27 +71,27 @@ pub struct PluginUpdateParams {
     // In order to avoid confusion, this parameter is not included in this implementation.
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePlugin {
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub plugin: Option<PluginSlug>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub status: Option<PluginStatus>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub name: Option<String>,
-    #[WPContext(edit, view)]
+    #[WpContext(edit, view)]
     pub plugin_uri: Option<String>,
-    #[WPContext(edit, view)]
+    #[WpContext(edit, view)]
     pub author: Option<String>,
-    #[WPContext(edit, view)]
+    #[WpContext(edit, view)]
     pub description: Option<PluginDescription>,
-    #[WPContext(edit, view)]
+    #[WpContext(edit, view)]
     pub version: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub network_only: Option<bool>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub requires_php: Option<String>,
-    #[WPContext(edit, view)]
+    #[WpContext(edit, view)]
     pub textdomain: Option<String>,
 }
 

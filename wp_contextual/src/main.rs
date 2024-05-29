@@ -1,19 +1,19 @@
 use serde::{Deserialize, Serialize};
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostObject {
     #[serde(rename(serialize = "ser_name"))]
-    #[WPContext(edit, view, embed)]
+    #[WpContext(edit, view, embed)]
     pub id: Option<u32>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub date: Option<String>,
-    #[WPContext(embed)]
+    #[WpContext(embed)]
     pub embed_date: Option<String>,
-    #[WPContext(edit, view, embed)]
+    #[WpContext(edit, view, embed)]
     pub already_strongly_typed: u32,
-    #[WPContext(edit, view)]
-    #[WPContextualField]
+    #[WpContext(edit, view)]
+    #[WpContextualField]
     pub guid: Option<SparsePostGuid>,
 }
 
@@ -23,11 +23,11 @@ pub struct PostGuid {
     pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostGuid {
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub raw: Option<String>,
-    #[WPContext(edit, view)]
+    #[WpContext(edit, view)]
     pub rendered: Option<String>,
 }
 
