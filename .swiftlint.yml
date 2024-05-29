@@ -3,3 +3,7 @@ included:
   - native/swift
 excluded: # paths to ignore during linting. Takes precedence over `included`.
   - native/swift/Sources/wordpress-api-wrapper/wp_api.swift # auto-generated code
+disabled_rules:
+  # Don't think we should enable this rule.
+  # See https://github.com/realm/SwiftLint/issues/5263 for context.
+  - non_optional_string_data_conversion
