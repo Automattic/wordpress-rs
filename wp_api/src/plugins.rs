@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{add_uniffi_exported_parser, SparseField, WPApiError, WpNetworkResponse};
+use crate::{add_uniffi_exported_parser, SparseField, WpApiError, WpNetworkResponse};
 
 add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
 add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);

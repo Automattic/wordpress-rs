@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use serde::Deserialize;
 use url::Url;
 
-use crate::WPApiError;
+use crate::WpApiError;
 
 use self::endpoint::WpEndpointUrl;
 
@@ -84,33 +84,33 @@ impl WpNetworkResponse {
         body_as_string(&self.body)
     }
 
-    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WPApiError> {
+    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WpApiError> {
         self.parse_response_for_generic_errors()?;
-        serde_json::from_slice(&self.body).map_err(|err| WPApiError::ParsingError {
+        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
             reason: err.to_string(),
             response: self.body_as_string(),
         })
     }
 
-    pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WpApiError>
     where
-        F: Fn(&WpNetworkResponse) -> Result<T, WPApiError>,
+        F: Fn(&WpNetworkResponse) -> Result<T, WpApiError>,
     {
         parser(self)
     }
 
-    fn parse_response_for_generic_errors(&self) -> Result<(), WPApiError> {
+    fn parse_response_for_generic_errors(&self) -> Result<(), WpApiError> {
         // TODO: Further parse the response body to include error message
         // TODO: Lots of unwraps to get a basic setup working
         let status = http::StatusCode::from_u16(self.status_code).unwrap();
         if let Ok(rest_error) = serde_json::from_slice(&self.body) {
-            Err(WPApiError::RestError {
+            Err(WpApiError::RestError {
                 rest_error,
                 status_code: self.status_code,
                 response: self.body_as_string(),
             })
         } else if status.is_client_error() || status.is_server_error() {
-            Err(WPApiError::UnknownError {
+            Err(WpApiError::UnknownError {
                 status_code: self.status_code,
                 response: self.body_as_string(),
             })
@@ -156,7 +156,7 @@ fn body_as_string(body: &[u8]) -> String {
 macro_rules! add_uniffi_exported_parser {
     ($fn_name:ident, $return_type: ty) => {
         #[uniffi::export]
-        pub fn $fn_name(response: &WpNetworkResponse) -> Result<$return_type, WPApiError> {
+        pub fn $fn_name(response: &WpNetworkResponse) -> Result<$return_type, WpApiError> {
             response.parse::<$return_type>()
         }
     };

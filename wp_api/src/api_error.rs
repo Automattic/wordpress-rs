@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum WPApiError {
+pub enum WpApiError {
     #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
     RestError {
         rest_error: WPRestErrorWrapper,

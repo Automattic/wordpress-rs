@@ -9,7 +9,7 @@ use request::{
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
 
-pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
+pub use api_error::{WPRestError, WPRestErrorCode, WPRestErrorWrapper, WpApiError};
 use login::*;
 use plugins::*;
 use users::*;
@@ -34,9 +34,9 @@ pub struct WpRequestBuilder {
 #[uniffi::export]
 impl WpRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Result<Self, WPApiError> {
+    pub fn new(site_url: String, authentication: WPAuthentication) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
-            .map_err(|err| WPApiError::SiteUrlParsingError {
+            .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
             })?
             .into();
@@ -179,9 +179,9 @@ impl WPApiParamOrder {
 }
 
 #[uniffi::export]
-pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
+pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WPAPIDetails, WpApiError> {
     let api_details =
-        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+        serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
             reason: err.to_string(),
             response: response.body_as_string(),
         })?;

@@ -4,7 +4,7 @@ use std::{fs::read_to_string, process::Command};
 use wp_api::{
     request::{RequestMethod, WpNetworkRequest, WpNetworkResponse},
     users::UserId,
-    WPApiError, WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper,
+    WPAuthentication, WPRestError, WPRestErrorCode, WPRestErrorWrapper, WpApiError,
     WpRequestBuilder,
 };
 
@@ -53,12 +53,12 @@ pub trait AssertWpError<T: std::fmt::Debug> {
     fn assert_wp_error(self, expected_error_code: WPRestErrorCode);
 }
 
-impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
+impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
     fn assert_wp_error(self, expected_error_code: WPRestErrorCode) {
         let expected_status_code =
             expected_status_code_for_wp_rest_error_code(&expected_error_code);
         let err = self.unwrap_err();
-        if let WPApiError::RestError {
+        if let WpApiError::RestError {
             rest_error:
                 WPRestErrorWrapper::Recognized(WPRestError {
                     code: error_code,
@@ -78,7 +78,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WPApiError> {
                 "Incorrect status code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
                 expected_status_code, status_code, response
             );
-        } else if let WPApiError::RestError {
+        } else if let WpApiError::RestError {
             rest_error: WPRestErrorWrapper::Unrecognized(unrecognized_error),
             status_code,
             response,

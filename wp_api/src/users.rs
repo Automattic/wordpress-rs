@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
 use crate::{
-    add_uniffi_exported_parser, SparseField, WPApiError, WPApiParamOrder, WpNetworkResponse,
+    add_uniffi_exported_parser, SparseField, WPApiParamOrder, WpApiError, WpNetworkResponse,
 };
 
 add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
