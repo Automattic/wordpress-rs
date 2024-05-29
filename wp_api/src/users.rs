@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
@@ -80,6 +80,27 @@ impl WpApiParamUsersWho {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum WpApiParamUsersHasPublishedPosts {
+    True,
+    False,
+    PostTypes(Vec<String>),
+}
+
+impl Display for WpApiParamUsersHasPublishedPosts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::True => true.to_string(),
+                Self::False => false.to_string(),
+                Self::PostTypes(post_types) => post_types.join(","),
+            },
+        )
+    }
+}
+
 #[derive(Debug, Default, uniffi::Record)]
 pub struct UserListParams {
     /// Current page of the collection.
@@ -114,7 +135,7 @@ pub struct UserListParams {
     /// One of: `authors`
     pub who: Option<WpApiParamUsersWho>,
     /// Limit result set to users who have published posts.
-    pub has_published_posts: Option<bool>,
+    pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 }
 
 impl UserListParams {
@@ -164,7 +185,7 @@ impl UserListParams {
             ),
             (
                 "has_published_posts",
-                self.has_published_posts.map(|x| x.to_string()),
+                self.has_published_posts.as_ref().map(|x| x.to_string()),
             ),
         ]
         .into_iter()
@@ -433,7 +454,8 @@ mod tests {
     #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
     #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))), &[])]
     #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), &[("who", "authors")])]
-    #[case(generate!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
+    #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))), &[("has_published_posts", "true")])]
+    #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))), &[("has_published_posts", "post,page")])]
     #[trace]
     fn test_user_list_params(
         #[case] params: UserListParams,

@@ -3,7 +3,8 @@ use rstest_reuse::{self, apply, template};
 use wp_api::{
     generate,
     users::{
-        SparseUser, SparseUserField, UserListParams, WpApiParamUsersOrderBy, WpApiParamUsersWho,
+        SparseUser, SparseUserField, UserListParams, WpApiParamUsersHasPublishedPosts,
+        WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
     WpApiParamOrder, WpContext,
 };
@@ -76,10 +77,10 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])))]
 #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))))]
 #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))))]
-#[case(generate!(UserListParams, (has_published_posts, Some(true))))]
+#[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))))]
 #[trace]
 #[tokio::test]
-async fn test_user_list_params_parametrized(
+async fn list_users_parametrized(
     #[case] params: UserListParams,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
@@ -116,6 +117,43 @@ async fn test_user_list_params_parametrized(
                 "Response was: '{:?}'",
                 parsed_response
             );
+        }
+    };
+}
+
+#[rstest]
+#[case(None)]
+#[case(Some(WpApiParamUsersHasPublishedPosts::True))]
+#[case(Some(WpApiParamUsersHasPublishedPosts::False))]
+#[case(Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string()])))]
+#[case(Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))]
+#[trace]
+#[tokio::test]
+async fn list_users_has_published_posts(
+    #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
+    #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
+) {
+    let response = request_builder()
+        .users()
+        .list(
+            context,
+            &Some(UserListParams {
+                has_published_posts,
+                ..Default::default()
+            }),
+        )
+        .execute()
+        .await;
+    let response = &response.unwrap();
+    match context {
+        WpContext::Edit => {
+            assert!(wp_api::users::parse_list_users_response_with_edit_context(response).is_ok())
+        }
+        WpContext::Embed => {
+            assert!(wp_api::users::parse_list_users_response_with_embed_context(response).is_ok())
+        }
+        WpContext::View => {
+            assert!(wp_api::users::parse_list_users_response_with_view_context(response).is_ok())
         }
     };
 }

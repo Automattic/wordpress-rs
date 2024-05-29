@@ -107,7 +107,10 @@ impl UsersEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::tests::{fixture_api_base_url, validate_endpoint};
+    use crate::{
+        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
+        WpApiParamUsersHasPublishedPosts,
+    };
     use rstest::*;
 
     #[rstest]
@@ -161,7 +164,7 @@ mod tests {
             roles: Vec::new(),
             capabilities: Vec::new(),
             who: None,
-            has_published_posts: Some(true),
+            has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
         };
         validate_endpoint(
             users_endpoint.list(WpContext::Edit, Some(&params)),
@@ -184,11 +187,14 @@ mod tests {
             roles: Vec::new(),
             capabilities: Vec::new(),
             who: None,
-            has_published_posts: Some(true),
+            has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
+                "post".to_string(),
+                "page".to_string(),
+            ])),
         };
         validate_endpoint(
             users_endpoint.filter_list(WpContext::Edit, Some(&params), &[SparseUserField::Name, SparseUserField::Email]),
-            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true&_fields=name%2Cemail",
+            "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=post%2Cpage&_fields=name%2Cemail",
         );
     }
 
