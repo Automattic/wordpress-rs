@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     RequestBuilder, SparseUserField, UserCreateParams, UserDeleteParams, UserId, UserListParams,
-    UserUpdateParams, WPContext,
+    UserUpdateParams, WpContext,
 };
 
 use super::{
@@ -29,7 +29,7 @@ impl UsersRequestBuilder {
 impl UsersRequestBuilder {
     pub fn list(
         &self,
-        context: WPContext,
+        context: WpContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
     ) -> WpNetworkRequest {
         self.request_builder
@@ -38,7 +38,7 @@ impl UsersRequestBuilder {
 
     pub fn filter_list(
         &self,
-        context: WPContext,
+        context: WpContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparseUserField],
     ) -> WpNetworkRequest {
@@ -46,7 +46,7 @@ impl UsersRequestBuilder {
             .get(self.endpoint.filter_list(context, params.as_ref(), fields))
     }
 
-    pub fn retrieve(&self, user_id: UserId, context: WPContext) -> WpNetworkRequest {
+    pub fn retrieve(&self, user_id: UserId, context: WpContext) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.retrieve(user_id, context))
     }
@@ -54,20 +54,20 @@ impl UsersRequestBuilder {
     pub fn filter_retrieve(
         &self,
         user_id: UserId,
-        context: WPContext,
+        context: WpContext,
         fields: &[SparseUserField],
     ) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.filter_retrieve(user_id, context, fields))
     }
 
-    pub fn retrieve_me(&self, context: WPContext) -> WpNetworkRequest {
+    pub fn retrieve_me(&self, context: WpContext) -> WpNetworkRequest {
         self.request_builder.get(self.endpoint.retrieve_me(context))
     }
 
     pub fn filter_retrieve_me(
         &self,
-        context: WPContext,
+        context: WpContext,
         fields: &[SparseUserField],
     ) -> WpNetworkRequest {
         self.request_builder

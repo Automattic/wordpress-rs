@@ -1,5 +1,5 @@
 use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
-use wp_api::{WPContext, WPRestErrorCode};
+use wp_api::{WPRestErrorCode, WpContext};
 
 use crate::integration_test_common::{
     request_builder, request_builder_as_subscriber, AssertWpError, WpNetworkRequestExecutor,
@@ -39,7 +39,7 @@ async fn delete_plugin_err_cannot_delete_active_plugin() {
 async fn list_plugins_err_cannot_view_plugins() {
     request_builder_as_subscriber()
         .plugins()
-        .list(WPContext::Edit, &None)
+        .list(WpContext::Edit, &None)
         .execute()
         .await
         .unwrap()
@@ -51,7 +51,7 @@ async fn list_plugins_err_cannot_view_plugins() {
 async fn retrieve_plugin_err_cannot_view_plugin() {
     request_builder_as_subscriber()
         .plugins()
-        .retrieve(WPContext::Edit, &HELLO_DOLLY_PLUGIN_SLUG.into())
+        .retrieve(WpContext::Edit, &HELLO_DOLLY_PLUGIN_SLUG.into())
         .execute()
         .await
         .unwrap()

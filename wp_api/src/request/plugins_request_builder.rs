@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     PluginCreateParams, PluginListParams, PluginSlug, PluginUpdateParams, RequestBuilder,
-    SparsePluginField, WPContext,
+    SparsePluginField, WpContext,
 };
 
 use super::{
@@ -29,7 +29,7 @@ impl PluginsRequestBuilder {
 impl PluginsRequestBuilder {
     pub fn list(
         &self,
-        context: WPContext,
+        context: WpContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
     ) -> WpNetworkRequest {
         self.request_builder
@@ -38,7 +38,7 @@ impl PluginsRequestBuilder {
 
     pub fn filter_list(
         &self,
-        context: WPContext,
+        context: WpContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparsePluginField],
     ) -> WpNetworkRequest {
@@ -50,14 +50,14 @@ impl PluginsRequestBuilder {
         self.request_builder.post(self.endpoint.create(), params)
     }
 
-    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> WpNetworkRequest {
+    pub fn retrieve(&self, context: WpContext, plugin: &PluginSlug) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.retrieve(context, plugin))
     }
 
     pub fn filter_retrieve(
         &self,
-        context: WPContext,
+        context: WpContext,
         plugin: &PluginSlug,
         fields: &[SparsePluginField],
     ) -> WpNetworkRequest {

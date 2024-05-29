@@ -5,7 +5,7 @@ use wp_api::{
     users::{
         SparseUser, SparseUserField, UserListParams, WPApiParamUsersOrderBy, WPApiParamUsersWho,
     },
-    WPApiParamOrder, WPContext,
+    WPApiParamOrder, WpContext,
 };
 
 use crate::integration_test_common::{
@@ -19,7 +19,7 @@ pub mod integration_test_common;
 async fn filter_users(#[case] fields: &[SparseUserField]) {
     let parsed_response = request_builder()
         .users()
-        .filter_list(WPContext::Edit, &None, fields)
+        .filter_list(WpContext::Edit, &None, fields)
         .execute()
         .await
         .unwrap()
@@ -36,7 +36,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
     let user_result = request_builder()
         .users()
-        .filter_retrieve(FIRST_USER_ID, WPContext::Edit, fields)
+        .filter_retrieve(FIRST_USER_ID, WpContext::Edit, fields)
         .execute()
         .await
         .unwrap()
@@ -50,7 +50,7 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
     let user_result = request_builder()
         .users()
-        .filter_retrieve_me(WPContext::Edit, fields)
+        .filter_retrieve_me(WpContext::Edit, fields)
         .execute()
         .await
         .unwrap()
@@ -81,7 +81,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 #[tokio::test]
 async fn test_user_list_params_parametrized(
     #[case] params: UserListParams,
-    #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
+    #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
     let response = request_builder()
         .users()
@@ -90,7 +90,7 @@ async fn test_user_list_params_parametrized(
         .await
         .unwrap();
     match context {
-        WPContext::Edit => {
+        WpContext::Edit => {
             let parsed_response =
                 wp_api::users::parse_list_users_response_with_edit_context(&response);
             assert!(
@@ -99,7 +99,7 @@ async fn test_user_list_params_parametrized(
                 parsed_response
             );
         }
-        WPContext::Embed => {
+        WpContext::Embed => {
             let parsed_response =
                 wp_api::users::parse_list_users_response_with_embed_context(&response);
             assert!(
@@ -108,7 +108,7 @@ async fn test_user_list_params_parametrized(
                 parsed_response
             );
         }
-        WPContext::View => {
+        WpContext::View => {
             let parsed_response =
                 wp_api::users::parse_list_users_response_with_view_context(&response);
             assert!(
@@ -124,7 +124,7 @@ async fn test_user_list_params_parametrized(
 async fn retrieve_user_with_edit_context() {
     assert!(request_builder()
         .users()
-        .retrieve(FIRST_USER_ID, WPContext::Edit)
+        .retrieve(FIRST_USER_ID, WpContext::Edit)
         .execute()
         .await
         .unwrap()
@@ -136,7 +136,7 @@ async fn retrieve_user_with_edit_context() {
 async fn retrieve_user_with_embed_context() {
     assert!(request_builder()
         .users()
-        .retrieve(FIRST_USER_ID, WPContext::Embed)
+        .retrieve(FIRST_USER_ID, WpContext::Embed)
         .execute()
         .await
         .unwrap()
@@ -148,7 +148,7 @@ async fn retrieve_user_with_embed_context() {
 async fn retrieve_user_with_view_context() {
     assert!(request_builder()
         .users()
-        .retrieve(FIRST_USER_ID, WPContext::View)
+        .retrieve(FIRST_USER_ID, WpContext::View)
         .execute()
         .await
         .unwrap()
@@ -160,7 +160,7 @@ async fn retrieve_user_with_view_context() {
 async fn retrieve_current_user_with_edit_context() {
     assert!(request_builder()
         .users()
-        .retrieve_me(WPContext::Edit)
+        .retrieve_me(WpContext::Edit)
         .execute()
         .await
         .unwrap()
@@ -172,7 +172,7 @@ async fn retrieve_current_user_with_edit_context() {
 async fn retrieve_current_user_with_embed_context() {
     assert!(request_builder()
         .users()
-        .retrieve_me(WPContext::Embed)
+        .retrieve_me(WpContext::Embed)
         .execute()
         .await
         .unwrap()
@@ -184,7 +184,7 @@ async fn retrieve_current_user_with_embed_context() {
 async fn retrieve_current_user_with_view_context() {
     assert!(request_builder()
         .users()
-        .retrieve_me(WPContext::View)
+        .retrieve_me(WpContext::View)
         .execute()
         .await
         .unwrap()

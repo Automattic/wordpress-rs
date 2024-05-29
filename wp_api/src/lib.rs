@@ -130,14 +130,14 @@ impl RequestBuilder {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum WPContext {
+pub enum WpContext {
     Edit,
     Embed,
     #[default]
     View,
 }
 
-impl WPContext {
+impl WpContext {
     fn as_str(&self) -> &str {
         match self {
             Self::Edit => "edit",
