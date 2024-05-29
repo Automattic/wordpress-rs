@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     endpoint::{plugins_endpoint::PluginsEndpoint, ApiBaseUrl},
-    WPNetworkRequest,
+    WpNetworkRequest,
 };
 
 #[derive(Debug, uniffi::Object)]
@@ -31,7 +31,7 @@ impl PluginsRequestBuilder {
         &self,
         context: WPContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
-    ) -> WPNetworkRequest {
+    ) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.list(context, params.as_ref()))
     }
@@ -41,16 +41,16 @@ impl PluginsRequestBuilder {
         context: WPContext,
         params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparsePluginField],
-    ) -> WPNetworkRequest {
+    ) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.filter_list(context, params.as_ref(), fields))
     }
 
-    pub fn create(&self, params: &PluginCreateParams) -> WPNetworkRequest {
+    pub fn create(&self, params: &PluginCreateParams) -> WpNetworkRequest {
         self.request_builder.post(self.endpoint.create(), params)
     }
 
-    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> WPNetworkRequest {
+    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.retrieve(context, plugin))
     }
@@ -60,17 +60,17 @@ impl PluginsRequestBuilder {
         context: WPContext,
         plugin: &PluginSlug,
         fields: &[SparsePluginField],
-    ) -> WPNetworkRequest {
+    ) -> WpNetworkRequest {
         self.request_builder
             .get(self.endpoint.filter_retrieve(context, plugin, fields))
     }
 
-    pub fn update(&self, plugin: &PluginSlug, params: &PluginUpdateParams) -> WPNetworkRequest {
+    pub fn update(&self, plugin: &PluginSlug, params: &PluginUpdateParams) -> WpNetworkRequest {
         self.request_builder
             .post(self.endpoint.update(plugin), params)
     }
 
-    pub fn delete(&self, plugin: &PluginSlug) -> WPNetworkRequest {
+    pub fn delete(&self, plugin: &PluginSlug) -> WpNetworkRequest {
         self.request_builder.delete(self.endpoint.delete(plugin))
     }
 }

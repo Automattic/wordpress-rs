@@ -15,7 +15,7 @@ const LINK_HEADER_KEY: &str = "Link";
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
-pub struct WPNetworkRequest {
+pub struct WpNetworkRequest {
     pub method: RequestMethod,
     pub url: WpEndpointUrl,
     // TODO: We probably want to implement a specific type for these headers instead of using a
@@ -27,17 +27,17 @@ pub struct WPNetworkRequest {
     pub body: Option<Vec<u8>>,
 }
 
-impl WPNetworkRequest {
+impl WpNetworkRequest {
     pub fn body_as_string(&self) -> Option<String> {
         self.body.as_ref().map(|b| body_as_string(b))
     }
 }
 
-impl Debug for WPNetworkRequest {
+impl Debug for WpNetworkRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = format!(
             indoc::indoc! {"
-                WPNetworkRequest {{
+                WpNetworkRequest {{
                     method: '{:?}',
                     url: '{:?}',
                     header_map: '{:?}',

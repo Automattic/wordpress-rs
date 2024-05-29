@@ -4,7 +4,7 @@ use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
     plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
-    RequestMethod, WPNetworkRequest, WPNetworkResponse,
+    RequestMethod, WPNetworkResponse, WpNetworkRequest,
 };
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
@@ -74,8 +74,8 @@ struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    fn get(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
-        WPNetworkRequest {
+    fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+        WpNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
             header_map: self.header_map(),
@@ -83,11 +83,11 @@ impl RequestBuilder {
         }
     }
 
-    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WPNetworkRequest
+    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
     {
-        WPNetworkRequest {
+        WpNetworkRequest {
             method: RequestMethod::POST,
             url: url.into(),
             header_map: self.header_map_for_post_request(),
@@ -95,8 +95,8 @@ impl RequestBuilder {
         }
     }
 
-    fn delete(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
-        WPNetworkRequest {
+    fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+        WpNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
             header_map: self.header_map(),

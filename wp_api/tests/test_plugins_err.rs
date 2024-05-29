@@ -2,7 +2,7 @@ use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
 use wp_api::{WPContext, WPRestErrorCode};
 
 use crate::integration_test_common::{
-    request_builder, request_builder_as_subscriber, AssertWpError, WPNetworkRequestExecutor,
+    request_builder, request_builder_as_subscriber, AssertWpError, WpNetworkRequestExecutor,
     HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 

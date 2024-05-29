@@ -9,7 +9,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    request_builder, request_builder_as_subscriber, AssertWpError, WPNetworkRequestExecutor,
+    request_builder, request_builder_as_subscriber, AssertWpError, WpNetworkRequestExecutor,
     FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
 };
 
