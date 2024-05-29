@@ -45,7 +45,7 @@ pub trait WpNetworkRequestExecutor {
 
 impl WpNetworkRequestExecutor for WpNetworkRequest {
     async fn execute(self) -> Result<WpNetworkResponse, reqwest::Error> {
-        AsyncWPNetworking::default().async_request(self).await
+        AsyncWpNetworking::default().async_request(self).await
     }
 }
 
@@ -167,11 +167,11 @@ where
 }
 
 #[derive(Debug)]
-pub struct AsyncWPNetworking {
+pub struct AsyncWpNetworking {
     client: reqwest::Client,
 }
 
-impl Default for AsyncWPNetworking {
+impl Default for AsyncWpNetworking {
     fn default() -> Self {
         Self {
             client: reqwest::Client::new(),
@@ -179,7 +179,7 @@ impl Default for AsyncWPNetworking {
     }
 }
 
-impl AsyncWPNetworking {
+impl AsyncWpNetworking {
     pub async fn async_request(
         &self,
         wp_request: WpNetworkRequest,
