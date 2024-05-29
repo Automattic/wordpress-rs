@@ -15,23 +15,42 @@ extension SparsePlugin: Contextual {
     public typealias EditContext = PluginWithEditContext
     public typealias EmbedContext = PluginWithEmbedContext
 
-    public static func retrieveRequest(id: PluginSlug, using requestBuilder: any WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest {
+    public static func retrieveRequest(
+        id: PluginSlug,
+        using requestBuilder: any WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest {
         requestBuilder.plugins().retrieve(context: context, plugin: id)
     }
 
-    public static func listRequest(params: PluginListParams?, using requestBuilder: any WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest {
+    public static func listRequest(
+        params: PluginListParams?,
+        using requestBuilder: any WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest {
         requestBuilder.plugins().list(context: context, params: params)
     }
 
-    public static func updateRequest(id: PluginSlug, params: PluginUpdateParams, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+    public static func updateRequest(
+        id: PluginSlug,
+        params: PluginUpdateParams,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
         requestBuilder.plugins().update(plugin: id, params: params)
     }
 
-    public static func createRequest(params: PluginCreateParams, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+    public static func createRequest(
+        params: PluginCreateParams,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
         requestBuilder.plugins().create(params: params)
     }
 
-    public static func deleteRequest(id: PluginSlug, params: Void, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+    public static func deleteRequest(
+        id: PluginSlug,
+        params: Void,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
         requestBuilder.plugins().delete(plugin: id)
     }
 
@@ -100,4 +119,3 @@ extension ContextualNamespace where T == SparsePlugin {
         return try parseFilterRetrievePluginResponse(response: response)
     }
 }
-

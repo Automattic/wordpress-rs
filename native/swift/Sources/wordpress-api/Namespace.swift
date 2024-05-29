@@ -26,11 +26,30 @@ public protocol Contextual {
     associatedtype CreateParams
     associatedtype DeleteParams
 
-    static func retrieveRequest(id: ID, using requestBuilder: WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest
-    static func listRequest(params: ListParams, using requestBuilder: WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest
-    static func updateRequest(id: ID, params: UpdateParams, using requestBuilder: WpRequestBuilderProtocol) -> WpNetworkRequest
-    static func createRequest(params: CreateParams, using requestBuilder: WpRequestBuilderProtocol) -> WpNetworkRequest
-    static func deleteRequest(id: ID, params: DeleteParams, using requestBuilder: WpRequestBuilderProtocol) -> WpNetworkRequest
+    static func retrieveRequest(
+        id: ID,
+        using requestBuilder: WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest
+    static func listRequest(
+        params: ListParams,
+        using requestBuilder: WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest
+    static func updateRequest(
+        id: ID,
+        params: UpdateParams,
+        using requestBuilder: WpRequestBuilderProtocol
+    ) -> WpNetworkRequest
+    static func createRequest(
+        params: CreateParams,
+        using requestBuilder: WpRequestBuilderProtocol
+    ) -> WpNetworkRequest
+    static func deleteRequest(
+        id: ID,
+        params: DeleteParams,
+        using requestBuilder: WpRequestBuilderProtocol
+    ) -> WpNetworkRequest
 
     static func parseResponse(_ response: WpNetworkResponse) throws -> ViewContext
     static func parseResponse(_ response: WpNetworkResponse) throws -> EditContext
@@ -121,7 +140,7 @@ extension ContextualNamespace {
         return try parseResponse(response)
     }
 
-    public func list<U>() async throws -> [R] where T.ListParams == Optional<U> {
+    public func list<U>() async throws -> [R] where T.ListParams == U? {
         try await list(with: nil)
     }
 }

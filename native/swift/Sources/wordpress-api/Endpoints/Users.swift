@@ -9,23 +9,42 @@ extension SparseUser: Contextual {
     public typealias EditContext = UserWithEditContext
     public typealias EmbedContext = UserWithEmbedContext
 
-    public static func retrieveRequest(id: UserId, using requestBuilder: WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest {
+    public static func retrieveRequest(
+        id: UserId,
+        using requestBuilder: WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest {
         requestBuilder.users().retrieve(userId: id, context: context)
     }
 
-    public static func listRequest(params: UserListParams?, using requestBuilder: WpRequestBuilderProtocol, context: WpContext) -> WpNetworkRequest {
+    public static func listRequest(
+        params: UserListParams?,
+        using requestBuilder: WpRequestBuilderProtocol,
+        context: WpContext
+    ) -> WpNetworkRequest {
         requestBuilder.users().list(context: context, params: params)
     }
 
-    public static func updateRequest(id: UserId, params: UserUpdateParams, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+    public static func updateRequest(
+        id: UserId,
+        params: UserUpdateParams,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
         requestBuilder.users().update(userId: id, params: params)
     }
 
-    public static func createRequest(params: UserCreateParams, using requestBuilder: any WpRequestBuilderProtocol) -> WpNetworkRequest {
+    public static func createRequest(
+        params: UserCreateParams,
+        using requestBuilder: any WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
         requestBuilder.users().create(params: params)
     }
 
-    public static func deleteRequest(id: ID, params: UserDeleteParams, using requestBuilder: WpRequestBuilderProtocol) -> WpNetworkRequest {
+    public static func deleteRequest(
+        id: ID,
+        params: UserDeleteParams,
+        using requestBuilder: WpRequestBuilderProtocol
+    ) -> WpNetworkRequest {
         requestBuilder.users().delete(userId: id, params: params)
     }
 
