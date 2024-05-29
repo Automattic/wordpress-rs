@@ -8,7 +8,6 @@ use request::{
 };
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
-use url::Url;
 
 pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
 use login::*;
@@ -35,19 +34,21 @@ pub struct WpRequestBuilder {
 #[uniffi::export]
 impl WpRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Self {
-        let url = Url::parse(site_url.as_str()).unwrap();
-        // TODO: Handle the url parse error
-        let api_base_url = Arc::new(ApiBaseUrl::new(site_url.as_str()).unwrap());
+    pub fn new(site_url: String, authentication: WPAuthentication) -> Result<Self, WPApiError> {
+        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
+            .map_err(|err| WPApiError::SiteUrlParsingError {
+                reason: err.to_string(),
+            })?
+            .into();
         let request_builder = Arc::new(RequestBuilder {
             authentication: authentication.clone(),
         });
 
-        Self {
+        Ok(Self {
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
             plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
                 .into(),
-        }
+        })
     }
 
     pub fn users(&self) -> Arc<UsersRequestBuilder> {

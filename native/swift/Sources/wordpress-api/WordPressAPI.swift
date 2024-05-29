@@ -16,9 +16,10 @@ public struct WordPressAPI {
     private let urlSession: URLSession
     package let requestBuilder: WpRequestBuilderProtocol
 
-    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
+    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) throws {
         self.urlSession = urlSession
-        self.requestBuilder = WpRequestBuilder(siteUrl: baseUrl.absoluteString, authentication: authenticationStategy)
+        self.requestBuilder = try WpRequestBuilder(siteUrl: baseUrl.absoluteString,
+            authentication: authenticationStategy)
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
