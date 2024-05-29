@@ -134,6 +134,12 @@ mod tests {
     #[case(
         WpContext::Embed,
         generate!(PluginListParams, (status, Some(PluginStatus::Active))),
+        &[SparsePluginField::AuthorUri, SparsePluginField::RequiresWp],
+        "/plugins?context=embed&status=active&_fields=author_uri%2Crequires_wp"
+    )]
+    #[case(
+        WpContext::Embed,
+        generate!(PluginListParams, (status, Some(PluginStatus::Active))),
         &[SparsePluginField::Name, SparsePluginField::PluginUri],
         "/plugins?context=embed&status=active&_fields=name%2Cplugin_uri"
     )]

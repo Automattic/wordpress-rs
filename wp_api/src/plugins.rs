@@ -84,11 +84,15 @@ pub struct SparsePlugin {
     #[WpContext(edit, view)]
     pub author: Option<String>,
     #[WpContext(edit, view)]
+    pub author_uri: Option<String>,
+    #[WpContext(edit, view)]
     pub description: Option<PluginDescription>,
     #[WpContext(edit, view)]
     pub version: Option<String>,
     #[WpContext(edit, embed, view)]
     pub network_only: Option<bool>,
+    #[WpContext(edit, embed, view)]
+    pub requires_wp: Option<String>,
     #[WpContext(edit, embed, view)]
     pub requires_php: Option<String>,
     #[WpContext(edit, view)]
@@ -98,12 +102,14 @@ pub struct SparsePlugin {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum SparsePluginField {
     Author,
+    AuthorUri,
     Description,
     Name,
     NetworkOnly,
     Plugin,
     PluginUri,
     RequiresPhp,
+    RequiresWp,
     Status,
     Textdomain,
     Version,
@@ -113,12 +119,14 @@ impl SparseField for SparsePluginField {
     fn as_str(&self) -> &str {
         match self {
             Self::Author => "author",
+            Self::AuthorUri => "author_uri",
             Self::Description => "description",
             Self::Name => "name",
             Self::NetworkOnly => "network_only",
             Self::Plugin => "plugin",
             Self::PluginUri => "plugin_uri",
             Self::RequiresPhp => "requires_php",
+            Self::RequiresWp => "requires_wp",
             Self::Status => "status",
             Self::Textdomain => "textdomain",
             Self::Version => "version",
