@@ -3,7 +3,7 @@ use wp_api::{
     request::endpoint::WpEndpointUrl,
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
-        WpApiParamUsersOrderBy, WpApiParamUsersWho,
+        WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
     WpAuthentication, WpContext, WpRestErrorCode,
 };
@@ -165,6 +165,26 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
         .unwrap()
         .parse_with(wp_api::users::parse_list_users_response_with_view_context)
         .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
+}
+
+#[tokio::test]
+async fn list_users_has_published_posts_err_invalid_param() {
+    request_builder()
+        .users()
+        .list(
+            WpContext::Edit,
+            &Some(UserListParams {
+                has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
+                    "foo".to_string()
+                ])),
+                ..Default::default()
+            }),
+        )
+        .execute()
+        .await
+        .unwrap()
+        .parse_with(wp_api::users::parse_list_users_response_with_edit_context)
+        .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
 
 #[tokio::test]
