@@ -4,12 +4,12 @@ use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
     plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
-    RequestMethod, WPNetworkRequest, WPNetworkResponse,
+    RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
 
-pub use api_error::{WPApiError, WPRestError, WPRestErrorCode, WPRestErrorWrapper};
+pub use api_error::{WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper};
 use login::*;
 use plugins::*;
 use users::*;
@@ -34,9 +34,9 @@ pub struct WpRequestBuilder {
 #[uniffi::export]
 impl WpRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WPAuthentication) -> Result<Self, WPApiError> {
+    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
-            .map_err(|err| WPApiError::SiteUrlParsingError {
+            .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
             })?
             .into();
@@ -64,18 +64,18 @@ impl WpRequestBuilder {
 fn wp_authentication_from_username_and_password(
     username: String,
     password: String,
-) -> WPAuthentication {
-    WPAuthentication::from_username_and_password(username, password)
+) -> WpAuthentication {
+    WpAuthentication::from_username_and_password(username, password)
 }
 
 #[derive(Debug)]
 struct RequestBuilder {
-    authentication: WPAuthentication,
+    authentication: WpAuthentication,
 }
 
 impl RequestBuilder {
-    fn get(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
-        WPNetworkRequest {
+    fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+        WpNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
             header_map: self.header_map(),
@@ -83,11 +83,11 @@ impl RequestBuilder {
         }
     }
 
-    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WPNetworkRequest
+    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
     {
-        WPNetworkRequest {
+        WpNetworkRequest {
             method: RequestMethod::POST,
             url: url.into(),
             header_map: self.header_map_for_post_request(),
@@ -95,8 +95,8 @@ impl RequestBuilder {
         }
     }
 
-    fn delete(&self, url: ApiEndpointUrl) -> WPNetworkRequest {
-        WPNetworkRequest {
+    fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+        WpNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
             header_map: self.header_map(),
@@ -111,8 +111,8 @@ impl RequestBuilder {
             CONTENT_TYPE_JSON.to_string(),
         );
         match self.authentication {
-            WPAuthentication::None => None,
-            WPAuthentication::AuthorizationHeader { ref token } => {
+            WpAuthentication::None => None,
+            WpAuthentication::AuthorizationHeader { ref token } => {
                 header_map.insert("Authorization".to_string(), format!("Basic {}", token))
             }
         };
@@ -130,14 +130,14 @@ impl RequestBuilder {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum WPContext {
+pub enum WpContext {
     Edit,
     Embed,
     #[default]
     View,
 }
 
-impl WPContext {
+impl WpContext {
     fn as_str(&self) -> &str {
         match self {
             Self::Edit => "edit",
@@ -148,28 +148,28 @@ impl WPContext {
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]
-pub enum WPAuthentication {
+pub enum WpAuthentication {
     AuthorizationHeader { token: String },
     None,
 }
 
-impl WPAuthentication {
+impl WpAuthentication {
     pub fn from_username_and_password(username: String, password: String) -> Self {
         use base64::prelude::*;
-        WPAuthentication::AuthorizationHeader {
+        WpAuthentication::AuthorizationHeader {
             token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
         }
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum WPApiParamOrder {
+pub enum WpApiParamOrder {
     #[default]
     Asc,
     Desc,
 }
 
-impl WPApiParamOrder {
+impl WpApiParamOrder {
     fn as_str(&self) -> &str {
         match self {
             Self::Asc => "asc",
@@ -179,9 +179,9 @@ impl WPApiParamOrder {
 }
 
 #[uniffi::export]
-pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDetails, WPApiError> {
+pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WpApiDetails, WpApiError> {
     let api_details =
-        serde_json::from_slice(&response.body).map_err(|err| WPApiError::ParsingError {
+        serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
             reason: err.to_string(),
             response: response.body_as_string(),
         })?;
@@ -189,9 +189,8 @@ pub fn parse_api_details_response(response: WPNetworkResponse) -> Result<WPAPIDe
     Ok(api_details)
 }
 
-// TODO: Figure out why we can't expose this method on `WPNetworkResponse` via UniFFI
 #[uniffi::export]
-pub fn get_link_header(response: &WPNetworkResponse, name: &str) -> Option<WPRestAPIURL> {
+pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WpRestApiUrl> {
     if let Some(url) = response.get_link_header(name) {
         return Some(url.into());
     }

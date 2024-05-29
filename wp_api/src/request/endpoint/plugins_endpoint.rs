@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use url::Url;
 
-use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WPContext};
+use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WpContext};
 
 use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
@@ -24,7 +24,7 @@ impl PluginsEndpoint {
         self.plugins_url_with_slug(plugin).into()
     }
 
-    pub fn list(&self, context: WPContext, params: Option<&PluginListParams>) -> ApiEndpointUrl {
+    pub fn list(&self, context: WpContext, params: Option<&PluginListParams>) -> ApiEndpointUrl {
         let mut url = self.plugins_base_url();
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
@@ -36,7 +36,7 @@ impl PluginsEndpoint {
 
     pub fn filter_list(
         &self,
-        context: WPContext,
+        context: WpContext,
         params: Option<&PluginListParams>,
         fields: &[SparsePluginField],
     ) -> ApiEndpointUrl {
@@ -46,7 +46,7 @@ impl PluginsEndpoint {
             .into()
     }
 
-    pub fn retrieve(&self, context: WPContext, plugin: &PluginSlug) -> ApiEndpointUrl {
+    pub fn retrieve(&self, context: WpContext, plugin: &PluginSlug) -> ApiEndpointUrl {
         let mut url = self.plugins_url_with_slug(plugin);
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
@@ -55,7 +55,7 @@ impl PluginsEndpoint {
 
     pub fn filter_retrieve(
         &self,
-        context: WPContext,
+        context: WpContext,
         plugin: &PluginSlug,
         fields: &[SparsePluginField],
     ) -> ApiEndpointUrl {
@@ -112,12 +112,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case(WPContext::Edit, generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=edit&search=foo")]
-    #[case(WPContext::Embed, generate!(PluginListParams, (status, Some(PluginStatus::Active))), "/plugins?context=embed&status=active")]
-    #[case(WPContext::View, generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "/plugins?context=view&search=foo&status=inactive")]
+    #[case(WpContext::Edit, generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=edit&search=foo")]
+    #[case(WpContext::Embed, generate!(PluginListParams, (status, Some(PluginStatus::Active))), "/plugins?context=embed&status=active")]
+    #[case(WpContext::View, generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "/plugins?context=view&search=foo&status=inactive")]
     fn list_plugins_with_params(
         plugins_endpoint: PluginsEndpoint,
-        #[case] context: WPContext,
+        #[case] context: WpContext,
         #[case] params: PluginListParams,
         #[case] expected_path: &str,
     ) {
@@ -126,26 +126,26 @@ mod tests {
 
     #[rstest]
     #[case(
-        WPContext::Edit,
+        WpContext::Edit,
         generate!(PluginListParams, (search, Some("foo".to_string()))),
         &[SparsePluginField::Author],
         "/plugins?context=edit&search=foo&_fields=author"
     )]
     #[case(
-        WPContext::Embed,
+        WpContext::Embed,
         generate!(PluginListParams, (status, Some(PluginStatus::Active))),
         &[SparsePluginField::Name, SparsePluginField::PluginUri],
         "/plugins?context=embed&status=active&_fields=name%2Cplugin_uri"
     )]
     #[case(
-        WPContext::View,
+        WpContext::View,
         generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), 
         &[SparsePluginField::NetworkOnly, SparsePluginField::RequiresPhp, SparsePluginField::Textdomain],
         "/plugins?context=view&search=foo&status=inactive&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
     fn filter_list_plugins_with_params(
         plugins_endpoint: PluginsEndpoint,
-        #[case] context: WPContext,
+        #[case] context: WpContext,
         #[case] params: PluginListParams,
         #[case] fields: &[SparsePluginField],
         #[case] expected_path: &str,
@@ -159,24 +159,24 @@ mod tests {
     #[rstest]
     #[case(
         "hello-dolly/hello".into(),
-        WPContext::View,
+        WpContext::View,
         "/plugins/hello-dolly/hello?context=view"
     )]
     #[case(
         "classic-editor/classic-editor".into(),
-        WPContext::Embed,
+        WpContext::Embed,
         "/plugins/classic-editor/classic-editor?context=embed"
     )]
-    #[case("foo/bar%baz".into(), WPContext::Edit, "/plugins/foo/bar%25baz?context=edit")]
+    #[case("foo/bar%baz".into(), WpContext::Edit, "/plugins/foo/bar%25baz?context=edit")]
     #[case(
         "foo/です".into(),
-        WPContext::View,
+        WpContext::View,
         "/plugins/foo/%E3%81%A7%E3%81%99?context=view"
     )]
     fn retrieve_plugin(
         plugins_endpoint: PluginsEndpoint,
         #[case] plugin_slug: PluginSlug,
-        #[case] context: WPContext,
+        #[case] context: WpContext,
         #[case] expected_path: &str,
     ) {
         validate_endpoint(
@@ -188,32 +188,32 @@ mod tests {
     #[rstest]
     #[case(
         "hello-dolly/hello".into(),
-        WPContext::View,
+        WpContext::View,
         &[SparsePluginField::Name],
         "/plugins/hello-dolly/hello?context=view&_fields=name"
     )]
     #[case(
         "classic-editor/classic-editor".into(),
-        WPContext::Embed,
+        WpContext::Embed,
         &[SparsePluginField::Description, SparsePluginField::Plugin],
         "/plugins/classic-editor/classic-editor?context=embed&_fields=description%2Cplugin"
     )]
     #[case(
         "foo/bar%baz".into(),
-        WPContext::Edit,
+        WpContext::Edit,
         &[SparsePluginField::Status, SparsePluginField::Version],
         "/plugins/foo/bar%25baz?context=edit&_fields=status%2Cversion"
     )]
     #[case(
         "foo/です".into(),
-        WPContext::View,
+        WpContext::View,
         &[SparsePluginField::NetworkOnly, SparsePluginField::RequiresPhp, SparsePluginField::Textdomain],
         "/plugins/foo/%E3%81%A7%E3%81%99?context=view&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
     fn filter_retrieve_plugin(
         plugins_endpoint: PluginsEndpoint,
         #[case] plugin_slug: PluginSlug,
-        #[case] context: WPContext,
+        #[case] context: WpContext,
         #[case] fields: &[SparsePluginField],
         #[case] expected_path: &str,
     ) {

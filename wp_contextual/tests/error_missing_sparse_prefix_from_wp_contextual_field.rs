@@ -1,11 +1,11 @@
-// If a field is marked with `#[WPContextualField]` it needs to be a Sparse type
+// If a field is marked with `#[WpContextualField]` it needs to be a Sparse type
 
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
-#[derive(WPContextual)]
+#[derive(WpContextual)]
 pub struct SparseFoo {
-    #[WPContext(edit)]
-    #[WPContextualField]
+    #[WpContext(edit)]
+    #[WpContextualField]
     bar: Option<Bar>,
 }
 

@@ -1,11 +1,11 @@
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
 mod wp_contextual_field_with_multiple_segments_helper;
 
-#[derive(WPContextual)]
+#[derive(WpContextual)]
 pub struct SparseFoo {
-    #[WPContext(edit)]
-    #[WPContextualField]
+    #[WpContext(edit)]
+    #[WpContextualField]
     pub bar: Option<wp_contextual_field_with_multiple_segments_helper::SparseBar>,
 }
 

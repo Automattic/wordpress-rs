@@ -1,4 +1,4 @@
-error: WPContextualField field types need to start with 'Sparse' prefix
+error: WpContextualField field types need to start with 'Sparse' prefix
  --> tests/error_missing_sparse_prefix_from_wp_contextual_field.rs:9:17
   |
 9 |     bar: Option<Bar>,

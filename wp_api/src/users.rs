@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use wp_contextual::WPContextual;
+use wp_contextual::WpContextual;
 
 use crate::{
-    add_uniffi_exported_parser, SparseField, WPApiError, WPApiParamOrder, WPNetworkResponse,
+    add_uniffi_exported_parser, SparseField, WpApiError, WpApiParamOrder, WpNetworkResponse,
 };
 
 add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
@@ -36,7 +36,7 @@ add_uniffi_exported_parser!(
 add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum WPApiParamUsersOrderBy {
+pub enum WpApiParamUsersOrderBy {
     Id,
     Include,
     #[default]
@@ -48,7 +48,7 @@ pub enum WPApiParamUsersOrderBy {
     Url,
 }
 
-impl WPApiParamUsersOrderBy {
+impl WpApiParamUsersOrderBy {
     fn as_str(&self) -> &str {
         match self {
             Self::Id => "id",
@@ -64,13 +64,13 @@ impl WPApiParamUsersOrderBy {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum WPApiParamUsersWho {
+pub enum WpApiParamUsersWho {
     #[default]
     All,
     Authors,
 }
 
-impl WPApiParamUsersWho {
+impl WpApiParamUsersWho {
     // The only valid value for this parameter is "authors"
     fn as_str(&self) -> Option<&str> {
         match self {
@@ -99,11 +99,11 @@ pub struct UserListParams {
     /// Order sort attribute ascending or descending.
     /// Default: `asc`
     /// One of: `asc`, `desc`
-    pub order: Option<WPApiParamOrder>,
+    pub order: Option<WpApiParamOrder>,
     /// Sort collection by user attribute.
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
-    pub orderby: Option<WPApiParamUsersOrderBy>,
+    pub orderby: Option<WpApiParamUsersOrderBy>,
     /// Limit result set to users with one or more specific slugs.
     pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
@@ -112,7 +112,7 @@ pub struct UserListParams {
     pub capabilities: Vec<String>,
     /// Limit result set to users who are considered authors.
     /// One of: `authors`
-    pub who: Option<WPApiParamUsersWho>,
+    pub who: Option<WpApiParamUsersWho>,
     /// Limit result set to users who have published posts.
     pub has_published_posts: Option<bool>,
 }
@@ -324,44 +324,44 @@ impl std::fmt::Display for UserId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WPContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseUser {
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub id: Option<UserId>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub username: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub name: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub first_name: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub last_name: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub email: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub url: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub description: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub link: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub locale: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub nickname: Option<String>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub registered_date: Option<String>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub roles: Option<Vec<String>>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub capabilities: Option<HashMap<String, bool>>,
-    #[WPContext(edit)]
+    #[WpContext(edit)]
     pub extra_capabilities: Option<HashMap<String, bool>>,
-    #[WPContext(edit, embed, view)]
+    #[WpContext(edit, embed, view)]
     // According to our tests, `avatar_urls` is not available for all site types. It's marked with
-    // `#[WPContextualOption]` which will make it an `Option` in the generated contextual types.
-    #[WPContextualOption]
+    // `#[WpContextual]` which will make it an `Option` in the generated contextual types.
+    #[WpContextualOption]
     pub avatar_urls: Option<HashMap<String, String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
@@ -424,15 +424,15 @@ mod tests {
     #[case(generate!(UserListParams, (exclude, vec![UserId(1), UserId(2)])), &[("exclude", "1,2")])]
     #[case(generate!(UserListParams, (include, vec![UserId(1)])), &[("include", "1")])]
     #[case(generate!(UserListParams, (per_page, Some(100)), (offset, Some(20))), &[("per_page", "100"), ("offset", "20")])]
-    #[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Asc))), &[("order", "asc")])]
-    #[case(generate!(UserListParams, (orderby, Some(WPApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
-    #[case(generate!(UserListParams, (order, Some(WPApiParamOrder::Desc)), (orderby, Some(WPApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
+    #[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Asc))), &[("order", "asc")])]
+    #[case(generate!(UserListParams, (orderby, Some(WpApiParamUsersOrderBy::Id))), &[("orderby", "id")])]
+    #[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Desc)), (orderby, Some(WpApiParamUsersOrderBy::Email))), &[("order", "desc"), ("orderby", "email")])]
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), &[("slug", "foo,bar")])]
     #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), &[("roles", "author,editor")])]
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), &[("slug", "foo,bar"), ("roles", "author,editor")])]
     #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), &[("capabilities", "edit_themes,delete_pages")])]
-    #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WPApiParamUsersWho::All))), &[])]
-    #[case(generate!(UserListParams, (who, Some(WPApiParamUsersWho::Authors))), &[("who", "authors")])]
+    #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))), &[])]
+    #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), &[("who", "authors")])]
     #[case(generate!(UserListParams, (has_published_posts, Some(true))), &[("has_published_posts", "true")])]
     #[trace]
     fn test_user_list_params(

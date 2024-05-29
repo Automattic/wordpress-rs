@@ -11,14 +11,14 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let original_ident_name = original_ident.to_string();
 
     let ident_name_without_prefix = original_ident_name.strip_prefix(IDENT_PREFIX).ok_or(
-        WPContextualParseError::WPContextualMissingSparsePrefix
+        WpContextualParseError::WpContextualMissingSparsePrefix
             .into_syn_error(original_ident.span()),
     )?;
     let fields =
         struct_fields(&ast.data).map_err(|err| err.into_syn_error(original_ident.span()))?;
     let parsed_fields = parse_fields(fields)?;
 
-    let contextual_token_streams = WPContextAttr::iter().map(|current_context| {
+    let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
         let cname = ident_name_for_context(ident_name_without_prefix, current_context);
         let cident = Ident::new(&cname, original_ident.span());
         let cfields = generate_context_fields(&parsed_fields, current_context)?;
@@ -39,7 +39,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
         .map(TokenStream::from_iter)
         .and_then(|t: TokenStream| {
             if t.is_empty() {
-                Err(WPContextualParseError::EmptyResult.into_syn_error(original_ident.span()))
+                Err(WpContextualParseError::EmptyResult.into_syn_error(original_ident.span()))
             } else {
                 Ok(t)
             }
@@ -49,7 +49,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
 // Validate that the given `data` is a `syn::Data::Struct` and extracts the fields from it
 fn struct_fields(
     data: &syn::Data,
-) -> Result<&syn::punctuated::Punctuated<syn::Field, syn::token::Comma>, WPContextualParseError> {
+) -> Result<&syn::punctuated::Punctuated<syn::Field, syn::token::Comma>, WpContextualParseError> {
     if let syn::Data::Struct(syn::DataStruct {
         fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
         ..
@@ -57,30 +57,30 @@ fn struct_fields(
     {
         Ok(named)
     } else {
-        Err(WPContextualParseError::WPContextualNotAStruct)
+        Err(WpContextualParseError::WpContextualNotAStruct)
     }
 }
 
-// Turns a list of `syn::Field`s to a list of `WPParsedField`s by parsing its attributes.
+// Turns a list of `syn::Field`s to a list of `WpParsedField`s by parsing its attributes.
 //
 // The following errors are directly handled by this function:
-// * `WPContextualParseAttrError::UnexpectedAttrPathSegmentCount`: The attribute path has multiple
+// * `WpContextualParseAttrError::UnexpectedAttrPathSegmentCount`: The attribute path has multiple
 // segments, separated by `::`. This case doesn't seem to be a valid syntax regardless of how
 // we handle it, but it's handled as an error just in case.
-// * `WPContextualParseAttrError::MissingWPContextMeta`: #[WPContext] attribute doesn't have any
+// * `WpContextualParseAttrError::MissingWpContextMeta`: #[WpContext] attribute doesn't have any
 // contexts.
-// * `WPContextualParseError::WPContextualFieldWithoutWPContext`: #[WPContextualField] is added to
-// a field that doesn't have the #[WPContext] attribute.
-// * `WPContextualParseError::WPContextualOptionWithoutWPContext`: #[WPContextualOption] is added to
-// a field that doesn't have the #[WPContext] attribute.
-// * `WPContextualParseError::WPContextualBothOptionAndField`: #[WPContextualField] and
-// #[WPContextualOption] attributes were used together.
+// * `WpContextualParseError::WpContextualFieldWithoutWpContext`: #[WpContextualField] is added to
+// a field that doesn't have the #[WpContext] attribute.
+// * `WpContextualParseError::WpContextualOptionWithoutWpContext`: #[WpContextualOption] is added to
+// a field that doesn't have the #[WpContext] attribute.
+// * `WpContextualParseError::WpContextualBothOptionAndField`: #[WpContextualField] and
+// #[WpContextualOption] attributes were used together.
 //
-// It'll also handle incorrectly formatted #[WPContext] attribute through
+// It'll also handle incorrectly formatted #[WpContext] attribute through
 // `parse_contexts_from_tokens` helper.
 fn parse_fields(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
-) -> Result<Vec<WPParsedField>, syn::Error> {
+) -> Result<Vec<WpParsedField>, syn::Error> {
     let parsed_fields = fields
         .iter()
         .map(|f| {
@@ -89,7 +89,7 @@ fn parse_fields(
                 .iter()
                 .map(|attr| {
                     if attr.path().segments.len() != 1 {
-                        return Err(WPContextualParseAttrError::UnexpectedAttrPathSegmentCount
+                        return Err(WpContextualParseAttrError::UnexpectedAttrPathSegmentCount
                             .into_syn_error(attr.path().span()));
                     }
                     let path_segment = attr
@@ -99,39 +99,39 @@ fn parse_fields(
                         .expect("Already validated that there is only one segment");
                     let segment_ident = &path_segment.ident;
                     if is_wp_contextual_field_ident(segment_ident) {
-                        return Ok(WPParsedAttr::ParsedWPContextualField);
+                        return Ok(WpParsedAttr::ParsedWpContextualField);
                     }
                     if is_wp_contextual_option_ident(segment_ident) {
-                        return Ok(WPParsedAttr::ParsedWPContextualOption);
+                        return Ok(WpParsedAttr::ParsedWpContextualOption);
                     }
                     if is_wp_context_ident(segment_ident) {
                         if let syn::Meta::List(meta_list) = &attr.meta {
                             let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
-                            Ok(WPParsedAttr::ParsedWPContext { contexts })
+                            Ok(WpParsedAttr::ParsedWpContext { contexts })
                         } else {
-                            Err(WPContextualParseAttrError::MissingWPContextMeta
+                            Err(WpContextualParseAttrError::MissingWpContextMeta
                                 .into_syn_error(attr.meta.span()))
                         }
                     } else {
-                        Ok(WPParsedAttr::ExternalAttr { attr: attr.clone() })
+                        Ok(WpParsedAttr::ExternalAttr { attr: attr.clone() })
                     }
                 })
-                .collect::<Result<Vec<WPParsedAttr>, syn::Error>>()?;
-            Ok(WPParsedField {
+                .collect::<Result<Vec<WpParsedAttr>, syn::Error>>()?;
+            Ok(WpParsedField {
                 field: f.clone(),
                 parsed_attrs,
             })
         })
-        .collect::<Result<Vec<WPParsedField>, syn::Error>>()?;
+        .collect::<Result<Vec<WpParsedField>, syn::Error>>()?;
 
     let assert_has_wp_context_attribute_if_it_has_given_attribute =
-        |attribute_to_check: WPParsedAttr, error_type: WPContextualParseError| {
+        |attribute_to_check: WpParsedAttr, error_type: WpContextualParseError| {
             if let Some(pf) = parsed_fields
                 .iter()
                 .filter(|pf| pf.parsed_attrs.contains(&attribute_to_check))
                 .find(|pf| {
                     !pf.parsed_attrs.iter().any(|pf| match pf {
-                        WPParsedAttr::ParsedWPContext { contexts } => !contexts.is_empty(),
+                        WpParsedAttr::ParsedWpContext { contexts } => !contexts.is_empty(),
                         _ => false,
                     })
                 })
@@ -142,33 +142,33 @@ fn parse_fields(
             }
         };
 
-    // Check if there are any fields that has #[WPContextualField] attribute,
-    // but not the #[WPContext] attribute
+    // Check if there are any fields that has #[WpContextualField] attribute,
+    // but not the #[WpContext] attribute
     assert_has_wp_context_attribute_if_it_has_given_attribute(
-        WPParsedAttr::ParsedWPContextualField,
-        WPContextualParseError::WPContextualFieldWithoutWPContext,
+        WpParsedAttr::ParsedWpContextualField,
+        WpContextualParseError::WpContextualFieldWithoutWpContext,
     )?;
 
-    // Check if there are any fields that has #[WPContextualField] attribute,
-    // but not the #[WPContext] attribute
+    // Check if there are any fields that has #[WpContextualField] attribute,
+    // but not the #[WpContext] attribute
     assert_has_wp_context_attribute_if_it_has_given_attribute(
-        WPParsedAttr::ParsedWPContextualOption,
-        WPContextualParseError::WPContextualOptionWithoutWPContext,
+        WpParsedAttr::ParsedWpContextualOption,
+        WpContextualParseError::WpContextualOptionWithoutWpContext,
     )?;
 
-    // Check if there are any fields that has both #[WPContextualField] & #[WPContextualOption]
+    // Check if there are any fields that has both #[WpContextualField] & #[WpContextualOption]
     // attributes and return an error. These attributes are incompatible with each other because
-    // #[WPContextualOption] will leave the type as is, whereas #[WPContextualField] will modify
+    // #[WpContextualOption] will leave the type as is, whereas #[WpContextualField] will modify
     // it.
     if let Some(pf) = parsed_fields.iter().find(|pf| {
         pf.parsed_attrs
-            .contains(&WPParsedAttr::ParsedWPContextualField)
+            .contains(&WpParsedAttr::ParsedWpContextualField)
             && pf
                 .parsed_attrs
-                .contains(&WPParsedAttr::ParsedWPContextualOption)
+                .contains(&WpParsedAttr::ParsedWpContextualOption)
     }) {
         return Err(
-            WPContextualParseError::WPContextualBothOptionAndField.into_syn_error(pf.field.span())
+            WpContextualParseError::WpContextualBothOptionAndField.into_syn_error(pf.field.span())
         );
     }
 
@@ -178,17 +178,17 @@ fn parse_fields(
 // Generates fields for the given context.
 //
 // It'll filter out any fields that don't have the given context, handle any mappings due to
-// #[WPContextualField] attribute and remove #[WPContext] and #[WPContextualField] attributes.
+// #[WpContextualField] attribute and remove #[WpContext] and #[WpContextualField] attributes.
 fn generate_context_fields(
-    parsed_fields_attrs: &[WPParsedField],
-    context: &WPContextAttr,
+    parsed_fields_attrs: &[WpParsedField],
+    context: &WpContextAttr,
 ) -> Result<Vec<syn::Field>, syn::Error> {
     parsed_fields_attrs
         .iter()
         .filter(|pf| {
             // Filter out any field that doesn't have this context
             pf.parsed_attrs.iter().any(|parsed_attr| {
-                if let WPParsedAttr::ParsedWPContext { contexts } = parsed_attr {
+                if let WpParsedAttr::ParsedWpContext { contexts } = parsed_attr {
                     contexts.iter().any(|c| c == context)
                 } else {
                     false
@@ -200,7 +200,7 @@ fn generate_context_fields(
 
             let new_type = if pf
                 .parsed_attrs
-                .contains(&WPParsedAttr::ParsedWPContextualOption)
+                .contains(&WpParsedAttr::ParsedWpContextualOption)
             {
                 f.ty.clone()
             } else {
@@ -211,19 +211,19 @@ fn generate_context_fields(
                         .iter()
                         .any(|s| is_wp_contextual_field_ident(&s.ident))
                 }) {
-                    // If the field has #[WPContextualField] attr, map it to its contextual field type
+                    // If the field has #[WpContextualField] attr, map it to its contextual field type
                     new_type = contextual_field_type(&new_type, context)?;
                 }
                 new_type
             };
             Ok::<syn::Field, syn::Error>(syn::Field {
-                // Remove the WPContext & WPContextualField attributes from the generated field
+                // Remove the WpContext & WpContextualField attributes from the generated field
                 attrs: pf
                     .parsed_attrs
                     .iter()
                     .filter_map(|parsed_attr| {
                         // The generated field should only contain external attributes
-                        if let WPParsedAttr::ExternalAttr { attr } = parsed_attr {
+                        if let WpParsedAttr::ExternalAttr { attr } = parsed_attr {
                             Some(attr.to_owned())
                         } else {
                             None
@@ -243,16 +243,16 @@ fn generate_context_fields(
 // Returns a contextual type for the given type.
 //
 // ```
-// #[derive(WPContextual)]
+// #[derive(WpContextual)]
 // pub struct SparseFoo {
-//     #[WPContext(edit)]
-//     #[WPContextualField]
+//     #[WpContext(edit)]
+//     #[WpContextualField]
 //     pub bar: Option<SparseBar>,
 // }
 //
-// #[WPContextual]
+// #[WpContextual]
 // pub struct SparseBar {
-//     #[WPContext(edit)]
+//     #[WpContext(edit)]
 //     pub baz: Option<u32>,
 // }
 // ```
@@ -269,15 +269,15 @@ fn generate_context_fields(
 // }
 // ```
 //
-// In this case, this function takes the `Option<SparseBar>` type and `&WPContextAttr::Edit`
+// In this case, this function takes the `Option<SparseBar>` type and `&WpContextAttr::Edit`
 // and turns it into `BarWithEditContext` type.
-fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn::Type, syn::Error> {
+fn contextual_field_type(ty: &syn::Type, context: &WpContextAttr) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
     let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
     let ident_name_without_prefix = match inner_segment.ident.to_string().strip_prefix(IDENT_PREFIX)
     {
         Some(ident) => Ok(ident.to_string()),
-        None => Err(WPContextualParseError::WPContextualFieldMissingSparsePrefix
+        None => Err(WpContextualParseError::WpContextualFieldMissingSparsePrefix
             .into_syn_error(inner_segment.ident.span())),
     }?;
     inner_segment.ident = Ident::new(
@@ -287,11 +287,11 @@ fn contextual_field_type(ty: &syn::Type, context: &WPContextAttr) -> Result<syn:
     Ok(ty)
 }
 
-// This is a recursive function that finds the inner path segment of a #[WPContextualField].
+// This is a recursive function that finds the inner path segment of a #[WpContextualField].
 //
-// There are many cases that are not supported by #[WPContextualField] mainly because these cases
+// There are many cases that are not supported by #[WpContextualField] mainly because these cases
 // are also not supported by UniFFI and/or serde. For example, we can't use tuples, references,
-// functions etc as a #[WPContextualField], but we also wouldn't expect to.
+// functions etc as a #[WpContextualField], but we also wouldn't expect to.
 //
 // The main cases we need to handle are Option<SparseFoo> and Option<Vec<SparseFoo>> types where
 // the API is either returning a single object or a list of objects.
@@ -307,7 +307,7 @@ fn find_contextual_field_inner_segment(
     ty: &mut syn::Type,
 ) -> Result<&mut syn::PathSegment, syn::Error> {
     let unsupported_err =
-        WPContextualParseError::WPContextualFieldTypeNotSupported.into_syn_error(ty.span());
+        WpContextualParseError::WpContextualFieldTypeNotSupported.into_syn_error(ty.span());
     if let syn::Type::Path(ref mut p) = ty {
         // A `syn::Type::Path` has to have at least one segment.
         assert!(!p.path.segments.is_empty());
@@ -316,13 +316,13 @@ fn find_contextual_field_inner_segment(
         //
         // Consider the following:
         // ```
-        // #[derive(WPContextual)]
+        // #[derive(WpContextual)]
         // pub struct SparseFoo {
-        //     #[WPContext(edit)]
-        //     #[WPContextualField]
+        //     #[WpContext(edit)]
+        //     #[WpContextualField]
         //     pub bar: Option<SparseBar>,
-        //     #[WPContext(view)]
-        //     #[WPContextualField]
+        //     #[WpContext(view)]
+        //     #[WpContextualField]
         //     pub baz: Option<baz::SparseBaz>,
         // }
         // ```
@@ -346,10 +346,10 @@ fn find_contextual_field_inner_segment(
             // No inner type
             //
             // ```
-            // #[derive(WPContextual)]
+            // #[derive(WpContextual)]
             // pub struct SparseFoo {
-            //     #[WPContext(edit)]
-            //     #[WPContextualField]
+            //     #[WpContext(edit)]
+            //     #[WpContextualField]
             //     pub bar: Option<SparseBar>,
             // }
             // ```
@@ -357,13 +357,13 @@ fn find_contextual_field_inner_segment(
             // Type is surrounded with angled brackets
             //
             // ```
-            // #[derive(WPContextual)]
+            // #[derive(WpContextual)]
             // pub struct SparseFoo {
-            //     #[WPContext(edit)]
-            //     #[WPContextualField]
+            //     #[WpContext(edit)]
+            //     #[WpContextualField]
             //     pub bar: Option<Vec<SparseBar>>,
-            //     #[WPContext(view)]
-            //     #[WPContextualField]
+            //     #[WpContext(view)]
+            //     #[WpContextualField]
             //     pub baz: Option<Vec<Vec<SparseBaz>>>,
             // }
             // ```
@@ -416,40 +416,40 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
     None
 }
 
-fn ident_name_for_context(ident_name_without_prefix: &str, context: &WPContextAttr) -> String {
+fn ident_name_for_context(ident_name_without_prefix: &str, context: &WpContextAttr) -> String {
     format!("{}With{}Context", ident_name_without_prefix, context)
 }
 
 fn is_wp_context_ident(ident: &Ident) -> bool {
-    ident.to_string().eq("WPContext")
+    ident.to_string().eq("WpContext")
 }
 
 fn is_wp_contextual_field_ident(ident: &Ident) -> bool {
-    ident.to_string().eq("WPContextualField")
+    ident.to_string().eq("WpContextualField")
 }
 
 fn is_wp_contextual_option_ident(ident: &Ident) -> bool {
-    ident.to_string().eq("WPContextualOption")
+    ident.to_string().eq("WpContextualOption")
 }
 
 // ```
-// #[WPContextual]
+// #[WpContextual]
 // pub struct SparseFoo {
-//     #[WPContext(edit, embed)]
+//     #[WpContext(edit, embed)]
 //     pub bar: Option<u32>,
 // }
 // ```
 //
 // In this example, given the `TokenStream` for `edit, embed`, turns it into
-// vec![WPContextAttr::Edit, WPContextAttr::Embed].
+// vec![WpContextAttr::Edit, WpContextAttr::Embed].
 fn parse_contexts_from_tokens(
     tokens: proc_macro2::TokenStream,
-) -> Result<Vec<WPContextAttr>, syn::Error> {
+) -> Result<Vec<WpContextAttr>, syn::Error> {
     tokens
         .into_iter()
         .filter_map(|t| match t {
             proc_macro2::TokenTree::Ident(ident) => Some(
-                WPContextAttr::from_str(&ident.to_string())
+                WpContextAttr::from_str(&ident.to_string())
                     .map_err(|error_type| error_type.into_syn_error(ident.span())),
             ),
             proc_macro2::TokenTree::Punct(p) => {
@@ -457,53 +457,53 @@ fn parse_contexts_from_tokens(
                     None
                 } else {
                     Some(Err(
-                        WPContextualParseAttrError::UnexpectedPunct.into_syn_error(p.span())
+                        WpContextualParseAttrError::UnexpectedPunct.into_syn_error(p.span())
                     ))
                 }
             }
             proc_macro2::TokenTree::Group(g) => Some(Err(
-                WPContextualParseAttrError::UnexpectedToken.into_syn_error(g.span()),
+                WpContextualParseAttrError::UnexpectedToken.into_syn_error(g.span()),
             )),
             proc_macro2::TokenTree::Literal(l) => Some(Err(
-                WPContextualParseAttrError::UnexpectedLiteralToken.into_syn_error(l.span()),
+                WpContextualParseAttrError::UnexpectedLiteralToken.into_syn_error(l.span()),
             )),
         })
-        .collect::<Result<Vec<WPContextAttr>, syn::Error>>()
+        .collect::<Result<Vec<WpContextAttr>, syn::Error>>()
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct WPParsedField {
+struct WpParsedField {
     field: syn::Field,
-    parsed_attrs: Vec<WPParsedAttr>,
+    parsed_attrs: Vec<WpParsedAttr>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum WPParsedAttr {
-    ParsedWPContextualField,
-    ParsedWPContextualOption,
-    ParsedWPContext { contexts: Vec<WPContextAttr> },
+enum WpParsedAttr {
+    ParsedWpContextualField,
+    ParsedWpContextualOption,
+    ParsedWpContext { contexts: Vec<WpContextAttr> },
     ExternalAttr { attr: syn::Attribute },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum WPContextAttr {
+enum WpContextAttr {
     Edit,
     Embed,
     View,
 }
 
-impl WPContextAttr {
-    pub fn iter() -> Iter<'static, WPContextAttr> {
+impl WpContextAttr {
+    pub fn iter() -> Iter<'static, WpContextAttr> {
         [
-            WPContextAttr::Edit,
-            WPContextAttr::Embed,
-            WPContextAttr::View,
+            WpContextAttr::Edit,
+            WpContextAttr::Embed,
+            WpContextAttr::View,
         ]
         .iter()
     }
 }
 
-impl Display for WPContextAttr {
+impl Display for WpContextAttr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -517,15 +517,15 @@ impl Display for WPContextAttr {
     }
 }
 
-impl FromStr for WPContextAttr {
-    type Err = WPContextualParseAttrError;
+impl FromStr for WpContextAttr {
+    type Err = WpContextualParseAttrError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
             "edit" => Ok(Self::Edit),
             "embed" => Ok(Self::Embed),
             "view" => Ok(Self::View),
-            _ => Err(WPContextualParseAttrError::UnexpectedWPContextIdent {
+            _ => Err(WpContextualParseAttrError::UnexpectedWpContextIdent {
                 input: input.to_string(),
             }),
         }
@@ -533,58 +533,58 @@ impl FromStr for WPContextAttr {
 }
 
 #[derive(Debug, thiserror::Error)]
-enum WPContextualParseError {
+enum WpContextualParseError {
     #[error(
-        "WPContextual didn't generate anything. Did you forget to add #[WPContext] attribute?"
+        "WpContextual didn't generate anything. Did you forget to add #[WpContext] attribute?"
     )]
     EmptyResult,
-    #[error("#[WPContextualField] & #[WPContextualOption] can't be used together")]
-    WPContextualBothOptionAndField,
+    #[error("#[WpContextualField] & #[WpContextualOption] can't be used together")]
+    WpContextualBothOptionAndField,
     #[error(
-        "WPContextualField field types need to start with '{}' prefix",
+        "WpContextualField field types need to start with '{}' prefix",
         IDENT_PREFIX
     )]
-    WPContextualFieldMissingSparsePrefix,
-    #[error("#[WPContextualField] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
-    WPContextualFieldWithoutWPContext,
-    #[error("Only Option<SparseFoo> & Option<Vec<SparseFoo>> types are supported by #[WPContextualField]")]
-    WPContextualFieldTypeNotSupported,
-    #[error("WPContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
-    WPContextualMissingSparsePrefix,
-    #[error("#[WPContextual] is only implemented for Structs")]
-    WPContextualNotAStruct,
-    #[error("#[WPContextualOption] doesn't have any contexts. Did you forget to add #[WPContext] attribute?")]
-    WPContextualOptionWithoutWPContext,
+    WpContextualFieldMissingSparsePrefix,
+    #[error("#[WpContextualField] doesn't have any contexts. Did you forget to add #[WpContext] attribute?")]
+    WpContextualFieldWithoutWpContext,
+    #[error("Only Option<SparseFoo> & Option<Vec<SparseFoo>> types are supported by #[WpContextualField]")]
+    WpContextualFieldTypeNotSupported,
+    #[error("WpContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
+    WpContextualMissingSparsePrefix,
+    #[error("#[WpContextual] is only implemented for Structs")]
+    WpContextualNotAStruct,
+    #[error("#[WpContextualOption] doesn't have any contexts. Did you forget to add #[WpContext] attribute?")]
+    WpContextualOptionWithoutWpContext,
 }
 
-impl WPContextualParseError {
+impl WpContextualParseError {
     fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
         syn::Error::new(span, self.to_string())
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-enum WPContextualParseAttrError {
-    // It's possible to trigger this error by using something like `#[wp_contextual::WPContext]`,
+enum WpContextualParseAttrError {
+    // It's possible to trigger this error by using something like `#[wp_contextual::WpContext]`,
     // however that's not a valid syntax. There is probably no valid syntax that uses `::` in the
     // current setup, but in case we are missing anything, we should be able to improve the
     // messaging by asking it to be reported.
-    #[error("Expected #[WPContext] or #[WPContextualField], found multi-segment path.\nPlease report this case to the `wp_contextual` developers.")]
+    #[error("Expected #[WpContext] or #[WpContextualField], found multi-segment path.\nPlease report this case to the `wp_contextual` developers.")]
     UnexpectedAttrPathSegmentCount,
     #[error("Did you mean ','?")]
     UnexpectedPunct,
     #[error("Expected 'edit', 'embed' or 'view', found '{}'", input)]
-    UnexpectedWPContextIdent { input: String },
+    UnexpectedWpContextIdent { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
-    #[error("Expected #[WPContext(edit, embed, view)]. Did you forget to add context types?")]
-    MissingWPContextMeta,
-    #[error("Expected #[WPContext(edit, embed, view)], found unsupported tokens")]
+    #[error("Expected #[WpContext(edit, embed, view)]. Did you forget to add context types?")]
+    MissingWpContextMeta,
+    #[error("Expected #[WpContext(edit, embed, view)], found unsupported tokens")]
     UnexpectedToken,
-    #[error("Expected #[WPContext(edit, embed, view)]. Try removing the quotation?")]
+    #[error("Expected #[WpContext(edit, embed, view)]. Try removing the quotation?")]
     UnexpectedLiteralToken,
 }
 
-impl WPContextualParseAttrError {
+impl WpContextualParseAttrError {
     fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
         syn::Error::new(span, self.to_string())
     }
@@ -645,7 +645,7 @@ mod tests {
             find_contextual_field_inner_segment(&mut input_type)
                 .unwrap_err()
                 .to_string(),
-            WPContextualParseError::WPContextualFieldTypeNotSupported.to_string()
+            WpContextualParseError::WpContextualFieldTypeNotSupported.to_string()
         );
     }
 

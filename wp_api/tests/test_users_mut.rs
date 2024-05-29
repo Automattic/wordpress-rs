@@ -2,7 +2,7 @@ use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
 use crate::integration_test_common::{
-    request_builder, WPNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
+    request_builder, WpNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod integration_test_common;

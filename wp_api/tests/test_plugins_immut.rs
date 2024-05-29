@@ -3,11 +3,11 @@ use rstest_reuse::{self, apply, template};
 use wp_api::{
     generate,
     plugins::{PluginListParams, PluginSlug, PluginStatus, SparsePlugin, SparsePluginField},
-    WPContext,
+    WpContext,
 };
 
 use crate::integration_test_common::{
-    request_builder, WPNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    request_builder, WpNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -25,7 +25,7 @@ async fn filter_plugins(
 ) {
     let parsed_response = request_builder()
         .plugins()
-        .filter_list(WPContext::Edit, &Some(params), fields)
+        .filter_list(WpContext::Edit, &Some(params), fields)
         .execute()
         .await
         .unwrap()
@@ -45,7 +45,7 @@ async fn filter_retrieve_plugin(
 ) {
     let plugin_result = request_builder()
         .plugins()
-        .filter_retrieve(WPContext::Edit, &slug.into(), fields)
+        .filter_retrieve(WpContext::Edit, &slug.into(), fields)
         .execute()
         .await
         .unwrap()
@@ -63,7 +63,7 @@ async fn filter_retrieve_plugin(
 #[tokio::test]
 async fn plugin_list_params_parametrized(
     #[case] params: PluginListParams,
-    #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
+    #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
     let response = request_builder()
         .plugins()
@@ -72,7 +72,7 @@ async fn plugin_list_params_parametrized(
         .await
         .unwrap();
     match context {
-        WPContext::Edit => {
+        WpContext::Edit => {
             let parsed_response =
                 wp_api::plugins::parse_list_plugins_response_with_edit_context(&response);
             assert!(
@@ -81,7 +81,7 @@ async fn plugin_list_params_parametrized(
                 parsed_response
             );
         }
-        WPContext::Embed => {
+        WpContext::Embed => {
             let parsed_response =
                 wp_api::plugins::parse_list_plugins_response_with_embed_context(&response);
             assert!(
@@ -90,7 +90,7 @@ async fn plugin_list_params_parametrized(
                 parsed_response
             );
         }
-        WPContext::View => {
+        WpContext::View => {
             let parsed_response =
                 wp_api::plugins::parse_list_plugins_response_with_view_context(&response);
             assert!(
@@ -110,7 +110,7 @@ async fn plugin_list_params_parametrized(
 async fn retrieve_plugin_with_edit_context(
     #[case] plugin_slug: PluginSlug,
     #[case] expected_author: &str,
-    #[values(WPContext::Edit, WPContext::Embed, WPContext::View)] context: WPContext,
+    #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
     let parsed_response = request_builder()
         .plugins()

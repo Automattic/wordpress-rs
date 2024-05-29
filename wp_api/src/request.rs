@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use serde::Deserialize;
 use url::Url;
 
-use crate::WPApiError;
+use crate::WpApiError;
 
 use self::endpoint::WpEndpointUrl;
 
@@ -15,7 +15,7 @@ const LINK_HEADER_KEY: &str = "Link";
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
-pub struct WPNetworkRequest {
+pub struct WpNetworkRequest {
     pub method: RequestMethod,
     pub url: WpEndpointUrl,
     // TODO: We probably want to implement a specific type for these headers instead of using a
@@ -27,17 +27,17 @@ pub struct WPNetworkRequest {
     pub body: Option<Vec<u8>>,
 }
 
-impl WPNetworkRequest {
+impl WpNetworkRequest {
     pub fn body_as_string(&self) -> Option<String> {
         self.body.as_ref().map(|b| body_as_string(b))
     }
 }
 
-impl Debug for WPNetworkRequest {
+impl Debug for WpNetworkRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = format!(
             indoc::indoc! {"
-                WPNetworkRequest {{
+                WpNetworkRequest {{
                     method: '{:?}',
                     url: '{:?}',
                     header_map: '{:?}',
@@ -56,7 +56,7 @@ impl Debug for WPNetworkRequest {
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
-pub struct WPNetworkResponse {
+pub struct WpNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
     // TODO: We probably want to implement a specific type for these headers instead of using a
@@ -67,7 +67,7 @@ pub struct WPNetworkResponse {
     pub header_map: Option<HashMap<String, String>>,
 }
 
-impl WPNetworkResponse {
+impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
         self.header_map
             .as_ref()
@@ -84,33 +84,33 @@ impl WPNetworkResponse {
         body_as_string(&self.body)
     }
 
-    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WPApiError> {
+    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WpApiError> {
         self.parse_response_for_generic_errors()?;
-        serde_json::from_slice(&self.body).map_err(|err| WPApiError::ParsingError {
+        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
             reason: err.to_string(),
             response: self.body_as_string(),
         })
     }
 
-    pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WPApiError>
+    pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WpApiError>
     where
-        F: Fn(&WPNetworkResponse) -> Result<T, WPApiError>,
+        F: Fn(&WpNetworkResponse) -> Result<T, WpApiError>,
     {
         parser(self)
     }
 
-    fn parse_response_for_generic_errors(&self) -> Result<(), WPApiError> {
+    fn parse_response_for_generic_errors(&self) -> Result<(), WpApiError> {
         // TODO: Further parse the response body to include error message
         // TODO: Lots of unwraps to get a basic setup working
         let status = http::StatusCode::from_u16(self.status_code).unwrap();
         if let Ok(rest_error) = serde_json::from_slice(&self.body) {
-            Err(WPApiError::RestError {
+            Err(WpApiError::RestError {
                 rest_error,
                 status_code: self.status_code,
                 response: self.body_as_string(),
             })
         } else if status.is_client_error() || status.is_server_error() {
-            Err(WPApiError::UnknownError {
+            Err(WpApiError::UnknownError {
                 status_code: self.status_code,
                 response: self.body_as_string(),
             })
@@ -120,11 +120,11 @@ impl WPNetworkResponse {
     }
 }
 
-impl Debug for WPNetworkResponse {
+impl Debug for WpNetworkResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = format!(
             indoc::indoc! {"
-                WPNetworkResponse {{
+                WpNetworkResponse {{
                     status_code: '{}',
                     header_map: '{:?}',
                     body: '{}'
@@ -156,7 +156,7 @@ fn body_as_string(body: &[u8]) -> String {
 macro_rules! add_uniffi_exported_parser {
     ($fn_name:ident, $return_type: ty) => {
         #[uniffi::export]
-        pub fn $fn_name(response: &WPNetworkResponse) -> Result<$return_type, WPApiError> {
+        pub fn $fn_name(response: &WpNetworkResponse) -> Result<$return_type, WpApiError> {
             response.parse::<$return_type>()
         }
     };
@@ -187,7 +187,7 @@ mod tests {
         #[case] expected_prev_link_header: Option<&str>,
         #[case] expected_next_link_header: Option<&str>,
     ) {
-        let response = WPNetworkResponse {
+        let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 200,
             header_map: Some([("Link".to_string(), link.to_string())].into()),

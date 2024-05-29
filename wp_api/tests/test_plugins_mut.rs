@@ -1,7 +1,7 @@
 use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
 
 use crate::integration_test_common::{
-    request_builder, run_and_restore_wp_content_plugins, WPNetworkRequestExecutor,
+    request_builder, run_and_restore_wp_content_plugins, WpNetworkRequestExecutor,
     CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
