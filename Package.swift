@@ -98,7 +98,9 @@ enum WordPressRSVersion {
     }
 }
 
+// Add SwiftLint to the package so that we can see linting issues directly from Xcode.
 func enableSwiftLint() throws {
+#if os(macOS)
     let version = try String(contentsOf: URL(string:"./.swiftlint.yml", relativeTo: URL(filePath: #filePath))!)
         .split(separator: "\n")
         .first(where: { $0.starts(with: "swiftlint_version") })?
@@ -114,4 +116,5 @@ func enableSwiftLint() throws {
     if let target = package.targets.first(where: { $0.name == "WordPressAPI" }) {
         target.plugins = (target.plugins ?? []) + [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint")]
     }
+#endif
 }
