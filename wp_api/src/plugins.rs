@@ -146,6 +146,12 @@ pub struct PluginSlug {
     pub slug: String,
 }
 
+impl PluginSlug {
+    pub fn new(slug: String) -> Self {
+        Self { slug }
+    }
+}
+
 impl From<&str> for PluginSlug {
     fn from(value: &str) -> Self {
         Self {

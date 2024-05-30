@@ -161,6 +161,7 @@ async fn list_users_has_published_posts(
 }
 
 #[rstest]
+#[trace]
 #[tokio::test]
 async fn retrieve_user(
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
@@ -175,6 +176,7 @@ async fn retrieve_user(
 }
 
 #[rstest]
+#[trace]
 #[tokio::test]
 async fn retrieve_me(
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
