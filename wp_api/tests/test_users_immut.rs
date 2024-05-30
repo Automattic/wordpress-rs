@@ -2,8 +2,9 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use wp_api::{
     generate,
+    request::WpNetworkResponse,
     users::{
-        SparseUser, SparseUserField, UserListParams, WpApiParamUsersHasPublishedPosts,
+        SparseUser, SparseUserField, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
         WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
     WpApiParamOrder, WpContext,
@@ -144,6 +145,7 @@ async fn list_users_has_published_posts(
         )
         .execute()
         .await;
+    assert!(response.is_ok());
     let response = &response.unwrap();
     match context {
         WpContext::Edit => {
@@ -158,76 +160,64 @@ async fn list_users_has_published_posts(
     };
 }
 
+#[rstest]
+#[trace]
 #[tokio::test]
-async fn retrieve_user_with_edit_context() {
-    assert!(request_builder()
+async fn retrieve_user(
+    #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
+    #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
+) {
+    let response = request_builder()
         .users()
-        .retrieve(FIRST_USER_ID, WpContext::Edit)
+        .retrieve(user_id, context)
         .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .is_ok());
+        .await;
+    assert!(response.is_ok());
+    assert_retrieve_user_response(&response.unwrap(), context, user_id);
 }
 
+#[rstest]
+#[trace]
 #[tokio::test]
-async fn retrieve_user_with_embed_context() {
-    assert!(request_builder()
+async fn retrieve_me(
+    #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
+) {
+    let response = request_builder()
         .users()
-        .retrieve(FIRST_USER_ID, WpContext::Embed)
+        .retrieve_me(context)
         .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::users::parse_retrieve_user_response_with_embed_context)
-        .is_ok());
+        .await;
+    assert!(response.is_ok());
+    // FIRST_USER_ID is the current user's id
+    assert_retrieve_user_response(&response.unwrap(), context, FIRST_USER_ID);
 }
 
-#[tokio::test]
-async fn retrieve_user_with_view_context() {
-    assert!(request_builder()
-        .users()
-        .retrieve(FIRST_USER_ID, WpContext::View)
-        .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::users::parse_retrieve_user_response_with_view_context)
-        .is_ok());
-}
-
-#[tokio::test]
-async fn retrieve_current_user_with_edit_context() {
-    assert!(request_builder()
-        .users()
-        .retrieve_me(WpContext::Edit)
-        .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-        .is_ok());
-}
-
-#[tokio::test]
-async fn retrieve_current_user_with_embed_context() {
-    assert!(request_builder()
-        .users()
-        .retrieve_me(WpContext::Embed)
-        .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::users::parse_retrieve_user_response_with_embed_context)
-        .is_ok());
-}
-
-#[tokio::test]
-async fn retrieve_current_user_with_view_context() {
-    assert!(request_builder()
-        .users()
-        .retrieve_me(WpContext::View)
-        .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::users::parse_retrieve_user_response_with_view_context)
-        .is_ok());
+fn assert_retrieve_user_response(
+    response: &WpNetworkResponse,
+    context: WpContext,
+    expected_user_id: UserId,
+) {
+    let user_id = match context {
+        WpContext::Edit => {
+            let parsed_response =
+                wp_api::users::parse_retrieve_user_response_with_edit_context(response);
+            assert!(parsed_response.is_ok());
+            parsed_response.unwrap().id
+        }
+        WpContext::Embed => {
+            let parsed_response =
+                wp_api::users::parse_retrieve_user_response_with_embed_context(response);
+            assert!(parsed_response.is_ok());
+            parsed_response.unwrap().id
+        }
+        WpContext::View => {
+            let parsed_response =
+                wp_api::users::parse_retrieve_user_response_with_view_context(response);
+            assert!(parsed_response.is_ok());
+            parsed_response.unwrap().id
+        }
+    };
+    assert_eq!(expected_user_id, user_id);
 }
 
 fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {

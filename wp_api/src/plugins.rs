@@ -140,10 +140,16 @@ pub struct PluginDeleteResponse {
     pub previous: PluginWithEditContext,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
 pub struct PluginSlug {
     pub slug: String,
+}
+
+impl PluginSlug {
+    pub fn new(slug: String) -> Self {
+        Self { slug }
+    }
 }
 
 impl From<&str> for PluginSlug {

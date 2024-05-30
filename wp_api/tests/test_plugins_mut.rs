@@ -1,4 +1,5 @@
-use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
+use rstest::rstest;
+use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
 
 use crate::integration_test_common::{
     request_builder, run_and_restore_wp_content_plugins, WpNetworkRequestExecutor,
@@ -25,28 +26,30 @@ async fn create_plugin() {
                 .unwrap()
                 .parse_with(wp_api::plugins::parse_create_plugin_response)
                 .unwrap();
+            assert_eq!(created_plugin.status, status);
             println!("Created Plugin: {:?}", created_plugin);
         })
     })
     .await;
 }
 
+#[rstest]
+#[case(PluginSlug::new(HELLO_DOLLY_PLUGIN_SLUG.into()), PluginStatus::Active)]
+#[case(PluginSlug::new(CLASSIC_EDITOR_PLUGIN_SLUG.into()), PluginStatus::Inactive)]
+#[trace]
 #[tokio::test]
-async fn update_plugin() {
+async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatus) {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
-            let status = PluginStatus::Active;
             let updated_plugin = request_builder()
                 .plugins()
-                .update(
-                    &HELLO_DOLLY_PLUGIN_SLUG.into(),
-                    &PluginUpdateParams { status },
-                )
+                .update(&slug, &PluginUpdateParams { status: new_status })
                 .execute()
                 .await
                 .unwrap()
                 .parse_with(wp_api::plugins::parse_update_plugin_response)
                 .unwrap();
+            assert_eq!(updated_plugin.status, new_status);
             println!("Updated Plugin: {:?}", updated_plugin);
         })
     })
@@ -57,14 +60,16 @@ async fn update_plugin() {
 async fn delete_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
+            let slug = CLASSIC_EDITOR_PLUGIN_SLUG.into();
             let deleted_plugin = request_builder()
                 .plugins()
-                .delete(&CLASSIC_EDITOR_PLUGIN_SLUG.into())
+                .delete(&slug)
                 .execute()
                 .await
                 .unwrap()
                 .parse_with(wp_api::plugins::parse_delete_plugin_response)
                 .unwrap();
+            assert_eq!(slug, deleted_plugin.previous.plugin);
             println!("Deleted Plugin: {:?}", deleted_plugin);
         })
     })
