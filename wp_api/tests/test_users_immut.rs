@@ -164,15 +164,16 @@ async fn list_users_has_published_posts(
 #[trace]
 #[tokio::test]
 async fn retrieve_user(
+    #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
     let response = request_builder()
         .users()
-        .retrieve(FIRST_USER_ID, context)
+        .retrieve(user_id, context)
         .execute()
         .await;
     assert!(response.is_ok());
-    assert_retrieve_user_response(&response.unwrap(), context, FIRST_USER_ID);
+    assert_retrieve_user_response(&response.unwrap(), context, user_id);
 }
 
 #[rstest]
