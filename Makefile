@@ -3,7 +3,7 @@ docker_container_repo_dir=/app
 
 # Common docker options
 rust_docker_container := public.ecr.aws/docker/library/rust:1.76
-swiftlint_container := ghcr.io/realm/swiftlint:0.53.0
+swiftlint_container := ghcr.io/realm/swiftlint:0.55.1
 
 docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
