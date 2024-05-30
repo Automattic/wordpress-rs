@@ -31,20 +31,7 @@ class UsersEndpointTest {
 
     @Test
     fun testUserListRequestWithHasPublishedPostsParam() = runTest {
-        // TODO: Add default values to the binding constructor from Rust
         val params = UserListParams(
-            page = null,
-            perPage = null,
-            search = null,
-            exclude = emptyList(),
-            include = emptyList(),
-            offset = null,
-            order = null,
-            orderby = null,
-            slug = emptyList(),
-            roles = emptyList(),
-            capabilities = emptyList(),
-            who = null,
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("post", "page"))
         )
         val result = users.list.withEditContext(params)
@@ -95,20 +82,7 @@ class UsersEndpointTest {
 
     @Test
     fun testErrorUserListRequestWithHasPublishedPostsInvalidParam() = runTest {
-        // TODO: Add default values to the binding constructor from Rust
         val params = UserListParams(
-            page = null,
-            perPage = null,
-            search = null,
-            exclude = emptyList(),
-            include = emptyList(),
-            offset = null,
-            order = null,
-            orderby = null,
-            slug = emptyList(),
-            roles = emptyList(),
-            capabilities = emptyList(),
-            who = null,
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("foo"))
         )
         val result = users.list.withEditContext(params)
