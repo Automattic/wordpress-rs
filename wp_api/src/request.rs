@@ -202,4 +202,52 @@ mod tests {
             response.get_link_header("next")
         );
     }
+
+    #[rstest]
+    fn test_headers_case_insentive() {
+        let headers: HashMap<String, String> = [
+            ("server".to_string(), "nginx".to_string()),
+            ("x-nananana".to_string(), "Batcache-Hit".to_string()),
+            (
+                "date".to_string(),
+                "Thu, 30 May 2024 23:52:17 GMT".to_string(),
+            ),
+            (
+                "content-type".to_string(),
+                "text/html; charset=UTF-8".to_string(),
+            ),
+            (
+                "strict-transport-security".to_string(),
+                "max-age=31536000".to_string(),
+            ),
+            ("vary".to_string(), "Accept-Encoding".to_string()),
+            (
+                "Link".to_string(),
+                "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\"".to_string(),
+            ),
+        ]
+        .into();
+        let response = WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 200,
+            header_map: Some(headers),
+        };
+
+        let headers = response.header_map.unwrap();
+
+        assert_eq!(headers.get("Server").unwrap(), "nginx");
+        assert_eq!(headers.get("X-Nananana").unwrap(), "Batcache-Hit");
+        assert_eq!(
+            headers.get("Date").unwrap(),
+            "Thu, 30 May 2024 23:52:17 GMT"
+        );
+        assert_eq!(
+            headers.get("Content-Type").unwrap(),
+            "text/html; charset=UTF-8"
+        );
+        assert_eq!(
+            headers.get("link").unwrap(),
+            "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\""
+        );
+    }
 }
