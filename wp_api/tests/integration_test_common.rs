@@ -16,6 +16,7 @@ pub const SECOND_USER_SLUG: &str = "themedemos";
 pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
+pub const WP_ORG_PLUGIN_SLUG_HELLO_DOLLY: &str = "hello-dolly";
 
 pub fn request_builder() -> WpRequestBuilder {
     let credentials = read_test_credentials_from_file();

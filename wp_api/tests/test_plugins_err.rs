@@ -1,3 +1,4 @@
+use integration_test_common::WP_ORG_PLUGIN_SLUG_HELLO_DOLLY;
 use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
 use wp_api::{WpContext, WpRestErrorCode};
 
@@ -7,6 +8,21 @@ use crate::integration_test_common::{
 };
 
 pub mod integration_test_common;
+
+#[tokio::test]
+async fn create_plugin_err_folder_exists() {
+    request_builder()
+        .plugins()
+        .create(&PluginCreateParams {
+            slug: WP_ORG_PLUGIN_SLUG_HELLO_DOLLY.into(),
+            status: PluginStatus::Active,
+        })
+        .execute()
+        .await
+        .unwrap()
+        .parse_with(wp_api::plugins::parse_create_plugin_response)
+        .assert_wp_error(WpRestErrorCode::CannotInstallPlugin);
+}
 
 #[tokio::test]
 async fn create_plugin_err_cannot_install_plugin() {
