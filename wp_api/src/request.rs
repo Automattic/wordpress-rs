@@ -1,8 +1,10 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
+use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::Deserialize;
 use url::Url;
 
+use crate::login::WpApiDetails;
 use crate::WpApiError;
 
 use self::endpoint::WpEndpointUrl;
@@ -55,7 +57,7 @@ impl Debug for WpNetworkRequest {
 }
 
 // Has custom `Debug` trait implementation
-#[derive(uniffi::Record)]
+#[derive(uniffi::Object)]
 pub struct WpNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
@@ -64,14 +66,54 @@ pub struct WpNetworkResponse {
     //
     // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
     // module.
-    pub header_map: Option<HashMap<String, String>>,
+    headers: Arc<HeaderMap>,
+}
+
+#[uniffi::export]
+impl WpNetworkResponse {
+    #[uniffi::constructor]
+    pub fn new(
+        body: Vec<u8>,
+        status_code: u16,
+        header_map: Option<HashMap<String, String>>,
+    ) -> Self {
+        let mut headers = HeaderMap::new();
+        if let Some(header_map) = header_map {
+            for (key, value) in header_map {
+                match (
+                    HeaderName::from_str(key.as_str()),
+                    HeaderValue::from_str(value.as_str()),
+                ) {
+                    (Ok(name), Ok(value)) => headers.insert(name, value),
+                    _ => None,
+                };
+            }
+        }
+
+        Self {
+            body,
+            status_code,
+            headers: headers.into(),
+        }
+    }
+
+    pub fn parse_api_details_response(&self) -> Result<WpApiDetails, WpApiError> {
+        let api_details =
+            serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
+                reason: err.to_string(),
+                response: self.body_as_string(),
+            })?;
+
+        Ok(api_details)
+    }
 }
 
 impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
-        self.header_map
+        self.headers
             .as_ref()
-            .map(|h_map| h_map.get(LINK_HEADER_KEY))?
+            .get(LINK_HEADER_KEY)
+            .and_then(|v| v.to_str().ok())
             .and_then(|link_header| parse_link_header::parse_with_rel(link_header).ok())
             .and_then(|link_map| {
                 link_map
@@ -131,7 +173,7 @@ impl Debug for WpNetworkResponse {
                 }}
                 "},
             self.status_code,
-            self.header_map,
+            self.headers,
             self.body_as_string()
         );
         s.pop(); // Remove the new line at the end
@@ -187,11 +229,11 @@ mod tests {
         #[case] expected_prev_link_header: Option<&str>,
         #[case] expected_next_link_header: Option<&str>,
     ) {
-        let response = WpNetworkResponse {
-            body: Vec::with_capacity(0),
-            status_code: 200,
-            header_map: Some([("Link".to_string(), link.to_string())].into()),
-        };
+        let response = WpNetworkResponse::new(
+            Vec::with_capacity(0),
+            200,
+            Some([("Link".to_string(), link.to_string())].into()),
+        );
 
         assert_eq!(
             expected_prev_link_header.and_then(|s| Url::parse(s).ok()),
@@ -200,6 +242,46 @@ mod tests {
         assert_eq!(
             expected_next_link_header.and_then(|s| Url::parse(s).ok()),
             response.get_link_header("next")
+        );
+    }
+
+    #[rstest]
+    fn test_headers_case_insentive() {
+        let headers: HashMap<String, String> = [
+            ("server".to_string(), "nginx".to_string()),
+            (
+                "date".to_string(),
+                "Thu, 30 May 2024 23:52:17 GMT".to_string(),
+            ),
+            (
+                "content-type".to_string(),
+                "text/html; charset=UTF-8".to_string(),
+            ),
+            (
+                "strict-transport-security".to_string(),
+                "max-age=31536000".to_string(),
+            ),
+            ("vary".to_string(), "Accept-Encoding".to_string()),
+            (
+                "Link".to_string(),
+                "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\"".to_string(),
+            ),
+        ]
+        .into();
+        let response = WpNetworkResponse::new(Vec::with_capacity(0), 200, Some(headers));
+
+        assert_eq!(response.headers.get("Server").unwrap(), "nginx");
+        assert_eq!(
+            response.headers.get("Date").unwrap(),
+            "Thu, 30 May 2024 23:52:17 GMT"
+        );
+        assert_eq!(
+            response.headers.get("Content-Type").unwrap(),
+            "text/html; charset=UTF-8"
+        );
+        assert_eq!(
+            response.headers.get("link").unwrap(),
+            "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\""
         );
     }
 }

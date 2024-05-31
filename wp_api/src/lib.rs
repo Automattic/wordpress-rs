@@ -179,17 +179,6 @@ impl WpApiParamOrder {
 }
 
 #[uniffi::export]
-pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WpApiDetails, WpApiError> {
-    let api_details =
-        serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
-            reason: err.to_string(),
-            response: response.body_as_string(),
-        })?;
-
-    Ok(api_details)
-}
-
-#[uniffi::export]
 pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WpRestApiUrl> {
     if let Some(url) = response.get_link_header(name) {
         return Some(url.into());
