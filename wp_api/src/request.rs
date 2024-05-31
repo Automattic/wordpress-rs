@@ -98,13 +98,10 @@ impl WpNetworkResponse {
     }
 
     pub fn parse_api_details_response(&self) -> Result<WpApiDetails, WpApiError> {
-        let api_details =
-            serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
-                reason: err.to_string(),
-                response: self.body_as_string(),
-            })?;
-
-        Ok(api_details)
+        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
+            reason: err.to_string(),
+            response: self.body_as_string(),
+        })
     }
 }
 
