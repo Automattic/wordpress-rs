@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
-use http::{HeaderMap, HeaderName, HeaderValue};
+use http::HeaderMap;
 use serde::Deserialize;
 use url::Url;
 
@@ -77,18 +77,9 @@ impl WpNetworkResponse {
         status_code: u16,
         header_map: Option<HashMap<String, String>>,
     ) -> Self {
-        let mut headers = HeaderMap::new();
-        if let Some(header_map) = header_map {
-            for (key, value) in header_map {
-                match (
-                    HeaderName::from_str(key.as_str()),
-                    HeaderValue::from_str(value.as_str()),
-                ) {
-                    (Ok(name), Ok(value)) => headers.insert(name, value),
-                    _ => None,
-                };
-            }
-        }
+        let headers: HeaderMap = header_map
+            .and_then(|m| (&m).try_into().ok())
+            .unwrap_or_default();
 
         Self {
             body,
@@ -246,6 +237,7 @@ mod tests {
     fn test_headers_case_insentive() {
         let headers: HashMap<String, String> = [
             ("server".to_string(), "nginx".to_string()),
+            ("x-nananana".to_string(), "Batcache-Hit".to_string()),
             (
                 "date".to_string(),
                 "Thu, 30 May 2024 23:52:17 GMT".to_string(),
@@ -268,6 +260,7 @@ mod tests {
         let response = WpNetworkResponse::new(Vec::with_capacity(0), 200, Some(headers));
 
         assert_eq!(response.headers.get("Server").unwrap(), "nginx");
+        assert_eq!(response.headers.get("X-Nananana").unwrap(), "Batcache-Hit");
         assert_eq!(
             response.headers.get("Date").unwrap(),
             "Thu, 30 May 2024 23:52:17 GMT"
