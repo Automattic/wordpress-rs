@@ -7,7 +7,6 @@ import org.junit.Test
 import uniffi.wp_api.SparseUserField
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
-import uniffi.wp_api.WpApiParamUsersWho
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
@@ -18,11 +17,13 @@ class UsersEndpointTest {
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val users = WpApiClient(siteUrl, authentication).users
+    private val client = WpApiClient(siteUrl, authentication)
+    private val requestHandler = WpApiClient(siteUrl, authentication).requestHandler
+    private val users = client.requestBuilder.users()
 
     @Test
     fun testUserListRequest() = runTest {
-        val result = users.list.withEditContext(params = null)
+        val result = requestHandler.execute { users.listWithEditContext(params = null) }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -34,7 +35,7 @@ class UsersEndpointTest {
         val params = UserListParams(
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("post", "page"))
         )
-        val result = users.list.withEditContext(params)
+        val result = requestHandler.execute { users.listWithEditContext(params) }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -43,11 +44,13 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterUserListRequest() = runTest {
-        val result = users.list.filter(
-            WpContext.EDIT,
-            params = null,
-            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
-        )
+        val result = requestHandler.execute {
+            users.filterList(
+                context = WpContext.EDIT,
+                params = null,
+                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            )
+        }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -57,11 +60,13 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
-        val result = users.retrieve.filter(
-            FIRST_USER_ID,
-            WpContext.EDIT,
-            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
-        )
+        val result = requestHandler.execute {
+            users.filterRetrieve(
+                FIRST_USER_ID,
+                WpContext.EDIT,
+                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            )
+        }
         assert(result is WpRequestSuccess)
         val sparseUser = (result as WpRequestSuccess).data
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
@@ -70,10 +75,12 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveCurrentUserRequest() = runTest {
-        val result = users.me.filter(
-            WpContext.EDIT,
-            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
-        )
+        val result = requestHandler.execute {
+            users.filterRetrieveMe(
+                WpContext.EDIT,
+                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            )
+        }
         assert(result is WpRequestSuccess)
         val sparseUser = (result as WpRequestSuccess).data
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
@@ -85,7 +92,7 @@ class UsersEndpointTest {
         val params = UserListParams(
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("foo"))
         )
-        val result = users.list.withEditContext(params)
+        val result = requestHandler.execute { users.listWithEditContext(params) }
         assert(result is RecognizedRestError)
         assertEquals(WpRestErrorCode.InvalidParam, (result as RecognizedRestError).error.code)
     }

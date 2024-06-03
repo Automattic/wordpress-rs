@@ -3,21 +3,16 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import uniffi.wp_api.WpApiException
-import uniffi.wp_api.WpNetworkRequest
-import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.WpRestErrorWrapper
 
-internal class WpRequestHandler(
-    private val networkHandler: NetworkHandler,
+class WpRequestHandler(
     private val dispatcher: CoroutineDispatcher
 ) {
     suspend fun <T> execute(
-        request: WpNetworkRequest,
-        parser: (response: WpNetworkResponse) -> T
+        request: suspend () -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
-            val response = networkHandler.request(request)
-            WpRequestSuccess(data = parser(response))
+            WpRequestSuccess(data = request())
         } catch (restException: WpApiException.RestException) {
             when (restException.restError) {
                 is WpRestErrorWrapper.Recognized -> {
