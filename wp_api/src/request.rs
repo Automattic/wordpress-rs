@@ -61,7 +61,7 @@ impl Debug for WpNetworkRequest {
 pub struct WpNetworkResponse {
     body: Vec<u8>,
     status_code: u16,
-    headers: HeaderMap,
+    header_map: HeaderMap,
 }
 
 #[uniffi::export]
@@ -72,14 +72,14 @@ impl WpNetworkResponse {
         status_code: u16,
         header_map: Option<HashMap<String, String>>,
     ) -> Self {
-        let headers: HeaderMap = header_map
+        let header_map: HeaderMap = header_map
             .and_then(|m| (&m).try_into().ok())
             .unwrap_or_default();
 
         Self {
             body,
             status_code,
-            headers,
+            header_map,
         }
     }
 
@@ -93,7 +93,7 @@ impl WpNetworkResponse {
 
 impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
-        self.headers
+        self.header_map
             .get(LINK_HEADER_KEY)
             .and_then(|v| v.to_str().ok())
             .and_then(|link_header| parse_link_header::parse_with_rel(link_header).ok())
@@ -155,7 +155,7 @@ impl Debug for WpNetworkResponse {
                 }}
                 "},
             self.status_code,
-            self.headers,
+            self.header_map,
             self.body_as_string()
         );
         s.pop(); // Remove the new line at the end
@@ -227,7 +227,7 @@ mod tests {
         );
     }
 
-    #[rstest]
+    #[test]
     fn test_headers_case_insentive() {
         let headers: HashMap<String, String> = [
             ("server".to_string(), "nginx".to_string()),
@@ -253,18 +253,21 @@ mod tests {
         .into();
         let response = WpNetworkResponse::new(Vec::with_capacity(0), 200, Some(headers));
 
-        assert_eq!(response.headers.get("Server").unwrap(), "nginx");
-        assert_eq!(response.headers.get("X-Nananana").unwrap(), "Batcache-Hit");
+        assert_eq!(response.header_map.get("Server").unwrap(), "nginx");
         assert_eq!(
-            response.headers.get("Date").unwrap(),
+            response.header_map.get("X-Nananana").unwrap(),
+            "Batcache-Hit"
+        );
+        assert_eq!(
+            response.header_map.get("Date").unwrap(),
             "Thu, 30 May 2024 23:52:17 GMT"
         );
         assert_eq!(
-            response.headers.get("Content-Type").unwrap(),
+            response.header_map.get("Content-Type").unwrap(),
             "text/html; charset=UTF-8"
         );
         assert_eq!(
-            response.headers.get("link").unwrap(),
+            response.header_map.get("link").unwrap(),
             "<http://localhost/wp-json/wp/v2/posts?page=2>; rel=\"next\""
         );
     }
