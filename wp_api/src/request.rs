@@ -8,10 +8,43 @@ use crate::WpApiError;
 use self::endpoint::WpEndpointUrl;
 
 pub mod endpoint;
-pub mod plugins_request_builder;
+//pub mod plugins_request_builder;
 pub mod users_request_builder;
 
 const LINK_HEADER_KEY: &str = "Link";
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum NetworkRequestError {
+    #[error(
+        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
+        status_code,
+        response
+    )]
+    UnknownError { status_code: u16, response: String },
+}
+
+impl From<NetworkRequestError> for WpApiError {
+    fn from(value: NetworkRequestError) -> Self {
+        match value {
+            NetworkRequestError::UnknownError {
+                status_code,
+                response,
+            } => Self::UnknownError {
+                status_code,
+                response,
+            },
+        }
+    }
+}
+
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait RequestExecutor: Send + Sync + Debug {
+    async fn execute(
+        &self,
+        request: WpNetworkRequest,
+    ) -> Result<WpNetworkResponse, NetworkRequestError>;
+}
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]

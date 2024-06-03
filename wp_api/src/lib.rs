@@ -2,9 +2,8 @@
 
 use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
-    plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
-    RequestMethod, WpNetworkRequest, WpNetworkResponse,
+    NetworkRequestError, RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
@@ -28,13 +27,17 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WpRequestBuilder {
     users: Arc<UsersRequestBuilder>,
-    plugins: Arc<PluginsRequestBuilder>,
+    //plugins: Arc<PluginsRequestBuilder>,
 }
 
 #[uniffi::export]
 impl WpRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
+    pub fn new(
+        site_url: String,
+        authentication: WpAuthentication,
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
             .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
@@ -42,12 +45,13 @@ impl WpRequestBuilder {
             .into();
         let request_builder = Arc::new(RequestBuilder {
             authentication: authentication.clone(),
+            executor: request_executor,
         });
 
         Ok(Self {
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
-            plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
-                .into(),
+            //plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
+            //   .into(),
         })
     }
 
@@ -55,9 +59,9 @@ impl WpRequestBuilder {
         self.users.clone()
     }
 
-    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
-        self.plugins.clone()
-    }
+    //pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+    //    self.plugins.clone()
+    //}
 }
 
 #[uniffi::export]
@@ -70,38 +74,49 @@ fn wp_authentication_from_username_and_password(
 
 #[derive(Debug)]
 struct RequestBuilder {
+    executor: Arc<dyn RequestExecutor>,
     authentication: WpAuthentication,
 }
 
 impl RequestBuilder {
-    fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
-            method: RequestMethod::GET,
-            url: url.into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+    async fn get(&self, url: ApiEndpointUrl) -> Result<WpNetworkResponse, NetworkRequestError> {
+        self.executor
+            .execute(WpNetworkRequest {
+                method: RequestMethod::GET,
+                url: url.into(),
+                header_map: self.header_map(),
+                body: None,
+            })
+            .await
     }
 
-    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
+    async fn post<T>(
+        &self,
+        url: ApiEndpointUrl,
+        json_body: &T,
+    ) -> Result<WpNetworkResponse, NetworkRequestError>
     where
         T: ?Sized + Serialize,
     {
-        WpNetworkRequest {
-            method: RequestMethod::POST,
-            url: url.into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(json_body).ok(),
-        }
+        self.executor
+            .execute(WpNetworkRequest {
+                method: RequestMethod::POST,
+                url: url.into(),
+                header_map: self.header_map_for_post_request(),
+                body: serde_json::to_vec(json_body).ok(),
+            })
+            .await
     }
 
-    fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: url.into(),
-            header_map: self.header_map(),
-            body: None,
-        }
+    async fn delete(&self, url: ApiEndpointUrl) -> Result<WpNetworkResponse, NetworkRequestError> {
+        self.executor
+            .execute(WpNetworkRequest {
+                method: RequestMethod::DELETE,
+                url: url.into(),
+                header_map: self.header_map(),
+                body: None,
+            })
+            .await
     }
 
     fn header_map(&self) -> HashMap<String, String> {
