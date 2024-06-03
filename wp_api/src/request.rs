@@ -15,12 +15,8 @@ const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum NetworkRequestError {
-    #[error(
-        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
-        status_code,
-        response
-    )]
-    UnknownError { status_code: u16, response: String },
+    #[error("Status Code: '{}'.\nReason: '{}'", status_code, reason)]
+    UnknownError { status_code: u16, reason: String },
 }
 
 impl From<NetworkRequestError> for WpApiError {
@@ -28,10 +24,10 @@ impl From<NetworkRequestError> for WpApiError {
         match value {
             NetworkRequestError::UnknownError {
                 status_code,
-                response,
+                reason,
             } => Self::UnknownError {
                 status_code,
-                response,
+                response: reason,
             },
         }
     }
@@ -183,16 +179,6 @@ pub enum RequestMethod {
 
 fn body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
-}
-
-#[macro_export]
-macro_rules! add_uniffi_exported_parser {
-    ($fn_name:ident, $return_type: ty) => {
-        #[uniffi::export]
-        pub fn $fn_name(response: &WpNetworkResponse) -> Result<$return_type, WpApiError> {
-            response.parse::<$return_type>()
-        }
-    };
 }
 
 #[cfg(test)]

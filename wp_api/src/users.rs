@@ -3,37 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{
-    add_uniffi_exported_parser, SparseField, WpApiError, WpApiParamOrder, WpNetworkResponse,
-};
-
-add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
-add_uniffi_exported_parser!(parse_filter_retrieve_user_response, SparseUser);
-add_uniffi_exported_parser!(
-    parse_list_users_response_with_edit_context,
-    Vec<UserWithEditContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_users_response_with_embed_context,
-    Vec<UserWithEmbedContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_users_response_with_view_context,
-    Vec<UserWithViewContext>
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_user_response_with_edit_context,
-    UserWithEditContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_user_response_with_embed_context,
-    UserWithEmbedContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_user_response_with_view_context,
-    UserWithViewContext
-);
-add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
+use crate::{SparseField, WpApiParamOrder};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersOrderBy {
