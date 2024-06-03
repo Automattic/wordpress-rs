@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug};
 
 use http::HeaderMap;
 use serde::Deserialize;
@@ -66,7 +66,7 @@ pub struct WpNetworkResponse {
     //
     // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
     // module.
-    headers: Arc<HeaderMap>,
+    headers: HeaderMap,
 }
 
 #[uniffi::export]
@@ -84,7 +84,7 @@ impl WpNetworkResponse {
         Self {
             body,
             status_code,
-            headers: headers.into(),
+            headers,
         }
     }
 
@@ -99,7 +99,6 @@ impl WpNetworkResponse {
 impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
         self.headers
-            .as_ref()
             .get(LINK_HEADER_KEY)
             .and_then(|v| v.to_str().ok())
             .and_then(|link_header| parse_link_header::parse_with_rel(link_header).ok())
