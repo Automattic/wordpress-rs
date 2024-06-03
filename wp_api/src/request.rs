@@ -59,8 +59,8 @@ impl Debug for WpNetworkRequest {
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Object)]
 pub struct WpNetworkResponse {
-    pub body: Vec<u8>,
-    pub status_code: u16,
+    body: Vec<u8>,
+    status_code: u16,
     // TODO: We probably want to implement a specific type for these headers instead of using a
     // regular HashMap.
     //
