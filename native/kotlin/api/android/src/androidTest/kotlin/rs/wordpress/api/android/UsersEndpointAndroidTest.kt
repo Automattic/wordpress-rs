@@ -19,11 +19,13 @@ class UsersEndpointAndroidTest {
         username = BuildConfig.TEST_ADMIN_USERNAME,
         password = BuildConfig.TEST_ADMIN_PASSWORD
     )
-    private val users = WpApiClient(siteUrl, authentication).users
+    private val client = WpApiClient(siteUrl, authentication)
+    private val requestHandler = WpApiClient(siteUrl, authentication).requestHandler
+    private val users = client.requestBuilder.users()
 
     @Test
     fun testUserListRequest() = runTest {
-        val result = users.list.withEditContext(params = null)
+        val result = requestHandler.execute { users.listWithEditContext(params = null) }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         Assert.assertEquals(NUMBER_OF_USERS, userList.count())
