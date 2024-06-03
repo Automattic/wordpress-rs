@@ -1,9 +1,7 @@
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
-use crate::integration_test_common::{
-    request_builder, WpNetworkRequestExecutor, FIRST_USER_ID, SECOND_USER_ID,
-};
+use crate::integration_test_common::{request_builder, FIRST_USER_ID, SECOND_USER_ID};
 
 pub mod integration_test_common;
 pub mod wp_db;
@@ -21,14 +19,7 @@ async fn create_user() {
             email.to_string(),
             password.to_string(),
         );
-        let created_user = request_builder()
-            .users()
-            .create(&params)
-            .execute()
-            .await
-            .unwrap()
-            .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-            .unwrap();
+        let created_user = request_builder().users().create(&params).await.unwrap();
 
         // Assert that the user is in DB
         let created_user_from_db = db.user(created_user.id.0 as u64).await.unwrap();
@@ -48,7 +39,6 @@ async fn delete_user() {
         let user_delete_response = request_builder()
             .users()
             .delete(SECOND_USER_ID, &user_delete_params)
-            .execute()
             .await;
         assert!(user_delete_response.is_ok());
 
@@ -71,10 +61,7 @@ async fn delete_current_user() {
         let deleted_user = request_builder()
             .users()
             .delete_me(&user_delete_params)
-            .execute()
             .await
-            .unwrap()
-            .parse_with(wp_api::users::parse_delete_user_response)
             .unwrap();
         assert!(deleted_user.deleted);
         assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
@@ -196,19 +183,18 @@ async fn update_user_slug() {
 #[tokio::test]
 async fn update_user_roles() {
     wp_db::run_and_restore(|_| async move {
-        let new_role = "new_role";
+        let new_role = "author";
         let params = UserUpdateParams {
             roles: vec![new_role.to_string()],
             ..Default::default()
         };
         let user_update_response = request_builder()
             .users()
-            .update(FIRST_USER_ID, &params)
-            .execute()
+            .update(SECOND_USER_ID, &params)
             .await;
         // It's quite tricky to validate the roles from DB, so we just ensure the request was
         // successful
-        assert!(user_update_response.is_ok());
+        assert!(user_update_response.is_ok(), "{:?}", user_update_response);
     })
     .await;
 }
@@ -224,7 +210,6 @@ async fn update_user_password() {
         let user_update_response = request_builder()
             .users()
             .update(FIRST_USER_ID, &params)
-            .execute()
             .await;
         // It's quite tricky to validate the password from DB, so we just ensure the request was
         // successful
@@ -241,7 +226,6 @@ where
         let user_update_response = request_builder()
             .users()
             .update(FIRST_USER_ID, &params)
-            .execute()
             .await;
         assert!(user_update_response.is_ok());
 
