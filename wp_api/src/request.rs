@@ -61,11 +61,6 @@ impl Debug for WpNetworkRequest {
 pub struct WpNetworkResponse {
     body: Vec<u8>,
     status_code: u16,
-    // TODO: We probably want to implement a specific type for these headers instead of using a
-    // regular HashMap.
-    //
-    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
-    // module.
     headers: HeaderMap,
 }
 
