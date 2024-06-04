@@ -1,7 +1,29 @@
 use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum RequestExecutionError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
     #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
     RestError {
         rest_error: WpRestErrorWrapper,
@@ -161,4 +183,18 @@ pub enum WpInternalErrorCode {
     UnableToDetermineInstalledPlugin,
     #[serde(rename = "unexpected_output")]
     UnexpectedOutput,
+}
+
+impl From<RequestExecutionError> for WpApiError {
+    fn from(value: RequestExecutionError) -> Self {
+        match value {
+            RequestExecutionError::RequestExecutionFailed {
+                status_code,
+                reason,
+            } => Self::RequestExecutionFailed {
+                status_code,
+                reason,
+            },
+        }
+    }
 }

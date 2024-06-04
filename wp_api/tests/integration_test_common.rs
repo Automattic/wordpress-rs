@@ -3,12 +3,10 @@ use futures::Future;
 use http::HeaderMap;
 use std::{fs::read_to_string, process::Command, sync::Arc};
 use wp_api::{
-    request::{
-        NetworkRequestError, RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
-    },
+    request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse},
     users::UserId,
-    WpApiError, WpAuthentication, WpRequestBuilder, WpRestError, WpRestErrorCode,
-    WpRestErrorWrapper,
+    RequestExecutionError, WpApiError, WpAuthentication, WpRequestBuilder, WpRestError,
+    WpRestErrorCode, WpRestErrorWrapper,
 };
 
 // The first user is also the current user
@@ -216,12 +214,12 @@ impl RequestExecutor for AsyncWpNetworking {
     async fn execute(
         &self,
         request: WpNetworkRequest,
-    ) -> Result<WpNetworkResponse, wp_api::request::NetworkRequestError> {
-        self.async_request(request)
-            .await
-            .map_err(|_err| NetworkRequestError::UnknownError {
-                status_code: 400,
-                reason: "TODO".to_string(),
-            })
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.async_request(request).await.map_err(|err| {
+            RequestExecutionError::RequestExecutionFailed {
+                status_code: err.status().map(|s| s.as_u16()),
+                reason: err.to_string(),
+            }
+        })
     }
 }

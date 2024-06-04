@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use serde::Deserialize;
 use url::Url;
 
-use crate::WpApiError;
+use crate::{api_error::RequestExecutionError, WpApiError};
 
 use self::endpoint::WpEndpointUrl;
 
@@ -13,33 +13,13 @@ pub mod users_request_builder;
 
 const LINK_HEADER_KEY: &str = "Link";
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum NetworkRequestError {
-    #[error("Status Code: '{}'.\nReason: '{}'", status_code, reason)]
-    UnknownError { status_code: u16, reason: String },
-}
-
-impl From<NetworkRequestError> for WpApiError {
-    fn from(value: NetworkRequestError) -> Self {
-        match value {
-            NetworkRequestError::UnknownError {
-                status_code,
-                reason,
-            } => Self::UnknownError {
-                status_code,
-                response: reason,
-            },
-        }
-    }
-}
-
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait RequestExecutor: Send + Sync + Debug {
     async fn execute(
         &self,
         request: WpNetworkRequest,
-    ) -> Result<WpNetworkResponse, NetworkRequestError>;
+    ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
 // Has custom `Debug` trait implementation

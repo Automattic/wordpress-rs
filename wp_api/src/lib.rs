@@ -4,12 +4,14 @@ use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
     plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
-    NetworkRequestError, RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
+    RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
 use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
 
-pub use api_error::{WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper};
+pub use api_error::{
+    RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
+};
 use login::*;
 use plugins::*;
 use users::*;
@@ -80,7 +82,7 @@ struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    async fn get(&self, url: ApiEndpointUrl) -> Result<WpNetworkResponse, NetworkRequestError> {
+    async fn get(&self, url: ApiEndpointUrl) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.executor
             .execute(WpNetworkRequest {
                 method: RequestMethod::GET,
@@ -95,7 +97,7 @@ impl RequestBuilder {
         &self,
         url: ApiEndpointUrl,
         json_body: &T,
-    ) -> Result<WpNetworkResponse, NetworkRequestError>
+    ) -> Result<WpNetworkResponse, RequestExecutionError>
     where
         T: ?Sized + Serialize,
     {
@@ -109,7 +111,10 @@ impl RequestBuilder {
             .await
     }
 
-    async fn delete(&self, url: ApiEndpointUrl) -> Result<WpNetworkResponse, NetworkRequestError> {
+    async fn delete(
+        &self,
+        url: ApiEndpointUrl,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.executor
             .execute(WpNetworkRequest {
                 method: RequestMethod::DELETE,
