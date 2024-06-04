@@ -1,12 +1,13 @@
 plugins {
+    alias(libs.plugins.rustAndroid)
+    alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.publishToS3)
     id("java-library")
-    id("org.jetbrains.kotlin.jvm")
     id("jvm-test-suite")
-    id("com.automattic.android.publish-to-s3")
 }
 
-ext.jniLibsPath = "${buildDir}/jniLibs/"
-ext.generatedTestResourcesPath = "${buildDir}/generatedTestResources/"
+ext.jniLibsPath = "$buildDir/jniLibs/"
+ext.generatedTestResourcesPath = "$buildDir/generatedTestResources/"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -19,7 +20,7 @@ java {
 testing {
     suites {
         configureEach {
-            useJUnit(junitVersion)
+            useJUnit(rootProject.libs.versions.junit.get())
         }
 
         integrationTest(JvmTestSuite) {
@@ -28,8 +29,8 @@ testing {
             dependencies {
                 implementation project()
 
-                implementation 'org.jetbrains.kotlin:kotlin-test'
-                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion"
+                implementation(rootProject.libs.kotlin.test)
+                implementation(rootProject.libs.kotlinx.coroutines.test)
             }
 
             targets {
@@ -53,15 +54,15 @@ repositories {
 }
 
 dependencies {
-    implementation "com.squareup.okhttp3:okhttp:$okHttpVersion"
-    implementation "net.java.dev.jna:jna:$jnaVersion"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion"
+    implementation(libs.okhttp)
+    implementation(libs.jna)
+    implementation(libs.kotlinx.coroutines.core)
 }
 
 sourceSets {
     main {
         java {
-            srcDir "${buildDir}/generated/source/uniffi/java/uniffi"
+            srcDir "$buildDir/generated/source/uniffi/java/uniffi"
         }
     }
     integrationTest {
@@ -133,7 +134,7 @@ project.afterEvaluate {
    }
 }
 
-def getNativeLibraryExtension() {
+static def getNativeLibraryExtension() {
     def currentOS = org.gradle.internal.os.OperatingSystem.current()
     if (currentOS.isLinux()) {
         ".so"
