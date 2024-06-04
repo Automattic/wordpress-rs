@@ -271,57 +271,6 @@ async fn update_user_err_user_invalid_slug() {
         .assert_wp_error(WpRestErrorCode::UserInvalidSlug);
 }
 
-// In the following tests, we manually modify the request because the errors they test are not
-// possible to get without it. We believe these tests are still useful as they act as a
-// documentation for how these errors might be received.
-//
-
-// TODO: These tests are probably no longer possible
-
-//#[tokio::test]
-//async fn create_user_err_user_exists() {
-//    let mut request = request_builder()
-//        .users()
-//        .create(&valid_user_create_params());
-//    request.url.0.push_str("?id=1");
-//    request.await.assert_wp_error(WpRestErrorCode::UserExists);
-//}
-
-//#[tokio::test]
-//async fn delete_user_err_trash_not_supported() {
-//    let mut request = request_builder().users().delete(
-//        FIRST_USER_ID,
-//        &UserDeleteParams {
-//            reassign: SECOND_USER_ID,
-//        },
-//    );
-//    request.url = WpEndpointUrl(request.url.0.replace("&force=true", ""));
-//    request
-//        .execute()
-//        .await
-//        .unwrap()
-//        .parse_with(wp_api::users::parse_retrieve_user_response_with_edit_context)
-//        .assert_wp_error(WpRestErrorCode::TrashNotSupported);
-//}
-//
-//#[tokio::test]
-//async fn update_user_err_user_invalid_argument() {
-//    let mut request = request_builder()
-//        .users()
-//        .update(FIRST_USER_ID, &UserUpdateParams::default());
-//    request.body = Some(
-//        serde_json::json!({
-//            "username": "new_username",
-//        })
-//        .to_string()
-//        .into_bytes(),
-//    );
-//    // Usernames are not editable
-//    request
-//        .await
-//        .assert_wp_error(WpRestErrorCode::UserInvalidArgument);
-//}
-
 // Helpers
 
 fn valid_user_create_params() -> UserCreateParams {
