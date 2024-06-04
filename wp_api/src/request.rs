@@ -8,7 +8,7 @@ use crate::WpApiError;
 use self::endpoint::WpEndpointUrl;
 
 pub mod endpoint;
-//pub mod plugins_request_builder;
+pub mod plugins_request_builder;
 pub mod users_request_builder;
 
 const LINK_HEADER_KEY: &str = "Link";

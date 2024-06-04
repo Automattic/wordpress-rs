@@ -2,6 +2,7 @@
 
 use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
+    plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
     NetworkRequestError, RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
@@ -27,7 +28,7 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[derive(Debug, uniffi::Object)]
 pub struct WpRequestBuilder {
     users: Arc<UsersRequestBuilder>,
-    //plugins: Arc<PluginsRequestBuilder>,
+    plugins: Arc<PluginsRequestBuilder>,
 }
 
 #[uniffi::export]
@@ -50,8 +51,8 @@ impl WpRequestBuilder {
 
         Ok(Self {
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
-            //plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
-            //   .into(),
+            plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
+                .into(),
         })
     }
 
@@ -59,9 +60,9 @@ impl WpRequestBuilder {
         self.users.clone()
     }
 
-    //pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
-    //    self.plugins.clone()
-    //}
+    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+        self.plugins.clone()
+    }
 }
 
 #[uniffi::export]
