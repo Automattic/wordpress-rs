@@ -18,6 +18,6 @@ public extension WordPressAPI {
 
     func getRestAPICapabilities(forApiRoot url: URL, using session: URLSession) async throws -> WpApiDetails {
         let wpResponse = try await self.perform(request: WpNetworkRequest(method: .get, url: url, headerMap: [:]))
-        return try parseApiDetailsResponse(response: wpResponse)
+        return try wpResponse.parseApiDetailsResponse()
     }
 }
