@@ -1,3 +1,4 @@
+use integration_test_common::AssertResponse;
 use rstest::rstest;
 use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
 
@@ -18,7 +19,11 @@ async fn create_plugin() {
                 slug: WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS.into(),
                 status,
             };
-            let created_plugin = request_builder().plugins().create(&params).await.unwrap();
+            let created_plugin = request_builder()
+                .plugins()
+                .create(&params)
+                .await
+                .assert_response();
             assert_eq!(created_plugin.status, status);
             println!("Created Plugin: {:?}", created_plugin);
         })
@@ -38,7 +43,7 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
                 .plugins()
                 .update(&slug, &PluginUpdateParams { status: new_status })
                 .await
-                .unwrap();
+                .assert_response();
             assert_eq!(updated_plugin.status, new_status);
             println!("Updated Plugin: {:?}", updated_plugin);
         })
@@ -51,7 +56,11 @@ async fn delete_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
             let slug = CLASSIC_EDITOR_PLUGIN_SLUG.into();
-            let deleted_plugin = request_builder().plugins().delete(&slug).await.unwrap();
+            let deleted_plugin = request_builder()
+                .plugins()
+                .delete(&slug)
+                .await
+                .assert_response();
             assert_eq!(slug, deleted_plugin.previous.plugin);
             println!("Deleted Plugin: {:?}", deleted_plugin);
         })

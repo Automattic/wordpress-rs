@@ -223,3 +223,18 @@ impl RequestExecutor for AsyncWpNetworking {
         })
     }
 }
+
+pub trait AssertResponse {
+    type Item;
+
+    fn assert_response(self) -> Self::Item;
+}
+
+impl<T: std::fmt::Debug> AssertResponse for Result<T, WpApiError> {
+    type Item = T;
+
+    fn assert_response(self) -> T {
+        assert!(self.is_ok(), "Response was: '{:?}'", self);
+        self.unwrap()
+    }
+}

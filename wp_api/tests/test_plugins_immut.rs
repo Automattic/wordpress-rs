@@ -7,7 +7,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    request_builder, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    request_builder, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -23,13 +23,11 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    let response = request_builder()
+    request_builder()
         .plugins()
         .filter_list(WpContext::Edit, &Some(params), fields)
-        .await;
-    assert!(response.is_ok(), "Response was: '{:?}'", response);
-    response
-        .unwrap()
+        .await
+        .assert_response()
         .iter()
         .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
 }
@@ -43,9 +41,9 @@ async fn filter_retrieve_plugin(
     let response = request_builder()
         .plugins()
         .filter_retrieve(WpContext::Edit, &slug.into(), fields)
-        .await;
-    assert!(response.is_ok(), "Response was: '{:?}'", response);
-    validate_sparse_plugin_fields(&response.unwrap(), fields);
+        .await
+        .assert_response();
+    validate_sparse_plugin_fields(&response, fields);
 }
 
 #[rstest]
@@ -61,25 +59,25 @@ async fn list_plugins(
 ) {
     match context {
         WpContext::Edit => {
-            let response = request_builder()
+            request_builder()
                 .plugins()
                 .list_with_edit_context(&Some(params))
-                .await;
-            assert!(response.is_ok(), "Response was: '{:?}'", response);
+                .await
+                .assert_response();
         }
         WpContext::Embed => {
-            let response = request_builder()
+            request_builder()
                 .plugins()
                 .list_with_embed_context(&Some(params))
-                .await;
-            assert!(response.is_ok(), "Response was: '{:?}'", response);
+                .await
+                .assert_response();
         }
         WpContext::View => {
-            let response = request_builder()
+            request_builder()
                 .plugins()
                 .list_with_view_context(&Some(params))
-                .await;
-            assert!(response.is_ok(), "Response was: '{:?}'", response);
+                .await
+                .assert_response();
         }
     };
 }
@@ -101,7 +99,7 @@ async fn retrieve_plugin(
                 .plugins()
                 .retrieve_with_edit_context(&plugin_slug)
                 .await
-                .unwrap();
+                .assert_response();
             assert_eq!(&plugin_slug, &plugin.plugin);
             assert_eq!(expected_author, plugin.author);
             assert_eq!(expected_plugin_uri, plugin.plugin_uri);
@@ -111,7 +109,7 @@ async fn retrieve_plugin(
                 .plugins()
                 .retrieve_with_embed_context(&plugin_slug)
                 .await
-                .unwrap();
+                .assert_response();
             assert_eq!(&plugin_slug, &plugin.plugin);
         }
         WpContext::View => {
@@ -119,7 +117,7 @@ async fn retrieve_plugin(
                 .plugins()
                 .retrieve_with_view_context(&plugin_slug)
                 .await
-                .unwrap();
+                .assert_response();
             assert_eq!(&plugin_slug, &plugin.plugin);
             assert_eq!(expected_author, plugin.author);
             assert_eq!(expected_plugin_uri, plugin.plugin_uri);

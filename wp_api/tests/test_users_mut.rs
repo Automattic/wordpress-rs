@@ -1,3 +1,4 @@
+use integration_test_common::AssertResponse;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
@@ -19,7 +20,11 @@ async fn create_user() {
             email.to_string(),
             password.to_string(),
         );
-        let created_user = request_builder().users().create(&params).await.unwrap();
+        let created_user = request_builder()
+            .users()
+            .create(&params)
+            .await
+            .assert_response();
 
         // Assert that the user is in DB
         let created_user_from_db = db.user(created_user.id.0 as u64).await.unwrap();
@@ -62,7 +67,7 @@ async fn delete_current_user() {
             .users()
             .delete_me(&user_delete_params)
             .await
-            .unwrap();
+            .assert_response();
         assert!(deleted_user.deleted);
         assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
 
@@ -188,13 +193,13 @@ async fn update_user_roles() {
             roles: vec![new_role.to_string()],
             ..Default::default()
         };
-        let user_update_response = request_builder()
-            .users()
-            .update(SECOND_USER_ID, &params)
-            .await;
         // It's quite tricky to validate the roles from DB, so we just ensure the request was
         // successful
-        assert!(user_update_response.is_ok(), "{:?}", user_update_response);
+        request_builder()
+            .users()
+            .update(SECOND_USER_ID, &params)
+            .await
+            .assert_response();
     })
     .await;
 }
@@ -207,13 +212,13 @@ async fn update_user_password() {
             password: Some(new_password.to_string()),
             ..Default::default()
         };
-        let user_update_response = request_builder()
-            .users()
-            .update(FIRST_USER_ID, &params)
-            .await;
         // It's quite tricky to validate the password from DB, so we just ensure the request was
         // successful
-        assert!(user_update_response.is_ok());
+        request_builder()
+            .users()
+            .update(FIRST_USER_ID, &params)
+            .await
+            .assert_response();
     })
     .await;
 }
@@ -223,11 +228,11 @@ where
     F: Fn(DbUser, Vec<DbUserMeta>),
 {
     wp_db::run_and_restore(|mut db| async move {
-        let user_update_response = request_builder()
+        request_builder()
             .users()
             .update(FIRST_USER_ID, &params)
-            .await;
-        assert!(user_update_response.is_ok());
+            .await
+            .assert_response();
 
         let db_user_after_update = db.user(FIRST_USER_ID.0 as u64).await.unwrap();
         let db_user_meta_after_update = db.user_meta(FIRST_USER_ID.0 as u64).await.unwrap();

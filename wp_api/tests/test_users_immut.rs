@@ -9,20 +9,20 @@ use wp_api::{
     WpApiParamOrder, WpContext,
 };
 
-use crate::integration_test_common::{request_builder, FIRST_USER_ID, SECOND_USER_ID};
+use crate::integration_test_common::{
+    request_builder, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
+};
 
 pub mod integration_test_common;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_users(#[case] fields: &[SparseUserField]) {
-    let parsed_response = request_builder()
+    request_builder()
         .users()
         .filter_list(WpContext::Edit, &None, fields)
-        .await;
-    assert!(parsed_response.is_ok());
-    parsed_response
-        .unwrap()
+        .await
+        .assert_response()
         .iter()
         .for_each(|user| validate_sparse_user_fields(user, fields));
 }
@@ -30,53 +30,53 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
 #[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
-    let user_result = request_builder()
+    let user = request_builder()
         .users()
         .filter_retrieve(FIRST_USER_ID, WpContext::Edit, fields)
-        .await;
-    assert!(user_result.is_ok());
-    validate_sparse_user_fields(&user_result.unwrap(), fields);
+        .await
+        .assert_response();
+    validate_sparse_user_fields(&user, fields);
 }
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
-    let user_result = request_builder()
+    let user = request_builder()
         .users()
         .filter_retrieve_me(WpContext::Edit, fields)
-        .await;
-    assert!(user_result.is_ok());
-    validate_sparse_user_fields(&user_result.unwrap(), fields);
+        .await
+        .assert_response();
+    validate_sparse_user_fields(&user, fields);
 }
 
 #[apply(list_users_cases)]
 #[tokio::test]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
-    let response = request_builder()
+    request_builder()
         .users()
         .list_with_edit_context(&Some(params))
-        .await;
-    assert!(response.is_ok(), "Response was: '{:?}'", response);
+        .await
+        .assert_response();
 }
 
 #[apply(list_users_cases)]
 #[tokio::test]
 async fn list_users_with_embed_context(#[case] params: UserListParams) {
-    let response = request_builder()
+    request_builder()
         .users()
         .list_with_embed_context(&Some(params))
-        .await;
-    assert!(response.is_ok(), "Response was: '{:?}'", response);
+        .await
+        .assert_response();
 }
 
 #[apply(list_users_cases)]
 #[tokio::test]
 async fn list_users_with_view_context(#[case] params: UserListParams) {
-    let response = request_builder()
+    request_builder()
         .users()
         .list_with_view_context(&Some(params))
-        .await;
-    assert!(response.is_ok(), "Response was: '{:?}'", response);
+        .await
+        .assert_response();
 }
 
 #[apply(list_users_has_published_posts_cases)]
@@ -85,14 +85,14 @@ async fn list_users_with_view_context(#[case] params: UserListParams) {
 async fn list_users_with_edit_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
-    let response = request_builder()
+    request_builder()
         .users()
         .list_with_edit_context(&Some(UserListParams {
             has_published_posts,
             ..Default::default()
         }))
-        .await;
-    assert!(response.is_ok());
+        .await
+        .assert_response();
 }
 
 #[apply(list_users_has_published_posts_cases)]
@@ -101,14 +101,14 @@ async fn list_users_with_edit_context_has_published_posts(
 async fn list_users_with_embed_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
-    let response = request_builder()
+    request_builder()
         .users()
         .list_with_embed_context(&Some(UserListParams {
             has_published_posts,
             ..Default::default()
         }))
-        .await;
-    assert!(response.is_ok());
+        .await
+        .assert_response();
 }
 
 #[apply(list_users_has_published_posts_cases)]
@@ -117,26 +117,26 @@ async fn list_users_with_embed_context_has_published_posts(
 async fn list_users_with_view_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
-    let response = request_builder()
+    request_builder()
         .users()
         .list_with_view_context(&Some(UserListParams {
             has_published_posts,
             ..Default::default()
         }))
-        .await;
-    assert!(response.is_ok());
+        .await
+        .assert_response();
 }
 
 #[rstest]
 #[trace]
 #[tokio::test]
 async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
-    let response = request_builder()
+    let user = request_builder()
         .users()
         .retrieve_with_edit_context(user_id)
-        .await;
-    assert!(response.is_ok());
-    assert_eq!(user_id, response.unwrap().id);
+        .await
+        .assert_response();
+    assert_eq!(user_id, user.id);
 }
 
 #[rstest]
@@ -145,57 +145,57 @@ async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
 async fn retrieve_user_with_embed_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
-    let response = request_builder()
+    let user = request_builder()
         .users()
         .retrieve_with_embed_context(user_id)
-        .await;
-    assert!(response.is_ok());
-    assert_eq!(user_id, response.unwrap().id);
+        .await
+        .assert_response();
+    assert_eq!(user_id, user.id);
 }
 
 #[rstest]
 #[trace]
 #[tokio::test]
 async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
-    let response = request_builder()
+    let user = request_builder()
         .users()
         .retrieve_with_view_context(user_id)
-        .await;
-    assert!(response.is_ok());
-    assert_eq!(user_id, response.unwrap().id);
+        .await
+        .assert_response();
+    assert_eq!(user_id, user.id);
 }
 
 #[tokio::test]
 async fn retrieve_me_with_edit_context() {
-    let response = request_builder()
+    let user = request_builder()
         .users()
         .retrieve_me_with_edit_context()
-        .await;
-    assert!(response.is_ok());
+        .await
+        .assert_response();
     // FIRST_USER_ID is the current user's id
-    assert_eq!(FIRST_USER_ID, response.unwrap().id);
+    assert_eq!(FIRST_USER_ID, user.id);
 }
 
 #[tokio::test]
 async fn retrieve_me_with_embed_context() {
-    let response = request_builder()
+    let user = request_builder()
         .users()
         .retrieve_me_with_embed_context()
-        .await;
-    assert!(response.is_ok());
+        .await
+        .assert_response();
     // FIRST_USER_ID is the current user's id
-    assert_eq!(FIRST_USER_ID, response.unwrap().id);
+    assert_eq!(FIRST_USER_ID, user.id);
 }
 
 #[tokio::test]
 async fn retrieve_me_with_view_context() {
-    let response = request_builder()
+    let user = request_builder()
         .users()
         .retrieve_me_with_view_context()
-        .await;
-    assert!(response.is_ok());
+        .await
+        .assert_response();
     // FIRST_USER_ID is the current user's id
-    assert_eq!(FIRST_USER_ID, response.unwrap().id);
+    assert_eq!(FIRST_USER_ID, user.id);
 }
 
 fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
