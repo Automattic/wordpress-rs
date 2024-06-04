@@ -23,12 +23,12 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    let parsed_response = request_builder()
+    let response = request_builder()
         .plugins()
         .filter_list(WpContext::Edit, &Some(params), fields)
         .await;
-    assert!(parsed_response.is_ok());
-    parsed_response
+    assert!(response.is_ok(), "Response was: '{:?}'", response);
+    response
         .unwrap()
         .iter()
         .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
@@ -40,12 +40,12 @@ async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let plugin_result = request_builder()
+    let response = request_builder()
         .plugins()
         .filter_retrieve(WpContext::Edit, &slug.into(), fields)
         .await;
-    assert!(plugin_result.is_ok());
-    validate_sparse_plugin_fields(&plugin_result.unwrap(), fields);
+    assert!(response.is_ok(), "Response was: '{:?}'", response);
+    validate_sparse_plugin_fields(&response.unwrap(), fields);
 }
 
 #[rstest]
