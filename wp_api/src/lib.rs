@@ -82,16 +82,32 @@ struct RequestBuilder {
 }
 
 impl RequestBuilder {
+    fn build_get_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+        WpNetworkRequest {
+            method: RequestMethod::GET,
+            url: url.into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     async fn get<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
         self.executor
-            .execute(WpNetworkRequest {
-                method: RequestMethod::GET,
-                url: url.into(),
-                header_map: self.header_map(),
-                body: None,
-            })
+            .execute(self.build_get_request(url))
             .await?
             .parse()
+    }
+
+    fn build_post_request<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
+    where
+        T: ?Sized + Serialize,
+    {
+        WpNetworkRequest {
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: self.header_map_for_post_request(),
+            body: serde_json::to_vec(json_body).ok(),
+        }
     }
 
     async fn post<T, R>(&self, url: ApiEndpointUrl, json_body: &T) -> Result<R, WpApiError>
@@ -100,24 +116,23 @@ impl RequestBuilder {
         R: DeserializeOwned,
     {
         self.executor
-            .execute(WpNetworkRequest {
-                method: RequestMethod::POST,
-                url: url.into(),
-                header_map: self.header_map_for_post_request(),
-                body: serde_json::to_vec(json_body).ok(),
-            })
+            .execute(self.build_post_request(url, json_body))
             .await?
             .parse()
     }
 
+    fn build_delete_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+        WpNetworkRequest {
+            method: RequestMethod::DELETE,
+            url: url.into(),
+            header_map: self.header_map(),
+            body: None,
+        }
+    }
+
     async fn delete<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
         self.executor
-            .execute(WpNetworkRequest {
-                method: RequestMethod::DELETE,
-                url: url.into(),
-                header_map: self.header_map(),
-                body: None,
-            })
+            .execute(self.build_delete_request(url))
             .await?
             .parse()
     }
