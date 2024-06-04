@@ -6,7 +6,7 @@ use request::{
     users_request_builder::UsersRequestBuilder,
     RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
 pub use api_error::{
@@ -82,7 +82,7 @@ struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    async fn get(&self, url: ApiEndpointUrl) -> Result<WpNetworkResponse, RequestExecutionError> {
+    async fn get<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
         self.executor
             .execute(WpNetworkRequest {
                 method: RequestMethod::GET,
@@ -90,16 +90,14 @@ impl RequestBuilder {
                 header_map: self.header_map(),
                 body: None,
             })
-            .await
+            .await?
+            .parse()
     }
 
-    async fn post<T>(
-        &self,
-        url: ApiEndpointUrl,
-        json_body: &T,
-    ) -> Result<WpNetworkResponse, RequestExecutionError>
+    async fn post<T, R>(&self, url: ApiEndpointUrl, json_body: &T) -> Result<R, WpApiError>
     where
         T: ?Sized + Serialize,
+        R: DeserializeOwned,
     {
         self.executor
             .execute(WpNetworkRequest {
@@ -108,13 +106,11 @@ impl RequestBuilder {
                 header_map: self.header_map_for_post_request(),
                 body: serde_json::to_vec(json_body).ok(),
             })
-            .await
+            .await?
+            .parse()
     }
 
-    async fn delete(
-        &self,
-        url: ApiEndpointUrl,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+    async fn delete<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
         self.executor
             .execute(WpNetworkRequest {
                 method: RequestMethod::DELETE,
@@ -122,7 +118,8 @@ impl RequestBuilder {
                 header_map: self.header_map(),
                 body: None,
             })
-            .await
+            .await?
+            .parse()
     }
 
     fn header_map(&self) -> HashMap<String, String> {

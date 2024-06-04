@@ -31,8 +31,7 @@ impl PluginsRequestBuilder {
     ) -> Result<Vec<PluginWithEditContext>, WpApiError> {
         self.request_builder
             .get(self.endpoint.list(WpContext::Edit, params.as_ref()))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn list_with_embed_context(
@@ -41,8 +40,7 @@ impl PluginsRequestBuilder {
     ) -> Result<Vec<PluginWithEmbedContext>, WpApiError> {
         self.request_builder
             .get(self.endpoint.list(WpContext::Embed, params.as_ref()))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn list_with_view_context(
@@ -51,8 +49,7 @@ impl PluginsRequestBuilder {
     ) -> Result<Vec<PluginWithViewContext>, WpApiError> {
         self.request_builder
             .get(self.endpoint.list(WpContext::View, params.as_ref()))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn filter_list(
@@ -63,8 +60,7 @@ impl PluginsRequestBuilder {
     ) -> Result<Vec<SparsePlugin>, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_list(context, params.as_ref(), fields))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn create(
@@ -73,8 +69,7 @@ impl PluginsRequestBuilder {
     ) -> Result<PluginWithEditContext, WpApiError> {
         self.request_builder
             .post(self.endpoint.create(), params)
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_with_edit_context(
@@ -83,8 +78,7 @@ impl PluginsRequestBuilder {
     ) -> Result<PluginWithEditContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve(WpContext::Edit, plugin))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_with_embed_context(
@@ -93,8 +87,7 @@ impl PluginsRequestBuilder {
     ) -> Result<PluginWithEmbedContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve(WpContext::Embed, plugin))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_with_view_context(
@@ -103,8 +96,7 @@ impl PluginsRequestBuilder {
     ) -> Result<PluginWithViewContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve(WpContext::View, plugin))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn filter_retrieve(
@@ -115,8 +107,7 @@ impl PluginsRequestBuilder {
     ) -> Result<SparsePlugin, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_retrieve(context, plugin, fields))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn update(
@@ -126,14 +117,12 @@ impl PluginsRequestBuilder {
     ) -> Result<PluginWithEditContext, WpApiError> {
         self.request_builder
             .post(self.endpoint.update(plugin), params)
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn delete(&self, plugin: &PluginSlug) -> Result<PluginDeleteResponse, WpApiError> {
         self.request_builder
             .delete(self.endpoint.delete(plugin))
-            .await?
-            .parse()
+            .await
     }
 }

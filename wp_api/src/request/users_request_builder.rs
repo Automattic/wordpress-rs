@@ -31,8 +31,7 @@ impl UsersRequestBuilder {
     ) -> Result<Vec<UserWithEditContext>, WpApiError> {
         self.request_builder
             .get(self.endpoint.list(WpContext::Edit, params.as_ref()))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn list_with_embed_context(
@@ -41,8 +40,7 @@ impl UsersRequestBuilder {
     ) -> Result<Vec<UserWithEmbedContext>, WpApiError> {
         self.request_builder
             .get(self.endpoint.list(WpContext::Embed, params.as_ref()))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn list_with_view_context(
@@ -51,8 +49,7 @@ impl UsersRequestBuilder {
     ) -> Result<Vec<UserWithViewContext>, WpApiError> {
         self.request_builder
             .get(self.endpoint.list(WpContext::View, params.as_ref()))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn filter_list(
@@ -63,8 +60,7 @@ impl UsersRequestBuilder {
     ) -> Result<Vec<SparseUser>, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_list(context, params.as_ref(), fields))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_with_edit_context(
@@ -73,8 +69,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve(user_id, WpContext::Edit))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_with_embed_context(
@@ -83,8 +78,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserWithEmbedContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve(user_id, WpContext::Embed))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_with_view_context(
@@ -93,8 +87,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserWithViewContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve(user_id, WpContext::View))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn filter_retrieve(
@@ -105,29 +98,25 @@ impl UsersRequestBuilder {
     ) -> Result<SparseUser, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_retrieve(user_id, context, fields))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_me_with_edit_context(&self) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve_me(WpContext::Edit))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_me_with_embed_context(&self) -> Result<UserWithEmbedContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve_me(WpContext::Embed))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn retrieve_me_with_view_context(&self) -> Result<UserWithViewContext, WpApiError> {
         self.request_builder
             .get(self.endpoint.retrieve_me(WpContext::View))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn filter_retrieve_me(
@@ -137,8 +126,7 @@ impl UsersRequestBuilder {
     ) -> Result<SparseUser, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_retrieve_me(context, fields))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn create(
@@ -147,8 +135,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
             .post(self.endpoint.create(), params)
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn update(
@@ -158,8 +145,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
             .post(self.endpoint.update(user_id), params)
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn update_me(
@@ -168,8 +154,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
             .post(self.endpoint.update_me(), params)
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn delete(
@@ -179,8 +164,7 @@ impl UsersRequestBuilder {
     ) -> Result<UserDeleteResponse, WpApiError> {
         self.request_builder
             .delete(self.endpoint.delete(user_id, params))
-            .await?
-            .parse()
+            .await
     }
 
     pub async fn delete_me(
@@ -189,7 +173,6 @@ impl UsersRequestBuilder {
     ) -> Result<UserDeleteResponse, WpApiError> {
         self.request_builder
             .delete(self.endpoint.delete_me(params))
-            .await?
-            .parse()
+            .await
     }
 }
