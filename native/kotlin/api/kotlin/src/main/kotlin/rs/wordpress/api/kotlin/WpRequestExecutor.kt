@@ -9,7 +9,7 @@ import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 
-class WpRequestExecutor(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) :
+internal class WpRequestExecutor(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) :
     RequestExecutor {
     private val client = OkHttpClient()
 

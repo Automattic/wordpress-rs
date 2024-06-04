@@ -18,12 +18,12 @@ class UsersEndpointTest {
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
     private val client = WpApiClient(siteUrl, authentication)
-    private val requestHandler = WpApiClient(siteUrl, authentication).requestHandler
-    private val users = client.requestBuilder.users()
 
     @Test
     fun testUserListRequest() = runTest {
-        val result = requestHandler.execute { users.listWithEditContext(params = null) }
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = null)
+        }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -35,7 +35,8 @@ class UsersEndpointTest {
         val params = UserListParams(
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("post", "page"))
         )
-        val result = requestHandler.execute { users.listWithEditContext(params) }
+        val result =
+            client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -44,8 +45,8 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterUserListRequest() = runTest {
-        val result = requestHandler.execute {
-            users.filterList(
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().filterList(
                 context = WpContext.EDIT,
                 params = null,
                 fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
@@ -60,8 +61,8 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
-        val result = requestHandler.execute {
-            users.filterRetrieve(
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().filterRetrieve(
                 FIRST_USER_ID,
                 WpContext.EDIT,
                 fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
@@ -75,8 +76,8 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveCurrentUserRequest() = runTest {
-        val result = requestHandler.execute {
-            users.filterRetrieveMe(
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().filterRetrieveMe(
                 WpContext.EDIT,
                 fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
             )
@@ -92,7 +93,8 @@ class UsersEndpointTest {
         val params = UserListParams(
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("foo"))
         )
-        val result = requestHandler.execute { users.listWithEditContext(params) }
+        val result =
+            client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result is RecognizedRestError)
         assertEquals(WpRestErrorCode.InvalidParam, (result as RecognizedRestError).error.code)
     }
