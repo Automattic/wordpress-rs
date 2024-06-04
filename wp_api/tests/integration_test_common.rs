@@ -194,12 +194,12 @@ impl AsyncWpNetworking {
             request = request.body(body);
         }
         let response = request.send().await?;
-        let status_code = response.status().as_u16();
-        Ok(WpNetworkResponse::new(
-            response.bytes().await.unwrap().to_vec(),
-            status_code,
-            None, // TODO: Properly read the headers
-        ))
+
+        Ok(WpNetworkResponse {
+            status_code: response.status().as_u16(),
+            body: response.bytes().await.unwrap().to_vec(),
+            header_map: None, // TODO: Properly read the headers
+        })
     }
 
     fn request_method(method: RequestMethod) -> http::Method {
