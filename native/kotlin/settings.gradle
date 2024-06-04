@@ -1,6 +1,6 @@
 pluginManagement {
     gradle.ext.detektVersion = "1.23.6"
-    gradle.ext.kotlinVersion = "1.8.20"
+    gradle.ext.kotlinVersion = "2.0.0"
     plugins {
         id("com.android.library") version "8.3.0"
         id("com.automattic.android.publish-to-s3") version "0.9.0"
