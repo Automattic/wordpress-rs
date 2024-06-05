@@ -6,10 +6,6 @@ plugins {
     id("jvm-test-suite")
 }
 
-val jniLibsPath = "${layout.buildDirectory.get()}/jniLibs/"
-val generatedTestResourcesPath = "${layout.buildDirectory.get()}/generatedTestResources/"
-val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")!!
-
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -30,7 +26,12 @@ testing {
 
             sources {
                 resources {
-                    setSrcDirs(listOf(jniLibsPath, generatedTestResourcesPath))
+                    setSrcDirs(
+                        listOf(
+                            rootProject.ext.get("jniLibsPath"),
+                            rootProject.ext.get("generatedTestResourcesPath")
+                        )
+                    )
                 }
             }
 
@@ -71,64 +72,46 @@ sourceSets {
     }
 }
 
-setupJniAndBindings()
-
-// Separated as a function to have everything in a scope and keep it contained
-fun setupJniAndBindings() {
-    val moduleName = "wp_api"
-    val nativeLibraryPath = "$cargoProjectRoot/target/release/lib${moduleName}${getNativeLibraryExtension()}"
+val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") {
+    val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")
     val uniffiGeneratedPath = "${layout.buildDirectory.get()}/generated/source/uniffi/java"
+    val nativeLibraryPath = rootProject.ext.get("nativeLibraryPath")!!
+    val rustModuleName = rootProject.ext.get("rustModuleName")
 
-    val cargoBuildLibraryReleaseTask = tasks.register<Exec>("cargoBuildLibraryRelease") {
-        workingDir(cargoProjectRoot)
-        commandLine("cargo", "build", "--package", moduleName, "--release")
-        // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
-    }
+    dependsOn(rootProject.tasks.named("cargoBuildLibraryRelease"))
+    workingDir(project.rootDir)
+    commandLine(
+        "cargo",
+        "run",
+        "--release",
+        "--bin",
+        "wp_uniffi_bindgen",
+        "generate",
+        "--library",
+        nativeLibraryPath,
+        "--out-dir",
+        uniffiGeneratedPath,
+        "--language",
+        "kotlin"
+    )
+    outputs.dir(uniffiGeneratedPath)
+    // Re-generate if the interface definition changes.
+    inputs.file(nativeLibraryPath)
+    // Re-generate if our uniffi-bindgen tooling changes.
+    inputs.dir("$cargoProjectRoot/wp_uniffi_bindgen/")
+    // Re-generate if our uniffi-bindgen version changes.
+    inputs.file("$cargoProjectRoot/Cargo.lock")
+    // Re-generate if the module source code changes
+    inputs.dir("$cargoProjectRoot/$rustModuleName/")
+}
 
-    val generateUniFFIBindingsTask = tasks.register<Exec>("generate_${moduleName}_UniFFIBindings") {
-        dependsOn(cargoBuildLibraryReleaseTask)
-        workingDir(project.rootDir)
-        commandLine(
-            "cargo",
-            "run",
-            "--release",
-            "--bin",
-            "wp_uniffi_bindgen",
-            "generate",
-            "--library",
-            nativeLibraryPath,
-            "--out-dir",
-            uniffiGeneratedPath,
-            "--language",
-            "kotlin"
-        )
-        outputs.dir(uniffiGeneratedPath)
-        // Re-generate if the interface definition changes.
-        inputs.file(nativeLibraryPath)
-        // Re-generate if our uniffi-bindgen tooling changes.
-        inputs.dir("$cargoProjectRoot/wp_uniffi_bindgen/")
-        // Re-generate if our uniffi-bindgen version changes.
-        inputs.file("$cargoProjectRoot/Cargo.lock")
-        // Re-generate if the module source code changes
-        inputs.dir("$cargoProjectRoot/${moduleName}/")
-    }
 
-    tasks.named("compileKotlin").configure {
-        dependsOn(generateUniFFIBindingsTask)
-    }
-    val copyDesktopJniLibsTask = tasks.register<Copy>("copyDesktopJniLibs") {
-        dependsOn(cargoBuildLibraryReleaseTask)
-        from(nativeLibraryPath)
-        into(jniLibsPath)
-    }
-    val copyTestCredentialsTask = tasks.register<Copy>("copyTestCredentials") {
-        from("$cargoProjectRoot/test_credentials")
-        into(generatedTestResourcesPath)
-    }
-    tasks.named("processIntegrationTestResources").configure {
-        dependsOn(copyDesktopJniLibsTask)
-        dependsOn(copyTestCredentialsTask)
-    }
+tasks.named("compileKotlin").configure {
+    dependsOn(generateUniFFIBindingsTask)
+}
+tasks.named("processIntegrationTestResources").configure {
+    dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
+    dependsOn(rootProject.tasks.named("copyTestCredentials"))
 }
 
 project.afterEvaluate {
@@ -142,16 +125,5 @@ project.afterEvaluate {
                 // version is set by "publish-to-s3" plugin
             }
         }
-   }
-}
-
-fun getNativeLibraryExtension(): String {
-    val currentOS = org.gradle.internal.os.OperatingSystem.current()
-    return if (currentOS.isLinux) {
-        ".so"
-    } else if (currentOS.isMacOsX) {
-        ".dylib"
-    } else {
-        throw GradleException("Unsupported Operating System: $currentOS")
     }
 }

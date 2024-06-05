@@ -31,7 +31,14 @@ kotlin {
     }
 
     sourceSets {
-        val desktopMain by getting
+        val desktopMain by getting {
+            resources.srcDirs(
+                listOf(
+                    rootProject.ext.get("jniLibsPath"),
+                    rootProject.ext.get("generatedTestResourcesPath")
+                )
+            )
+        }
 
         androidMain.dependencies {
             implementation(compose.preview)
@@ -52,9 +59,6 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(project(":api:kotlin"))
         }
-
-        // TODO: This won't always work
-        sourceSets["desktopMain"].resources.srcDirs(listOf("${rootDir}/api/kotlin/build/jniLibs/"))
     }
 }
 
@@ -105,4 +109,9 @@ compose.desktop {
             packageVersion = "1.0.0"
         }
     }
+}
+
+tasks.named("desktopProcessResources").configure {
+    dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
+    dependsOn(rootProject.tasks.named("copyTestCredentials"))
 }
