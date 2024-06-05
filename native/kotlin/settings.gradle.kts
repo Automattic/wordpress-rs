@@ -15,5 +15,25 @@ pluginManagement {
     }
 }
 
+dependencyResolutionManagement {
+    repositories {
+        maven {
+            url = uri("https://a8c-libs.s3.amazonaws.com/android")
+            content {
+                includeGroup("rs.wordpress.api")
+            }
+        }
+        google {
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
+            }
+        }
+        mavenCentral()
+    }
+}
+
 include(":api:kotlin")
 include(":api:android")
+include(":example:composeApp")

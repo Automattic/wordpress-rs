@@ -1,9 +1,11 @@
 [versions]
-agp = "8.4.1"
+agp = "8.3.0"
 android-compileSdk = "34"
 android-minSdk = "24"
 android-targetSdk = "34"
 androidx-annotation = "1.8.0"
+androidx-activityCompose = "1.9.0"
+androidx-core-ktx = "1.13.1"
 androidxTestRulesVersion = "1.5.0"
 androidxTestRunnerVersion = "1.5.2"
 compose-plugin = "1.6.10"
@@ -17,7 +19,9 @@ publish-to-s3-plugin = "0.9.0"
 rust-android-plugin = "0.9.4"
 
 [libraries]
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "androidx-annotation" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core-ktx" }
 androidx-rules = { module = "androidx.test:rules", version.ref = "androidxTestRulesVersion" }
 androidx-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunnerVersion" }
 detekt-formatting = { group = "io.gitlab.arturbosch.detekt", name = "detekt-formatting", version.ref = "detekt-plugin" }
@@ -31,7 +35,10 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okHtt
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt-plugin" }
+jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 publishToS3 = { id = "com.automattic.android.publish-to-s3", version.ref = "publish-to-s3-plugin" }
 rustAndroid = { id = "org.mozilla.rust-android-gradle.rust-android", version.ref = "rust-android-plugin" }

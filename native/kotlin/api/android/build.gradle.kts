@@ -60,17 +60,6 @@ android {
     sourceSets["androidTest"].jniLibs.srcDirs.plus("${layout.buildDirectory.get()}/rustJniLibs/android")
 }
 
-repositories {
-    maven {
-        url = uri("https://a8c-libs.s3.amazonaws.com/android")
-        content {
-            includeGroup("rs.wordpress.api")
-        }
-    }
-    mavenCentral()
-    google()
-}
-
 dependencies {
     if (project.hasProperty("wpApiKotlinVersion")) {
         api("rs.wordpress.api:kotlin:${project.properties["wpApiKotlinVersion"]}") {

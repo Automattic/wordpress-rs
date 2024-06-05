@@ -57,11 +57,6 @@ tasks.named("check") {
     dependsOn(testing.suites.named("integrationTest"))
 }
 
-repositories {
-    mavenCentral()
-    google()
-}
-
 dependencies {
     implementation(libs.okhttp)
     implementation(libs.jna)
