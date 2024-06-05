@@ -8,18 +8,7 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
-buildscript {
-  extra.apply {
-      set("cargoProjectRoot", "${project.rootDir}/../..")
-
-      val wpApiKotlinProjectDependency = if (project.hasProperty("wpApiKotlinVersion")) {
-          "rs.wordpress.api:kotlin:${project.properties["wpApiKotlinVersion"]}"
-      } else {
-          project(":api:kotlin")
-      }
-      set("wpApiKotlinProjectDependency", wpApiKotlinProjectDependency)
-  }
-}
+rootProject.ext.set("cargoProjectRoot", "${project.rootDir}/../..")
 
 allprojects {
     apply(plugin = rootProject.libs.plugins.detekt.get().pluginId)

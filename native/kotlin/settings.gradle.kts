@@ -10,28 +10,8 @@ pluginManagement {
                 includeGroup("com.automattic.android.publish-to-s3")
             }
         }
-        google {
-            mavenContent {
-                includeGroupAndSubgroups("androidx")
-                includeGroupAndSubgroups("com.android")
-                includeGroupAndSubgroups("com.google")
-            }
-        }
-        mavenCentral()
         gradlePluginPortal()
-    }
-}
-
-dependencyResolutionManagement {
-    repositories {
-        google {
-            mavenContent {
-                includeGroupAndSubgroups("androidx")
-                includeGroupAndSubgroups("com.android")
-                includeGroupAndSubgroups("com.google")
-            }
-        }
-        mavenCentral()
+        google()
     }
 }
 
