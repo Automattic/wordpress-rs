@@ -1,15 +1,15 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseUserField
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class UsersEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
