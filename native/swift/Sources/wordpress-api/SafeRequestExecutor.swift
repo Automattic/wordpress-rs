@@ -15,7 +15,7 @@ public protocol SafeRequestExecutor: RequestExecutor {
 
 extension SafeRequestExecutor {
 
-    public func execute(request: WpNetworkRequest) async throws  -> WpNetworkResponse {
+    public func execute(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let result = await execute(request)
         return try result.get()
     }
@@ -24,6 +24,7 @@ extension SafeRequestExecutor {
 
 extension URLSession: SafeRequestExecutor {
 
+    // swiftlint:disable force_cast
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
             let (data, response) = try await self.data(for: request.asURLRequest())
@@ -40,5 +41,5 @@ extension URLSession: SafeRequestExecutor {
             return .failure(.RequestExecutionFailed(statusCode: nil, reason: ""))
         }
     }
-
+    // swiftlint:enable force_cast
 }

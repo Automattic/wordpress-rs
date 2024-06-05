@@ -64,7 +64,7 @@ final class WordPressAPITests: XCTestCase {
         )
 
         do {
-            let _ = try await api.users.retrieveWithViewContext(userId: 1)
+            _ = try await api.users.retrieveWithViewContext(userId: 1)
             XCTFail("Unexpected response")
         } catch let error as URLError {
             XCTAssertEqual(error.code, .timedOut)
