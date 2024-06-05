@@ -1,15 +1,13 @@
 import XCTest
 import Foundation
 import WordPressAPI
-#if canImport(WordPressAPIInternal)
-import WordPressAPIInternal
-#endif
 
 final class WordPressAPITests: XCTestCase {
 
-    func testExample() throws {
-        let request = try WpRequestBuilder(siteUrl: "https://wordpress.org", authentication: .none)
-            .users().list(context: .view, params: nil)
-        XCTAssertTrue(try XCTUnwrap(request).url.hasPrefix("https://wordpress.org/wp-json/wp/v2/users"))
+    func testExample() async throws {
+        // TODO: Implement a `RequestExecutor` to stub HTTP requests in unit tests.
+        let api = try WordPressAPI(urlSession: .shared, baseUrl: URL(string: "https://wordpress.org")!, authenticationStategy: .none)
+        let users = try await api.users.listWithViewContext(params: nil)
+        XCTAssertFalse(users.isEmpty)
     }
 }
