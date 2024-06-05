@@ -36,6 +36,7 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(project(":api:android"))
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -44,6 +45,8 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
+            implementation(libs.androidx.material)
+            implementation(libs.landscapist.coil)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

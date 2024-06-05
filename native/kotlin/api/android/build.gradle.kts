@@ -28,6 +28,7 @@ android {
 
     buildTypes {
         debug {
+            // TODO: Test credentials shouldn't be included while publishing
             readTestCredentials()?.let {
                 buildConfigField("String", "TEST_SITE_URL", "\"${it.siteUrl}\"")
                 buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${it.adminUsername}\"")
