@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use serde::Deserialize;
 use url::Url;
 
-use crate::WpApiError;
+use crate::{api_error::RequestExecutionError, WpApiError};
 
 use self::endpoint::WpEndpointUrl;
 
@@ -12,6 +12,15 @@ pub mod plugins_request_builder;
 pub mod users_request_builder;
 
 const LINK_HEADER_KEY: &str = "Link";
+
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait RequestExecutor: Send + Sync + Debug {
+    async fn execute(
+        &self,
+        request: WpNetworkRequest,
+    ) -> Result<WpNetworkResponse, RequestExecutionError>;
+}
 
 // Has custom `Debug` trait implementation
 #[derive(uniffi::Record)]
@@ -150,16 +159,6 @@ pub enum RequestMethod {
 
 fn body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
-}
-
-#[macro_export]
-macro_rules! add_uniffi_exported_parser {
-    ($fn_name:ident, $return_type: ty) => {
-        #[uniffi::export]
-        pub fn $fn_name(response: &WpNetworkResponse) -> Result<$return_type, WpApiError> {
-            response.parse::<$return_type>()
-        }
-    };
 }
 
 #[cfg(test)]

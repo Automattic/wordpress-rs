@@ -5,14 +5,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 
-class WpNetworkHandler(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) :
-    NetworkHandler {
+internal class WpRequestExecutor(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) :
+    RequestExecutor {
     private val client = OkHttpClient()
 
-    override suspend fun request(request: WpNetworkRequest): WpNetworkResponse =
+    override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url)
             request.headerMap.forEach { (key, value) ->

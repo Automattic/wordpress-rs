@@ -3,12 +3,11 @@ use rstest_reuse::{self, apply, template};
 use wp_api::{
     generate,
     plugins::{PluginListParams, PluginSlug, PluginStatus, SparsePlugin, SparsePluginField},
-    request::WpNetworkResponse,
     WpContext,
 };
 
 use crate::integration_test_common::{
-    request_builder, WpNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    request_builder, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -24,16 +23,11 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    let parsed_response = request_builder()
+    request_builder()
         .plugins()
         .filter_list(WpContext::Edit, &Some(params), fields)
-        .execute()
         .await
-        .unwrap()
-        .parse_with(wp_api::plugins::parse_filter_plugins_response);
-    assert!(parsed_response.is_ok());
-    parsed_response
-        .unwrap()
+        .assert_response()
         .iter()
         .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
 }
@@ -44,15 +38,12 @@ async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let plugin_result = request_builder()
+    let response = request_builder()
         .plugins()
         .filter_retrieve(WpContext::Edit, &slug.into(), fields)
-        .execute()
         .await
-        .unwrap()
-        .parse_with(wp_api::plugins::parse_filter_retrieve_plugin_response);
-    assert!(plugin_result.is_ok());
-    validate_sparse_plugin_fields(&plugin_result.unwrap(), fields);
+        .assert_response();
+    validate_sparse_plugin_fields(&response, fields);
 }
 
 #[rstest]
@@ -66,39 +57,27 @@ async fn list_plugins(
     #[case] params: PluginListParams,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
-    let response = request_builder()
-        .plugins()
-        .list(context, &Some(params))
-        .execute()
-        .await
-        .unwrap();
     match context {
         WpContext::Edit => {
-            let parsed_response =
-                wp_api::plugins::parse_list_plugins_response_with_edit_context(&response);
-            assert!(
-                parsed_response.is_ok(),
-                "Response was: '{:?}'",
-                parsed_response
-            );
+            request_builder()
+                .plugins()
+                .list_with_edit_context(&Some(params))
+                .await
+                .assert_response();
         }
         WpContext::Embed => {
-            let parsed_response =
-                wp_api::plugins::parse_list_plugins_response_with_embed_context(&response);
-            assert!(
-                parsed_response.is_ok(),
-                "Response was: '{:?}'",
-                parsed_response
-            );
+            request_builder()
+                .plugins()
+                .list_with_embed_context(&Some(params))
+                .await
+                .assert_response();
         }
         WpContext::View => {
-            let parsed_response =
-                wp_api::plugins::parse_list_plugins_response_with_view_context(&response);
-            assert!(
-                parsed_response.is_ok(),
-                "Response was: '{:?}'",
-                parsed_response
-            );
+            request_builder()
+                .plugins()
+                .list_with_view_context(&Some(params))
+                .await
+                .assert_response();
         }
     };
 }
@@ -114,68 +93,36 @@ async fn retrieve_plugin(
     #[case] expected_plugin_uri: &str,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
-    let response = request_builder()
-        .plugins()
-        .retrieve(context, &plugin_slug)
-        .execute()
-        .await;
-    assert!(
-        response.is_ok(),
-        "Retrieve plugin failed!\nContext: {:?}\nPlugin: {:?}\nResponse was: '{:?}'",
-        context,
-        plugin_slug,
-        response
-    );
-    assert_retrieve_plugin_response(
-        &response.unwrap(),
-        context,
-        &plugin_slug,
-        if context == WpContext::Embed {
-            None
-        } else {
-            Some(expected_author)
-        },
-        if context == WpContext::Embed {
-            None
-        } else {
-            Some(expected_plugin_uri)
-        },
-    );
-}
-
-fn assert_retrieve_plugin_response(
-    response: &WpNetworkResponse,
-    context: WpContext,
-    expected_slug: &PluginSlug,
-    expected_author: Option<&str>,
-    expected_plugin_uri: Option<&str>,
-) {
-    let (plugin, author, plugin_uri) = match context {
+    match context {
         WpContext::Edit => {
-            let parsed_response =
-                wp_api::plugins::parse_retrieve_plugin_response_with_edit_context(response);
-            assert!(parsed_response.is_ok());
-            let p = parsed_response.unwrap();
-            (p.plugin, Some(p.author), Some(p.plugin_uri))
+            let plugin = request_builder()
+                .plugins()
+                .retrieve_with_edit_context(&plugin_slug)
+                .await
+                .assert_response();
+            assert_eq!(&plugin_slug, &plugin.plugin);
+            assert_eq!(expected_author, plugin.author);
+            assert_eq!(expected_plugin_uri, plugin.plugin_uri);
         }
         WpContext::Embed => {
-            let parsed_response =
-                wp_api::plugins::parse_retrieve_plugin_response_with_embed_context(response);
-            assert!(parsed_response.is_ok());
-            let p = parsed_response.unwrap();
-            (p.plugin, None, None)
+            let plugin = request_builder()
+                .plugins()
+                .retrieve_with_embed_context(&plugin_slug)
+                .await
+                .assert_response();
+            assert_eq!(&plugin_slug, &plugin.plugin);
         }
         WpContext::View => {
-            let parsed_response =
-                wp_api::plugins::parse_retrieve_plugin_response_with_view_context(response);
-            assert!(parsed_response.is_ok());
-            let p = parsed_response.unwrap();
-            (p.plugin, Some(p.author), Some(p.plugin_uri))
+            let plugin = request_builder()
+                .plugins()
+                .retrieve_with_view_context(&plugin_slug)
+                .await
+                .assert_response();
+            assert_eq!(&plugin_slug, &plugin.plugin);
+            assert_eq!(expected_author, plugin.author);
+            assert_eq!(expected_plugin_uri, plugin.plugin_uri);
         }
     };
-    assert_eq!(expected_slug, &plugin);
-    assert_eq!(expected_author, author.as_deref());
-    assert_eq!(expected_plugin_uri, plugin_uri.as_deref());
 }
 
 fn validate_sparse_plugin_fields(plugin: &SparsePlugin, fields: &[SparsePluginField]) {

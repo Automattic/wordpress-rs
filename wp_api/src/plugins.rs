@@ -1,37 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{add_uniffi_exported_parser, SparseField, WpApiError, WpNetworkResponse};
-
-add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
-add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);
-add_uniffi_exported_parser!(
-    parse_list_plugins_response_with_edit_context,
-    Vec<PluginWithEditContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_plugins_response_with_embed_context,
-    Vec<PluginWithEmbedContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_plugins_response_with_view_context,
-    Vec<PluginWithViewContext>
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_plugin_response_with_edit_context,
-    PluginWithEditContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_plugin_response_with_embed_context,
-    PluginWithEmbedContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_plugin_response_with_view_context,
-    PluginWithViewContext
-);
-add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext);
-add_uniffi_exported_parser!(parse_update_plugin_response, PluginWithEditContext);
-add_uniffi_exported_parser!(parse_delete_plugin_response, PluginDeleteResponse);
+use crate::SparseField;
 
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {

@@ -4,12 +4,14 @@ use request::{
     endpoint::{ApiBaseUrl, ApiEndpointUrl},
     plugins_request_builder::PluginsRequestBuilder,
     users_request_builder::UsersRequestBuilder,
-    RequestMethod, WpNetworkRequest, WpNetworkResponse,
+    RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
 };
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
-pub use api_error::{WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper};
+pub use api_error::{
+    RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
+};
 use login::*;
 use plugins::*;
 use users::*;
@@ -34,7 +36,11 @@ pub struct WpRequestBuilder {
 #[uniffi::export]
 impl WpRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
+    pub fn new(
+        site_url: String,
+        authentication: WpAuthentication,
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
             .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
@@ -42,6 +48,7 @@ impl WpRequestBuilder {
             .into();
         let request_builder = Arc::new(RequestBuilder {
             authentication: authentication.clone(),
+            executor: request_executor,
         });
 
         Ok(Self {
@@ -70,11 +77,12 @@ fn wp_authentication_from_username_and_password(
 
 #[derive(Debug)]
 struct RequestBuilder {
+    executor: Arc<dyn RequestExecutor>,
     authentication: WpAuthentication,
 }
 
 impl RequestBuilder {
-    fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+    fn build_get_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
@@ -83,7 +91,14 @@ impl RequestBuilder {
         }
     }
 
-    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
+    async fn get<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
+        self.executor
+            .execute(self.build_get_request(url))
+            .await?
+            .parse()
+    }
+
+    fn build_post_request<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
     {
@@ -95,13 +110,31 @@ impl RequestBuilder {
         }
     }
 
-    fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+    async fn post<T, R>(&self, url: ApiEndpointUrl, json_body: &T) -> Result<R, WpApiError>
+    where
+        T: ?Sized + Serialize,
+        R: DeserializeOwned,
+    {
+        self.executor
+            .execute(self.build_post_request(url, json_body))
+            .await?
+            .parse()
+    }
+
+    fn build_delete_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
             header_map: self.header_map(),
             body: None,
         }
+    }
+
+    async fn delete<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
+        self.executor
+            .execute(self.build_delete_request(url))
+            .await?
+            .parse()
     }
 
     fn header_map(&self) -> HashMap<String, String> {

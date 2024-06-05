@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
 use crate::{
-    RequestBuilder, SparseUserField, UserCreateParams, UserDeleteParams, UserId, UserListParams,
-    UserUpdateParams, WpContext,
+    RequestBuilder, SparseUser, SparseUserField, UserCreateParams, UserDeleteParams,
+    UserDeleteResponse, UserId, UserListParams, UserUpdateParams, UserWithEditContext,
+    UserWithEmbedContext, UserWithViewContext, WpApiError, WpContext,
 };
 
-use super::{
-    endpoint::{users_endpoint::UsersEndpoint, ApiBaseUrl},
-    WpNetworkRequest,
-};
+use super::endpoint::{users_endpoint::UsersEndpoint, ApiBaseUrl};
 
 #[derive(Debug, uniffi::Object)]
 pub struct UsersRequestBuilder {
@@ -27,72 +25,154 @@ impl UsersRequestBuilder {
 
 #[uniffi::export]
 impl UsersRequestBuilder {
-    pub fn list(
+    pub async fn list_with_edit_context(
         &self,
-        context: WpContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
-    ) -> WpNetworkRequest {
+    ) -> Result<Vec<UserWithEditContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(context, params.as_ref()))
+            .get(self.endpoint.list(WpContext::Edit, params.as_ref()))
+            .await
     }
 
-    pub fn filter_list(
+    pub async fn list_with_embed_context(
+        &self,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+    ) -> Result<Vec<UserWithEmbedContext>, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.list(WpContext::Embed, params.as_ref()))
+            .await
+    }
+
+    pub async fn list_with_view_context(
+        &self,
+        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+    ) -> Result<Vec<UserWithViewContext>, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.list(WpContext::View, params.as_ref()))
+            .await
+    }
+
+    pub async fn filter_list(
         &self,
         context: WpContext,
         params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
         fields: &[SparseUserField],
-    ) -> WpNetworkRequest {
+    ) -> Result<Vec<SparseUser>, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_list(context, params.as_ref(), fields))
+            .await
     }
 
-    pub fn retrieve(&self, user_id: UserId, context: WpContext) -> WpNetworkRequest {
+    pub async fn retrieve_with_edit_context(
+        &self,
+        user_id: UserId,
+    ) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
-            .get(self.endpoint.retrieve(user_id, context))
+            .get(self.endpoint.retrieve(user_id, WpContext::Edit))
+            .await
     }
 
-    pub fn filter_retrieve(
+    pub async fn retrieve_with_embed_context(
+        &self,
+        user_id: UserId,
+    ) -> Result<UserWithEmbedContext, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.retrieve(user_id, WpContext::Embed))
+            .await
+    }
+
+    pub async fn retrieve_with_view_context(
+        &self,
+        user_id: UserId,
+    ) -> Result<UserWithViewContext, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.retrieve(user_id, WpContext::View))
+            .await
+    }
+
+    pub async fn filter_retrieve(
         &self,
         user_id: UserId,
         context: WpContext,
         fields: &[SparseUserField],
-    ) -> WpNetworkRequest {
+    ) -> Result<SparseUser, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_retrieve(user_id, context, fields))
+            .await
     }
 
-    pub fn retrieve_me(&self, context: WpContext) -> WpNetworkRequest {
-        self.request_builder.get(self.endpoint.retrieve_me(context))
+    pub async fn retrieve_me_with_edit_context(&self) -> Result<UserWithEditContext, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.retrieve_me(WpContext::Edit))
+            .await
     }
 
-    pub fn filter_retrieve_me(
+    pub async fn retrieve_me_with_embed_context(&self) -> Result<UserWithEmbedContext, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.retrieve_me(WpContext::Embed))
+            .await
+    }
+
+    pub async fn retrieve_me_with_view_context(&self) -> Result<UserWithViewContext, WpApiError> {
+        self.request_builder
+            .get(self.endpoint.retrieve_me(WpContext::View))
+            .await
+    }
+
+    pub async fn filter_retrieve_me(
         &self,
         context: WpContext,
         fields: &[SparseUserField],
-    ) -> WpNetworkRequest {
+    ) -> Result<SparseUser, WpApiError> {
         self.request_builder
             .get(self.endpoint.filter_retrieve_me(context, fields))
+            .await
     }
 
-    pub fn create(&self, params: &UserCreateParams) -> WpNetworkRequest {
-        self.request_builder.post(self.endpoint.create(), params)
+    pub async fn create(
+        &self,
+        params: &UserCreateParams,
+    ) -> Result<UserWithEditContext, WpApiError> {
+        self.request_builder
+            .post(self.endpoint.create(), params)
+            .await
     }
 
-    pub fn update(&self, user_id: UserId, params: &UserUpdateParams) -> WpNetworkRequest {
+    pub async fn update(
+        &self,
+        user_id: UserId,
+        params: &UserUpdateParams,
+    ) -> Result<UserWithEditContext, WpApiError> {
         self.request_builder
             .post(self.endpoint.update(user_id), params)
+            .await
     }
 
-    pub fn update_me(&self, params: &UserUpdateParams) -> WpNetworkRequest {
-        self.request_builder.post(self.endpoint.update_me(), params)
+    pub async fn update_me(
+        &self,
+        params: &UserUpdateParams,
+    ) -> Result<UserWithEditContext, WpApiError> {
+        self.request_builder
+            .post(self.endpoint.update_me(), params)
+            .await
     }
 
-    pub fn delete(&self, user_id: UserId, params: &UserDeleteParams) -> WpNetworkRequest {
+    pub async fn delete(
+        &self,
+        user_id: UserId,
+        params: &UserDeleteParams,
+    ) -> Result<UserDeleteResponse, WpApiError> {
         self.request_builder
             .delete(self.endpoint.delete(user_id, params))
+            .await
     }
 
-    pub fn delete_me(&self, params: &UserDeleteParams) -> WpNetworkRequest {
-        self.request_builder.delete(self.endpoint.delete_me(params))
+    pub async fn delete_me(
+        &self,
+        params: &UserDeleteParams,
+    ) -> Result<UserDeleteResponse, WpApiError> {
+        self.request_builder
+            .delete(self.endpoint.delete_me(params))
+            .await
     }
 }

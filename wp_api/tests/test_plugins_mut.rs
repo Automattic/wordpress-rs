@@ -1,9 +1,10 @@
+use integration_test_common::AssertResponse;
 use rstest::rstest;
 use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
 
 use crate::integration_test_common::{
-    request_builder, run_and_restore_wp_content_plugins, WpNetworkRequestExecutor,
-    CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
+    request_builder, run_and_restore_wp_content_plugins, CLASSIC_EDITOR_PLUGIN_SLUG,
+    HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
 pub mod integration_test_common;
@@ -21,11 +22,8 @@ async fn create_plugin() {
             let created_plugin = request_builder()
                 .plugins()
                 .create(&params)
-                .execute()
                 .await
-                .unwrap()
-                .parse_with(wp_api::plugins::parse_create_plugin_response)
-                .unwrap();
+                .assert_response();
             assert_eq!(created_plugin.status, status);
             println!("Created Plugin: {:?}", created_plugin);
         })
@@ -44,11 +42,8 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
             let updated_plugin = request_builder()
                 .plugins()
                 .update(&slug, &PluginUpdateParams { status: new_status })
-                .execute()
                 .await
-                .unwrap()
-                .parse_with(wp_api::plugins::parse_update_plugin_response)
-                .unwrap();
+                .assert_response();
             assert_eq!(updated_plugin.status, new_status);
             println!("Updated Plugin: {:?}", updated_plugin);
         })
@@ -64,11 +59,8 @@ async fn delete_plugin() {
             let deleted_plugin = request_builder()
                 .plugins()
                 .delete(&slug)
-                .execute()
                 .await
-                .unwrap()
-                .parse_with(wp_api::plugins::parse_delete_plugin_response)
-                .unwrap();
+                .assert_response();
             assert_eq!(slug, deleted_plugin.previous.plugin);
             println!("Deleted Plugin: {:?}", deleted_plugin);
         })

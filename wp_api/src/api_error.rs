@@ -1,7 +1,29 @@
 use serde::Deserialize;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum RequestExecutionError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
     #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
     RestError {
         rest_error: WpRestErrorWrapper,
@@ -84,15 +106,6 @@ pub enum WpRestErrorCode {
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
     // ---
-    // Tested, but we believe these errors are imppossible to get unless the requests are manually modified
-    // ---
-    #[serde(rename = "rest_user_exists")]
-    UserExists,
-    #[serde(rename = "rest_user_invalid_argument")]
-    UserInvalidArgument,
-    #[serde(rename = "rest_trash_not_supported")]
-    TrashNotSupported,
-    // ---
     // Untested, because we believe these errors require multisite
     // ---
     #[serde(rename = "rest_cannot_manage_network_plugins")]
@@ -102,18 +115,27 @@ pub enum WpRestErrorCode {
     #[serde(rename = "rest_user_create")]
     UserCreate,
     // ---
-    // Untested, because we believe these errors are impossible to get
+    // Untested, because we don't think these errors are possible to get while using this library
     // ---
-    /// Happens while activating a plugin without the `activate_plugin` permission.
+    /// If a plugin is tried to be activated without the `activate_plugin` permission.
     /// However, in a default setup a prior check of `activate_plugins` will fail
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_activate_plugin")]
     CannotActivatePlugin,
-    /// Happens while deactivating a plugin without the `deactivate_plugin` permission.
-    /// However, in a default setup a prior check of `activate_plugins` will fail
+    /// If a plugin is tried to be deactivated without the `deactivate_plugin` permission.
+    /// However, in a default setup a prior check of `deactivate_plugin` will fail
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_deactivate_plugin")]
     CannotDeactivatePlugin,
+    // If `force=true` is missing from delete user request.
+    #[serde(rename = "rest_trash_not_supported")]
+    TrashNotSupported,
+    // If the create user url includes an existing user id.
+    #[serde(rename = "rest_user_exists")]
+    UserExists,
+    // If username is included in the update user request.
+    #[serde(rename = "rest_user_invalid_argument")]
+    UserInvalidArgument,
     #[serde(rename = "rest_user_invalid_username")]
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]
@@ -161,4 +183,18 @@ pub enum WpInternalErrorCode {
     UnableToDetermineInstalledPlugin,
     #[serde(rename = "unexpected_output")]
     UnexpectedOutput,
+}
+
+impl From<RequestExecutionError> for WpApiError {
+    fn from(value: RequestExecutionError) -> Self {
+        match value {
+            RequestExecutionError::RequestExecutionFailed {
+                status_code,
+                reason,
+            } => Self::RequestExecutionFailed {
+                status_code,
+                reason,
+            },
+        }
+    }
 }
