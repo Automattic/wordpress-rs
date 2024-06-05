@@ -17,11 +17,25 @@ public struct WordPressAPI {
     package let requestBuilder: WpRequestBuilderProtocol
 
     public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) throws {
+        try self.init(
+            urlSession: urlSession,
+            baseUrl: baseUrl,
+            authenticationStategy: authenticationStategy,
+            executor: urlSession
+        )
+    }
+
+    init(
+        urlSession: URLSession,
+        baseUrl: URL,
+        authenticationStategy: WpAuthentication,
+        executor: RequestExecutor
+    ) throws {
         self.urlSession = urlSession
         self.requestBuilder = try WpRequestBuilder(
             siteUrl: baseUrl.absoluteString,
             authentication: authenticationStategy,
-            requestExecutor: urlSession
+            requestExecutor: executor
         )
     }
 
@@ -209,8 +223,32 @@ extension URL {
 }
 
 extension URLSession: RequestExecutor {
-    public func execute(request: WordPressAPIInternal.WpNetworkRequest) async throws -> WpNetworkResponse {
+    public func execute(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let (data, response) = try await self.data(for: request.asURLRequest())
         return try WpNetworkResponse.from(data: data, response: response)
     }
 }
+
+#if os(Linux)
+// `URLSession.data(for:) async throws` is not available on Linux's Foundation framework.
+extension URLSession {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        try await withCheckedThrowingContinuation { continuation in
+            let task = self.dataTask(with: request) { data, response, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let data = data, let response = response else {
+                    continuation.resume(throwing: WordPressAPI.Errors.unableToParseResponse)
+                    return
+                }
+
+                continuation.resume(returning: (data, response))
+            }
+            task.resume()
+        }
+    }
+}
+#endif
