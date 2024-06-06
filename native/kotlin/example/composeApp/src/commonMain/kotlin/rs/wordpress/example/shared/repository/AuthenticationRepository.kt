@@ -1,5 +1,6 @@
 package rs.wordpress.example.shared.repository
 
+import rs.wordpress.example.shared.domain.AuthenticatedSite
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
@@ -8,7 +9,7 @@ class AuthenticationRepository(
     localTestSiteUsername: String,
     localTestSitePassword: String
 ) {
-    private val authenticatedSites = mutableMapOf<String, WpAuthentication>()
+    private val authenticatedSites = mutableMapOf<AuthenticatedSite, WpAuthentication>()
 
     init {
         addAuthenticatedSite(localTestSiteUrl, localTestSiteUsername, localTestSitePassword)
@@ -16,11 +17,16 @@ class AuthenticationRepository(
 
     fun addAuthenticatedSite(siteUrl: String, username: String, password: String): Boolean {
         if (siteUrl.isNotEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-            authenticatedSites[siteUrl] = wpAuthenticationFromUsernameAndPassword(username, password)
+            authenticatedSites[AuthenticatedSite(name = siteUrl, url = siteUrl)] =
+                wpAuthenticationFromUsernameAndPassword(username, password)
             return true
         }
         return false
     }
 
-    fun authenticatedSiteList(): List<String> = authenticatedSites.keys.toList().sorted()
+    fun authenticatedSiteList(): List<AuthenticatedSite> =
+        authenticatedSites.keys.toList().sortedBy { it.name }
+
+    fun authenticationForSite(authenticatedSite: AuthenticatedSite): WpAuthentication? =
+        authenticatedSites[authenticatedSite]
 }

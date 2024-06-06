@@ -19,6 +19,8 @@ kotlinx-coroutines = "1.8.1"
 landscapist = "2.3.3"
 lifecycle = "2.8.1"
 okHttp = "4.12.0"
+navigation = "2.7.7"
+navigationCompose = "2.8.0-alpha02"
 publish-to-s3-plugin = "0.9.0"
 rust-android-plugin = "0.9.4"
 
@@ -30,6 +32,7 @@ androidx-rules = { module = "androidx.test:rules", version.ref = "androidxTestRu
 androidx-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunnerVersion" }
 androidx-material = { group = "androidx.compose.material3", name = "material3", version.ref = "androidx-material3" }
 detekt-formatting = { group = "io.gitlab.arturbosch.detekt", name = "detekt-formatting", version.ref = "detekt-plugin" }
+jetbrains-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna"}
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
@@ -41,6 +44,9 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 landscapist-coil = { group = "com.github.skydoves", name = "landscapist-coil3", version.ref = "landscapist" }
 lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "lifecycle" }
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigation" }
+navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigation" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okHttp" }
 
 [plugins]

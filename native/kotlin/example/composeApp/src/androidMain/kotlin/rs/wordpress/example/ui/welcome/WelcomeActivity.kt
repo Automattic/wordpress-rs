@@ -5,14 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
+import rs.wordpress.example.shared.App
 
 class WelcomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            WelcomeScreen()
+            App()
         }
     }
 }
@@ -20,5 +20,5 @@ class WelcomeActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    WelcomeScreen()
+    App()
 }

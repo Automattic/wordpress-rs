@@ -35,6 +35,9 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.koin.android)
             implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.navigation.compose)
+            implementation(libs.navigation.fragment.ktx)
+            implementation(libs.navigation.ui.ktx)
             implementation(project(":api:android"))
         }
         commonMain.dependencies {
@@ -44,6 +47,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
+            implementation(libs.jetbrains.navigation.compose)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.kotlinx.coroutines.core)
