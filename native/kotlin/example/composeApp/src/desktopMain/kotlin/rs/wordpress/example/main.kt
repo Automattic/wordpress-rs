@@ -1,3 +1,4 @@
+package rs.wordpress.example
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
