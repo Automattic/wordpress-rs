@@ -85,8 +85,10 @@ steps:
           make test-swift-linux
       - label: ":swift: Lint"
         command: |
+          .buildkite/download-xcframework.sh
           echo "--- :swift: Swiftlint"
           make lint-swift
+        depends_on: xcframework
         env:
           IMAGE_ID: xcode-15.3
         agents:
