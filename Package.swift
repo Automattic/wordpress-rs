@@ -61,11 +61,9 @@ var package = Package(
     ]
 )
 
-let isCI = ProcessInfo.processInfo.environment["CI"] == "true"
-
 // MARK: - Enable local development toolings
 
-let localDevelopment = !isCI && libwordpressFFIVersion.isLocal
+let localDevelopment = libwordpressFFIVersion.isLocal
 
 if localDevelopment {
     try enableSwiftLint()

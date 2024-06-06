@@ -87,6 +87,10 @@ steps:
         command: |
           echo "--- :swift: Swiftlint"
           make lint-swift
+        env:
+          IMAGE_ID: xcode-15.3
+        agents:
+          queue: mac
   #
   # Kotlin Group
   - group: ":kotlin: Kotlin Wrapper"
