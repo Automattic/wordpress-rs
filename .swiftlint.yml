@@ -10,3 +10,6 @@ disabled_rules:
   - non_optional_string_data_conversion
   # Allow using short names (i.e. T, U, ID) for generic types.
   - type_name
+  # The library is still developing. We'll allow todo at this stage.
+  - todo
+
