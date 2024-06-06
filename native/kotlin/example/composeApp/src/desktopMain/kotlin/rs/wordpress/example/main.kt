@@ -4,7 +4,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import org.koin.compose.KoinApplication
 import rs.wordpress.example.shared.App
-import rs.wordpress.example.shared.di.commonModule
+import rs.wordpress.example.shared.di.commonModules
 
 fun main() = application {
     Window(
@@ -12,7 +12,7 @@ fun main() = application {
         title = "WordPressRsExample",
     ) {
         KoinApplication(application = {
-            modules(commonModule())
+            modules(commonModules())
         }) {
             App()
         }
