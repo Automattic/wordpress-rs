@@ -3,6 +3,7 @@ package rs.wordpress.example.shared.di
 import org.koin.dsl.module
 import rs.wordpress.example.shared.localTestSiteUrl
 import rs.wordpress.example.shared.repository.AuthenticationRepository
+import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 
@@ -19,6 +20,7 @@ val authModule = module {
 
 val viewModelModule = module {
     // TODO: Need to pass a scoped api client
+    single { PluginListViewModel(get()) }
     single { UserListViewModel(get()) }
     single { WelcomeViewModel(get()) }
 }
