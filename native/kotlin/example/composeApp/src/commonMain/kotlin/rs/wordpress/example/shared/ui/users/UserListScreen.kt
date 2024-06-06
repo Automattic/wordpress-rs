@@ -1,4 +1,4 @@
-package rs.wordpress.example.shared
+package rs.wordpress.example.shared.ui.users
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
-import rs.wordpress.example.shared.ui.users.UserListViewModel
 import uniffi.wp_api.UserWithEditContext
 
 @Composable
 @Preview
-fun App(userListViewModel: UserListViewModel = koinInject()) {
+fun UserListScreen(userListViewModel: UserListViewModel = koinInject()) {
     MaterialTheme {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

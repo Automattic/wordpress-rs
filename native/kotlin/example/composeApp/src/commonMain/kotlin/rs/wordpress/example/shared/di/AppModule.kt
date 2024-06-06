@@ -1,34 +1,29 @@
 package rs.wordpress.example.shared.di
 
 import org.koin.dsl.module
-import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.example.shared.localTestSiteUrl
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import rs.wordpress.example.shared.ui.users.UserListViewModel
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 
-val localTestSiteApiClientModule = module {
+val authModule = module {
     single {
-        WpApiClient(
-            siteUrl = localTestSiteUrl().siteUrl,
-            authentication = wpAuthenticationFromUsernameAndPassword(
-                "test@example.com",
-                password = "WpXcVrSWZvPcI1gD9muIOF8l"
-            )
+        // TODO: Read from test credentials file
+        AuthenticationRepository(
+            localTestSiteUrl = localTestSiteUrl().siteUrl,
+            localTestSiteUsername = "test@example.com",
+            localTestSitePassword = "WpXcVrSWZvPcI1gD9muIOF8l"
         )
     }
 }
 
-val authModule = module {
-    single { AuthenticationRepository() }
-}
-
 val viewModelModule = module {
+    // TODO: Need to pass a scoped api client
     single { UserListViewModel(get()) }
+    single { WelcomeViewModel(get()) }
 }
 
 fun commonModules() = listOf(
     authModule,
-    localTestSiteApiClientModule,
     viewModelModule
 )

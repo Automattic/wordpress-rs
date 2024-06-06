@@ -1,20 +1,26 @@
 package rs.wordpress.example.shared.repository
 
-import rs.wordpress.api.kotlin.WpApiClient
-import rs.wordpress.api.kotlin.WpRequestSuccess
-import uniffi.wp_api.UserWithEditContext
+import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
-class AuthenticationRepository {
-    suspend fun addAuthenticatedSite(siteUrl: String, username: String, password: String): UserWithEditContext {
-        val client = WpApiClient(
-            siteUrl = siteUrl,
-            authentication = wpAuthenticationFromUsernameAndPassword(username, password)
-        )
+class AuthenticationRepository(
+    localTestSiteUrl: String,
+    localTestSiteUsername: String,
+    localTestSitePassword: String
+) {
+    private val authenticatedSites = mutableMapOf<String, WpAuthentication>()
 
-        val user = client.request { requestBuilder ->
-            requestBuilder.users().retrieveMeWithEditContext()
-        } as WpRequestSuccess
-        return user.data
+    init {
+        addAuthenticatedSite(localTestSiteUrl, localTestSiteUsername, localTestSitePassword)
     }
+
+    fun addAuthenticatedSite(siteUrl: String, username: String, password: String): Boolean {
+        if (siteUrl.isNotEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
+            authenticatedSites[siteUrl] = wpAuthenticationFromUsernameAndPassword(username, password)
+            return true
+        }
+        return false
+    }
+
+    fun authenticatedSiteList(): List<String> = authenticatedSites.keys.toList().sorted()
 }

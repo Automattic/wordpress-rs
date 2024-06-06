@@ -1,4 +1,4 @@
-package rs.wordpress.example
+package rs.wordpress.example.ui.login
 
 import android.content.Intent
 import android.os.Bundle
@@ -7,10 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import org.koin.android.ext.android.inject
-import rs.wordpress.example.ui.login.LoginScreen
-import rs.wordpress.example.ui.login.LoginViewModel
 
-class MainActivity : ComponentActivity() {
+class LoginActivity : ComponentActivity() {
     private val loginViewModel: LoginViewModel by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
