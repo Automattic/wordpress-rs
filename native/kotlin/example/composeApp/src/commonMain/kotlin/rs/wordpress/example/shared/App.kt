@@ -7,12 +7,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
+import rs.wordpress.example.shared.ui.login.LoginScreen
 import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
 
 @Composable
-fun App() {
+fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
     KoinContext {
         val userListViewModel = koinInject<UserListViewModel>()
         val navController = rememberNavController()
@@ -21,6 +22,7 @@ fun App() {
             NavHost(navController, startDestination = "welcome") {
                 composable("welcome") {
                     WelcomeScreen(
+                        authenticationEnabled,
                         onLoginClicked = {
                             navController.navigate("login")
                         },
@@ -29,6 +31,11 @@ fun App() {
                             navController.navigate("users")
                         }
                     )
+                }
+                composable("login") {
+                    authenticateSite?.let {
+                        LoginScreen(authenticateSite)
+                    }
                 }
                 composable("users") {
                     UserListScreen()

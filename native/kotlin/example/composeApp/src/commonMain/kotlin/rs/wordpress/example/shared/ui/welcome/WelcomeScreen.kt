@@ -1,6 +1,5 @@
 package rs.wordpress.example.shared.ui.welcome
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,14 +11,17 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 
 @Composable
 @org.jetbrains.compose.ui.tooling.preview.Preview
-fun WelcomeScreen(onLoginClicked: () -> Unit, onSiteClicked: (AuthenticatedSite) -> Unit) {
+fun WelcomeScreen(
+    authenticationEnabled: Boolean,
+    onLoginClicked: () -> Unit,
+    onSiteClicked: (AuthenticatedSite) -> Unit
+) {
     KoinContext{
         val welcomeViewModel = koinInject<WelcomeViewModel>()
 
@@ -29,11 +31,17 @@ fun WelcomeScreen(onLoginClicked: () -> Unit, onSiteClicked: (AuthenticatedSite)
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxSize(),
             ) {
+                if (authenticationEnabled) {
+                    Column {
+                        Button(onClick = onLoginClicked) {
+                            Text("Add new site")
+                        }
+                    }
+                }
                 LazyColumn {
                     items(welcomeViewModel.getSiteList()) { site ->
                         Button(onClick = { onSiteClicked(site) }) {
                             Text(site.name)
-                            Modifier.background(Color.Yellow)
                         }
                     }
                 }
