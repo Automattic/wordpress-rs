@@ -23,14 +23,8 @@ dependencyResolutionManagement {
                 includeGroup("rs.wordpress.api")
             }
         }
-        google {
-            mavenContent {
-                includeGroupAndSubgroups("androidx")
-                includeGroupAndSubgroups("com.android")
-                includeGroupAndSubgroups("com.google")
-            }
-        }
         mavenCentral()
+        google()
     }
 }
 
