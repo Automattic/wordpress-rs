@@ -1,3 +1,4 @@
+package rs.wordpress.example.shared
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image

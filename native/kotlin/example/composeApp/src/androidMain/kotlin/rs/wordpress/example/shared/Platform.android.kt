@@ -1,3 +1,5 @@
+package rs.wordpress.example.shared
+
 import android.os.Build
 
 class AndroidPlatform : Platform {

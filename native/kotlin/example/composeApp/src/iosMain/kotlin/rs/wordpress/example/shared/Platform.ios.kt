@@ -1,3 +1,5 @@
+package rs.wordpress.example.shared
+
 import platform.UIKit.UIDevice
 
 class IOSPlatform: Platform {

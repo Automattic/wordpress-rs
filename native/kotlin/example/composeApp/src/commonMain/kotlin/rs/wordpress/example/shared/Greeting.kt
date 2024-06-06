@@ -1,3 +1,5 @@
+package rs.wordpress.example.shared
+
 class Greeting {
     private val platform = getPlatform()
 
