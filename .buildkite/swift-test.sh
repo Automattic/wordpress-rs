@@ -23,6 +23,7 @@ function build_for_real_device() {
     xcodebuild -destination "generic/platform=$platform" \
         -scheme WordPress \
         -derivedDataPath DerivedData \
+        -skipPackagePluginValidation \
         build | xcbeautify
 }
 

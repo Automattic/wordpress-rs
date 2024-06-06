@@ -14,5 +14,6 @@ xcodebuild \
     -scheme WordPress \
     -derivedDataPath DerivedData \
     -destination "id=${device_id}" \
+    -skipPackagePluginValidation \
     test \
     | xcbeautify
