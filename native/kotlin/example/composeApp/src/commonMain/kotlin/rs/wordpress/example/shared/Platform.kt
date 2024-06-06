@@ -1,6 +1,8 @@
 package rs.wordpress.example.shared
 
-import rs.wordpress.api.kotlin.WpApiClient
+interface TestSiteUrl {
+    val siteUrl: String
+}
 
 interface Platform {
     val name: String
@@ -8,4 +10,4 @@ interface Platform {
 
 expect fun getPlatform(): Platform
 
-expect fun createWpApiClient(): WpApiClient
+expect fun localTestSiteUrl(): TestSiteUrl

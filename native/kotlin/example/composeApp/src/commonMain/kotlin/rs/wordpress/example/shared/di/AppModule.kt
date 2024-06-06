@@ -1,12 +1,20 @@
 package rs.wordpress.example.shared.di
 
 import org.koin.dsl.module
-import rs.wordpress.example.shared.createWpApiClient
+import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.localTestSiteUrl
 import rs.wordpress.example.shared.ui.users.UserListViewModel
+import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
-val apiClientModule = module {
+val localTestSiteApiClientModule = module {
     single {
-        createWpApiClient()
+        WpApiClient(
+            siteUrl = localTestSiteUrl().siteUrl,
+            authentication = wpAuthenticationFromUsernameAndPassword(
+                "test@example.com",
+                password = "WpXcVrSWZvPcI1gD9muIOF8l"
+            )
+        )
     }
 }
 
@@ -15,6 +23,6 @@ val viewModelModule = module {
 }
 
 fun commonModule() = listOf(
-    apiClientModule,
+    localTestSiteApiClientModule,
     viewModelModule
 )
