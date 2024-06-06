@@ -3,7 +3,9 @@ package rs.wordpress.example
 import android.app.Application
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
-import rs.wordpress.example.shared.di.commonModule
+import org.koin.dsl.module
+import rs.wordpress.example.shared.di.commonModules
+import rs.wordpress.example.ui.login.LoginViewModel
 
 class ExampleApplication: Application() {
     override fun onCreate() {
@@ -11,7 +13,11 @@ class ExampleApplication: Application() {
 
         startKoin {
             androidContext(this@ExampleApplication)
-            modules(commonModule())
+            modules(commonModules().plus(androidOnlyModules))
         }
     }
+}
+
+private val androidOnlyModules = module {
+    single { LoginViewModel(get()) }
 }

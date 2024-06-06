@@ -46,6 +46,7 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
+            implementation(libs.kotlinx.coroutines.core)
             implementation(libs.landscapist.coil)
             implementation(libs.lifecycle.viewmodel)
             compileOnly(project(":api:kotlin"))
