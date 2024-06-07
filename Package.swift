@@ -111,6 +111,13 @@ func enableSwiftLint() throws {
 
     package.dependencies.append(.package(url: "https://github.com/realm/SwiftLint", exact: .init(version)!))
 
+    var platforms = package.platforms ?? []
+    if let mac = platforms.firstIndex(where: { $0 == .macOS(.v11) }) {
+        platforms.remove(at: mac)
+        platforms.append(.macOS(.v12))
+    }
+    package.platforms = platforms
+
     if let target = package.targets.first(where: { $0.name == "WordPressAPI" }) {
         target.plugins = (target.plugins ?? []) + [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint")]
     }
