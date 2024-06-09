@@ -1,16 +1,15 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseUserField
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
-import uniffi.wp_api.WpApiParamUsersWho
 import uniffi.wp_api.WpContext
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class UsersEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
@@ -18,11 +17,13 @@ class UsersEndpointTest {
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val users = WpApiClient(siteUrl, authentication).users
+    private val client = WpApiClient(siteUrl, authentication)
 
     @Test
     fun testUserListRequest() = runTest {
-        val result = users.list.withEditContext(params = null)
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = null)
+        }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -31,23 +32,11 @@ class UsersEndpointTest {
 
     @Test
     fun testUserListRequestWithHasPublishedPostsParam() = runTest {
-        // TODO: Add default values to the binding constructor from Rust
         val params = UserListParams(
-            page = null,
-            perPage = null,
-            search = null,
-            exclude = emptyList(),
-            include = emptyList(),
-            offset = null,
-            order = null,
-            orderby = null,
-            slug = emptyList(),
-            roles = emptyList(),
-            capabilities = emptyList(),
-            who = null,
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("post", "page"))
         )
-        val result = users.list.withEditContext(params)
+        val result =
+            client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -56,11 +45,13 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterUserListRequest() = runTest {
-        val result = users.list.filter(
-            WpContext.EDIT,
-            params = null,
-            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
-        )
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().filterList(
+                context = WpContext.EDIT,
+                params = null,
+                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            )
+        }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
         assertEquals(NUMBER_OF_USERS, userList.count())
@@ -70,11 +61,13 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
-        val result = users.retrieve.filter(
-            FIRST_USER_ID,
-            WpContext.EDIT,
-            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
-        )
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().filterRetrieve(
+                FIRST_USER_ID,
+                WpContext.EDIT,
+                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            )
+        }
         assert(result is WpRequestSuccess)
         val sparseUser = (result as WpRequestSuccess).data
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
@@ -83,10 +76,12 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveCurrentUserRequest() = runTest {
-        val result = users.me.filter(
-            WpContext.EDIT,
-            fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
-        )
+        val result = client.request { requestBuilder ->
+            requestBuilder.users().filterRetrieveMe(
+                WpContext.EDIT,
+                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            )
+        }
         assert(result is WpRequestSuccess)
         val sparseUser = (result as WpRequestSuccess).data
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
@@ -95,23 +90,11 @@ class UsersEndpointTest {
 
     @Test
     fun testErrorUserListRequestWithHasPublishedPostsInvalidParam() = runTest {
-        // TODO: Add default values to the binding constructor from Rust
         val params = UserListParams(
-            page = null,
-            perPage = null,
-            search = null,
-            exclude = emptyList(),
-            include = emptyList(),
-            offset = null,
-            order = null,
-            orderby = null,
-            slug = emptyList(),
-            roles = emptyList(),
-            capabilities = emptyList(),
-            who = null,
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("foo"))
         )
-        val result = users.list.withEditContext(params)
+        val result =
+            client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result is RecognizedRestError)
         assertEquals(WpRestErrorCode.InvalidParam, (result as RecognizedRestError).error.code)
     }

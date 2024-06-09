@@ -7,7 +7,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    request_builder, WpNetworkRequestExecutor, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    request_builder, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -23,16 +23,11 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    let parsed_response = request_builder()
+    request_builder()
         .plugins()
         .filter_list(WpContext::Edit, &Some(params), fields)
-        .execute()
         .await
-        .unwrap()
-        .parse_with(wp_api::plugins::parse_filter_plugins_response);
-    assert!(parsed_response.is_ok());
-    parsed_response
-        .unwrap()
+        .assert_response()
         .iter()
         .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
 }
@@ -43,15 +38,12 @@ async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let plugin_result = request_builder()
+    let response = request_builder()
         .plugins()
         .filter_retrieve(WpContext::Edit, &slug.into(), fields)
-        .execute()
         .await
-        .unwrap()
-        .parse_with(wp_api::plugins::parse_filter_retrieve_plugin_response);
-    assert!(plugin_result.is_ok());
-    validate_sparse_plugin_fields(&plugin_result.unwrap(), fields);
+        .assert_response();
+    validate_sparse_plugin_fields(&response, fields);
 }
 
 #[rstest]
@@ -61,72 +53,76 @@ async fn filter_retrieve_plugin(
 #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))))]
 #[trace]
 #[tokio::test]
-async fn plugin_list_params_parametrized(
+async fn list_plugins(
     #[case] params: PluginListParams,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
-    let response = request_builder()
-        .plugins()
-        .list(context, &Some(params))
-        .execute()
-        .await
-        .unwrap();
     match context {
         WpContext::Edit => {
-            let parsed_response =
-                wp_api::plugins::parse_list_plugins_response_with_edit_context(&response);
-            assert!(
-                parsed_response.is_ok(),
-                "Response was: '{:?}'",
-                parsed_response
-            );
+            request_builder()
+                .plugins()
+                .list_with_edit_context(&Some(params))
+                .await
+                .assert_response();
         }
         WpContext::Embed => {
-            let parsed_response =
-                wp_api::plugins::parse_list_plugins_response_with_embed_context(&response);
-            assert!(
-                parsed_response.is_ok(),
-                "Response was: '{:?}'",
-                parsed_response
-            );
+            request_builder()
+                .plugins()
+                .list_with_embed_context(&Some(params))
+                .await
+                .assert_response();
         }
         WpContext::View => {
-            let parsed_response =
-                wp_api::plugins::parse_list_plugins_response_with_view_context(&response);
-            assert!(
-                parsed_response.is_ok(),
-                "Response was: '{:?}'",
-                parsed_response
-            );
+            request_builder()
+                .plugins()
+                .list_with_view_context(&Some(params))
+                .await
+                .assert_response();
         }
     };
 }
 
 #[rstest]
-#[case(CLASSIC_EDITOR_PLUGIN_SLUG.into(), "WordPress Contributors")]
-#[case(HELLO_DOLLY_PLUGIN_SLUG.into(), "Matt Mullenweg")]
+#[case(CLASSIC_EDITOR_PLUGIN_SLUG.into(), "WordPress Contributors", "https://wordpress.org/plugins/classic-editor/")]
+#[case(HELLO_DOLLY_PLUGIN_SLUG.into(), "Matt Mullenweg", "http://wordpress.org/plugins/hello-dolly/")]
 #[trace]
 #[tokio::test]
-async fn retrieve_plugin_with_edit_context(
+async fn retrieve_plugin(
     #[case] plugin_slug: PluginSlug,
     #[case] expected_author: &str,
+    #[case] expected_plugin_uri: &str,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
-    let parsed_response = request_builder()
-        .plugins()
-        .retrieve(context, &plugin_slug)
-        .execute()
-        .await
-        .unwrap()
-        .parse_with(wp_api::plugins::parse_retrieve_plugin_response_with_edit_context);
-    assert!(
-        parsed_response.is_ok(),
-        "Retrieve plugin failed!\nContext: {:?}\nPlugin: {:?}\nResponse was: '{:?}'",
-        context,
-        plugin_slug,
-        parsed_response
-    );
-    assert_eq!(expected_author, parsed_response.unwrap().author);
+    match context {
+        WpContext::Edit => {
+            let plugin = request_builder()
+                .plugins()
+                .retrieve_with_edit_context(&plugin_slug)
+                .await
+                .assert_response();
+            assert_eq!(&plugin_slug, &plugin.plugin);
+            assert_eq!(expected_author, plugin.author);
+            assert_eq!(expected_plugin_uri, plugin.plugin_uri);
+        }
+        WpContext::Embed => {
+            let plugin = request_builder()
+                .plugins()
+                .retrieve_with_embed_context(&plugin_slug)
+                .await
+                .assert_response();
+            assert_eq!(&plugin_slug, &plugin.plugin);
+        }
+        WpContext::View => {
+            let plugin = request_builder()
+                .plugins()
+                .retrieve_with_view_context(&plugin_slug)
+                .await
+                .assert_response();
+            assert_eq!(&plugin_slug, &plugin.plugin);
+            assert_eq!(expected_author, plugin.author);
+            assert_eq!(expected_plugin_uri, plugin.plugin_uri);
+        }
+    };
 }
 
 fn validate_sparse_plugin_fields(plugin: &SparsePlugin, fields: &[SparsePluginField]) {
@@ -180,11 +176,13 @@ fn validate_sparse_plugin_fields(plugin: &SparsePlugin, fields: &[SparsePluginFi
 #[template]
 #[rstest]
 #[case(&[SparsePluginField::Author])]
+#[case(&[SparsePluginField::AuthorUri])]
 #[case(&[SparsePluginField::Description])]
 #[case(&[SparsePluginField::Name])]
 #[case(&[SparsePluginField::NetworkOnly])]
 #[case(&[SparsePluginField::Plugin])]
 #[case(&[SparsePluginField::PluginUri])]
+#[case(&[SparsePluginField::RequiresWp])]
 #[case(&[SparsePluginField::RequiresPhp])]
 #[case(&[SparsePluginField::Status])]
 #[case(&[SparsePluginField::Textdomain])]

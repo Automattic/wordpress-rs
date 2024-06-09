@@ -113,7 +113,7 @@ struct LoginView: View {
             return nil
         }
 
-        let client = WordPressAPI(
+        let client = try WordPressAPI(
             urlSession: .shared,
             baseUrl: apiRoot,
             authenticationStategy: .none

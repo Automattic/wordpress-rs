@@ -3,37 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{
-    add_uniffi_exported_parser, SparseField, WpApiError, WpApiParamOrder, WpNetworkResponse,
-};
-
-add_uniffi_exported_parser!(parse_filter_users_response, Vec<SparseUser>);
-add_uniffi_exported_parser!(parse_filter_retrieve_user_response, SparseUser);
-add_uniffi_exported_parser!(
-    parse_list_users_response_with_edit_context,
-    Vec<UserWithEditContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_users_response_with_embed_context,
-    Vec<UserWithEmbedContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_users_response_with_view_context,
-    Vec<UserWithViewContext>
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_user_response_with_edit_context,
-    UserWithEditContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_user_response_with_embed_context,
-    UserWithEmbedContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_user_response_with_view_context,
-    UserWithViewContext
-);
-add_uniffi_exported_parser!(parse_delete_user_response, UserDeleteResponse);
+use crate::{SparseField, WpApiParamOrder};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersOrderBy {
@@ -105,36 +75,49 @@ impl Display for WpApiParamUsersHasPublishedPosts {
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
+    #[uniffi(default = None)]
     pub page: Option<u32>,
     /// Maximum number of items to be returned in result set.
     /// Default: `10`
+    #[uniffi(default = None)]
     pub per_page: Option<u32>,
     /// Limit results to those matching a string.
+    #[uniffi(default = None)]
     pub search: Option<String>,
     /// Ensure result set excludes specific IDs.
+    #[uniffi(default = [])]
     pub exclude: Vec<UserId>,
     /// Limit result set to specific IDs.
+    #[uniffi(default = [])]
     pub include: Vec<UserId>,
     /// Offset the result set by a specific number of items.
+    #[uniffi(default = None)]
     pub offset: Option<u32>,
     /// Order sort attribute ascending or descending.
     /// Default: `asc`
     /// One of: `asc`, `desc`
+    #[uniffi(default = None)]
     pub order: Option<WpApiParamOrder>,
     /// Sort collection by user attribute.
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
+    #[uniffi(default = None)]
     pub orderby: Option<WpApiParamUsersOrderBy>,
     /// Limit result set to users with one or more specific slugs.
+    #[uniffi(default = [])]
     pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
+    #[uniffi(default = [])]
     pub roles: Vec<String>,
     /// Limit result set to users matching at least one specific capability provided. Accepts csv list or single capability.
+    #[uniffi(default = [])]
     pub capabilities: Vec<String>,
     /// Limit result set to users who are considered authors.
     /// One of: `authors`
+    #[uniffi(default = None)]
     pub who: Option<WpApiParamUsersWho>,
     /// Limit result set to users who have published posts.
+    #[uniffi(default = None)]
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 }
 
@@ -237,6 +220,7 @@ pub struct UserCreateParams {
     pub slug: Option<String>,
     /// Roles assigned to the user.
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[uniffi(default = [])]
     pub roles: Vec<String>,
     /// Meta fields.
     #[uniffi(default = None)]
@@ -267,40 +251,52 @@ impl UserCreateParams {
 #[derive(Debug, Default, Serialize, uniffi::Record)]
 pub struct UserUpdateParams {
     /// Display name for the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// First name for the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_name: Option<String>,
     /// Last name for the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     /// The email address for the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
     /// URL of the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Description of the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Locale for the user.
     /// One of: , `en_US`
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     /// The nickname for the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nickname: Option<String>,
     /// An alphanumeric identifier for the user.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     /// Roles assigned to the user.
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[uniffi(default = [])]
     pub roles: Vec<String>,
     /// Password for the user (never included).
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
     /// Meta fields.
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<String>,
 }

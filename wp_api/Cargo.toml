@@ -8,6 +8,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_api"
 
 [dependencies]
+async-trait = "0.1"
 base64 = { workspace = true }
 http = { workspace = true }
 indoc = "2.0"

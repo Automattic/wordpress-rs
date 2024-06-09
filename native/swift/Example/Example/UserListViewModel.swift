@@ -2,11 +2,11 @@ import Foundation
 import SwiftUI
 import WordPressAPI
 
-extension SparseUser.ViewContext: Identifiable {}
+extension UserWithViewContext: Identifiable {}
 
 @Observable class UserListViewModel {
 
-    var users: [SparseUser.ViewContext]
+    var users: [UserWithViewContext]
     var fetchUsersTask: Task<Void, Never>?
     var error: MyError?
     var shouldPresentAlert = false
@@ -15,7 +15,7 @@ extension SparseUser.ViewContext: Identifiable {}
 
     // swiftlint:disable force_try
     var api: WordPressAPI {
-        WordPressAPI(
+        try! WordPressAPI(
             urlSession: .shared,
             baseUrl: URL(string: loginManager.getDefaultSiteUrl()!)!,
             authenticationStategy: try! loginManager.getLoginCredentials()!
@@ -23,7 +23,7 @@ extension SparseUser.ViewContext: Identifiable {}
     }
     // swiftlint:enable force_try
 
-    init(loginManager: LoginManager, users: [SparseUser.ViewContext] = []) {
+    init(loginManager: LoginManager, users: [UserWithViewContext] = []) {
         self.loginManager = loginManager
         self.users = users
     }
@@ -34,7 +34,7 @@ extension SparseUser.ViewContext: Identifiable {}
 
         self.fetchUsersTask = Task { @MainActor in
             do {
-                users = try await api.users.forViewing.list()
+                users = try await api.users.listWithViewContext(params: nil)
             } catch let error {
                 shouldPresentAlert = true
                 self.error = MyError(underlyingError: error)

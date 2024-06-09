@@ -1,37 +1,7 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{add_uniffi_exported_parser, SparseField, WpApiError, WpNetworkResponse};
-
-add_uniffi_exported_parser!(parse_filter_plugins_response, Vec<SparsePlugin>);
-add_uniffi_exported_parser!(parse_filter_retrieve_plugin_response, SparsePlugin);
-add_uniffi_exported_parser!(
-    parse_list_plugins_response_with_edit_context,
-    Vec<PluginWithEditContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_plugins_response_with_embed_context,
-    Vec<PluginWithEmbedContext>
-);
-add_uniffi_exported_parser!(
-    parse_list_plugins_response_with_view_context,
-    Vec<PluginWithViewContext>
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_plugin_response_with_edit_context,
-    PluginWithEditContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_plugin_response_with_embed_context,
-    PluginWithEmbedContext
-);
-add_uniffi_exported_parser!(
-    parse_retrieve_plugin_response_with_view_context,
-    PluginWithViewContext
-);
-add_uniffi_exported_parser!(parse_create_plugin_response, PluginWithEditContext);
-add_uniffi_exported_parser!(parse_update_plugin_response, PluginWithEditContext);
-add_uniffi_exported_parser!(parse_delete_plugin_response, PluginDeleteResponse);
+use crate::SparseField;
 
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
@@ -84,11 +54,15 @@ pub struct SparsePlugin {
     #[WpContext(edit, view)]
     pub author: Option<String>,
     #[WpContext(edit, view)]
+    pub author_uri: Option<String>,
+    #[WpContext(edit, view)]
     pub description: Option<PluginDescription>,
     #[WpContext(edit, view)]
     pub version: Option<String>,
     #[WpContext(edit, embed, view)]
     pub network_only: Option<bool>,
+    #[WpContext(edit, embed, view)]
+    pub requires_wp: Option<String>,
     #[WpContext(edit, embed, view)]
     pub requires_php: Option<String>,
     #[WpContext(edit, view)]
@@ -98,12 +72,14 @@ pub struct SparsePlugin {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum SparsePluginField {
     Author,
+    AuthorUri,
     Description,
     Name,
     NetworkOnly,
     Plugin,
     PluginUri,
     RequiresPhp,
+    RequiresWp,
     Status,
     Textdomain,
     Version,
@@ -113,12 +89,14 @@ impl SparseField for SparsePluginField {
     fn as_str(&self) -> &str {
         match self {
             Self::Author => "author",
+            Self::AuthorUri => "author_uri",
             Self::Description => "description",
             Self::Name => "name",
             Self::NetworkOnly => "network_only",
             Self::Plugin => "plugin",
             Self::PluginUri => "plugin_uri",
             Self::RequiresPhp => "requires_php",
+            Self::RequiresWp => "requires_wp",
             Self::Status => "status",
             Self::Textdomain => "textdomain",
             Self::Version => "version",
@@ -132,10 +110,16 @@ pub struct PluginDeleteResponse {
     pub previous: PluginWithEditContext,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
 pub struct PluginSlug {
     pub slug: String,
+}
+
+impl PluginSlug {
+    pub fn new(slug: String) -> Self {
+        Self { slug }
+    }
 }
 
 impl From<&str> for PluginSlug {
