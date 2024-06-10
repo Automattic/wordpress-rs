@@ -2,11 +2,14 @@ use std::sync::Arc;
 
 use crate::{
     PluginCreateParams, PluginDeleteResponse, PluginListParams, PluginSlug, PluginUpdateParams,
-    PluginWithEditContext, PluginWithEmbedContext, PluginWithViewContext, RequestBuilder,
-    SparsePlugin, SparsePluginField, WpApiError, WpContext,
+    PluginWithEditContext, PluginWithEmbedContext, PluginWithViewContext, SparsePlugin,
+    SparsePluginField, WpApiError, WpContext,
 };
 
-use super::endpoint::{plugins_endpoint::PluginsEndpoint, ApiBaseUrl};
+use super::{
+    endpoint::{plugins_endpoint::PluginsEndpoint, ApiBaseUrl},
+    RequestBuilder,
+};
 
 #[derive(Debug, uniffi::Object)]
 pub struct PluginsRequestBuilder {
