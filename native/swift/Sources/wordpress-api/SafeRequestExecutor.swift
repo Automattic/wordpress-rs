@@ -22,6 +22,10 @@ extension SafeRequestExecutor {
 
 }
 
+#if hasFeature(RetroactiveAttribute)
+extension URLSession: @retroactive RequestExecutor {}
+#endif
+
 extension URLSession: SafeRequestExecutor {
 
     // swiftlint:disable force_cast
