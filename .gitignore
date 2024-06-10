@@ -18,6 +18,9 @@ local.properties
 # Ignore generated jni libs - at least for now
 ./native/android/lib/src/main/jniLibs
 
+# Kotlin multiplatform
+native/kotlin/.kotlin/
+
 # macOS
 .DS_Store
 
