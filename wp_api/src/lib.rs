@@ -1,13 +1,10 @@
 #![allow(dead_code, unused_variables)]
 
 use request::{
-    endpoint::{ApiBaseUrl, ApiEndpointUrl},
-    plugins_request_builder::PluginsRequestBuilder,
-    users_request_builder::UsersRequestBuilder,
-    RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
+    endpoint::ApiBaseUrl, plugins_request_builder::PluginsRequestBuilder,
+    users_request_builder::UsersRequestBuilder, RequestExecutor, WpNetworkResponse,
 };
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 pub use api_error::{
     RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
@@ -24,8 +21,6 @@ pub mod users;
 
 #[cfg(test)]
 mod unit_test_common;
-
-const CONTENT_TYPE_JSON: &str = "application/json";
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpRequestBuilder {
@@ -46,10 +41,10 @@ impl WpRequestBuilder {
                 reason: err.to_string(),
             })?
             .into();
-        let request_builder = Arc::new(RequestBuilder {
-            authentication: authentication.clone(),
-            executor: request_executor,
-        });
+        let request_builder = Arc::new(request::RequestBuilder::new(
+            request_executor,
+            authentication.clone(),
+        ));
 
         Ok(Self {
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
@@ -73,93 +68,6 @@ fn wp_authentication_from_username_and_password(
     password: String,
 ) -> WpAuthentication {
     WpAuthentication::from_username_and_password(username, password)
-}
-
-#[derive(Debug)]
-struct RequestBuilder {
-    executor: Arc<dyn RequestExecutor>,
-    authentication: WpAuthentication,
-}
-
-impl RequestBuilder {
-    fn build_get_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
-            method: RequestMethod::GET,
-            url: url.into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    async fn get<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
-        self.executor
-            .execute(self.build_get_request(url))
-            .await?
-            .parse()
-    }
-
-    fn build_post_request<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
-    where
-        T: ?Sized + Serialize,
-    {
-        WpNetworkRequest {
-            method: RequestMethod::POST,
-            url: url.into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(json_body).ok(),
-        }
-    }
-
-    async fn post<T, R>(&self, url: ApiEndpointUrl, json_body: &T) -> Result<R, WpApiError>
-    where
-        T: ?Sized + Serialize,
-        R: DeserializeOwned,
-    {
-        self.executor
-            .execute(self.build_post_request(url, json_body))
-            .await?
-            .parse()
-    }
-
-    fn build_delete_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: url.into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    async fn delete<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
-        self.executor
-            .execute(self.build_delete_request(url))
-            .await?
-            .parse()
-    }
-
-    fn header_map(&self) -> HashMap<String, String> {
-        let mut header_map = HashMap::new();
-        header_map.insert(
-            http::header::ACCEPT.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
-        );
-        match self.authentication {
-            WpAuthentication::None => None,
-            WpAuthentication::AuthorizationHeader { ref token } => {
-                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
-            }
-        };
-        header_map
-    }
-
-    fn header_map_for_post_request(&self) -> HashMap<String, String> {
-        let mut header_map = self.header_map();
-        header_map.insert(
-            http::header::CONTENT_TYPE.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
-        );
-        header_map
-    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]

@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
 use crate::{
-    RequestBuilder, SparseUser, SparseUserField, UserCreateParams, UserDeleteParams,
-    UserDeleteResponse, UserId, UserListParams, UserUpdateParams, UserWithEditContext,
-    UserWithEmbedContext, UserWithViewContext, WpApiError, WpContext,
+    SparseUser, SparseUserField, UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId,
+    UserListParams, UserUpdateParams, UserWithEditContext, UserWithEmbedContext,
+    UserWithViewContext, WpApiError, WpContext,
 };
 
-use super::endpoint::{users_endpoint::UsersEndpoint, ApiBaseUrl};
+use super::{
+    endpoint::{users_endpoint::UsersEndpoint, ApiBaseUrl},
+    RequestBuilder,
+};
 
 #[derive(Debug, uniffi::Object)]
 pub struct UsersRequestBuilder {
