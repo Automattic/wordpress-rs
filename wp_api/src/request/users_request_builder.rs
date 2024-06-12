@@ -30,39 +30,39 @@ impl UsersRequestBuilder {
 impl UsersRequestBuilder {
     pub async fn list_with_edit_context(
         &self,
-        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        params: &UserListParams,
     ) -> Result<Vec<UserWithEditContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(WpContext::Edit, params.as_ref()))
+            .get(self.endpoint.list(WpContext::Edit, params))
             .await
     }
 
     pub async fn list_with_embed_context(
         &self,
-        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        params: &UserListParams,
     ) -> Result<Vec<UserWithEmbedContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(WpContext::Embed, params.as_ref()))
+            .get(self.endpoint.list(WpContext::Embed, params))
             .await
     }
 
     pub async fn list_with_view_context(
         &self,
-        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        params: &UserListParams,
     ) -> Result<Vec<UserWithViewContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(WpContext::View, params.as_ref()))
+            .get(self.endpoint.list(WpContext::View, params))
             .await
     }
 
     pub async fn filter_list(
         &self,
         context: WpContext,
-        params: &Option<UserListParams>, // UniFFI doesn't support Option<&T>
+        params: &UserListParams,
         fields: &[SparseUserField],
     ) -> Result<Vec<SparseUser>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.filter_list(context, params.as_ref(), fields))
+            .get(self.endpoint.filter_list(context, params, fields))
             .await
     }
 

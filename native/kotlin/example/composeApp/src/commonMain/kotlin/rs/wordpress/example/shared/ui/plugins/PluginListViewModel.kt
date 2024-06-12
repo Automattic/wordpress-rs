@@ -5,6 +5,7 @@ import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestSuccess
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 import rs.wordpress.example.shared.repository.AuthenticationRepository
+import uniffi.wp_api.PluginListParams
 import uniffi.wp_api.PluginWithEditContext
 
 class PluginListViewModel(private val authRepository: AuthenticationRepository) {
@@ -21,7 +22,7 @@ class PluginListViewModel(private val authRepository: AuthenticationRepository) 
         apiClient?.let { apiClient ->
             val pluginsResult = runBlocking {
                 apiClient.request { requestBuilder ->
-                    requestBuilder.plugins().listWithEditContext(params = null)
+                    requestBuilder.plugins().listWithEditContext(params = PluginListParams())
                 }
             }
             return when (pluginsResult) {

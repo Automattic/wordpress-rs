@@ -1,4 +1,4 @@
-use wp_api::plugins::{PluginCreateParams, PluginStatus, PluginUpdateParams};
+use wp_api::plugins::{PluginCreateParams, PluginListParams, PluginStatus, PluginUpdateParams};
 use wp_api::WpRestErrorCode;
 
 use crate::integration_test_common::{
@@ -33,7 +33,7 @@ async fn delete_plugin_err_cannot_delete_active_plugin() {
 async fn list_plugins_err_cannot_view_plugins() {
     request_builder_as_subscriber()
         .plugins()
-        .list_with_edit_context(&None)
+        .list_with_edit_context(&PluginListParams::default())
         .await
         .assert_wp_error(WpRestErrorCode::CannotViewPlugins);
 }

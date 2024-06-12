@@ -24,20 +24,18 @@ impl PluginsEndpoint {
         self.plugins_url_with_slug(plugin).into()
     }
 
-    pub fn list(&self, context: WpContext, params: Option<&PluginListParams>) -> ApiEndpointUrl {
+    pub fn list(&self, context: WpContext, params: &PluginListParams) -> ApiEndpointUrl {
         let mut url = self.plugins_base_url();
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
+        url.query_pairs_mut().extend_pairs(params.query_pairs());
         url.into()
     }
 
     pub fn filter_list(
         &self,
         context: WpContext,
-        params: Option<&PluginListParams>,
+        params: &PluginListParams,
         fields: &[SparsePluginField],
     ) -> ApiEndpointUrl {
         self.list(context, params)
@@ -112,6 +110,7 @@ mod tests {
     }
 
     #[rstest]
+    #[case(WpContext::Edit, PluginListParams::default(), "/plugins?context=edit")]
     #[case(WpContext::Edit, generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=edit&search=foo")]
     #[case(WpContext::Embed, generate!(PluginListParams, (status, Some(PluginStatus::Active))), "/plugins?context=embed&status=active")]
     #[case(WpContext::View, generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "/plugins?context=view&search=foo&status=inactive")]
@@ -121,10 +120,11 @@ mod tests {
         #[case] params: PluginListParams,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(plugins_endpoint.list(context, Some(&params)), expected_path);
+        validate_endpoint(plugins_endpoint.list(context, &params), expected_path);
     }
 
     #[rstest]
+    #[case(WpContext::Edit, PluginListParams::default(), &[], "/plugins?context=edit&_fields=")]
     #[case(
         WpContext::Edit,
         generate!(PluginListParams, (search, Some("foo".to_string()))),
@@ -157,7 +157,7 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_endpoint(
-            plugins_endpoint.filter_list(context, Some(&params), fields),
+            plugins_endpoint.filter_list(context, &params, fields),
             expected_path,
         );
     }
