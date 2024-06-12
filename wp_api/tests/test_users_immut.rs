@@ -199,54 +199,52 @@ async fn retrieve_me_with_view_context() {
 }
 
 fn validate_sparse_user_fields(user: &SparseUser, fields: &[SparseUserField]) {
-    assert_eq!(user.id.is_some(), fields.contains(&SparseUserField::Id));
+    let field_included = |field| {
+        // If "fields" is empty the server will return all fields
+        fields.is_empty() || fields.contains(&field)
+    };
+    assert_eq!(user.id.is_some(), field_included(SparseUserField::Id));
     assert_eq!(
         user.username.is_some(),
-        fields.contains(&SparseUserField::Username)
+        field_included(SparseUserField::Username)
     );
-    assert_eq!(user.name.is_some(), fields.contains(&SparseUserField::Name));
+    assert_eq!(user.name.is_some(), field_included(SparseUserField::Name));
     assert_eq!(
         user.last_name.is_some(),
-        fields.contains(&SparseUserField::LastName)
+        field_included(SparseUserField::LastName)
     );
-    assert_eq!(
-        user.email.is_some(),
-        fields.contains(&SparseUserField::Email)
-    );
-    assert_eq!(user.url.is_some(), fields.contains(&SparseUserField::Url));
+    assert_eq!(user.email.is_some(), field_included(SparseUserField::Email));
+    assert_eq!(user.url.is_some(), field_included(SparseUserField::Url));
     assert_eq!(
         user.description.is_some(),
-        fields.contains(&SparseUserField::Description)
+        field_included(SparseUserField::Description)
     );
-    assert_eq!(user.link.is_some(), fields.contains(&SparseUserField::Link));
+    assert_eq!(user.link.is_some(), field_included(SparseUserField::Link));
     assert_eq!(
         user.locale.is_some(),
-        fields.contains(&SparseUserField::Locale)
+        field_included(SparseUserField::Locale)
     );
     assert_eq!(
         user.nickname.is_some(),
-        fields.contains(&SparseUserField::Nickname)
+        field_included(SparseUserField::Nickname)
     );
-    assert_eq!(user.slug.is_some(), fields.contains(&SparseUserField::Slug));
+    assert_eq!(user.slug.is_some(), field_included(SparseUserField::Slug));
     assert_eq!(
         user.registered_date.is_some(),
-        fields.contains(&SparseUserField::RegisteredDate)
+        field_included(SparseUserField::RegisteredDate)
     );
-    assert_eq!(
-        user.roles.is_some(),
-        fields.contains(&SparseUserField::Roles)
-    );
+    assert_eq!(user.roles.is_some(), field_included(SparseUserField::Roles));
     assert_eq!(
         user.capabilities.is_some(),
-        fields.contains(&SparseUserField::Capabilities)
+        field_included(SparseUserField::Capabilities)
     );
     assert_eq!(
         user.extra_capabilities.is_some(),
-        fields.contains(&SparseUserField::ExtraCapabilities)
+        field_included(SparseUserField::ExtraCapabilities)
     );
     assert_eq!(
         user.avatar_urls.is_some(),
-        fields.contains(&SparseUserField::AvatarUrls)
+        field_included(SparseUserField::AvatarUrls)
     );
 }
 
@@ -282,6 +280,7 @@ fn list_users_has_published_posts_cases() {}
 
 #[template]
 #[rstest]
+#[case(&[])]
 #[case(&[SparseUserField::Id])]
 #[case(&[SparseUserField::Username])]
 #[case(&[SparseUserField::Name])]
