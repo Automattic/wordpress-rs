@@ -30,39 +30,39 @@ impl PluginsRequestBuilder {
 impl PluginsRequestBuilder {
     pub async fn list_with_edit_context(
         &self,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        params: &PluginListParams,
     ) -> Result<Vec<PluginWithEditContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(WpContext::Edit, params.as_ref()))
+            .get(self.endpoint.list(WpContext::Edit, params))
             .await
     }
 
     pub async fn list_with_embed_context(
         &self,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        params: &PluginListParams,
     ) -> Result<Vec<PluginWithEmbedContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(WpContext::Embed, params.as_ref()))
+            .get(self.endpoint.list(WpContext::Embed, params))
             .await
     }
 
     pub async fn list_with_view_context(
         &self,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        params: &PluginListParams,
     ) -> Result<Vec<PluginWithViewContext>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.list(WpContext::View, params.as_ref()))
+            .get(self.endpoint.list(WpContext::View, params))
             .await
     }
 
     pub async fn filter_list(
         &self,
         context: WpContext,
-        params: &Option<PluginListParams>, // UniFFI doesn't support Option<&T>
+        params: &PluginListParams,
         fields: &[SparsePluginField],
     ) -> Result<Vec<SparsePlugin>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.filter_list(context, params.as_ref(), fields))
+            .get(self.endpoint.filter_list(context, params, fields))
             .await
     }
 

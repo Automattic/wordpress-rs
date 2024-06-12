@@ -20,7 +20,7 @@ pub mod integration_test_common;
 async fn filter_users(#[case] fields: &[SparseUserField]) {
     request_builder()
         .users()
-        .filter_list(WpContext::Edit, &None, fields)
+        .filter_list(WpContext::Edit, &UserListParams::default(), fields)
         .await
         .assert_response()
         .iter()
@@ -54,7 +54,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
     request_builder()
         .users()
-        .list_with_edit_context(&Some(params))
+        .list_with_edit_context(&params)
         .await
         .assert_response();
 }
@@ -64,7 +64,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 async fn list_users_with_embed_context(#[case] params: UserListParams) {
     request_builder()
         .users()
-        .list_with_embed_context(&Some(params))
+        .list_with_embed_context(&params)
         .await
         .assert_response();
 }
@@ -74,7 +74,7 @@ async fn list_users_with_embed_context(#[case] params: UserListParams) {
 async fn list_users_with_view_context(#[case] params: UserListParams) {
     request_builder()
         .users()
-        .list_with_view_context(&Some(params))
+        .list_with_view_context(&params)
         .await
         .assert_response();
 }
@@ -87,10 +87,10 @@ async fn list_users_with_edit_context_has_published_posts(
 ) {
     request_builder()
         .users()
-        .list_with_edit_context(&Some(UserListParams {
+        .list_with_edit_context(&UserListParams {
             has_published_posts,
             ..Default::default()
-        }))
+        })
         .await
         .assert_response();
 }
@@ -103,10 +103,10 @@ async fn list_users_with_embed_context_has_published_posts(
 ) {
     request_builder()
         .users()
-        .list_with_embed_context(&Some(UserListParams {
+        .list_with_embed_context(&UserListParams {
             has_published_posts,
             ..Default::default()
-        }))
+        })
         .await
         .assert_response();
 }
@@ -119,10 +119,10 @@ async fn list_users_with_view_context_has_published_posts(
 ) {
     request_builder()
         .users()
-        .list_with_view_context(&Some(UserListParams {
+        .list_with_view_context(&UserListParams {
             has_published_posts,
             ..Default::default()
-        }))
+        })
         .await
         .assert_response();
 }

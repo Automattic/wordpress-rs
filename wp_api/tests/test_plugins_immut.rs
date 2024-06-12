@@ -25,7 +25,7 @@ async fn filter_plugins(
 ) {
     request_builder()
         .plugins()
-        .filter_list(WpContext::Edit, &Some(params), fields)
+        .filter_list(WpContext::Edit, &params, fields)
         .await
         .assert_response()
         .iter()
@@ -61,21 +61,21 @@ async fn list_plugins(
         WpContext::Edit => {
             request_builder()
                 .plugins()
-                .list_with_edit_context(&Some(params))
+                .list_with_edit_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::Embed => {
             request_builder()
                 .plugins()
-                .list_with_embed_context(&Some(params))
+                .list_with_embed_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::View => {
             request_builder()
                 .plugins()
-                .list_with_view_context(&Some(params))
+                .list_with_view_context(&params)
                 .await
                 .assert_response();
         }
