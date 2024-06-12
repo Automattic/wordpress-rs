@@ -62,7 +62,7 @@ impl UsersRequestBuilder {
         fields: &[SparseUserField],
     ) -> Result<Vec<SparseUser>, WpApiError> {
         self.request_builder
-            .get(self.endpoint.filter_list(context, &params, fields))
+            .get(self.endpoint.filter_list(context, params, fields))
             .await
     }
 

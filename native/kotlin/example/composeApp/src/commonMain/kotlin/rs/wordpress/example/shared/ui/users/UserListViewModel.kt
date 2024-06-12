@@ -5,6 +5,7 @@ import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestSuccess
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 import rs.wordpress.example.shared.repository.AuthenticationRepository
+import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserWithEditContext
 
 class UserListViewModel(private val authRepository: AuthenticationRepository) {
@@ -21,7 +22,7 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
         apiClient?.let { apiClient ->
             val usersResult = runBlocking {
                 apiClient.request { requestBuilder ->
-                    requestBuilder.users().listWithEditContext(params = null)
+                    requestBuilder.users().listWithEditContext(params = UserListParams())
                 }
             }
             return when (usersResult) {
