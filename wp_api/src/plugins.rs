@@ -6,8 +6,10 @@ use crate::SparseField;
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
+    #[uniffi(default = None)]
     pub search: Option<String>,
     /// Limits results to plugins with the given status.
+    #[uniffi(default = None)]
     pub status: Option<PluginStatus>,
 }
 
