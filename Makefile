@@ -3,7 +3,6 @@ docker_container_repo_dir=/app
 
 # Common docker options
 rust_docker_container := public.ecr.aws/docker/library/rust:1.76
-swiftlint_container := ghcr.io/realm/swiftlint:0.53.0
 
 docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
@@ -181,10 +180,10 @@ lint-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all -- -D warnings"
 
 lint-swift:
-	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint
+	swift package plugin swiftlint
 
 lintfix-swift:
-	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint --autocorrect
+	swift package plugin swiftlint --autocorrect
 
 fmt-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt"
