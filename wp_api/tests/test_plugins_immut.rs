@@ -25,7 +25,7 @@ async fn filter_plugins(
 ) {
     request_builder()
         .plugins()
-        .filter_list(WpContext::Edit, &Some(params), fields)
+        .filter_list(WpContext::Edit, &params, fields)
         .await
         .assert_response()
         .iter()
@@ -61,21 +61,21 @@ async fn list_plugins(
         WpContext::Edit => {
             request_builder()
                 .plugins()
-                .list_with_edit_context(&Some(params))
+                .list_with_edit_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::Embed => {
             request_builder()
                 .plugins()
-                .list_with_embed_context(&Some(params))
+                .list_with_embed_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::View => {
             request_builder()
                 .plugins()
-                .list_with_view_context(&Some(params))
+                .list_with_view_context(&params)
                 .await
                 .assert_response();
         }
@@ -126,55 +126,60 @@ async fn retrieve_plugin(
 }
 
 fn validate_sparse_plugin_fields(plugin: &SparsePlugin, fields: &[SparsePluginField]) {
+    let field_included = |field| {
+        // If "fields" is empty the server will return all fields
+        fields.is_empty() || fields.contains(&field)
+    };
     assert_eq!(
         plugin.author.is_some(),
-        fields.contains(&SparsePluginField::Author)
+        field_included(SparsePluginField::Author)
     );
 
     assert_eq!(
         plugin.author.is_some(),
-        fields.contains(&SparsePluginField::Author)
+        field_included(SparsePluginField::Author)
     );
     assert_eq!(
         plugin.description.is_some(),
-        fields.contains(&SparsePluginField::Description)
+        field_included(SparsePluginField::Description)
     );
     assert_eq!(
         plugin.name.is_some(),
-        fields.contains(&SparsePluginField::Name)
+        field_included(SparsePluginField::Name)
     );
     assert_eq!(
         plugin.network_only.is_some(),
-        fields.contains(&SparsePluginField::NetworkOnly)
+        field_included(SparsePluginField::NetworkOnly)
     );
     assert_eq!(
         plugin.plugin.is_some(),
-        fields.contains(&SparsePluginField::Plugin)
+        field_included(SparsePluginField::Plugin)
     );
     assert_eq!(
         plugin.plugin_uri.is_some(),
-        fields.contains(&SparsePluginField::PluginUri)
+        field_included(SparsePluginField::PluginUri)
     );
     assert_eq!(
         plugin.requires_php.is_some(),
-        fields.contains(&SparsePluginField::RequiresPhp)
+        field_included(SparsePluginField::RequiresPhp)
     );
     assert_eq!(
         plugin.status.is_some(),
-        fields.contains(&SparsePluginField::Status)
+        field_included(SparsePluginField::Status)
     );
     assert_eq!(
         plugin.textdomain.is_some(),
-        fields.contains(&SparsePluginField::Textdomain)
+        field_included(SparsePluginField::Textdomain)
     );
     assert_eq!(
         plugin.version.is_some(),
-        fields.contains(&SparsePluginField::Version)
+        field_included(SparsePluginField::Version)
     );
 }
 
 #[template]
 #[rstest]
+#[case(&[])]
 #[case(&[SparsePluginField::Author])]
 #[case(&[SparsePluginField::AuthorUri])]
 #[case(&[SparsePluginField::Description])]

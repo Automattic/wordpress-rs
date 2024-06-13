@@ -32,20 +32,18 @@ impl UsersEndpoint {
         url.into()
     }
 
-    pub fn list(&self, context: WpContext, params: Option<&UserListParams>) -> ApiEndpointUrl {
+    pub fn list(&self, context: WpContext, params: &UserListParams) -> ApiEndpointUrl {
         let mut url = self.api_base_url.by_appending("users");
         url.query_pairs_mut()
             .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
+        url.query_pairs_mut().extend_pairs(params.query_pairs());
         url.into()
     }
 
     pub fn filter_list(
         &self,
         context: WpContext,
-        params: Option<&UserListParams>,
+        params: &UserListParams,
         fields: &[SparseUserField],
     ) -> ApiEndpointUrl {
         self.list(context, params)
@@ -144,7 +142,15 @@ mod tests {
     #[rstest]
     fn list_users(users_endpoint: UsersEndpoint) {
         validate_endpoint(
-            users_endpoint.list(WpContext::Edit, None),
+            users_endpoint.list(WpContext::Edit, &UserListParams::default()),
+            "/users?context=edit",
+        );
+    }
+
+    #[rstest]
+    fn list_users_default_params_empty_fields(users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.list(WpContext::Edit, &UserListParams::default()),
             "/users?context=edit",
         );
     }
@@ -167,8 +173,16 @@ mod tests {
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
         };
         validate_endpoint(
-            users_endpoint.list(WpContext::Edit, Some(&params)),
+            users_endpoint.list(WpContext::Edit, &params),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true",
+        );
+    }
+
+    #[rstest]
+    fn filter_list_users_default_params_empty_fields(users_endpoint: UsersEndpoint) {
+        validate_endpoint(
+            users_endpoint.filter_list(WpContext::Edit, &UserListParams::default(), &[]),
+            "/users?context=edit&_fields=",
         );
     }
 
@@ -193,7 +207,7 @@ mod tests {
             ])),
         };
         validate_endpoint(
-            users_endpoint.filter_list(WpContext::Edit, Some(&params), &[SparseUserField::Name, SparseUserField::Email]),
+            users_endpoint.filter_list(WpContext::Edit, &params, &[SparseUserField::Name, SparseUserField::Email]),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=post%2Cpage&_fields=name%2Cemail",
         );
     }

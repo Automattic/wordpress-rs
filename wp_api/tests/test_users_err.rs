@@ -68,7 +68,7 @@ async fn delete_current_user_err_user_invalid_reassign() {
 async fn list_users_err_forbidden_context() {
     request_builder_as_subscriber()
         .users()
-        .list_with_edit_context(&None)
+        .list_with_edit_context(&UserListParams::default())
         .await
         .assert_wp_error(WpRestErrorCode::ForbiddenContext);
 }
@@ -81,7 +81,7 @@ async fn list_users_err_forbidden_orderby_email() {
     };
     request_builder_as_subscriber()
         .users()
-        .list_with_view_context(&Some(params))
+        .list_with_view_context(&params)
         .await
         .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
 }
@@ -94,7 +94,7 @@ async fn list_users_err_forbidden_who() {
     };
     request_builder_as_subscriber()
         .users()
-        .list_with_view_context(&Some(params))
+        .list_with_view_context(&params)
         .await
         .assert_wp_error(WpRestErrorCode::ForbiddenWho);
 }
@@ -107,7 +107,7 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
     };
     request_builder_as_subscriber()
         .users()
-        .list_with_edit_context(&Some(params))
+        .list_with_edit_context(&params)
         .await
         .assert_wp_error(WpRestErrorCode::UserCannotView);
 }
@@ -120,7 +120,7 @@ async fn list_users_with_roles_err_user_cannot_view() {
     };
     request_builder_as_subscriber()
         .users()
-        .list_with_edit_context(&Some(params))
+        .list_with_edit_context(&params)
         .await
         .assert_wp_error(WpRestErrorCode::UserCannotView);
 }
@@ -133,7 +133,7 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
     };
     request_builder_as_subscriber()
         .users()
-        .list_with_view_context(&Some(params))
+        .list_with_view_context(&params)
         .await
         .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
 }
@@ -142,12 +142,12 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
 async fn list_users_has_published_posts_err_invalid_param() {
     request_builder()
         .users()
-        .list_with_edit_context(&Some(UserListParams {
+        .list_with_edit_context(&UserListParams {
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
                 "foo".to_string()
             ])),
             ..Default::default()
-        }))
+        })
         .await
         .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
