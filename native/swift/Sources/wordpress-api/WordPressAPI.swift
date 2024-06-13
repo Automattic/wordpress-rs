@@ -55,7 +55,10 @@ public struct WordPressAPI {
         }
     }
 
-    package func perform(request: WpNetworkRequest, callback: @escaping @Sendable (Result<WpNetworkResponse, Error>) -> Void) {
+    package func perform(
+        request: WpNetworkRequest,
+        callback: @escaping @Sendable (Result<WpNetworkResponse, Error>) -> Void
+    ) {
         let task = self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
             if let error {
                 callback(.failure(error))
