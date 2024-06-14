@@ -40,7 +40,7 @@ final class WordPressAPITests: XCTestCase {
         let stubs = HTTPStubs()
         stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
 
-        let api = try WordPressAPI(
+        let api = WordPressAPI(
             urlSession: .shared,
             baseUrl: URL(string: "https://wordpress.org")!,
             authenticationStategy: .none,
@@ -56,7 +56,7 @@ final class WordPressAPITests: XCTestCase {
         let stubs = HTTPStubs()
         stubs.missingStub = .failure(URLError(.timedOut))
 
-        let api = try WordPressAPI(
+        let api = WordPressAPI(
             urlSession: .shared,
             baseUrl: URL(string: "https://wordpress.org")!,
             authenticationStategy: .none,

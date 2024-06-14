@@ -16,8 +16,8 @@ public struct WordPressAPI {
     private let urlSession: URLSession
     package let requestBuilder: WpRequestBuilderProtocol
 
-    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) throws {
-        try self.init(
+    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) {
+        self.init(
             urlSession: urlSession,
             baseUrl: baseUrl,
             authenticationStategy: authenticationStategy,
@@ -30,10 +30,10 @@ public struct WordPressAPI {
         baseUrl: URL,
         authenticationStategy: WpAuthentication,
         executor: SafeRequestExecutor
-    ) throws {
+    ) {
         self.urlSession = urlSession
-        self.requestBuilder = try WpRequestBuilder(
-            siteUrl: baseUrl.absoluteString,
+        self.requestBuilder = WpRequestBuilder(
+            siteUrl: baseUrl.asApiBaseUrl(),
             authentication: authenticationStategy,
             requestExecutor: executor
         )
@@ -222,5 +222,11 @@ extension WpRestApiUrl {
 extension URL {
     func asRestUrl() -> WpRestApiUrl {
         WpRestApiUrl(stringValue: self.absoluteString)
+    }
+
+    func asApiBaseUrl() -> ApiBaseUrl {
+        // This call will never return a nil value, because `absoluteString` is
+        // always a valid url string.
+        apiBaseUrlFromStr(str: absoluteString)!
     }
 }

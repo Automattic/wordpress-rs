@@ -15,7 +15,7 @@ extension UserWithViewContext: Identifiable {}
 
     // swiftlint:disable force_try
     var api: WordPressAPI {
-        try! WordPressAPI(
+        WordPressAPI(
             urlSession: .shared,
             baseUrl: URL(string: loginManager.getDefaultSiteUrl()!)!,
             authenticationStategy: try! loginManager.getLoginCredentials()!
@@ -34,7 +34,7 @@ extension UserWithViewContext: Identifiable {}
 
         self.fetchUsersTask = Task { @MainActor in
             do {
-                users = try await api.users.listWithViewContext(params: nil)
+                users = try await api.users.listWithViewContext(params: .init())
             } catch let error {
                 shouldPresentAlert = true
                 self.error = MyError(underlyingError: error)
