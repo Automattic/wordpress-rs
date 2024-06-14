@@ -32,25 +32,21 @@ pub struct WpRequestBuilder {
 impl WpRequestBuilder {
     #[uniffi::constructor]
     pub fn new(
-        site_url: String,
+        site_url: ApiBaseUrl,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
-    ) -> Result<Self, WpApiError> {
-        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
-            .map_err(|err| WpApiError::SiteUrlParsingError {
-                reason: err.to_string(),
-            })?
-            .into();
+    ) -> Self {
+        let api_base_url: Arc<ApiBaseUrl> = site_url.into();
         let request_builder = Arc::new(request::RequestBuilder::new(
             request_executor,
             authentication.clone(),
         ));
 
-        Ok(Self {
+        Self {
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
             plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
                 .into(),
-        })
+        }
     }
 
     pub fn users(&self) -> Arc<UsersRequestBuilder> {

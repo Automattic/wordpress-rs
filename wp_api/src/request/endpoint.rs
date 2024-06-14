@@ -42,9 +42,9 @@ impl From<ApiEndpointUrl> for WpEndpointUrl {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct ApiBaseUrl {
-    url: Url,
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ApiBaseUrl {
+    standard_absolute_url: String,
 }
 
 impl TryFrom<&str> for ApiBaseUrl {
@@ -55,8 +55,18 @@ impl TryFrom<&str> for ApiBaseUrl {
             let url = parsed_url
                 .extend(WP_JSON_PATH_SEGMENTS)
                 .expect("ApiBaseUrl is already parsed, so this can't result in an error");
-            Self { url }
+            Self {
+                standard_absolute_url: url.into(),
+            }
         })
+    }
+}
+
+impl From<Url> for ApiBaseUrl {
+    fn from(url: Url) -> Self {
+        Self {
+            standard_absolute_url: url.into(),
+        }
     }
 }
 
@@ -65,8 +75,15 @@ impl ApiBaseUrl {
         site_base_url.try_into()
     }
 
+    fn url(&self) -> Url {
+        self.standard_absolute_url
+            .as_str()
+            .try_into()
+            .expect("standard_absolute_url was assigned from a Url instance, so this can't result in an error")
+    }
+
     fn by_appending(&self, segment: &str) -> Url {
-        self.url
+        self.url()
             .clone()
             .append(segment)
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
@@ -77,15 +94,20 @@ impl ApiBaseUrl {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        self.url
+        self.url()
             .clone()
             .extend(segments)
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
     fn as_str(&self) -> &str {
-        self.url.as_str()
+        self.standard_absolute_url.as_str()
     }
+}
+
+#[uniffi::export]
+fn api_base_url_from_str(str: &str) -> Option<ApiBaseUrl> {
+    ApiBaseUrl::try_from(str).ok()
 }
 
 trait UrlExtension {
