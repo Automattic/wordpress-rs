@@ -36,7 +36,7 @@ impl WpRequestBuilder {
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Result<Self, WpApiError> {
-        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
+        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
             .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
             })?
