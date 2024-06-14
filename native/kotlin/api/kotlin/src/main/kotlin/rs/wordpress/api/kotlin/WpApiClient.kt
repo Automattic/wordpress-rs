@@ -3,23 +3,25 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import uniffi.wp_api.ApiBaseUrl
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpRequestBuilder
 import uniffi.wp_api.WpRestErrorWrapper
+import uniffi.wp_api.apiBaseUrlFromStr
 
 class WpApiClient
-@Throws(WpApiException::class)
 constructor(
-    siteUrl: String,
+    siteUrl: HttpUrl,
     authentication: WpAuthentication,
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
-        WpRequestBuilder(siteUrl, authentication, requestExecutor)
+        WpRequestBuilder(siteUrl.toApiBaseUrl(), authentication, requestExecutor)
     }
 
     // Provides the _only_ way to execute requests using our Kotlin wrapper.
@@ -45,4 +47,11 @@ constructor(
             }
         }
     }
+}
+
+fun HttpUrl.toApiBaseUrl(): ApiBaseUrl {
+    val absoluteUrl = this.toString()
+    // This call will never return a null value, because absoluteUrl is always
+    // a valid url string.
+    return apiBaseUrlFromStr(absoluteUrl)!!
 }

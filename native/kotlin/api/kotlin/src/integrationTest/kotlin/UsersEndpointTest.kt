@@ -1,6 +1,7 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseUserField
 import uniffi.wp_api.UserListParams
@@ -17,7 +18,7 @@ class UsersEndpointTest {
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val client = WpApiClient(siteUrl, authentication)
+    private val client = WpApiClient(siteUrl.toHttpUrlOrNull()!!, authentication)
 
     @Test
     fun testUserListRequest() = runTest {
