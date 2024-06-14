@@ -181,9 +181,7 @@ mod tests {
 
     #[fixture]
     pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
-        TryInto::<ApiBaseUrl>::try_into("https://example.com")
-            .unwrap()
-            .into()
+        ApiBaseUrl::try_from("https://example.com").unwrap().into()
     }
 
     pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
