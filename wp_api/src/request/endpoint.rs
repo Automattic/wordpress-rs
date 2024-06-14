@@ -47,16 +47,20 @@ pub(crate) struct ApiBaseUrl {
     url: Url,
 }
 
-impl ApiBaseUrl {
-    pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
-        Url::parse(site_base_url).map(|parsed_url| {
+impl TryFrom<&str> for ApiBaseUrl {
+    type Error = url::ParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Url::parse(value).map(|parsed_url| {
             let url = parsed_url
                 .extend(WP_JSON_PATH_SEGMENTS)
                 .expect("ApiBaseUrl is already parsed, so this can't result in an error");
             Self { url }
         })
     }
+}
 
+impl ApiBaseUrl {
     fn by_appending(&self, segment: &str) -> Url {
         self.url
             .clone()
@@ -154,7 +158,7 @@ mod tests {
         )]
         test_base_url: &str,
     ) {
-        let api_base_url = ApiBaseUrl::new(test_base_url).unwrap();
+        let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
         let expected_wp_json_url = wp_json_endpoint(test_base_url);
         assert_eq!(expected_wp_json_url, api_base_url.as_str());
         assert_eq!(
@@ -177,7 +181,9 @@ mod tests {
 
     #[fixture]
     pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
-        ApiBaseUrl::new("https://example.com").unwrap().into()
+        TryInto::<ApiBaseUrl>::try_into("https://example.com")
+            .unwrap()
+            .into()
     }
 
     pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
