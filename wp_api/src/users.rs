@@ -121,6 +121,17 @@ pub struct UserListParams {
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 }
 
+#[uniffi::export]
+fn user_list_params_default() -> UserListParams {
+    UserListParams::default()
+}
+
+#[uniffi::export]
+fn user_list_params_update(str: &str) -> UserListParams {
+    println!("{}", str);
+    UserListParams::default()
+}
+
 impl UserListParams {
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
         [

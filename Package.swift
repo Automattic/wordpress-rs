@@ -64,10 +64,15 @@ var package = Package(
 
 // MARK: - Enable local development toolings
 
+#if os(macOS)
 let localDevelopment = libwordpressFFIVersion.isLocal
+#else
+let localDevelopment = false
+#endif
 
 if localDevelopment {
     try enableSwiftLint()
+    addCodegenTarget()
 }
 
 // MARK: - Helpers
@@ -99,7 +104,6 @@ enum WordPressRSVersion {
 
 // Add SwiftLint to the package so that we can see linting issues directly from Xcode.
 func enableSwiftLint() throws {
-#if os(macOS)
     let version = try String(contentsOf: URL(string:"./.swiftlint.yml", relativeTo: URL(filePath: #filePath))!)
         .split(separator: "\n")
         .first(where: { $0.starts(with: "swiftlint_version") })?
@@ -122,5 +126,19 @@ func enableSwiftLint() throws {
     if let target = package.targets.first(where: { $0.name == "WordPressAPI" }) {
         target.plugins = (target.plugins ?? []) + [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint")]
     }
-#endif
+}
+
+func addCodegenTarget() {
+    package.dependencies.append(.package(url: "https://github.com/apple/swift-syntax.git", from: "510.0.0"))
+
+    let target = Target.executableTarget(
+        name: "codegen",
+        dependencies: [
+            .product(name: "SwiftSyntax", package: "swift-syntax"),
+            .product(name: "SwiftParser", package: "swift-syntax"),
+            .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
+        ],
+        path: "native/swift/Sources/codegen"
+    )
+    package.targets.append(target)
 }
