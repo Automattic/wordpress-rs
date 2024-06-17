@@ -2,6 +2,7 @@
 members = [
   "wp_api",
   "wp_contextual",
+  "wp_derive_request_builder",
   "wp_uniffi_bindgen",
   "xcframework",
 ]

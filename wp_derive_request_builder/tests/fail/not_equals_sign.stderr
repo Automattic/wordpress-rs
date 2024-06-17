@@ -1,0 +1,5 @@
+error: Did you mean '='?
+ --> tests/fail/not_equals_sign.rs:4:26
+  |
+4 |     #[contextual_get(url : "/users", params = &UserListParams, output = Vec<SparseUser>)]
+  |                          ^
