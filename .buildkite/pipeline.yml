@@ -15,6 +15,11 @@ steps:
           echo "--- :rust: Building + Testing"
           make test-rust-lib
           make test-rust-doc
+      - label: ":rust: Test `#[derive(WpDerivedRequest)]` Parser"
+        command: |
+          # Once we have integration tests running in CI, we can remove this separate step
+          echo "--- :rust: Testing `#[derive(WpDerivedRequest)]` Parser"
+          make test-rust-wp-derived-request-parser
       - label: ":rust: Lint"
         command: |
           echo "--- :rust: Running Clippy"

@@ -151,6 +151,9 @@ test-rust-lib:
 test-rust-doc:
 	$(rust_docker_run) cargo test --doc -- --nocapture
 
+test-rust-wp-derived-request-parser:
+	$(rust_docker_run) cargo test --package wp_derive_request_builder
+
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
