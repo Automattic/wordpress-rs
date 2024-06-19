@@ -1,4 +1,4 @@
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Span, TokenStream, TokenTree};
 use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
@@ -7,12 +7,37 @@ use syn::{
 
 use crate::parse::RequestType;
 
-#[derive(Debug)]
+// Use a wrapper for ParamsType to indicate that in case the `params` is Some, there is at least
+// one token in it
+#[derive(Debug, Clone)]
+pub struct ParamsType {
+    tokens: Option<Vec<TokenTree>>,
+}
+
+impl ParamsType {
+    pub fn new(tokens: Option<Vec<TokenTree>>) -> Self {
+        Self {
+            tokens: tokens.and_then(|tokens| {
+                if tokens.is_empty() {
+                    None
+                } else {
+                    Some(tokens)
+                }
+            }),
+        }
+    }
+
+    pub fn tokens(&self) -> Option<&Vec<TokenTree>> {
+        self.tokens.as_ref()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ParsedVariantAttribute {
-    request_type: RequestType,
-    url: String,
-    params: Option<Vec<TokenTree>>,
-    output: Vec<TokenTree>,
+    pub request_type: RequestType,
+    pub url_parts: Vec<UrlPart>,
+    pub params: ParamsType,
+    pub output: Vec<TokenTree>,
 }
 
 impl ParsedVariantAttribute {
@@ -232,10 +257,12 @@ impl Parse for ParsedVariantAttribute {
             ItemVariantAttributeParseError::MissingOutput.into_syn_error(input.span())
         })?;
 
+        let url_parts = UrlPart::split(url_str.to_string(), &meta_list_span)?;
+
         Ok(Self {
             request_type,
-            url: url_str.to_string(),
-            params: params_tokens,
+            url_parts,
+            params: ParamsType::new(params_tokens),
             output,
         })
     }
@@ -266,5 +293,62 @@ enum ItemVariantAttributeParseError {
 impl ItemVariantAttributeParseError {
     fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
         syn::Error::new(span, self.to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum UrlPart {
+    Dynamic(String),
+    Static(String),
+}
+
+impl UrlPart {
+    fn split(mut url: String, error_span: &Span) -> syn::Result<Vec<Self>> {
+        if url.starts_with('"') && url.ends_with('"') {
+            url.pop();
+            url.remove(0);
+        } else {
+            return Err(
+                ItemVariantAttributeParseError::UrlShouldBeLiteral.into_syn_error(*error_span)
+            );
+        }
+        let parts = url
+            .split('/')
+            .filter_map(|p| {
+                if p.starts_with('<') && p.ends_with('>') {
+                    let mut p = p.to_string();
+                    // Remove first and last character
+                    p.pop();
+                    p.remove(0);
+                    Some(Self::Dynamic(p))
+                } else {
+                    let p = p.trim();
+                    if p.is_empty() {
+                        None
+                    } else {
+                        Some(Self::Static(p.to_string()))
+                    }
+                }
+            })
+            .collect::<Vec<Self>>();
+        Ok(parts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("\"users\"", &[UrlPart::Static("users".to_string())])]
+    #[case("\"<user_id>\"", &[UrlPart::Dynamic("user_id".to_string())])]
+    #[case("\"users/<user_id>\"", &[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string())])]
+    #[case("\"users/<user_id>/<user_type>\"", &[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())])]
+    fn test_fn_url_params(#[case] input: &str, #[case] expected_url_parts: &[UrlPart]) {
+        assert_eq!(
+            UrlPart::split(input.into(), &proc_macro2::Span::call_site()).unwrap(),
+            expected_url_parts
+        );
     }
 }

@@ -4,6 +4,36 @@ use crate::{SparseUserField, UserDeleteParams, UserId, UserListParams, WpContext
 
 use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 
+// Temporary mod to showcase `wp_derive_request_builder`
+// The generated code can be inspected by running:
+// ```
+// cargo expand request::endpoint::users_endpoint::generated -p wp_api
+// ```
+mod generated {
+    use super::*;
+
+    #[derive(wp_derive_request_builder::WpDerivedRequest)]
+    #[SparseField(SparseUserField)]
+    enum UsersRequest {
+        #[contextual_get(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>)]
+        List,
+        #[post(url = "/users", params = &crate::UserCreateParams, output = UserWithEditContext)]
+        Create,
+        #[delete(url = "/users/<user_id>", params = &UserDeleteParams, output = crate::UserDeleteResponse)]
+        Delete,
+        #[delete(url = "/users/me", params = &UserDeleteParams, output = crate::UserDeleteResponse)]
+        DeleteMe,
+        #[contextual_get(url = "/users/<user_id>", output = crate::SparseUser)]
+        Retrieve,
+        #[contextual_get(url = "/users/me", output = crate::SparseUser)]
+        RetrieveMe,
+        #[post(url = "/users/<user_id>", params = &crate::UserUpdateParams, output = UserWithEditContext)]
+        Update,
+        #[post(url = "/users/me", params = &crate::UserUpdateParams, output = UserWithEditContext)]
+        UpdateMe,
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct UsersEndpoint {
     api_base_url: Arc<ApiBaseUrl>,

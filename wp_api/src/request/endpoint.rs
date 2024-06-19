@@ -83,6 +83,22 @@ impl ApiBaseUrl {
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
+    pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        self.url
+            .clone()
+            .extend(segments.into_iter().flat_map(|s| {
+                s.as_ref()
+                    .split('/')
+                    .map(str::to_string)
+                    .collect::<Vec<String>>()
+            }))
+            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
+    }
+
     fn as_str(&self) -> &str {
         self.url.as_str()
     }
