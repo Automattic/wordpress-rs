@@ -47,11 +47,14 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
                 let context_query_pair =
                     fn_body_context_query_pairs(&config.crate_ident, context_and_filter_handler);
                 let api_endpoint_url_type = &config.api_endpoint_url_type;
+                let fields_query_pairs =
+                    fn_body_fields_query_pairs(&config.crate_ident, context_and_filter_handler);
                 quote! {
                     pub #fn_signature -> #api_endpoint_url_type {
                         #url_from_endpoint
                         #context_query_pair
                         #query_pairs
+                        #fields_query_pairs
                         url.into()
                     }
                 }

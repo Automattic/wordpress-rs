@@ -250,6 +250,7 @@ pub fn fn_body_query_pairs(params_type: &ParamsType, request_type: RequestType) 
 }
 
 pub fn fn_body_fields_query_pairs(
+    crate_ident: &Ident,
     context_and_filter_handler: ContextAndFilterHandler,
 ) -> TokenStream {
     match context_and_filter_handler {
@@ -258,6 +259,7 @@ pub fn fn_body_fields_query_pairs(
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
         ContextAndFilterHandler::FilterTakeContextAsArgument
         | ContextAndFilterHandler::FilterNoContext => quote! {
+            use #crate_ident::SparseField;
             url.query_pairs_mut().append_pair(
                 "_fields",
                 fields
@@ -827,8 +829,9 @@ mod tests {
     ) {
         // Test if the `_fields` query pair is included or not
         // Since this query pair is static, there is no need to compare the string value
+        let crate_ident = format_ident!("crate");
         assert_eq!(
-            fn_body_fields_query_pairs(context_and_filter_handler).is_empty(),
+            fn_body_fields_query_pairs(&crate_ident, context_and_filter_handler).is_empty(),
             is_empty
         );
     }
