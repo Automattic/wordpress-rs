@@ -2,6 +2,7 @@
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
+mod generate;
 mod parse;
 mod sparse_field_attr;
 mod variant_attr;
@@ -11,12 +12,13 @@ mod variant_attr;
     attributes(SparseField, get, post, delete, contextual_get)
 )]
 pub fn derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as parse::ParsedEnum);
+    let parsed_enum = parse_macro_input!(input as parse::ParsedEnum);
 
     if cfg!(feature = "generate_request_builder") {
-        dbg!("{:#?}", input);
-        // TODO: Generate endpoint & request builder
-        TokenStream::new()
+        //dbg!("{:#?}", parsed_enum.clone());
+        generate::generate_types(&parsed_enum)
+            .unwrap_or_else(|err| err.into_compile_error())
+            .into()
     } else {
         TokenStream::new()
     }

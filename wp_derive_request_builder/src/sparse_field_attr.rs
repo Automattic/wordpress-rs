@@ -5,9 +5,9 @@ use syn::{
     Attribute, Ident, Meta, MetaList, Result,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SparseFieldAttr {
-    tokens: TokenStream,
+    pub tokens: TokenStream,
 }
 
 impl Parse for SparseFieldAttr {

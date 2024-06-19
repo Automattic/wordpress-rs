@@ -3023,6 +3023,7 @@ dependencies = [
  "uniffi",
  "url",
  "wp_contextual",
+ "wp_derive_request_builder",
 ]
 
 [[package]]
@@ -3046,6 +3047,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
+ "rstest",
  "serde",
  "strum",
  "strum_macros",
@@ -3053,6 +3055,7 @@ dependencies = [
  "thiserror",
  "trybuild",
  "uniffi",
+ "url",
 ]
 
 [[package]]

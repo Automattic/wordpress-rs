@@ -15,7 +15,9 @@ name = "tests"
 path = "tests/parser_tests.rs"
 
 [dev-dependencies]
+rstest = { workspace = true }
 trybuild = { version = "1.0", features = ["diff"] }
+url = { workspace = true }
 
 [dependencies]
 convert_case = "0.6"

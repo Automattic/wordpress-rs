@@ -13,11 +13,11 @@ use syn::{
 
 use crate::{sparse_field_attr::SparseFieldAttr, variant_attr::ParsedVariantAttribute};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParsedEnum {
-    sparse_field_attr: SparseFieldAttr,
-    enum_ident: Ident,
-    variants: Punctuated<ParsedVariant, Comma>,
+    pub sparse_field_attr: SparseFieldAttr,
+    pub enum_ident: Ident,
+    pub variants: Punctuated<ParsedVariant, Comma>,
 }
 
 impl Parse for ParsedEnum {
@@ -35,10 +35,10 @@ impl Parse for ParsedEnum {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParsedVariant {
-    attr: ParsedVariantAttribute,
-    variant_ident: Ident,
+    pub attr: ParsedVariantAttribute,
+    pub variant_ident: Ident,
 }
 
 impl Parse for ParsedVariant {
