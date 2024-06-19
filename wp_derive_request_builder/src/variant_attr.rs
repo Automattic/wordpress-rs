@@ -296,7 +296,7 @@ impl ItemVariantAttributeParseError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UrlPart {
     Dynamic(String),
     Static(String),
@@ -332,5 +332,23 @@ impl UrlPart {
             })
             .collect::<Vec<Self>>();
         Ok(parts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("\"users\"", &[UrlPart::Static("users".to_string())])]
+    #[case("\"<user_id>\"", &[UrlPart::Dynamic("user_id".to_string())])]
+    #[case("\"users/<user_id>\"", &[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string())])]
+    #[case("\"users/<user_id>/<user_type>\"", &[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())])]
+    fn test_fn_url_params(#[case] input: &str, #[case] expected_url_parts: &[UrlPart]) {
+        assert_eq!(
+            UrlPart::split(input.into(), &proc_macro2::Span::call_site()).unwrap(),
+            expected_url_parts
+        );
     }
 }

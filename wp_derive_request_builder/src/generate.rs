@@ -18,7 +18,7 @@ mod helpers_to_generate_tokens;
 pub(crate) fn generate_types(parsed_enum: &ParsedEnum) -> syn::Result<TokenStream> {
     let config = Config::new(parsed_enum);
 
-    Ok(generate_endpoint_type(&config, &parsed_enum))
+    Ok(generate_endpoint_type(&config, parsed_enum))
 }
 
 fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
@@ -98,7 +98,7 @@ impl ContextAndFilterHandler {
         match request_type {
             crate::parse::RequestType::ContextualGet => {
                 let mut v: Vec<Self> = WpContext::iter()
-                    .map(|c| Self::NoFilterTakeContextAsFunctionName(c))
+                    .map(Self::NoFilterTakeContextAsFunctionName)
                     .collect();
                 v.push(ContextAndFilterHandler::FilterTakeContextAsArgument);
                 v

@@ -296,6 +296,7 @@ pub fn fn_body_context_query_pairs(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::too_many_arguments)]
     use crate::sparse_field_attr;
 
     use super::*;
@@ -306,7 +307,7 @@ mod tests {
     #[case(&[UrlPart::Static("users".to_string())], "")]
     #[case(&[UrlPart::Dynamic("user_id".to_string())], "user_id : UserId ,")]
     #[case(&[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string())], "user_id : UserId ,")]
-    #[case(&[ UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ], "user_id : UserId , user_type : UserType ,")]
+    #[case(&[UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())], "user_id : UserId , user_type : UserType ,")]
     fn test_fn_url_params(#[case] url_parts: &[UrlPart], #[case] expected_str: &str) {
         assert_eq!(fn_url_params(url_parts).to_string(), expected_str);
     }
@@ -809,7 +810,7 @@ mod tests {
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_query_pairs(&params, request_type).to_string(),
+            fn_body_query_pairs(params, request_type).to_string(),
             expected_str
         );
     }
