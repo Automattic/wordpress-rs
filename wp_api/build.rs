@@ -16,7 +16,7 @@ fn generate_test_credentials_file() -> Result<(), Box<dyn Error>> {
 
     let out_dir = env::var("OUT_DIR")?;
     let dest_path = Path::new(&out_dir).join("generated_test_credentials.rs");
-    let mut buf_writer = BufWriter::new(File::create(&dest_path)?);
+    let mut buf_writer = BufWriter::new(File::create(dest_path)?);
 
     if let Ok(file_contents) = read_to_string("../test_credentials") {
         let lines: Vec<&str> = file_contents.lines().collect();
