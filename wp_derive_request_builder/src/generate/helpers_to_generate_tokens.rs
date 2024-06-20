@@ -129,25 +129,6 @@ pub fn fn_name(
     }
 }
 
-pub fn fn_body_get_url_from_endpoint(
-    variant_ident: &Ident,
-    url_parts: &[UrlPart],
-    params_type: &ParamsType,
-    request_type: RequestType,
-    context_and_filter_handler: ContextAndFilterHandler,
-) -> TokenStream {
-    let fn_name = fn_name(variant_ident, context_and_filter_handler);
-    let fn_arg_url_parts = fn_arg_url_parts(url_parts);
-    let fn_arg_context = fn_arg_context(context_and_filter_handler);
-    let fn_arg_provided_params =
-        fn_arg_provided_params(PartOf::Endpoint, params_type, request_type);
-    let fn_arg_fields = fn_arg_fields(context_and_filter_handler);
-
-    quote! {
-        let url = self.endpoint.#fn_name(#fn_arg_url_parts #fn_arg_context #fn_arg_provided_params #fn_arg_fields);
-    }
-}
-
 fn fn_arg_url_parts(url_parts: &[UrlPart]) -> TokenStream {
     url_parts
         .iter()
@@ -222,6 +203,25 @@ pub fn fn_body_get_url_from_api_base_url(url_parts: &[UrlPart]) -> TokenStream {
     }
 }
 
+pub fn fn_body_get_url_from_endpoint(
+    variant_ident: &Ident,
+    url_parts: &[UrlPart],
+    params_type: &ParamsType,
+    request_type: RequestType,
+    context_and_filter_handler: ContextAndFilterHandler,
+) -> TokenStream {
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
+    let fn_arg_url_parts = fn_arg_url_parts(url_parts);
+    let fn_arg_context = fn_arg_context(context_and_filter_handler);
+    let fn_arg_provided_params =
+        fn_arg_provided_params(PartOf::Endpoint, params_type, request_type);
+    let fn_arg_fields = fn_arg_fields(context_and_filter_handler);
+
+    quote! {
+        let url = self.endpoint.#fn_name(#fn_arg_url_parts #fn_arg_context #fn_arg_provided_params #fn_arg_fields);
+    }
+}
+
 pub fn fn_body_query_pairs(params_type: &ParamsType, request_type: RequestType) -> TokenStream {
     match request_type {
         RequestType::ContextualGet | RequestType::Delete | RequestType::Get => {
@@ -291,6 +291,31 @@ pub fn fn_body_context_query_pairs(
         | ContextAndFilterHandler::FilterTakeContextAsArgument => quote! {
             url.query_pairs_mut().append_pair("context", context.as_str());
         },
+    }
+}
+
+pub fn fn_body_build_request_from_url(
+    params_type: &ParamsType,
+    request_type: RequestType,
+) -> TokenStream {
+    match request_type {
+        RequestType::ContextualGet | RequestType::Get => quote! {
+            self.request_builder.build_get_request(url)
+        },
+        RequestType::Delete => quote! {
+            self.request_builder.build_delete_request(url)
+        },
+        RequestType::Post => {
+            if params_type.tokens().is_some() {
+                quote! {
+                    self.request_builder.build_post_request(url, params)
+                }
+            } else {
+                quote! {
+                    self.request_builder.build_post_request(url)
+                }
+            }
+        }
     }
 }
 
@@ -859,6 +884,42 @@ mod tests {
         let crate_ident = format_ident!("crate");
         assert_eq!(
             fn_body_context_query_pairs(&crate_ident, context_and_filter_handler).to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
+    #[case(&ParamsType::new(None), RequestType::ContextualGet, "self . request_builder . build_get_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::ContextualGet,
+        "self . request_builder . build_get_request (url)"
+    )]
+    #[case(&ParamsType::new(None), RequestType::Get, "self . request_builder . build_get_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::Get,
+        "self . request_builder . build_get_request (url)"
+    )]
+    #[case(&ParamsType::new(None), RequestType::Delete, "self . request_builder . build_delete_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::Delete,
+        "self . request_builder . build_delete_request (url)"
+    )]
+    #[case(&ParamsType::new(None), RequestType::Post, "self . request_builder . build_post_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::Post,
+        "self . request_builder . build_post_request (url , params)"
+    )]
+    fn test_fn_body_build_request_from_url(
+        #[case] params: &ParamsType,
+        #[case] request_type: RequestType,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            fn_body_build_request_from_url(params, request_type).to_string(),
             expected_str
         );
     }

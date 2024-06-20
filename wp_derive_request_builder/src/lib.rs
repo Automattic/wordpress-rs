@@ -16,9 +16,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     if cfg!(feature = "generate_request_builder") {
         //dbg!("{:#?}", parsed_enum.clone());
-        generate::generate_types(&parsed_enum)
-            .unwrap_or_else(|err| err.into_compile_error())
-            .into()
+        generate::generate_types(&parsed_enum).into()
     } else {
         TokenStream::new()
     }
