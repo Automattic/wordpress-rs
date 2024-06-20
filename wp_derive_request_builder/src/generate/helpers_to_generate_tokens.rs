@@ -381,6 +381,7 @@ mod tests {
     use crate::sparse_field_attr;
 
     use super::*;
+    use quote::ToTokens;
     use rstest::rstest;
     use syn::parse_quote;
 
@@ -591,6 +592,41 @@ mod tests {
     ) {
         assert_eq!(
             fn_arg_fields(context_and_filter_handler).to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
+    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::None, "crate :: SparseUser")]
+    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::NoFilterTakeContextAsArgument, "crate :: SparseUser")]
+    #[case(
+        parse_quote!(crate::SparseUser),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
+        "crate :: UserWithEditContext"
+    )]
+    #[case(
+        parse_quote!(SparseUser),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
+        "UserWithEmbedContext"
+    )]
+    #[case(
+        parse_quote!(std::vec::Vec<crate::SparseUser>),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::View),
+        "std :: vec :: Vec < crate :: UserWithViewContext >"
+    )]
+    #[case(parse_quote!(SparseUser), ContextAndFilterHandler::FilterTakeContextAsArgument, "SparseUser")]
+    #[case(parse_quote!(Vec<SparseUser>), ContextAndFilterHandler::FilterNoContext, "Vec < SparseUser >")]
+    fn test_output_type(
+        #[case] output_token_stream: TokenStream,
+        #[case] context_and_filter_handler: ContextAndFilterHandler,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            output_type(
+                output_token_stream.into_iter().collect(),
+                context_and_filter_handler
+            )
+            .to_string(),
             expected_str
         );
     }
