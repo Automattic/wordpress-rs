@@ -36,9 +36,7 @@ pub fn output_type(
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::NoFilterTakeContextAsArgument
         | ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => {
-            TokenStream::from_iter(output_token_tree.into_iter())
-        }
+        | ContextAndFilterHandler::FilterNoContext => TokenStream::from_iter(output_token_tree),
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => output_token_tree
             .into_iter()
             .map(|token| {
@@ -107,9 +105,9 @@ pub fn fn_provided_param(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
+                crate::parse::RequestType::ContextualGet | crate::parse::RequestType::Delete => {
+                    tokens
+                }
                 crate::parse::RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
@@ -202,9 +200,9 @@ fn fn_arg_provided_params(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
+                crate::parse::RequestType::ContextualGet | crate::parse::RequestType::Delete => {
+                    tokens
+                }
                 crate::parse::RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
@@ -261,7 +259,7 @@ pub fn fn_body_get_url_from_endpoint(
 
 pub fn fn_body_query_pairs(params_type: &ParamsType, request_type: RequestType) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Delete | RequestType::Get => {
+        RequestType::ContextualGet | RequestType::Delete => {
             if let Some(tokens) = params_type.tokens() {
                 let is_option = if let Some(TokenTree::Ident(ref ident)) = tokens.first() {
                     // TODO: This won't work with `std::option::Option` or `core::option::Option`
@@ -336,7 +334,7 @@ pub fn fn_body_build_request_from_url(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Get => quote! {
+        RequestType::ContextualGet => quote! {
             self.request_builder.build_get_request(url)
         },
         RequestType::Delete => quote! {
@@ -395,8 +393,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::Get, "")]
-    #[case(PartOf::Endpoint, &ParamsType::new(Some(vec![])), RequestType::Get, "")]
+    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::ContextualGet, "")]
+    #[case(PartOf::Endpoint, &ParamsType::new(Some(vec![])), RequestType::ContextualGet, "")]
     #[case(
         PartOf::Endpoint,
         &referenced_params_type("UserCreateParams"),
@@ -418,13 +416,13 @@ mod tests {
     #[case(
         PartOf::Endpoint,
         &referenced_params_type("UserListParams"),
-        RequestType::Get,
+        RequestType::ContextualGet,
         "params : &UserListParams ,"
     )]
     #[case(
         PartOf::Endpoint,
         &referenced_params_type("UserListParams"),
-        RequestType::Get,
+        RequestType::ContextualGet,
         "params : &UserListParams ,"
     )]
     fn test_fn_provided_param(
@@ -556,14 +554,13 @@ mod tests {
     }
 
     #[rstest]
-    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::Get, "")]
+    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::ContextualGet, "")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserCreateParams"), RequestType::Post, "")]
     #[case(PartOf::RequestBuilder, &referenced_params_type("UserCreateParams"), RequestType::Post, "params ,")]
     #[case(PartOf::RequestExecutor, &referenced_params_type("UserCreateParams"), RequestType::Post, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::ContextualGet, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::ContextualGet, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::Delete, "params ,")]
-    #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::Get, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::Post, "")]
     fn test_fn_arg_provided_params(
         #[case] part_of: PartOf,
@@ -1024,12 +1021,6 @@ mod tests {
     #[case(
         &referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
-        "self . request_builder . build_get_request (url)"
-    )]
-    #[case(&ParamsType::new(None), RequestType::Get, "self . request_builder . build_get_request (url)")]
-    #[case(
-        &referenced_params_type("UserListParams"),
-        RequestType::Get,
         "self . request_builder . build_get_request (url)"
     )]
     #[case(&ParamsType::new(None), RequestType::Delete, "self . request_builder . build_delete_request (url)")]

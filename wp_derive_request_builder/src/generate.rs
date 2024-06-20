@@ -236,12 +236,6 @@ impl ContextAndFilterHandler {
                 v.push(ContextAndFilterHandler::FilterTakeContextAsArgument);
                 v
             }
-            crate::parse::RequestType::Get => {
-                vec![
-                    ContextAndFilterHandler::NoFilterTakeContextAsArgument,
-                    ContextAndFilterHandler::FilterTakeContextAsArgument,
-                ]
-            }
             crate::parse::RequestType::Delete | crate::parse::RequestType::Post => {
                 vec![
                     ContextAndFilterHandler::None,
