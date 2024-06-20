@@ -10,6 +10,8 @@ use crate::{
     variant_attr::{ParamsType, UrlPart},
 };
 
+const SPARSE_IDENT_PREFIX: &str = "Sparse";
+
 pub fn endpoint_ident(parsed_enum: &ParsedEnum) -> Ident {
     format_ident!("{}Endpoint", parsed_enum.enum_ident)
 }
@@ -24,6 +26,39 @@ pub fn api_base_url_type(crate_ident: &Ident) -> TokenStream {
 
 pub fn request_builder_type(crate_ident: &Ident) -> TokenStream {
     quote! { std::sync::Arc<#crate_ident::request::RequestBuilder> }
+}
+
+pub fn output_type(
+    output_token_tree: Vec<TokenTree>,
+    context_and_filter_handler: ContextAndFilterHandler,
+) -> TokenStream {
+    match context_and_filter_handler {
+        ContextAndFilterHandler::None
+        | ContextAndFilterHandler::NoFilterTakeContextAsArgument
+        | ContextAndFilterHandler::FilterTakeContextAsArgument
+        | ContextAndFilterHandler::FilterNoContext => TokenStream::from_iter(output_token_tree),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => output_token_tree
+            .into_iter()
+            .map(|token| {
+                if let TokenTree::Ident(ident) = token {
+                    let new_ident = if let Some(ident_without_sparse_prefix) =
+                        ident.to_string().strip_prefix(SPARSE_IDENT_PREFIX)
+                    {
+                        format_ident!(
+                            "{}With{}Context",
+                            ident_without_sparse_prefix,
+                            context.to_string()
+                        )
+                    } else {
+                        ident
+                    };
+                    quote! { #new_ident }
+                } else {
+                    quote! { #token }
+                }
+            })
+            .collect::<TokenStream>(),
+    }
 }
 
 pub fn fn_signature(
@@ -70,12 +105,12 @@ pub fn fn_provided_param(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
+                crate::parse::RequestType::ContextualGet | crate::parse::RequestType::Delete => {
+                    tokens
+                }
                 crate::parse::RequestType::Post => TokenStream::new(),
             },
-            PartOf::RequestBuilder => tokens,
+            PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
     } else {
         TokenStream::new()
@@ -165,12 +200,12 @@ fn fn_arg_provided_params(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
+                crate::parse::RequestType::ContextualGet | crate::parse::RequestType::Delete => {
+                    tokens
+                }
                 crate::parse::RequestType::Post => TokenStream::new(),
             },
-            PartOf::RequestBuilder => tokens,
+            PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
     } else {
         TokenStream::new()
@@ -224,7 +259,7 @@ pub fn fn_body_get_url_from_endpoint(
 
 pub fn fn_body_query_pairs(params_type: &ParamsType, request_type: RequestType) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Delete | RequestType::Get => {
+        RequestType::ContextualGet | RequestType::Delete => {
             if let Some(tokens) = params_type.tokens() {
                 let is_option = if let Some(TokenTree::Ident(ref ident)) = tokens.first() {
                     // TODO: This won't work with `std::option::Option` or `core::option::Option`
@@ -299,7 +334,7 @@ pub fn fn_body_build_request_from_url(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Get => quote! {
+        RequestType::ContextualGet => quote! {
             self.request_builder.build_get_request(url)
         },
         RequestType::Delete => quote! {
@@ -319,12 +354,32 @@ pub fn fn_body_build_request_from_url(
     }
 }
 
+pub fn fn_body_get_request_from_request_builder(
+    variant_ident: &Ident,
+    url_parts: &[UrlPart],
+    params_type: &ParamsType,
+    request_type: RequestType,
+    context_and_filter_handler: ContextAndFilterHandler,
+) -> TokenStream {
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
+    let fn_arg_url_parts = fn_arg_url_parts(url_parts);
+    let fn_arg_context = fn_arg_context(context_and_filter_handler);
+    let fn_arg_provided_params =
+        fn_arg_provided_params(PartOf::RequestExecutor, params_type, request_type);
+    let fn_arg_fields = fn_arg_fields(context_and_filter_handler);
+
+    quote! {
+        let request = self.request_builder.#fn_name(#fn_arg_url_parts #fn_arg_context #fn_arg_provided_params #fn_arg_fields);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::too_many_arguments)]
     use crate::sparse_field_attr;
 
     use super::*;
+    use quote::ToTokens;
     use rstest::rstest;
     use syn::parse_quote;
 
@@ -338,8 +393,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::Get, "")]
-    #[case(PartOf::Endpoint, &ParamsType::new(Some(vec![])), RequestType::Get, "")]
+    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::ContextualGet, "")]
+    #[case(PartOf::Endpoint, &ParamsType::new(Some(vec![])), RequestType::ContextualGet, "")]
     #[case(
         PartOf::Endpoint,
         &referenced_params_type("UserCreateParams"),
@@ -353,15 +408,21 @@ mod tests {
         "params : &UserCreateParams ,"
     )]
     #[case(
+        PartOf::RequestExecutor,
+        &referenced_params_type("UserCreateParams"),
+        RequestType::Post,
+        "params : &UserCreateParams ,"
+    )]
+    #[case(
         PartOf::Endpoint,
         &referenced_params_type("UserListParams"),
-        RequestType::Get,
+        RequestType::ContextualGet,
         "params : &UserListParams ,"
     )]
     #[case(
         PartOf::Endpoint,
         &referenced_params_type("UserListParams"),
-        RequestType::Get,
+        RequestType::ContextualGet,
         "params : &UserListParams ,"
     )]
     fn test_fn_provided_param(
@@ -493,13 +554,13 @@ mod tests {
     }
 
     #[rstest]
-    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::Get, "")]
+    #[case(PartOf::Endpoint, &ParamsType::new(None), RequestType::ContextualGet, "")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserCreateParams"), RequestType::Post, "")]
     #[case(PartOf::RequestBuilder, &referenced_params_type("UserCreateParams"), RequestType::Post, "params ,")]
+    #[case(PartOf::RequestExecutor, &referenced_params_type("UserCreateParams"), RequestType::Post, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::ContextualGet, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::ContextualGet, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::Delete, "params ,")]
-    #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::Get, "params ,")]
     #[case(PartOf::Endpoint, &referenced_params_type("UserListParams"), RequestType::Post, "")]
     fn test_fn_arg_provided_params(
         #[case] part_of: PartOf,
@@ -533,6 +594,41 @@ mod tests {
     }
 
     #[rstest]
+    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::None, "crate :: SparseUser")]
+    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::NoFilterTakeContextAsArgument, "crate :: SparseUser")]
+    #[case(
+        parse_quote!(crate::SparseUser),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
+        "crate :: UserWithEditContext"
+    )]
+    #[case(
+        parse_quote!(SparseUser),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
+        "UserWithEmbedContext"
+    )]
+    #[case(
+        parse_quote!(std::vec::Vec<crate::SparseUser>),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::View),
+        "std :: vec :: Vec < crate :: UserWithViewContext >"
+    )]
+    #[case(parse_quote!(SparseUser), ContextAndFilterHandler::FilterTakeContextAsArgument, "SparseUser")]
+    #[case(parse_quote!(Vec<SparseUser>), ContextAndFilterHandler::FilterNoContext, "Vec < SparseUser >")]
+    fn test_output_type(
+        #[case] output_token_stream: TokenStream,
+        #[case] context_and_filter_handler: ContextAndFilterHandler,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            output_type(
+                output_token_stream.into_iter().collect(),
+                context_and_filter_handler
+            )
+            .to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
     #[case(
         PartOf::Endpoint,
         format_ident!("Create"),
@@ -551,6 +647,14 @@ mod tests {
         "fn filter_create (& self , fields : & [SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
+        format_ident!("Create"),
+        url_static_users(),
+        &referenced_params_type("UserCreateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::FilterNoContext,
+        "fn filter_create (& self , params : &UserCreateParams , fields : & [SparseUserField])")]
+    #[case(
+        PartOf::RequestExecutor,
         format_ident!("Create"),
         url_static_users(),
         &referenced_params_type("UserCreateParams"),
@@ -638,6 +742,14 @@ mod tests {
         ContextAndFilterHandler::None,
         "fn update (& self , user_id : UserId , params : &UserUpdateParams ,)")]
     #[case(
+        PartOf::RequestExecutor,
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        &referenced_params_type("UserUpdateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "fn update (& self , user_id : UserId , params : &UserUpdateParams ,)")]
+    #[case(
         PartOf::RequestBuilder,
         format_ident!("Update"),
         url_users_with_user_id(),
@@ -646,7 +758,23 @@ mod tests {
         ContextAndFilterHandler::FilterNoContext,
         "fn filter_update (& self , user_id : UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
     #[case(
+        PartOf::RequestExecutor,
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        &referenced_params_type("UserUpdateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::FilterNoContext,
+        "fn filter_update (& self , user_id : UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
+    #[case(
         PartOf::RequestBuilder,
+        format_ident!("List"),
+        url_static_users(),
+        &referenced_params_type("UserListParams"),
+        RequestType::ContextualGet,
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
+        "fn list_with_edit_context (& self , params : &UserListParams ,)")]
+    #[case(
+        PartOf::RequestExecutor,
         format_ident!("List"),
         url_static_users(),
         &referenced_params_type("UserListParams"),
@@ -895,12 +1023,6 @@ mod tests {
         RequestType::ContextualGet,
         "self . request_builder . build_get_request (url)"
     )]
-    #[case(&ParamsType::new(None), RequestType::Get, "self . request_builder . build_get_request (url)")]
-    #[case(
-        &referenced_params_type("UserListParams"),
-        RequestType::Get,
-        "self . request_builder . build_get_request (url)"
-    )]
     #[case(&ParamsType::new(None), RequestType::Delete, "self . request_builder . build_delete_request (url)")]
     #[case(
         &referenced_params_type("UserListParams"),
@@ -920,6 +1042,105 @@ mod tests {
     ) {
         assert_eq!(
             fn_body_build_request_from_url(params, request_type).to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
+    #[case(
+        format_ident!("Create"),
+        url_static_users(),
+        &referenced_params_type("UserCreateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "let request = self . request_builder . create (params ,) ;")]
+    #[case(
+        format_ident!("Create"),
+        url_static_users(),
+        &referenced_params_type("UserCreateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::FilterNoContext,
+        "let request = self . request_builder . filter_create (params , fields ,) ;")]
+    #[case(
+        format_ident!("Delete"),
+        url_users_with_user_id(),
+        &referenced_params_type("UserDeleteParams"),
+        RequestType::Delete,
+        ContextAndFilterHandler::None,
+        "let request = self . request_builder . delete (user_id , params ,) ;")]
+    #[case(
+        format_ident!("Delete"),
+        url_users_with_user_id(),
+        &referenced_params_type("UserDeleteParams"),
+        RequestType::Delete,
+        ContextAndFilterHandler::FilterNoContext,
+        "let request = self . request_builder . filter_delete (user_id , params , fields ,) ;")]
+    #[case(
+        format_ident!("DeleteMe"),
+        url_static_users(),
+        &referenced_params_type("UserDeleteParams"),
+        RequestType::Delete,
+        ContextAndFilterHandler::None,
+        "let request = self . request_builder . delete_me (params ,) ;")]
+    #[case(
+        format_ident!("List"),
+        url_static_users(),
+        &referenced_params_type("UserListParams"),
+        RequestType::ContextualGet,
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
+        "let request = self . request_builder . list_with_edit_context (params ,) ;")]
+    #[case(
+        format_ident!("List"),
+        url_static_users(),
+        &referenced_params_type("UserListParams"),
+        RequestType::ContextualGet,
+        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        "let request = self . request_builder . filter_list (context , params , fields ,) ;")]
+    #[case(
+        format_ident!("Retrieve"),
+        url_users_with_user_id(),
+        &ParamsType::new(None),
+        RequestType::ContextualGet,
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
+        "let request = self . request_builder . retrieve_with_embed_context (user_id ,) ;")]
+    #[case(
+        format_ident!("Retrieve"),
+        url_users_with_user_id(),
+        &ParamsType::new(None),
+        RequestType::ContextualGet,
+        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        "let request = self . request_builder . filter_retrieve (user_id , context , fields ,) ;")]
+    #[case(
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        &referenced_params_type("UserUpdateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "let request = self . request_builder . update (user_id , params ,) ;")]
+    #[case(
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        &referenced_params_type("UserUpdateParams"),
+        RequestType::Post,
+        ContextAndFilterHandler::FilterNoContext,
+        "let request = self . request_builder . filter_update (user_id , params , fields ,) ;")]
+    fn test_fn_body_get_request_from_request_builder(
+        #[case] variant_ident: Ident,
+        #[case] url_parts: Vec<UrlPart>,
+        #[case] params_type: &ParamsType,
+        #[case] request_type: RequestType,
+        #[case] context_and_filter_handler: ContextAndFilterHandler,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            fn_body_get_request_from_request_builder(
+                &variant_ident,
+                &url_parts,
+                params_type,
+                request_type,
+                context_and_filter_handler
+            )
+            .to_string(),
             expected_str
         );
     }
