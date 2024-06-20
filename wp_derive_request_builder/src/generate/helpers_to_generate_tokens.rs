@@ -294,6 +294,31 @@ pub fn fn_body_context_query_pairs(
     }
 }
 
+pub fn fn_body_build_request_from_url(
+    params_type: &ParamsType,
+    request_type: RequestType,
+) -> TokenStream {
+    match request_type {
+        RequestType::ContextualGet | RequestType::Get => quote! {
+            self.request_builder.build_get_request(url)
+        },
+        RequestType::Delete => quote! {
+            self.request_builder.build_delete_request(url)
+        },
+        RequestType::Post => {
+            if params_type.tokens().is_some() {
+                quote! {
+                    self.request_builder.build_post_request(url, params)
+                }
+            } else {
+                quote! {
+                    self.request_builder.build_post_request(url)
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::too_many_arguments)]
@@ -859,6 +884,42 @@ mod tests {
         let crate_ident = format_ident!("crate");
         assert_eq!(
             fn_body_context_query_pairs(&crate_ident, context_and_filter_handler).to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
+    #[case(&ParamsType::new(None), RequestType::ContextualGet, "self . request_builder . build_get_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::ContextualGet,
+        "self . request_builder . build_get_request (url)"
+    )]
+    #[case(&ParamsType::new(None), RequestType::Get, "self . request_builder . build_get_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::Get,
+        "self . request_builder . build_get_request (url)"
+    )]
+    #[case(&ParamsType::new(None), RequestType::Delete, "self . request_builder . build_delete_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::Delete,
+        "self . request_builder . build_delete_request (url)"
+    )]
+    #[case(&ParamsType::new(None), RequestType::Post, "self . request_builder . build_post_request (url)")]
+    #[case(
+        &referenced_params_type("UserListParams"),
+        RequestType::Post,
+        "self . request_builder . build_post_request (url , params)"
+    )]
+    fn test_fn_body_build_request_from_url(
+        #[case] params: &ParamsType,
+        #[case] request_type: RequestType,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            fn_body_build_request_from_url(params, request_type).to_string(),
             expected_str
         );
     }
