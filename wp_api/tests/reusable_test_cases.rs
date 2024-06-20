@@ -1,0 +1,23 @@
+#![allow(unused_macros)]
+use rstest_reuse::{self, template};
+
+#[template]
+#[rstest]
+#[case(UserListParams::default())]
+#[case(generate!(UserListParams, (page, Some(1))))]
+#[case(generate!(UserListParams, (page, Some(2)), (per_page, Some(5))))]
+#[case(generate!(UserListParams, (search, Some("foo".to_string()))))]
+#[case(generate!(UserListParams, (exclude, vec![FIRST_USER_ID, SECOND_USER_ID])))]
+#[case(generate!(UserListParams, (include, vec![FIRST_USER_ID])))]
+#[case(generate!(UserListParams, (per_page, Some(100)), (offset, Some(20))))]
+#[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Asc))))]
+#[case(generate!(UserListParams, (orderby, Some(WpApiParamUsersOrderBy::Id))))]
+#[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Desc)), (orderby, Some(WpApiParamUsersOrderBy::Email))))]
+#[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
+#[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])))]
+#[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])))]
+#[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])))]
+#[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))))]
+#[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))))]
+#[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))))]
+pub fn list_users_cases(#[case] params: UserListParams) {}

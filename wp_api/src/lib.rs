@@ -2,7 +2,8 @@
 
 use request::{
     endpoint::ApiBaseUrl, plugins_request_builder::PluginsRequestBuilder,
-    users_request_builder::UsersRequestBuilder, RequestExecutor, WpNetworkResponse,
+    users_request_builder::UsersRequestBuilder, RequestExecutor, UsersRequestBuilder2,
+    WpNetworkResponse,
 };
 use std::sync::Arc;
 
@@ -21,6 +22,43 @@ pub mod users;
 
 #[cfg(test)]
 mod unit_test_common;
+
+// TODO: This is a temporary type that allows building a request type
+// Although we'll have a type that does that, it's unlikely that it'll look like this.
+// It still does its job for now to prove that `UsersRequestBuilder2` (temporary) type is
+// properly generated and utilized in `test_manual_request_builder_immut` integration tests
+#[derive(Debug, uniffi::Object)]
+pub struct WpApiRequestBuilder {
+    users: Arc<UsersRequestBuilder2>,
+}
+
+#[uniffi::export]
+impl WpApiRequestBuilder {
+    #[uniffi::constructor]
+    pub fn new(
+        site_url: String,
+        authentication: WpAuthentication,
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Result<Self, WpApiError> {
+        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
+            .map_err(|err| WpApiError::SiteUrlParsingError {
+                reason: err.to_string(),
+            })?
+            .into();
+        let request_builder = Arc::new(request::RequestBuilder::new(
+            request_executor,
+            authentication.clone(),
+        ));
+
+        Ok(Self {
+            users: UsersRequestBuilder2::new(api_base_url.clone(), request_builder.clone()).into(),
+        })
+    }
+
+    pub fn users(&self) -> Arc<UsersRequestBuilder2> {
+        self.users.clone()
+    }
+}
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpRequestBuilder {

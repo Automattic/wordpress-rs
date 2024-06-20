@@ -9,16 +9,13 @@ mod variant_attr;
 
 #[proc_macro_derive(
     WpDerivedRequest,
-    attributes(SparseField, get, post, delete, contextual_get)
+    attributes(SparseField, post, delete, contextual_get)
 )]
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed_enum = parse_macro_input!(input as parse::ParsedEnum);
 
     if cfg!(feature = "generate_request_builder") {
-        //dbg!("{:#?}", parsed_enum.clone());
-        generate::generate_types(&parsed_enum)
-            .unwrap_or_else(|err| err.into_compile_error())
-            .into()
+        generate::generate_types(&parsed_enum).into()
     } else {
         TokenStream::new()
     }
