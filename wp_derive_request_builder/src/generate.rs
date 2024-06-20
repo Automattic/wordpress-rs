@@ -237,10 +237,7 @@ impl ContextAndFilterHandler {
                 v
             }
             crate::parse::RequestType::Delete | crate::parse::RequestType::Post => {
-                vec![
-                    ContextAndFilterHandler::None,
-                    ContextAndFilterHandler::FilterNoContext,
-                ]
+                vec![ContextAndFilterHandler::None]
             }
         }
     }
