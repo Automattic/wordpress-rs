@@ -37,12 +37,12 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
-        let output_type = TokenStream::from_iter(variant.attr.output.clone().into_iter());
-        let output_type = quote! { #output_type };
 
         ContextAndFilterHandler::from_request_type(variant.attr.request_type)
             .into_iter()
             .map(|context_and_filter_handler| {
+                let output_type =
+                    output_type(variant.attr.output.clone(), context_and_filter_handler);
                 let request_from_request_builder = fn_body_get_request_from_request_builder(
                     &variant.variant_ident,
                     url_parts,

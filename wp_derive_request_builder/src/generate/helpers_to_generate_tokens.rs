@@ -10,6 +10,8 @@ use crate::{
     variant_attr::{ParamsType, UrlPart},
 };
 
+const SPARSE_IDENT_PREFIX: &str = "Sparse";
+
 pub fn endpoint_ident(parsed_enum: &ParsedEnum) -> Ident {
     format_ident!("{}Endpoint", parsed_enum.enum_ident)
 }
@@ -24,6 +26,41 @@ pub fn api_base_url_type(crate_ident: &Ident) -> TokenStream {
 
 pub fn request_builder_type(crate_ident: &Ident) -> TokenStream {
     quote! { std::sync::Arc<#crate_ident::request::RequestBuilder> }
+}
+
+pub fn output_type(
+    output_token_tree: Vec<TokenTree>,
+    context_and_filter_handler: ContextAndFilterHandler,
+) -> TokenStream {
+    match context_and_filter_handler {
+        ContextAndFilterHandler::None
+        | ContextAndFilterHandler::NoFilterTakeContextAsArgument
+        | ContextAndFilterHandler::FilterTakeContextAsArgument
+        | ContextAndFilterHandler::FilterNoContext => {
+            TokenStream::from_iter(output_token_tree.into_iter())
+        }
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => output_token_tree
+            .into_iter()
+            .map(|token| {
+                if let TokenTree::Ident(ident) = token {
+                    let new_ident = if let Some(ident_without_sparse_prefix) =
+                        ident.to_string().strip_prefix(SPARSE_IDENT_PREFIX)
+                    {
+                        format_ident!(
+                            "{}With{}Context",
+                            ident_without_sparse_prefix,
+                            context.to_string()
+                        )
+                    } else {
+                        ident
+                    };
+                    quote! { #new_ident }
+                } else {
+                    quote! { #token }
+                }
+            })
+            .collect::<TokenStream>(),
+    }
 }
 
 pub fn fn_signature(
