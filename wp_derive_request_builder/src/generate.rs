@@ -21,9 +21,73 @@ pub(crate) fn generate_types(parsed_enum: &ParsedEnum) -> TokenStream {
         &mut [
             generate_endpoint_type(&config, parsed_enum),
             generate_request_builder(&config, parsed_enum),
+            generate_async_request_executor(&config, parsed_enum),
         ]
         .into_iter(),
     )
+}
+
+fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
+    let api_base_url_type = &config.api_base_url_type;
+    let request_builder_ident = &config.request_builder_ident;
+    let request_executor_ident = &config.request_executor_ident;
+    let request_executor_type = &config.request_executor_type;
+    let wp_api_error_type = &config.wp_api_error_type;
+
+    let functions = parsed_enum.variants.iter().map(|variant| {
+        let url_parts = variant.attr.url_parts.as_slice();
+        let params_type = &variant.attr.params;
+        let output_type = TokenStream::from_iter(variant.attr.output.clone().into_iter());
+        let output_type = quote! { #output_type };
+
+        ContextAndFilterHandler::from_request_type(variant.attr.request_type)
+            .into_iter()
+            .map(|context_and_filter_handler| {
+                let request_from_request_builder = fn_body_get_request_from_request_builder(
+                    &variant.variant_ident,
+                    url_parts,
+                    params_type,
+                    variant.attr.request_type,
+                    context_and_filter_handler,
+                );
+                let fn_signature = fn_signature(
+                    PartOf::RequestExecutor,
+                    &variant.variant_ident,
+                    url_parts,
+                    params_type,
+                    variant.attr.request_type,
+                    context_and_filter_handler,
+                    &config.sparse_field_type,
+                );
+                quote! {
+                    pub async #fn_signature -> Result<#output_type, #wp_api_error_type> {
+                        #request_from_request_builder
+                        self.request_executor.execute(request).await?.parse()
+                   }
+                }
+            })
+            .collect::<TokenStream>()
+    });
+
+    quote! {
+        #[derive(Debug, uniffi::Object)]
+        pub struct #request_executor_ident {
+            request_builder: #request_builder_ident,
+            request_executor: #request_executor_type,
+        }
+        impl #request_executor_ident {
+            pub(crate) fn new(request_builder: #request_builder_ident, request_executor: #request_executor_type) -> Self {
+                Self {
+                    request_builder,
+                    request_executor,
+                }
+            }
+        }
+        #[uniffi::export]
+        impl #request_executor_ident {
+            #(#functions)*
+        }
+    }
 }
 
 fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
@@ -56,12 +120,12 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                     context_and_filter_handler,
                     &config.sparse_field_type,
                 );
-                let fn_body =
+                let fn_body_build_request_from_url =
                     fn_body_build_request_from_url(params_type, variant.attr.request_type);
                 quote! {
                     pub #fn_signature -> #wp_network_request_type {
                         #url_from_endpoint
-                        #fn_body
+                        #fn_body_build_request_from_url
                     }
                 }
             })
@@ -150,6 +214,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
 pub enum PartOf {
     Endpoint,
     RequestBuilder,
+    RequestExecutor,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -207,12 +272,16 @@ impl Display for WpContext {
 
 #[derive(Debug)]
 pub struct Config {
+    // TODO: It's not clear what some of the names refer to and the difference between them
+    // For example, with "request_builder_ident" & "request_builder_type"
     pub api_base_url_type: TokenStream,
     pub api_endpoint_url_type: TokenStream,
     pub crate_ident: Ident,
     pub endpoint_ident: Ident,
     pub request_builder_ident: Ident,
     pub request_builder_type: TokenStream,
+    pub request_executor_ident: Ident,
+    pub request_executor_type: TokenStream,
     pub sparse_field_type: SparseFieldAttr,
     pub wp_api_error_type: TokenStream,
     pub wp_network_request_type: TokenStream,
@@ -232,6 +301,8 @@ impl Config {
             quote! { std::sync::Arc<#crate_ident::request::endpoint::ApiBaseUrl> };
         let api_endpoint_url_type = quote! { #crate_ident::request::endpoint::ApiEndpointUrl };
         let request_builder_type = quote! { std::sync::Arc<#crate_ident::request::RequestBuilder> };
+        let request_executor_type =
+            quote! { std::sync::Arc<dyn #crate_ident::request::RequestExecutor> };
         let wp_api_error_type = quote! { #crate_ident::WpApiError };
         let wp_network_request_type = quote! { #crate_ident::request::WpNetworkRequest };
         Self {
@@ -243,6 +314,8 @@ impl Config {
             // implementation
             request_builder_ident: format_ident!("{}Builder2", parsed_enum.enum_ident),
             request_builder_type,
+            request_executor_ident: format_ident!("{}Executor", parsed_enum.enum_ident),
+            request_executor_type,
             sparse_field_type: parsed_enum.sparse_field_attr.clone(),
             wp_api_error_type,
             wp_network_request_type,

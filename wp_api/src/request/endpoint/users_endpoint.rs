@@ -17,7 +17,7 @@ pub mod generated {
     enum UsersRequest {
         #[contextual_get(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>)]
         List,
-        #[post(url = "/users", params = &crate::UserCreateParams, output = UserWithEditContext)]
+        #[post(url = "/users", params = &crate::UserCreateParams, output = crate::UserWithEditContext)]
         Create,
         #[delete(url = "/users/<user_id>", params = &UserDeleteParams, output = crate::UserDeleteResponse)]
         Delete,
@@ -27,9 +27,9 @@ pub mod generated {
         Retrieve,
         #[contextual_get(url = "/users/me", output = crate::SparseUser)]
         RetrieveMe,
-        #[post(url = "/users/<user_id>", params = &crate::UserUpdateParams, output = UserWithEditContext)]
+        #[post(url = "/users/<user_id>", params = &crate::UserUpdateParams, output = crate::UserWithEditContext)]
         Update,
-        #[post(url = "/users/me", params = &crate::UserUpdateParams, output = UserWithEditContext)]
+        #[post(url = "/users/me", params = &crate::UserUpdateParams, output = crate::UserWithEditContext)]
         UpdateMe,
     }
 }
