@@ -9,7 +9,7 @@ use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
 // ```
 // cargo expand request::endpoint::users_endpoint::generated -p wp_api
 // ```
-mod generated {
+pub mod generated {
     use super::*;
 
     #[derive(wp_derive_request_builder::WpDerivedRequest)]
