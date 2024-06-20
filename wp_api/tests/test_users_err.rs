@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use integration_test_common::{AsyncWpNetworking, SECOND_USER_EMAIL};
+use integration_test_common::{AsyncWpNetworking, SECOND_USER_EMAIL, TEST_CREDENTIALS_SITE_URL};
 use wp_api::{
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
@@ -164,7 +164,7 @@ async fn retrieve_user_err_user_invalid_id() {
 #[tokio::test]
 async fn retrieve_user_err_unauthorized() {
     wp_api::WpRequestBuilder::new(
-        integration_test_common::read_test_credentials_from_file().site_url,
+        TEST_CREDENTIALS_SITE_URL.to_string(),
         WpAuthentication::None,
         Arc::new(AsyncWpNetworking::default()),
     )
