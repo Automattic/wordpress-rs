@@ -129,25 +129,6 @@ pub fn fn_name(
     }
 }
 
-pub fn fn_body_get_url_from_endpoint(
-    variant_ident: &Ident,
-    url_parts: &[UrlPart],
-    params_type: &ParamsType,
-    request_type: RequestType,
-    context_and_filter_handler: ContextAndFilterHandler,
-) -> TokenStream {
-    let fn_name = fn_name(variant_ident, context_and_filter_handler);
-    let fn_arg_url_parts = fn_arg_url_parts(url_parts);
-    let fn_arg_context = fn_arg_context(context_and_filter_handler);
-    let fn_arg_provided_params =
-        fn_arg_provided_params(PartOf::Endpoint, params_type, request_type);
-    let fn_arg_fields = fn_arg_fields(context_and_filter_handler);
-
-    quote! {
-        let url = self.endpoint.#fn_name(#fn_arg_url_parts #fn_arg_context #fn_arg_provided_params #fn_arg_fields);
-    }
-}
-
 fn fn_arg_url_parts(url_parts: &[UrlPart]) -> TokenStream {
     url_parts
         .iter()
@@ -219,6 +200,25 @@ pub fn fn_body_get_url_from_api_base_url(url_parts: &[UrlPart]) -> TokenStream {
         .collect::<Vec<TokenStream>>();
     quote! {
         let mut url = self.api_base_url.by_extending_and_splitting_by_forward_slash([ #(#url_parts,)* ]);
+    }
+}
+
+pub fn fn_body_get_url_from_endpoint(
+    variant_ident: &Ident,
+    url_parts: &[UrlPart],
+    params_type: &ParamsType,
+    request_type: RequestType,
+    context_and_filter_handler: ContextAndFilterHandler,
+) -> TokenStream {
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
+    let fn_arg_url_parts = fn_arg_url_parts(url_parts);
+    let fn_arg_context = fn_arg_context(context_and_filter_handler);
+    let fn_arg_provided_params =
+        fn_arg_provided_params(PartOf::Endpoint, params_type, request_type);
+    let fn_arg_fields = fn_arg_fields(context_and_filter_handler);
+
+    quote! {
+        let url = self.endpoint.#fn_name(#fn_arg_url_parts #fn_arg_context #fn_arg_provided_params #fn_arg_fields);
     }
 }
 
