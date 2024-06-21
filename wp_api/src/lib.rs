@@ -42,20 +42,13 @@ pub struct WpApiRequestBuilder {
 #[uniffi::export]
 impl WpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(
-        site_url: String,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-    ) -> Result<Self, WpApiError> {
+    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
             .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
             })?
             .into();
-        let request_builder = Arc::new(request::RequestBuilder::new(
-            request_executor,
-            authentication.clone(),
-        ));
+        let request_builder = Arc::new(request::InnerRequestBuilder::new(authentication.clone()));
 
         Ok(Self {
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
@@ -87,27 +80,25 @@ impl WpRequestBuilder {
                 reason: err.to_string(),
             })?
             .into();
-        let request_builder = Arc::new(request::RequestBuilder::new(
-            request_executor.clone(),
-            authentication.clone(),
-        ));
+        let inner_request_builder =
+            Arc::new(request::InnerRequestBuilder::new(authentication.clone()));
 
         Ok(Self {
             application_passwords: ApplicationPasswordsRequestExecutor::new(
                 ApplicationPasswordsRequestBuilder::new(
                     api_base_url.clone(),
-                    request_builder.clone(),
+                    inner_request_builder.clone(),
                 ),
                 request_executor.clone(),
             )
             .into(),
             users: UsersRequestExecutor::new(
-                UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
+                UsersRequestBuilder::new(api_base_url.clone(), inner_request_builder.clone()),
                 request_executor.clone(),
             )
             .into(),
             plugins: PluginsRequestExecutor::new(
-                PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
+                PluginsRequestBuilder::new(api_base_url.clone(), inner_request_builder.clone()),
                 request_executor.clone(),
             )
             .into(),

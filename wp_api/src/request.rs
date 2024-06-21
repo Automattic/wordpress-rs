@@ -1,7 +1,7 @@
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug};
 
 use endpoint::ApiEndpointUrl;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{api_error::RequestExecutionError, WpApiError, WpAuthentication};
@@ -14,23 +14,16 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug)]
-pub(crate) struct RequestBuilder {
-    executor: Arc<dyn RequestExecutor>,
+pub(crate) struct InnerRequestBuilder {
     authentication: WpAuthentication,
 }
 
-impl RequestBuilder {
-    pub(crate) fn new(
-        executor: Arc<dyn RequestExecutor>,
-        authentication: WpAuthentication,
-    ) -> Self {
-        Self {
-            executor,
-            authentication,
-        }
+impl InnerRequestBuilder {
+    pub(crate) fn new(authentication: WpAuthentication) -> Self {
+        Self { authentication }
     }
 
-    fn build_get_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+    fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
@@ -39,14 +32,7 @@ impl RequestBuilder {
         }
     }
 
-    async fn get<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
-        self.executor
-            .execute(self.build_get_request(url))
-            .await?
-            .parse()
-    }
-
-    fn build_post_request<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
+    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
     {
@@ -58,31 +44,13 @@ impl RequestBuilder {
         }
     }
 
-    async fn post<T, R>(&self, url: ApiEndpointUrl, json_body: &T) -> Result<R, WpApiError>
-    where
-        T: ?Sized + Serialize,
-        R: DeserializeOwned,
-    {
-        self.executor
-            .execute(self.build_post_request(url, json_body))
-            .await?
-            .parse()
-    }
-
-    fn build_delete_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+    fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
             header_map: self.header_map(),
             body: None,
         }
-    }
-
-    async fn delete<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
-        self.executor
-            .execute(self.build_delete_request(url))
-            .await?
-            .parse()
     }
 
     fn header_map(&self) -> HashMap<String, String> {

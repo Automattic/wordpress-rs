@@ -94,7 +94,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let api_base_url_type = &config.api_base_url_type;
     let endpoint_ident = &config.endpoint_ident;
     let request_builder_ident = &config.request_builder_ident;
-    let request_builder_type = &config.request_builder_type;
+    let inner_request_builder_type = &config.inner_request_builder_type;
     let wp_network_request_type = &config.wp_network_request_type;
 
     let functions = parsed_enum.variants.iter().map(|variant| {
@@ -136,13 +136,13 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
         #[derive(Debug, uniffi::Object)]
         pub struct #request_builder_ident {
             endpoint: #endpoint_ident,
-            request_builder: #request_builder_type,
+            inner: #inner_request_builder_type,
         }
         impl #request_builder_ident {
-            pub(crate) fn new(api_base_url: #api_base_url_type, request_builder: #request_builder_type) -> Self {
+            pub(crate) fn new(api_base_url: #api_base_url_type, inner_request_builder: #inner_request_builder_type) -> Self {
                 Self {
                     endpoint: #endpoint_ident::new(api_base_url),
-                    request_builder,
+                    inner: inner_request_builder,
                 }
             }
         }
@@ -270,7 +270,7 @@ pub struct Config {
     pub crate_ident: Ident,
     pub endpoint_ident: Ident,
     pub request_builder_ident: Ident,
-    pub request_builder_type: TokenStream,
+    pub inner_request_builder_type: TokenStream,
     pub request_executor_ident: Ident,
     pub request_executor_type: TokenStream,
     pub sparse_field_type: SparseFieldAttr,
@@ -291,7 +291,8 @@ impl Config {
         let api_base_url_type =
             quote! { std::sync::Arc<#crate_ident::request::endpoint::ApiBaseUrl> };
         let api_endpoint_url_type = quote! { #crate_ident::request::endpoint::ApiEndpointUrl };
-        let request_builder_type = quote! { std::sync::Arc<#crate_ident::request::RequestBuilder> };
+        let inner_request_builder_type =
+            quote! { std::sync::Arc<#crate_ident::request::InnerRequestBuilder> };
         let request_executor_type =
             quote! { std::sync::Arc<dyn #crate_ident::request::RequestExecutor> };
         let wp_api_error_type = quote! { #crate_ident::WpApiError };
@@ -302,7 +303,7 @@ impl Config {
             crate_ident,
             endpoint_ident: format_ident!("{}Endpoint", parsed_enum.enum_ident),
             request_builder_ident: format_ident!("{}Builder", parsed_enum.enum_ident),
-            request_builder_type,
+            inner_request_builder_type,
             request_executor_ident: format_ident!("{}Executor", parsed_enum.enum_ident),
             request_executor_type,
             sparse_field_type: parsed_enum.sparse_field_attr.clone(),
