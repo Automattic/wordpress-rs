@@ -2,10 +2,8 @@
 
 use request::{
     endpoint::{
-        application_passwords_endpoint::{
-            ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
-        },
-        plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
+        application_passwords_endpoint::ApplicationPasswordsRequestExecutor,
+        plugins_endpoint::PluginsRequestExecutor,
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         ApiBaseUrl,
     },
@@ -85,20 +83,20 @@ impl WpRequestBuilder {
 
         Ok(Self {
             application_passwords: ApplicationPasswordsRequestExecutor::new(
-                ApplicationPasswordsRequestBuilder::new(
-                    api_base_url.clone(),
-                    inner_request_builder.clone(),
-                ),
+                api_base_url.clone(),
+                inner_request_builder.clone(),
                 request_executor.clone(),
             )
             .into(),
             users: UsersRequestExecutor::new(
-                UsersRequestBuilder::new(api_base_url.clone(), inner_request_builder.clone()),
+                api_base_url.clone(),
+                inner_request_builder.clone(),
                 request_executor.clone(),
             )
             .into(),
             plugins: PluginsRequestExecutor::new(
-                PluginsRequestBuilder::new(api_base_url.clone(), inner_request_builder.clone()),
+                api_base_url.clone(),
+                inner_request_builder.clone(),
                 request_executor.clone(),
             )
             .into(),

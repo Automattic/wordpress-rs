@@ -29,6 +29,7 @@ pub(crate) fn generate_types(parsed_enum: &ParsedEnum) -> TokenStream {
 
 fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
     let static_api_base_url_type = &config.static_types.api_base_url;
+    let static_inner_request_builder_type = &config.static_types.inner_request_builder;
     let static_request_executor_type = &config.static_types.request_executor;
     let static_wp_api_error_type = &config.static_types.wp_api_error;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
@@ -76,9 +77,9 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
             request_executor: #static_request_executor_type,
         }
         impl #generated_request_executor_ident {
-            pub(crate) fn new(request_builder: #generated_request_builder_ident, request_executor: #static_request_executor_type) -> Self {
+            pub(crate) fn new(api_base_url: #static_api_base_url_type, inner_request_builder: #static_inner_request_builder_type, request_executor: #static_request_executor_type) -> Self {
                 Self {
-                    request_builder,
+                    request_builder: #generated_request_builder_ident::new(api_base_url, inner_request_builder),
                     request_executor,
                 }
             }
