@@ -3,10 +3,10 @@
 use request::{
     endpoint::{
         application_passwords_endpoint::{
-            ApplicationPasswordsRequestBuilder2, ApplicationPasswordsRequestExecutor,
+            ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
         },
-        plugins_endpoint::{PluginsRequestBuilder2, PluginsRequestExecutor},
-        users_endpoint::{UsersRequestBuilder2, UsersRequestExecutor},
+        plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
+        users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         ApiBaseUrl,
     },
     RequestExecutor, WpNetworkResponse,
@@ -36,7 +36,7 @@ mod unit_test_common;
 // properly generated and utilized in `test_manual_request_builder_immut` integration tests
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiRequestBuilder {
-    users: Arc<UsersRequestBuilder2>,
+    users: Arc<UsersRequestBuilder>,
 }
 
 #[uniffi::export]
@@ -58,11 +58,11 @@ impl WpApiRequestBuilder {
         ));
 
         Ok(Self {
-            users: UsersRequestBuilder2::new(api_base_url.clone(), request_builder.clone()).into(),
+            users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
         })
     }
 
-    pub fn users(&self) -> Arc<UsersRequestBuilder2> {
+    pub fn users(&self) -> Arc<UsersRequestBuilder> {
         self.users.clone()
     }
 }
@@ -94,7 +94,7 @@ impl WpRequestBuilder {
 
         Ok(Self {
             application_passwords: ApplicationPasswordsRequestExecutor::new(
-                ApplicationPasswordsRequestBuilder2::new(
+                ApplicationPasswordsRequestBuilder::new(
                     api_base_url.clone(),
                     request_builder.clone(),
                 ),
@@ -102,12 +102,12 @@ impl WpRequestBuilder {
             )
             .into(),
             users: UsersRequestExecutor::new(
-                UsersRequestBuilder2::new(api_base_url.clone(), request_builder.clone()),
+                UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
                 request_executor.clone(),
             )
             .into(),
             plugins: PluginsRequestExecutor::new(
-                PluginsRequestBuilder2::new(api_base_url.clone(), request_builder.clone()),
+                PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone()),
                 request_executor.clone(),
             )
             .into(),

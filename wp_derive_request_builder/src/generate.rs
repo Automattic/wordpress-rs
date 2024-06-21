@@ -301,9 +301,7 @@ impl Config {
             api_endpoint_url_type,
             crate_ident,
             endpoint_ident: format_ident!("{}Endpoint", parsed_enum.enum_ident),
-            // TODO: We use `2` suffix here to prevent the name clash with the current
-            // implementation
-            request_builder_ident: format_ident!("{}Builder2", parsed_enum.enum_ident),
+            request_builder_ident: format_ident!("{}Builder", parsed_enum.enum_ident),
             request_builder_type,
             request_executor_ident: format_ident!("{}Executor", parsed_enum.enum_ident),
             request_executor_type,
