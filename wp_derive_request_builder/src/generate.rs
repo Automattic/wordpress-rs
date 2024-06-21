@@ -78,7 +78,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
             request_executor: #static_request_executor_type,
         }
         impl #generated_request_executor_ident {
-            pub(crate) fn new(api_base_url: #static_api_base_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type) -> Self {
+            pub fn new(api_base_url: #static_api_base_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type) -> Self {
                 Self {
                     request_builder: #generated_request_builder_ident::new(api_base_url, authentication),
                     request_executor,
@@ -142,7 +142,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
             inner: #static_inner_request_builder_type,
         }
         impl #generated_request_builder_ident {
-            pub(crate) fn new(api_base_url: #static_api_base_url_type, authentication: #static_wp_authentication_type) -> Self {
+            pub fn new(api_base_url: #static_api_base_url_type, authentication: #static_wp_authentication_type) -> Self {
                 Self {
                     endpoint: #generated_endpoint_ident::new(api_base_url),
                     inner: #static_inner_request_builder_type::new(authentication),
