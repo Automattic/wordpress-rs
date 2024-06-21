@@ -21,7 +21,6 @@ lane :release do |options|
   build_xcframework
   update_swift_package
   publish_github_release
-  # TODO: publish android library
 end
 
 lane :validate do
