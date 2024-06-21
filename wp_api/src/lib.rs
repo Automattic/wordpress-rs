@@ -46,10 +46,9 @@ impl WpApiRequestBuilder {
                 reason: err.to_string(),
             })?
             .into();
-        let request_builder = Arc::new(request::InnerRequestBuilder::new(authentication.clone()));
 
         Ok(Self {
-            users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
+            users: UsersRequestBuilder::new(api_base_url.clone(), authentication).into(),
         })
     }
 
@@ -78,25 +77,23 @@ impl WpRequestBuilder {
                 reason: err.to_string(),
             })?
             .into();
-        let inner_request_builder =
-            Arc::new(request::InnerRequestBuilder::new(authentication.clone()));
 
         Ok(Self {
             application_passwords: ApplicationPasswordsRequestExecutor::new(
                 api_base_url.clone(),
-                inner_request_builder.clone(),
+                authentication.clone(),
                 request_executor.clone(),
             )
             .into(),
             users: UsersRequestExecutor::new(
                 api_base_url.clone(),
-                inner_request_builder.clone(),
+                authentication.clone(),
                 request_executor.clone(),
             )
             .into(),
             plugins: PluginsRequestExecutor::new(
                 api_base_url.clone(),
-                inner_request_builder.clone(),
+                authentication.clone(),
                 request_executor.clone(),
             )
             .into(),

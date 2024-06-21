@@ -14,12 +14,12 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug)]
-pub(crate) struct InnerRequestBuilder {
+struct InnerRequestBuilder {
     authentication: WpAuthentication,
 }
 
 impl InnerRequestBuilder {
-    pub(crate) fn new(authentication: WpAuthentication) -> Self {
+    fn new(authentication: WpAuthentication) -> Self {
         Self { authentication }
     }
 
