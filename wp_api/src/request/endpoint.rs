@@ -2,6 +2,7 @@ use url::Url;
 
 use crate::SparseField;
 
+pub(crate) mod application_passwords_endpoint;
 pub(crate) mod plugins_endpoint;
 pub(crate) mod users_endpoint;
 
