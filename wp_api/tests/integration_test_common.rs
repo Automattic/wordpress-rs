@@ -1,13 +1,15 @@
 use async_trait::async_trait;
 use futures::Future;
 use http::HeaderMap;
-use std::{fs::read_to_string, process::Command, sync::Arc};
+use std::{process::Command, sync::Arc};
 use wp_api::{
     request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse},
     users::UserId,
     RequestExecutionError, WpApiError, WpAuthentication, WpRequestBuilder, WpRestError,
     WpRestErrorCode, WpRestErrorWrapper,
 };
+
+include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
@@ -19,13 +21,12 @@ pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 
 pub fn request_builder() -> WpRequestBuilder {
-    let credentials = read_test_credentials_from_file();
     let authentication = WpAuthentication::from_username_and_password(
-        credentials.admin_username,
-        credentials.admin_password,
+        TEST_CREDENTIALS_ADMIN_USERNAME.to_string(),
+        TEST_CREDENTIALS_ADMIN_PASSWORD.to_string(),
     );
     WpRequestBuilder::new(
-        credentials.site_url,
+        TEST_CREDENTIALS_SITE_URL.to_string(),
         authentication,
         Arc::new(AsyncWpNetworking::default()),
     )
@@ -33,13 +34,12 @@ pub fn request_builder() -> WpRequestBuilder {
 }
 
 pub fn request_builder_as_subscriber() -> WpRequestBuilder {
-    let credentials = read_test_credentials_from_file();
     let authentication = WpAuthentication::from_username_and_password(
-        credentials.subscriber_username,
-        credentials.subscriber_password,
+        TEST_CREDENTIALS_SUBSCRIBER_USERNAME.to_string(),
+        TEST_CREDENTIALS_SUBSCRIBER_PASSWORD.to_string(),
     );
     WpRequestBuilder::new(
-        credentials.site_url,
+        TEST_CREDENTIALS_SITE_URL.to_string(),
         authentication,
         Arc::new(AsyncWpNetworking::default()),
     )
@@ -88,27 +88,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         } else {
             panic!("Unexpected wp_error '{:?}'", err);
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct TestCredentials {
-    pub site_url: String,
-    pub admin_username: String,
-    pub admin_password: String,
-    pub subscriber_username: String,
-    pub subscriber_password: String,
-}
-
-pub fn read_test_credentials_from_file() -> TestCredentials {
-    let file_contents = read_to_string("../test_credentials").unwrap();
-    let lines: Vec<&str> = file_contents.lines().collect();
-    TestCredentials {
-        site_url: lines[0].to_string(),
-        admin_username: lines[1].to_string(),
-        admin_password: lines[2].to_string(),
-        subscriber_username: lines[3].to_string(),
-        subscriber_password: lines[4].to_string(),
     }
 }
 

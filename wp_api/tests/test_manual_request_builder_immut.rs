@@ -1,5 +1,6 @@
 use integration_test_common::{
-    read_test_credentials_from_file, AsyncWpNetworking, FIRST_USER_ID, SECOND_USER_ID,
+    AsyncWpNetworking, FIRST_USER_ID, SECOND_USER_ID, TEST_CREDENTIALS_ADMIN_PASSWORD,
+    TEST_CREDENTIALS_ADMIN_USERNAME, TEST_CREDENTIALS_SITE_URL,
 };
 use reusable_test_cases::list_users_cases;
 use rstest::*;
@@ -21,15 +22,14 @@ pub mod reusable_test_cases;
 #[apply(list_users_cases)]
 #[tokio::test]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
-    let credentials = read_test_credentials_from_file();
     let authentication = WpAuthentication::from_username_and_password(
-        credentials.admin_username,
-        credentials.admin_password,
+        TEST_CREDENTIALS_ADMIN_USERNAME.to_string(),
+        TEST_CREDENTIALS_ADMIN_PASSWORD.to_string(),
     );
     let async_wp_networking = Arc::new(AsyncWpNetworking::default());
 
     let request_builder = WpApiRequestBuilder::new(
-        credentials.site_url,
+        TEST_CREDENTIALS_SITE_URL.to_string(),
         authentication,
         // TODO: A request executor shouldn't be necessary, but we don't have a standalone request
         // builder yet
