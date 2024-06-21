@@ -43,7 +43,7 @@ public struct WordPressAPI {
         self.requestBuilder.users()
     }
 
-    public var plugins: PluginsRequestBuilder {
+    public var plugins: PluginsRequestExecutor {
         self.requestBuilder.plugins()
     }
 
