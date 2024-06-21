@@ -5,10 +5,10 @@ use request::{
         application_passwords_endpoint::{
             ApplicationPasswordsRequestBuilder2, ApplicationPasswordsRequestExecutor,
         },
+        plugins_endpoint::{PluginsRequestBuilder2, PluginsRequestExecutor},
         users_endpoint::{UsersRequestBuilder2, UsersRequestExecutor},
         ApiBaseUrl,
     },
-    plugins_request_builder::PluginsRequestBuilder,
     RequestExecutor, WpNetworkResponse,
 };
 use std::sync::Arc;
@@ -71,7 +71,7 @@ impl WpApiRequestBuilder {
 pub struct WpRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
-    plugins: Arc<PluginsRequestBuilder>,
+    plugins: Arc<PluginsRequestExecutor>,
 }
 
 #[uniffi::export]
@@ -106,8 +106,11 @@ impl WpRequestBuilder {
                 request_executor.clone(),
             )
             .into(),
-            plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
-                .into(),
+            plugins: PluginsRequestExecutor::new(
+                PluginsRequestBuilder2::new(api_base_url.clone(), request_builder.clone()),
+                request_executor.clone(),
+            )
+            .into(),
         })
     }
 
@@ -119,7 +122,7 @@ impl WpRequestBuilder {
         self.users.clone()
     }
 
-    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+    pub fn plugins(&self) -> Arc<PluginsRequestExecutor> {
         self.plugins.clone()
     }
 }

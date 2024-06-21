@@ -40,7 +40,7 @@ async fn filter_retrieve_plugin(
 ) {
     let response = request_builder()
         .plugins()
-        .filter_retrieve(WpContext::Edit, &slug.into(), fields)
+        .filter_retrieve(&slug.into(), WpContext::Edit, fields)
         .await
         .assert_response();
     validate_sparse_plugin_fields(&response, fields);

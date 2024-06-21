@@ -48,7 +48,7 @@ mod tests {
     fn delete_user(endpoint: UsersRequestEndpoint) {
         validate_endpoint(
             endpoint.delete(
-                UserId(54),
+                &UserId(54),
                 &UserDeleteParams {
                     reassign: UserId(98),
                 },
@@ -143,7 +143,7 @@ mod tests {
     #[rstest]
     fn retrieve_user(endpoint: UsersRequestEndpoint) {
         validate_endpoint(
-            endpoint.retrieve_with_view_context(UserId(98)),
+            endpoint.retrieve_with_view_context(&UserId(98)),
             "/users/98?context=view",
         );
     }
@@ -152,7 +152,7 @@ mod tests {
     fn filter_retrieve_user(endpoint: UsersRequestEndpoint) {
         validate_endpoint(
             endpoint.filter_retrieve(
-                UserId(98),
+                &UserId(98),
                 WpContext::View,
                 &[SparseUserField::Nickname, SparseUserField::Url],
             ),
@@ -181,7 +181,7 @@ mod tests {
 
     #[rstest]
     fn update_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(endpoint.update(UserId(98)), "/users/98");
+        validate_endpoint(endpoint.update(&UserId(98)), "/users/98");
     }
 
     #[rstest]
