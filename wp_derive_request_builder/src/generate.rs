@@ -31,8 +31,8 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_request_executor_type = &config.static_types.request_executor;
     let static_wp_api_error_type = &config.static_types.wp_api_error;
-    let request_builder_ident = &config.request_builder_ident;
-    let request_executor_ident = &config.request_executor_ident;
+    let generated_request_builder_ident = &config.generated_idents.request_builder;
+    let generated_request_executor_ident = &config.generated_idents.request_executor;
 
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
@@ -71,12 +71,12 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
 
     quote! {
         #[derive(Debug, uniffi::Object)]
-        pub struct #request_executor_ident {
-            request_builder: #request_builder_ident,
+        pub struct #generated_request_executor_ident {
+            request_builder: #generated_request_builder_ident,
             request_executor: #static_request_executor_type,
         }
-        impl #request_executor_ident {
-            pub(crate) fn new(request_builder: #request_builder_ident, request_executor: #static_request_executor_type) -> Self {
+        impl #generated_request_executor_ident {
+            pub(crate) fn new(request_builder: #generated_request_builder_ident, request_executor: #static_request_executor_type) -> Self {
                 Self {
                     request_builder,
                     request_executor,
@@ -84,7 +84,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
             }
         }
         #[uniffi::export]
-        impl #request_executor_ident {
+        impl #generated_request_executor_ident {
             #(#functions)*
         }
     }
@@ -94,8 +94,8 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_inner_request_builder_type = &config.static_types.inner_request_builder;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
-    let endpoint_ident = &config.endpoint_ident;
-    let request_builder_ident = &config.request_builder_ident;
+    let generated_endpoint_ident = &config.generated_idents.endpoint;
+    let generated_request_builder_ident = &config.generated_idents.request_builder;
 
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
@@ -134,20 +134,20 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
 
     quote! {
         #[derive(Debug, uniffi::Object)]
-        pub struct #request_builder_ident {
-            endpoint: #endpoint_ident,
+        pub struct #generated_request_builder_ident {
+            endpoint: #generated_endpoint_ident,
             inner: #static_inner_request_builder_type,
         }
-        impl #request_builder_ident {
+        impl #generated_request_builder_ident {
             pub(crate) fn new(api_base_url: #static_api_base_url_type, inner_request_builder: #static_inner_request_builder_type) -> Self {
                 Self {
-                    endpoint: #endpoint_ident::new(api_base_url),
+                    endpoint: #generated_endpoint_ident::new(api_base_url),
                     inner: inner_request_builder,
                 }
             }
         }
         #[uniffi::export]
-        impl #request_builder_ident {
+        impl #generated_request_builder_ident {
             #(#functions)*
         }
     }
@@ -156,7 +156,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
 fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_api_endpoint_url_type = &config.static_types.api_endpoint_url;
-    let endpoint_ident = &config.endpoint_ident;
+    let generated_endpoint_ident = &config.generated_idents.endpoint;
 
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
@@ -196,11 +196,11 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
 
     quote! {
         #[derive(Debug)]
-        pub struct #endpoint_ident {
+        pub struct #generated_endpoint_ident {
             api_base_url: #static_api_base_url_type,
         }
 
-        impl #endpoint_ident {
+        impl #generated_endpoint_ident {
             pub fn new(api_base_url: #static_api_base_url_type) -> Self {
                 Self { api_base_url }
             }
@@ -263,13 +263,9 @@ impl Display for WpContext {
 
 #[derive(Debug)]
 pub struct Config {
-    // TODO: It's not clear what some of the names refer to and the difference between them
-    // For example, with "request_builder_ident" & "request_builder_type"
     pub crate_ident: Ident,
-    pub endpoint_ident: Ident,
-    pub request_builder_ident: Ident,
-    pub request_executor_ident: Ident,
     pub sparse_field_type: SparseFieldAttr,
+    pub generated_idents: ConfigGeneratedIdents,
     pub static_types: ConfigStaticTypes,
 }
 
@@ -283,14 +279,13 @@ impl Config {
             FoundCrate::Itself => format_ident!("crate"),
             FoundCrate::Name(name) => Ident::new(&name, Span::call_site()),
         };
+        let generated_idents = ConfigGeneratedIdents::new(parsed_enum);
         let static_types = ConfigStaticTypes::new(&crate_ident);
 
         Self {
             crate_ident,
-            endpoint_ident: format_ident!("{}Endpoint", parsed_enum.enum_ident),
-            request_builder_ident: format_ident!("{}Builder", parsed_enum.enum_ident),
-            request_executor_ident: format_ident!("{}Executor", parsed_enum.enum_ident),
             sparse_field_type: parsed_enum.sparse_field_attr.clone(),
+            generated_idents,
             static_types,
         }
     }
@@ -315,6 +310,23 @@ impl ConfigStaticTypes {
             request_executor: quote! { std::sync::Arc<dyn #crate_ident::request::RequestExecutor> },
             wp_api_error: quote! { #crate_ident::WpApiError },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ConfigGeneratedIdents {
+    pub endpoint: Ident,
+    pub request_builder: Ident,
+    pub request_executor: Ident,
+}
+
+impl ConfigGeneratedIdents {
+    fn new(parsed_enum: &ParsedEnum) -> Self {
+        Self {
+            endpoint: format_ident!("{}Endpoint", parsed_enum.enum_ident),
+            request_builder: format_ident!("{}Builder", parsed_enum.enum_ident),
+            request_executor: format_ident!("{}Executor", parsed_enum.enum_ident),
         }
     }
 }
