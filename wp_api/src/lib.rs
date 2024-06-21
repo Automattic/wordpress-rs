@@ -28,10 +28,6 @@ pub mod users;
 #[cfg(test)]
 mod unit_test_common;
 
-// TODO: This is a temporary type that allows building a request type
-// Although we'll have a type that does that, it's unlikely that it'll look like this.
-// It still does its job for now to prove that `UsersRequestBuilder2` (temporary) type is
-// properly generated and utilized in `test_manual_request_builder_immut` integration tests
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiRequestBuilder {
     users: Arc<UsersRequestBuilder>,
