@@ -47,23 +47,21 @@ pub async fn find_api_urls(
     site_url: &str,
     request_executor: Arc<dyn RequestExecutor>,
 ) -> Result<WpRestApiUrls, FindApiUrlsError> {
-    let result = Url::parse(site_url)?;
-    inner_find_api_urls(result, request_executor).await
-    //let result = ParsedSiteUrl::parse_str(site_url);
-    //match result {
-    //    Ok(url) => inner_find_api_urls(url, request_executor).await,
-    //    Err(initial_parse_err) => match initial_parse_err {
-    //        // If the url doesn't have a base, try using `https`
-    //        url::ParseError::RelativeUrlWithoutBase => {
-    //            if let Ok(url) = Url::parse(format!("https://{}", site_url).as_str()) {
-    //                inner_find_api_urls(url, request_executor).await
-    //            } else {
-    //                Err(initial_parse_err.into())
-    //            }
-    //        }
-    //        _ => Err(initial_parse_err.into()),
-    //    },
-    //}
+    let result = Url::parse(site_url);
+    match result {
+        Ok(url) => inner_find_api_urls(url, request_executor).await,
+        Err(initial_parse_err) => match initial_parse_err {
+            // If the url doesn't have a base, try using `https`
+            url::ParseError::RelativeUrlWithoutBase => {
+                if let Ok(url) = Url::parse(format!("https://{}", site_url).as_str()) {
+                    inner_find_api_urls(url, request_executor).await
+                } else {
+                    Err(initial_parse_err.into())
+                }
+            }
+            _ => Err(initial_parse_err.into()),
+        },
+    }
 }
 
 async fn inner_find_api_urls(
