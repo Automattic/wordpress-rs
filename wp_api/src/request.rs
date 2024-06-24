@@ -11,6 +11,7 @@ use self::endpoint::WpEndpointUrl;
 pub mod endpoint;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
+// TODO: It looks like this could be `Link` or `link`
 const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug)]
@@ -145,7 +146,13 @@ impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Option<Url> {
         self.header_map
             .as_ref()
-            .map(|h_map| h_map.get(LINK_HEADER_KEY))?
+            .map(|h_map| {
+                if let Some(k) = h_map.get(LINK_HEADER_KEY) {
+                    Some(k)
+                } else {
+                    h_map.get(&LINK_HEADER_KEY.to_lowercase())
+                }
+            })?
             .and_then(|link_header| parse_link_header::parse_with_rel(link_header).ok())
             .and_then(|link_map| {
                 link_map

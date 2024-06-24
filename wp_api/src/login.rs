@@ -17,8 +17,8 @@ pub enum FindApiUrlsError {
     CapabilitiesResponseError,
     #[error(transparent)]
     ParseSiteUrlError(#[from] ParseSiteUrlError),
-    #[error("Link Header not found in response")]
-    LinkHeaderNotFound,
+    #[error("Link Header not found in response: {:?}", response)]
+    LinkHeaderNotFound { response: String },
     #[error("Not yet implemented")]
     NotYetImplemented,
 }
@@ -29,13 +29,13 @@ impl From<RequestExecutionError> for FindApiUrlsError {
     }
 }
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct WpRestApiRootUrl {}
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {
     api_root_url: String,
-    application_password_authentication_url: String,
+    application_passwords_authentication_url: String,
 }
 
 #[uniffi::export]
@@ -58,7 +58,9 @@ pub async fn find_api_urls(
     // 3. Extracts the Link header pointing to the WP.org API root [this needs error handling for "what if this isn't a WP site?"
     let api_root_url = api_root_response
         .get_link_header("https://api.w.org/")
-        .ok_or(FindApiUrlsError::LinkHeaderNotFound)?
+        .ok_or(FindApiUrlsError::LinkHeaderNotFound {
+            response: api_root_response.body_as_string(),
+        })?
         .to_string();
 
     // 4. Fetches the API root, which contains the URL to the login page
@@ -72,14 +74,14 @@ pub async fn find_api_urls(
     let mut authentication_map = parse_api_details_response(capabilities_response)
         .map_err(|_| FindApiUrlsError::CapabilitiesResponseError)?
         .authentication;
-    let application_password_authentication_url = authentication_map
-        .remove("application-password")
+    let application_passwords_authentication_url = authentication_map
+        .remove("application-passwords")
         .ok_or(FindApiUrlsError::ApplicationPasswordEndpointNotFound)?
         .endpoints
         .authorization;
     Ok(WpRestApiUrls {
         api_root_url,
-        application_password_authentication_url,
+        application_passwords_authentication_url,
     })
 }
 

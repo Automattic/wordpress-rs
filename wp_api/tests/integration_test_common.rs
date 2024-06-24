@@ -169,12 +169,17 @@ impl AsyncWpNetworking {
         if let Some(body) = wp_request.body {
             request = request.body(body);
         }
-        let response = request.send().await?;
+        let mut response = request.send().await?;
+        let header_map = response
+            .headers_mut()
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap().to_string()))
+            .collect();
 
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: None, // TODO: Properly read the headers
+            header_map: Some(header_map), // TODO: Properly read the headers
         })
     }
 
@@ -209,7 +214,7 @@ pub trait AssertResponse {
     fn assert_response(self) -> Self::Item;
 }
 
-impl<T: std::fmt::Debug> AssertResponse for Result<T, WpApiError> {
+impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
     type Item = T;
 
     fn assert_response(self) -> T {
