@@ -32,8 +32,8 @@ pub enum FindApiUrlsError {
 
 #[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {
+    api_details: Arc<WpApiDetails>,
     api_root_url: String,
-    application_passwords_authentication_url: Option<String>,
 }
 
 #[uniffi::export]
@@ -47,11 +47,12 @@ pub async fn find_api_urls(
         .await?
         .to_string();
 
-    let wp_api_details = fetch_wp_api_details(api_root_url.clone(), &request_executor).await?;
+    let api_details = fetch_wp_api_details(&api_root_url, &request_executor)
+        .await?
+        .into();
     Ok(WpRestApiUrls {
+        api_details,
         api_root_url,
-        application_passwords_authentication_url: wp_api_details
-            .find_application_passwords_authentication_url(),
     })
 }
 
@@ -77,7 +78,7 @@ async fn fetch_api_root_url(
 }
 
 async fn fetch_wp_api_details(
-    api_root_url: String,
+    api_root_url: &String,
     request_executor: &Arc<dyn RequestExecutor>,
 ) -> Result<WpApiDetails, FindApiUrlsError> {
     let api_details_response = request_executor
@@ -123,7 +124,7 @@ pub fn extract_login_details_from_url(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
 pub struct WpApiDetails {
     pub name: String,
     pub description: String,
@@ -136,6 +137,7 @@ pub struct WpApiDetails {
     pub site_icon_url: String,
 }
 
+#[uniffi::export]
 impl WpApiDetails {
     fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
