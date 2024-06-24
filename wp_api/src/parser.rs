@@ -2,14 +2,15 @@ use url::Url;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum ParseSiteUrlError {
-    #[error("Generic parsing error - not yet implemented")]
-    Generic,
+    #[error("Error while parsing site url: {}", reason)]
+    ParsingError { reason: String },
 }
 
 impl From<url::ParseError> for ParseSiteUrlError {
     fn from(value: url::ParseError) -> Self {
-        // TODO
-        Self::Generic
+        Self::ParsingError {
+            reason: value.to_string(),
+        }
     }
 }
 
@@ -31,8 +32,3 @@ impl From<Url> for ParsedSiteUrl {
         Self { site_url: url }
     }
 }
-
-//#[cfg(test)]
-//mod tests {
-//    fn parse
-//}

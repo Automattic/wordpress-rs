@@ -4,31 +4,31 @@ use std::str;
 use std::sync::Arc;
 use url::Url;
 
-use crate::parser::ParsedSiteUrl;
+use crate::parser::{ParseSiteUrlError, ParsedSiteUrl};
 use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest};
 use crate::RequestExecutionError;
 
+const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
+const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
+
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum FindApiUrlsError {
-    #[error("Not yet implemented capabilities response error")]
-    CapabilitiesResponseError,
-    #[error("Generic parsing error - not yet implemented")]
-    ParseSiteUrlError,
-    #[error("Link Header not found in response: {:?}", response)]
-    LinkHeaderNotFound { response: String },
-    #[error("Not yet implemented")]
-    NotYetImplemented,
+    #[error("Api details couldn't be parsed from response: {:?}", response)]
+    ApiDetailsCouldntBeParsed { response: String },
+    #[error("Api root link header not found in response: {:?}", response)]
+    ApiRootLinkHeaderNotFound { response: String },
+    #[error(transparent)]
+    ParseSiteUrlError {
+        #[from]
+        inner: ParseSiteUrlError,
+    },
+    #[error(transparent)]
+    RequestExecutionError {
+        #[from]
+        inner: RequestExecutionError,
+    },
 }
-
-impl From<RequestExecutionError> for FindApiUrlsError {
-    fn from(value: RequestExecutionError) -> Self {
-        Self::NotYetImplemented
-    }
-}
-
-#[derive(Debug, uniffi::Record)]
-pub struct WpRestApiRootUrl {}
 
 #[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {
@@ -41,11 +41,26 @@ pub async fn find_api_urls(
     site_url: String,
     request_executor: Arc<dyn RequestExecutor>,
 ) -> Result<WpRestApiUrls, FindApiUrlsError> {
-    // 1. Parse the URL to standardize its format (so "example.com" would become "https://example.com")
-    let parsed_site_url =
-        ParsedSiteUrl::parse_str(site_url).map_err(|_| FindApiUrlsError::ParseSiteUrlError)?;
+    let parsed_site_url = ParsedSiteUrl::parse_str(site_url)?;
 
-    // 2. Fetches the site's homepage with a HEAD request
+    let api_root_url = fetch_api_root_url(&parsed_site_url, &request_executor)
+        .await?
+        .to_string();
+
+    let wp_api_details = fetch_wp_api_details(api_root_url.clone(), &request_executor).await?;
+    Ok(WpRestApiUrls {
+        api_root_url,
+        application_passwords_authentication_url: wp_api_details
+            .find_application_passwords_authentication_url(),
+    })
+}
+
+// Fetches the site's homepage with a HEAD request, then extracts the Link header pointing
+// to the WP.org API root
+async fn fetch_api_root_url(
+    parsed_site_url: &ParsedSiteUrl,
+    request_executor: &Arc<dyn RequestExecutor>,
+) -> Result<Url, FindApiUrlsError> {
     let api_root_request = WpNetworkRequest {
         method: RequestMethod::HEAD,
         url: WpEndpointUrl(parsed_site_url.site_url.to_string()),
@@ -54,32 +69,29 @@ pub async fn find_api_urls(
     };
     let api_root_response = request_executor.execute(api_root_request).await?;
 
-    // 3. Extracts the Link header pointing to the WP.org API root [this needs error handling for "what if this isn't a WP site?"
-    let api_root_url = api_root_response
-        .get_link_header("https://api.w.org/")
-        .ok_or(FindApiUrlsError::LinkHeaderNotFound {
+    api_root_response
+        .get_link_header(API_ROOT_LINK_HEADER)
+        .ok_or(FindApiUrlsError::ApiRootLinkHeaderNotFound {
             response: api_root_response.body_as_string(),
-        })?
-        .to_string();
+        })
+}
 
-    // 4. Fetches the API root, which contains the URL to the login page
-    let capabilities_request = WpNetworkRequest {
-        method: RequestMethod::GET,
-        url: WpEndpointUrl(api_root_url.clone()),
-        header_map: HashMap::new(),
-        body: None,
-    };
-    let capabilities_response = request_executor.execute(capabilities_request).await?;
-    let mut authentication_map =
-        serde_json::from_slice::<WpApiDetails>(&capabilities_response.body)
-            .map_err(|_| FindApiUrlsError::CapabilitiesResponseError)?
-            .authentication;
-    let application_passwords_authentication_url = authentication_map
-        .remove("application-passwords")
-        .map(|auth_scheme| auth_scheme.endpoints.authorization);
-    Ok(WpRestApiUrls {
-        api_root_url,
-        application_passwords_authentication_url,
+async fn fetch_wp_api_details(
+    api_root_url: String,
+    request_executor: &Arc<dyn RequestExecutor>,
+) -> Result<WpApiDetails, FindApiUrlsError> {
+    let api_details_response = request_executor
+        .execute(WpNetworkRequest {
+            method: RequestMethod::GET,
+            url: WpEndpointUrl(api_root_url.clone()),
+            header_map: HashMap::new(),
+            body: None,
+        })
+        .await?;
+    serde_json::from_slice(&api_details_response.body).map_err(|_| {
+        FindApiUrlsError::ApiDetailsCouldntBeParsed {
+            response: api_details_response.body_as_string(),
+        }
     })
 }
 
@@ -122,6 +134,14 @@ pub struct WpApiDetails {
     pub namespaces: Vec<String>,
     pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
     pub site_icon_url: String,
+}
+
+impl WpApiDetails {
+    fn find_application_passwords_authentication_url(&self) -> Option<String> {
+        self.authentication
+            .get(KEY_APPLICATION_PASSWORDS)
+            .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
