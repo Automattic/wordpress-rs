@@ -2,7 +2,11 @@ import Foundation
 import SwiftUI
 import WordPressAPI
 
+#if hasFeature(RetroactiveAttribute)
+extension UserWithViewContext: @retroactive Identifiable {}
+#else
 extension UserWithViewContext: Identifiable {}
+#endif
 
 @Observable class UserListViewModel {
 
