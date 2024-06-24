@@ -4,7 +4,7 @@ use std::str;
 use std::sync::Arc;
 use url::Url;
 
-use crate::parser::{ParseSiteUrlError, ParsedSiteUrl};
+use crate::parser::ParsedSiteUrl;
 use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
 use crate::{RequestExecutionError, WpApiError};
@@ -15,8 +15,8 @@ pub enum FindApiUrlsError {
     ApplicationPasswordEndpointNotFound,
     #[error("Not yet implemented capabilities response error")]
     CapabilitiesResponseError,
-    #[error(transparent)]
-    ParseSiteUrlError(#[from] ParseSiteUrlError),
+    #[error("Generic parsing error - not yet implemented")]
+    ParseSiteUrlError,
     #[error("Link Header not found in response: {:?}", response)]
     LinkHeaderNotFound { response: String },
     #[error("Not yet implemented")]
@@ -44,7 +44,8 @@ pub async fn find_api_urls(
     request_executor: Arc<dyn RequestExecutor>,
 ) -> Result<WpRestApiUrls, FindApiUrlsError> {
     // 1. Parse the URL to standardize its format (so "example.com" would become "https://example.com")
-    let parsed_site_url = ParsedSiteUrl::parse_str(site_url)?;
+    let parsed_site_url =
+        ParsedSiteUrl::parse_str(site_url).map_err(|_| FindApiUrlsError::ParseSiteUrlError)?;
 
     // 2. Fetches the site's homepage with a HEAD request
     let api_root_request = WpNetworkRequest {
