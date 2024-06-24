@@ -4,7 +4,6 @@ use std::str;
 use std::sync::Arc;
 use url::Url;
 
-use crate::parser::{ParseSiteUrlError, ParsedSiteUrl};
 use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest};
 use crate::RequestExecutionError;
@@ -15,19 +14,26 @@ const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum FindApiUrlsError {
     #[error("Api details couldn't be parsed from response: {:?}", response)]
-    ApiDetailsCouldntBeParsed { response: String },
-    #[error("Api root link header not found in response: {:?}", response)]
-    ApiRootLinkHeaderNotFound { response: String },
-    #[error(transparent)]
-    ParseSiteUrlError {
-        #[from]
-        inner: ParseSiteUrlError,
+    ApiDetailsCouldntBeParsed { reason: String, response: String },
+    #[error("Api root link header not found in header_map: {:?}", header_map)]
+    ApiRootLinkHeaderNotFound {
+        header_map: Option<HashMap<String, String>>,
     },
+    #[error("Error while parsing site url: {}", reason)]
+    ParseSiteUrlError { reason: String },
     #[error(transparent)]
     RequestExecutionError {
         #[from]
         inner: RequestExecutionError,
     },
+}
+
+impl From<url::ParseError> for FindApiUrlsError {
+    fn from(value: url::ParseError) -> Self {
+        Self::ParseSiteUrlError {
+            reason: value.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, uniffi::Record)]
@@ -38,33 +44,53 @@ pub struct WpRestApiUrls {
 
 #[uniffi::export]
 pub async fn find_api_urls(
-    site_url: String,
+    site_url: &str,
     request_executor: Arc<dyn RequestExecutor>,
 ) -> Result<WpRestApiUrls, FindApiUrlsError> {
-    let parsed_site_url = ParsedSiteUrl::parse_str(site_url)?;
+    let result = Url::parse(site_url)?;
+    inner_find_api_urls(result, request_executor).await
+    //let result = ParsedSiteUrl::parse_str(site_url);
+    //match result {
+    //    Ok(url) => inner_find_api_urls(url, request_executor).await,
+    //    Err(initial_parse_err) => match initial_parse_err {
+    //        // If the url doesn't have a base, try using `https`
+    //        url::ParseError::RelativeUrlWithoutBase => {
+    //            if let Ok(url) = Url::parse(format!("https://{}", site_url).as_str()) {
+    //                inner_find_api_urls(url, request_executor).await
+    //            } else {
+    //                Err(initial_parse_err.into())
+    //            }
+    //        }
+    //        _ => Err(initial_parse_err.into()),
+    //    },
+    //}
+}
 
-    let api_root_url = fetch_api_root_url(&parsed_site_url, &request_executor)
-        .await?
-        .to_string();
+async fn inner_find_api_urls(
+    parsed_site_url: Url,
+    request_executor: Arc<dyn RequestExecutor>,
+) -> Result<WpRestApiUrls, FindApiUrlsError> {
+    let api_root_url = fetch_api_root_url(parsed_site_url, &request_executor).await?;
+    let api_root_url_as_string = api_root_url.to_string();
 
-    let api_details = fetch_wp_api_details(&api_root_url, &request_executor)
+    let api_details = fetch_wp_api_details(api_root_url, &request_executor)
         .await?
         .into();
     Ok(WpRestApiUrls {
         api_details,
-        api_root_url,
+        api_root_url: api_root_url_as_string,
     })
 }
 
 // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing
 // to the WP.org API root
 async fn fetch_api_root_url(
-    parsed_site_url: &ParsedSiteUrl,
+    parsed_site_url: Url,
     request_executor: &Arc<dyn RequestExecutor>,
 ) -> Result<Url, FindApiUrlsError> {
     let api_root_request = WpNetworkRequest {
         method: RequestMethod::HEAD,
-        url: WpEndpointUrl(parsed_site_url.site_url.to_string()),
+        url: WpEndpointUrl(parsed_site_url.to_string()),
         header_map: HashMap::new(),
         body: None,
     };
@@ -73,24 +99,25 @@ async fn fetch_api_root_url(
     api_root_response
         .get_link_header(API_ROOT_LINK_HEADER)
         .ok_or(FindApiUrlsError::ApiRootLinkHeaderNotFound {
-            response: api_root_response.body_as_string(),
+            header_map: api_root_response.header_map,
         })
 }
 
 async fn fetch_wp_api_details(
-    api_root_url: &String,
+    api_root_url: Url,
     request_executor: &Arc<dyn RequestExecutor>,
 ) -> Result<WpApiDetails, FindApiUrlsError> {
     let api_details_response = request_executor
         .execute(WpNetworkRequest {
             method: RequestMethod::GET,
-            url: WpEndpointUrl(api_root_url.clone()),
+            url: api_root_url.into(),
             header_map: HashMap::new(),
             body: None,
         })
         .await?;
-    serde_json::from_slice(&api_details_response.body).map_err(|_| {
+    serde_json::from_slice(&api_details_response.body).map_err(|err| {
         FindApiUrlsError::ApiDetailsCouldntBeParsed {
+            reason: err.to_string(),
             response: api_details_response.body_as_string(),
         }
     })

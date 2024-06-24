@@ -173,7 +173,7 @@ impl AsyncWpNetworking {
         let header_map = response
             .headers_mut()
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v.to_str().unwrap().to_string()))
+            .filter_map(|(k, v)| v.to_str().map(|v| (k.to_string(), v.to_string())).ok())
             .collect();
 
         Ok(WpNetworkResponse {

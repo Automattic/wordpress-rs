@@ -20,7 +20,6 @@ use users::*;
 mod api_error; // re-exported relevant types
 pub mod application_passwords;
 pub mod login;
-pub mod parser;
 pub mod plugins;
 pub mod request;
 pub mod users;
