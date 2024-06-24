@@ -62,10 +62,7 @@ struct LoginView: View {
 
         self.loginTask = Task {
             do {
-
-                guard var authURL = try await getLoginUrl() else {
-                    return
-                }
+                let apiUrls = try await WordPressAPI.Helpers.findApiUrls(for: url, in: .shared)
 
                 var appNameValue = "WordPress SDK Example App"
 
@@ -77,6 +74,10 @@ struct LoginView: View {
                 let deviceName = UIDevice.current.name
                 appNameValue += " - (\(deviceName))"
                 #endif
+
+                guard var authURL = URL(string: apiUrls.applicationPasswordsAuthenticationUrl) else {
+                    return
+                }
 
                 authURL.append(queryItems: [
                     URLQueryItem(name: "app_name", value: appNameValue),
@@ -101,32 +102,6 @@ struct LoginView: View {
                 debugPrint(err)
             }
         }
-    }
-
-    func getLoginUrl() async throws -> URL? {
-        let parsedUrl = try WordPressAPI.Helpers.parseUrl(string: url)
-
-        guard let apiRoot = try await WordPressAPI.findRestApiEndpointRoot(
-            forSiteUrl: parsedUrl,
-            using: URLSession.shared
-        ) else {
-            return nil
-        }
-
-        let client = try WordPressAPI(
-            urlSession: .shared,
-            baseUrl: apiRoot,
-            authenticationStategy: .none
-        )
-
-        let capabilities = try await client.getRestAPICapabilities(forApiRoot: apiRoot, using: .shared)
-
-        guard let authenticationUrl = capabilities.authentication.first?.value.endpoints.authorization else {
-            debugPrint("No authentication approaches found – unable to continue")
-            abort()
-        }
-
-        return URL(string: authenticationUrl)
     }
 }
 

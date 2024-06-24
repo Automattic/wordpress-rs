@@ -81,24 +81,8 @@ public struct WordPressAPI {
     }
 
     public struct Helpers {
-
-        public static func parseUrl(string: String) throws -> URL {
-
-            if let url = URL(string: string), url.scheme != nil {
-                return url
-            }
-
-            if let url = URL(string: "http://" + string) {
-                return url
-            }
-
-            if let url = URL(string: "http://" + string + "/") {
-                return url
-            }
-
-            debugPrint("Invalid URL")
-
-            throw ParseError.invalidUrl
+        public static func findApiUrls(for siteUrl: String, in session: URLSession) async throws -> WpRestApiUrls {
+            try await WordPressAPIInternal.findApiUrls(siteUrl: siteUrl, requestExecutor: session)
         }
 
         public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
