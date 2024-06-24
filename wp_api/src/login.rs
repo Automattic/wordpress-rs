@@ -6,13 +6,11 @@ use url::Url;
 
 use crate::parser::ParsedSiteUrl;
 use crate::request::endpoint::WpEndpointUrl;
-use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
-use crate::{RequestExecutionError, WpApiError};
+use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest};
+use crate::RequestExecutionError;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum FindApiUrlsError {
-    #[error("Not yet implemented application password authorization endpoint not found")]
-    ApplicationPasswordEndpointNotFound,
     #[error("Not yet implemented capabilities response error")]
     CapabilitiesResponseError,
     #[error("Generic parsing error - not yet implemented")]
@@ -35,7 +33,7 @@ pub struct WpRestApiRootUrl {}
 #[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {
     api_root_url: String,
-    application_passwords_authentication_url: String,
+    application_passwords_authentication_url: Option<String>,
 }
 
 #[uniffi::export]
@@ -72,14 +70,13 @@ pub async fn find_api_urls(
         body: None,
     };
     let capabilities_response = request_executor.execute(capabilities_request).await?;
-    let mut authentication_map = parse_api_details_response(capabilities_response)
-        .map_err(|_| FindApiUrlsError::CapabilitiesResponseError)?
-        .authentication;
+    let mut authentication_map =
+        serde_json::from_slice::<WpApiDetails>(&capabilities_response.body)
+            .map_err(|_| FindApiUrlsError::CapabilitiesResponseError)?
+            .authentication;
     let application_passwords_authentication_url = authentication_map
         .remove("application-passwords")
-        .ok_or(FindApiUrlsError::ApplicationPasswordEndpointNotFound)?
-        .endpoints
-        .authorization;
+        .map(|auth_scheme| auth_scheme.endpoints.authorization);
     Ok(WpRestApiUrls {
         api_root_url,
         application_passwords_authentication_url,
@@ -174,23 +171,4 @@ impl From<WpRestApiUrl> for String {
     fn from(url: WpRestApiUrl) -> Self {
         url.string_value
     }
-}
-
-#[uniffi::export]
-pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WpRestApiUrl> {
-    if let Some(url) = response.get_link_header(name) {
-        return Some(url.into());
-    }
-
-    None
-}
-
-#[uniffi::export]
-pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WpApiDetails, WpApiError> {
-    let api_details =
-        serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
-            reason: err.to_string(),
-            response: response.body_as_string(),
-        })?;
-    Ok(api_details)
 }
