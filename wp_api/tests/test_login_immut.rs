@@ -7,6 +7,7 @@ pub mod integration_test_common;
 #[rstest]
 #[case("http://localhost")]
 #[case("http://localhost/wp-json")]
+#[case("http://localhost/wp-admin.php")]
 #[case("https://orchestremetropolitain.com/wp-json")]
 #[case("orchestremetropolitain.com/wp-json")]
 // TODO: Theses cases should work, but they don't yet
