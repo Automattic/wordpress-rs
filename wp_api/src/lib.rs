@@ -7,20 +7,20 @@ use request::{
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         ApiBaseUrl,
     },
-    RequestExecutor, WpNetworkResponse,
+    RequestExecutor,
 };
 use std::sync::Arc;
 
 pub use api_error::{
     RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
 };
-use login::*;
 use plugins::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
 pub mod application_passwords;
 pub mod login;
+pub mod parser;
 pub mod plugins;
 pub mod request;
 pub mod users;
@@ -164,26 +164,6 @@ impl WpApiParamOrder {
             Self::Desc => "desc",
         }
     }
-}
-
-#[uniffi::export]
-pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WpApiDetails, WpApiError> {
-    let api_details =
-        serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
-            reason: err.to_string(),
-            response: response.body_as_string(),
-        })?;
-
-    Ok(api_details)
-}
-
-#[uniffi::export]
-pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WpRestApiUrl> {
-    if let Some(url) = response.get_link_header(name) {
-        return Some(url.into());
-    }
-
-    None
 }
 
 trait SparseField {
