@@ -1,9 +1,15 @@
 #![allow(dead_code, unused_variables)]
 
 use request::{
-    endpoint::ApiBaseUrl, plugins_request_builder::PluginsRequestBuilder,
-    users_request_builder::UsersRequestBuilder, RequestExecutor, UsersRequestBuilder2,
-    WpNetworkResponse,
+    endpoint::{
+        application_passwords_endpoint::{
+            ApplicationPasswordsRequestBuilder2, ApplicationPasswordsRequestExecutor,
+        },
+        ApiBaseUrl,
+    },
+    plugins_request_builder::PluginsRequestBuilder,
+    users_request_builder::UsersRequestBuilder,
+    RequestExecutor, UsersRequestBuilder2, WpNetworkResponse,
 };
 use std::sync::Arc;
 
@@ -15,6 +21,7 @@ use plugins::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
+pub mod application_passwords;
 pub mod login;
 pub mod plugins;
 pub mod request;
@@ -62,6 +69,7 @@ impl WpApiRequestBuilder {
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpRequestBuilder {
+    application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     users: Arc<UsersRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
 }
@@ -80,15 +88,27 @@ impl WpRequestBuilder {
             })?
             .into();
         let request_builder = Arc::new(request::RequestBuilder::new(
-            request_executor,
+            request_executor.clone(),
             authentication.clone(),
         ));
 
         Ok(Self {
+            application_passwords: ApplicationPasswordsRequestExecutor::new(
+                ApplicationPasswordsRequestBuilder2::new(
+                    api_base_url.clone(),
+                    request_builder.clone(),
+                ),
+                request_executor.clone(),
+            )
+            .into(),
             users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
             plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
                 .into(),
         })
+    }
+
+    pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestExecutor> {
+        self.application_passwords.clone()
     }
 
     pub fn users(&self) -> Arc<UsersRequestBuilder> {

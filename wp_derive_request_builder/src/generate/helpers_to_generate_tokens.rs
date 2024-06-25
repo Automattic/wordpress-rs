@@ -123,7 +123,9 @@ pub fn fn_context_param(context_and_filter_handler: ContextAndFilterHandler) -> 
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_)
         | ContextAndFilterHandler::FilterNoContext => TokenStream::new(),
         ContextAndFilterHandler::NoFilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterTakeContextAsArgument => quote! { context: WpContext, },
+        | ContextAndFilterHandler::FilterTakeContextAsArgument => {
+            quote! { context: crate::WpContext, }
+        }
     }
 }
 
@@ -445,7 +447,7 @@ mod tests {
     )]
     #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsArgument,
-        "context : WpContext ,"
+        "context : crate :: WpContext ,"
     )]
     #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
@@ -453,7 +455,7 @@ mod tests {
     )]
     #[case(
         ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "context : WpContext ,"
+        "context : crate :: WpContext ,"
     )]
     fn test_fn_context_param(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
@@ -692,7 +694,7 @@ mod tests {
         &referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsArgument,
-        "fn list (& self , context : WpContext , params : &UserListParams ,)")]
+        "fn list (& self , context : crate :: WpContext , params : &UserListParams ,)")]
     #[case(
         PartOf::Endpoint,
         format_ident!("List"),
@@ -700,7 +702,7 @@ mod tests {
         &referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
         ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "fn filter_list (& self , context : WpContext , params : &UserListParams , fields : & [SparseUserField])")]
+        "fn filter_list (& self , context : crate :: WpContext , params : &UserListParams , fields : & [SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Retrieve"),
@@ -716,7 +718,7 @@ mod tests {
         &ParamsType::new(None),
         RequestType::ContextualGet,
         ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "fn filter_retrieve (& self , user_id : UserId , context : WpContext , fields : & [SparseUserField])")]
+        "fn filter_retrieve (& self , user_id : UserId , context : crate :: WpContext , fields : & [SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Update"),
