@@ -43,7 +43,7 @@ async fn delete_user() {
         };
         let user_delete_response = request_builder()
             .users()
-            .delete(SECOND_USER_ID, &user_delete_params)
+            .delete(&SECOND_USER_ID, &user_delete_params)
             .await;
         assert!(user_delete_response.is_ok());
 
@@ -197,7 +197,7 @@ async fn update_user_roles() {
         // successful
         request_builder()
             .users()
-            .update(SECOND_USER_ID, &params)
+            .update(&SECOND_USER_ID, &params)
             .await
             .assert_response();
     })
@@ -216,7 +216,7 @@ async fn update_user_password() {
         // successful
         request_builder()
             .users()
-            .update(FIRST_USER_ID, &params)
+            .update(&FIRST_USER_ID, &params)
             .await
             .assert_response();
     })
@@ -230,7 +230,7 @@ where
     wp_db::run_and_restore(|mut db| async move {
         request_builder()
             .users()
-            .update(FIRST_USER_ID, &params)
+            .update(&FIRST_USER_ID, &params)
             .await
             .assert_response();
 

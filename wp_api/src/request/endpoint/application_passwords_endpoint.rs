@@ -26,7 +26,7 @@ mod tests {
     #[rstest]
     fn list_application_passwords_with_edit_context(endpoint: ApplicationPasswordsRequestEndpoint) {
         validate_endpoint(
-            endpoint.list_with_edit_context(UserId(2)),
+            endpoint.list_with_edit_context(&UserId(2)),
             "/users/2/application-passwords?context=edit",
         );
     }
@@ -36,7 +36,7 @@ mod tests {
         endpoint: ApplicationPasswordsRequestEndpoint,
     ) {
         validate_endpoint(
-            endpoint.list_with_embed_context(UserId(71)),
+            endpoint.list_with_embed_context(&UserId(71)),
             "/users/71/application-passwords?context=embed",
         );
     }
@@ -44,7 +44,7 @@ mod tests {
     #[rstest]
     fn list_application_passwords_with_view_context(endpoint: ApplicationPasswordsRequestEndpoint) {
         validate_endpoint(
-            endpoint.list_with_view_context(UserId(9999)),
+            endpoint.list_with_view_context(&UserId(9999)),
             "/users/9999/application-passwords?context=view",
         );
     }
@@ -59,7 +59,7 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_endpoint(
-            endpoint.filter_list(UserId(2), context, fields),
+            endpoint.filter_list(&UserId(2), context, fields),
             expected_path,
         );
     }

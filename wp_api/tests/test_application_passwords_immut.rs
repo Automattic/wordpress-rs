@@ -19,7 +19,7 @@ async fn filter_application_passwords(
 ) {
     request_builder()
         .application_passwords()
-        .filter_list(user_id, WpContext::Edit, fields)
+        .filter_list(&user_id, WpContext::Edit, fields)
         .await
         .assert_response()
         .iter()
@@ -33,7 +33,7 @@ async fn list_application_passwords_with_edit_context(
 ) {
     request_builder()
         .application_passwords()
-        .list_with_edit_context(user_id)
+        .list_with_edit_context(&user_id)
         .await
         .assert_response();
 }
@@ -45,7 +45,7 @@ async fn list_application_passwords_with_embed_context(
 ) {
     request_builder()
         .application_passwords()
-        .list_with_embed_context(user_id)
+        .list_with_embed_context(&user_id)
         .await
         .assert_response();
 }
@@ -57,7 +57,7 @@ async fn list_application_passwords_with_view_context(
 ) {
     request_builder()
         .application_passwords()
-        .list_with_view_context(user_id)
+        .list_with_view_context(&user_id)
         .await
         .assert_response();
 }
@@ -68,7 +68,7 @@ async fn list_application_passwords_with_view_context(
 async fn list_application_passwords_ensure_last_ip() {
     let list = request_builder()
         .application_passwords()
-        .list_with_edit_context(FIRST_USER_ID)
+        .list_with_edit_context(&FIRST_USER_ID)
         .await
         .assert_response();
     assert!(list.first().unwrap().last_ip.is_some());

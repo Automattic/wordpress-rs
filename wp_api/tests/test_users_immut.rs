@@ -34,7 +34,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
     let user = request_builder()
         .users()
-        .filter_retrieve(FIRST_USER_ID, WpContext::Edit, fields)
+        .filter_retrieve(&FIRST_USER_ID, WpContext::Edit, fields)
         .await
         .assert_response();
     validate_sparse_user_fields(&user, fields);
@@ -135,7 +135,7 @@ async fn list_users_with_view_context_has_published_posts(
 async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
     let user = request_builder()
         .users()
-        .retrieve_with_edit_context(user_id)
+        .retrieve_with_edit_context(&user_id)
         .await
         .assert_response();
     assert_eq!(user_id, user.id);
@@ -149,7 +149,7 @@ async fn retrieve_user_with_embed_context(
 ) {
     let user = request_builder()
         .users()
-        .retrieve_with_embed_context(user_id)
+        .retrieve_with_embed_context(&user_id)
         .await
         .assert_response();
     assert_eq!(user_id, user.id);
@@ -161,7 +161,7 @@ async fn retrieve_user_with_embed_context(
 async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
     let user = request_builder()
         .users()
-        .retrieve_with_view_context(user_id)
+        .retrieve_with_view_context(&user_id)
         .await
         .assert_response();
     assert_eq!(user_id, user.id);

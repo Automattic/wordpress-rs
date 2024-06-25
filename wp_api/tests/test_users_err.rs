@@ -30,7 +30,7 @@ async fn delete_user_err_user_cannot_delete() {
     request_builder_as_subscriber()
         .users()
         .delete(
-            FIRST_USER_ID,
+            &FIRST_USER_ID,
             &UserDeleteParams {
                 reassign: SECOND_USER_ID,
             },
@@ -44,7 +44,7 @@ async fn delete_user_err_user_invalid_reassign() {
     request_builder()
         .users()
         .delete(
-            FIRST_USER_ID,
+            &FIRST_USER_ID,
             &UserDeleteParams {
                 reassign: UserId(987654321),
             },
@@ -156,7 +156,7 @@ async fn list_users_has_published_posts_err_invalid_param() {
 async fn retrieve_user_err_user_invalid_id() {
     request_builder()
         .users()
-        .retrieve_with_edit_context(UserId(987654321))
+        .retrieve_with_edit_context(&UserId(987654321))
         .await
         .assert_wp_error(WpRestErrorCode::UserInvalidId);
 }
@@ -184,7 +184,7 @@ async fn update_user_err_cannot_edit() {
     // Subscribers can't update someone else's slug
     request_builder_as_subscriber()
         .users()
-        .update(FIRST_USER_ID, &params)
+        .update(&FIRST_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::CannotEdit);
 }
@@ -198,7 +198,7 @@ async fn update_user_err_cannot_edit_roles() {
     // Subscribers can't update their roles
     request_builder_as_subscriber()
         .users()
-        .update(SECOND_USER_ID, &params)
+        .update(&SECOND_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::CannotEditRoles);
 }
@@ -212,7 +212,7 @@ async fn update_user_err_user_invalid_email() {
     // Can't update user's email to an email that's already in use
     request_builder()
         .users()
-        .update(FIRST_USER_ID, &params)
+        .update(&FIRST_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::UserInvalidEmail);
 }
@@ -225,7 +225,7 @@ async fn update_user_email_err_invalid_param() {
     };
     request_builder()
         .users()
-        .update(FIRST_USER_ID, &params)
+        .update(&FIRST_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
@@ -238,7 +238,7 @@ async fn update_user_password_err_invalid_param() {
     };
     request_builder()
         .users()
-        .update(FIRST_USER_ID, &params)
+        .update(&FIRST_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::InvalidParam);
 }
@@ -252,7 +252,7 @@ async fn update_user_err_user_invalid_role() {
     // Can't update user's email to a role that doesn't exist
     request_builder()
         .users()
-        .update(FIRST_USER_ID, &params)
+        .update(&FIRST_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::UserInvalidRole);
 }
@@ -266,7 +266,7 @@ async fn update_user_err_user_invalid_slug() {
     // Can't update user's slug to a slug that's already in use
     request_builder()
         .users()
-        .update(FIRST_USER_ID, &params)
+        .update(&FIRST_USER_ID, &params)
         .await
         .assert_wp_error(WpRestErrorCode::UserInvalidSlug);
 }

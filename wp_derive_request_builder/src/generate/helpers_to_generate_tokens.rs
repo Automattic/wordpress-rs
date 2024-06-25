@@ -83,7 +83,7 @@ pub fn fn_url_params(url_parts: &[UrlPart]) -> TokenStream {
         if let UrlPart::Dynamic(p) = p {
             let p_ident = format_ident!("{}", p);
             let p_upper_camel_case = format_ident!("{}", p.to_case(Case::UpperCamel));
-            Some(quote! { #p_ident: #p_upper_camel_case })
+            Some(quote! { #p_ident: &#p_upper_camel_case })
         } else {
             None
         }
@@ -387,9 +387,9 @@ mod tests {
 
     #[rstest]
     #[case(&[UrlPart::Static("users".to_string())], "")]
-    #[case(&[UrlPart::Dynamic("user_id".to_string())], "user_id : UserId ,")]
-    #[case(&[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string())], "user_id : UserId ,")]
-    #[case(&[UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())], "user_id : UserId , user_type : UserType ,")]
+    #[case(&[UrlPart::Dynamic("user_id".to_string())], "user_id : & UserId ,")]
+    #[case(&[UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string())], "user_id : & UserId ,")]
+    #[case(&[UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())], "user_id : & UserId , user_type : & UserType ,")]
     fn test_fn_url_params(#[case] url_parts: &[UrlPart], #[case] expected_str: &str) {
         assert_eq!(fn_url_params(url_parts).to_string(), expected_str);
     }
@@ -670,7 +670,7 @@ mod tests {
         &referenced_params_type("UserDeleteParams"),
         RequestType::Delete,
         ContextAndFilterHandler::None,
-        "fn delete (& self , user_id : UserId , params : &UserDeleteParams ,)")]
+        "fn delete (& self , user_id : & UserId , params : &UserDeleteParams ,)")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Delete"),
@@ -678,7 +678,7 @@ mod tests {
         &referenced_params_type("UserDeleteParams"),
         RequestType::Delete,
         ContextAndFilterHandler::FilterNoContext,
-        "fn filter_delete (& self , user_id : UserId , params : &UserDeleteParams , fields : & [SparseUserField])")]
+        "fn filter_delete (& self , user_id : & UserId , params : &UserDeleteParams , fields : & [SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("DeleteMe"),
@@ -710,7 +710,7 @@ mod tests {
         &ParamsType::new(None),
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
-        "fn retrieve_with_embed_context (& self , user_id : UserId ,)")]
+        "fn retrieve_with_embed_context (& self , user_id : & UserId ,)")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Retrieve"),
@@ -718,7 +718,7 @@ mod tests {
         &ParamsType::new(None),
         RequestType::ContextualGet,
         ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "fn filter_retrieve (& self , user_id : UserId , context : crate :: WpContext , fields : & [SparseUserField])")]
+        "fn filter_retrieve (& self , user_id : & UserId , context : crate :: WpContext , fields : & [SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Update"),
@@ -726,7 +726,7 @@ mod tests {
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
         ContextAndFilterHandler::None,
-        "fn update (& self , user_id : UserId ,)")]
+        "fn update (& self , user_id : & UserId ,)")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Update"),
@@ -734,7 +734,7 @@ mod tests {
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
         ContextAndFilterHandler::FilterNoContext,
-        "fn filter_update (& self , user_id : UserId , fields : & [SparseUserField])")]
+        "fn filter_update (& self , user_id : & UserId , fields : & [SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("Update"),
@@ -742,7 +742,7 @@ mod tests {
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
         ContextAndFilterHandler::None,
-        "fn update (& self , user_id : UserId , params : &UserUpdateParams ,)")]
+        "fn update (& self , user_id : & UserId , params : &UserUpdateParams ,)")]
     #[case(
         PartOf::RequestExecutor,
         format_ident!("Update"),
@@ -750,7 +750,7 @@ mod tests {
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
         ContextAndFilterHandler::None,
-        "fn update (& self , user_id : UserId , params : &UserUpdateParams ,)")]
+        "fn update (& self , user_id : & UserId , params : &UserUpdateParams ,)")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("Update"),
@@ -758,7 +758,7 @@ mod tests {
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
         ContextAndFilterHandler::FilterNoContext,
-        "fn filter_update (& self , user_id : UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
+        "fn filter_update (& self , user_id : & UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
     #[case(
         PartOf::RequestExecutor,
         format_ident!("Update"),
@@ -766,7 +766,7 @@ mod tests {
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
         ContextAndFilterHandler::FilterNoContext,
-        "fn filter_update (& self , user_id : UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
+        "fn filter_update (& self , user_id : & UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("List"),

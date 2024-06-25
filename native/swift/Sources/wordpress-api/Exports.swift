@@ -34,6 +34,6 @@ public typealias PluginListParams = WordPressAPIInternal.PluginListParams
 public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
-public typealias PluginsRequestBuilder = WordPressAPIInternal.PluginsRequestBuilder
+public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
 
 #endif
