@@ -33,11 +33,12 @@ extension URLSession: SafeRequestExecutor {
         do {
             let (data, response) = try await self.data(for: request.asURLRequest())
             let urlResponse = response as! HTTPURLResponse
+
             return .success(
                 WpNetworkResponse(
                     body: data,
                     statusCode: UInt16(urlResponse.statusCode),
-                    headerMap: urlResponse.httpHeaders
+                    headerMap: try WpNetworkHeaderMap.fromMap(hashMap: urlResponse.httpHeaders)
                 )
             )
         } catch {

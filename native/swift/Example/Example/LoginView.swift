@@ -75,11 +75,11 @@ struct LoginView: View {
                 appNameValue += " - (\(deviceName))"
                 #endif
 
-                guard var authUrlString = apiUrls.apiDetails.findApplicationPasswordsAuthenticationUrl() else {
-                    return
-                }
-
-                guard var authURL = URL(string: authUrlString) else {
+                guard
+                    let authUrlString = apiUrls.apiDetails.findApplicationPasswordsAuthenticationUrl(),
+                    var authURL = URL(string: authUrlString)
+                else {
+                    // TODO: This should emit an error
                     return
                 }
 

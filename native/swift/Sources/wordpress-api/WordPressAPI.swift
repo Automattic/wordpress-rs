@@ -146,7 +146,7 @@ extension WpNetworkResponse {
         return WpNetworkResponse(
             body: data,
             statusCode: UInt16(response.statusCode),
-            headerMap: response.httpHeaders
+            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders)
         )
 
     }
