@@ -38,7 +38,7 @@ final class WordPressAPITests: XCTestCase {
           }
         """
         let stubs = HTTPStubs()
-        stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
+        try stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
 
         let api = try WordPressAPI(
             urlSession: .shared,
@@ -77,11 +77,11 @@ final class WordPressAPITests: XCTestCase {
 }
 
 extension WpNetworkResponse {
-    static func json(_ content: String) -> WpNetworkResponse {
+    static func json(_ content: String) throws -> WpNetworkResponse {
         WpNetworkResponse(
             body: content.data(using: .utf8)!,
             statusCode: 200,
-            headerMap: ["Content-Type": "application/json"]
+            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"])
         )
     }
 }
