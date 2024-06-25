@@ -5,26 +5,28 @@ use std::sync::Arc;
 use url::Url;
 
 use crate::request::endpoint::WpEndpointUrl;
-use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest};
+use crate::request::{RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest};
 use crate::RequestExecutionError;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FindApiUrlsError {
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
     #[error("Api root link header not found in header_map: {:?}", header_map)]
-    ApiRootLinkHeaderNotFound {
-        header_map: Option<HashMap<String, String>>,
-    },
+    ApiRootLinkHeaderNotFound { header_map: Arc<WpNetworkHeaderMap> },
     #[error("Error while parsing site url: {}", reason)]
     ParseSiteUrlError { reason: String },
-    #[error(transparent)]
-    RequestExecutionError {
-        #[from]
-        inner: RequestExecutionError,
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
     },
 }
 
@@ -32,6 +34,20 @@ impl From<url::ParseError> for FindApiUrlsError {
     fn from(value: url::ParseError) -> Self {
         Self::ParseSiteUrlError {
             reason: value.to_string(),
+        }
+    }
+}
+
+impl From<RequestExecutionError> for FindApiUrlsError {
+    fn from(value: RequestExecutionError) -> Self {
+        match value {
+            RequestExecutionError::RequestExecutionFailed {
+                status_code,
+                reason,
+            } => Self::RequestExecutionFailed {
+                status_code,
+                reason,
+            },
         }
     }
 }

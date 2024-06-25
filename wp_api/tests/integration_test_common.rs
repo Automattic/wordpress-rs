@@ -3,7 +3,9 @@ use futures::Future;
 use http::HeaderMap;
 use std::{process::Command, sync::Arc};
 use wp_api::{
-    request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse},
+    request::{
+        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+    },
     users::UserId,
     RequestExecutionError, WpApiError, WpAuthentication, WpRequestBuilder, WpRestError,
     WpRestErrorCode, WpRestErrorWrapper,
@@ -169,17 +171,13 @@ impl AsyncWpNetworking {
         if let Some(body) = wp_request.body {
             request = request.body(body);
         }
-        let mut response = request.send().await?;
-        let header_map = response
-            .headers_mut()
-            .into_iter()
-            .filter_map(|(k, v)| v.to_str().map(|v| (k.to_string(), v.to_string())).ok())
-            .collect();
+        let response = request.send().await?;
 
+        let header_map = Arc::new(WpNetworkHeaderMap::new(response.headers().clone()));
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Some(header_map), // TODO: Properly read the headers
+            header_map,
         })
     }
 
