@@ -8,11 +8,8 @@ use crate::{api_error::RequestExecutionError, WpApiError, WpAuthentication};
 
 use self::endpoint::WpEndpointUrl;
 
-pub use endpoint::users_endpoint::generated::UsersRequestBuilder2;
-
 pub mod endpoint;
 pub mod plugins_request_builder;
-pub mod users_request_builder;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";

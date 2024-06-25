@@ -39,7 +39,7 @@ public struct WordPressAPI {
         )
     }
 
-    public var users: UsersRequestBuilder {
+    public var users: UsersRequestExecutor {
         self.requestBuilder.users()
     }
 

@@ -20,7 +20,7 @@ public typealias UserUpdateParams = WordPressAPIInternal.UserUpdateParams
 public typealias UserCreateParams = WordPressAPIInternal.UserCreateParams
 public typealias UserDeleteParams = WordPressAPIInternal.UserDeleteParams
 public typealias UserDeleteResponse = WordPressAPIInternal.UserDeleteResponse
-public typealias UsersRequestBuilder = WordPressAPIInternal.UsersRequestBuilder
+public typealias UsersRequestExecutor = WordPressAPIInternal.UsersRequestExecutor
 
 // MARK: - Plugins
 
