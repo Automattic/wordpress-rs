@@ -2,11 +2,9 @@
 
 use request::{
     endpoint::{
-        application_passwords_endpoint::{
-            ApplicationPasswordsRequestBuilder2, ApplicationPasswordsRequestExecutor,
-        },
-        plugins_endpoint::{PluginsRequestBuilder2, PluginsRequestExecutor},
-        users_endpoint::{UsersRequestBuilder2, UsersRequestExecutor},
+        application_passwords_endpoint::ApplicationPasswordsRequestExecutor,
+        plugins_endpoint::PluginsRequestExecutor,
+        users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         ApiBaseUrl,
     },
     RequestExecutor, WpNetworkResponse,
@@ -30,39 +28,27 @@ pub mod users;
 #[cfg(test)]
 mod unit_test_common;
 
-// TODO: This is a temporary type that allows building a request type
-// Although we'll have a type that does that, it's unlikely that it'll look like this.
-// It still does its job for now to prove that `UsersRequestBuilder2` (temporary) type is
-// properly generated and utilized in `test_manual_request_builder_immut` integration tests
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiRequestBuilder {
-    users: Arc<UsersRequestBuilder2>,
+    users: Arc<UsersRequestBuilder>,
 }
 
 #[uniffi::export]
 impl WpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(
-        site_url: String,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-    ) -> Result<Self, WpApiError> {
+    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
         let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
             .map_err(|err| WpApiError::SiteUrlParsingError {
                 reason: err.to_string(),
             })?
             .into();
-        let request_builder = Arc::new(request::RequestBuilder::new(
-            request_executor,
-            authentication.clone(),
-        ));
 
         Ok(Self {
-            users: UsersRequestBuilder2::new(api_base_url.clone(), request_builder.clone()).into(),
+            users: UsersRequestBuilder::new(api_base_url.clone(), authentication).into(),
         })
     }
 
-    pub fn users(&self) -> Arc<UsersRequestBuilder2> {
+    pub fn users(&self) -> Arc<UsersRequestBuilder> {
         self.users.clone()
     }
 }
@@ -87,27 +73,23 @@ impl WpRequestBuilder {
                 reason: err.to_string(),
             })?
             .into();
-        let request_builder = Arc::new(request::RequestBuilder::new(
-            request_executor.clone(),
-            authentication.clone(),
-        ));
 
         Ok(Self {
             application_passwords: ApplicationPasswordsRequestExecutor::new(
-                ApplicationPasswordsRequestBuilder2::new(
-                    api_base_url.clone(),
-                    request_builder.clone(),
-                ),
+                api_base_url.clone(),
+                authentication.clone(),
                 request_executor.clone(),
             )
             .into(),
             users: UsersRequestExecutor::new(
-                UsersRequestBuilder2::new(api_base_url.clone(), request_builder.clone()),
+                api_base_url.clone(),
+                authentication.clone(),
                 request_executor.clone(),
             )
             .into(),
             plugins: PluginsRequestExecutor::new(
-                PluginsRequestBuilder2::new(api_base_url.clone(), request_builder.clone()),
+                api_base_url.clone(),
+                authentication.clone(),
                 request_executor.clone(),
             )
             .into(),
