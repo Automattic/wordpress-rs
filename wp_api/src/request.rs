@@ -170,21 +170,34 @@ impl WpNetworkHeaderMap {
         }
     }
 
-    pub fn build_header_name_value(
+    fn build_header_name_value(
         header_name: String,
         header_value: String,
-    ) -> Result<(HeaderName, HeaderValue), WpNetworkHeaderMapError> {
-        if let Ok(header_name) = HeaderName::from_bytes(header_name.as_bytes()) {
-            if let Ok(header_value) = HeaderValue::from_str(&header_value) {
-                // Using [http::HeaderMap::append] is important here because `insert` will
-                // remove any existing values
-                Ok((header_name, header_value))
-            } else {
-                Err(WpNetworkHeaderMapError::InvalidHeaderValue { header_value })
-            }
-        } else {
-            Err(WpNetworkHeaderMapError::InvalidHeaderName { header_name })
-        }
+    ) -> Vec<Result<(HeaderName, HeaderValue), WpNetworkHeaderMapError>> {
+        header_value
+            .split(',')
+            .filter_map(|x| match x.trim() {
+                "" => None,
+                y => Some(y),
+            })
+            .map(|header_value| {
+                if let Ok(header_name) = HeaderName::from_bytes(header_name.as_bytes()) {
+                    if let Ok(header_value) = HeaderValue::from_str(header_value) {
+                        // Using [http::HeaderMap::append] is important here because `insert` will
+                        // remove any existing values
+                        Ok((header_name, header_value))
+                    } else {
+                        Err(WpNetworkHeaderMapError::InvalidHeaderValue {
+                            header_value: header_value.to_string(),
+                        })
+                    }
+                } else {
+                    Err(WpNetworkHeaderMapError::InvalidHeaderName {
+                        header_name: header_name.clone(),
+                    })
+                }
+            })
+            .collect()
     }
 }
 
@@ -197,7 +210,7 @@ impl WpNetworkHeaderMap {
         let inner = hash_map
             .into_iter()
             .flat_map(|(header_name, values)| {
-                values.into_iter().map(move |header_value| {
+                values.into_iter().flat_map(move |header_value| {
                     Self::build_header_name_value(header_name.clone(), header_value)
                 })
             })
@@ -209,7 +222,7 @@ impl WpNetworkHeaderMap {
     fn from_map(hash_map: HashMap<String, String>) -> Result<Self, WpNetworkHeaderMapError> {
         let inner = hash_map
             .into_iter()
-            .map(|(header_name, header_value)| {
+            .flat_map(|(header_name, header_value)| {
                 Self::build_header_name_value(header_name.clone(), header_value)
             })
             .collect::<Result<HeaderMap, WpNetworkHeaderMapError>>()?;
@@ -226,18 +239,23 @@ pub enum WpNetworkHeaderMapError {
 }
 
 impl WpNetworkResponse {
-    pub fn get_link_header(&self, name: &str) -> Option<Url> {
-        let header_map = &self.header_map.inner;
-        let link_header = if let Some(k) = header_map.get(LINK_HEADER_KEY) {
-            Some(k)
-        } else {
-            header_map.get(LINK_HEADER_KEY.to_lowercase())
-        }?;
-        let link_header = link_header.to_str().ok()?;
-        let link_map = parse_link_header::parse_with_rel(link_header).ok()?;
-        link_map
-            .get(name)
-            .and_then(|link| Url::parse(link.raw_uri.as_str()).ok())
+    pub fn get_link_header(&self, name: &str) -> Vec<Url> {
+        [
+            self.header_map.inner.get_all(LINK_HEADER_KEY),
+            self.header_map
+                .inner
+                .get_all(LINK_HEADER_KEY.to_lowercase()),
+        ]
+        .into_iter()
+        .flatten()
+        .flat_map(|link_header| link_header.to_str().ok())
+        .flat_map(|link_header_str| parse_link_header::parse_with_rel(link_header_str).ok())
+        .flat_map(|link_map| {
+            link_map
+                .get(name)
+                .and_then(|link| Url::parse(link.raw_uri.as_str()).ok())
+        })
+        .collect()
     }
 
     pub fn body_as_string(&self) -> String {
@@ -345,31 +363,34 @@ mod tests {
                     .unwrap(),
             ),
         };
-
         assert_eq!(
             expected_prev_link_header.and_then(|s| Url::parse(s).ok()),
-            response.get_link_header("prev")
+            response.get_link_header("prev").first().cloned(),
+            "response headers: {:?}",
+            response.header_map.inner
         );
         assert_eq!(
             expected_next_link_header.and_then(|s| Url::parse(s).ok()),
-            response.get_link_header("next")
+            response.get_link_header("next").first().cloned(),
+            "response headers: {:?}",
+            response.header_map.inner
         );
     }
 
+    // TODO: Temporary test setup
     #[test]
     fn test_header_map_from_map() {
         let hash_map = [
             ("host".to_string(), vec!["x".to_string(), "xy".to_string()]),
-            ("host_1".to_string(), vec!["a".to_string()]),
+            ("host_1".to_string(), vec!["a,b".to_string()]),
         ]
         .into();
-        let result = WpNetworkHeaderMap::from_multi_map(hash_map);
-        assert!(result.is_ok());
-        let header_map = result.unwrap();
-        let values = header_map.inner.get_all("host");
-        let mut values_iter = header_map.inner.get_all("host").iter();
-        assert_eq!("x", *values_iter.next().unwrap());
-        assert_eq!("xy", *values_iter.next().unwrap());
-        assert_eq!("a", header_map.inner.get("host_1").unwrap());
+        let header_map = WpNetworkHeaderMap::from_multi_map(hash_map).unwrap();
+        let mut host_iter = header_map.inner.get_all("host").iter();
+        assert_eq!("x", *host_iter.next().unwrap());
+        assert_eq!("xy", *host_iter.next().unwrap());
+        let mut host_1_iter = header_map.inner.get_all("host_1").iter();
+        assert_eq!("a", *host_1_iter.next().unwrap());
+        assert_eq!("b", *host_1_iter.next().unwrap());
     }
 }

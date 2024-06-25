@@ -112,9 +112,11 @@ async fn fetch_api_root_url(
 
     api_root_response
         .get_link_header(API_ROOT_LINK_HEADER)
+        .first()
         .ok_or(FindApiUrlsError::ApiRootLinkHeaderNotFound {
             header_map: api_root_response.header_map,
         })
+        .cloned()
 }
 
 async fn fetch_wp_api_details(
