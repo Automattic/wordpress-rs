@@ -24,8 +24,8 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn find_api_urls(&self, site_url: &str) -> Result<WpRestApiUrls, FindApiUrlsError> {
-        self.inner.find_api_urls(site_url).await
+    async fn api_discovery(&self, site_url: &str) -> Result<WpRestApiUrls, FindApiUrlsError> {
+        self.inner.api_discovery(site_url).await
     }
 }
 
@@ -39,15 +39,15 @@ impl WpLoginClient {
         Self { request_executor }
     }
 
-    pub async fn find_api_urls(&self, site_url: &str) -> Result<WpRestApiUrls, FindApiUrlsError> {
+    pub async fn api_discovery(&self, site_url: &str) -> Result<WpRestApiUrls, FindApiUrlsError> {
         let result = Url::parse(site_url);
         match result {
-            Ok(url) => self.inner_find_api_urls(url).await,
+            Ok(url) => self.inner_api_discovery(url).await,
             Err(initial_parse_err) => match initial_parse_err {
                 // If the url doesn't have a base, try using `https`
                 url::ParseError::RelativeUrlWithoutBase => {
                     if let Ok(url) = Url::parse(format!("https://{}", site_url).as_str()) {
-                        self.inner_find_api_urls(url).await
+                        self.inner_api_discovery(url).await
                     } else {
                         Err(initial_parse_err.into())
                     }
@@ -57,7 +57,7 @@ impl WpLoginClient {
         }
     }
 
-    async fn inner_find_api_urls(
+    async fn inner_api_discovery(
         &self,
         parsed_site_url: Url,
     ) -> Result<WpRestApiUrls, FindApiUrlsError> {

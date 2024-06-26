@@ -16,9 +16,9 @@ class WpLoginClient(
         UniffiWpLoginClient(requestExecutor)
     }
 
-    suspend fun urlDiscovery(siteUrl: String): Result<WpRestApiUrls> = withContext(dispatcher) {
+    suspend fun apiDiscovery(siteUrl: String): Result<WpRestApiUrls> = withContext(dispatcher) {
         try {
-            Result.success(internalClient.findApiUrls(siteUrl))
+            Result.success(internalClient.apiDiscovery(siteUrl))
         } catch (e: FindApiUrlsException) {
             Result.failure(e)
         }

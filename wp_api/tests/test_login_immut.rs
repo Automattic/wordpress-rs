@@ -19,6 +19,6 @@ pub mod integration_test_common;
 #[tokio::test]
 async fn test_login_flow(#[case] site_url: &str) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
-    let wp_rest_api_urls = client.find_api_urls(site_url).await.assert_response();
+    let wp_rest_api_urls = client.api_discovery(site_url).await.assert_response();
     dbg!("wp_rest_api_urls: {}", wp_rest_api_urls);
 }
