@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 @testable import WordPressAPI
+import WordPressAPIInternal
 
 class HTTPErrorTests: XCTestCase {
 
@@ -24,8 +25,7 @@ class HTTPErrorTests: XCTestCase {
         } catch let error as URLError {
             XCTAssertEqual(error.code, .timedOut)
         } catch {
-            XCTExpectFailure("URLError can't not be passed to Rust")
-            XCTAssertFalse(true, "Unexpected error: \(error)")
+            XCTAssertTrue(error is WordPressAPIInternal.WpApiError)
         }
     }
 #endif
