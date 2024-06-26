@@ -6,11 +6,13 @@ use url::Url;
 
 pub use login_client::WpLoginClient;
 pub use login_error::FindApiUrlsError;
+pub use url_discovery::UrlDiscoveryState;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
 mod login_client;
 mod login_error;
+mod url_discovery;
 
 #[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {

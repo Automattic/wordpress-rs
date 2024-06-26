@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
-use url::Url;
 
 use crate::request::endpoint::WpEndpointUrl;
-use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest};
+use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
 
-use super::{FindApiUrlsError, WpApiDetails, WpRestApiUrls};
+use super::url_discovery::{
+    FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial, UrlDiscoveryState,
+};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -24,7 +25,7 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn api_discovery(&self, site_url: &str) -> Result<WpRestApiUrls, FindApiUrlsError> {
+    async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
         self.inner.api_discovery(site_url).await
     }
 }
@@ -39,76 +40,84 @@ impl WpLoginClient {
         Self { request_executor }
     }
 
-    pub async fn api_discovery(&self, site_url: &str) -> Result<WpRestApiUrls, FindApiUrlsError> {
-        let result = Url::parse(site_url);
-        match result {
-            Ok(url) => self.inner_api_discovery(url).await,
-            Err(initial_parse_err) => match initial_parse_err {
-                // If the url doesn't have a base, try using `https`
-                url::ParseError::RelativeUrlWithoutBase => {
-                    if let Ok(url) = Url::parse(format!("https://{}", site_url).as_str()) {
-                        self.inner_api_discovery(url).await
-                    } else {
-                        Err(initial_parse_err.into())
-                    }
-                }
-                _ => Err(initial_parse_err.into()),
-            },
-        }
+    pub async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
+        self.attempt_api_discovery(site_url).await
     }
 
-    async fn inner_api_discovery(
-        &self,
-        parsed_site_url: Url,
-    ) -> Result<WpRestApiUrls, FindApiUrlsError> {
-        let api_root_url = self.fetch_api_root_url(parsed_site_url).await?;
-        let api_root_url_as_string = api_root_url.to_string();
-
-        let api_details = self.fetch_wp_api_details(api_root_url).await?.into();
-        Ok(WpRestApiUrls {
-            api_details,
-            api_root_url: api_root_url_as_string,
-        })
+    async fn attempt_api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
+        let initial_state = StateInitial::new(site_url);
+        let parsed_url_state = match initial_state.parse() {
+            Ok(s) => s,
+            Err(e) => {
+                return UrlDiscoveryState::FailedToParseSiteUrl {
+                    site_url: site_url.to_string(),
+                    error: e,
+                }
+            }
+        };
+        let api_root_response = match self.fetch_api_root_url(&parsed_url_state.site_url).await {
+            Ok(response) => response,
+            Err(e) => {
+                return UrlDiscoveryState::FailedToFetchApiRootUrl {
+                    site_url: parsed_url_state.site_url,
+                    error: e,
+                }
+            }
+        };
+        let fetched_api_root_url = match parsed_url_state.parse_api_root_response(api_root_response)
+        {
+            Ok(s) => s,
+            Err(e) => return e,
+        };
+        let api_details_response = match self
+            .fetch_wp_api_details(&fetched_api_root_url.api_root_url)
+            .await
+        {
+            Ok(response) => response,
+            Err(e) => {
+                return UrlDiscoveryState::FailedToFetchApiDetails {
+                    site_url: fetched_api_root_url.site_url,
+                    api_root_url: fetched_api_root_url.api_root_url,
+                    error: e,
+                }
+            }
+        };
+        match fetched_api_root_url.parse_api_details_response(api_details_response) {
+            Ok(s) => s.into(),
+            Err(e) => e,
+        }
     }
 
     // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing
     // to the WP.org API root
-    async fn fetch_api_root_url(&self, parsed_site_url: Url) -> Result<Url, FindApiUrlsError> {
+    async fn fetch_api_root_url(
+        &self,
+        parsed_site_url: &ParsedUrl,
+    ) -> Result<WpNetworkResponse, FetchApiRootUrlError> {
         let api_root_request = WpNetworkRequest {
             method: RequestMethod::HEAD,
-            url: WpEndpointUrl(parsed_site_url.to_string()),
+            url: WpEndpointUrl(parsed_site_url.url()),
             header_map: HashMap::new(),
             body: None,
         };
-        let api_root_response = self.request_executor.execute(api_root_request).await?;
-
-        api_root_response
-            .get_link_header(API_ROOT_LINK_HEADER)
-            .first()
-            .ok_or(FindApiUrlsError::ApiRootLinkHeaderNotFound {
-                header_map: api_root_response.header_map,
-            })
-            .cloned()
+        self.request_executor
+            .execute(api_root_request)
+            .await
+            .map_err(FetchApiRootUrlError::from)
     }
 
     async fn fetch_wp_api_details(
         &self,
-        api_root_url: Url,
-    ) -> Result<WpApiDetails, FindApiUrlsError> {
-        let api_details_response = self
-            .request_executor
+        api_root_url: &ParsedUrl,
+    ) -> Result<WpNetworkResponse, FetchApiDetailsError> {
+        self.request_executor
             .execute(WpNetworkRequest {
                 method: RequestMethod::GET,
-                url: api_root_url.into(),
+                url: WpEndpointUrl(api_root_url.url()),
                 header_map: HashMap::new(),
                 body: None,
             })
-            .await?;
-        serde_json::from_slice(&api_details_response.body).map_err(|err| {
-            FindApiUrlsError::ApiDetailsCouldntBeParsed {
-                reason: err.to_string(),
-                response: api_details_response.body_as_string(),
-            }
-        })
+            .await
+            .map_err(FetchApiDetailsError::from)
     }
 }
