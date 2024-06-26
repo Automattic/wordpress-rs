@@ -11,8 +11,7 @@ pub mod integration_test_common;
 #[case("http://localhost/wp-admin.php")]
 #[case("https://orchestremetropolitain.com/fr/")]
 #[case("https://orchestremetropolitain.com/wp-json")]
-// TODO: This doesn't work in the new setup yet
-//#[case("orchestremetropolitain.com/wp-json")]
+#[case("orchestremetropolitain.com/wp-json")]
 // TODO: Theses cases should work, but they don't yet
 //#[case("localhost")]
 //#[case("http://localhost/wp-admin")]

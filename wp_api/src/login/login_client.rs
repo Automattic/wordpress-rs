@@ -6,7 +6,8 @@ use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
 
 use super::url_discovery::{
-    FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial, UrlDiscoveryState,
+    FetchApiDetailsError, FetchApiRootUrlError, ParseUrlError, ParsedUrl, StateInitial,
+    UrlDiscoveryState,
 };
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
@@ -41,7 +42,18 @@ impl WpLoginClient {
     }
 
     pub async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
-        self.attempt_api_discovery(site_url).await
+        let state = self.attempt_api_discovery(site_url).await;
+
+        if let UrlDiscoveryState::FailedToParseSiteUrl {
+            site_url: _,
+            error: ParseUrlError::RelativeUrlWithoutBase,
+        } = state
+        {
+            self.attempt_api_discovery(format!("https://{}", site_url).as_str())
+                .await
+        } else {
+            state
+        }
     }
 
     async fn attempt_api_discovery(&self, site_url: &str) -> UrlDiscoveryState {

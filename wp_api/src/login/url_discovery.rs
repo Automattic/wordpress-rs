@@ -223,8 +223,11 @@ pub struct ParsedUrl {
 impl ParsedUrl {
     fn parse(input: &str) -> Result<Self, ParseUrlError> {
         Url::parse(input)
-            .map_err(|e| ParseUrlError::ParseUrlError {
-                reason: e.to_string(),
+            .map_err(|e| match e {
+                url::ParseError::RelativeUrlWithoutBase => ParseUrlError::RelativeUrlWithoutBase,
+                _ => ParseUrlError::ParseUrlError {
+                    reason: e.to_string(),
+                },
             })
             .map(|url| Self { url })
     }
@@ -241,4 +244,6 @@ impl ParsedUrl {
 pub enum ParseUrlError {
     #[error("Error while parsing url: {}", reason)]
     ParseUrlError { reason: String },
+    #[error("Relative URL without a base")]
+    RelativeUrlWithoutBase,
 }
