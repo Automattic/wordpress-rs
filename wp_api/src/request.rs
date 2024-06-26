@@ -170,6 +170,7 @@ impl WpNetworkHeaderMap {
         }
     }
 
+    // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
         header_name: String,
         header_value: String,
@@ -364,33 +365,86 @@ mod tests {
             ),
         };
         assert_eq!(
-            expected_prev_link_header.and_then(|s| Url::parse(s).ok()),
-            response.get_link_header("prev").first().cloned(),
+            expected_prev_link_header
+                .and_then(|s| Url::parse(s).ok())
+                .as_ref(),
+            response.get_link_header("prev").first(),
             "response headers: {:?}",
             response.header_map.inner
         );
         assert_eq!(
-            expected_next_link_header.and_then(|s| Url::parse(s).ok()),
-            response.get_link_header("next").first().cloned(),
+            expected_next_link_header
+                .and_then(|s| Url::parse(s).ok())
+                .as_ref(),
+            response.get_link_header("next").first(),
             "response headers: {:?}",
             response.header_map.inner
         );
     }
 
-    // TODO: Temporary test setup
     #[test]
     fn test_header_map_from_map() {
         let hash_map = [
-            ("host".to_string(), vec!["x".to_string(), "xy".to_string()]),
-            ("host_1".to_string(), vec!["a,b".to_string()]),
+            ("Age".to_string(), "1,2".to_string()),
+            (
+                LINK_HEADER_KEY.to_string(),
+                "<https://one.example.com>; rel=\"preconnect\", <https://two.example.com>"
+                    .to_string(),
+            ),
+            ("User-Agent".to_string(), "".to_string()),
+        ]
+        .into();
+        let header_map = WpNetworkHeaderMap::from_map(hash_map).unwrap();
+        assert_header_map_values(&header_map, "Age", vec!["1", "2"]);
+        assert_header_map_values(
+            &header_map,
+            LINK_HEADER_KEY,
+            vec![
+                "<https://one.example.com>; rel=\"preconnect\"",
+                "<https://two.example.com>",
+            ],
+        );
+        assert_header_map_values(&header_map, "User-Agent", vec![]);
+    }
+
+    #[test]
+    fn test_header_map_from_multi_map() {
+        let hash_map = [
+            ("Age".to_string(), vec!["1".to_string(), "2,3".to_string()]),
+            (
+                LINK_HEADER_KEY.to_string(),
+                vec![
+                    "<https://one.example.com>; rel=\"preconnect\", <https://two.example.com>"
+                        .to_string(),
+                ],
+            ),
+            ("Retry-After".to_string(), vec!["120".to_string()]),
+            ("User-Agent".to_string(), vec![]),
         ]
         .into();
         let header_map = WpNetworkHeaderMap::from_multi_map(hash_map).unwrap();
-        let mut host_iter = header_map.inner.get_all("host").iter();
-        assert_eq!("x", *host_iter.next().unwrap());
-        assert_eq!("xy", *host_iter.next().unwrap());
-        let mut host_1_iter = header_map.inner.get_all("host_1").iter();
-        assert_eq!("a", *host_1_iter.next().unwrap());
-        assert_eq!("b", *host_1_iter.next().unwrap());
+        assert_header_map_values(&header_map, "Age", vec!["1", "2", "3"]);
+        assert_header_map_values(
+            &header_map,
+            LINK_HEADER_KEY,
+            vec![
+                "<https://one.example.com>; rel=\"preconnect\"",
+                "<https://two.example.com>",
+            ],
+        );
+        assert_header_map_values(&header_map, "Retry-After", vec!["120"]);
+        assert_header_map_values(&header_map, "User-Agent", vec![]);
+    }
+
+    fn assert_header_map_values(header_map: &WpNetworkHeaderMap, key: &str, values: Vec<&str>) {
+        assert_eq!(
+            header_map
+                .inner
+                .get_all(key)
+                .iter()
+                .map(|h| h.to_str().unwrap())
+                .collect::<Vec<&str>>(),
+            values
+        );
     }
 }
