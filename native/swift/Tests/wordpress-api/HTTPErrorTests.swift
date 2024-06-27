@@ -2,7 +2,10 @@ import Foundation
 import XCTest
 
 @testable import WordPressAPI
+
+#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
+#endif
 
 class HTTPErrorTests: XCTestCase {
 
@@ -25,7 +28,11 @@ class HTTPErrorTests: XCTestCase {
         } catch let error as URLError {
             XCTAssertEqual(error.code, .timedOut)
         } catch {
+            #if canImport(WordPressAPIInternal)
             XCTAssertTrue(error is WordPressAPIInternal.WpApiError)
+            #else
+            XCTAssertTrue(error is WpApiError)
+            #endif
         }
     }
 #endif
