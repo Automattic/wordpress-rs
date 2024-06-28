@@ -26,7 +26,7 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryResult {
+    async fn api_discovery(&self, site_url: String) -> UrlDiscoveryResult {
         self.inner.api_discovery(site_url).await
     }
 }
@@ -41,7 +41,7 @@ impl WpLoginClient {
         Self { request_executor }
     }
 
-    pub async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryResult {
+    pub async fn api_discovery(&self, site_url: String) -> UrlDiscoveryResult {
         let attempts = futures::future::join_all(
             url_discovery::find_attempts(site_url)
                 .iter()

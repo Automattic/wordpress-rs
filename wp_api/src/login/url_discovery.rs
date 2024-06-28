@@ -10,8 +10,20 @@ use super::WpApiDetails;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
-pub fn find_attempts(input_site_url: &str) -> Vec<String> {
-    vec![input_site_url.to_string()]
+pub fn find_attempts(input_site_url: String) -> Vec<String> {
+    let mut attempts = vec![input_site_url.clone()];
+    if !input_site_url.starts_with("http") {
+        attempts.push(format!("https://{}", input_site_url))
+    }
+    if input_site_url.ends_with("wp-admin") {
+        attempts.push(format!("{}.php", input_site_url))
+    } else if input_site_url.ends_with("wp-admin/") {
+        let mut s = input_site_url.clone();
+        s.pop()
+            .expect("Already verified that there is at least one char");
+        attempts.push(format!("{}.php", s));
+    }
+    attempts
 }
 
 #[derive(Debug, uniffi::Enum)]

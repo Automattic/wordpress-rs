@@ -61,7 +61,7 @@ pub struct WpApiDetails {
 
 #[uniffi::export]
 impl WpApiDetails {
-    fn find_application_passwords_authentication_url(&self) -> Option<String> {
+    pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
             .get(KEY_APPLICATION_PASSWORDS)
             .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
