@@ -10,7 +10,7 @@ use super::WpApiDetails;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
-pub fn find_attempts(input_site_url: String) -> Vec<String> {
+pub fn construct_attempts(input_site_url: String) -> Vec<String> {
     let mut attempts = vec![input_site_url.clone()];
     if !input_site_url.starts_with("http") {
         attempts.push(format!("https://{}", input_site_url))
@@ -286,8 +286,11 @@ mod tests {
         "https://orchestremetropolitain.com/wp-json",
         vec!["https://orchestremetropolitain.com/wp-json"]
     )]
-    fn test_find_attempts(#[case] input_site_url: &str, #[case] mut expected_attempts: Vec<&str>) {
-        let mut found_attempts = find_attempts(input_site_url.to_string());
+    fn test_construct_attempts(
+        #[case] input_site_url: &str,
+        #[case] mut expected_attempts: Vec<&str>,
+    ) {
+        let mut found_attempts = construct_attempts(input_site_url.to_string());
         found_attempts.sort();
         expected_attempts.sort();
         assert_eq!(found_attempts, expected_attempts)

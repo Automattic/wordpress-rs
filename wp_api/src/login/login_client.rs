@@ -43,7 +43,7 @@ impl WpLoginClient {
 
     pub async fn api_discovery(&self, site_url: String) -> UrlDiscoveryResult {
         let attempts = futures::future::join_all(
-            url_discovery::find_attempts(site_url)
+            url_discovery::construct_attempts(site_url)
                 .iter()
                 .map(|s| async { self.attempt_api_discovery(s).await }),
         )
