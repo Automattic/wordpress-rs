@@ -81,10 +81,6 @@ public struct WordPressAPI {
     }
 
     public struct Helpers {
-        public static func findApiUrls(for siteUrl: String, in session: URLSession) async throws -> WpRestApiUrls {
-            try await WordPressAPIInternal.findApiUrls(siteUrl: siteUrl, requestExecutor: session)
-        }
-
         public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
             return extractLoginDetailsFromUrl(url: url.asRestUrl())
         }

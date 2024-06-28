@@ -35,7 +35,7 @@ final class UsersTest: XCTestCase {
           }
         """
         let stubs = HTTPStubs()
-        stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
+        try stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
 
         let api = try WordPressAPI(
             urlSession: .shared,

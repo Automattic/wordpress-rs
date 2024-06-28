@@ -44,11 +44,11 @@ class HTTPStubs: SafeRequestExecutor {
 
 extension WpNetworkResponse {
 
-    static func json(_ content: String) -> WpNetworkResponse {
+    static func json(_ content: String) throws -> WpNetworkResponse {
         WpNetworkResponse(
             body: content.data(using: .utf8)!,
             statusCode: 200,
-            headerMap: ["Content-Type": "application/json"]
+            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"])
         )
     }
 
