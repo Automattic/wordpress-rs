@@ -6,8 +6,9 @@ use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
 
 use super::url_discovery::{
-    self, FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial, UrlDiscoveryResult,
-    UrlDiscoveryState,
+    self, FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial,
+    UrlDiscoveryAttemptError, UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState,
+    UrlDiscoverySuccess,
 };
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
@@ -26,7 +27,10 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn api_discovery(&self, site_url: String) -> UrlDiscoveryResult {
+    async fn api_discovery(
+        &self,
+        site_url: String,
+    ) -> Result<UrlDiscoverySuccess, UrlDiscoveryError> {
         self.inner.api_discovery(site_url).await
     }
 }
@@ -41,75 +45,81 @@ impl WpLoginClient {
         Self { request_executor }
     }
 
-    pub async fn api_discovery(&self, site_url: String) -> UrlDiscoveryResult {
+    pub async fn api_discovery(
+        &self,
+        site_url: String,
+    ) -> Result<UrlDiscoverySuccess, UrlDiscoveryError> {
         let attempts = futures::future::join_all(
             url_discovery::construct_attempts(site_url)
                 .iter()
                 .map(|s| async { self.attempt_api_discovery(s).await }),
         )
         .await;
-        let successful_attempt = attempts
-            .iter()
-            .find(|a| matches!(a, UrlDiscoveryState::SuccessfullyFetchedApiDetails { .. }));
-        if let Some(UrlDiscoveryState::SuccessfullyFetchedApiDetails {
-            site_url,
-            api_details,
-            api_root_url,
-        }) = successful_attempt
-        {
-            UrlDiscoveryResult::Success {
-                site_url: site_url.clone(),
-                api_details: api_details.clone(),
-                api_root_url: api_root_url.clone(),
-                attempts,
+        let successful_attempt = attempts.iter().find_map(|a| {
+            if let Ok(s) = a {
+                Some((
+                    s.site_url.clone(),
+                    s.api_details.clone(),
+                    s.api_root_url.clone(),
+                ))
+            } else {
+                None
             }
+        });
+
+        let attempts = attempts
+            .into_iter()
+            .map(|a| match a {
+                Ok(s) => UrlDiscoveryState::Success(s),
+                Err(e) => UrlDiscoveryState::Failure(e),
+            })
+            .collect();
+        if let Some(s) = successful_attempt {
+            Ok(UrlDiscoverySuccess {
+                site_url: s.0,
+                api_details: s.1,
+                api_root_url: s.2,
+                attempts,
+            })
         } else {
-            UrlDiscoveryResult::Failure { attempts }
+            Err(UrlDiscoveryError::UrlDiscoveryFailed { attempts })
         }
     }
 
-    async fn attempt_api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
+    async fn attempt_api_discovery(
+        &self,
+        site_url: &str,
+    ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
         let initial_state = StateInitial::new(site_url);
-        let parsed_url_state = match initial_state.parse() {
-            Ok(s) => s,
-            Err(e) => {
-                return UrlDiscoveryState::FailedToParseSiteUrl {
+        let parsed_url_state =
+            initial_state
+                .parse()
+                .map_err(|e| UrlDiscoveryAttemptError::FailedToParseSiteUrl {
                     site_url: site_url.to_string(),
                     error: e,
-                }
-            }
-        };
-        let api_root_response = match self.fetch_api_root_url(&parsed_url_state.site_url).await {
-            Ok(response) => response,
-            Err(e) => {
-                return UrlDiscoveryState::FailedToFetchApiRootUrl {
-                    site_url: parsed_url_state.site_url,
-                    error: e,
-                }
-            }
-        };
-        let fetched_api_root_url = match parsed_url_state.parse_api_root_response(api_root_response)
-        {
-            Ok(s) => s,
-            Err(e) => return e,
-        };
-        let api_details_response = match self
+                })?;
+        let api_root_response = self
+            .fetch_api_root_url(&parsed_url_state.site_url)
+            .await
+            .map_err(|e| UrlDiscoveryAttemptError::FailedToFetchApiRootUrl {
+                site_url: parsed_url_state.site_url.clone(),
+                error: e,
+            })?;
+        let fetched_api_root_url = parsed_url_state
+            .parse_api_root_response(api_root_response)
+            .map_err(|e| UrlDiscoveryAttemptError::FailedToFetchApiRootUrl {
+                site_url: parsed_url_state.site_url.clone(),
+                error: e,
+            })?;
+        let api_details_response = self
             .fetch_wp_api_details(&fetched_api_root_url.api_root_url)
             .await
-        {
-            Ok(response) => response,
-            Err(e) => {
-                return UrlDiscoveryState::FailedToFetchApiDetails {
-                    site_url: fetched_api_root_url.site_url,
-                    api_root_url: fetched_api_root_url.api_root_url,
-                    error: e,
-                }
-            }
-        };
-        match fetched_api_root_url.parse_api_details_response(api_details_response) {
-            Ok(s) => s.into(),
-            Err(e) => e,
-        }
+            .map_err(|e| UrlDiscoveryAttemptError::FailedToFetchApiDetails {
+                site_url: fetched_api_root_url.site_url.clone(),
+                api_root_url: fetched_api_root_url.api_root_url.clone(),
+                error: e,
+            })?;
+        fetched_api_root_url.parse_api_details_response(api_details_response)
     }
 
     // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing

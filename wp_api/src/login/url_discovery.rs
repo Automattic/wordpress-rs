@@ -28,47 +28,46 @@ pub fn construct_attempts(input_site_url: String) -> Vec<String> {
 
 #[derive(Debug, uniffi::Enum)]
 pub enum UrlDiscoveryState {
-    Initial {
-        site_url: String,
-    },
+    Success(UrlDiscoveryAttemptSuccess),
+    Failure(UrlDiscoveryAttemptError),
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct UrlDiscoveryAttemptSuccess {
+    pub site_url: Arc<ParsedUrl>,
+    pub api_details: Arc<WpApiDetails>,
+    pub api_root_url: Arc<ParsedUrl>,
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum UrlDiscoveryAttemptError {
     FailedToParseSiteUrl {
         site_url: String,
         error: ParseUrlError,
     },
-    SuccessfullyParsedUrl {
-        site_url: Arc<ParsedUrl>,
-    },
     FailedToFetchApiRootUrl {
         site_url: Arc<ParsedUrl>,
         error: FetchApiRootUrlError,
-    },
-    SuccessfullyFetchedApiRootUrl {
-        site_url: Arc<ParsedUrl>,
-        api_root_url: Arc<ParsedUrl>,
     },
     FailedToFetchApiDetails {
         site_url: Arc<ParsedUrl>,
         api_root_url: Arc<ParsedUrl>,
         error: FetchApiDetailsError,
     },
-    SuccessfullyFetchedApiDetails {
-        site_url: Arc<ParsedUrl>,
-        api_details: Arc<WpApiDetails>,
-        api_root_url: Arc<ParsedUrl>,
-    },
 }
 
-#[derive(Debug, uniffi::Enum)]
-pub enum UrlDiscoveryResult {
-    Success {
-        site_url: Arc<ParsedUrl>,
-        api_details: Arc<WpApiDetails>,
-        api_root_url: Arc<ParsedUrl>,
-        attempts: Vec<UrlDiscoveryState>,
-    },
-    Failure {
-        attempts: Vec<UrlDiscoveryState>,
-    },
+#[derive(Debug, uniffi::Record)]
+pub struct UrlDiscoverySuccess {
+    pub site_url: Arc<ParsedUrl>,
+    pub api_details: Arc<WpApiDetails>,
+    pub api_root_url: Arc<ParsedUrl>,
+    pub attempts: Vec<UrlDiscoveryState>,
+}
+
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum UrlDiscoveryError {
+    #[error("Url discovery failed: {:?}", attempts)]
+    UrlDiscoveryFailed { attempts: Vec<UrlDiscoveryState> },
 }
 
 #[derive(Debug)]
@@ -101,23 +100,20 @@ impl StateParsedUrl {
     }
 
     pub fn parse_api_root_response(
-        self,
+        &self,
         response: WpNetworkResponse,
-    ) -> Result<StateFetchedApiRootUrl, UrlDiscoveryState> {
+    ) -> Result<StateFetchedApiRootUrl, FetchApiRootUrlError> {
         match response
             .get_link_header(API_ROOT_LINK_HEADER)
             .into_iter()
             .nth(0)
         {
             Some(url) => Ok(StateFetchedApiRootUrl {
-                site_url: self.site_url,
+                site_url: self.site_url.clone(),
                 api_root_url: ParsedUrl { url }.into(),
             }),
-            None => Err(UrlDiscoveryState::FailedToFetchApiRootUrl {
-                site_url: self.site_url,
-                error: FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
-                    header_map: response.header_map,
-                },
+            None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
+                header_map: response.header_map,
             }),
         }
     }
@@ -133,9 +129,9 @@ impl StateFetchedApiRootUrl {
     pub fn parse_api_details_response(
         self,
         response: WpNetworkResponse,
-    ) -> Result<StateFetchedApiDetails, UrlDiscoveryState> {
+    ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
         match serde_json::from_slice::<WpApiDetails>(&response.body) {
-            Ok(api_details) => Ok(StateFetchedApiDetails {
+            Ok(api_details) => Ok(UrlDiscoveryAttemptSuccess {
                 site_url: self.site_url,
                 api_details: api_details.into(),
                 api_root_url: self.api_root_url,
@@ -145,7 +141,7 @@ impl StateFetchedApiRootUrl {
                     reason: err.to_string(),
                     response: response.body_as_string(),
                 };
-                Err(UrlDiscoveryState::FailedToFetchApiDetails {
+                Err(UrlDiscoveryAttemptError::FailedToFetchApiDetails {
                     site_url: self.site_url,
                     api_root_url: self.api_root_url,
                     error: e,
@@ -155,9 +151,9 @@ impl StateFetchedApiRootUrl {
     }
 }
 
-impl From<StateFetchedApiDetails> for UrlDiscoveryState {
+impl From<StateFetchedApiDetails> for UrlDiscoveryAttemptSuccess {
     fn from(state: StateFetchedApiDetails) -> Self {
-        Self::SuccessfullyFetchedApiDetails {
+        UrlDiscoveryAttemptSuccess {
             site_url: state.site_url,
             api_details: state.api_details,
             api_root_url: state.api_root_url,
