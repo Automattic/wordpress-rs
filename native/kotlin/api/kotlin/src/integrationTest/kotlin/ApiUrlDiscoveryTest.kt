@@ -2,6 +2,7 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.UrlDiscoveryResult
 import kotlin.test.assertEquals
 
 class ApiUrlDiscoveryTest {
@@ -9,11 +10,13 @@ class ApiUrlDiscoveryTest {
 
     @Test
     fun testFindsCorrectApiUrls() = runTest {
-        val apiUrls = loginClient.apiDiscovery("https://orchestremetropolitain.com/fr/").getOrThrow()
-        assertEquals("https://orchestremetropolitain.com/wp-json/", apiUrls.apiRootUrl)
+        val urlDiscoveryResult = loginClient.apiDiscovery("https://orchestremetropolitain.com/fr/")
+        assert(urlDiscoveryResult is UrlDiscoveryResult.Success)
+        val urlDiscoverySuccess = urlDiscoveryResult as UrlDiscoveryResult.Success;
+        assertEquals("https://orchestremetropolitain.com/wp-json/", urlDiscoverySuccess.apiRootUrl.url())
         assertEquals(
             "https://orchestremetropolitain.com/wp-admin/authorize-application.php",
-            apiUrls.apiDetails.findApplicationPasswordsAuthenticationUrl()
+            urlDiscoverySuccess.apiDetails.findApplicationPasswordsAuthenticationUrl()
         )
     }
 }

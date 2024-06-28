@@ -3,10 +3,9 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import uniffi.wp_api.FindApiUrlsException
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpLoginClient
-import uniffi.wp_api.WpRestApiUrls
+import uniffi.wp_api.UrlDiscoveryResult
 
 class WpLoginClient(
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
@@ -16,11 +15,7 @@ class WpLoginClient(
         UniffiWpLoginClient(requestExecutor)
     }
 
-    suspend fun apiDiscovery(siteUrl: String): Result<WpRestApiUrls> = withContext(dispatcher) {
-        try {
-            Result.success(internalClient.apiDiscovery(siteUrl))
-        } catch (e: FindApiUrlsException) {
-            Result.failure(e)
-        }
+    suspend fun apiDiscovery(siteUrl: String): UrlDiscoveryResult = withContext(dispatcher) {
+        internalClient.apiDiscovery(siteUrl)
     }
 }

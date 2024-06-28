@@ -50,8 +50,8 @@ impl WpLoginClient {
         .await;
         let successful_attempt = attempts
             .iter()
-            .find(|a| matches!(a, UrlDiscoveryState::FetchedApiDetails { .. }));
-        if let Some(UrlDiscoveryState::FetchedApiDetails {
+            .find(|a| matches!(a, UrlDiscoveryState::SuccessfullyFetchedApiDetails { .. }));
+        if let Some(UrlDiscoveryState::SuccessfullyFetchedApiDetails {
             site_url,
             api_details,
             api_root_url,

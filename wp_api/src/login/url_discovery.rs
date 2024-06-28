@@ -35,14 +35,14 @@ pub enum UrlDiscoveryState {
         site_url: String,
         error: ParseUrlError,
     },
-    ParsedUrl {
+    SuccessfullyParsedUrl {
         site_url: Arc<ParsedUrl>,
     },
     FailedToFetchApiRootUrl {
         site_url: Arc<ParsedUrl>,
         error: FetchApiRootUrlError,
     },
-    FetchedApiRootUrl {
+    SuccessfullyFetchedApiRootUrl {
         site_url: Arc<ParsedUrl>,
         api_root_url: Arc<ParsedUrl>,
     },
@@ -51,7 +51,7 @@ pub enum UrlDiscoveryState {
         api_root_url: Arc<ParsedUrl>,
         error: FetchApiDetailsError,
     },
-    FetchedApiDetails {
+    SuccessfullyFetchedApiDetails {
         site_url: Arc<ParsedUrl>,
         api_details: Arc<WpApiDetails>,
         api_root_url: Arc<ParsedUrl>,
@@ -157,7 +157,7 @@ impl StateFetchedApiRootUrl {
 
 impl From<StateFetchedApiDetails> for UrlDiscoveryState {
     fn from(state: StateFetchedApiDetails) -> Self {
-        Self::FetchedApiDetails {
+        Self::SuccessfullyFetchedApiDetails {
             site_url: state.site_url,
             api_details: state.api_details,
             api_root_url: state.api_root_url,
@@ -241,7 +241,7 @@ impl ParsedUrl {
         Url::parse(input)
             .map_err(|e| match e {
                 url::ParseError::RelativeUrlWithoutBase => ParseUrlError::RelativeUrlWithoutBase,
-                _ => ParseUrlError::ParseUrlError {
+                _ => ParseUrlError::Generic {
                     reason: e.to_string(),
                 },
             })
@@ -259,7 +259,7 @@ impl ParsedUrl {
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum ParseUrlError {
     #[error("Error while parsing url: {}", reason)]
-    ParseUrlError { reason: String },
+    Generic { reason: String },
     #[error("Relative URL without a base")]
     RelativeUrlWithoutBase,
 }
