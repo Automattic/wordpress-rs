@@ -103,14 +103,14 @@ impl WpLoginClient {
             .await
             .and_then(|r| parsed_url_state.parse_api_root_response(r))
             .map_err(|e| UrlDiscoveryAttemptError::FetchApiRootUrlFailed {
-                site_url: parsed_url_state.site_url.clone(),
+                site_url: parsed_url_state.site_url.clone().into(),
                 error: e,
             })?;
         self.fetch_wp_api_details(&state_fetched_api_root_url.api_root_url)
             .await
             .map_err(|e| UrlDiscoveryAttemptError::FetchApiDetailsFailed {
-                site_url: state_fetched_api_root_url.site_url.clone(),
-                api_root_url: state_fetched_api_root_url.api_root_url.clone(),
+                site_url: state_fetched_api_root_url.site_url.clone().into(),
+                api_root_url: state_fetched_api_root_url.api_root_url.clone().into(),
                 error: e,
             })
             .and_then(|r| state_fetched_api_root_url.parse_api_details_response(r))

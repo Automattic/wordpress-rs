@@ -89,14 +89,12 @@ impl StateInitial {
 
 #[derive(Debug)]
 pub(super) struct StateParsedUrl {
-    pub site_url: Arc<ParsedUrl>,
+    pub site_url: ParsedUrl,
 }
 
 impl StateParsedUrl {
-    fn new(parsed_url: ParsedUrl) -> Self {
-        Self {
-            site_url: Arc::new(parsed_url),
-        }
+    fn new(site_url: ParsedUrl) -> Self {
+        Self { site_url }
     }
 
     pub fn parse_api_root_response(
@@ -110,7 +108,7 @@ impl StateParsedUrl {
         {
             Some(url) => Ok(StateFetchedApiRootUrl {
                 site_url: self.site_url.clone(),
-                api_root_url: ParsedUrl { url }.into(),
+                api_root_url: ParsedUrl { url },
             }),
             None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
                 header_map: response.header_map,
@@ -121,8 +119,8 @@ impl StateParsedUrl {
 
 #[derive(Debug)]
 pub(super) struct StateFetchedApiRootUrl {
-    pub site_url: Arc<ParsedUrl>,
-    pub api_root_url: Arc<ParsedUrl>,
+    pub site_url: ParsedUrl,
+    pub api_root_url: ParsedUrl,
 }
 
 impl StateFetchedApiRootUrl {
@@ -132,9 +130,9 @@ impl StateFetchedApiRootUrl {
     ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
         match serde_json::from_slice::<WpApiDetails>(&response.body) {
             Ok(api_details) => Ok(UrlDiscoveryAttemptSuccess {
-                site_url: self.site_url,
+                site_url: self.site_url.into(),
                 api_details: api_details.into(),
-                api_root_url: self.api_root_url,
+                api_root_url: self.api_root_url.into(),
             }),
             Err(err) => {
                 let e = FetchApiDetailsError::ApiDetailsCouldntBeParsed {
@@ -142,8 +140,8 @@ impl StateFetchedApiRootUrl {
                     response: response.body_as_string(),
                 };
                 Err(UrlDiscoveryAttemptError::FetchApiDetailsFailed {
-                    site_url: self.site_url,
-                    api_root_url: self.api_root_url,
+                    site_url: self.site_url.into(),
+                    api_root_url: self.api_root_url.into(),
                     error: e,
                 })
             }
@@ -154,18 +152,18 @@ impl StateFetchedApiRootUrl {
 impl From<StateFetchedApiDetails> for UrlDiscoveryAttemptSuccess {
     fn from(state: StateFetchedApiDetails) -> Self {
         UrlDiscoveryAttemptSuccess {
-            site_url: state.site_url,
-            api_details: state.api_details,
-            api_root_url: state.api_root_url,
+            site_url: state.site_url.into(),
+            api_details: state.api_details.into(),
+            api_root_url: state.api_root_url.into(),
         }
     }
 }
 
 #[derive(Debug)]
 pub(super) struct StateFetchedApiDetails {
-    pub site_url: Arc<ParsedUrl>,
-    pub api_details: Arc<WpApiDetails>,
-    pub api_root_url: Arc<ParsedUrl>,
+    pub site_url: ParsedUrl,
+    pub api_details: WpApiDetails,
+    pub api_root_url: ParsedUrl,
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -227,7 +225,7 @@ impl From<RequestExecutionError> for FetchApiDetailsError {
 }
 
 // TODO: Should be in a central place, used across the code base
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug, Clone, uniffi::Object)]
 pub struct ParsedUrl {
     url: Url,
 }
