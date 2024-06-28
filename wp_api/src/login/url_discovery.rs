@@ -10,6 +10,10 @@ use super::WpApiDetails;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
+pub fn find_attempts(input_site_url: &str) -> Vec<String> {
+    vec![input_site_url.to_string()]
+}
+
 #[derive(Debug, uniffi::Enum)]
 pub enum UrlDiscoveryState {
     Initial {

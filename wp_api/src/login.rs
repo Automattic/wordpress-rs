@@ -5,7 +5,7 @@ use std::sync::Arc;
 use url::Url;
 
 pub use login_client::WpLoginClient;
-pub use url_discovery::UrlDiscoveryState;
+pub use url_discovery::{UrlDiscoveryResult, UrlDiscoveryState};
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 

@@ -10,6 +10,7 @@ name = "wp_api"
 [dependencies]
 async-trait = "0.1"
 base64 = { workspace = true }
+futures = "0.3"
 http = { workspace = true }
 indoc = "2.0"
 url = { workspace = true }

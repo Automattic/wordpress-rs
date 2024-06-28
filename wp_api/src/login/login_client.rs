@@ -6,7 +6,7 @@ use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
 
 use super::url_discovery::{
-    FetchApiDetailsError, FetchApiRootUrlError, ParseUrlError, ParsedUrl, StateInitial,
+    self, FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial, UrlDiscoveryResult,
     UrlDiscoveryState,
 };
 
@@ -26,7 +26,7 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
+    async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryResult {
         self.inner.api_discovery(site_url).await
     }
 }
@@ -41,18 +41,30 @@ impl WpLoginClient {
         Self { request_executor }
     }
 
-    pub async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryState {
-        let state = self.attempt_api_discovery(site_url).await;
-
-        if let UrlDiscoveryState::FailedToParseSiteUrl {
-            site_url: _,
-            error: ParseUrlError::RelativeUrlWithoutBase,
-        } = state
+    pub async fn api_discovery(&self, site_url: &str) -> UrlDiscoveryResult {
+        let attempts = futures::future::join_all(
+            url_discovery::find_attempts(site_url)
+                .iter()
+                .map(|s| async { self.attempt_api_discovery(s).await }),
+        )
+        .await;
+        let successful_attempt = attempts
+            .iter()
+            .find(|a| matches!(a, UrlDiscoveryState::FetchedApiDetails { .. }));
+        if let Some(UrlDiscoveryState::FetchedApiDetails {
+            site_url,
+            api_details,
+            api_root_url,
+        }) = successful_attempt
         {
-            self.attempt_api_discovery(format!("https://{}", site_url).as_str())
-                .await
+            UrlDiscoveryResult::Success {
+                site_url: site_url.clone(),
+                api_details: api_details.clone(),
+                api_root_url: api_root_url.clone(),
+                attempts,
+            }
         } else {
-            state
+            UrlDiscoveryResult::Failure { attempts }
         }
     }
 
