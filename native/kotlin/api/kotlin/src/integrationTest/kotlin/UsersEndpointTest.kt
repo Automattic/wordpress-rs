@@ -96,6 +96,6 @@ class UsersEndpointTest {
         val result =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result is RecognizedRestError)
-        assertEquals(WpRestErrorCode.InvalidParam, (result as RecognizedRestError).error.code)
+        assert((result as RecognizedRestError).error.code is WpRestErrorCode.InvalidParam)
     }
 }
