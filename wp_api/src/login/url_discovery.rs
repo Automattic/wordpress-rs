@@ -263,3 +263,33 @@ pub enum ParseUrlError {
     #[error("Relative URL without a base")]
     RelativeUrlWithoutBase,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case("localhost", vec!["localhost", "https://localhost"])]
+    #[case("http://localhost", vec!["http://localhost"])]
+    #[case("http://localhost/wp-json", vec!["http://localhost/wp-json"])]
+    #[case("http://localhost/wp-admin.php", vec!["http://localhost/wp-admin.php"])]
+    #[case("http://localhost/wp-admin", vec!["http://localhost/wp-admin", "http://localhost/wp-admin.php"])]
+    #[case("http://localhost/wp-admin/", vec!["http://localhost/wp-admin/", "http://localhost/wp-admin.php"])]
+    #[case("orchestremetropolitain.com/wp-json", vec!["orchestremetropolitain.com/wp-json", "https://orchestremetropolitain.com/wp-json"])]
+    #[case("https://orchestremetropolitain.com", vec!["https://orchestremetropolitain.com"])]
+    #[case(
+        "https://orchestremetropolitain.com/fr/",
+        vec!["https://orchestremetropolitain.com/fr/"]
+    )]
+    #[case(
+        "https://orchestremetropolitain.com/wp-json",
+        vec!["https://orchestremetropolitain.com/wp-json"]
+    )]
+    fn test_find_attempts(#[case] input_site_url: &str, #[case] mut expected_attempts: Vec<&str>) {
+        let mut found_attempts = find_attempts(input_site_url.to_string());
+        found_attempts.sort();
+        expected_attempts.sort();
+        assert_eq!(found_attempts, expected_attempts)
+    }
+}
