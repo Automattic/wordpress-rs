@@ -98,28 +98,22 @@ impl WpLoginClient {
                     site_url: site_url.to_string(),
                     error: e,
                 })?;
-        let api_root_response = self
+        let state_fetched_api_root_url = self
             .fetch_api_root_url(&parsed_url_state.site_url)
             .await
-            .map_err(|e| UrlDiscoveryAttemptError::FailedToFetchApiRootUrl {
+            .and_then(|r| parsed_url_state.parse_api_root_response(r))
+            .map_err(|e| UrlDiscoveryAttemptError::FetchApiRootUrlFailed {
                 site_url: parsed_url_state.site_url.clone(),
                 error: e,
             })?;
-        let fetched_api_root_url = parsed_url_state
-            .parse_api_root_response(api_root_response)
-            .map_err(|e| UrlDiscoveryAttemptError::FailedToFetchApiRootUrl {
-                site_url: parsed_url_state.site_url.clone(),
-                error: e,
-            })?;
-        let api_details_response = self
-            .fetch_wp_api_details(&fetched_api_root_url.api_root_url)
+        self.fetch_wp_api_details(&state_fetched_api_root_url.api_root_url)
             .await
-            .map_err(|e| UrlDiscoveryAttemptError::FailedToFetchApiDetails {
-                site_url: fetched_api_root_url.site_url.clone(),
-                api_root_url: fetched_api_root_url.api_root_url.clone(),
+            .map_err(|e| UrlDiscoveryAttemptError::FetchApiDetailsFailed {
+                site_url: state_fetched_api_root_url.site_url.clone(),
+                api_root_url: state_fetched_api_root_url.api_root_url.clone(),
                 error: e,
-            })?;
-        fetched_api_root_url.parse_api_details_response(api_details_response)
+            })
+            .and_then(|r| state_fetched_api_root_url.parse_api_details_response(r))
     }
 
     // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing

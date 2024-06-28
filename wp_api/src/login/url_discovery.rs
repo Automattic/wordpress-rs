@@ -45,11 +45,11 @@ pub enum UrlDiscoveryAttemptError {
         site_url: String,
         error: ParseUrlError,
     },
-    FailedToFetchApiRootUrl {
+    FetchApiRootUrlFailed {
         site_url: Arc<ParsedUrl>,
         error: FetchApiRootUrlError,
     },
-    FailedToFetchApiDetails {
+    FetchApiDetailsFailed {
         site_url: Arc<ParsedUrl>,
         api_root_url: Arc<ParsedUrl>,
         error: FetchApiDetailsError,
@@ -141,7 +141,7 @@ impl StateFetchedApiRootUrl {
                     reason: err.to_string(),
                     response: response.body_as_string(),
                 };
-                Err(UrlDiscoveryAttemptError::FailedToFetchApiDetails {
+                Err(UrlDiscoveryAttemptError::FetchApiDetailsFailed {
                     site_url: self.site_url,
                     api_root_url: self.api_root_url,
                     error: e,
