@@ -24,7 +24,7 @@ fun LoginScreen(authenticateSite: (String) -> Unit) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize(),
         ) {
-            var siteUrl by remember { mutableStateOf("https://loudly-special.jurassic.ninja/") }
+            var siteUrl by remember { mutableStateOf("boldly-inner.jurassic.ninja") }
             TextField(value = siteUrl, onValueChange = { siteUrl = it })
             Button(onClick = { authenticateSite(siteUrl) }) {
                 Text("Login")
