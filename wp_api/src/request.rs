@@ -208,6 +208,12 @@ impl WpNetworkHeaderMap {
     }
 }
 
+impl From<HeaderMap> for WpNetworkHeaderMap {
+    fn from(header_map: HeaderMap) -> Self {
+        Self::new(header_map)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpNetworkHeaderMapError {
     #[error("Invalid header name: {}", header_name)]
