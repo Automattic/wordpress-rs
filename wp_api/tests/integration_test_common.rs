@@ -171,13 +171,13 @@ impl AsyncWpNetworking {
         if let Some(body) = wp_request.body {
             request = request.body(body);
         }
-        let response = request.send().await?;
+        let mut response = request.send().await?;
 
-        let header_map = Arc::new(WpNetworkHeaderMap::new(response.headers().clone()));
+        let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map,
+            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
         })
     }
 
