@@ -58,9 +58,9 @@ impl WpLoginClient {
         let successful_attempt = attempts.iter().find_map(|a| {
             if let Ok(s) = a {
                 Some((
-                    s.site_url.clone(),
-                    s.api_details.clone(),
-                    s.api_root_url.clone(),
+                    Arc::clone(&s.site_url),
+                    Arc::clone(&s.api_details),
+                    Arc::clone(&s.api_root_url),
                 ))
             } else {
                 None
@@ -98,22 +98,26 @@ impl WpLoginClient {
                     site_url: site_url.to_string(),
                     error: e,
                 })?;
+        let parsed_site_url = parsed_url_state.site_url.clone();
         let state_fetched_api_root_url = self
             .fetch_api_root_url(&parsed_url_state.site_url)
             .await
             .and_then(|r| parsed_url_state.parse_api_root_response(r))
             .map_err(|e| UrlDiscoveryAttemptError::FetchApiRootUrlFailed {
-                site_url: parsed_url_state.site_url.clone().into(),
+                site_url: Arc::new(parsed_site_url),
                 error: e,
             })?;
-        self.fetch_wp_api_details(&state_fetched_api_root_url.api_root_url)
+        match self
+            .fetch_wp_api_details(&state_fetched_api_root_url.api_root_url)
             .await
-            .map_err(|e| UrlDiscoveryAttemptError::FetchApiDetailsFailed {
-                site_url: state_fetched_api_root_url.site_url.clone().into(),
-                api_root_url: state_fetched_api_root_url.api_root_url.clone().into(),
+        {
+            Ok(r) => state_fetched_api_root_url.parse_api_details_response(r),
+            Err(e) => Err(UrlDiscoveryAttemptError::FetchApiDetailsFailed {
+                site_url: Arc::new(state_fetched_api_root_url.site_url),
+                api_root_url: Arc::new(state_fetched_api_root_url.api_root_url),
                 error: e,
-            })
-            .and_then(|r| state_fetched_api_root_url.parse_api_details_response(r))
+            }),
+        }
     }
 
     // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing

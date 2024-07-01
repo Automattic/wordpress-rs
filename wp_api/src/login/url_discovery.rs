@@ -98,7 +98,7 @@ impl StateParsedUrl {
     }
 
     pub fn parse_api_root_response(
-        &self,
+        self,
         response: WpNetworkResponse,
     ) -> Result<StateFetchedApiRootUrl, FetchApiRootUrlError> {
         match response
@@ -107,7 +107,7 @@ impl StateParsedUrl {
             .nth(0)
         {
             Some(url) => Ok(StateFetchedApiRootUrl {
-                site_url: self.site_url.clone(),
+                site_url: self.site_url,
                 api_root_url: ParsedUrl { url },
             }),
             None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
@@ -130,9 +130,9 @@ impl StateFetchedApiRootUrl {
     ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
         match serde_json::from_slice::<WpApiDetails>(&response.body) {
             Ok(api_details) => Ok(UrlDiscoveryAttemptSuccess {
-                site_url: self.site_url.into(),
-                api_details: api_details.into(),
-                api_root_url: self.api_root_url.into(),
+                site_url: Arc::new(self.site_url),
+                api_details: Arc::new(api_details),
+                api_root_url: Arc::new(self.api_root_url),
             }),
             Err(err) => {
                 let e = FetchApiDetailsError::ApiDetailsCouldntBeParsed {
@@ -140,8 +140,8 @@ impl StateFetchedApiRootUrl {
                     response: response.body_as_string(),
                 };
                 Err(UrlDiscoveryAttemptError::FetchApiDetailsFailed {
-                    site_url: self.site_url.into(),
-                    api_root_url: self.api_root_url.into(),
+                    site_url: Arc::new(self.site_url),
+                    api_root_url: Arc::new(self.api_root_url),
                     error: e,
                 })
             }
@@ -152,9 +152,9 @@ impl StateFetchedApiRootUrl {
 impl From<StateFetchedApiDetails> for UrlDiscoveryAttemptSuccess {
     fn from(state: StateFetchedApiDetails) -> Self {
         UrlDiscoveryAttemptSuccess {
-            site_url: state.site_url.into(),
-            api_details: state.api_details.into(),
-            api_root_url: state.api_root_url.into(),
+            site_url: Arc::new(state.site_url),
+            api_details: Arc::new(state.api_details),
+            api_root_url: Arc::new(state.api_root_url),
         }
     }
 }
