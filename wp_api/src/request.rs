@@ -12,7 +12,6 @@ use self::endpoint::WpEndpointUrl;
 pub mod endpoint;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
-// TODO: It looks like this could be `Link` or `link`
 const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug)]
@@ -148,28 +147,6 @@ impl WpNetworkHeaderMap {
         Self { inner: header_map }
     }
 
-    // Inserts a key-value pair into the map.
-    // If the map did not previously have this key present, then false is returned.
-    //
-    // Returns an error if a header name or a header value can't be built from the given arguments
-    pub fn append_key_value(
-        header_map: &mut HeaderMap,
-        header_name: String,
-        header_value: String,
-    ) -> Result<bool, WpNetworkHeaderMapError> {
-        if let Ok(header_name) = HeaderName::from_bytes(header_name.as_bytes()) {
-            if let Ok(header_value) = HeaderValue::from_str(&header_value) {
-                // Using [http::HeaderMap::append] is important here because `insert` will
-                // remove any existing values
-                Ok(header_map.append(header_name.clone(), header_value))
-            } else {
-                Err(WpNetworkHeaderMapError::InvalidHeaderValue { header_value })
-            }
-        } else {
-            Err(WpNetworkHeaderMapError::InvalidHeaderName { header_name })
-        }
-    }
-
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
         header_name: String,
@@ -224,7 +201,7 @@ impl WpNetworkHeaderMap {
         let inner = hash_map
             .into_iter()
             .flat_map(|(header_name, header_value)| {
-                Self::build_header_name_value(header_name.clone(), header_value)
+                Self::build_header_name_value(header_name, header_value)
             })
             .collect::<Result<HeaderMap, WpNetworkHeaderMapError>>()?;
         Ok(Self { inner })
