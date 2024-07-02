@@ -1,11 +1,15 @@
+use integration_test_common::request_builder_as_subscriber;
 use rstest::*;
 use rstest_reuse::{self, apply, template};
-use wp_api::application_passwords::{SparseApplicationPassword, SparseApplicationPasswordField};
+use wp_api::application_passwords::{
+    ApplicationPasswordUuid, SparseApplicationPassword, SparseApplicationPasswordField,
+};
 use wp_api::users::UserId;
 use wp_api::WpContext;
 
 use crate::integration_test_common::{
     request_builder, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
+    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
 };
 
 pub mod integration_test_common;
@@ -72,6 +76,90 @@ async fn list_application_passwords_ensure_last_ip() {
         .await
         .assert_response();
     assert!(list.first().unwrap().last_ip.is_some());
+}
+
+#[tokio::test]
+async fn retrieve_current_application_passwords_with_edit_context() {
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_current_with_edit_context(&FIRST_USER_ID)
+        .await
+        .assert_response();
+    assert_eq!(
+        a.uuid,
+        ApplicationPasswordUuid {
+            uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+async fn retrieve_current_application_passwords_with_embed_context() {
+    let a = request_builder_as_subscriber()
+        .application_passwords()
+        .retrieve_current_with_embed_context(&SECOND_USER_ID)
+        .await
+        .assert_response();
+    assert_eq!(
+        a.uuid,
+        ApplicationPasswordUuid {
+            uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+async fn retrieve_current_application_passwords_with_view_context() {
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_current_with_view_context(&FIRST_USER_ID)
+        .await
+        .assert_response();
+    assert_eq!(
+        a.uuid,
+        ApplicationPasswordUuid {
+            uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+async fn retrieve_application_passwords_with_edit_context() {
+    let uuid = ApplicationPasswordUuid {
+        uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+    };
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_with_edit_context(&FIRST_USER_ID, &uuid)
+        .await
+        .assert_response();
+    assert_eq!(a.uuid, uuid);
+}
+
+#[tokio::test]
+async fn retrieve_application_passwords_with_embed_context() {
+    let uuid = ApplicationPasswordUuid {
+        uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+    };
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_with_embed_context(&FIRST_USER_ID, &uuid)
+        .await
+        .assert_response();
+    assert_eq!(a.uuid, uuid);
+}
+
+#[tokio::test]
+async fn retrieve_application_passwords_with_view_context() {
+    let uuid = ApplicationPasswordUuid {
+        uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string(),
+    };
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_with_view_context(&SECOND_USER_ID, &uuid)
+        .await
+        .assert_response();
+    assert_eq!(a.uuid, uuid);
 }
 
 fn validate_sparse_application_password_fields(

@@ -1,13 +1,21 @@
 use wp_derive_request_builder::WpDerivedRequest;
 
-use crate::application_passwords::SparseApplicationPasswordField;
+use crate::application_passwords::{
+    ApplicationPasswordUuid, ApplicationPasswordWithEditContext,
+    ApplicationPasswordWithEmbedContext, ApplicationPasswordWithViewContext,
+    SparseApplicationPassword, SparseApplicationPasswordField,
+};
 use crate::users::UserId;
 
 #[derive(WpDerivedRequest)]
 #[SparseField(SparseApplicationPasswordField)]
 enum ApplicationPasswordsRequest {
-    #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<crate::application_passwords::SparseApplicationPassword>)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>)]
     List,
+    #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword)]
+    Retrieve,
+    #[contextual_get(url = "/users/<user_id>/application-passwords/introspect", output = SparseApplicationPassword)]
+    RetrieveCurrent,
 }
 
 #[cfg(test)]
@@ -46,6 +54,31 @@ mod tests {
         validate_endpoint(
             endpoint.list_with_view_context(&UserId(9999)),
             "/users/9999/application-passwords?context=view",
+        );
+    }
+
+    #[rstest]
+    fn retrieve_current_application_passwords_with_edit_context(
+        endpoint: ApplicationPasswordsRequestEndpoint,
+    ) {
+        validate_endpoint(
+            endpoint.retrieve_current_with_edit_context(&UserId(2)),
+            "/users/2/application-passwords/introspect?context=edit",
+        );
+    }
+
+    #[rstest]
+    fn retrieve_application_passwords_with_embed_context(
+        endpoint: ApplicationPasswordsRequestEndpoint,
+    ) {
+        validate_endpoint(
+            endpoint.retrieve_with_embed_context(
+                &UserId(2),
+                &ApplicationPasswordUuid {
+                    uuid: "584a87d5-4f18-4c33-a315-4c05ed1fc485".to_string(),
+                },
+            ),
+            "/users/2/application-passwords/584a87d5-4f18-4c33-a315-4c05ed1fc485?context=embed",
         );
     }
 

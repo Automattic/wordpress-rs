@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
@@ -51,6 +53,12 @@ impl crate::SparseField for SparseApplicationPasswordField {
 #[serde(transparent)]
 pub struct ApplicationPasswordUuid {
     pub uuid: String,
+}
+
+impl Display for ApplicationPasswordUuid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uuid)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
