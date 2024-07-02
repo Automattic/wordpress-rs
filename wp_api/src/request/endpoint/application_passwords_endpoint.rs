@@ -1,7 +1,7 @@
 use wp_derive_request_builder::WpDerivedRequest;
 
 use crate::application_passwords::{
-    ApplicationPasswordUuid, ApplicationPasswordWithEditContext,
+    ApplicationPasswordCreateParams, ApplicationPasswordUuid, ApplicationPasswordWithEditContext,
     ApplicationPasswordWithEmbedContext, ApplicationPasswordWithViewContext,
     SparseApplicationPassword, SparseApplicationPasswordField,
 };
@@ -10,6 +10,8 @@ use crate::users::UserId;
 #[derive(WpDerivedRequest)]
 #[SparseField(SparseApplicationPasswordField)]
 enum ApplicationPasswordsRequest {
+    #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
+    Create,
     #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>)]
     List,
     #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword)]
@@ -30,6 +32,14 @@ mod tests {
     };
     use rstest::*;
     use std::sync::Arc;
+
+    #[rstest]
+    fn create_user(endpoint: ApplicationPasswordsRequestEndpoint) {
+        validate_endpoint(
+            endpoint.create(&UserId(1)),
+            "/users/1/application-passwords",
+        );
+    }
 
     #[rstest]
     fn list_application_passwords_with_edit_context(endpoint: ApplicationPasswordsRequestEndpoint) {
