@@ -1,6 +1,10 @@
 import Foundation
 import WordPressAPIInternal
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public class WordPressLoginClient {
 
     private let urlSession: URLSession
