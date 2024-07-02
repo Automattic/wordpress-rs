@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use futures::Future;
-use http::HeaderMap;
 use std::{process::Command, sync::Arc};
 use wp_api::{
     request::{
@@ -160,16 +159,17 @@ impl Default for AsyncWpNetworking {
 impl AsyncWpNetworking {
     pub async fn async_request(
         &self,
-        wp_request: WpNetworkRequest,
+        wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
-        let request_headers: HeaderMap = (&wp_request.header_map).try_into().unwrap();
-
         let mut request = self
             .client
-            .request(Self::request_method(wp_request.method), wp_request.url.0)
-            .headers(request_headers);
-        if let Some(body) = wp_request.body {
-            request = request.body(body);
+            .request(
+                Self::request_method(wp_request.method()),
+                wp_request.url().0.as_str(),
+            )
+            .headers(wp_request.header_map().as_header_map());
+        if let Some(body) = wp_request.body() {
+            request = request.body(body.contents());
         }
         let mut response = request.send().await?;
 
@@ -195,7 +195,7 @@ impl AsyncWpNetworking {
 impl RequestExecutor for AsyncWpNetworking {
     async fn execute(
         &self,
-        request: WpNetworkRequest,
+        request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.async_request(request).await.map_err(|err| {
             RequestExecutionError::RequestExecutionFailed {

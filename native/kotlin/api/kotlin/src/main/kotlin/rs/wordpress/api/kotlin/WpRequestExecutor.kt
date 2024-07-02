@@ -16,9 +16,11 @@ internal class WpRequestExecutor(private val dispatcher: CoroutineDispatcher = D
 
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
-            val requestBuilder = Request.Builder().url(request.url)
-            request.headerMap.forEach { (key, value) ->
-                requestBuilder.header(key, value)
+            val requestBuilder = Request.Builder().url(request.url())
+            request.headerMap().toMap().forEach { (key, values) ->
+                values.forEach { value ->
+                    requestBuilder.addHeader(key, value)
+                }
             }
 
             client.newCall(requestBuilder.build()).execute().use { response ->

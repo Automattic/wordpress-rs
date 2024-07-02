@@ -64,7 +64,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
                 quote! {
                     pub async #fn_signature -> Result<#output_type, #static_wp_api_error_type> {
                         #request_from_request_builder
-                        self.request_executor.execute(request).await?.parse()
+                        self.request_executor.execute(std::sync::Arc::new(request)).await?.parse()
                    }
                 }
             })
