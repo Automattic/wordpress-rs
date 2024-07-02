@@ -1,7 +1,22 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
+use std::sync::Arc;
 use url::Url;
+
+pub use login_client::WpLoginClient;
+pub use url_discovery::{UrlDiscoveryState, UrlDiscoverySuccess};
+
+const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
+
+mod login_client;
+mod url_discovery;
+
+#[derive(Debug, uniffi::Record)]
+pub struct WpRestApiUrls {
+    api_details: Arc<WpApiDetails>,
+    api_root_url: String,
+}
 
 // After a successful login, the system will receive an OAuth callback with the login details
 // embedded as query params. This function parses that URL and extracts the login details as an object.
@@ -31,7 +46,7 @@ pub fn extract_login_details_from_url(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
 pub struct WpApiDetails {
     pub name: String,
     pub description: String,
@@ -42,6 +57,15 @@ pub struct WpApiDetails {
     pub namespaces: Vec<String>,
     pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
     pub site_icon_url: String,
+}
+
+#[uniffi::export]
+impl WpApiDetails {
+    pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
+        self.authentication
+            .get(KEY_APPLICATION_PASSWORDS)
+            .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

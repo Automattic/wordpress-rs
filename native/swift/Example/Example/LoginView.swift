@@ -62,71 +62,60 @@ struct LoginView: View {
 
         self.loginTask = Task {
             do {
+                let loginClient = WordPressLoginClient(urlSession: .shared)
+                let discoveryResult = try await loginClient.discoverLoginUrl(for: url)
 
-                guard var authURL = try await getLoginUrl() else {
-                    return
+                guard
+                    let authURLString = discoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl(),
+                    let authURL = URL(string: authURLString)
+                else {
+                    abort() // TODO: Better error handling
                 }
 
-                var appNameValue = "WordPress SDK Example App"
-
-                #if os(macOS)
-                if let deviceName = Host.current().localizedName {
-                    appNameValue += " - (\(deviceName))"
-                }
-                #else
-                let deviceName = UIDevice.current.name
-                appNameValue += " - (\(deviceName))"
-                #endif
-
-                authURL.append(queryItems: [
-                    URLQueryItem(name: "app_name", value: appNameValue),
-                    URLQueryItem(name: "app_id", value: "00000000-0000-4000-8000-000000000000"),
-                    URLQueryItem(name: "success_url", value: "exampleauth://login")
-                ])
-
-                let urlWithToken = try await webAuthenticationSession.authenticate(
-                    using: authURL,
-                    callbackURLScheme: "exampleauth"
-                )
-
-                guard let loginDetails = WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
-                    debugPrint("Unable to parse login details")
-                    abort()
-                }
-
+                let loginDetails = try await displayLoginView(withAuthenticationUrl: authURL)
                 try await loginManager.setLoginCredentials(to: loginDetails)
             } catch let err {
-                self.isLoggingIn = false
-                self.loginError = err.localizedDescription
-                debugPrint(err)
+                handleLoginError(err)
             }
         }
     }
 
-    func getLoginUrl() async throws -> URL? {
-        let parsedUrl = try WordPressAPI.Helpers.parseUrl(string: url)
+    private func displayLoginView(withAuthenticationUrl authURL: URL) async throws -> WpApiApplicationPasswordDetails {
+        var appNameValue = "WordPress SDK Example App"
 
-        guard let apiRoot = try await WordPressAPI.findRestApiEndpointRoot(
-            forSiteUrl: parsedUrl,
-            using: URLSession.shared
-        ) else {
-            return nil
+        #if os(macOS)
+        if let deviceName = Host.current().localizedName {
+            appNameValue += " - (\(deviceName))"
         }
+        #else
+        let deviceName = UIDevice.current.name
+        appNameValue += " - (\(deviceName))"
+        #endif
 
-        let client = try WordPressAPI(
-            urlSession: .shared,
-            baseUrl: apiRoot,
-            authenticationStategy: .none
+        var mutableAuthURL = authURL
+
+        mutableAuthURL.append(queryItems: [
+            URLQueryItem(name: "app_name", value: appNameValue),
+            URLQueryItem(name: "app_id", value: "00000000-0000-4000-8000-000000000000"),
+            URLQueryItem(name: "success_url", value: "exampleauth://login")
+        ])
+
+        let urlWithToken = try await webAuthenticationSession.authenticate(
+            using: mutableAuthURL,
+            callbackURLScheme: "exampleauth"
         )
 
-        let capabilities = try await client.getRestAPICapabilities(forApiRoot: apiRoot, using: .shared)
-
-        guard let authenticationUrl = capabilities.authentication.first?.value.endpoints.authorization else {
-            debugPrint("No authentication approaches found – unable to continue")
+        guard let loginDetails = WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
+            debugPrint("Unable to parse login details")
             abort()
         }
 
-        return URL(string: authenticationUrl)
+        return loginDetails
+    }
+
+    private func handleLoginError(_ error: Error) {
+        self.isLoggingIn = false
+        self.loginError = error.localizedDescription
     }
 }
 

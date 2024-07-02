@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 
@@ -24,7 +25,7 @@ internal class WpRequestExecutor(private val dispatcher: CoroutineDispatcher = D
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
-                    headerMap = null
+                    headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
                 )
             }
         }

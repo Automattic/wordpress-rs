@@ -12,6 +12,12 @@ uniffi::custom_newtype!(WpEndpointUrl, String);
 #[derive(Debug)]
 pub struct WpEndpointUrl(pub String);
 
+impl From<Url> for WpEndpointUrl {
+    fn from(url: Url) -> Self {
+        Self(url.to_string())
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ApiEndpointUrl {
     url: Url,

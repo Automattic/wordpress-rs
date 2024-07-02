@@ -81,26 +81,6 @@ public struct WordPressAPI {
     }
 
     public struct Helpers {
-
-        public static func parseUrl(string: String) throws -> URL {
-
-            if let url = URL(string: string), url.scheme != nil {
-                return url
-            }
-
-            if let url = URL(string: "http://" + string) {
-                return url
-            }
-
-            if let url = URL(string: "http://" + string + "/") {
-                return url
-            }
-
-            debugPrint("Invalid URL")
-
-            throw ParseError.invalidUrl
-        }
-
         public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
             return extractLoginDetailsFromUrl(url: url.asRestUrl())
         }
@@ -162,7 +142,7 @@ extension WpNetworkResponse {
         return WpNetworkResponse(
             body: data,
             statusCode: UInt16(response.statusCode),
-            headerMap: response.httpHeaders
+            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders)
         )
 
     }

@@ -22,17 +22,17 @@ constructor(
         WpRequestBuilder(siteUrl, authentication, requestExecutor)
     }
 
-    // Provides the _only_ way to execute requests using our Kotlin wrapper.
+    // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
     //
     // It makes sure that the errors are wrapped in `WpRequestResult` type instead of forcing
     // clients to try/catch the errors.
     //
     // It'll also help make sure any breaking changes to the API will end up as a compiler error.
     suspend fun <T> request(
-        buildRequest: suspend (WpRequestBuilder) -> T
+        executeRequest: suspend (WpRequestBuilder) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
-            WpRequestSuccess(data = buildRequest(requestBuilder))
+            WpRequestSuccess(data = executeRequest(requestBuilder))
         } catch (restException: WpApiException.RestException) {
             when (restException.restError) {
                 is WpRestErrorWrapper.Recognized -> {

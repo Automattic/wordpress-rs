@@ -1,11 +1,14 @@
-import Foundation
 import XCTest
-
+import Foundation
 @testable import WordPressAPI
 
-final class UsersTest: XCTestCase {
+#if canImport(WordPressAPIInternal)
+import WordPressAPIInternal
+#endif
 
-    func testRetrieveUser() async throws {
+final class WordPressAPITests: XCTestCase {
+
+    func testExample() async throws {
         let response = """
           {
             "id": 1,
@@ -46,5 +49,29 @@ final class UsersTest: XCTestCase {
         let user = try await api.users.retrieveWithViewContext(userId: 1)
         XCTAssertEqual(user.name, "User Name")
     }
+
+#if !os(Linux)
+    // Skip on Linux, because `XCTExpectFailure` is unavailable on Linux
+    func testTimeout() async throws {
+        let stubs = HTTPStubs()
+        stubs.missingStub = .failure(URLError(.timedOut))
+
+        let api = try WordPressAPI(
+            urlSession: .shared,
+            baseUrl: URL(string: "https://wordpress.org")!,
+            authenticationStategy: .none,
+            executor: stubs
+        )
+
+        do {
+            _ = try await api.users.retrieveWithViewContext(userId: 1)
+            XCTFail("Unexpected response")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .timedOut)
+        } catch {
+            XCTAssertTrue(error is WordPressAPIInternal.WpApiError)
+        }
+    }
+#endif
 
 }

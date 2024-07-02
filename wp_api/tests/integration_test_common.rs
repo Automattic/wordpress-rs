@@ -3,7 +3,9 @@ use futures::Future;
 use http::HeaderMap;
 use std::{process::Command, sync::Arc};
 use wp_api::{
-    request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse},
+    request::{
+        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+    },
     users::UserId,
     RequestExecutionError, WpApiError, WpAuthentication, WpRequestBuilder, WpRestError,
     WpRestErrorCode, WpRestErrorWrapper,
@@ -169,12 +171,13 @@ impl AsyncWpNetworking {
         if let Some(body) = wp_request.body {
             request = request.body(body);
         }
-        let response = request.send().await?;
+        let mut response = request.send().await?;
 
+        let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: None, // TODO: Properly read the headers
+            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
         })
     }
 
@@ -209,7 +212,7 @@ pub trait AssertResponse {
     fn assert_response(self) -> Self::Item;
 }
 
-impl<T: std::fmt::Debug> AssertResponse for Result<T, WpApiError> {
+impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
     type Item = T;
 
     fn assert_response(self) -> T {
