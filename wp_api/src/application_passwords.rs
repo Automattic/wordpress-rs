@@ -82,3 +82,9 @@ pub struct ApplicationPasswordCreateParams {
     /// The name of the application password.
     pub name: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct ApplicationPasswordDeleteResponse {
+    pub deleted: bool,
+    pub count: i32,
+}

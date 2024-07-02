@@ -1,9 +1,9 @@
 use wp_derive_request_builder::WpDerivedRequest;
 
 use crate::application_passwords::{
-    ApplicationPasswordCreateParams, ApplicationPasswordUuid, ApplicationPasswordWithEditContext,
-    ApplicationPasswordWithEmbedContext, ApplicationPasswordWithViewContext,
-    SparseApplicationPassword, SparseApplicationPasswordField,
+    ApplicationPasswordCreateParams, ApplicationPasswordDeleteResponse, ApplicationPasswordUuid,
+    ApplicationPasswordWithEditContext, ApplicationPasswordWithEmbedContext,
+    ApplicationPasswordWithViewContext, SparseApplicationPassword, SparseApplicationPasswordField,
 };
 use crate::users::UserId;
 
@@ -12,6 +12,8 @@ use crate::users::UserId;
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
     Create,
+    #[delete(url = "/users/<user_id>/application-passwords", output = ApplicationPasswordDeleteResponse)]
+    DeleteAll,
     #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>)]
     List,
     #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword)]
@@ -37,6 +39,14 @@ mod tests {
     fn create_user(endpoint: ApplicationPasswordsRequestEndpoint) {
         validate_endpoint(
             endpoint.create(&UserId(1)),
+            "/users/1/application-passwords",
+        );
+    }
+
+    #[rstest]
+    fn delete_user(endpoint: ApplicationPasswordsRequestEndpoint) {
+        validate_endpoint(
+            endpoint.delete_all(&UserId(1)),
             "/users/1/application-passwords",
         );
     }
