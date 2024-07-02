@@ -80,9 +80,11 @@ wp plugin delete wordpress-importer
   printf "http://localhost\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
   wp user application-password create test@example.com test --porcelain 
+  wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p'
   printf "themedemos\n"
   ## Create an Application password for a subscriber user, and store it where it can be used by the test suite
   wp user application-password create themedemos test --porcelain
+  wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p'
 } >> /tmp/test_credentials
 
 ## Used for integration tests
