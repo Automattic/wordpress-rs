@@ -1,9 +1,10 @@
 use wp_derive_request_builder::WpDerivedRequest;
 
 use crate::application_passwords::{
-    ApplicationPasswordCreateParams, ApplicationPasswordDeleteResponse, ApplicationPasswordUuid,
-    ApplicationPasswordWithEditContext, ApplicationPasswordWithEmbedContext,
-    ApplicationPasswordWithViewContext, SparseApplicationPassword, SparseApplicationPasswordField,
+    ApplicationPasswordCreateParams, ApplicationPasswordDeleteAllResponse,
+    ApplicationPasswordDeleteResponse, ApplicationPasswordUuid, ApplicationPasswordWithEditContext,
+    ApplicationPasswordWithEmbedContext, ApplicationPasswordWithViewContext,
+    SparseApplicationPassword, SparseApplicationPasswordField,
 };
 use crate::users::UserId;
 
@@ -12,7 +13,9 @@ use crate::users::UserId;
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
     Create,
-    #[delete(url = "/users/<user_id>/application-passwords", output = ApplicationPasswordDeleteResponse)]
+    #[delete(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = ApplicationPasswordDeleteResponse)]
+    Delete,
+    #[delete(url = "/users/<user_id>/application-passwords", output = ApplicationPasswordDeleteAllResponse)]
     DeleteAll,
     #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>)]
     List,
@@ -36,7 +39,7 @@ mod tests {
     use std::sync::Arc;
 
     #[rstest]
-    fn create_user(endpoint: ApplicationPasswordsRequestEndpoint) {
+    fn create_application_password(endpoint: ApplicationPasswordsRequestEndpoint) {
         validate_endpoint(
             endpoint.create(&UserId(1)),
             "/users/1/application-passwords",
@@ -44,7 +47,20 @@ mod tests {
     }
 
     #[rstest]
-    fn delete_user(endpoint: ApplicationPasswordsRequestEndpoint) {
+    fn delete_single_application_password(endpoint: ApplicationPasswordsRequestEndpoint) {
+        validate_endpoint(
+            endpoint.delete(
+                &UserId(2),
+                &ApplicationPasswordUuid {
+                    uuid: "584a87d5-4f18-4c33-a315-4c05ed1fc485".to_string(),
+                },
+            ),
+            "/users/2/application-passwords/584a87d5-4f18-4c33-a315-4c05ed1fc485",
+        );
+    }
+
+    #[rstest]
+    fn delete_all_application_passwords(endpoint: ApplicationPasswordsRequestEndpoint) {
         validate_endpoint(
             endpoint.delete_all(&UserId(1)),
             "/users/1/application-passwords",

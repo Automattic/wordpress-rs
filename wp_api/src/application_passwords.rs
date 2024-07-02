@@ -86,5 +86,11 @@ pub struct ApplicationPasswordCreateParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct ApplicationPasswordDeleteResponse {
     pub deleted: bool,
+    pub previous: ApplicationPasswordWithEditContext,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct ApplicationPasswordDeleteAllResponse {
+    pub deleted: bool,
     pub count: i32,
 }
