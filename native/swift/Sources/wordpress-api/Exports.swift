@@ -9,6 +9,11 @@ import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
 
+// MARK: - Login
+
+public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
+public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
+
 // MARK: - Users
 
 public typealias SparseUser = WordPressAPIInternal.SparseUser

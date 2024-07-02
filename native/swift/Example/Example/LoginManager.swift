@@ -1,7 +1,5 @@
 import Foundation
-#if canImport(WordPressAPIInternal)
-import WordPressAPIInternal
-#endif
+import WordPressAPI
 
 class LoginManager: NSObject, ObservableObject {
 

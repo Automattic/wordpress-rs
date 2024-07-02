@@ -62,50 +62,60 @@ struct LoginView: View {
 
         self.loginTask = Task {
             do {
-                let apiUrls = try await WordPressAPI.Helpers.findApiUrls(for: url, in: .shared)
-
-                var appNameValue = "WordPress SDK Example App"
-
-                #if os(macOS)
-                if let deviceName = Host.current().localizedName {
-                    appNameValue += " - (\(deviceName))"
-                }
-                #else
-                let deviceName = UIDevice.current.name
-                appNameValue += " - (\(deviceName))"
-                #endif
+                let loginClient = WordPressLoginClient(urlSession: .shared)
+                let discoveryResult = try await loginClient.discoverLoginUrl(for: url)
 
                 guard
-                    let authUrlString = apiUrls.apiDetails.findApplicationPasswordsAuthenticationUrl(),
-                    var authURL = URL(string: authUrlString)
+                    let authURLString = discoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl(),
+                    let authURL = URL(string: authURLString)
                 else {
-                    // TODO: This should emit an error
-                    return
+                    abort() // TODO: Better error handling
                 }
 
-                authURL.append(queryItems: [
-                    URLQueryItem(name: "app_name", value: appNameValue),
-                    URLQueryItem(name: "app_id", value: "00000000-0000-4000-8000-000000000000"),
-                    URLQueryItem(name: "success_url", value: "exampleauth://login")
-                ])
-
-                let urlWithToken = try await webAuthenticationSession.authenticate(
-                    using: authURL,
-                    callbackURLScheme: "exampleauth"
-                )
-
-                guard let loginDetails = WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
-                    debugPrint("Unable to parse login details")
-                    abort()
-                }
-
+                let loginDetails = try await displayLoginView(withAuthenticationUrl: authURL)
                 try await loginManager.setLoginCredentials(to: loginDetails)
             } catch let err {
-                self.isLoggingIn = false
-                self.loginError = err.localizedDescription
-                debugPrint(err)
+                handleLoginError(err)
             }
         }
+    }
+
+    private func displayLoginView(withAuthenticationUrl authURL: URL) async throws -> WpApiApplicationPasswordDetails {
+        var appNameValue = "WordPress SDK Example App"
+
+        #if os(macOS)
+        if let deviceName = Host.current().localizedName {
+            appNameValue += " - (\(deviceName))"
+        }
+        #else
+        let deviceName = UIDevice.current.name
+        appNameValue += " - (\(deviceName))"
+        #endif
+
+        var mutableAuthURL = authURL
+
+        mutableAuthURL.append(queryItems: [
+            URLQueryItem(name: "app_name", value: appNameValue),
+            URLQueryItem(name: "app_id", value: "00000000-0000-4000-8000-000000000000"),
+            URLQueryItem(name: "success_url", value: "exampleauth://login")
+        ])
+
+        let urlWithToken = try await webAuthenticationSession.authenticate(
+            using: mutableAuthURL,
+            callbackURLScheme: "exampleauth"
+        )
+
+        guard let loginDetails = WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
+            debugPrint("Unable to parse login details")
+            abort()
+        }
+
+        return loginDetails
+    }
+
+    private func handleLoginError(_ error: Error) {
+        self.isLoggingIn = false
+        self.loginError = error.localizedDescription
     }
 }
 
