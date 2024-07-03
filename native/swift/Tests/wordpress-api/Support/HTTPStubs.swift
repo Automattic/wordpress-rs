@@ -35,7 +35,7 @@ class HTTPStubs: SafeRequestExecutor {
 
     func stub(path: String, with response: WpNetworkResponse) {
         stubs.append((
-            condition: { URL(string: $0.url)?.path == path },
+            condition: { URL(string: $0.url())?.path == path },
             response: response
         ))
     }
