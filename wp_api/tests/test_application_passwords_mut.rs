@@ -1,6 +1,9 @@
+use integration_test_common::TEST_CREDENTIALS_ADMIN_PASSWORD_UUID;
 use serial_test::serial;
 use wp_api::{
-    application_passwords::{ApplicationPasswordCreateParams, ApplicationPasswordUuid},
+    application_passwords::{
+        ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
+    },
     users::UserId,
 };
 use wp_db::DbUserMeta;
@@ -18,7 +21,7 @@ pub mod wp_db;
 async fn create_application_password() {
     wp_db::run_and_restore(|mut db| async move {
         let password_name = "IntegrationTest";
-        // Assert that the application password is not in DB
+        // Assert that the application password name is not in DB
         assert!(
             !db_application_password_meta_for_user(&mut db, &FIRST_USER_ID)
                 .await
@@ -35,6 +38,48 @@ async fn create_application_password() {
         let created_application_password = request_builder()
             .application_passwords()
             .create(&FIRST_USER_ID, &params)
+            .await
+            .assert_response();
+
+        // Assert that the application password is in DB
+        let db_user_meta_after_update =
+            db_application_password_meta_for_user(&mut db, &FIRST_USER_ID).await;
+        assert!(db_user_meta_after_update.is_some());
+        let meta_value = db_user_meta_after_update.unwrap().meta_value;
+        assert!(meta_value.contains(password_name));
+        assert!(meta_value.contains(&created_application_password.uuid.uuid));
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_application_password() {
+    wp_db::run_and_restore(|mut db| async move {
+        let password_name = "IntegrationTest";
+        // Assert that the application password name is not in DB
+        assert!(
+            !db_application_password_meta_for_user(&mut db, &FIRST_USER_ID)
+                .await
+                .unwrap()
+                .meta_value
+                .contains(password_name)
+        );
+
+        // Update the application password to use the new name using the API
+        let params = ApplicationPasswordUpdateParams {
+            app_id: None,
+            name: password_name.to_string(),
+        };
+        let created_application_password = request_builder()
+            .application_passwords()
+            .update(
+                &FIRST_USER_ID,
+                &ApplicationPasswordUuid {
+                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                },
+                &params,
+            )
             .await
             .assert_response();
 

@@ -94,3 +94,12 @@ pub struct ApplicationPasswordDeleteAllResponse {
     pub deleted: bool,
     pub count: i32,
 }
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct ApplicationPasswordUpdateParams {
+    /// A UUID provided by the application to uniquely identify it.
+    /// It is recommended to use an UUID v5 with the URL or DNS namespace.
+    pub app_id: Option<String>,
+    /// The name of the application password.
+    pub name: String,
+}
