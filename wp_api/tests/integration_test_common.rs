@@ -223,3 +223,13 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
         self.unwrap()
     }
 }
+
+pub fn run_wp_cli_command(args: impl AsRef<str>) -> std::process::ExitStatus {
+    Command::new("make")
+        .arg("-C")
+        .arg("../")
+        .arg("run-wp-cli-command")
+        .arg(format!("ARGS={}", args.as_ref()))
+        .status()
+        .expect("Failed to run wp-cli command")
+}
