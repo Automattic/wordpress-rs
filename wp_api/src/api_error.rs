@@ -63,6 +63,8 @@ pub struct UnrecognizedWpRestError {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpRestErrorCode {
+    #[serde(rename = "rest_application_password_not_found")]
+    ApplicationPasswordNotFound,
     #[serde(rename = "rest_cannot_create_application_passwords")]
     CannotCreateApplicationPasswords,
     #[serde(rename = "rest_cannot_create_user")]
@@ -79,6 +81,8 @@ pub enum WpRestErrorCode {
     CannotEditApplicationPassword,
     #[serde(rename = "rest_cannot_edit_roles")]
     CannotEditRoles,
+    #[serde(rename = "rest_cannot_introspect_app_password_for_non_authenticated_user")]
+    CannotIntrospectAppPasswordForNonAuthenticatedUser,
     #[serde(rename = "rest_cannot_install_plugin")]
     CannotInstallPlugin,
     #[serde(rename = "rest_cannot_list_application_passwords")]
@@ -139,6 +143,8 @@ pub enum WpRestErrorCode {
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_deactivate_plugin")]
     CannotDeactivatePlugin,
+    #[serde(rename = "rest_no_authenticated_app_password")]
+    NoAuthenticatedAppPassword,
     // If `force=true` is missing from delete user request.
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,

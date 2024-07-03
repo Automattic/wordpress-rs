@@ -1,19 +1,14 @@
-// TODO
-#![allow(unused)]
-use integration_test_common::{request_builder_as_subscriber, run_wp_cli_command};
+use integration_test_common::{request_builder_as_subscriber, request_builder_as_unauthenticated};
 use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::{parallel, serial};
+use serial_test::parallel;
 use wp_api::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
-    SparseApplicationPassword, SparseApplicationPasswordField,
 };
-use wp_api::users::UserId;
-use wp_api::{WpContext, WpRestErrorCode};
+use wp_api::WpRestErrorCode;
 
 use crate::integration_test_common::{
     request_builder, AssertWpError, FIRST_USER_ID, SECOND_USER_ID,
-    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
+    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID,
 };
 
 pub mod integration_test_common;
@@ -115,4 +110,29 @@ async fn delete_application_passwords_err_cannot_delete_application_passwords() 
         .delete_all(&FIRST_USER_ID)
         .await
         .assert_wp_error(WpRestErrorCode::CannotDeleteApplicationPasswords);
+}
+
+#[rstest]
+#[tokio::test]
+#[parallel]
+async fn retrieve_application_password_err_cannot_introspect_app_password_for_non_authenticated_user_401(
+) {
+    // Unauthenticated user can not retrieve the current application password for the second user
+    request_builder_as_unauthenticated()
+        .application_passwords()
+        .retrieve_current_with_edit_context(&SECOND_USER_ID)
+        .await
+        .assert_wp_error(WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
+}
+
+#[rstest]
+#[tokio::test]
+#[parallel]
+async fn retrieve_application_password_err_cannot_introspect_app_password_for_another_user_403() {
+    // First user can not retrieve the current application password for the second user
+    request_builder()
+        .application_passwords()
+        .retrieve_current_with_edit_context(&SECOND_USER_ID)
+        .await
+        .assert_wp_error(WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
 }
