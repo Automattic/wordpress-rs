@@ -19,7 +19,7 @@ pub mod reusable_test_cases;
 #[apply(filter_fields_cases)]
 #[tokio::test]
 #[parallel]
-async fn filter_application_passwords(
+async fn filter_list_application_passwords(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
     #[case] fields: &[SparseApplicationPasswordField],
 ) {
@@ -30,6 +30,39 @@ async fn filter_application_passwords(
         .assert_response()
         .iter()
         .for_each(|p| validate_sparse_application_password_fields(p, fields));
+}
+
+#[apply(filter_fields_cases)]
+#[tokio::test]
+#[parallel]
+async fn filter_retrieve_application_password(#[case] fields: &[SparseApplicationPasswordField]) {
+    let p = request_builder()
+        .application_passwords()
+        .filter_retrieve(
+            &FIRST_USER_ID,
+            &ApplicationPasswordUuid {
+                uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+            },
+            WpContext::Edit,
+            fields,
+        )
+        .await
+        .assert_response();
+    validate_sparse_application_password_fields(&p, fields);
+}
+
+#[apply(filter_fields_cases)]
+#[tokio::test]
+#[parallel]
+async fn filter_retrieve_current_application_password(
+    #[case] fields: &[SparseApplicationPasswordField],
+) {
+    let p = request_builder()
+        .application_passwords()
+        .filter_retrieve_current(&FIRST_USER_ID, WpContext::Edit, fields)
+        .await
+        .assert_response();
+    validate_sparse_application_password_fields(&p, fields);
 }
 
 #[rstest]
