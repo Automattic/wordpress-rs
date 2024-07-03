@@ -1,5 +1,6 @@
 use rstest::*;
 use rstest_reuse::{self, apply, template};
+use serial_test::parallel;
 use wp_api::{
     generate,
     plugins::{PluginListParams, PluginSlug, PluginStatus, SparsePlugin, SparsePluginField},
@@ -14,6 +15,7 @@ pub mod integration_test_common;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_plugins(
     #[case] fields: &[SparsePluginField],
     #[values(
@@ -34,6 +36,7 @@ async fn filter_plugins(
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
@@ -53,6 +56,7 @@ async fn filter_retrieve_plugin(
 #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))))]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn list_plugins(
     #[case] params: PluginListParams,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
@@ -87,6 +91,7 @@ async fn list_plugins(
 #[case(HELLO_DOLLY_PLUGIN_SLUG.into(), "Matt Mullenweg", "http://wordpress.org/plugins/hello-dolly/")]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn retrieve_plugin(
     #[case] plugin_slug: PluginSlug,
     #[case] expected_author: &str,

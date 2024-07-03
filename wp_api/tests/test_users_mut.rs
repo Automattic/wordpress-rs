@@ -1,4 +1,5 @@
 use integration_test_common::AssertResponse;
+use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
@@ -8,6 +9,7 @@ pub mod integration_test_common;
 pub mod wp_db;
 
 #[tokio::test]
+#[serial]
 async fn create_user() {
     wp_db::run_and_restore(|mut db| async move {
         let username = "t_username";
@@ -35,6 +37,7 @@ async fn create_user() {
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_user() {
     wp_db::run_and_restore(|mut db| async move {
         // Delete the user using the API and ensure it's successful
@@ -57,6 +60,7 @@ async fn delete_user() {
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_current_user() {
     wp_db::run_and_restore(|mut db| async move {
         // Delete the user using the API and ensure it's successful
@@ -82,6 +86,7 @@ async fn delete_current_user() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_name() {
     let new_name = "new_name";
     let params = UserUpdateParams {
@@ -95,6 +100,7 @@ async fn update_user_name() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_first_name() {
     let new_first_name = "new_first_name";
     let params = UserUpdateParams {
@@ -108,6 +114,7 @@ async fn update_user_first_name() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_last_name() {
     let new_last_name = "new_last_name";
     let params = UserUpdateParams {
@@ -121,6 +128,7 @@ async fn update_user_last_name() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_email() {
     let new_email = "new_email@example.com";
     let params = UserUpdateParams {
@@ -134,6 +142,7 @@ async fn update_user_email() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_url() {
     let new_url = "https://new_url";
     let params = UserUpdateParams {
@@ -147,6 +156,7 @@ async fn update_user_url() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_description() {
     let new_description = "new_description";
     let params = UserUpdateParams {
@@ -160,6 +170,7 @@ async fn update_user_description() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_nickname() {
     let new_nickname = "new_nickname";
     let params = UserUpdateParams {
@@ -173,6 +184,7 @@ async fn update_user_nickname() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_slug() {
     let new_slug = "new_slug";
     let params = UserUpdateParams {
@@ -186,6 +198,7 @@ async fn update_user_slug() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_roles() {
     wp_db::run_and_restore(|_| async move {
         let new_role = "author";
@@ -205,6 +218,7 @@ async fn update_user_roles() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_password() {
     wp_db::run_and_restore(|_| async move {
         let new_password = "new_password";

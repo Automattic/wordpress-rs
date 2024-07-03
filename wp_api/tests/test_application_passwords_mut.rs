@@ -1,3 +1,4 @@
+use serial_test::serial;
 use wp_api::{
     application_passwords::{ApplicationPasswordCreateParams, ApplicationPasswordUuid},
     users::UserId,
@@ -13,6 +14,7 @@ pub mod integration_test_common;
 pub mod wp_db;
 
 #[tokio::test]
+#[serial]
 async fn create_application_password() {
     wp_db::run_and_restore(|mut db| async move {
         let password_name = "IntegrationTest";
@@ -48,6 +50,7 @@ async fn create_application_password() {
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_single_application_password() {
     wp_db::run_and_restore(|mut db| async move {
         let uuid = ApplicationPasswordUuid {
@@ -83,6 +86,7 @@ async fn delete_single_application_password() {
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_all_application_passwords() {
     wp_db::run_and_restore(|mut db| async move {
         // Assert that the application password is in DB

@@ -1,5 +1,6 @@
 use integration_test_common::AssertResponse;
 use rstest::rstest;
+use serial_test::serial;
 use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
 
 use crate::integration_test_common::{
@@ -11,6 +12,7 @@ pub mod integration_test_common;
 pub mod wp_db;
 
 #[tokio::test]
+#[serial]
 async fn create_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
@@ -36,6 +38,7 @@ async fn create_plugin() {
 #[case(PluginSlug::new(CLASSIC_EDITOR_PLUGIN_SLUG.into()), PluginStatus::Inactive)]
 #[trace]
 #[tokio::test]
+#[serial]
 async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatus) {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
@@ -52,6 +55,7 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {

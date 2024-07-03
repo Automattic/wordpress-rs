@@ -1,6 +1,7 @@
 use integration_test_common::request_builder_as_subscriber;
 use rstest::*;
 use rstest_reuse::{self, apply, template};
+use serial_test::parallel;
 use wp_api::application_passwords::{
     ApplicationPasswordUuid, SparseApplicationPassword, SparseApplicationPasswordField,
 };
@@ -17,6 +18,7 @@ pub mod reusable_test_cases;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_application_passwords(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
     #[case] fields: &[SparseApplicationPasswordField],
@@ -32,6 +34,7 @@ async fn filter_application_passwords(
 
 #[rstest]
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_with_edit_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -44,6 +47,7 @@ async fn list_application_passwords_with_edit_context(
 
 #[rstest]
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_with_embed_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -56,6 +60,7 @@ async fn list_application_passwords_with_embed_context(
 
 #[rstest]
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_with_view_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -69,6 +74,7 @@ async fn list_application_passwords_with_view_context(
 // TODO: This might not be a good test case to keep, but it's helpful during initial implementation
 // to ensure that the ip address is properly parsed
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_ensure_last_ip() {
     let list = request_builder()
         .application_passwords()
@@ -79,6 +85,7 @@ async fn list_application_passwords_ensure_last_ip() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_current_application_passwords_with_edit_context() {
     let a = request_builder()
         .application_passwords()
@@ -94,6 +101,7 @@ async fn retrieve_current_application_passwords_with_edit_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_current_application_passwords_with_embed_context() {
     let a = request_builder_as_subscriber()
         .application_passwords()
@@ -109,6 +117,7 @@ async fn retrieve_current_application_passwords_with_embed_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_current_application_passwords_with_view_context() {
     let a = request_builder()
         .application_passwords()
@@ -124,6 +133,7 @@ async fn retrieve_current_application_passwords_with_view_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_application_passwords_with_edit_context() {
     let uuid = ApplicationPasswordUuid {
         uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
@@ -137,6 +147,7 @@ async fn retrieve_application_passwords_with_edit_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_application_passwords_with_embed_context() {
     let uuid = ApplicationPasswordUuid {
         uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
@@ -150,6 +161,7 @@ async fn retrieve_application_passwords_with_embed_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_application_passwords_with_view_context() {
     let uuid = ApplicationPasswordUuid {
         uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string(),
