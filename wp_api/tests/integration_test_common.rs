@@ -105,7 +105,9 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
 
 fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) -> &[u16] {
     match error_code {
-        WpRestErrorCode::ApplicationPasswordNotFound => &[403],
+        WpRestErrorCode::ApplicationPasswordsDisabled => &[501],
+        WpRestErrorCode::ApplicationPasswordsDisabledForUser => &[501],
+        WpRestErrorCode::ApplicationPasswordNotFound => &[404],
         WpRestErrorCode::CannotCreateApplicationPasswords => &[403],
         WpRestErrorCode::CannotActivatePlugin => &[403],
         WpRestErrorCode::CannotCreateUser => &[403],
@@ -113,6 +115,7 @@ fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) ->
         WpRestErrorCode::CannotDeleteActivePlugin => &[400],
         WpRestErrorCode::CannotDeleteApplicationPassword => &[403],
         WpRestErrorCode::CannotDeleteApplicationPasswords => &[403],
+        WpRestErrorCode::CannotManageApplicationPasswords => &[401, 403],
         WpRestErrorCode::CannotEdit => &[403],
         WpRestErrorCode::CannotEditApplicationPassword => &[403],
         WpRestErrorCode::CannotEditRoles => &[403],

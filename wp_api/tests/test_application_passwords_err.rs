@@ -136,3 +136,19 @@ async fn retrieve_application_password_err_cannot_introspect_app_password_for_an
         .await
         .assert_wp_error(WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
 }
+
+#[rstest]
+#[tokio::test]
+#[parallel]
+async fn retrieve_application_password_err_application_password_not_found() {
+    request_builder()
+        .application_passwords()
+        .retrieve_with_edit_context(
+            &FIRST_USER_ID,
+            &ApplicationPasswordUuid {
+                uuid: "foo".to_string(),
+            },
+        )
+        .await
+        .assert_wp_error(WpRestErrorCode::ApplicationPasswordNotFound);
+}

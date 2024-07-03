@@ -122,6 +122,17 @@ pub enum WpRestErrorCode {
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
     // ---
+    // Untested, because we are unable to create the necessary conditions for them
+    // ---
+    #[serde(rename = "application_passwords_disabled")]
+    ApplicationPasswordsDisabled,
+    #[serde(rename = "application_passwords_disabled_for_user")]
+    ApplicationPasswordsDisabledForUser,
+    #[serde(rename = "rest_cannot_manage_application_passwords")]
+    CannotManageApplicationPasswords,
+    #[serde(rename = "rest_no_authenticated_app_password")]
+    NoAuthenticatedAppPassword,
+    // ---
     // Untested, because we believe these errors require multisite
     // ---
     #[serde(rename = "rest_cannot_manage_network_plugins")]
@@ -143,8 +154,6 @@ pub enum WpRestErrorCode {
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_deactivate_plugin")]
     CannotDeactivatePlugin,
-    #[serde(rename = "rest_no_authenticated_app_password")]
-    NoAuthenticatedAppPassword,
     // If `force=true` is missing from delete user request.
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,
