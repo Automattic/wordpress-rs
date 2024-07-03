@@ -69,7 +69,9 @@ final class WordPressAPITests: XCTestCase {
         } catch let error as URLError {
             XCTAssertEqual(error.code, .timedOut)
         } catch {
+            #if canImport(WordPressAPIInternal)
             XCTAssertTrue(error is WordPressAPIInternal.WpApiError)
+            #endif
         }
     }
 #endif

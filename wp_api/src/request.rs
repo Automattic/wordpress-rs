@@ -28,7 +28,7 @@ impl InnerRequestBuilder {
         WpNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
-            header_map: self.header_map(),
+            header_map: self.header_map().into(),
             body: None,
         }
     }
@@ -40,8 +40,10 @@ impl InnerRequestBuilder {
         WpNetworkRequest {
             method: RequestMethod::POST,
             url: url.into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(json_body).ok(),
+            header_map: self.header_map_for_post_request().into(),
+            body: serde_json::to_vec(json_body)
+                .ok()
+                .map(|b| Arc::new(WpNetworkRequestBody::new(b))),
         }
     }
 
@@ -49,31 +51,33 @@ impl InnerRequestBuilder {
         WpNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
-            header_map: self.header_map(),
+            header_map: self.header_map().into(),
             body: None,
         }
     }
 
-    fn header_map(&self) -> HashMap<String, String> {
-        let mut header_map = HashMap::new();
+    fn header_map(&self) -> WpNetworkHeaderMap {
+        let mut header_map = HeaderMap::new();
         header_map.insert(
-            http::header::ACCEPT.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
+            http::header::ACCEPT,
+            HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
         match self.authentication {
-            WpAuthentication::None => None,
+            WpAuthentication::None => (),
             WpAuthentication::AuthorizationHeader { ref token } => {
-                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
+                let hv = HeaderValue::from_str(&format!("Basic {}", token));
+                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
+                header_map.insert(http::header::AUTHORIZATION, hv);
             }
         };
-        header_map
+        header_map.into()
     }
 
-    fn header_map_for_post_request(&self) -> HashMap<String, String> {
+    fn header_map_for_post_request(&self) -> WpNetworkHeaderMap {
         let mut header_map = self.header_map();
-        header_map.insert(
-            http::header::CONTENT_TYPE.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
+        header_map.inner.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
         header_map
     }
@@ -84,27 +88,57 @@ impl InnerRequestBuilder {
 pub trait RequestExecutor: Send + Sync + Debug {
     async fn execute(
         &self,
-        request: WpNetworkRequest,
+        request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
-// Has custom `Debug` trait implementation
-#[derive(uniffi::Record)]
-pub struct WpNetworkRequest {
-    pub method: RequestMethod,
-    pub url: WpEndpointUrl,
-    // TODO: We probably want to implement a specific type for these headers instead of using a
-    // regular HashMap.
-    //
-    // It could be something similar to `reqwest`'s [`header`](https://docs.rs/reqwest/latest/reqwest/header/index.html)
-    // module.
-    pub header_map: HashMap<String, String>,
-    pub body: Option<Vec<u8>>,
+#[derive(uniffi::Object)]
+pub struct WpNetworkRequestBody {
+    inner: Vec<u8>,
 }
 
+impl WpNetworkRequestBody {
+    fn new(body: Vec<u8>) -> Self {
+        Self { inner: body }
+    }
+}
+
+#[uniffi::export]
+impl WpNetworkRequestBody {
+    pub fn contents(&self) -> Vec<u8> {
+        self.inner.clone()
+    }
+}
+
+// Has custom `Debug` trait implementation
+#[derive(uniffi::Object)]
+pub struct WpNetworkRequest {
+    pub(crate) method: RequestMethod,
+    pub(crate) url: WpEndpointUrl,
+    pub(crate) header_map: Arc<WpNetworkHeaderMap>,
+    pub(crate) body: Option<Arc<WpNetworkRequestBody>>,
+}
+
+#[uniffi::export]
 impl WpNetworkRequest {
+    pub fn method(&self) -> RequestMethod {
+        self.method.clone()
+    }
+
+    pub fn url(&self) -> WpEndpointUrl {
+        self.url.clone()
+    }
+
+    pub fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+        self.header_map.clone()
+    }
+
+    pub fn body(&self) -> Option<Arc<WpNetworkRequestBody>> {
+        self.body.clone()
+    }
+
     pub fn body_as_string(&self) -> Option<String> {
-        self.body.as_ref().map(|b| body_as_string(b))
+        self.body.as_ref().map(|b| body_as_string(&b.inner))
     }
 }
 
@@ -137,7 +171,7 @@ pub struct WpNetworkResponse {
     pub header_map: Arc<WpNetworkHeaderMap>,
 }
 
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug, Default, Clone, uniffi::Object)]
 pub struct WpNetworkHeaderMap {
     inner: HeaderMap,
 }
@@ -177,6 +211,10 @@ impl WpNetworkHeaderMap {
             })
             .collect()
     }
+
+    pub fn as_header_map(&self) -> HeaderMap {
+        self.inner.clone()
+    }
 }
 
 #[uniffi::export]
@@ -205,6 +243,18 @@ impl WpNetworkHeaderMap {
             })
             .collect::<Result<HeaderMap, WpNetworkHeaderMapError>>()?;
         Ok(Self { inner })
+    }
+
+    fn to_map(&self) -> HashMap<String, Vec<String>> {
+        let mut header_hashmap = HashMap::new();
+        self.inner.iter().for_each(|(k, v)| {
+            let v = String::from_utf8_lossy(v.as_bytes()).into_owned();
+            header_hashmap
+                .entry(k.as_str().to_owned())
+                .or_insert_with(Vec::new)
+                .push(v)
+        });
+        header_hashmap
     }
 }
 

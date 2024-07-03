@@ -9,7 +9,7 @@ pub(crate) mod users_endpoint;
 const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
 
 uniffi::custom_newtype!(WpEndpointUrl, String);
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WpEndpointUrl(pub String);
 
 impl From<Url> for WpEndpointUrl {

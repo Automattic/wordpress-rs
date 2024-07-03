@@ -92,25 +92,33 @@ public struct WordPressAPI {
     }
 }
 
+public extension WpNetworkHeaderMap {
+    func toFlatMap() -> [String: String] {
+        self.toMap().mapValues { $0.joined(separator: ",") }
+    }
+}
+
 public extension WpNetworkRequest {
     func asURLRequest() -> URLRequest {
-        let url = URL(string: self.url)!
+        let url = URL(string: self.url())!
         var request = URLRequest(url: url)
-        request.httpMethod = self.method.rawValue
-        request.allHTTPHeaderFields = self.headerMap
-        request.httpBody = self.body
+        request.httpMethod = self.method().rawValue
+        request.allHTTPHeaderFields = self.headerMap().toFlatMap()
+        request.httpBody = self.body()?.contents()
         return request
     }
 
     #if DEBUG
     func debugPrint() {
-        print("\(method.rawValue) \(url)")
-        for (name, value) in headerMap {
+        print("\(method().rawValue) \(self.url())")
+        for (name, value) in self.headerMap().toMap() {
             print("\(name): \(value)")
         }
+
         print("")
-        if let body, let text = String(data: body, encoding: .utf8) {
-            print(text)
+
+        if let bodyString = self.bodyAsString() {
+            print(bodyString)
         }
     }
     #endif
@@ -180,12 +188,6 @@ extension RequestMethod {
         case .delete: "DELETE"
         case .head: "HEAD"
         }
-    }
-}
-
-extension WpNetworkRequest {
-    init(method: RequestMethod, url: URL, headerMap: [String: String]) {
-        self.init(method: method, url: url.absoluteString, headerMap: headerMap, body: nil)
     }
 }
 

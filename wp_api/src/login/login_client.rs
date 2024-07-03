@@ -1,9 +1,10 @@
-use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
 
 use crate::request::endpoint::WpEndpointUrl;
-use crate::request::{RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse};
+use crate::request::{
+    RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+};
 
 use super::url_discovery::{
     self, FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial,
@@ -129,11 +130,11 @@ impl WpLoginClient {
         let api_root_request = WpNetworkRequest {
             method: RequestMethod::HEAD,
             url: WpEndpointUrl(parsed_site_url.url()),
-            header_map: HashMap::new(),
+            header_map: WpNetworkHeaderMap::default().into(),
             body: None,
         };
         self.request_executor
-            .execute(api_root_request)
+            .execute(api_root_request.into())
             .await
             .map_err(FetchApiRootUrlError::from)
     }
@@ -143,12 +144,15 @@ impl WpLoginClient {
         api_root_url: &ParsedUrl,
     ) -> Result<WpNetworkResponse, FetchApiDetailsError> {
         self.request_executor
-            .execute(WpNetworkRequest {
-                method: RequestMethod::GET,
-                url: WpEndpointUrl(api_root_url.url()),
-                header_map: HashMap::new(),
-                body: None,
-            })
+            .execute(
+                WpNetworkRequest {
+                    method: RequestMethod::GET,
+                    url: WpEndpointUrl(api_root_url.url()),
+                    header_map: WpNetworkHeaderMap::default().into(),
+                    body: None,
+                }
+                .into(),
+            )
             .await
             .map_err(FetchApiDetailsError::from)
     }
