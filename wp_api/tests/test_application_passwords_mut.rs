@@ -23,7 +23,7 @@ async fn create_application_password() {
         let password_name = "IntegrationTest";
         // Assert that the application password name is not in DB
         assert!(
-            !db_application_password_meta_for_user(&mut db, &FIRST_USER_ID)
+            !db_application_password_meta_for_user(&mut db, &SECOND_USER_ID)
                 .await
                 .unwrap()
                 .meta_value
@@ -37,13 +37,13 @@ async fn create_application_password() {
         };
         let created_application_password = request_builder()
             .application_passwords()
-            .create(&FIRST_USER_ID, &params)
+            .create(&SECOND_USER_ID, &params)
             .await
             .assert_response();
 
         // Assert that the application password is in DB
         let db_user_meta_after_update =
-            db_application_password_meta_for_user(&mut db, &FIRST_USER_ID).await;
+            db_application_password_meta_for_user(&mut db, &SECOND_USER_ID).await;
         assert!(db_user_meta_after_update.is_some());
         let meta_value = db_user_meta_after_update.unwrap().meta_value;
         assert!(meta_value.contains(password_name));
