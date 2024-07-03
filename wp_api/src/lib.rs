@@ -14,10 +14,13 @@ use std::sync::Arc;
 pub use api_error::{
     RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
 };
+pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use users::*;
 
 mod api_error; // re-exported relevant types
+mod parsed_url; // re-exported relevant types
+
 pub mod application_passwords;
 pub mod login;
 pub mod plugins;

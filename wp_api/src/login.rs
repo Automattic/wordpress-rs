@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
-use url_discovery::ParsedUrl;
 
 pub use login_client::WpLoginClient;
 pub use url_discovery::{UrlDiscoveryState, UrlDiscoverySuccess};
+
+use crate::ParsedUrl;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 

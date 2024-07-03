@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use url::Url;
 
 use crate::{
     request::{WpNetworkHeaderMap, WpNetworkResponse},
-    RequestExecutionError,
+    ParseUrlError, ParsedUrl, RequestExecutionError,
 };
 
 use super::WpApiDetails;
@@ -222,45 +221,6 @@ impl From<RequestExecutionError> for FetchApiDetailsError {
             },
         }
     }
-}
-
-// TODO: Should be in a central place, used across the code base
-#[derive(Debug, Clone, uniffi::Object)]
-pub struct ParsedUrl {
-    pub(crate) inner: Url,
-}
-
-impl ParsedUrl {
-    fn new(url: Url) -> Self {
-        Self { inner: url }
-    }
-}
-
-#[uniffi::export]
-impl ParsedUrl {
-    #[uniffi::constructor]
-    fn parse(input: &str) -> Result<Self, ParseUrlError> {
-        Url::parse(input)
-            .map_err(|e| match e {
-                url::ParseError::RelativeUrlWithoutBase => ParseUrlError::RelativeUrlWithoutBase,
-                _ => ParseUrlError::Generic {
-                    reason: e.to_string(),
-                },
-            })
-            .map(Self::new)
-    }
-
-    pub fn url(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-pub enum ParseUrlError {
-    #[error("Error while parsing url: {}", reason)]
-    Generic { reason: String },
-    #[error("Relative URL without a base")]
-    RelativeUrlWithoutBase,
 }
 
 #[cfg(test)]
