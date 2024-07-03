@@ -63,6 +63,8 @@ pub struct UnrecognizedWpRestError {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpRestErrorCode {
+    #[serde(rename = "rest_cannot_create_application_passwords")]
+    CannotCreateApplicationPasswords,
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
     #[serde(rename = "rest_cannot_delete_active_plugin")]

@@ -1,11 +1,12 @@
 // TODO
 #![allow(unused)]
-use integration_test_common::request_builder_as_subscriber;
+use integration_test_common::{request_builder_as_subscriber, run_wp_cli_command};
 use rstest::*;
 use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
+use serial_test::{parallel, serial};
 use wp_api::application_passwords::{
-    ApplicationPasswordUuid, SparseApplicationPassword, SparseApplicationPasswordField,
+    ApplicationPasswordCreateParams, ApplicationPasswordUuid, SparseApplicationPassword,
+    SparseApplicationPasswordField,
 };
 use wp_api::users::UserId;
 use wp_api::{WpContext, WpRestErrorCode};
@@ -17,6 +18,7 @@ use crate::integration_test_common::{
 
 pub mod integration_test_common;
 pub mod reusable_test_cases;
+pub mod wp_db;
 
 #[rstest]
 #[tokio::test]
@@ -45,4 +47,21 @@ async fn retrieve_application_password_err_cannot_read_application_password() {
         )
         .await
         .assert_wp_error(WpRestErrorCode::CannotReadApplicationPassword);
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn create_application_password_err_cannot_create_application_passwords() {
+    request_builder_as_subscriber()
+        .application_passwords()
+        .create(
+            &FIRST_USER_ID,
+            &ApplicationPasswordCreateParams {
+                app_id: None,
+                name: "foo".to_string(),
+            },
+        )
+        .await
+        .assert_wp_error(WpRestErrorCode::CannotCreateApplicationPasswords);
 }

@@ -94,6 +94,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
 
 fn expected_status_code_for_wp_rest_error_code(error_code: &WpRestErrorCode) -> u16 {
     match error_code {
+        WpRestErrorCode::CannotCreateApplicationPasswords => 403,
         WpRestErrorCode::CannotActivatePlugin => 403,
         WpRestErrorCode::CannotCreateUser => 403,
         WpRestErrorCode::CannotDeactivatePlugin => 403,
