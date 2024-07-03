@@ -108,7 +108,7 @@ impl StateParsedUrl {
         {
             Some(url) => Ok(StateFetchedApiRootUrl {
                 site_url: self.site_url,
-                api_root_url: ParsedUrl { url },
+                api_root_url: ParsedUrl::new(url),
             }),
             None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
                 header_map: response.header_map,
@@ -227,10 +227,18 @@ impl From<RequestExecutionError> for FetchApiDetailsError {
 // TODO: Should be in a central place, used across the code base
 #[derive(Debug, Clone, uniffi::Object)]
 pub struct ParsedUrl {
-    url: Url,
+    pub(crate) inner: Url,
 }
 
 impl ParsedUrl {
+    fn new(url: Url) -> Self {
+        Self { inner: url }
+    }
+}
+
+#[uniffi::export]
+impl ParsedUrl {
+    #[uniffi::constructor]
     fn parse(input: &str) -> Result<Self, ParseUrlError> {
         Url::parse(input)
             .map_err(|e| match e {
@@ -239,14 +247,11 @@ impl ParsedUrl {
                     reason: e.to_string(),
                 },
             })
-            .map(|url| Self { url })
+            .map(Self::new)
     }
-}
 
-#[uniffi::export]
-impl ParsedUrl {
     pub fn url(&self) -> String {
-        self.url.to_string()
+        self.inner.to_string()
     }
 }
 

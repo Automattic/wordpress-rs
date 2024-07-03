@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
-use url::Url;
+use url_discovery::ParsedUrl;
 
 pub use login_client::WpLoginClient;
 pub use url_discovery::{UrlDiscoveryState, UrlDiscoverySuccess};
@@ -22,10 +22,10 @@ pub struct WpRestApiUrls {
 // embedded as query params. This function parses that URL and extracts the login details as an object.
 #[uniffi::export]
 pub fn extract_login_details_from_url(
-    url: WpRestApiUrl,
+    url: Arc<ParsedUrl>,
 ) -> Option<WpApiApplicationPasswordDetails> {
     if let (Some(site_url), Some(user_login), Some(password)) =
-        url.as_url()
+        url.inner
             .query_pairs()
             .fold((None, None, None), |accum, (k, v)| {
                 match k.to_string().as_str() {
@@ -83,36 +83,4 @@ pub struct WpApiApplicationPasswordDetails {
     pub site_url: String,
     pub user_login: String,
     pub password: String,
-}
-
-// A type that's guaranteed to represent a valid URL
-//
-// It is a programmer error to instantiate this object with an invalid URL
-#[derive(Debug, uniffi::Record)]
-pub struct WpRestApiUrl {
-    pub string_value: String,
-}
-
-impl WpRestApiUrl {
-    pub fn as_str(&self) -> &str {
-        self.string_value.as_str()
-    }
-
-    pub fn as_url(&self) -> url::Url {
-        Url::parse(self.string_value.as_str()).unwrap()
-    }
-}
-
-impl From<Url> for WpRestApiUrl {
-    fn from(url: url::Url) -> Self {
-        WpRestApiUrl {
-            string_value: url.into(),
-        }
-    }
-}
-
-impl From<WpRestApiUrl> for String {
-    fn from(url: WpRestApiUrl) -> Self {
-        url.string_value
-    }
 }
