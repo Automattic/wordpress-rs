@@ -152,7 +152,7 @@ mod tests {
 
     #[rstest]
     #[case(WpContext::Edit, &[SparseApplicationPasswordField::Uuid], "/users/2/application-passwords/584a87d5-4f18-4c33-a315-4c05ed1fc485?context=edit&_fields=uuid")]
-    #[case(WpContext::View, &[SparseApplicationPasswordField::Uuid, SparseApplicationPasswordField::Name], "/users/2/application-passwords/584a87d5-4f18-4c33-a315-4c05ed1fc485?context=view&_fields=uuid%2Cname")]
+    #[case(WpContext::View, &[SparseApplicationPasswordField::Uuid, SparseApplicationPasswordField::Password], "/users/2/application-passwords/584a87d5-4f18-4c33-a315-4c05ed1fc485?context=view&_fields=uuid%2Cpassword")]
     fn filter_retrieve_application_passwords(
         endpoint: ApplicationPasswordsRequestEndpoint,
         #[case] context: WpContext,
