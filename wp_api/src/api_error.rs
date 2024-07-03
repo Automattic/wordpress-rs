@@ -69,8 +69,14 @@ pub enum WpRestErrorCode {
     CannotCreateUser,
     #[serde(rename = "rest_cannot_delete_active_plugin")]
     CannotDeleteActivePlugin,
+    #[serde(rename = "rest_cannot_delete_application_password")]
+    CannotDeleteApplicationPassword,
+    #[serde(rename = "rest_cannot_delete_application_passwords")]
+    CannotDeleteApplicationPasswords,
     #[serde(rename = "rest_cannot_edit")]
     CannotEdit,
+    #[serde(rename = "rest_cannot_edit_application_password")]
+    CannotEditApplicationPassword,
     #[serde(rename = "rest_cannot_edit_roles")]
     CannotEditRoles,
     #[serde(rename = "rest_cannot_install_plugin")]
