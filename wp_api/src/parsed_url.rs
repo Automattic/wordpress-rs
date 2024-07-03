@@ -92,28 +92,12 @@ mod tests {
     use rstest::rstest;
     use url::Url;
 
-    #[test]
-    fn success() {
-        assert_eq!(
-            "http://example.com/",
-            ParsedUrl::parse("http://example.com").unwrap().url()
-        );
-    }
-
-    #[test]
-    fn try_from_str() {
-        assert_eq!(
-            "http://example.com/",
-            ParsedUrl::try_from("http://example.com").unwrap().url()
-        );
-    }
-
-    #[test]
-    fn can_be_converted_to_url() {
-        assert_eq!(
-            Url::parse("http://example.com").unwrap(),
-            ParsedUrl::try_from("http://example.com").unwrap().inner
-        );
+    #[rstest]
+    #[case("http://example.com")]
+    fn parse_url_success(#[case] input: &str) {
+        let parsed_url = ParsedUrl::parse(input).unwrap();
+        assert_eq!(parsed_url.url(), "http://example.com/",);
+        assert_eq!(parsed_url, Url::parse("http://example.com").unwrap().into());
     }
 
     #[rstest]
@@ -125,7 +109,7 @@ mod tests {
     #[case("", ParseUrlError::RelativeUrlWithoutBase)]
     // https://www.unicode.org/reports/tr46/#Validity_Criteria
     #[case("https://xn--u-ccb.com", ParseUrlError::IdnaError)]
-    fn url_errors(#[case] input: &str, #[case] expected_err: ParseUrlError) {
+    fn parse_url_error(#[case] input: &str, #[case] expected_err: ParseUrlError) {
         assert_eq!(ParsedUrl::try_from(input).unwrap_err(), expected_err);
     }
 }
