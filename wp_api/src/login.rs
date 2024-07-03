@@ -24,27 +24,25 @@ pub struct WpRestApiUrls {
 #[uniffi::export]
 pub fn extract_login_details_from_url(
     url: Arc<ParsedUrl>,
-) -> Option<WpApiApplicationPasswordDetails> {
-    if let (Some(site_url), Some(user_login), Some(password)) =
+) -> Result<WpApiApplicationPasswordDetails, OAuthResponseUrlError> {
+    let f = |key| {
         url.inner
             .query_pairs()
-            .fold((None, None, None), |accum, (k, v)| {
-                match k.to_string().as_str() {
-                    "site_url" => (Some(v.to_string()), accum.1, accum.2),
-                    "user_login" => (accum.0, Some(v.to_string()), accum.2),
-                    "password" => (accum.0, accum.1, Some(v.to_string())),
-                    _ => accum,
-                }
-            })
-    {
-        Some(WpApiApplicationPasswordDetails {
-            site_url,
-            user_login,
-            password,
-        })
-    } else {
-        None
+            .find_map(|(k, v)| (k == key).then_some(v.to_string()))
+    };
+    if let Some(is_success) = f("success") {
+        if is_success == "false" {
+            return Err(OAuthResponseUrlError::UnsuccessfulLogin);
+        }
     }
+    let site_url = f("site_url").ok_or(OAuthResponseUrlError::MissingSiteUrl)?;
+    let user_login = f("user_login").ok_or(OAuthResponseUrlError::MissingUsername)?;
+    let password = f("password").ok_or(OAuthResponseUrlError::MissingPassword)?;
+    Ok(WpApiApplicationPasswordDetails {
+        site_url,
+        user_login,
+        password,
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Object)]
@@ -79,9 +77,70 @@ pub struct WpRestApiAuthenticationEndpoint {
     pub authorization: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 pub struct WpApiApplicationPasswordDetails {
     pub site_url: String,
     pub user_login: String,
     pub password: String,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error)]
+pub enum OAuthResponseUrlError {
+    #[error("The given URL is missing the `site_url` query parameter")]
+    MissingSiteUrl,
+    #[error("The given URL is missing the `username` query parameter")]
+    MissingUsername,
+    #[error("The given URL is missing the `password` query parameter")]
+    MissingPassword,
+    #[error("Unsuccessful Login")]
+    UnsuccessfulLogin,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(
+        "exampleauth://login?site_url=http://example.com&user_login=test&password=1234",
+        Ok(())
+    )]
+    #[case(
+        "exampleauth://login?site_url=http://example.com&user_login=test&password=1234&foo=bar",
+        Ok(())
+    )]
+    #[case(
+        "exampleauth://login?user_login=test&password=1234",
+        Err(OAuthResponseUrlError::MissingSiteUrl)
+    )]
+    #[case(
+        "exampleauth://login?site_url=http://example.com&password=1234",
+        Err(OAuthResponseUrlError::MissingUsername)
+    )]
+    #[case(
+        "exampleauth://login?site_url=http://example.com&user_login=test",
+        Err(OAuthResponseUrlError::MissingPassword)
+    )]
+    #[case(
+        "exampleauth://login?success=false",
+        Err(OAuthResponseUrlError::UnsuccessfulLogin)
+    )]
+    #[case(
+        "exampleauth://login?success=true",
+        Err(OAuthResponseUrlError::MissingSiteUrl)
+    )]
+    fn test_extract_login_details_from_url(
+        #[case] input: &str,
+        #[case] expected_result: Result<(), OAuthResponseUrlError>,
+    ) {
+        assert_eq!(
+            extract_login_details_from_url(ParsedUrl::try_from(input).unwrap().into()),
+            expected_result.map(|_| WpApiApplicationPasswordDetails {
+                site_url: "http://example.com".to_string(),
+                user_login: "test".to_string(),
+                password: "1234".to_string(),
+            })
+        );
+    }
 }
