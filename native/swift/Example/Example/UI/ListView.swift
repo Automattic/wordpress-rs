@@ -36,11 +36,11 @@ struct ListView: View {
 
 #Preview {
 
-    let viewModel = ListViewModel(loginManager: LoginManager(), fetchDataTask: Task(operation: {
+    let viewModel = ListViewModel(loginManager: LoginManager(), dataCallback: {
         [
             ListViewData(id: "1234", title: "Item 1", subtitle: "Subtitle", fields: [:])
         ]
-    }))
+    })
 
     return ListView(viewModel: viewModel)
 }
