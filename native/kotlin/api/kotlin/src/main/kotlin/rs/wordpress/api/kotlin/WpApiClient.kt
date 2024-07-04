@@ -3,23 +3,24 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.UniffiWpApiClient
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpAuthentication
-import uniffi.wp_api.WpRequestBuilder
 import uniffi.wp_api.WpRestErrorWrapper
 
 class WpApiClient
 @Throws(WpApiException::class)
 constructor(
-    siteUrl: String,
+    siteUrl: ParsedUrl,
     authentication: WpAuthentication,
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
-        WpRequestBuilder(siteUrl, authentication, requestExecutor)
+        UniffiWpApiClient(siteUrl, authentication, requestExecutor)
     }
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
@@ -29,7 +30,7 @@ constructor(
     //
     // It'll also help make sure any breaking changes to the API will end up as a compiler error.
     suspend fun <T> request(
-        executeRequest: suspend (WpRequestBuilder) -> T
+        executeRequest: suspend (UniffiWpApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
             WpRequestSuccess(data = executeRequest(requestBuilder))

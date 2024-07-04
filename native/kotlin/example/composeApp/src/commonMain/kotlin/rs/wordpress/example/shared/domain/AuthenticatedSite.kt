@@ -1,3 +1,5 @@
 package rs.wordpress.example.shared.domain
 
-data class AuthenticatedSite(val name: String, val url: String)
+import uniffi.wp_api.ParsedUrl
+
+data class AuthenticatedSite(val name: String, val url: ParsedUrl)

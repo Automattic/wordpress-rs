@@ -5,6 +5,7 @@ import org.junit.Assert
 import org.junit.Test
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestSuccess
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
@@ -17,7 +18,7 @@ class UsersEndpointAndroidTest {
         username = BuildConfig.TEST_ADMIN_USERNAME,
         password = BuildConfig.TEST_ADMIN_PASSWORD
     )
-    private val client = WpApiClient(siteUrl, authentication)
+    private val client = WpApiClient(ParsedUrl.parse(siteUrl), authentication)
 
     @Test
     fun testUserListRequest() = runTest {
