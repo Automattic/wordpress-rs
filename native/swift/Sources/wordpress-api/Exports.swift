@@ -8,7 +8,7 @@
 import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
-public typealias WpParsedUrl = WordPressAPIInternal.ParsedUrl
+public typealias ParsedUrl = WordPressAPIInternal.ParsedUrl
 
 // MARK: - Login
 
@@ -48,5 +48,4 @@ public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicat
 public typealias ApplicationPasswordWithEditContext = WordPressAPIInternal.ApplicationPasswordWithEditContext
 public typealias ApplicationPasswordWithViewContext = WordPressAPIInternal.ApplicationPasswordWithViewContext
 public typealias ApplicationPasswordWithEmbedContext = WordPressAPIInternal.ApplicationPasswordWithEmbedContext
-
 #endif
