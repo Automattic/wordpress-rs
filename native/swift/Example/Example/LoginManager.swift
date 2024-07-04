@@ -83,7 +83,7 @@ struct Keychain {
         if try lookup(for: server) != nil {
             let deletionStatus = SecItemDelete([
                 kSecClass as String: kSecClassInternetPassword,
-                kSecAttrServer as String: server as CFString,
+                kSecAttrServer as String: server as CFString
             ] as CFDictionary)
 
             guard deletionStatus == errSecSuccess else { throw KeychainError.unhandledError(status: deletionStatus) }
