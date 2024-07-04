@@ -5,11 +5,11 @@ use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{
     RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
 };
+use crate::ParsedUrl;
 
 use super::url_discovery::{
-    self, FetchApiDetailsError, FetchApiRootUrlError, ParsedUrl, StateInitial,
-    UrlDiscoveryAttemptError, UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState,
-    UrlDiscoverySuccess,
+    self, FetchApiDetailsError, FetchApiRootUrlError, StateInitial, UrlDiscoveryAttemptError,
+    UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState, UrlDiscoverySuccess,
 };
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";

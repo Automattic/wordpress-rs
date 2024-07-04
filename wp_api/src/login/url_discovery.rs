@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use url::Url;
 
 use crate::{
     request::{WpNetworkHeaderMap, WpNetworkResponse},
-    RequestExecutionError,
+    ParseUrlError, ParsedUrl, RequestExecutionError,
 };
 
 use super::WpApiDetails;
@@ -108,7 +107,7 @@ impl StateParsedUrl {
         {
             Some(url) => Ok(StateFetchedApiRootUrl {
                 site_url: self.site_url,
-                api_root_url: ParsedUrl { url },
+                api_root_url: ParsedUrl::new(url),
             }),
             None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
                 header_map: response.header_map,
@@ -222,40 +221,6 @@ impl From<RequestExecutionError> for FetchApiDetailsError {
             },
         }
     }
-}
-
-// TODO: Should be in a central place, used across the code base
-#[derive(Debug, Clone, uniffi::Object)]
-pub struct ParsedUrl {
-    url: Url,
-}
-
-impl ParsedUrl {
-    fn parse(input: &str) -> Result<Self, ParseUrlError> {
-        Url::parse(input)
-            .map_err(|e| match e {
-                url::ParseError::RelativeUrlWithoutBase => ParseUrlError::RelativeUrlWithoutBase,
-                _ => ParseUrlError::Generic {
-                    reason: e.to_string(),
-                },
-            })
-            .map(|url| Self { url })
-    }
-}
-
-#[uniffi::export]
-impl ParsedUrl {
-    pub fn url(&self) -> String {
-        self.url.to_string()
-    }
-}
-
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-pub enum ParseUrlError {
-    #[error("Error while parsing url: {}", reason)]
-    Generic { reason: String },
-    #[error("Relative URL without a base")]
-    RelativeUrlWithoutBase,
 }
 
 #[cfg(test)]
