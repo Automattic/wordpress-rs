@@ -56,9 +56,17 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
         self.uuid.uuid
     }
 
+    var creationDateString: String {
+        guard let date = Date.fromWordPressDate(self.created) else {
+            return self.created
+        }
+
+        return RelativeDateTimeFormatter().string(for: date) ?? self.created
+    }
+
     var asListViewData: ListViewData {
-        ListViewData(id: self.uuid.uuid, title: self.name, subtitle: self.created, fields: [
-            "Created": self.created
+        ListViewData(id: self.uuid.uuid, title: self.name, subtitle: creationDateString, fields: [
+            "Created": creationDateString
         ])
     }
 }
