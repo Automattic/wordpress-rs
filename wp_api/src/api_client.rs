@@ -1,4 +1,3 @@
-use crate::WpAuthentication;
 use crate::{
     request::{
         endpoint::{
@@ -11,6 +10,7 @@ use crate::{
     },
     WpApiError,
 };
+use crate::{ParsedUrl, WpAuthentication};
 use std::sync::Arc;
 
 #[derive(Debug, uniffi::Object)]
@@ -49,17 +49,13 @@ pub struct WpRequestBuilder {
 impl WpRequestBuilder {
     #[uniffi::constructor]
     pub fn new(
-        site_url: String,
+        site_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
-    ) -> Result<Self, WpApiError> {
-        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
-            .map_err(|err| WpApiError::SiteUrlParsingError {
-                reason: err.to_string(),
-            })?
-            .into();
+    ) -> Self {
+        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 
-        Ok(Self {
+        Self {
             application_passwords: ApplicationPasswordsRequestExecutor::new(
                 api_base_url.clone(),
                 authentication.clone(),
@@ -78,7 +74,7 @@ impl WpRequestBuilder {
                 request_executor.clone(),
             )
             .into(),
-        })
+        }
     }
 
     pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestExecutor> {
