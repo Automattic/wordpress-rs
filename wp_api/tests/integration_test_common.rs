@@ -21,7 +21,7 @@ pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 
-pub fn request_builder() -> WpApiClient {
+pub fn api_client() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
         TEST_CREDENTIALS_ADMIN_USERNAME.to_string(),
         TEST_CREDENTIALS_ADMIN_PASSWORD.to_string(),
@@ -33,7 +33,7 @@ pub fn request_builder() -> WpApiClient {
     )
 }
 
-pub fn request_builder_as_subscriber() -> WpApiClient {
+pub fn api_client_as_subscriber() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
         TEST_CREDENTIALS_SUBSCRIBER_USERNAME.to_string(),
         TEST_CREDENTIALS_SUBSCRIBER_PASSWORD.to_string(),
@@ -45,7 +45,7 @@ pub fn request_builder_as_subscriber() -> WpApiClient {
     )
 }
 
-pub fn request_builder_as_unauthenticated() -> WpApiClient {
+pub fn api_client_as_unauthenticated() -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
         WpAuthentication::None,

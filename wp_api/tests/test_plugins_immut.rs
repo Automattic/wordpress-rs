@@ -8,7 +8,7 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    request_builder, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    api_client, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
@@ -25,7 +25,7 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    request_builder()
+    api_client()
         .plugins()
         .filter_list(WpContext::Edit, &params, fields)
         .await
@@ -41,7 +41,7 @@ async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let response = request_builder()
+    let response = api_client()
         .plugins()
         .filter_retrieve(&slug.into(), WpContext::Edit, fields)
         .await
@@ -63,21 +63,21 @@ async fn list_plugins(
 ) {
     match context {
         WpContext::Edit => {
-            request_builder()
+            api_client()
                 .plugins()
                 .list_with_edit_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::Embed => {
-            request_builder()
+            api_client()
                 .plugins()
                 .list_with_embed_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::View => {
-            request_builder()
+            api_client()
                 .plugins()
                 .list_with_view_context(&params)
                 .await
@@ -100,7 +100,7 @@ async fn retrieve_plugin(
 ) {
     match context {
         WpContext::Edit => {
-            let plugin = request_builder()
+            let plugin = api_client()
                 .plugins()
                 .retrieve_with_edit_context(&plugin_slug)
                 .await
@@ -110,7 +110,7 @@ async fn retrieve_plugin(
             assert_eq!(expected_plugin_uri, plugin.plugin_uri);
         }
         WpContext::Embed => {
-            let plugin = request_builder()
+            let plugin = api_client()
                 .plugins()
                 .retrieve_with_embed_context(&plugin_slug)
                 .await
@@ -118,7 +118,7 @@ async fn retrieve_plugin(
             assert_eq!(&plugin_slug, &plugin.plugin);
         }
         WpContext::View => {
-            let plugin = request_builder()
+            let plugin = api_client()
                 .plugins()
                 .retrieve_with_view_context(&plugin_slug)
                 .await

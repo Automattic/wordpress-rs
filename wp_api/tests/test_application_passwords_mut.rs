@@ -9,7 +9,7 @@ use wp_api::{
 use wp_db::DbUserMeta;
 
 use crate::integration_test_common::{
-    request_builder, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
+    api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
     TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
 };
 
@@ -35,7 +35,7 @@ async fn create_application_password() {
             app_id: None,
             name: password_name.to_string(),
         };
-        let created_application_password = request_builder()
+        let created_application_password = api_client()
             .application_passwords()
             .create(&SECOND_USER_ID, &params)
             .await
@@ -71,7 +71,7 @@ async fn update_application_password() {
             app_id: None,
             name: password_name.to_string(),
         };
-        let created_application_password = request_builder()
+        let created_application_password = api_client()
             .application_passwords()
             .update(
                 &FIRST_USER_ID,
@@ -110,7 +110,7 @@ async fn delete_single_application_password() {
                 .contains(TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID)
         );
         // Delete the user's application passwords using the API and ensure it's successful
-        let response = request_builder()
+        let response = api_client()
             .application_passwords()
             .delete(&SECOND_USER_ID, &uuid)
             .await
@@ -143,7 +143,7 @@ async fn delete_all_application_passwords() {
                 .contains(TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID)
         );
         // Delete the user's application passwords using the API and ensure it's successful
-        let response = request_builder()
+        let response = api_client()
             .application_passwords()
             .delete_all(&SECOND_USER_ID)
             .await
