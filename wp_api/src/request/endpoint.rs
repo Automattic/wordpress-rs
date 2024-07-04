@@ -54,16 +54,20 @@ pub(crate) struct ApiBaseUrl {
     url: Url,
 }
 
+impl From<Url> for ApiBaseUrl {
+    fn from(url: Url) -> Self {
+        let url = url
+            .extend(WP_JSON_PATH_SEGMENTS)
+            .expect("Given url is already parsed, so this can't result in an error");
+        Self { url }
+    }
+}
+
 impl TryFrom<&str> for ApiBaseUrl {
     type Error = url::ParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Url::parse(value).map(|parsed_url| {
-            let url = parsed_url
-                .extend(WP_JSON_PATH_SEGMENTS)
-                .expect("ApiBaseUrl is already parsed, so this can't result in an error");
-            Self { url }
-        })
+        Url::parse(value).map(ApiBaseUrl::from)
     }
 }
 

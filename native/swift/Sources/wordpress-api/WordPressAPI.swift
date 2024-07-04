@@ -14,10 +14,10 @@ public struct WordPressAPI {
     }
 
     private let urlSession: URLSession
-    package let requestBuilder: WpRequestBuilderProtocol
+    package let requestBuilder: UniffiWpApiClient
 
-    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) throws {
-        try self.init(
+    public init(urlSession: URLSession, baseUrl: ParsedUrl, authenticationStategy: WpAuthentication) {
+        self.init(
             urlSession: urlSession,
             baseUrl: baseUrl,
             authenticationStategy: authenticationStategy,
@@ -27,13 +27,13 @@ public struct WordPressAPI {
 
     init(
         urlSession: URLSession,
-        baseUrl: URL,
+        baseUrl: ParsedUrl,
         authenticationStategy: WpAuthentication,
         executor: SafeRequestExecutor
-    ) throws {
+    ) {
         self.urlSession = urlSession
-        self.requestBuilder = try WpRequestBuilder(
-            siteUrl: baseUrl.absoluteString,
+        self.requestBuilder = UniffiWpApiClient(
+            siteUrl: baseUrl,
             authentication: authenticationStategy,
             requestExecutor: executor
         )

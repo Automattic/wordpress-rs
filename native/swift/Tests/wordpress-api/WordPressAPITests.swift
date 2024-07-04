@@ -42,7 +42,7 @@ final class WordPressAPITests: XCTestCase {
 
         let api = try WordPressAPI(
             urlSession: .shared,
-            baseUrl: URL(string: "https://wordpress.org")!,
+            baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
             authenticationStategy: .none,
             executor: stubs
         )
@@ -58,7 +58,7 @@ final class WordPressAPITests: XCTestCase {
 
         let api = try WordPressAPI(
             urlSession: .shared,
-            baseUrl: URL(string: "https://wordpress.org")!,
+            baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
             authenticationStategy: .none,
             executor: stubs
         )

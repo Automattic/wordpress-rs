@@ -1,6 +1,7 @@
 package rs.wordpress.example.shared.repository
 
 import rs.wordpress.example.shared.domain.AuthenticatedSite
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
@@ -17,7 +18,7 @@ class AuthenticationRepository(
 
     fun addAuthenticatedSite(siteUrl: String, username: String, password: String): Boolean {
         if (siteUrl.isNotEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-            authenticatedSites[AuthenticatedSite(name = siteUrl, url = siteUrl)] =
+            authenticatedSites[AuthenticatedSite(name = siteUrl, url = ParsedUrl.parse(siteUrl))] =
                 wpAuthenticationFromUsernameAndPassword(username, password)
             return true
         }

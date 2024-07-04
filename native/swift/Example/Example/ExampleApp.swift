@@ -1,4 +1,5 @@
 import SwiftUI
+import WordPressAPI
 
 @main
 struct ExampleApp: App {
@@ -6,12 +7,27 @@ struct ExampleApp: App {
     @StateObject
     var loginManager = LoginManager()
 
+    let rootListItems = [
+        RootListData(name: "Application Passwords", callback: {
+            try await WordPressAPI.globalInstance.applicationPasswords.listWithEditContext(userId: 1)
+                .map { $0.asListViewData }
+        }),
+        RootListData(name: "Users", callback: {
+            try await WordPressAPI.globalInstance.users.listWithEditContext(params: .init())
+                .map { $0.asListViewData }
+        }),
+        RootListData(name: "Plugins", callback: {
+            try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
+                .map { $0.asListViewData }
+        })
+    ]
+
     var body: some Scene {
         WindowGroup {
             if loginManager.isLoggedIn {
                 NavigationView {
                     // The first column is the sidebar.
-                    RootListView()
+                    RootListView(items: rootListItems)
 
                     // Initial content of the second column.
                     EmptyView()

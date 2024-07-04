@@ -1,9 +1,10 @@
 package rs.wordpress.api.kotlin
 
+import uniffi.wp_api.ParsedUrl
 import java.io.File
 
 data class TestCredentials(
-    val siteUrl: String,
+    val siteUrl: ParsedUrl,
     val adminUsername: String,
     val adminPassword: String,
     val adminPasswordUuid: String,
@@ -21,7 +22,7 @@ data class TestCredentials(
                 }
             }
             TestCredentials(
-                siteUrl = lineList[0],
+                siteUrl = ParsedUrl.parse(lineList[0]),
                 adminUsername = lineList[1],
                 adminPassword = lineList[2],
                 adminPasswordUuid = lineList[3],

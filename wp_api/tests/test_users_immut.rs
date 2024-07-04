@@ -11,9 +11,7 @@ use wp_api::{
     WpApiParamOrder, WpContext,
 };
 
-use crate::integration_test_common::{
-    request_builder, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
-};
+use crate::integration_test_common::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
 
 pub mod integration_test_common;
 pub mod reusable_test_cases;
@@ -22,7 +20,7 @@ pub mod reusable_test_cases;
 #[tokio::test]
 #[parallel]
 async fn filter_users(#[case] fields: &[SparseUserField]) {
-    request_builder()
+    api_client()
         .users()
         .filter_list(WpContext::Edit, &UserListParams::default(), fields)
         .await
@@ -35,7 +33,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .filter_retrieve(&FIRST_USER_ID, WpContext::Edit, fields)
         .await
@@ -47,7 +45,7 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .filter_retrieve_me(WpContext::Edit, fields)
         .await
@@ -59,7 +57,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 #[tokio::test]
 #[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
-    request_builder()
+    api_client()
         .users()
         .list_with_edit_context(&params)
         .await
@@ -70,7 +68,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 #[tokio::test]
 #[parallel]
 async fn list_users_with_embed_context(#[case] params: UserListParams) {
-    request_builder()
+    api_client()
         .users()
         .list_with_embed_context(&params)
         .await
@@ -81,7 +79,7 @@ async fn list_users_with_embed_context(#[case] params: UserListParams) {
 #[tokio::test]
 #[parallel]
 async fn list_users_with_view_context(#[case] params: UserListParams) {
-    request_builder()
+    api_client()
         .users()
         .list_with_view_context(&params)
         .await
@@ -95,7 +93,7 @@ async fn list_users_with_view_context(#[case] params: UserListParams) {
 async fn list_users_with_edit_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
-    request_builder()
+    api_client()
         .users()
         .list_with_edit_context(&UserListParams {
             has_published_posts,
@@ -112,7 +110,7 @@ async fn list_users_with_edit_context_has_published_posts(
 async fn list_users_with_embed_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
-    request_builder()
+    api_client()
         .users()
         .list_with_embed_context(&UserListParams {
             has_published_posts,
@@ -129,7 +127,7 @@ async fn list_users_with_embed_context_has_published_posts(
 async fn list_users_with_view_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
-    request_builder()
+    api_client()
         .users()
         .list_with_view_context(&UserListParams {
             has_published_posts,
@@ -144,7 +142,7 @@ async fn list_users_with_view_context_has_published_posts(
 #[tokio::test]
 #[parallel]
 async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .retrieve_with_edit_context(&user_id)
         .await
@@ -159,7 +157,7 @@ async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
 async fn retrieve_user_with_embed_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .retrieve_with_embed_context(&user_id)
         .await
@@ -172,7 +170,7 @@ async fn retrieve_user_with_embed_context(
 #[tokio::test]
 #[parallel]
 async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .retrieve_with_view_context(&user_id)
         .await
@@ -183,7 +181,7 @@ async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
 #[tokio::test]
 #[parallel]
 async fn retrieve_me_with_edit_context() {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .retrieve_me_with_edit_context()
         .await
@@ -195,7 +193,7 @@ async fn retrieve_me_with_edit_context() {
 #[tokio::test]
 #[parallel]
 async fn retrieve_me_with_embed_context() {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .retrieve_me_with_embed_context()
         .await
@@ -207,7 +205,7 @@ async fn retrieve_me_with_embed_context() {
 #[tokio::test]
 #[parallel]
 async fn retrieve_me_with_view_context() {
-    let user = request_builder()
+    let user = api_client()
         .users()
         .retrieve_me_with_view_context()
         .await

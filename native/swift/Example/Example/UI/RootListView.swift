@@ -3,20 +3,7 @@ import WordPressAPI
 
 struct RootListView: View {
 
-    let items = [
-        RootListData(name: "Application Passwords", callback: Task(operation: {
-            try await WordPressAPI.globalInstance.applicationPasswords.listWithEditContext(userId: 1)
-                .map { $0.asListViewData }
-        })),
-        RootListData(name: "Users", callback: Task(operation: {
-            try await WordPressAPI.globalInstance.users.listWithEditContext(params: .init())
-                .map { $0.asListViewData }
-        })),
-        RootListData(name: "Plugins", callback: Task(operation: {
-            try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
-                .map { $0.asListViewData }
-        }))
-    ]
+    let items: [RootListData]
 
     var body: some View {
         List(self.items) { data in
@@ -34,7 +21,7 @@ struct RootListViewItem: View {
                 ListView(
                     viewModel: ListViewModel(
                         loginManager: LoginManager(),
-                        fetchDataTask: self.item.callback
+                        dataCallback: self.item.callback
                     )
                 )
             } label: {
@@ -47,7 +34,7 @@ struct RootListViewItem: View {
 struct RootListData: Identifiable {
 
     let name: String
-    let callback: Task<[ListViewData], Error>
+    let callback: ListViewModel.FetchDataTask
 
     var id: String {
         self.name
@@ -55,5 +42,5 @@ struct RootListData: Identifiable {
 }
 
 #Preview {
-    RootListView()
+    RootListView(items: [])
 }

@@ -8,15 +8,15 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    request_builder, request_builder_as_subscriber, request_builder_as_unauthenticated,
-    AssertWpError, FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
+    api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
+    FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
 };
 
 pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_user_err_cannot_create_user() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .create(&valid_user_create_params())
         .await
@@ -25,7 +25,7 @@ async fn create_user_err_cannot_create_user() {
 
 #[tokio::test]
 async fn delete_user_err_user_cannot_delete() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .delete(
             &FIRST_USER_ID,
@@ -39,7 +39,7 @@ async fn delete_user_err_user_cannot_delete() {
 
 #[tokio::test]
 async fn delete_user_err_user_invalid_reassign() {
-    request_builder()
+    api_client()
         .users()
         .delete(
             &FIRST_USER_ID,
@@ -53,7 +53,7 @@ async fn delete_user_err_user_invalid_reassign() {
 
 #[tokio::test]
 async fn delete_current_user_err_user_invalid_reassign() {
-    request_builder()
+    api_client()
         .users()
         .delete_me(&UserDeleteParams {
             reassign: UserId(987654321),
@@ -64,7 +64,7 @@ async fn delete_current_user_err_user_invalid_reassign() {
 
 #[tokio::test]
 async fn list_users_err_forbidden_context() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .list_with_edit_context(&UserListParams::default())
         .await
@@ -77,7 +77,7 @@ async fn list_users_err_forbidden_orderby_email() {
         orderby: Some(WpApiParamUsersOrderBy::Email),
         ..Default::default()
     };
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .list_with_view_context(&params)
         .await
@@ -90,7 +90,7 @@ async fn list_users_err_forbidden_who() {
         who: Some(WpApiParamUsersWho::Authors),
         ..Default::default()
     };
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .list_with_view_context(&params)
         .await
@@ -103,7 +103,7 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
         capabilities: vec!["foo".to_string()],
         ..Default::default()
     };
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .list_with_edit_context(&params)
         .await
@@ -116,7 +116,7 @@ async fn list_users_with_roles_err_user_cannot_view() {
         roles: vec!["foo".to_string()],
         ..Default::default()
     };
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .list_with_edit_context(&params)
         .await
@@ -129,7 +129,7 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
         orderby: Some(WpApiParamUsersOrderBy::RegisteredDate),
         ..Default::default()
     };
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .list_with_view_context(&params)
         .await
@@ -138,7 +138,7 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
 
 #[tokio::test]
 async fn list_users_has_published_posts_err_invalid_param() {
-    request_builder()
+    api_client()
         .users()
         .list_with_edit_context(&UserListParams {
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
@@ -152,7 +152,7 @@ async fn list_users_has_published_posts_err_invalid_param() {
 
 #[tokio::test]
 async fn retrieve_user_err_user_invalid_id() {
-    request_builder()
+    api_client()
         .users()
         .retrieve_with_edit_context(&UserId(987654321))
         .await
@@ -161,7 +161,7 @@ async fn retrieve_user_err_user_invalid_id() {
 
 #[tokio::test]
 async fn retrieve_user_err_unauthorized() {
-    request_builder_as_unauthenticated()
+    api_client_as_unauthenticated()
         .users()
         .retrieve_me_with_edit_context()
         .await
@@ -175,7 +175,7 @@ async fn update_user_err_cannot_edit() {
         ..Default::default()
     };
     // Subscribers can't update someone else's slug
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
@@ -189,7 +189,7 @@ async fn update_user_err_cannot_edit_roles() {
         ..Default::default()
     };
     // Subscribers can't update their roles
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .users()
         .update(&SECOND_USER_ID, &params)
         .await
@@ -203,7 +203,7 @@ async fn update_user_err_user_invalid_email() {
         ..Default::default()
     };
     // Can't update user's email to an email that's already in use
-    request_builder()
+    api_client()
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
@@ -216,7 +216,7 @@ async fn update_user_email_err_invalid_param() {
         email: Some("not_valid".to_string()),
         ..Default::default()
     };
-    request_builder()
+    api_client()
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
@@ -229,7 +229,7 @@ async fn update_user_password_err_invalid_param() {
         password: Some("".to_string()),
         ..Default::default()
     };
-    request_builder()
+    api_client()
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
@@ -243,7 +243,7 @@ async fn update_user_err_user_invalid_role() {
         ..Default::default()
     };
     // Can't update user's email to a role that doesn't exist
-    request_builder()
+    api_client()
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
@@ -257,7 +257,7 @@ async fn update_user_err_user_invalid_slug() {
         ..Default::default()
     };
     // Can't update user's slug to a slug that's already in use
-    request_builder()
+    api_client()
         .users()
         .update(&FIRST_USER_ID, &params)
         .await

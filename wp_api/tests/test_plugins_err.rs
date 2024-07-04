@@ -2,7 +2,7 @@ use wp_api::plugins::{PluginCreateParams, PluginListParams, PluginStatus, Plugin
 use wp_api::WpRestErrorCode;
 
 use crate::integration_test_common::{
-    request_builder, request_builder_as_subscriber, AssertWpError, HELLO_DOLLY_PLUGIN_SLUG,
+    api_client, api_client_as_subscriber, AssertWpError, HELLO_DOLLY_PLUGIN_SLUG,
     WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
@@ -10,7 +10,7 @@ pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_plugin_err_cannot_install_plugin() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .plugins()
         .create(&PluginCreateParams {
             slug: WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS.into(),
@@ -22,7 +22,7 @@ async fn create_plugin_err_cannot_install_plugin() {
 
 #[tokio::test]
 async fn delete_plugin_err_cannot_delete_active_plugin() {
-    request_builder()
+    api_client()
         .plugins()
         .delete(&HELLO_DOLLY_PLUGIN_SLUG.into())
         .await
@@ -31,7 +31,7 @@ async fn delete_plugin_err_cannot_delete_active_plugin() {
 
 #[tokio::test]
 async fn list_plugins_err_cannot_view_plugins() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .plugins()
         .list_with_edit_context(&PluginListParams::default())
         .await
@@ -40,7 +40,7 @@ async fn list_plugins_err_cannot_view_plugins() {
 
 #[tokio::test]
 async fn retrieve_plugin_err_cannot_view_plugin() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .plugins()
         .retrieve_with_edit_context(&HELLO_DOLLY_PLUGIN_SLUG.into())
         .await
@@ -49,7 +49,7 @@ async fn retrieve_plugin_err_cannot_view_plugin() {
 
 #[tokio::test]
 async fn update_plugin_err_plugin_not_found() {
-    request_builder()
+    api_client()
         .plugins()
         .update(
             &"foo".into(),
@@ -63,7 +63,7 @@ async fn update_plugin_err_plugin_not_found() {
 
 #[tokio::test]
 async fn update_plugin_err_cannot_manage_plugins() {
-    request_builder_as_subscriber()
+    api_client_as_subscriber()
         .plugins()
         .update(
             &HELLO_DOLLY_PLUGIN_SLUG.into(),

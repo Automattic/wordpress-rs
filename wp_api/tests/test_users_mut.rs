@@ -3,7 +3,7 @@ use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
-use crate::integration_test_common::{request_builder, FIRST_USER_ID, SECOND_USER_ID};
+use crate::integration_test_common::{api_client, FIRST_USER_ID, SECOND_USER_ID};
 
 pub mod integration_test_common;
 pub mod wp_db;
@@ -22,11 +22,7 @@ async fn create_user() {
             email.to_string(),
             password.to_string(),
         );
-        let created_user = request_builder()
-            .users()
-            .create(&params)
-            .await
-            .assert_response();
+        let created_user = api_client().users().create(&params).await.assert_response();
 
         // Assert that the user is in DB
         let created_user_from_db = db.user(created_user.id.0 as u64).await.unwrap();
@@ -44,7 +40,7 @@ async fn delete_user() {
         let user_delete_params = UserDeleteParams {
             reassign: FIRST_USER_ID,
         };
-        let user_delete_response = request_builder()
+        let user_delete_response = api_client()
             .users()
             .delete(&SECOND_USER_ID, &user_delete_params)
             .await;
@@ -67,7 +63,7 @@ async fn delete_current_user() {
         let user_delete_params = UserDeleteParams {
             reassign: SECOND_USER_ID,
         };
-        let deleted_user = request_builder()
+        let deleted_user = api_client()
             .users()
             .delete_me(&user_delete_params)
             .await
@@ -208,7 +204,7 @@ async fn update_user_roles() {
         };
         // It's quite tricky to validate the roles from DB, so we just ensure the request was
         // successful
-        request_builder()
+        api_client()
             .users()
             .update(&SECOND_USER_ID, &params)
             .await
@@ -228,7 +224,7 @@ async fn update_user_password() {
         };
         // It's quite tricky to validate the password from DB, so we just ensure the request was
         // successful
-        request_builder()
+        api_client()
             .users()
             .update(&FIRST_USER_ID, &params)
             .await
@@ -242,7 +238,7 @@ where
     F: Fn(DbUser, Vec<DbUserMeta>),
 {
     wp_db::run_and_restore(|mut db| async move {
-        request_builder()
+        api_client()
             .users()
             .update(&FIRST_USER_ID, &params)
             .await
