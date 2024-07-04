@@ -83,17 +83,6 @@ impl ApiBaseUrl {
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
-    fn by_extending<I>(&self, segments: I) -> Url
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        self.url
-            .clone()
-            .extend(segments)
-            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
-    }
-
     pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
     where
         I: IntoIterator,
@@ -197,8 +186,16 @@ mod tests {
             format!("{}/bar", expected_wp_json_url)
         );
         assert_eq!(
-            api_base_url.by_extending(["bar", "baz"]).as_str(),
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(["bar", "baz"])
+                .as_str(),
             format!("{}/bar/baz", expected_wp_json_url)
+        );
+        assert_eq!(
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(["bar", "baz/quox"])
+                .as_str(),
+            format!("{}/bar/baz/quox", expected_wp_json_url)
         );
     }
 
