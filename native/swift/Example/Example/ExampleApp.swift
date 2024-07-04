@@ -9,7 +9,34 @@ struct ExampleApp: App {
     var body: some Scene {
         WindowGroup {
             if loginManager.isLoggedIn {
-                ContentView(viewModel: UserListViewModel(loginManager: self.loginManager))
+                NavigationView {
+                    // The first column is the sidebar.
+                    RootListView()
+
+                    // Initial content of the second column.
+                    EmptyView()
+
+                    // Initial content for the third column.
+                    Text("Select a category of settings in the sidebar.")
+                }.toolbar(content: {
+                    #if os(macOS)
+                    ToolbarItem {
+                        Button("Log Out") {
+                            Task {
+                                await loginManager.logout()
+                            }
+                        }
+                    }
+                    #else
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("Log Out") {
+                            Task {
+                                await loginManager.logout()
+                            }
+                        }
+                    }
+                    #endif
+                })
             } else {
                 LoginView()
             }
