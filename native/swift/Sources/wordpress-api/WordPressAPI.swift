@@ -85,8 +85,9 @@ public struct WordPressAPI {
     }
 
     public struct Helpers {
-        public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
-            return extractLoginDetailsFromUrl(url: url.asRestUrl())
+        public static func extractLoginDetails(from url: URL) throws -> WpApiApplicationPasswordDetails? {
+            let parsedUrl = try ParsedUrl.from(url: url)
+            return try extractLoginDetailsFromUrl(url: parsedUrl)
         }
     }
 
@@ -195,18 +196,8 @@ extension RequestMethod {
     }
 }
 
-extension WpRestApiUrl {
-    func asUrl() -> URL {
-        guard let url = URL(string: stringValue) else {
-            preconditionFailure("Invalid URL: \(stringValue)")
-        }
-
-        return url
-    }
-}
-
-extension URL {
-    func asRestUrl() -> WpRestApiUrl {
-        WpRestApiUrl(stringValue: self.absoluteString)
+extension ParsedUrl {
+    static func from(url: URL) throws -> ParsedUrl {
+        try parse(input: url.absoluteString)
     }
 }
