@@ -9,7 +9,7 @@ mod variant_attr;
 
 #[proc_macro_derive(
     WpDerivedRequest,
-    attributes(SparseField, post, delete, contextual_get)
+    attributes(SparseField, Namespace, post, delete, contextual_get)
 )]
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed_enum = parse_macro_input!(input as parse::ParsedEnum);

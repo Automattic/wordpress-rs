@@ -6,7 +6,7 @@ pub(crate) mod application_passwords_endpoint;
 pub(crate) mod plugins_endpoint;
 pub(crate) mod users_endpoint;
 
-const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
+const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 
 uniffi::custom_newtype!(WpEndpointUrl, String);
 #[derive(Debug, Clone)]
@@ -93,7 +93,10 @@ impl ApiBaseUrl {
             .extend(segments.into_iter().flat_map(|s| {
                 s.as_ref()
                     .split('/')
-                    .map(str::to_string)
+                    .filter_map(|x| match x.trim() {
+                        "" => None,
+                        y => Some(y.to_string()),
+                    })
                     .collect::<Vec<String>>()
             }))
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
@@ -213,9 +216,10 @@ mod tests {
     }
 
     pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        let namespace = "/wp/v2";
         assert_eq!(
             endpoint_url.as_str(),
-            format!("{}{}", fixture_api_base_url().as_str(), path)
+            format!("{}{}{}", fixture_api_base_url().as_str(), namespace, path)
         );
     }
 }

@@ -10,7 +10,7 @@ use syn::Ident;
 
 use crate::{
     parse::{ParsedEnum, ParsedVariant, RequestType},
-    sparse_field_attr::SparseFieldAttr,
+    sparse_field_attr::{NamespaceAttr, SparseFieldAttr},
 };
 
 mod helpers_to_generate_tokens;
@@ -165,7 +165,8 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
         let request_type = variant.attr.request_type;
-        let url_from_api_base_url = fn_body_get_url_from_api_base_url(url_parts);
+        let url_from_api_base_url =
+            fn_body_get_url_from_api_base_url(&config.namespace_attr, url_parts);
         let query_pairs = fn_body_query_pairs(params_type, request_type);
 
         ContextAndFilterHandler::from_request_type(request_type)
@@ -268,6 +269,7 @@ impl Display for WpContext {
 pub struct Config {
     pub crate_ident: Ident,
     pub sparse_field_type: SparseFieldAttr,
+    pub namespace_attr: NamespaceAttr,
     pub generated_idents: ConfigGeneratedIdents,
     pub static_types: ConfigStaticTypes,
 }
@@ -287,7 +289,8 @@ impl Config {
 
         Self {
             crate_ident,
-            sparse_field_type: parsed_enum.sparse_field_attr.clone(),
+            sparse_field_type: parsed_enum.outer_attr.sparse_field_attr.clone(),
+            namespace_attr: parsed_enum.outer_attr.namespace_attr.clone(),
             generated_idents,
             static_types,
         }

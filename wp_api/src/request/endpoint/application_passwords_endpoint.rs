@@ -9,6 +9,7 @@ use crate::application_passwords::{
 use crate::users::UserId;
 
 #[derive(WpDerivedRequest)]
+#[Namespace("/wp/v2")]
 #[SparseField(SparseApplicationPasswordField)]
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]

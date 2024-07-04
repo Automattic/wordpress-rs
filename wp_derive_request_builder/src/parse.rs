@@ -11,24 +11,27 @@ use syn::{
     Ident, Token,
 };
 
-use crate::{sparse_field_attr::SparseFieldAttr, variant_attr::ParsedVariantAttribute};
+use crate::{
+    sparse_field_attr::{OuterAttr, SparseFieldAttr},
+    variant_attr::ParsedVariantAttribute,
+};
 
 #[derive(Debug, Clone)]
 pub struct ParsedEnum {
-    pub sparse_field_attr: SparseFieldAttr,
+    pub outer_attr: OuterAttr,
     pub enum_ident: Ident,
     pub variants: Punctuated<ParsedVariant, Comma>,
 }
 
 impl Parse for ParsedEnum {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let sparse_field_attr = input.parse()?;
+        let outer_attr = input.parse()?;
         let _enum_token: Token![enum] = input.parse()?;
         let enum_ident: Ident = input.parse()?;
         let content: ParseBuffer;
         let brace_token = braced!(content in input);
         Ok(Self {
-            sparse_field_attr,
+            outer_attr,
             enum_ident,
             variants: content.parse_terminated(ParsedVariant::parse, Token![,])?,
         })

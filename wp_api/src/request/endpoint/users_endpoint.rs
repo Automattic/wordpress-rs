@@ -6,6 +6,7 @@ use crate::{
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
+#[Namespace("/wp/v2")]
 #[SparseField(SparseUserField)]
 enum UsersRequest {
     #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>)]
