@@ -13,7 +13,7 @@ use crate::{ParsedUrl, WpAuthentication};
 use std::sync::Arc;
 
 #[derive(Debug, uniffi::Object)]
-pub struct UniffiWpApiRequestBuilder {
+struct UniffiWpApiRequestBuilder {
     inner: WpApiRequestBuilder,
 }
 
@@ -26,16 +26,16 @@ impl UniffiWpApiRequestBuilder {
         }
     }
 
-    pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestBuilder> {
-        self.inner.application_passwords()
+    fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestBuilder> {
+        self.inner.application_passwords.clone()
     }
 
-    pub fn users(&self) -> Arc<UsersRequestBuilder> {
-        self.inner.users()
+    fn users(&self) -> Arc<UsersRequestBuilder> {
+        self.inner.users.clone()
     }
 
-    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
-        self.inner.plugins()
+    fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+        self.inner.plugins.clone()
     }
 }
 
@@ -62,28 +62,28 @@ impl WpApiRequestBuilder {
         }
     }
 
-    pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestBuilder> {
-        self.application_passwords.clone()
+    pub fn application_passwords(&self) -> &ApplicationPasswordsRequestBuilder {
+        self.application_passwords.as_ref()
     }
 
-    pub fn users(&self) -> Arc<UsersRequestBuilder> {
-        self.users.clone()
+    pub fn users(&self) -> &UsersRequestBuilder {
+        self.users.as_ref()
     }
 
-    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
-        self.plugins.clone()
+    pub fn plugins(&self) -> &PluginsRequestBuilder {
+        self.plugins.as_ref()
     }
 }
 
 #[derive(Debug, uniffi::Object)]
-pub struct UniffiWpApiClient {
+struct UniffiWpApiClient {
     inner: WpApiClient,
 }
 
 #[uniffi::export]
 impl UniffiWpApiClient {
     #[uniffi::constructor]
-    pub fn new(
+    fn new(
         site_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
@@ -93,16 +93,16 @@ impl UniffiWpApiClient {
         }
     }
 
-    pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestExecutor> {
-        self.inner.application_passwords()
+    fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestExecutor> {
+        self.inner.application_passwords.clone()
     }
 
-    pub fn users(&self) -> Arc<UsersRequestExecutor> {
-        self.inner.users()
+    fn users(&self) -> Arc<UsersRequestExecutor> {
+        self.inner.users.clone()
     }
 
-    pub fn plugins(&self) -> Arc<PluginsRequestExecutor> {
-        self.inner.plugins()
+    fn plugins(&self) -> Arc<PluginsRequestExecutor> {
+        self.inner.plugins.clone()
     }
 }
 
@@ -143,15 +143,15 @@ impl WpApiClient {
         }
     }
 
-    pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestExecutor> {
-        self.application_passwords.clone()
+    pub fn application_passwords(&self) -> &ApplicationPasswordsRequestExecutor {
+        self.application_passwords.as_ref()
     }
 
-    pub fn users(&self) -> Arc<UsersRequestExecutor> {
-        self.users.clone()
+    pub fn users(&self) -> &UsersRequestExecutor {
+        self.users.as_ref()
     }
 
-    pub fn plugins(&self) -> Arc<PluginsRequestExecutor> {
-        self.plugins.clone()
+    pub fn plugins(&self) -> &PluginsRequestExecutor {
+        self.plugins.as_ref()
     }
 }
