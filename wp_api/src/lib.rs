@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-pub use api_client::{WpApiRequestBuilder, WpRequestBuilder};
+pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{
     RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
 };

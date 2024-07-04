@@ -6,7 +6,7 @@ use wp_api::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
     users::UserId,
-    ParsedUrl, RequestExecutionError, WpApiError, WpAuthentication, WpRequestBuilder, WpRestError,
+    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpRestError,
     WpRestErrorCode, WpRestErrorWrapper,
 };
 
@@ -21,32 +21,32 @@ pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 
-pub fn request_builder() -> WpRequestBuilder {
+pub fn request_builder() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
         TEST_CREDENTIALS_ADMIN_USERNAME.to_string(),
         TEST_CREDENTIALS_ADMIN_PASSWORD.to_string(),
     );
-    WpRequestBuilder::new(
+    WpApiClient::new(
         test_site_url(),
         authentication,
         Arc::new(AsyncWpNetworking::default()),
     )
 }
 
-pub fn request_builder_as_subscriber() -> WpRequestBuilder {
+pub fn request_builder_as_subscriber() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
         TEST_CREDENTIALS_SUBSCRIBER_USERNAME.to_string(),
         TEST_CREDENTIALS_SUBSCRIBER_PASSWORD.to_string(),
     );
-    WpRequestBuilder::new(
+    WpApiClient::new(
         test_site_url(),
         authentication,
         Arc::new(AsyncWpNetworking::default()),
     )
 }
 
-pub fn request_builder_as_unauthenticated() -> WpRequestBuilder {
-    WpRequestBuilder::new(
+pub fn request_builder_as_unauthenticated() -> WpApiClient {
+    WpApiClient::new(
         test_site_url(),
         WpAuthentication::None,
         Arc::new(AsyncWpNetworking::default()),

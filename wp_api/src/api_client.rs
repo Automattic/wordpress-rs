@@ -39,14 +39,14 @@ impl WpApiRequestBuilder {
 }
 
 #[derive(Debug, uniffi::Object)]
-pub struct WpRequestBuilder {
+pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
 }
 
 #[uniffi::export]
-impl WpRequestBuilder {
+impl WpApiClient {
     #[uniffi::constructor]
     pub fn new(
         site_url: Arc<ParsedUrl>,
