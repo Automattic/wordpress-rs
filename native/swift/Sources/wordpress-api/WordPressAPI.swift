@@ -47,6 +47,10 @@ public struct WordPressAPI {
         self.requestBuilder.plugins()
     }
 
+    public var applicationPasswords: ApplicationPasswordsRequestExecutor {
+        self.requestBuilder.applicationPasswords()
+    }
+
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         try await withCheckedThrowingContinuation { continuation in
             self.perform(request: request) { result in

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
@@ -53,6 +55,12 @@ pub struct ApplicationPasswordUuid {
     pub uuid: String,
 }
 
+impl Display for ApplicationPasswordUuid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uuid)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
 pub struct ApplicationPasswordAppId {
@@ -64,4 +72,34 @@ pub struct ApplicationPasswordAppId {
 pub struct IpAddress {
     #[serde(alias = "last_ip")]
     pub value: String,
+}
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct ApplicationPasswordCreateParams {
+    /// A UUID provided by the application to uniquely identify it.
+    /// It is recommended to use an UUID v5 with the URL or DNS namespace.
+    pub app_id: Option<String>,
+    /// The name of the application password.
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct ApplicationPasswordDeleteResponse {
+    pub deleted: bool,
+    pub previous: ApplicationPasswordWithEditContext,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct ApplicationPasswordDeleteAllResponse {
+    pub deleted: bool,
+    pub count: i32,
+}
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct ApplicationPasswordUpdateParams {
+    /// A UUID provided by the application to uniquely identify it.
+    /// It is recommended to use an UUID v5 with the URL or DNS namespace.
+    pub app_id: Option<String>,
+    /// The name of the application password.
+    pub name: String,
 }

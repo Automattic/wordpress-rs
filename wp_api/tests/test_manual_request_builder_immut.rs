@@ -5,6 +5,7 @@ use integration_test_common::{
 use reusable_test_cases::list_users_cases;
 use rstest::*;
 use rstest_reuse::{self, apply};
+use serial_test::parallel;
 use wp_api::{
     generate,
     users::UserWithEditContext,
@@ -20,6 +21,7 @@ pub mod reusable_test_cases;
 
 #[apply(list_users_cases)]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let authentication = WpAuthentication::from_username_and_password(
         TEST_CREDENTIALS_ADMIN_USERNAME.to_string(),

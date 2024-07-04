@@ -1,5 +1,6 @@
 use integration_test_common::{AssertResponse, AsyncWpNetworking};
 use rstest::rstest;
+use serial_test::serial;
 use std::sync::Arc;
 use wp_api::login::WpLoginClient;
 
@@ -26,6 +27,7 @@ const ORCHESTREMETROPOLITAIN_AUTH_URL: &str =
     ORCHESTREMETROPOLITAIN_AUTH_URL
 )]
 #[tokio::test]
+#[serial]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
     let url_discovery = client

@@ -1,11 +1,16 @@
+use integration_test_common::request_builder_as_subscriber;
 use rstest::*;
 use rstest_reuse::{self, apply, template};
-use wp_api::application_passwords::{SparseApplicationPassword, SparseApplicationPasswordField};
+use serial_test::parallel;
+use wp_api::application_passwords::{
+    ApplicationPasswordUuid, SparseApplicationPassword, SparseApplicationPasswordField,
+};
 use wp_api::users::UserId;
 use wp_api::WpContext;
 
 use crate::integration_test_common::{
     request_builder, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
+    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
 };
 
 pub mod integration_test_common;
@@ -13,7 +18,8 @@ pub mod reusable_test_cases;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
-async fn filter_application_passwords(
+#[parallel]
+async fn filter_list_application_passwords(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
     #[case] fields: &[SparseApplicationPasswordField],
 ) {
@@ -26,8 +32,42 @@ async fn filter_application_passwords(
         .for_each(|p| validate_sparse_application_password_fields(p, fields));
 }
 
+#[apply(filter_fields_cases)]
+#[tokio::test]
+#[parallel]
+async fn filter_retrieve_application_password(#[case] fields: &[SparseApplicationPasswordField]) {
+    let p = request_builder()
+        .application_passwords()
+        .filter_retrieve(
+            &FIRST_USER_ID,
+            &ApplicationPasswordUuid {
+                uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+            },
+            WpContext::Edit,
+            fields,
+        )
+        .await
+        .assert_response();
+    validate_sparse_application_password_fields(&p, fields);
+}
+
+#[apply(filter_fields_cases)]
+#[tokio::test]
+#[parallel]
+async fn filter_retrieve_current_application_password(
+    #[case] fields: &[SparseApplicationPasswordField],
+) {
+    let p = request_builder()
+        .application_passwords()
+        .filter_retrieve_current(&FIRST_USER_ID, WpContext::Edit, fields)
+        .await
+        .assert_response();
+    validate_sparse_application_password_fields(&p, fields);
+}
+
 #[rstest]
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_with_edit_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -40,6 +80,7 @@ async fn list_application_passwords_with_edit_context(
 
 #[rstest]
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_with_embed_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -52,6 +93,7 @@ async fn list_application_passwords_with_embed_context(
 
 #[rstest]
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_with_view_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -65,6 +107,7 @@ async fn list_application_passwords_with_view_context(
 // TODO: This might not be a good test case to keep, but it's helpful during initial implementation
 // to ensure that the ip address is properly parsed
 #[tokio::test]
+#[parallel]
 async fn list_application_passwords_ensure_last_ip() {
     let list = request_builder()
         .application_passwords()
@@ -72,6 +115,96 @@ async fn list_application_passwords_ensure_last_ip() {
         .await
         .assert_response();
     assert!(list.first().unwrap().last_ip.is_some());
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_current_application_passwords_with_edit_context() {
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_current_with_edit_context(&FIRST_USER_ID)
+        .await
+        .assert_response();
+    assert_eq!(
+        a.uuid,
+        ApplicationPasswordUuid {
+            uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_current_application_passwords_with_embed_context() {
+    let a = request_builder_as_subscriber()
+        .application_passwords()
+        .retrieve_current_with_embed_context(&SECOND_USER_ID)
+        .await
+        .assert_response();
+    assert_eq!(
+        a.uuid,
+        ApplicationPasswordUuid {
+            uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_current_application_passwords_with_view_context() {
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_current_with_view_context(&FIRST_USER_ID)
+        .await
+        .assert_response();
+    assert_eq!(
+        a.uuid,
+        ApplicationPasswordUuid {
+            uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string()
+        }
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_application_passwords_with_edit_context() {
+    let uuid = ApplicationPasswordUuid {
+        uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+    };
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_with_edit_context(&FIRST_USER_ID, &uuid)
+        .await
+        .assert_response();
+    assert_eq!(a.uuid, uuid);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_application_passwords_with_embed_context() {
+    let uuid = ApplicationPasswordUuid {
+        uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+    };
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_with_embed_context(&FIRST_USER_ID, &uuid)
+        .await
+        .assert_response();
+    assert_eq!(a.uuid, uuid);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_application_passwords_with_view_context() {
+    let uuid = ApplicationPasswordUuid {
+        uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string(),
+    };
+    let a = request_builder()
+        .application_passwords()
+        .retrieve_with_view_context(&SECOND_USER_ID, &uuid)
+        .await
+        .assert_response();
+    assert_eq!(a.uuid, uuid);
 }
 
 fn validate_sparse_application_password_fields(

@@ -41,4 +41,11 @@ public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
 public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
 
+// MARK: – Application Passwords
+
+public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicationPassword
+public typealias ApplicationPasswordWithEditContext = WordPressAPIInternal.ApplicationPasswordWithEditContext
+public typealias ApplicationPasswordWithViewContext = WordPressAPIInternal.ApplicationPasswordWithViewContext
+public typealias ApplicationPasswordWithEmbedContext = WordPressAPIInternal.ApplicationPasswordWithEmbedContext
+
 #endif

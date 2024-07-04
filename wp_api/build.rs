@@ -30,8 +30,10 @@ struct TestCredentials {
     site_url: String,
     admin_username: String,
     admin_password: String,
+    admin_password_uuid: String,
     subscriber_username: String,
     subscriber_password: String,
+    subscriber_password_uuid: String,
 }
 
 impl TestCredentials {
@@ -44,8 +46,10 @@ impl TestCredentials {
                     site_url: lines[0].to_string(),
                     admin_username: lines[1].to_string(),
                     admin_password: lines[2].to_string(),
-                    subscriber_username: lines[3].to_string(),
-                    subscriber_password: lines[4].to_string(),
+                    admin_password_uuid: lines[3].to_string(),
+                    subscriber_username: lines[4].to_string(),
+                    subscriber_password: lines[5].to_string(),
+                    subscriber_password_uuid: lines[6].to_string(),
                 });
             }
         }
@@ -58,14 +62,18 @@ impl TestCredentials {
 pub const TEST_CREDENTIALS_SITE_URL: &str = "{}";
 pub const TEST_CREDENTIALS_ADMIN_USERNAME: &str = "{}";
 pub const TEST_CREDENTIALS_ADMIN_PASSWORD: &str = "{}";
+pub const TEST_CREDENTIALS_ADMIN_PASSWORD_UUID: &str = "{}";
 pub const TEST_CREDENTIALS_SUBSCRIBER_USERNAME: &str = "{}";
 pub const TEST_CREDENTIALS_SUBSCRIBER_PASSWORD: &str = "{}";
+pub const TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID: &str = "{}";
 "#,
             self.site_url,
             self.admin_username,
             self.admin_password,
+            self.admin_password_uuid,
             self.subscriber_username,
-            self.subscriber_password
+            self.subscriber_password,
+            self.subscriber_password_uuid
         )
         .trim()
         .to_string()

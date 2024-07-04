@@ -71,8 +71,9 @@ struct LoginView: View {
                 else {
                     abort() // TODO: Better error handling
                 }
-
+                debugPrint(authURL)
                 let loginDetails = try await displayLoginView(withAuthenticationUrl: authURL)
+                debugPrint(loginDetails)
                 try await loginManager.setLoginCredentials(to: loginDetails)
             } catch let err {
                 handleLoginError(err)

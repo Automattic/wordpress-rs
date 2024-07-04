@@ -1,6 +1,7 @@
 use reusable_test_cases::list_users_cases;
 use rstest::*;
 use rstest_reuse::{self, apply, template};
+use serial_test::parallel;
 use wp_api::{
     generate,
     users::{
@@ -19,6 +20,7 @@ pub mod reusable_test_cases;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_users(#[case] fields: &[SparseUserField]) {
     request_builder()
         .users()
@@ -31,6 +33,7 @@ async fn filter_users(#[case] fields: &[SparseUserField]) {
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
     let user = request_builder()
         .users()
@@ -42,6 +45,7 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserField]) {
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
     let user = request_builder()
         .users()
@@ -53,6 +57,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserField]) {
 
 #[apply(list_users_cases)]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
     request_builder()
         .users()
@@ -63,6 +68,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 
 #[apply(list_users_cases)]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_embed_context(#[case] params: UserListParams) {
     request_builder()
         .users()
@@ -73,6 +79,7 @@ async fn list_users_with_embed_context(#[case] params: UserListParams) {
 
 #[apply(list_users_cases)]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_view_context(#[case] params: UserListParams) {
     request_builder()
         .users()
@@ -84,6 +91,7 @@ async fn list_users_with_view_context(#[case] params: UserListParams) {
 #[apply(list_users_has_published_posts_cases)]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_edit_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
@@ -100,6 +108,7 @@ async fn list_users_with_edit_context_has_published_posts(
 #[apply(list_users_has_published_posts_cases)]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_embed_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
@@ -116,6 +125,7 @@ async fn list_users_with_embed_context_has_published_posts(
 #[apply(list_users_has_published_posts_cases)]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn list_users_with_view_context_has_published_posts(
     #[case] has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 ) {
@@ -132,6 +142,7 @@ async fn list_users_with_view_context_has_published_posts(
 #[rstest]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
     let user = request_builder()
         .users()
@@ -144,6 +155,7 @@ async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
 #[rstest]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn retrieve_user_with_embed_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
 ) {
@@ -158,6 +170,7 @@ async fn retrieve_user_with_embed_context(
 #[rstest]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId) {
     let user = request_builder()
         .users()
@@ -168,6 +181,7 @@ async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_me_with_edit_context() {
     let user = request_builder()
         .users()
@@ -179,6 +193,7 @@ async fn retrieve_me_with_edit_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_me_with_embed_context() {
     let user = request_builder()
         .users()
@@ -190,6 +205,7 @@ async fn retrieve_me_with_embed_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_me_with_view_context() {
     let user = request_builder()
         .users()
