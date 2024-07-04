@@ -1,40 +1,52 @@
-use crate::{
-    request::{
-        endpoint::{
-            application_passwords_endpoint::ApplicationPasswordsRequestExecutor,
-            plugins_endpoint::PluginsRequestExecutor,
-            users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
-            ApiBaseUrl,
+use crate::request::{
+    endpoint::{
+        application_passwords_endpoint::{
+            ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
         },
-        RequestExecutor,
+        plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
+        users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
+        ApiBaseUrl,
     },
-    WpApiError,
+    RequestExecutor,
 };
 use crate::{ParsedUrl, WpAuthentication};
 use std::sync::Arc;
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiRequestBuilder {
+    application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
+    plugins: Arc<PluginsRequestBuilder>,
 }
 
 #[uniffi::export]
 impl WpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: String, authentication: WpAuthentication) -> Result<Self, WpApiError> {
-        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::try_from(site_url.as_str())
-            .map_err(|err| WpApiError::SiteUrlParsingError {
-                reason: err.to_string(),
-            })?
-            .into();
+    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 
-        Ok(Self {
-            users: UsersRequestBuilder::new(api_base_url.clone(), authentication).into(),
-        })
+        Self {
+            application_passwords: ApplicationPasswordsRequestBuilder::new(
+                api_base_url.clone(),
+                authentication.clone(),
+            )
+            .into(),
+            users: UsersRequestBuilder::new(api_base_url.clone(), authentication.clone()).into(),
+            plugins: PluginsRequestBuilder::new(api_base_url.clone(), authentication.clone())
+                .into(),
+        }
+    }
+
+    pub fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestBuilder> {
+        self.application_passwords.clone()
     }
 
     pub fn users(&self) -> Arc<UsersRequestBuilder> {
         self.users.clone()
+    }
+
+    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
+        self.plugins.clone()
     }
 }
 
