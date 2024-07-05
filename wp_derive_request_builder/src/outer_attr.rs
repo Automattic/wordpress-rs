@@ -1,4 +1,4 @@
-use proc_macro2::{Literal, TokenStream, TokenTree};
+use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 use syn::{
     parse::{Parse, ParseStream},
     spanned::Spanned,
@@ -10,24 +10,20 @@ pub struct NamespaceAttr {
     pub token: TokenTree,
 }
 
-impl TryFrom<TokenStream> for NamespaceAttr {
-    type Error = OuterAttrParseError;
-
-    fn try_from(value: TokenStream) -> std::result::Result<Self, Self::Error> {
-        let mut iter = value.into_iter();
+impl NamespaceAttr {
+    fn new(tokens: TokenStream, attr_span: Span) -> Result<Self> {
+        let tokens_span = tokens.span();
+        let mut iter = tokens.into_iter();
         if let Some(first) = iter.next() {
             if iter.next().is_some() {
-                // Has more than one token
-                Err(OuterAttrParseError::WrongNamespaceAttrFormat)
+                Err(OuterAttrParseError::NamespaceAttrHasMultipleTokens.into_syn_error(tokens_span))
             } else if let TokenTree::Literal(_) = first {
                 Ok(Self { token: first })
             } else {
-                // Is not a literal
-                Err(OuterAttrParseError::NamespaceAttrIsNotLiteral)
+                Err(OuterAttrParseError::NamespaceAttrIsNotLiteral.into_syn_error(first.span()))
             }
         } else {
-            // Doesn't have any tokens
-            Err(OuterAttrParseError::WrongNamespaceAttrFormat)
+            Err(OuterAttrParseError::NamespaceAttrHasNoTokens.into_syn_error(attr_span))
         }
     }
 }
@@ -48,6 +44,7 @@ impl Parse for OuterAttr {
         let attrs = Attribute::parse_outer(input)?;
 
         let (sparse_field, namespace) = attrs.into_iter().fold((None, None), |(acc), a| {
+            let attr_span = a.span();
             let Meta::List(meta_list) = a.meta else {
                 return acc;
             };
@@ -59,8 +56,8 @@ impl Parse for OuterAttr {
                     .expect("Already verified that there is only one segment");
 
                 match s.ident.to_string().as_str() {
-                    "SparseField" => (Some(meta_list.tokens), acc.1),
-                    "Namespace" => (acc.0, Some(meta_list.tokens)),
+                    "SparseField" => (Some((meta_list.tokens, attr_span)), acc.1),
+                    "Namespace" => (acc.0, Some((meta_list.tokens, attr_span))),
                     // Unrecognized attributes may belong to another proc macro, so we need
                     // to ignore them and not return an error
                     _ => acc,
@@ -70,11 +67,11 @@ impl Parse for OuterAttr {
             }
         });
         let sparse_field_attr = sparse_field
-            .map(|tokens| SparseFieldAttr { tokens })
+            .map(|(tokens, _)| SparseFieldAttr { tokens })
             .ok_or(OuterAttrParseError::MissingSparseFieldAttr.into_syn_error(input.span()))?;
         let namespace_attr = namespace
             .ok_or(OuterAttrParseError::MissingNamespaceAttr.into_syn_error(input.span()))
-            .and_then(|t| NamespaceAttr::try_from(t).map_err(|e| e.into_syn_error(input.span())))?;
+            .and_then(|(t, attr_span)| NamespaceAttr::new(t, attr_span))?;
 
         Ok(Self {
             namespace_attr,
@@ -85,16 +82,18 @@ impl Parse for OuterAttr {
 
 #[derive(Debug, thiserror::Error)]
 pub enum OuterAttrParseError {
-    #[error("Expecting #[Namespace(\"_path_\")] - Did you forget (\"\")?")]
+    #[error("Expecting #[Namespace(\"_path_\")] - Try wrapping the path in \"\"")]
     NamespaceAttrIsNotLiteral,
-    #[error("Expecting #[Namespace(\"_path_\")] - Path should be a single '/' separated literal")]
+    #[error(
+        "Expecting #[Namespace(\"_path_\")] - Path should be a single literal separated by '/'"
+    )]
     NamespaceAttrHasMultipleTokens,
+    #[error("Expecting #[Namespace(\"_path_\")] - Path is missing")]
+    NamespaceAttrHasNoTokens,
     #[error("Missing #[Namespace(\"_path_\")] attribute")]
     MissingNamespaceAttr,
     #[error("Missing #[SparseField(_field_type_)] attribute")]
     MissingSparseFieldAttr,
-    #[error("Expecting #[Namespace(\"_path_\")]")]
-    WrongNamespaceAttrFormat,
 }
 
 impl OuterAttrParseError {
