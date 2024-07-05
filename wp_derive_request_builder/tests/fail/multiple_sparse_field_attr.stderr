@@ -1,5 +1,0 @@
-error: Only a single #[SparseField(_field_type_)] attribute is supported
- --> tests/fail/multiple_sparse_field_attr.rs:4:1
-  |
-4 | enum UsersRequest {
-  | ^^^^

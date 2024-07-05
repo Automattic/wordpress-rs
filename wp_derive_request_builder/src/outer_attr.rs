@@ -46,41 +46,32 @@ pub struct OuterAttr {
 impl Parse for OuterAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
-        if attrs.is_empty() {
-            return Err(OuterAttrParseError::NoOuterAttrs.into_syn_error(input.span()));
-        } else if attrs.len() > 2 {
-            return Err(OuterAttrParseError::UnexpectedNumberOfAttrs.into_syn_error(input.span()));
-        }
 
-        let pairs = attrs
-            .into_iter()
-            .map(|a| {
-                let error_span = a.span();
-                if let Meta::List(meta_list) = a.meta {
-                    if meta_list.path.segments.len() != 1 {
-                        Err(OuterAttrParseError::UnexpectedAttrPathSegmentCount
-                            .into_syn_error(error_span))
-                    } else {
-                        let s = meta_list
-                            .path
-                            .segments
-                            .first()
-                            .expect("Already verified that there is only one segment");
-                        Ok((s.ident.to_string(), meta_list.tokens))
-                    }
+        let (sparse_field, namespace) = attrs.into_iter().try_fold((None, None), |acc, a| {
+            let error_span = a.span();
+            if let Meta::List(meta_list) = a.meta {
+                if meta_list.path.segments.len() != 1 {
+                    Err(OuterAttrParseError::UnexpectedAttrPathSegmentCount
+                        .into_syn_error(error_span))
                 } else {
-                    Err(OuterAttrParseError::WrongOuterAttrFormat.into_syn_error(error_span))
+                    let s = meta_list
+                        .path
+                        .segments
+                        .first()
+                        .expect("Already verified that there is only one segment");
+
+                    match s.ident.to_string().as_str() {
+                        "SparseField" => Ok((Some(meta_list.tokens), acc.1)),
+                        "Namespace" => Ok((acc.0, Some(meta_list.tokens))),
+                        // Unrecognized attribute may belong to another Derive macro, so we need
+                        // to ignore and not return an error
+                        _ => Ok(acc),
+                    }
                 }
-            })
-            .collect::<Result<Vec<(String, TokenStream)>>>()?;
-        let (sparse_field, namespace) =
-            pairs
-                .into_iter()
-                .try_fold((None, None), |acc, (k, tokens)| match k.as_str() {
-                    "SparseField" => Ok((Some(tokens), acc.1)),
-                    "Namespace" => Ok((acc.0, Some(tokens))),
-                    _ => Err(OuterAttrParseError::UnexpectedAttr.into_syn_error(input.span())),
-                })?;
+            } else {
+                Err(OuterAttrParseError::WrongOuterAttrFormat.into_syn_error(error_span))
+            }
+        })?;
         let sparse_field_attr = sparse_field
             .map(|tokens| SparseFieldAttr { tokens })
             .ok_or(OuterAttrParseError::MissingSparseFieldAttr.into_syn_error(input.span()))?;
@@ -101,26 +92,16 @@ pub enum OuterAttrParseError {
     NamespaceAttrIsNotLiteral,
     #[error("Expecting #[Namespace(\"_path_\")] - Found extra tokens")]
     NamespaceAttrHasMultipleTokens,
-    #[error("Missing #[SparseField(_field_type_) & #[Namespace(\"_path_\")] attributes]")]
-    NoOuterAttrs,
     #[error("Missing #[Namespace(\"_path_\")]")]
     MissingNamespaceAttr,
     #[error("Missing #[SparseField(_field_type_)]")]
     MissingSparseFieldAttr,
-    #[error(
-        "Only #[SparseField(_field_type_)] & #[Namespace(\"_path_\")] attributes are supported"
-    )]
-    UnexpectedNumberOfAttrs,
     #[error("Only SparseField & Namespace attributes only have one path segment")]
     UnexpectedAttrPathSegmentCount,
     #[error("Expecting #[SparseField(_field_type_)] & #[Namespace(\"_path_\")]")]
     WrongOuterAttrFormat,
     #[error("Expecting #[Namespace(\"_path_\")]")]
     WrongNamespaceAttrFormat,
-    #[error(
-        "Only #[SparseField(_field_type_)] & #[Namespace(\"_path_\")] attributes are supported"
-    )]
-    UnexpectedAttr,
 }
 
 impl OuterAttrParseError {
