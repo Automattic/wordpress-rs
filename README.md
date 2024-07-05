@@ -12,4 +12,8 @@ The following dependencies must be installed on your system to build and run the
 
 ## Development
 
-The majority of the project's scripts are managed in a Makefile found in the root of the project.
+The majority of the project's scripts are managed in a Makefile found in the root of the project. To see a list of available commands, run:
+
+```sh
+make help
+```
