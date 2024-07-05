@@ -19,13 +19,11 @@ impl TryFrom<TokenStream> for NamespaceAttr {
             if iter.next().is_some() {
                 // Has more than one token
                 Err(OuterAttrParseError::WrongNamespaceAttrFormat)
+            } else if let TokenTree::Literal(_) = first {
+                Ok(Self { token: first })
             } else {
-                if let TokenTree::Literal(_) = first {
-                    Ok(Self { token: first })
-                } else {
-                    // Is not a literal
-                    Err(OuterAttrParseError::NamespaceAttrIsNotLiteral)
-                }
+                // Is not a literal
+                Err(OuterAttrParseError::NamespaceAttrIsNotLiteral)
             }
         } else {
             // Doesn't have any tokens
@@ -57,7 +55,7 @@ impl Parse for OuterAttr {
         let pairs = attrs
             .into_iter()
             .map(|a| {
-                let error_span = a.span().clone();
+                let error_span = a.span();
                 if let Meta::List(meta_list) = a.meta {
                     if meta_list.path.segments.len() != 1 {
                         Err(OuterAttrParseError::UnexpectedAttrPathSegmentCount
@@ -78,9 +76,9 @@ impl Parse for OuterAttr {
         let (sparse_field, namespace) =
             pairs
                 .into_iter()
-                .fold(Ok((None, None)), |acc, (k, tokens)| match k.as_str() {
-                    "SparseField" => acc.map(|acc| (Some(tokens), acc.1)),
-                    "Namespace" => acc.map(|acc| (acc.0, Some(tokens))),
+                .try_fold((None, None), |acc, (k, tokens)| match k.as_str() {
+                    "SparseField" => Ok((Some(tokens), acc.1)),
+                    "Namespace" => Ok((acc.0, Some(tokens))),
                     _ => Err(OuterAttrParseError::UnexpectedAttr.into_syn_error(input.span())),
                 })?;
         let sparse_field_attr = sparse_field

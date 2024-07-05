@@ -1,4 +1,5 @@
 #[derive(wp_derive_request_builder::WpDerivedRequest)]
+#[Namespace("/wp/v2")]
 #[SparseField(crate::SparseUserField)]
 #[SparseField(crate::SparsePluginField)]
 enum UsersRequest {
