@@ -47,31 +47,28 @@ impl Parse for OuterAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
 
-        let (sparse_field, namespace) = attrs.into_iter().try_fold((None, None), |acc, a| {
-            let error_span = a.span();
-            if let Meta::List(meta_list) = a.meta {
-                if meta_list.path.segments.len() != 1 {
-                    Err(OuterAttrParseError::UnexpectedAttrPathSegmentCount
-                        .into_syn_error(error_span))
-                } else {
-                    let s = meta_list
-                        .path
-                        .segments
-                        .first()
-                        .expect("Already verified that there is only one segment");
+        let (sparse_field, namespace) = attrs.into_iter().fold((None, None), |(acc), a| {
+            let Meta::List(meta_list) = a.meta else {
+                return acc;
+            };
+            if meta_list.path.segments.len() == 1 {
+                let s = meta_list
+                    .path
+                    .segments
+                    .first()
+                    .expect("Already verified that there is only one segment");
 
-                    match s.ident.to_string().as_str() {
-                        "SparseField" => Ok((Some(meta_list.tokens), acc.1)),
-                        "Namespace" => Ok((acc.0, Some(meta_list.tokens))),
-                        // Unrecognized attribute may belong to another Derive macro, so we need
-                        // to ignore and not return an error
-                        _ => Ok(acc),
-                    }
+                match s.ident.to_string().as_str() {
+                    "SparseField" => (Some(meta_list.tokens), acc.1),
+                    "Namespace" => (acc.0, Some(meta_list.tokens)),
+                    // Unrecognized attributes may belong to another proc macro, so we need
+                    // to ignore them and not return an error
+                    _ => acc,
                 }
             } else {
-                Err(OuterAttrParseError::WrongOuterAttrFormat.into_syn_error(error_span))
+                acc
             }
-        })?;
+        });
         let sparse_field_attr = sparse_field
             .map(|tokens| SparseFieldAttr { tokens })
             .ok_or(OuterAttrParseError::MissingSparseFieldAttr.into_syn_error(input.span()))?;
@@ -90,16 +87,12 @@ impl Parse for OuterAttr {
 pub enum OuterAttrParseError {
     #[error("Expecting #[Namespace(\"_path_\")] - Did you forget (\"\")?")]
     NamespaceAttrIsNotLiteral,
-    #[error("Expecting #[Namespace(\"_path_\")] - Found extra tokens")]
+    #[error("Expecting #[Namespace(\"_path_\")] - Path should be a single '/' separated literal")]
     NamespaceAttrHasMultipleTokens,
-    #[error("Missing #[Namespace(\"_path_\")]")]
+    #[error("Missing #[Namespace(\"_path_\")] attribute")]
     MissingNamespaceAttr,
-    #[error("Missing #[SparseField(_field_type_)]")]
+    #[error("Missing #[SparseField(_field_type_)] attribute")]
     MissingSparseFieldAttr,
-    #[error("Only SparseField & Namespace attributes only have one path segment")]
-    UnexpectedAttrPathSegmentCount,
-    #[error("Expecting #[SparseField(_field_type_)] & #[Namespace(\"_path_\")]")]
-    WrongOuterAttrFormat,
     #[error("Expecting #[Namespace(\"_path_\")]")]
     WrongNamespaceAttrFormat,
 }

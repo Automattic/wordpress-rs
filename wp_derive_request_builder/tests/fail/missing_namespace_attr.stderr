@@ -1,4 +1,4 @@
-error: Missing #[Namespace("_path_")]
+error: Missing #[Namespace("_path_")] attribute
  --> tests/fail/missing_namespace_attr.rs:3:1
   |
 3 | enum UsersRequest {
