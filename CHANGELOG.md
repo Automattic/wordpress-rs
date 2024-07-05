@@ -1,7 +1,3 @@
-# WP REST API Project CHANGELOG
-
----
-
 ## Trunk
 
 ### Breaking Changes
@@ -22,12 +18,12 @@ _None_
 
 ## 0.1
 
-This is the first release. It supports the following for the Swift and Kotlin platforms:
-- Application Token-based login
-- Application Token Management endpoints
-- Users endpoints
-- Plugins endpoints
+This first release includes the following for the Kotlin, Rust & Swift platforms:
+- Authentication using Application Passwords
+- [Application Passwords](https://developer.wordpress.org/rest-api/reference/application-passwords/) endpoint
+- [Users](https://developer.wordpress.org/rest-api/reference/users/) endpoint
+- [Plugins](https://developer.wordpress.org/rest-api/reference/plugins/) endpoint
 
 It also includes all of the underlying infrastructure for this – including:
-- `wp_contextual` – a set of macros for generating model objects from a DSL that closely matches https://developer.wordpress.org/rest-api/reference/.
-- `wp_derive_request_builder` – a set of macros for generating endpoint implementations based on Rust's strong generic type support.
+- `wp_contextual` – A proc macro that generates `Edit`, `Embed` & `View` contextual types from given Sparse type
+- `wp_derive_request_builder` – A proc macro that generates endpoint, request builder and request executor types
