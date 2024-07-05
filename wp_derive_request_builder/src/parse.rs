@@ -12,7 +12,7 @@ use syn::{
 };
 
 use crate::{
-    sparse_field_attr::{OuterAttr, SparseFieldAttr},
+    outer_attr::{OuterAttr, SparseFieldAttr},
     variant_attr::ParsedVariantAttribute,
 };
 

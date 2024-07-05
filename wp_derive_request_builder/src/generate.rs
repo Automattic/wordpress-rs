@@ -9,8 +9,8 @@ use strum_macros::EnumIter;
 use syn::Ident;
 
 use crate::{
+    outer_attr::{NamespaceAttr, SparseFieldAttr},
     parse::{ParsedEnum, ParsedVariant, RequestType},
-    sparse_field_attr::{NamespaceAttr, SparseFieldAttr},
 };
 
 mod helpers_to_generate_tokens;

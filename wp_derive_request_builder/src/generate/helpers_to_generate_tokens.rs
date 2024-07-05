@@ -5,8 +5,8 @@ use syn::Ident;
 
 use super::{ContextAndFilterHandler, PartOf, WpContext};
 use crate::{
+    outer_attr::{NamespaceAttr, SparseFieldAttr},
     parse::{ParsedEnum, RequestType},
-    sparse_field_attr::{NamespaceAttr, SparseFieldAttr},
     variant_attr::{ParamsType, UrlPart},
 };
 
@@ -383,8 +383,6 @@ pub fn fn_body_get_request_from_request_builder(
 mod tests {
     #![allow(clippy::too_many_arguments)]
     use std::str::FromStr;
-
-    use crate::sparse_field_attr;
 
     use super::*;
     use proc_macro2::Literal;

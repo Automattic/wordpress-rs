@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod generate;
+mod outer_attr;
 mod parse;
-mod sparse_field_attr;
 mod variant_attr;
 
 #[proc_macro_derive(
