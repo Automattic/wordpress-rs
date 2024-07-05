@@ -1,5 +1,5 @@
 error: Url should be set as a String: (url = "/foo")
- --> tests/fail/url_value_not_literal.rs:4:28
+ --> tests/fail/url_value_not_literal.rs:5:28
   |
-4 |     #[contextual_get(url = users, params = &UserListParams, output = Vec<SparseUser>)]
+5 |     #[contextual_get(url = users, params = &UserListParams, output = Vec<SparseUser>)]
   |                            ^^^^^

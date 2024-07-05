@@ -1,5 +1,5 @@
 error: Missing #[SparseField(_field_type_)]
- --> tests/fail/missing_sparse_field_attr.rs:2:1
+ --> tests/fail/missing_sparse_field_attr.rs:3:1
   |
-2 | enum UsersRequest {
+3 | enum UsersRequest {
   | ^^^^

@@ -1,5 +1,5 @@
 error: Expecting key value pairs (url = "", params = FooParam, output = FooOutput)
- --> tests/fail/url_not_ident.rs:4:22
+ --> tests/fail/url_not_ident.rs:5:22
   |
-4 |     #[contextual_get("url" = "/users", params = &UserListParams, output = Vec<SparseUser>)]
+5 |     #[contextual_get("url" = "/users", params = &UserListParams, output = Vec<SparseUser>)]
   |                      ^^^^^
