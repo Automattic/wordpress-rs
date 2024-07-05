@@ -191,16 +191,14 @@ test-rust-doc:
 test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
 
-test-server:
+test-server: stop-server
 	@# Help: Start the test server.
-	stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server:
+stop-server: delete-wp-plugins-backup
 	@# Help: Stop the running server.
-	delete-wp-plugins-backup
 	docker-compose down
 
 dump-mysql:
@@ -218,9 +216,8 @@ restore-wp-content-plugins:
 delete-wp-plugins-backup:
 	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
-lint:
+lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
-	lint-rust lint-swift
 
 lint-rust:
 	@# Help: Run the linter for Rust.
