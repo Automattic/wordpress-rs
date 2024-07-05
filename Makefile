@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := help
+
 # The directory where the git repo is mounted in the docker container
 docker_container_repo_dir=/app
 
@@ -26,6 +28,7 @@ ifeq ($(uname), darwin)
 endif
 
 clean:
+	@# Help: Remove untracked files from the project via Git.
 	git clean -ffXd
 
 bindings:
@@ -38,6 +41,7 @@ bindings:
 
 .PHONY: docs # Rebuild docs each time we run this command
 docs:
+	@# Help: Generate project documentation.
 	rm -rf docs
 	mkdir -p docs
 	$(rust_docker_run) /bin/bash -c 'cargo doc'
@@ -46,6 +50,7 @@ docs:
 	cp -r target/doc/wp_contextual docs/wp_contextual
 
 docs-archive: docs
+	@# Help: Archive the generated project documentation.
 	tar -czvf  docs.tar.gz docs
 
 # An XCFramework relies on the .h file and the modulemap to interact with the precompiled binary
@@ -154,12 +159,16 @@ test-rust-doc:
 test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
 
-test-server: stop-server
+test-server:
+	@# Help: Start the test server.
+	stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server: delete-wp-plugins-backup
+stop-server:
+	@# Help: Stop the running server.
+	delete-wp-plugins-backup
 	docker-compose down
 
 dump-mysql:
@@ -177,15 +186,20 @@ restore-wp-content-plugins:
 delete-wp-plugins-backup:
 	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
-lint: lint-rust lint-swift
+lint:
+	@# Help: Run the linter for all languages.
+	lint-rust lint-swift
 
 lint-rust:
+	@# Help: Run the linter for Rust.
 	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all -- -D warnings"
 
 lint-swift:
+	@# Help: Run the linter for Swift.
 	swift package plugin swiftlint
 
 lintfix-swift:
+	@# Help: Run the linter for Swift and correct fixable issues.
 	swift package plugin swiftlint --autocorrect
 
 fmt-rust:
@@ -199,6 +213,7 @@ build-in-docker:
 	$(docker_build_and_run)
 
 dev-server:
+	@# Help: Start the development server.
 	mkdir -p .wordpress
 	docker-compose up
 
@@ -228,3 +243,12 @@ setup-rust-android-targets:
 
 run-wp-cli-command:
 	docker exec -it wordpress /bin/bash -c "wp --allow-root $(ARGS)"
+
+help:
+	@printf "%-40s %s\n" "Target" "Description"
+	@printf "%-40s %s\n" "------" "-----------"
+	@make -pqR : 2>/dev/null \
+		| awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' \
+		| sort \
+		| egrep -v -e '^[^[:alnum:]]' -e '^$@$$' \
+		| xargs -I _ sh -c 'printf "%-40s " _; make _ -nB | (grep -i "^# Help:" || echo "") | tail -1 | sed "s/^# Help: //g"'
