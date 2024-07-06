@@ -90,7 +90,7 @@ enum WordPressRSVersion {
         case let .release(version, checksum):
             return .binaryTarget(
                 name: "libwordpressFFI",
-                url: "https://github.com/Automattic/wordpress-rs/releases/download/\(version)/libwordpressFFI.xcframework.zip",
+                url: "https://cdn.a8c-ci.services/wordpress-rs/\(version)/libwordpressFFI.xcframework.zip",
                 checksum: checksum
             )
         }

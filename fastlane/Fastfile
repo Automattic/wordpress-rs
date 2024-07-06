@@ -6,6 +6,7 @@ LANE_VALUE_VERSION = 'WP_VERSION'
 LANE_VALUE_GITHUB_TOKEN = 'WP_GITHUB_TOKEN'
 LANE_VALUE_XCFRAMEWORK = 'WP_XCFRAMEWORK'
 LANE_VALUE_XCFRAMEWORK_CHECKSUM = 'WP_XCFRAMEWORK_CHECKSUM'
+LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH = 'WP_XCFRAMEWORK_CHECKSUM_PATH'
 
 GITHUB_REPO = 'automattic/wordpress-rs'
 GIT_REMOTE_NAME = 'origin'
@@ -20,7 +21,9 @@ lane :release do |options|
   validate
   build_xcframework
   update_swift_package
+  write_checksum_txt
   publish_github_release
+  publish_to_s3
 end
 
 lane :validate do
@@ -74,18 +77,30 @@ lane :update_swift_package do
   File.open(file_path, 'w') { |file| file.puts lines }
 end
 
-lane :publish_github_release do
-  version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
-  github_token = lane_context[LANE_VALUE_GITHUB_TOKEN] || UI.user_error!('Missing github token lane context')
-
-  UI.user_error!('Missing xcframework checksum lane context') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK)
+lane :write_checksum_txt do
+  UI.user_error!('Missing xcframework path') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK)
   xcframework = lane_context[LANE_VALUE_XCFRAMEWORK]
-  UI.user_error!('Missing xcframework checksum lane context') unless File.exist?(xcframework)
+  UI.user_error!('Missing xcframework path') unless File.exist?(xcframework)
 
   UI.user_error!('Missing xcframework checksum lane context') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK_CHECKSUM)
   checksum = lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM]
   checksum_file = "#{xcframework}.checksum.txt"
   File.write(checksum_file, checksum)
+
+  lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH] = checksum_file
+end
+
+lane :publish_github_release do
+  version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
+  github_token = lane_context[LANE_VALUE_GITHUB_TOKEN] || UI.user_error!('Missing github token lane context')
+
+  UI.user_error!('Missing xcframework path') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK)
+  xcframework = lane_context[LANE_VALUE_XCFRAMEWORK]
+  UI.user_error!('Missing xcframework path') unless File.exist?(xcframework)
+
+  UI.user_error!('Missing xcframework checksum file path') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH)
+  checksum_file = lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH]
+  UI.user_error!('Missing xcframework checksum file path') unless File.exist?(checksum_file)
 
   # Create a new branch to commit the Package.swift changes.
   # Please note, the new commit is tagged and pushed to the remote. The new branch
@@ -104,6 +119,34 @@ lane :publish_github_release do
     tag_name: version,
     description: "Release version #{version}",
     upload_assets: [xcframework, checksum_file]
+  )
+end
+
+lane :publish_to_s3 do
+  version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
+
+  UI.user_error!('Missing xcframework path') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK)
+  xcframework = lane_context[LANE_VALUE_XCFRAMEWORK]
+  UI.user_error!('Missing xcframework path') unless File.exist?(xcframework)
+
+  UI.user_error!('Missing xcframework checksum file path') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH)
+  checksum_file = lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH]
+  UI.user_error!('Missing xcframework checksum file path') unless File.exist?(checksum_file)
+
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, xcframework),
+    file: xcframework,
+    auto_prefix: false,
+    if_exists: :fail
+  )
+
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, checksum_file),
+    file: checksum_file,
+    auto_prefix: false,
+    if_exists: :fail
   )
 end
 
