@@ -1,22 +1,18 @@
 #![allow(dead_code, unused_variables)]
 
-use request::{
-    endpoint::{ApiBaseUrl, ApiEndpointUrl},
-    plugins_request_builder::PluginsRequestBuilder,
-    users_request_builder::UsersRequestBuilder,
-    RequestExecutor, RequestMethod, WpNetworkRequest, WpNetworkResponse,
-};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, sync::Arc};
-
+pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{
     RequestExecutionError, WpApiError, WpRestError, WpRestErrorCode, WpRestErrorWrapper,
 };
-use login::*;
+pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use users::*;
 
+mod api_client; // re-exported relevant types
 mod api_error; // re-exported relevant types
+mod parsed_url; // re-exported relevant types
+
+pub mod application_passwords;
 pub mod login;
 pub mod plugins;
 pub mod request;
@@ -24,143 +20,6 @@ pub mod users;
 
 #[cfg(test)]
 mod unit_test_common;
-
-const CONTENT_TYPE_JSON: &str = "application/json";
-
-#[derive(Debug, uniffi::Object)]
-pub struct WpRequestBuilder {
-    users: Arc<UsersRequestBuilder>,
-    plugins: Arc<PluginsRequestBuilder>,
-}
-
-#[uniffi::export]
-impl WpRequestBuilder {
-    #[uniffi::constructor]
-    pub fn new(
-        site_url: String,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-    ) -> Result<Self, WpApiError> {
-        let api_base_url: Arc<ApiBaseUrl> = ApiBaseUrl::new(site_url.as_str())
-            .map_err(|err| WpApiError::SiteUrlParsingError {
-                reason: err.to_string(),
-            })?
-            .into();
-        let request_builder = Arc::new(RequestBuilder {
-            authentication: authentication.clone(),
-            executor: request_executor,
-        });
-
-        Ok(Self {
-            users: UsersRequestBuilder::new(api_base_url.clone(), request_builder.clone()).into(),
-            plugins: PluginsRequestBuilder::new(api_base_url.clone(), request_builder.clone())
-                .into(),
-        })
-    }
-
-    pub fn users(&self) -> Arc<UsersRequestBuilder> {
-        self.users.clone()
-    }
-
-    pub fn plugins(&self) -> Arc<PluginsRequestBuilder> {
-        self.plugins.clone()
-    }
-}
-
-#[uniffi::export]
-fn wp_authentication_from_username_and_password(
-    username: String,
-    password: String,
-) -> WpAuthentication {
-    WpAuthentication::from_username_and_password(username, password)
-}
-
-#[derive(Debug)]
-struct RequestBuilder {
-    executor: Arc<dyn RequestExecutor>,
-    authentication: WpAuthentication,
-}
-
-impl RequestBuilder {
-    fn build_get_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
-            method: RequestMethod::GET,
-            url: url.into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    async fn get<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
-        self.executor
-            .execute(self.build_get_request(url))
-            .await?
-            .parse()
-    }
-
-    fn build_post_request<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
-    where
-        T: ?Sized + Serialize,
-    {
-        WpNetworkRequest {
-            method: RequestMethod::POST,
-            url: url.into(),
-            header_map: self.header_map_for_post_request(),
-            body: serde_json::to_vec(json_body).ok(),
-        }
-    }
-
-    async fn post<T, R>(&self, url: ApiEndpointUrl, json_body: &T) -> Result<R, WpApiError>
-    where
-        T: ?Sized + Serialize,
-        R: DeserializeOwned,
-    {
-        self.executor
-            .execute(self.build_post_request(url, json_body))
-            .await?
-            .parse()
-    }
-
-    fn build_delete_request(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
-        WpNetworkRequest {
-            method: RequestMethod::DELETE,
-            url: url.into(),
-            header_map: self.header_map(),
-            body: None,
-        }
-    }
-
-    async fn delete<T: DeserializeOwned>(&self, url: ApiEndpointUrl) -> Result<T, WpApiError> {
-        self.executor
-            .execute(self.build_delete_request(url))
-            .await?
-            .parse()
-    }
-
-    fn header_map(&self) -> HashMap<String, String> {
-        let mut header_map = HashMap::new();
-        header_map.insert(
-            http::header::ACCEPT.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
-        );
-        match self.authentication {
-            WpAuthentication::None => None,
-            WpAuthentication::AuthorizationHeader { ref token } => {
-                header_map.insert("Authorization".to_string(), format!("Basic {}", token))
-            }
-        };
-        header_map
-    }
-
-    fn header_map_for_post_request(&self) -> HashMap<String, String> {
-        let mut header_map = self.header_map();
-        header_map.insert(
-            http::header::CONTENT_TYPE.to_string(),
-            CONTENT_TYPE_JSON.to_string(),
-        );
-        header_map
-    }
-}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpContext {
@@ -195,6 +54,14 @@ impl WpAuthentication {
     }
 }
 
+#[uniffi::export]
+fn wp_authentication_from_username_and_password(
+    username: String,
+    password: String,
+) -> WpAuthentication {
+    WpAuthentication::from_username_and_password(username, password)
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamOrder {
     #[default]
@@ -209,26 +76,6 @@ impl WpApiParamOrder {
             Self::Desc => "desc",
         }
     }
-}
-
-#[uniffi::export]
-pub fn parse_api_details_response(response: WpNetworkResponse) -> Result<WpApiDetails, WpApiError> {
-    let api_details =
-        serde_json::from_slice(&response.body).map_err(|err| WpApiError::ParsingError {
-            reason: err.to_string(),
-            response: response.body_as_string(),
-        })?;
-
-    Ok(api_details)
-}
-
-#[uniffi::export]
-pub fn get_link_header(response: &WpNetworkResponse, name: &str) -> Option<WpRestApiUrl> {
-    if let Some(url) = response.get_link_header(name) {
-        return Some(url.into());
-    }
-
-    None
 }
 
 trait SparseField {

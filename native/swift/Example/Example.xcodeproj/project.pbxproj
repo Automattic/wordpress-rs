@@ -7,25 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		242D648E2C3602C1007CA96C /* ListViewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D648D2C3602C1007CA96C /* ListViewData.swift */; };
+		242D64922C360687007CA96C /* RootListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64912C360687007CA96C /* RootListView.swift */; };
+		242D64942C3608C6007CA96C /* ListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64932C3608C6007CA96C /* ListView.swift */; };
+		242D64962C360EB3007CA96C /* WordPressAPI+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64952C360EB3007CA96C /* WordPressAPI+Extensions.swift */; };
 		2479BF812B621CB60014A01D /* ExampleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2479BF802B621CB60014A01D /* ExampleApp.swift */; };
-		2479BF832B621CB60014A01D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2479BF822B621CB60014A01D /* ContentView.swift */; };
 		2479BF852B621CB70014A01D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2479BF842B621CB70014A01D /* Assets.xcassets */; };
 		2479BF892B621CB70014A01D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2479BF882B621CB70014A01D /* Preview Assets.xcassets */; };
 		2479BF912B621CCA0014A01D /* WordPressAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 2479BF902B621CCA0014A01D /* WordPressAPI */; };
-		2479BF932B621E9B0014A01D /* UserListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2479BF922B621E9B0014A01D /* UserListViewModel.swift */; };
+		2479BF932B621E9B0014A01D /* ListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2479BF922B621E9B0014A01D /* ListViewModel.swift */; };
 		24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C32E2BA8F96F00162AD1 /* LoginView.swift */; };
 		24A3C3362BAA874C00162AD1 /* LoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C3352BAA874C00162AD1 /* LoginManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		242D648D2C3602C1007CA96C /* ListViewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewData.swift; sourceTree = "<group>"; };
+		242D64912C360687007CA96C /* RootListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootListView.swift; sourceTree = "<group>"; };
+		242D64932C3608C6007CA96C /* ListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListView.swift; sourceTree = "<group>"; };
+		242D64952C360EB3007CA96C /* WordPressAPI+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WordPressAPI+Extensions.swift"; sourceTree = "<group>"; };
 		2479BF7D2B621CB60014A01D /* Example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Example.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2479BF802B621CB60014A01D /* ExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExampleApp.swift; sourceTree = "<group>"; };
-		2479BF822B621CB60014A01D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2479BF842B621CB70014A01D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2479BF882B621CB70014A01D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		2479BF922B621E9B0014A01D /* UserListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserListViewModel.swift; sourceTree = "<group>"; };
+		2479BF922B621E9B0014A01D /* ListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewModel.swift; sourceTree = "<group>"; };
 		24A3C32E2BA8F96F00162AD1 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		24A3C3342BAA45B800162AD1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		24A3C3342BAA45B800162AD1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		24A3C3352BAA874C00162AD1 /* LoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -41,6 +47,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		242D64972C363960007CA96C /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				2479BF872B621CB70014A01D /* Preview Content */,
+				242D64932C3608C6007CA96C /* ListView.swift */,
+				242D64912C360687007CA96C /* RootListView.swift */,
+				24A3C32E2BA8F96F00162AD1 /* LoginView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		242D64982C363996007CA96C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				24A3C3342BAA45B800162AD1 /* Info.plist */,
+				2479BF842B621CB70014A01D /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		2479BF742B621CB60014A01D = {
 			isa = PBXGroup;
 			children = (
@@ -60,14 +86,13 @@
 		2479BF7F2B621CB60014A01D /* Example */ = {
 			isa = PBXGroup;
 			children = (
-				24A3C3342BAA45B800162AD1 /* Info.plist */,
+				242D64972C363960007CA96C /* UI */,
+				242D64982C363996007CA96C /* Resources */,
 				2479BF802B621CB60014A01D /* ExampleApp.swift */,
-				24A3C32E2BA8F96F00162AD1 /* LoginView.swift */,
-				2479BF822B621CB60014A01D /* ContentView.swift */,
-				2479BF842B621CB70014A01D /* Assets.xcassets */,
-				2479BF872B621CB70014A01D /* Preview Content */,
-				2479BF922B621E9B0014A01D /* UserListViewModel.swift */,
+				2479BF922B621E9B0014A01D /* ListViewModel.swift */,
 				24A3C3352BAA874C00162AD1 /* LoginManager.swift */,
+				242D648D2C3602C1007CA96C /* ListViewData.swift */,
+				242D64952C360EB3007CA96C /* WordPressAPI+Extensions.swift */,
 			);
 			path = Example;
 			sourceTree = "<group>";
@@ -156,11 +181,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2479BF832B621CB60014A01D /* ContentView.swift in Sources */,
+				242D64922C360687007CA96C /* RootListView.swift in Sources */,
 				2479BF812B621CB60014A01D /* ExampleApp.swift in Sources */,
 				24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */,
-				2479BF932B621E9B0014A01D /* UserListViewModel.swift in Sources */,
+				2479BF932B621E9B0014A01D /* ListViewModel.swift in Sources */,
 				24A3C3362BAA874C00162AD1 /* LoginManager.swift in Sources */,
+				242D64962C360EB3007CA96C /* WordPressAPI+Extensions.swift in Sources */,
+				242D648E2C3602C1007CA96C /* ListViewData.swift in Sources */,
+				242D64942C3608C6007CA96C /* ListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,10 +316,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"Example/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Example/UI/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Example/Info.plist;
+				INFOPLIST_FILE = Example/Resources/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -326,10 +354,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"Example/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"Example/UI/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Example/Info.plist;
+				INFOPLIST_FILE = Example/Resources/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -390,7 +418,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		2479BF902B621CCA0014A01D /* WordPressAPI */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = "WordPressAPI";
+			productName = WordPressAPI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -28,10 +28,12 @@ android {
 
     buildTypes {
         debug {
+            // TODO: Test credentials shouldn't be included while publishing
             readTestCredentials()?.let {
                 buildConfigField("String", "TEST_SITE_URL", "\"${it.siteUrl}\"")
                 buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${it.adminUsername}\"")
                 buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${it.adminPassword}\"")
+                buildConfigField("String", "TEST_ADMIN_PASSWORD_UUID", "\"${it.adminPasswordUuid}\"")
                 buildConfigField(
                     "String",
                     "TEST_SUBSCRIBER_USERNAME",
@@ -42,6 +44,7 @@ android {
                     "TEST_SUBSCRIBER_PASSWORD",
                     "\"${it.subscriberPassword}\""
                 )
+                buildConfigField("String", "TEST_SUBSCRIBER_PASSWORD_UUID", "\"${it.subscriberPasswordUuid}\"")
             }
         }
     }
@@ -58,17 +61,6 @@ android {
     lint.baseline = file("${project.rootDir}/config/lint/baseline.xml")
 
     sourceSets["androidTest"].jniLibs.srcDirs.plus("${layout.buildDirectory.get()}/rustJniLibs/android")
-}
-
-repositories {
-    maven {
-        url = uri("https://a8c-libs.s3.amazonaws.com/android")
-        content {
-            includeGroup("rs.wordpress.api")
-        }
-    }
-    mavenCentral()
-    google()
 }
 
 dependencies {
@@ -173,8 +165,10 @@ fun readTestCredentials(): TestCredentials? {
         siteUrl = siteUrl,
         adminUsername = lines[1],
         adminPassword = lines[2],
-        subscriberUsername = lines[3],
-        subscriberPassword = lines[4]
+        adminPasswordUuid = lines[3],
+        subscriberUsername = lines[4],
+        subscriberPassword = lines[5],
+        subscriberPasswordUuid = lines[6]
     )
 }
 
@@ -182,6 +176,8 @@ data class TestCredentials(
     val siteUrl: String,
     val adminUsername: String,
     val adminPassword: String,
+    val adminPasswordUuid: String,
     val subscriberUsername: String,
     val subscriberPassword: String,
+    val subscriberPasswordUuid: String,
 )

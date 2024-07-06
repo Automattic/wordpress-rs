@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
@@ -6,8 +8,10 @@ use crate::SparseField;
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
+    #[uniffi(default = None)]
     pub search: Option<String>,
     /// Limits results to plugins with the given status.
+    #[uniffi(default = None)]
     pub status: Option<PluginStatus>,
 }
 
@@ -127,6 +131,12 @@ impl From<&str> for PluginSlug {
         Self {
             slug: value.to_string(),
         }
+    }
+}
+
+impl Display for PluginSlug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.slug)
     }
 }
 

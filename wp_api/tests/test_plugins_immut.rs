@@ -1,5 +1,6 @@
 use rstest::*;
 use rstest_reuse::{self, apply, template};
+use serial_test::parallel;
 use wp_api::{
     generate,
     plugins::{PluginListParams, PluginSlug, PluginStatus, SparsePlugin, SparsePluginField},
@@ -7,13 +8,14 @@ use wp_api::{
 };
 
 use crate::integration_test_common::{
-    request_builder, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    api_client, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
 pub mod integration_test_common;
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_plugins(
     #[case] fields: &[SparsePluginField],
     #[values(
@@ -23,9 +25,9 @@ async fn filter_plugins(
     )]
     params: PluginListParams,
 ) {
-    request_builder()
+    api_client()
         .plugins()
-        .filter_list(WpContext::Edit, &Some(params), fields)
+        .filter_list(WpContext::Edit, &params, fields)
         .await
         .assert_response()
         .iter()
@@ -34,13 +36,14 @@ async fn filter_plugins(
 
 #[apply(filter_fields_cases)]
 #[tokio::test]
+#[parallel]
 async fn filter_retrieve_plugin(
     #[case] fields: &[SparsePluginField],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let response = request_builder()
+    let response = api_client()
         .plugins()
-        .filter_retrieve(WpContext::Edit, &slug.into(), fields)
+        .filter_retrieve(&slug.into(), WpContext::Edit, fields)
         .await
         .assert_response();
     validate_sparse_plugin_fields(&response, fields);
@@ -53,29 +56,30 @@ async fn filter_retrieve_plugin(
 #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))))]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn list_plugins(
     #[case] params: PluginListParams,
     #[values(WpContext::Edit, WpContext::Embed, WpContext::View)] context: WpContext,
 ) {
     match context {
         WpContext::Edit => {
-            request_builder()
+            api_client()
                 .plugins()
-                .list_with_edit_context(&Some(params))
+                .list_with_edit_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::Embed => {
-            request_builder()
+            api_client()
                 .plugins()
-                .list_with_embed_context(&Some(params))
+                .list_with_embed_context(&params)
                 .await
                 .assert_response();
         }
         WpContext::View => {
-            request_builder()
+            api_client()
                 .plugins()
-                .list_with_view_context(&Some(params))
+                .list_with_view_context(&params)
                 .await
                 .assert_response();
         }
@@ -87,6 +91,7 @@ async fn list_plugins(
 #[case(HELLO_DOLLY_PLUGIN_SLUG.into(), "Matt Mullenweg", "http://wordpress.org/plugins/hello-dolly/")]
 #[trace]
 #[tokio::test]
+#[parallel]
 async fn retrieve_plugin(
     #[case] plugin_slug: PluginSlug,
     #[case] expected_author: &str,
@@ -95,7 +100,7 @@ async fn retrieve_plugin(
 ) {
     match context {
         WpContext::Edit => {
-            let plugin = request_builder()
+            let plugin = api_client()
                 .plugins()
                 .retrieve_with_edit_context(&plugin_slug)
                 .await
@@ -105,7 +110,7 @@ async fn retrieve_plugin(
             assert_eq!(expected_plugin_uri, plugin.plugin_uri);
         }
         WpContext::Embed => {
-            let plugin = request_builder()
+            let plugin = api_client()
                 .plugins()
                 .retrieve_with_embed_context(&plugin_slug)
                 .await
@@ -113,7 +118,7 @@ async fn retrieve_plugin(
             assert_eq!(&plugin_slug, &plugin.plugin);
         }
         WpContext::View => {
-            let plugin = request_builder()
+            let plugin = api_client()
                 .plugins()
                 .retrieve_with_view_context(&plugin_slug)
                 .await
@@ -126,55 +131,60 @@ async fn retrieve_plugin(
 }
 
 fn validate_sparse_plugin_fields(plugin: &SparsePlugin, fields: &[SparsePluginField]) {
+    let field_included = |field| {
+        // If "fields" is empty the server will return all fields
+        fields.is_empty() || fields.contains(&field)
+    };
     assert_eq!(
         plugin.author.is_some(),
-        fields.contains(&SparsePluginField::Author)
+        field_included(SparsePluginField::Author)
     );
 
     assert_eq!(
         plugin.author.is_some(),
-        fields.contains(&SparsePluginField::Author)
+        field_included(SparsePluginField::Author)
     );
     assert_eq!(
         plugin.description.is_some(),
-        fields.contains(&SparsePluginField::Description)
+        field_included(SparsePluginField::Description)
     );
     assert_eq!(
         plugin.name.is_some(),
-        fields.contains(&SparsePluginField::Name)
+        field_included(SparsePluginField::Name)
     );
     assert_eq!(
         plugin.network_only.is_some(),
-        fields.contains(&SparsePluginField::NetworkOnly)
+        field_included(SparsePluginField::NetworkOnly)
     );
     assert_eq!(
         plugin.plugin.is_some(),
-        fields.contains(&SparsePluginField::Plugin)
+        field_included(SparsePluginField::Plugin)
     );
     assert_eq!(
         plugin.plugin_uri.is_some(),
-        fields.contains(&SparsePluginField::PluginUri)
+        field_included(SparsePluginField::PluginUri)
     );
     assert_eq!(
         plugin.requires_php.is_some(),
-        fields.contains(&SparsePluginField::RequiresPhp)
+        field_included(SparsePluginField::RequiresPhp)
     );
     assert_eq!(
         plugin.status.is_some(),
-        fields.contains(&SparsePluginField::Status)
+        field_included(SparsePluginField::Status)
     );
     assert_eq!(
         plugin.textdomain.is_some(),
-        fields.contains(&SparsePluginField::Textdomain)
+        field_included(SparsePluginField::Textdomain)
     );
     assert_eq!(
         plugin.version.is_some(),
-        fields.contains(&SparsePluginField::Version)
+        field_included(SparsePluginField::Version)
     );
 }
 
 #[template]
 #[rstest]
+#[case(&[])]
 #[case(&[SparsePluginField::Author])]
 #[case(&[SparsePluginField::AuthorUri])]
 #[case(&[SparsePluginField::Description])]

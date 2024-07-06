@@ -1,13 +1,16 @@
 package rs.wordpress.api.kotlin
 
+import uniffi.wp_api.ParsedUrl
 import java.io.File
 
 data class TestCredentials(
-    val siteUrl: String,
+    val siteUrl: ParsedUrl,
     val adminUsername: String,
     val adminPassword: String,
+    val adminPasswordUuid: String,
     val subscriberUsername: String,
-    val subscriberPassword: String
+    val subscriberPassword: String,
+    val subscriberPasswordUuid: String
 ) {
     companion object {
         val INSTANCE: TestCredentials by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -19,11 +22,13 @@ data class TestCredentials(
                 }
             }
             TestCredentials(
-                siteUrl = lineList[0],
+                siteUrl = ParsedUrl.parse(lineList[0]),
                 adminUsername = lineList[1],
                 adminPassword = lineList[2],
-                subscriberUsername = lineList[3],
-                subscriberPassword = lineList[4],
+                adminPasswordUuid = lineList[3],
+                subscriberUsername = lineList[4],
+                subscriberPassword = lineList[5],
+                subscriberPasswordUuid = lineList[6],
             )
         }
     }

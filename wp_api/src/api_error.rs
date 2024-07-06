@@ -63,18 +63,34 @@ pub struct UnrecognizedWpRestError {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpRestErrorCode {
+    #[serde(rename = "rest_application_password_not_found")]
+    ApplicationPasswordNotFound,
+    #[serde(rename = "rest_cannot_create_application_passwords")]
+    CannotCreateApplicationPasswords,
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
     #[serde(rename = "rest_cannot_delete_active_plugin")]
     CannotDeleteActivePlugin,
+    #[serde(rename = "rest_cannot_delete_application_password")]
+    CannotDeleteApplicationPassword,
+    #[serde(rename = "rest_cannot_delete_application_passwords")]
+    CannotDeleteApplicationPasswords,
     #[serde(rename = "rest_cannot_edit")]
     CannotEdit,
+    #[serde(rename = "rest_cannot_edit_application_password")]
+    CannotEditApplicationPassword,
     #[serde(rename = "rest_cannot_edit_roles")]
     CannotEditRoles,
+    #[serde(rename = "rest_cannot_introspect_app_password_for_non_authenticated_user")]
+    CannotIntrospectAppPasswordForNonAuthenticatedUser,
     #[serde(rename = "rest_cannot_install_plugin")]
     CannotInstallPlugin,
+    #[serde(rename = "rest_cannot_list_application_passwords")]
+    CannotListApplicationPasswords,
     #[serde(rename = "rest_cannot_manage_plugins")]
     CannotManagePlugins,
+    #[serde(rename = "rest_cannot_read_application_password")]
+    CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_view_plugin")]
     CannotViewPlugin,
     #[serde(rename = "rest_cannot_view_plugins")]
@@ -105,6 +121,17 @@ pub enum WpRestErrorCode {
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
+    // ---
+    // Untested, because we are unable to create the necessary conditions for them
+    // ---
+    #[serde(rename = "application_passwords_disabled")]
+    ApplicationPasswordsDisabled,
+    #[serde(rename = "application_passwords_disabled_for_user")]
+    ApplicationPasswordsDisabledForUser,
+    #[serde(rename = "rest_cannot_manage_application_passwords")]
+    CannotManageApplicationPasswords,
+    #[serde(rename = "rest_no_authenticated_app_password")]
+    NoAuthenticatedAppPassword,
     // ---
     // Untested, because we believe these errors require multisite
     // ---

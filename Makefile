@@ -2,18 +2,17 @@
 docker_container_repo_dir=/app
 
 # Common docker options
-rust_docker_container := public.ecr.aws/docker/library/rust:1.76
-swiftlint_container := ghcr.io/realm/swiftlint:0.53.0
+rust_docker_container := public.ecr.aws/docker/library/rust:1.79
 
-docker_opts_shared :=  --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
+docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
-swift_package_platform_macos := $(call swift_package_platform_version,macos)
-swift_package_platform_ios := $(call swift_package_platform_version,ios)
-swift_package_platform_watchos := $(call swift_package_platform_version,watchos)
-swift_package_platform_tvos :=	$(call swift_package_platform_version,tvos)
+swift_package_platform_macos = $(call swift_package_platform_version,macos)
+swift_package_platform_ios = $(call swift_package_platform_version,ios)
+swift_package_platform_watchos = $(call swift_package_platform_version,watchos)
+swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 rust_nightly_toolchain := nightly-2024-04-30
@@ -176,6 +175,9 @@ test-rust-lib:
 test-rust-doc:
 	$(rust_docker_run) cargo test --doc -- --nocapture
 
+test-rust-wp-derived-request-parser:
+	$(rust_docker_run) cargo test --package wp_derive_request_builder
+
 test-server: stop-server
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
@@ -205,10 +207,10 @@ lint-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all -- -D warnings"
 
 lint-swift:
-	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint
+	swift package plugin swiftlint
 
 lintfix-swift:
-	docker run -v $(PWD):$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it $(swiftlint_container) swiftlint --autocorrect
+	swift package plugin swiftlint --autocorrect
 
 fmt-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt"
@@ -247,3 +249,6 @@ setup-rust-android-targets:
 		i686-linux-android \
 		armv7-linux-androideabi \
 		aarch64-linux-android
+
+run-wp-cli-command:
+	docker exec -it wordpress /bin/bash -c "wp --allow-root $(ARGS)"

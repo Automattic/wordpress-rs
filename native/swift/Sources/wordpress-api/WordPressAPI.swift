@@ -14,10 +14,10 @@ public struct WordPressAPI {
     }
 
     private let urlSession: URLSession
-    package let requestBuilder: WpRequestBuilderProtocol
+    package let requestBuilder: UniffiWpApiClient
 
-    public init(urlSession: URLSession, baseUrl: URL, authenticationStategy: WpAuthentication) throws {
-        try self.init(
+    public init(urlSession: URLSession, baseUrl: ParsedUrl, authenticationStategy: WpAuthentication) {
+        self.init(
             urlSession: urlSession,
             baseUrl: baseUrl,
             authenticationStategy: authenticationStategy,
@@ -27,24 +27,28 @@ public struct WordPressAPI {
 
     init(
         urlSession: URLSession,
-        baseUrl: URL,
+        baseUrl: ParsedUrl,
         authenticationStategy: WpAuthentication,
         executor: SafeRequestExecutor
-    ) throws {
+    ) {
         self.urlSession = urlSession
-        self.requestBuilder = try WpRequestBuilder(
-            siteUrl: baseUrl.absoluteString,
+        self.requestBuilder = UniffiWpApiClient(
+            siteUrl: baseUrl,
             authentication: authenticationStategy,
             requestExecutor: executor
         )
     }
 
-    public var users: UsersRequestBuilder {
+    public var users: UsersRequestExecutor {
         self.requestBuilder.users()
     }
 
-    public var plugins: PluginsRequestBuilder {
+    public var plugins: PluginsRequestExecutor {
         self.requestBuilder.plugins()
+    }
+
+    public var applicationPasswords: ApplicationPasswordsRequestExecutor {
+        self.requestBuilder.applicationPasswords()
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
@@ -55,7 +59,10 @@ public struct WordPressAPI {
         }
     }
 
-    package func perform(request: WpNetworkRequest, callback: @escaping (Result<WpNetworkResponse, Error>) -> Void) {
+    package func perform(
+        request: WpNetworkRequest,
+        callback: @escaping @Sendable (Result<WpNetworkResponse, Error>) -> Void
+    ) {
         let task = self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
             if let error {
                 callback(.failure(error))
@@ -78,28 +85,9 @@ public struct WordPressAPI {
     }
 
     public struct Helpers {
-
-        public static func parseUrl(string: String) throws -> URL {
-
-            if let url = URL(string: string), url.scheme != nil {
-                return url
-            }
-
-            if let url = URL(string: "http://" + string) {
-                return url
-            }
-
-            if let url = URL(string: "http://" + string + "/") {
-                return url
-            }
-
-            debugPrint("Invalid URL")
-
-            throw ParseError.invalidUrl
-        }
-
-        public static func extractLoginDetails(from url: URL) -> WpApiApplicationPasswordDetails? {
-            return extractLoginDetailsFromUrl(url: url.asRestUrl())
+        public static func extractLoginDetails(from url: URL) throws -> WpApiApplicationPasswordDetails? {
+            let parsedUrl = try ParsedUrl.from(url: url)
+            return try extractLoginDetailsFromUrl(url: parsedUrl)
         }
     }
 
@@ -109,25 +97,33 @@ public struct WordPressAPI {
     }
 }
 
+public extension WpNetworkHeaderMap {
+    func toFlatMap() -> [String: String] {
+        self.toMap().mapValues { $0.joined(separator: ",") }
+    }
+}
+
 public extension WpNetworkRequest {
     func asURLRequest() -> URLRequest {
-        let url = URL(string: self.url)!
+        let url = URL(string: self.url())!
         var request = URLRequest(url: url)
-        request.httpMethod = self.method.rawValue
-        request.allHTTPHeaderFields = self.headerMap
-        request.httpBody = self.body
+        request.httpMethod = self.method().rawValue
+        request.allHTTPHeaderFields = self.headerMap().toFlatMap()
+        request.httpBody = self.body()?.contents()
         return request
     }
 
     #if DEBUG
     func debugPrint() {
-        print("\(method.rawValue) \(url)")
-        for (name, value) in headerMap {
+        print("\(method().rawValue) \(self.url())")
+        for (name, value) in self.headerMap().toMap() {
             print("\(name): \(value)")
         }
+
         print("")
-        if let body, let text = String(data: body, encoding: .utf8) {
-            print(text)
+
+        if let bodyString = self.bodyAsString() {
+            print(bodyString)
         }
     }
     #endif
@@ -159,7 +155,7 @@ extension WpNetworkResponse {
         return WpNetworkResponse(
             body: data,
             statusCode: UInt16(response.statusCode),
-            headerMap: response.httpHeaders
+            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders)
         )
 
     }
@@ -200,24 +196,8 @@ extension RequestMethod {
     }
 }
 
-extension WpNetworkRequest {
-    init(method: RequestMethod, url: URL, headerMap: [String: String]) {
-        self.init(method: method, url: url.absoluteString, headerMap: headerMap, body: nil)
-    }
-}
-
-extension WpRestApiUrl {
-    func asUrl() -> URL {
-        guard let url = URL(string: stringValue) else {
-            preconditionFailure("Invalid URL: \(stringValue)")
-        }
-
-        return url
-    }
-}
-
-extension URL {
-    func asRestUrl() -> WpRestApiUrl {
-        WpRestApiUrl(stringValue: self.absoluteString)
+extension ParsedUrl {
+    static func from(url: URL) throws -> ParsedUrl {
+        try parse(input: url.absoluteString)
     }
 }

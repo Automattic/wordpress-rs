@@ -1,7 +1,5 @@
 import Foundation
-#if canImport(WordPressAPIInternal)
-import WordPressAPIInternal
-#endif
+import WordPressAPI
 
 class LoginManager: NSObject, ObservableObject {
 
@@ -39,9 +37,7 @@ class LoginManager: NSObject, ObservableObject {
 
     public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails) async throws {
         setDefaultSiteUrl(to: newValue.siteUrl)
-        if !hasStoredLoginCredentials() {
-            try Keychain.store(username: newValue.userLogin, password: newValue.password, for: newValue.siteUrl)
-        }
+        try Keychain.store(username: newValue.userLogin, password: newValue.password, for: newValue.siteUrl)
 
         await MainActor.run {
             isLoggedIn = true
@@ -84,14 +80,21 @@ struct Keychain {
             throw KeychainError.invalidPassword
         }
 
-        let query: [String: Any] = [
+        if try lookup(for: server) != nil {
+            let deletionStatus = SecItemDelete([
+                kSecClass as String: kSecClassInternetPassword,
+                kSecAttrServer as String: server as CFString
+            ] as CFDictionary)
+
+            guard deletionStatus == errSecSuccess else { throw KeychainError.unhandledError(status: deletionStatus) }
+        }
+
+        let status = SecItemAdd([
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrAccount as String: username as CFString,
             kSecAttrServer as String: server as CFString,
             kSecValueData as String: utf8Password as CFData
-        ]
-
-        let status = SecItemAdd(query as CFDictionary, nil)
+        ] as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.unhandledError(status: status) }
     }
 

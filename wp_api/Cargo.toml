@@ -10,15 +10,17 @@ name = "wp_api"
 [dependencies]
 async-trait = "0.1"
 base64 = { workspace = true }
+futures = "0.3"
 http = { workspace = true }
 indoc = "2.0"
-url = "2.5"
+url = { workspace = true }
 parse_link_header = "0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_contextual = { path = "../wp_contextual" }
+wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }
 
 [dev-dependencies]
 chrono = { version = "0.4" }
@@ -27,6 +29,7 @@ reqwest = "0.12"
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
 serde_json = { workspace = true }
+serial_test = "3.1"
 sqlx = { version = "0.7", features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
 tokio = { version = "1.37", features = [ "full" ] }
 

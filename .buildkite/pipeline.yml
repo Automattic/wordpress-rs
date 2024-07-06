@@ -15,6 +15,11 @@ steps:
           echo "--- :rust: Building + Testing"
           make test-rust-lib
           make test-rust-doc
+      - label: ":rust: Test `#[derive(WpDerivedRequest)]` Parser"
+        command: |
+          # Once we have integration tests running in CI, we can remove this separate step
+          echo "--- :rust: Testing `#[derive(WpDerivedRequest)]` Parser"
+          make test-rust-wp-derived-request-parser
       - label: ":rust: Lint"
         command: |
           echo "--- :rust: Running Clippy"
@@ -85,8 +90,14 @@ steps:
           make test-swift-linux
       - label: ":swift: Lint"
         command: |
+          .buildkite/download-xcframework.sh
           echo "--- :swift: Swiftlint"
           make lint-swift
+        depends_on: xcframework
+        env:
+          IMAGE_ID: xcode-15.3
+        agents:
+          queue: mac
   #
   # Kotlin Group
   - group: ":kotlin: Kotlin Wrapper"
@@ -110,7 +121,7 @@ steps:
           echo "--- 🧹 Linting"
 
           # This is a temporary step until we implement a more graceful way to handle missing credentials
-          printf "site_url\nadmin_username\nadmin_password\nsubscriber_username\nsubscriber_password\n" > test_credentials
+          printf "site_url\nadmin_username\nadmin_password\nadmin_password_uuid\nsubscriber_username\nsubscriber_password\nsubscriber_password_uuid\n" > test_credentials
 
           cd ./native/kotlin
           ./gradlew detektMain detektTest

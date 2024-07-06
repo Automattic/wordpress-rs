@@ -22,7 +22,7 @@ class UsersEndpointTest {
     @Test
     fun testUserListRequest() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.users().listWithEditContext(params = null)
+            requestBuilder.users().listWithEditContext(params = UserListParams())
         }
         assert(result is WpRequestSuccess)
         val userList = (result as WpRequestSuccess).data
@@ -48,7 +48,7 @@ class UsersEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.users().filterList(
                 context = WpContext.EDIT,
-                params = null,
+                params = UserListParams(),
                 fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
             )
         }
@@ -96,6 +96,6 @@ class UsersEndpointTest {
         val result =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result is RecognizedRestError)
-        assertEquals(WpRestErrorCode.InvalidParam, (result as RecognizedRestError).error.code)
+        assert((result as RecognizedRestError).error.code is WpRestErrorCode.InvalidParam)
     }
 }

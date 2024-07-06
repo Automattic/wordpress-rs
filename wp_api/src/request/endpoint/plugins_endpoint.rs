@@ -1,83 +1,23 @@
-use std::sync::Arc;
+use crate::{plugins::PluginListParams, PluginSlug};
+use crate::{
+    PluginCreateParams, PluginDeleteResponse, PluginUpdateParams, PluginWithEditContext,
+    PluginWithEmbedContext, PluginWithViewContext, SparsePlugin, SparsePluginField,
+};
+use wp_derive_request_builder::WpDerivedRequest;
 
-use url::Url;
-
-use crate::{plugins::PluginListParams, PluginSlug, SparsePluginField, WpContext};
-
-use super::{ApiBaseUrl, ApiEndpointUrl, UrlExtension};
-
-#[derive(Debug)]
-pub(crate) struct PluginsEndpoint {
-    api_base_url: Arc<ApiBaseUrl>,
-}
-
-impl PluginsEndpoint {
-    pub fn new(api_base_url: Arc<ApiBaseUrl>) -> Self {
-        Self { api_base_url }
-    }
-
-    pub fn create(&self) -> ApiEndpointUrl {
-        self.plugins_base_url().into()
-    }
-
-    pub fn delete(&self, plugin: &PluginSlug) -> ApiEndpointUrl {
-        self.plugins_url_with_slug(plugin).into()
-    }
-
-    pub fn list(&self, context: WpContext, params: Option<&PluginListParams>) -> ApiEndpointUrl {
-        let mut url = self.plugins_base_url();
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        if let Some(params) = params {
-            url.query_pairs_mut().extend_pairs(params.query_pairs());
-        }
-        url.into()
-    }
-
-    pub fn filter_list(
-        &self,
-        context: WpContext,
-        params: Option<&PluginListParams>,
-        fields: &[SparsePluginField],
-    ) -> ApiEndpointUrl {
-        self.list(context, params)
-            .url
-            .append_filter_fields(fields)
-            .into()
-    }
-
-    pub fn retrieve(&self, context: WpContext, plugin: &PluginSlug) -> ApiEndpointUrl {
-        let mut url = self.plugins_url_with_slug(plugin);
-        url.query_pairs_mut()
-            .append_pair("context", context.as_str());
-        url.into()
-    }
-
-    pub fn filter_retrieve(
-        &self,
-        context: WpContext,
-        plugin: &PluginSlug,
-        fields: &[SparsePluginField],
-    ) -> ApiEndpointUrl {
-        self.retrieve(context, plugin)
-            .url
-            .append_filter_fields(fields)
-            .into()
-    }
-
-    pub fn update(&self, plugin: &PluginSlug) -> ApiEndpointUrl {
-        self.plugins_url_with_slug(plugin).into()
-    }
-
-    fn plugins_base_url(&self) -> Url {
-        self.api_base_url.by_appending("plugins")
-    }
-
-    fn plugins_url_with_slug(&self, plugin: &PluginSlug) -> Url {
-        self.api_base_url
-            // The '/' character has to be preserved and not get encoded
-            .by_extending(["plugins"].into_iter().chain(plugin.slug.split('/')))
-    }
+#[derive(WpDerivedRequest)]
+#[SparseField(SparsePluginField)]
+enum PluginsRequest {
+    #[post(url = "/plugins", params = &PluginCreateParams, output = PluginWithEditContext)]
+    Create,
+    #[delete(url = "/plugins/<plugin_slug>", output = PluginDeleteResponse)]
+    Delete,
+    #[contextual_get(url = "/plugins", params = &PluginListParams, output = Vec<SparsePlugin>)]
+    List,
+    #[contextual_get(url = "/plugins/<plugin_slug>", output = SparsePlugin)]
+    Retrieve,
+    #[post(url = "/plugins/<plugin_slug>", params = &PluginUpdateParams, output = PluginWithEditContext)]
+    Update,
 }
 
 #[cfg(test)]
@@ -85,14 +25,18 @@ mod tests {
     use super::*;
     use crate::{
         generate,
-        request::endpoint::tests::{fixture_api_base_url, validate_endpoint},
-        PluginStatus,
+        request::endpoint::{
+            tests::{fixture_api_base_url, validate_endpoint},
+            ApiBaseUrl,
+        },
+        PluginStatus, WpContext,
     };
     use rstest::*;
+    use std::sync::Arc;
 
     #[rstest]
-    fn create_plugin(plugins_endpoint: PluginsEndpoint) {
-        validate_endpoint(plugins_endpoint.create(), "/plugins");
+    fn create_plugin(endpoint: PluginsRequestEndpoint) {
+        validate_endpoint(endpoint.create(), "/plugins");
     }
 
     #[rstest]
@@ -104,27 +48,50 @@ mod tests {
     #[case("foo/bar%baz".into(), "/plugins/foo/bar%25baz")]
     #[case("foo/です".into(), "/plugins/foo/%E3%81%A7%E3%81%99")]
     fn delete_plugin(
-        plugins_endpoint: PluginsEndpoint,
+        endpoint: PluginsRequestEndpoint,
         #[case] plugin_slug: PluginSlug,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(plugins_endpoint.delete(&plugin_slug), expected_path);
+        validate_endpoint(endpoint.delete(&plugin_slug), expected_path);
     }
 
     #[rstest]
-    #[case(WpContext::Edit, generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=edit&search=foo")]
-    #[case(WpContext::Embed, generate!(PluginListParams, (status, Some(PluginStatus::Active))), "/plugins?context=embed&status=active")]
-    #[case(WpContext::View, generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "/plugins?context=view&search=foo&status=inactive")]
-    fn list_plugins_with_params(
-        plugins_endpoint: PluginsEndpoint,
-        #[case] context: WpContext,
+    #[case(PluginListParams::default(), "/plugins?context=edit")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=edit&search=foo")]
+    #[case(generate!(PluginListParams, (status, Some(PluginStatus::Active))), "/plugins?context=edit&status=active")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "/plugins?context=edit&search=foo&status=inactive")]
+    fn list_plugins_with_edit_context(
+        endpoint: PluginsRequestEndpoint,
         #[case] params: PluginListParams,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(plugins_endpoint.list(context, Some(&params)), expected_path);
+        validate_endpoint(endpoint.list_with_edit_context(&params), expected_path);
     }
 
     #[rstest]
+    #[case(PluginListParams::default(), "/plugins?context=embed")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=embed&search=foo")]
+    fn list_plugins_with_embed_context(
+        endpoint: PluginsRequestEndpoint,
+        #[case] params: PluginListParams,
+        #[case] expected_path: &str,
+    ) {
+        validate_endpoint(endpoint.list_with_embed_context(&params), expected_path);
+    }
+
+    #[rstest]
+    #[case(PluginListParams::default(), "/plugins?context=view")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))), "/plugins?context=view&search=foo")]
+    fn list_plugins_with_view_context(
+        endpoint: PluginsRequestEndpoint,
+        #[case] params: PluginListParams,
+        #[case] expected_path: &str,
+    ) {
+        validate_endpoint(endpoint.list_with_view_context(&params), expected_path);
+    }
+
+    #[rstest]
+    #[case(WpContext::Edit, PluginListParams::default(), &[], "/plugins?context=edit&_fields=")]
     #[case(
         WpContext::Edit,
         generate!(PluginListParams, (search, Some("foo".to_string()))),
@@ -150,14 +117,14 @@ mod tests {
         "/plugins?context=view&search=foo&status=inactive&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
     fn filter_list_plugins_with_params(
-        plugins_endpoint: PluginsEndpoint,
+        endpoint: PluginsRequestEndpoint,
         #[case] context: WpContext,
         #[case] params: PluginListParams,
         #[case] fields: &[SparsePluginField],
         #[case] expected_path: &str,
     ) {
         validate_endpoint(
-            plugins_endpoint.filter_list(context, Some(&params), fields),
+            endpoint.filter_list(context, &params, fields),
             expected_path,
         );
     }
@@ -165,28 +132,24 @@ mod tests {
     #[rstest]
     #[case(
         "hello-dolly/hello".into(),
-        WpContext::View,
         "/plugins/hello-dolly/hello?context=view"
     )]
     #[case(
         "classic-editor/classic-editor".into(),
-        WpContext::Embed,
-        "/plugins/classic-editor/classic-editor?context=embed"
+        "/plugins/classic-editor/classic-editor?context=view"
     )]
-    #[case("foo/bar%baz".into(), WpContext::Edit, "/plugins/foo/bar%25baz?context=edit")]
+    #[case("foo/bar%baz".into(), "/plugins/foo/bar%25baz?context=view")]
     #[case(
         "foo/です".into(),
-        WpContext::View,
         "/plugins/foo/%E3%81%A7%E3%81%99?context=view"
     )]
-    fn retrieve_plugin(
-        plugins_endpoint: PluginsEndpoint,
+    fn retrieve_plugin_with_view_context(
+        endpoint: PluginsRequestEndpoint,
         #[case] plugin_slug: PluginSlug,
-        #[case] context: WpContext,
         #[case] expected_path: &str,
     ) {
         validate_endpoint(
-            plugins_endpoint.retrieve(context, &plugin_slug),
+            endpoint.retrieve_with_view_context(&plugin_slug),
             expected_path,
         );
     }
@@ -217,14 +180,14 @@ mod tests {
         "/plugins/foo/%E3%81%A7%E3%81%99?context=view&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
     fn filter_retrieve_plugin(
-        plugins_endpoint: PluginsEndpoint,
+        endpoint: PluginsRequestEndpoint,
         #[case] plugin_slug: PluginSlug,
         #[case] context: WpContext,
         #[case] fields: &[SparsePluginField],
         #[case] expected_path: &str,
     ) {
         validate_endpoint(
-            plugins_endpoint.filter_retrieve(context, &plugin_slug, fields),
+            endpoint.filter_retrieve(&plugin_slug, context, fields),
             expected_path,
         );
     }
@@ -238,15 +201,15 @@ mod tests {
     #[case("foo/bar%baz".into(), "/plugins/foo/bar%25baz")]
     #[case("foo/です".into(), "/plugins/foo/%E3%81%A7%E3%81%99")]
     fn update_plugin(
-        plugins_endpoint: PluginsEndpoint,
+        endpoint: PluginsRequestEndpoint,
         #[case] plugin_slug: PluginSlug,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(plugins_endpoint.update(&plugin_slug), expected_path);
+        validate_endpoint(endpoint.update(&plugin_slug), expected_path);
     }
 
     #[fixture]
-    fn plugins_endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> PluginsEndpoint {
-        PluginsEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> PluginsRequestEndpoint {
+        PluginsRequestEndpoint::new(fixture_api_base_url)
     }
 }

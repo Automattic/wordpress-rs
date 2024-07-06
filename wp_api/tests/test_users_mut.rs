@@ -1,13 +1,15 @@
 use integration_test_common::AssertResponse;
+use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_db::{DbUser, DbUserMeta};
 
-use crate::integration_test_common::{request_builder, FIRST_USER_ID, SECOND_USER_ID};
+use crate::integration_test_common::{api_client, FIRST_USER_ID, SECOND_USER_ID};
 
 pub mod integration_test_common;
 pub mod wp_db;
 
 #[tokio::test]
+#[serial]
 async fn create_user() {
     wp_db::run_and_restore(|mut db| async move {
         let username = "t_username";
@@ -20,11 +22,7 @@ async fn create_user() {
             email.to_string(),
             password.to_string(),
         );
-        let created_user = request_builder()
-            .users()
-            .create(&params)
-            .await
-            .assert_response();
+        let created_user = api_client().users().create(&params).await.assert_response();
 
         // Assert that the user is in DB
         let created_user_from_db = db.user(created_user.id.0 as u64).await.unwrap();
@@ -35,15 +33,16 @@ async fn create_user() {
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_user() {
     wp_db::run_and_restore(|mut db| async move {
         // Delete the user using the API and ensure it's successful
         let user_delete_params = UserDeleteParams {
             reassign: FIRST_USER_ID,
         };
-        let user_delete_response = request_builder()
+        let user_delete_response = api_client()
             .users()
-            .delete(SECOND_USER_ID, &user_delete_params)
+            .delete(&SECOND_USER_ID, &user_delete_params)
             .await;
         assert!(user_delete_response.is_ok());
 
@@ -57,13 +56,14 @@ async fn delete_user() {
 }
 
 #[tokio::test]
+#[serial]
 async fn delete_current_user() {
     wp_db::run_and_restore(|mut db| async move {
         // Delete the user using the API and ensure it's successful
         let user_delete_params = UserDeleteParams {
             reassign: SECOND_USER_ID,
         };
-        let deleted_user = request_builder()
+        let deleted_user = api_client()
             .users()
             .delete_me(&user_delete_params)
             .await
@@ -82,6 +82,7 @@ async fn delete_current_user() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_name() {
     let new_name = "new_name";
     let params = UserUpdateParams {
@@ -95,6 +96,7 @@ async fn update_user_name() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_first_name() {
     let new_first_name = "new_first_name";
     let params = UserUpdateParams {
@@ -108,6 +110,7 @@ async fn update_user_first_name() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_last_name() {
     let new_last_name = "new_last_name";
     let params = UserUpdateParams {
@@ -121,6 +124,7 @@ async fn update_user_last_name() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_email() {
     let new_email = "new_email@example.com";
     let params = UserUpdateParams {
@@ -134,6 +138,7 @@ async fn update_user_email() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_url() {
     let new_url = "https://new_url";
     let params = UserUpdateParams {
@@ -147,6 +152,7 @@ async fn update_user_url() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_description() {
     let new_description = "new_description";
     let params = UserUpdateParams {
@@ -160,6 +166,7 @@ async fn update_user_description() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_nickname() {
     let new_nickname = "new_nickname";
     let params = UserUpdateParams {
@@ -173,6 +180,7 @@ async fn update_user_nickname() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_slug() {
     let new_slug = "new_slug";
     let params = UserUpdateParams {
@@ -186,6 +194,7 @@ async fn update_user_slug() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_roles() {
     wp_db::run_and_restore(|_| async move {
         let new_role = "author";
@@ -195,9 +204,9 @@ async fn update_user_roles() {
         };
         // It's quite tricky to validate the roles from DB, so we just ensure the request was
         // successful
-        request_builder()
+        api_client()
             .users()
-            .update(SECOND_USER_ID, &params)
+            .update(&SECOND_USER_ID, &params)
             .await
             .assert_response();
     })
@@ -205,6 +214,7 @@ async fn update_user_roles() {
 }
 
 #[tokio::test]
+#[serial]
 async fn update_user_password() {
     wp_db::run_and_restore(|_| async move {
         let new_password = "new_password";
@@ -214,9 +224,9 @@ async fn update_user_password() {
         };
         // It's quite tricky to validate the password from DB, so we just ensure the request was
         // successful
-        request_builder()
+        api_client()
             .users()
-            .update(FIRST_USER_ID, &params)
+            .update(&FIRST_USER_ID, &params)
             .await
             .assert_response();
     })
@@ -228,9 +238,9 @@ where
     F: Fn(DbUser, Vec<DbUserMeta>),
 {
     wp_db::run_and_restore(|mut db| async move {
-        request_builder()
+        api_client()
             .users()
-            .update(FIRST_USER_ID, &params)
+            .update(&FIRST_USER_ID, &params)
             .await
             .assert_response();
 

@@ -38,11 +38,11 @@ final class WordPressAPITests: XCTestCase {
           }
         """
         let stubs = HTTPStubs()
-        stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
+        try stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
 
         let api = try WordPressAPI(
             urlSession: .shared,
-            baseUrl: URL(string: "https://wordpress.org")!,
+            baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
             authenticationStategy: .none,
             executor: stubs
         )
@@ -58,7 +58,7 @@ final class WordPressAPITests: XCTestCase {
 
         let api = try WordPressAPI(
             urlSession: .shared,
-            baseUrl: URL(string: "https://wordpress.org")!,
+            baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
             authenticationStategy: .none,
             executor: stubs
         )
@@ -69,57 +69,11 @@ final class WordPressAPITests: XCTestCase {
         } catch let error as URLError {
             XCTAssertEqual(error.code, .timedOut)
         } catch {
-            XCTExpectFailure("URLError can't not be passed to Rust")
-            XCTAssertFalse(true, "Unexpected error: \(error)")
+            #if canImport(WordPressAPIInternal)
+            XCTAssertTrue(error is WordPressAPIInternal.WpApiError)
+            #endif
         }
     }
 #endif
-
-}
-
-extension WpNetworkResponse {
-    static func json(_ content: String) -> WpNetworkResponse {
-        WpNetworkResponse(
-            body: content.data(using: .utf8)!,
-            statusCode: 200,
-            headerMap: ["Content-Type": "application/json"]
-        )
-    }
-}
-
-class HTTPStubs: SafeRequestExecutor {
-
-    var stubs: [(condition: (WpNetworkRequest) -> Bool, response: WpNetworkResponse)] = []
-
-    var missingStub: Result<WpNetworkResponse, Error>?
-
-    public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
-        if let response = stub(for: request) {
-            return .success(response)
-        }
-
-        switch missingStub {
-        case let .success(response):
-            return .success(response)
-        case .failure:
-            // TODO: Translate error into the Rust type
-            return .failure(.RequestExecutionFailed(statusCode: nil, reason: ""))
-        default:
-            // TODO: Translate error into the Rust type
-            return .failure(.RequestExecutionFailed(statusCode: nil, reason: ""))
-        }
-    }
-
-    func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
-        stubs.first { stub in stub.condition(request) }?
-            .response
-    }
-
-    func stub(path: String, with response: WpNetworkResponse) {
-        stubs.append((
-            condition: { URL(string: $0.url)?.path == path },
-            response: response
-        ))
-    }
 
 }

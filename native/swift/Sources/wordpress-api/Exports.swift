@@ -8,6 +8,12 @@
 import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
+public typealias ParsedUrl = WordPressAPIInternal.ParsedUrl
+
+// MARK: - Login
+
+public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
+public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 
 // MARK: - Users
 
@@ -20,7 +26,7 @@ public typealias UserUpdateParams = WordPressAPIInternal.UserUpdateParams
 public typealias UserCreateParams = WordPressAPIInternal.UserCreateParams
 public typealias UserDeleteParams = WordPressAPIInternal.UserDeleteParams
 public typealias UserDeleteResponse = WordPressAPIInternal.UserDeleteResponse
-public typealias UsersRequestBuilder = WordPressAPIInternal.UsersRequestBuilder
+public typealias UsersRequestExecutor = WordPressAPIInternal.UsersRequestExecutor
 
 // MARK: - Plugins
 
@@ -34,6 +40,12 @@ public typealias PluginListParams = WordPressAPIInternal.PluginListParams
 public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
-public typealias PluginsRequestBuilder = WordPressAPIInternal.PluginsRequestBuilder
+public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
 
+// MARK: – Application Passwords
+
+public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicationPassword
+public typealias ApplicationPasswordWithEditContext = WordPressAPIInternal.ApplicationPasswordWithEditContext
+public typealias ApplicationPasswordWithViewContext = WordPressAPIInternal.ApplicationPasswordWithViewContext
+public typealias ApplicationPasswordWithEmbedContext = WordPressAPIInternal.ApplicationPasswordWithEmbedContext
 #endif
