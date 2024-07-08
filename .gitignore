@@ -30,6 +30,7 @@ native/kotlin/.kotlin/
 xcuserdata
 DerivedData
 fastlane/report.xml
+libwordPressFFI.xcframework*
 
 # Auto-generated Swift Files
 native/swift/Sources/wordpress-api-wrapper/*.swift

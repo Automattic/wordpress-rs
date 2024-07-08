@@ -137,6 +137,14 @@ else
 xcframework: xcframework-all
 endif
 
+xcframework-package: xcframework-all
+	rm -rf libwordpressFFI.xcframework.zip
+	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ libwordpressFFI.xcframework.zip
+
+xcframework-package-checksum:
+	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
+
+
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
 
