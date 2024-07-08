@@ -200,6 +200,12 @@ mod tests {
                 .as_str(),
             format!("{}/bar/baz/quox", expected_wp_json_url)
         );
+        assert_eq!(
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(["/bar", "/baz/quox"])
+                .as_str(),
+            format!("{}/bar/baz/quox", expected_wp_json_url)
+        );
     }
 
     fn wp_json_endpoint(base_url: &str) -> String {
@@ -215,8 +221,11 @@ mod tests {
         ApiBaseUrl::try_from("https://example.com").unwrap().into()
     }
 
-    pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
-        let namespace = "/wp/v2";
+    pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint("/wp/v2", endpoint_url, path);
+    }
+
+    fn validate_endpoint(namespace: &str, endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
             endpoint_url.as_str(),
             format!("{}{}{}", fixture_api_base_url().as_str(), namespace, path)
