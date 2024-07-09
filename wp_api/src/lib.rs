@@ -15,6 +15,7 @@ mod parsed_url; // re-exported relevant types
 pub mod application_passwords;
 pub mod login;
 pub mod plugins;
+pub mod post_types;
 pub mod request;
 pub mod users;
 pub mod wp_site_health_tests;
