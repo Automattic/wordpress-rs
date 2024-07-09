@@ -167,8 +167,16 @@ impl XCFramework {
                 let new_header_path = new_headers_dir.join("libwordpressFFI.h");
                 let new_module_path = new_headers_dir.join("module.modulemap");
 
-                println!("Moving: {} -> {}", header_path.display(), new_header_path.display());
-                println!("Moving: {} -> {}", module_path.display(), new_module_path.display());
+                println!(
+                    "Moving: {} -> {}",
+                    header_path.display(),
+                    new_header_path.display()
+                );
+                println!(
+                    "Moving: {} -> {}",
+                    module_path.display(),
+                    new_module_path.display()
+                );
 
                 std::fs::rename(header_path, new_header_path)?;
                 std::fs::rename(module_path, new_module_path)?;
