@@ -6,6 +6,7 @@ LANE_VALUE_VERSION = 'WP_VERSION'
 LANE_VALUE_GITHUB_TOKEN = 'WP_GITHUB_TOKEN'
 LANE_VALUE_XCFRAMEWORK = 'WP_XCFRAMEWORK'
 LANE_VALUE_XCFRAMEWORK_CHECKSUM = 'WP_XCFRAMEWORK_CHECKSUM'
+LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH = 'WP_XCFRAMEWORK_CHECKSUM_PATH'
 
 GITHUB_REPO = 'automattic/wordpress-rs'
 GIT_REMOTE_NAME = 'origin'
@@ -18,9 +19,9 @@ lane :release do |options|
   lane_context.set_sensitive(LANE_VALUE_GITHUB_TOKEN, github_token)
 
   validate
-  build_xcframework
   update_swift_package
   publish_github_release
+  publish_to_s3
 end
 
 lane :validate do
@@ -39,34 +40,13 @@ lane :validate do
     if git_tag_exists(tag: version, remote: true, remote_name: GIT_REMOTE_NAME)
 end
 
-lane :build_xcframework do
-  output = File.expand_path('./target/libwordpressFFI.xcframework.zip', PROJECT_ROOT)
-  UI.user_error!("xcframework zip exists: #{output}") if File.exist?(output)
-
-  UI.message("Switching to dir: #{PROJECT_ROOT}")
-  checksum = Dir.chdir(PROJECT_ROOT) do
-    sh 'make xcframework'
-    source = File.expand_path('./target/libwordpressFFI.xcframework')
-    zip(path: source, output_path: output)
-    sh('swift', 'package', 'compute-checksum', output).chomp
-  end
-
-  lane_context[LANE_VALUE_XCFRAMEWORK] = output
-  lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM] = checksum
-
-  [output, checksum]
-end
-
 lane :update_swift_package do
   version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
-
-  UI.user_error!('Missing xcframework checksum lane context') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK_CHECKSUM)
-  checksum = lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM]
 
   file_path = File.expand_path('./Package.swift', PROJECT_ROOT)
   lines = File.readlines(file_path).map do |line|
     if line.start_with?('let libwordpressFFIVersion: WordPressRSVersion =')
-      "let libwordpressFFIVersion: WordPressRSVersion = .release(version: \"#{version}\", checksum: \"#{checksum}\")"
+      "let libwordpressFFIVersion: WordPressRSVersion = .release(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
     else
       line
     end
@@ -78,15 +58,6 @@ lane :publish_github_release do
   version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
   github_token = lane_context[LANE_VALUE_GITHUB_TOKEN] || UI.user_error!('Missing github token lane context')
 
-  UI.user_error!('Missing xcframework checksum lane context') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK)
-  xcframework = lane_context[LANE_VALUE_XCFRAMEWORK]
-  UI.user_error!('Missing xcframework checksum lane context') unless File.exist?(xcframework)
-
-  UI.user_error!('Missing xcframework checksum lane context') unless lane_context.key?(LANE_VALUE_XCFRAMEWORK_CHECKSUM)
-  checksum = lane_context[LANE_VALUE_XCFRAMEWORK_CHECKSUM]
-  checksum_file = "#{xcframework}.checksum.txt"
-  File.write(checksum_file, checksum)
-
   # Create a new branch to commit the Package.swift changes.
   # Please note, the new commit is tagged and pushed to the remote. The new branch
   # is not pushed to the remote and can be discarded.
@@ -95,6 +66,13 @@ lane :publish_github_release do
     path: File.expand_path('./Package.swift', PROJECT_ROOT),
     message: "Update Package.swift to use version #{version}"
   )
+
+  git_add(path: xcframework_bindings_file_path, force: true)
+  git_commit(
+    path: xcframework_bindings_file_path,
+    message: "Commit Swift Bindings for version #{version}"
+  )
+
   add_git_tag(tag: version)
   push_git_tags(tag: version, remote: GIT_REMOTE_NAME)
   set_github_release(
@@ -103,8 +81,44 @@ lane :publish_github_release do
     name: version,
     tag_name: version,
     description: "Release version #{version}",
-    upload_assets: [xcframework, checksum_file]
+    upload_assets: [xcframework_file_path, xcframework_checksum_file_path]
   )
+end
+
+lane :publish_to_s3 do
+  version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
+
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, File.basename(xcframework_file_path)),
+    file: xcframework_file_path,
+    auto_prefix: false,
+    if_exists: :fail
+  )
+
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, File.basename(xcframework_checksum_file_path)),
+    file: xcframework_checksum_file_path,
+    auto_prefix: false,
+    if_exists: :fail
+  )
+end
+
+def xcframework_checksum
+  File.read(xcframework_checksum_file_path).strip!
+end
+
+def xcframework_checksum_file_path
+  File.join(PROJECT_ROOT, 'libwordpressFFI.xcframework.zip.checksum.txt')
+end
+
+def xcframework_file_path
+  File.join(PROJECT_ROOT, 'libwordpressFFI.xcframework.zip')
+end
+
+def xcframework_bindings_file_path
+  File.join(PROJECT_ROOT, 'native', 'swift', 'Sources', 'wordpress-api-wrapper', 'wp_api.swift')
 end
 
 def remove_lane_context_values(names)

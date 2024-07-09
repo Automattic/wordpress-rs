@@ -100,6 +100,7 @@ impl XCFramework {
 
         let libraries = self.combine_libraries(temp_dir)?;
         let temp_dest = self.create_xcframework(&libraries, temp_dir)?;
+        self.patch_xcframework(&temp_dest)?;
 
         let dest = PathBuf::from(XCFRAMEWORK_OUTPUT_PATH);
         recreate_directory(&dest)?;
@@ -146,6 +147,43 @@ impl XCFramework {
             .successful_output()?;
 
         Ok(temp_dest)
+    }
+
+    // Fixes an issue including the XCFramework in an Xcode project that already contains an XCFramework: https://github.com/jessegrosjean/module-map-error
+    fn patch_xcframework(&self, temp_dir: &Path) -> Result<()> {
+        println!("Patching XCFramework to have a unique header directory");
+
+        for dir_entry in std::fs::read_dir(temp_dir)? {
+            let path = dir_entry.expect("Invalid Path").path();
+            if path.is_dir() {
+                let headers_dir = temp_dir.join(&path).join("Headers");
+                let header_path = headers_dir.join("libwordpressFFI.h");
+                let module_path = headers_dir.join("module.modulemap");
+
+                let new_headers_dir = temp_dir.join(&path).join("Headers").join("libwordpressFFI");
+
+                recreate_directory(&new_headers_dir)?;
+
+                let new_header_path = new_headers_dir.join("libwordpressFFI.h");
+                let new_module_path = new_headers_dir.join("module.modulemap");
+
+                println!(
+                    "Moving: {} -> {}",
+                    header_path.display(),
+                    new_header_path.display()
+                );
+                println!(
+                    "Moving: {} -> {}",
+                    module_path.display(),
+                    new_module_path.display()
+                );
+
+                std::fs::rename(header_path, new_header_path)?;
+                std::fs::rename(module_path, new_module_path)?;
+            }
+        }
+
+        Ok(())
     }
 }
 

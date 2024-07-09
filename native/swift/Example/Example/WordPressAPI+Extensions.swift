@@ -6,7 +6,7 @@ extension WordPressAPI {
         get throws {
             let loginManager = LoginManager()
 
-            let parsedUrl = try WpParsedUrl.parse(input: loginManager.getDefaultSiteUrl()!)
+            let parsedUrl = try ParsedUrl.parse(input: loginManager.getDefaultSiteUrl()!)
 
             return try WordPressAPI(
                urlSession: .shared,
