@@ -5,8 +5,8 @@ use syn::Ident;
 
 use super::{ContextAndFilterHandler, PartOf, WpContext};
 use crate::{
+    outer_attr::{NamespaceAttr, SparseFieldAttr},
     parse::{ParsedEnum, RequestType},
-    sparse_field_attr::SparseFieldAttr,
     variant_attr::{ParamsType, UrlPart},
 };
 
@@ -224,7 +224,10 @@ fn fn_arg_fields(context_and_filter_handler: ContextAndFilterHandler) -> TokenSt
     }
 }
 
-pub fn fn_body_get_url_from_api_base_url(url_parts: &[UrlPart]) -> TokenStream {
+pub fn fn_body_get_url_from_api_base_url(
+    namespace_attr: &NamespaceAttr,
+    url_parts: &[UrlPart],
+) -> TokenStream {
     let url_parts = url_parts
         .iter()
         .map(|part| match part {
@@ -235,8 +238,9 @@ pub fn fn_body_get_url_from_api_base_url(url_parts: &[UrlPart]) -> TokenStream {
             UrlPart::Static(static_part) => quote! { #static_part },
         })
         .collect::<Vec<TokenStream>>();
+    let namespace = namespace_attr.token.clone();
     quote! {
-        let mut url = self.api_base_url.by_extending_and_splitting_by_forward_slash([ #(#url_parts,)* ]);
+        let mut url = self.api_base_url.by_extending_and_splitting_by_forward_slash([ #namespace, #(#url_parts,)* ]);
     }
 }
 
@@ -378,9 +382,10 @@ pub fn fn_body_get_request_from_request_builder(
 #[cfg(test)]
 mod tests {
     #![allow(clippy::too_many_arguments)]
-    use crate::sparse_field_attr;
+    use std::str::FromStr;
 
     use super::*;
+    use proc_macro2::Literal;
     use quote::ToTokens;
     use rstest::rstest;
     use syn::parse_quote;
@@ -910,34 +915,40 @@ mod tests {
     #[rstest]
     #[case(
         url_static_users(),
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"users\" ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"/wp/v2\" , \"users\" ,]) ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"users\" , & user_id . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"/wp/v2\" , \"users\" , & user_id . to_string () ,]) ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"users\" , & user_id . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"/wp/v2\" , \"users\" , & user_id . to_string () ,]) ;"
     )]
     #[case(
         vec![UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())],
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([& user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"/wp/v2\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"users\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"/wp/v2\" , \"users\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Static("me".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"users\" , \"me\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([\"/wp/v2\" , \"users\" , \"me\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
     )]
     fn test_fn_body_get_url_from_api_base_url(
         #[case] url_parts: Vec<UrlPart>,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_get_url_from_api_base_url(&url_parts).to_string(),
+            fn_body_get_url_from_api_base_url(
+                &NamespaceAttr {
+                    token: quote! { "/wp/v2" }.into_iter().next().unwrap(),
+                },
+                &url_parts
+            )
+            .to_string(),
             expected_str
         );
     }

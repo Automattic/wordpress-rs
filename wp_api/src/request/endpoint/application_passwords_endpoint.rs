@@ -9,6 +9,7 @@ use crate::application_passwords::{
 use crate::users::UserId;
 
 #[derive(WpDerivedRequest)]
+#[Namespace("/wp/v2")]
 #[SparseField(SparseApplicationPasswordField)]
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
@@ -32,7 +33,7 @@ mod tests {
     use super::*;
     use crate::{
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_endpoint},
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
         WpContext,
@@ -42,7 +43,7 @@ mod tests {
 
     #[rstest]
     fn create_application_password(endpoint: ApplicationPasswordsRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.create(&UserId(1)),
             "/users/1/application-passwords",
         );
@@ -50,7 +51,7 @@ mod tests {
 
     #[rstest]
     fn delete_single_application_password(endpoint: ApplicationPasswordsRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.delete(
                 &UserId(2),
                 &ApplicationPasswordUuid {
@@ -63,7 +64,7 @@ mod tests {
 
     #[rstest]
     fn delete_all_application_passwords(endpoint: ApplicationPasswordsRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.delete_all(&UserId(1)),
             "/users/1/application-passwords",
         );
@@ -71,7 +72,7 @@ mod tests {
 
     #[rstest]
     fn list_application_passwords_with_edit_context(endpoint: ApplicationPasswordsRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.list_with_edit_context(&UserId(2)),
             "/users/2/application-passwords?context=edit",
         );
@@ -81,7 +82,7 @@ mod tests {
     fn list_application_passwords_with_embed_context(
         endpoint: ApplicationPasswordsRequestEndpoint,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.list_with_embed_context(&UserId(71)),
             "/users/71/application-passwords?context=embed",
         );
@@ -89,7 +90,7 @@ mod tests {
 
     #[rstest]
     fn list_application_passwords_with_view_context(endpoint: ApplicationPasswordsRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.list_with_view_context(&UserId(9999)),
             "/users/9999/application-passwords?context=view",
         );
@@ -104,7 +105,7 @@ mod tests {
         #[case] fields: &[SparseApplicationPasswordField],
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_list(&UserId(2), context, fields),
             expected_path,
         );
@@ -114,7 +115,7 @@ mod tests {
     fn retrieve_current_application_passwords_with_edit_context(
         endpoint: ApplicationPasswordsRequestEndpoint,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.retrieve_current_with_edit_context(&UserId(2)),
             "/users/2/application-passwords/introspect?context=edit",
         );
@@ -129,7 +130,7 @@ mod tests {
         #[case] fields: &[SparseApplicationPasswordField],
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_retrieve_current(&UserId(2), context, fields),
             expected_path,
         );
@@ -139,7 +140,7 @@ mod tests {
     fn retrieve_application_passwords_with_embed_context(
         endpoint: ApplicationPasswordsRequestEndpoint,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.retrieve_with_embed_context(
                 &UserId(2),
                 &ApplicationPasswordUuid {
@@ -162,7 +163,7 @@ mod tests {
         let uuid = ApplicationPasswordUuid {
             uuid: "584a87d5-4f18-4c33-a315-4c05ed1fc485".to_string(),
         };
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_retrieve(&UserId(2), &uuid, context, fields),
             expected_path,
         );
@@ -170,7 +171,7 @@ mod tests {
 
     #[rstest]
     fn update_application_password(endpoint: ApplicationPasswordsRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.update(
                 &UserId(2),
                 &ApplicationPasswordUuid {

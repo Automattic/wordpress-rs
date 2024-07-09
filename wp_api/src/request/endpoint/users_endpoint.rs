@@ -6,6 +6,7 @@ use crate::{
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
+#[Namespace("/wp/v2")]
 #[SparseField(SparseUserField)]
 enum UsersRequest {
     #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>)]
@@ -31,7 +32,7 @@ mod tests {
     use super::*;
     use crate::{
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_endpoint},
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
         WpApiParamUsersHasPublishedPosts, WpContext,
@@ -41,12 +42,12 @@ mod tests {
 
     #[rstest]
     fn create_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(endpoint.create(), "/users");
+        validate_wp_v2_endpoint(endpoint.create(), "/users");
     }
 
     #[rstest]
     fn delete_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.delete(
                 &UserId(54),
                 &UserDeleteParams {
@@ -59,7 +60,7 @@ mod tests {
 
     #[rstest]
     fn delete_current_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.delete_me(&UserDeleteParams {
                 reassign: UserId(98),
             }),
@@ -69,7 +70,7 @@ mod tests {
 
     #[rstest]
     fn list_users(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.list_with_edit_context(&UserListParams::default()),
             "/users?context=edit",
         );
@@ -77,7 +78,7 @@ mod tests {
 
     #[rstest]
     fn list_users_default_params_empty_fields(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.list_with_edit_context(&UserListParams::default()),
             "/users?context=edit",
         );
@@ -100,7 +101,7 @@ mod tests {
             who: None,
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
         };
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.list_with_edit_context(&params),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=true",
         );
@@ -108,7 +109,7 @@ mod tests {
 
     #[rstest]
     fn filter_list_users_default_params_empty_fields(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_list(WpContext::Edit, &UserListParams::default(), &[]),
             "/users?context=edit&_fields=",
         );
@@ -134,7 +135,7 @@ mod tests {
                 "page".to_string(),
             ])),
         };
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_list(WpContext::Edit, &params, &[SparseUserField::Name, SparseUserField::Email]),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=post%2Cpage&_fields=name%2Cemail",
         );
@@ -142,7 +143,7 @@ mod tests {
 
     #[rstest]
     fn retrieve_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.retrieve_with_view_context(&UserId(98)),
             "/users/98?context=view",
         );
@@ -150,7 +151,7 @@ mod tests {
 
     #[rstest]
     fn filter_retrieve_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_retrieve(
                 &UserId(98),
                 WpContext::View,
@@ -162,7 +163,7 @@ mod tests {
 
     #[rstest]
     fn retrieve_current_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.retrieve_me_with_embed_context(),
             "/users/me?context=embed",
         );
@@ -170,7 +171,7 @@ mod tests {
 
     #[rstest]
     fn filter_retrieve_current_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_retrieve_me(
                 WpContext::Embed,
                 &[SparseUserField::Roles, SparseUserField::Capabilities],
@@ -181,12 +182,12 @@ mod tests {
 
     #[rstest]
     fn update_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(endpoint.update(&UserId(98)), "/users/98");
+        validate_wp_v2_endpoint(endpoint.update(&UserId(98)), "/users/98");
     }
 
     #[rstest]
     fn update_current_user(endpoint: UsersRequestEndpoint) {
-        validate_endpoint(endpoint.update_me(), "/users/me");
+        validate_wp_v2_endpoint(endpoint.update_me(), "/users/me");
     }
 
     #[fixture]

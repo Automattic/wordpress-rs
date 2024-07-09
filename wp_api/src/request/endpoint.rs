@@ -6,7 +6,7 @@ pub(crate) mod application_passwords_endpoint;
 pub(crate) mod plugins_endpoint;
 pub(crate) mod users_endpoint;
 
-const WP_JSON_PATH_SEGMENTS: [&str; 3] = ["wp-json", "wp", "v2"];
+const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 
 uniffi::custom_newtype!(WpEndpointUrl, String);
 #[derive(Debug, Clone)]
@@ -83,17 +83,6 @@ impl ApiBaseUrl {
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
-    fn by_extending<I>(&self, segments: I) -> Url
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        self.url
-            .clone()
-            .extend(segments)
-            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
-    }
-
     pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
     where
         I: IntoIterator,
@@ -104,7 +93,10 @@ impl ApiBaseUrl {
             .extend(segments.into_iter().flat_map(|s| {
                 s.as_ref()
                     .split('/')
-                    .map(str::to_string)
+                    .filter_map(|x| match x.trim() {
+                        "" => None,
+                        y => Some(y.to_string()),
+                    })
                     .collect::<Vec<String>>()
             }))
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
@@ -197,8 +189,22 @@ mod tests {
             format!("{}/bar", expected_wp_json_url)
         );
         assert_eq!(
-            api_base_url.by_extending(["bar", "baz"]).as_str(),
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(["bar", "baz"])
+                .as_str(),
             format!("{}/bar/baz", expected_wp_json_url)
+        );
+        assert_eq!(
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(["bar", "baz/quox"])
+                .as_str(),
+            format!("{}/bar/baz/quox", expected_wp_json_url)
+        );
+        assert_eq!(
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(["/bar", "/baz/quox"])
+                .as_str(),
+            format!("{}/bar/baz/quox", expected_wp_json_url)
         );
     }
 
@@ -215,10 +221,14 @@ mod tests {
         ApiBaseUrl::try_from("https://example.com").unwrap().into()
     }
 
-    pub fn validate_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint("/wp/v2", endpoint_url, path);
+    }
+
+    fn validate_endpoint(namespace: &str, endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
             endpoint_url.as_str(),
-            format!("{}{}", fixture_api_base_url().as_str(), path)
+            format!("{}{}{}", fixture_api_base_url().as_str(), namespace, path)
         );
     }
 }

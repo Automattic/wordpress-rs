@@ -6,6 +6,7 @@ use crate::{
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
+#[Namespace("/wp/v2")]
 #[SparseField(SparsePluginField)]
 enum PluginsRequest {
     #[post(url = "/plugins", params = &PluginCreateParams, output = PluginWithEditContext)]
@@ -26,7 +27,7 @@ mod tests {
     use crate::{
         generate,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_endpoint},
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
         PluginStatus, WpContext,
@@ -36,7 +37,7 @@ mod tests {
 
     #[rstest]
     fn create_plugin(endpoint: PluginsRequestEndpoint) {
-        validate_endpoint(endpoint.create(), "/plugins");
+        validate_wp_v2_endpoint(endpoint.create(), "/plugins");
     }
 
     #[rstest]
@@ -52,7 +53,7 @@ mod tests {
         #[case] plugin_slug: PluginSlug,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(endpoint.delete(&plugin_slug), expected_path);
+        validate_wp_v2_endpoint(endpoint.delete(&plugin_slug), expected_path);
     }
 
     #[rstest]
@@ -65,7 +66,7 @@ mod tests {
         #[case] params: PluginListParams,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(endpoint.list_with_edit_context(&params), expected_path);
+        validate_wp_v2_endpoint(endpoint.list_with_edit_context(&params), expected_path);
     }
 
     #[rstest]
@@ -76,7 +77,7 @@ mod tests {
         #[case] params: PluginListParams,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(endpoint.list_with_embed_context(&params), expected_path);
+        validate_wp_v2_endpoint(endpoint.list_with_embed_context(&params), expected_path);
     }
 
     #[rstest]
@@ -87,7 +88,7 @@ mod tests {
         #[case] params: PluginListParams,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(endpoint.list_with_view_context(&params), expected_path);
+        validate_wp_v2_endpoint(endpoint.list_with_view_context(&params), expected_path);
     }
 
     #[rstest]
@@ -123,7 +124,7 @@ mod tests {
         #[case] fields: &[SparsePluginField],
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_list(context, &params, fields),
             expected_path,
         );
@@ -148,7 +149,7 @@ mod tests {
         #[case] plugin_slug: PluginSlug,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.retrieve_with_view_context(&plugin_slug),
             expected_path,
         );
@@ -186,7 +187,7 @@ mod tests {
         #[case] fields: &[SparsePluginField],
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(
+        validate_wp_v2_endpoint(
             endpoint.filter_retrieve(&plugin_slug, context, fields),
             expected_path,
         );
@@ -205,7 +206,7 @@ mod tests {
         #[case] plugin_slug: PluginSlug,
         #[case] expected_path: &str,
     ) {
-        validate_endpoint(endpoint.update(&plugin_slug), expected_path);
+        validate_wp_v2_endpoint(endpoint.update(&plugin_slug), expected_path);
     }
 
     #[fixture]

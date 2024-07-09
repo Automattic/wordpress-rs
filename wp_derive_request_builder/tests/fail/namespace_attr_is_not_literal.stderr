@@ -1,0 +1,5 @@
+error: Expecting #[Namespace("_path_")] - Try wrapping the path in ""
+ --> tests/fail/namespace_attr_is_not_literal.rs:2:13
+  |
+2 | #[Namespace(wp)]
+  |             ^^

@@ -1,5 +1,5 @@
 error: Missing (url = "/foo")
- --> tests/fail/missing_url.rs:4:7
+ --> tests/fail/missing_url.rs:5:7
   |
-4 |     #[contextual_get(params = &UserListParams, output = Vec<SparseUser>)]
+5 |     #[contextual_get(params = &UserListParams, output = Vec<SparseUser>)]
   |       ^^^^^^^^^^^^^^
