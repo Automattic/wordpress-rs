@@ -5,6 +5,7 @@ use crate::SparseField;
 pub(crate) mod application_passwords_endpoint;
 pub(crate) mod plugins_endpoint;
 pub(crate) mod users_endpoint;
+pub(crate) mod wp_site_health_tests_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 
@@ -223,6 +224,10 @@ mod tests {
 
     pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         validate_endpoint("/wp/v2", endpoint_url, path);
+    }
+
+    pub fn validate_wp_site_health_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint("/wp-site-health/v1", endpoint_url, path);
     }
 
     fn validate_endpoint(namespace: &str, endpoint_url: ApiEndpointUrl, path: &str) {
