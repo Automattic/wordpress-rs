@@ -5,7 +5,7 @@ use crate::SparseField;
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SparseWpSiteHealthTest {
     pub actions: Option<String>,
-    pub badge: WpSiteHealthTestBadge,
+    pub badge: Option<WpSiteHealthTestBadge>,
     pub description: Option<String>,
     pub label: Option<String>,
     pub status: Option<String>,

@@ -3051,6 +3051,7 @@ dependencies = [
  "http 1.1.0",
  "indoc",
  "parse_link_header",
+ "paste",
  "reqwest",
  "rstest",
  "rstest_reuse",
