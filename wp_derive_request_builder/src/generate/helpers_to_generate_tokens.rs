@@ -32,23 +32,23 @@ pub fn output_type(
     output_token_tree: Vec<TokenTree>,
     context_and_filter_handler: ContextAndFilterHandler,
 ) -> TokenStream {
-    match context_and_filter_handler {
-        ContextAndFilterHandler::None
-        | ContextAndFilterHandler::NoFilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => TokenStream::from_iter(output_token_tree),
-        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => output_token_tree
+    let strip_sparse_prefix = |token_tree: Vec<TokenTree>, context: Option<WpContext>| {
+        token_tree
             .into_iter()
             .map(|token| {
                 if let TokenTree::Ident(ident) = token {
                     let new_ident = if let Some(ident_without_sparse_prefix) =
                         ident.to_string().strip_prefix(SPARSE_IDENT_PREFIX)
                     {
-                        format_ident!(
-                            "{}With{}Context",
-                            ident_without_sparse_prefix,
-                            context.to_string()
-                        )
+                        if let Some(context) = context {
+                            format_ident!(
+                                "{}With{}Context",
+                                ident_without_sparse_prefix,
+                                context.to_string()
+                            )
+                        } else {
+                            format_ident!("{}", ident_without_sparse_prefix,)
+                        }
                     } else {
                         ident
                     };
@@ -57,7 +57,15 @@ pub fn output_type(
                     quote! { #token }
                 }
             })
-            .collect::<TokenStream>(),
+            .collect::<TokenStream>()
+    };
+    match context_and_filter_handler {
+        ContextAndFilterHandler::None => strip_sparse_prefix(output_token_tree, None),
+        ContextAndFilterHandler::FilterTakeContextAsArgument
+        | ContextAndFilterHandler::FilterNoContext => TokenStream::from_iter(output_token_tree),
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => {
+            strip_sparse_prefix(output_token_tree, Some(context))
+        }
     }
 }
 
@@ -105,9 +113,9 @@ pub fn fn_provided_param(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet | crate::parse::RequestType::Delete => {
-                    tokens
-                }
+                crate::parse::RequestType::ContextualGet
+                | crate::parse::RequestType::Delete
+                | crate::parse::RequestType::Get => tokens,
                 crate::parse::RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
@@ -122,8 +130,7 @@ pub fn fn_context_param(context_and_filter_handler: ContextAndFilterHandler) -> 
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_)
         | ContextAndFilterHandler::FilterNoContext => TokenStream::new(),
-        ContextAndFilterHandler::NoFilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterTakeContextAsArgument => {
+        ContextAndFilterHandler::FilterTakeContextAsArgument => {
             quote! { context: crate::WpContext, }
         }
     }
@@ -135,7 +142,6 @@ pub fn fn_fields_param(
 ) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
-        | ContextAndFilterHandler::NoFilterTakeContextAsArgument
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
         ContextAndFilterHandler::FilterTakeContextAsArgument
         | ContextAndFilterHandler::FilterNoContext => {
@@ -151,9 +157,7 @@ pub fn fn_name(
 ) -> Ident {
     let basic_fn_name = format_ident!("{}", variant_ident.to_string().to_case(Case::Snake));
     match context_and_filter_handler {
-        ContextAndFilterHandler::None | ContextAndFilterHandler::NoFilterTakeContextAsArgument => {
-            basic_fn_name
-        }
+        ContextAndFilterHandler::None => basic_fn_name,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => format_ident!(
             "{}_with_{}_context",
             basic_fn_name,
@@ -184,8 +188,7 @@ fn fn_arg_context(context_and_filter_handler: ContextAndFilterHandler) -> TokenS
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::FilterNoContext
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
-        ContextAndFilterHandler::NoFilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterTakeContextAsArgument => {
+        ContextAndFilterHandler::FilterTakeContextAsArgument => {
             quote! { context, }
         }
     }
@@ -202,9 +205,9 @@ fn fn_arg_provided_params(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet | crate::parse::RequestType::Delete => {
-                    tokens
-                }
+                crate::parse::RequestType::ContextualGet
+                | crate::parse::RequestType::Delete
+                | crate::parse::RequestType::Get => tokens,
                 crate::parse::RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
@@ -217,7 +220,6 @@ fn fn_arg_provided_params(
 fn fn_arg_fields(context_and_filter_handler: ContextAndFilterHandler) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
-        | ContextAndFilterHandler::NoFilterTakeContextAsArgument
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
         ContextAndFilterHandler::FilterTakeContextAsArgument
         | ContextAndFilterHandler::FilterNoContext => quote! { fields, },
@@ -265,7 +267,7 @@ pub fn fn_body_get_url_from_endpoint(
 
 pub fn fn_body_query_pairs(params_type: &ParamsType, request_type: RequestType) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Delete => {
+        RequestType::ContextualGet | RequestType::Delete | RequestType::Get => {
             if let Some(tokens) = params_type.tokens() {
                 let is_option = if let Some(TokenTree::Ident(ref ident)) = tokens.first() {
                     // TODO: This won't work with `std::option::Option` or `core::option::Option`
@@ -296,7 +298,6 @@ pub fn fn_body_fields_query_pairs(
 ) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
-        | ContextAndFilterHandler::NoFilterTakeContextAsArgument
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
         ContextAndFilterHandler::FilterTakeContextAsArgument
         | ContextAndFilterHandler::FilterNoContext => quote! {
@@ -328,8 +329,7 @@ pub fn fn_body_context_query_pairs(
                 url.query_pairs_mut().append_pair("context", #crate_ident::WpContext::#context.as_str());
             }
         }
-        ContextAndFilterHandler::NoFilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterTakeContextAsArgument => quote! {
+        ContextAndFilterHandler::FilterTakeContextAsArgument => quote! {
             url.query_pairs_mut().append_pair("context", context.as_str());
         },
     }
@@ -340,7 +340,7 @@ pub fn fn_body_build_request_from_url(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet => quote! {
+        RequestType::ContextualGet | RequestType::Get => quote! {
             self.inner.get(url)
         },
         RequestType::Delete => quote! {
@@ -451,10 +451,6 @@ mod tests {
         ""
     )]
     #[case(
-        ContextAndFilterHandler::NoFilterTakeContextAsArgument,
-        "context : crate :: WpContext ,"
-    )]
-    #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
         ""
     )]
@@ -479,7 +475,6 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         "list_with_edit_context"
     )]
-    #[case("List", ContextAndFilterHandler::NoFilterTakeContextAsArgument, "list")]
     #[case(
         "ListContents",
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
@@ -503,7 +498,6 @@ mod tests {
 
     #[rstest]
     #[case(ContextAndFilterHandler::None, quote! { SparseUserField }, "")]
-    #[case(ContextAndFilterHandler::NoFilterTakeContextAsArgument, quote! { SparseUserField }, "")]
     #[case(ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::View), quote! { SparseUserField }, "")]
     #[case(
         ContextAndFilterHandler::FilterTakeContextAsArgument,
@@ -543,7 +537,6 @@ mod tests {
 
     #[rstest]
     #[case(ContextAndFilterHandler::None, "")]
-    #[case(ContextAndFilterHandler::NoFilterTakeContextAsArgument, "context ,")]
     #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         ""
@@ -583,7 +576,6 @@ mod tests {
 
     #[rstest]
     #[case(ContextAndFilterHandler::None, "")]
-    #[case(ContextAndFilterHandler::NoFilterTakeContextAsArgument, "")]
     #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         ""
@@ -601,8 +593,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::None, "crate :: SparseUser")]
-    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::NoFilterTakeContextAsArgument, "crate :: SparseUser")]
+    #[case(parse_quote!(crate::SparseUser), ContextAndFilterHandler::None, "crate :: User")]
+    #[case(parse_quote!(crate::UserWithEditContext), ContextAndFilterHandler::None, "crate :: UserWithEditContext")]
     #[case(
         parse_quote!(crate::SparseUser),
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
@@ -692,14 +684,6 @@ mod tests {
         RequestType::Delete,
         ContextAndFilterHandler::None,
         "fn delete_me (& self , params : &UserDeleteParams ,)")]
-    #[case(
-        PartOf::Endpoint,
-        format_ident!("List"),
-        url_static_users(),
-        &referenced_params_type("UserListParams"),
-        RequestType::ContextualGet,
-        ContextAndFilterHandler::NoFilterTakeContextAsArgument,
-        "fn list (& self , context : crate :: WpContext , params : &UserListParams ,)")]
     #[case(
         PartOf::Endpoint,
         format_ident!("List"),
@@ -983,7 +967,6 @@ mod tests {
 
     #[rstest]
     #[case(ContextAndFilterHandler::None, true)]
-    #[case(ContextAndFilterHandler::NoFilterTakeContextAsArgument, true)]
     #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         true
@@ -1005,10 +988,6 @@ mod tests {
 
     #[rstest]
     #[case(ContextAndFilterHandler::None, "")]
-    #[case(
-        ContextAndFilterHandler::NoFilterTakeContextAsArgument,
-        "url . query_pairs_mut () . append_pair (\"context\" , context . as_str ()) ;"
-    )]
     #[case(
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         "url . query_pairs_mut () . append_pair (\"context\" , crate :: WpContext :: Edit . as_str ()) ;"

@@ -59,5 +59,6 @@ impl Parse for ParsedVariant {
 pub(crate) enum RequestType {
     ContextualGet,
     Delete,
+    Get,
     Post,
 }
