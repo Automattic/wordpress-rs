@@ -41,22 +41,14 @@ pub struct WpApiRequestBuilder {
 impl WpApiRequestBuilder {
     pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
-
-        Self {
-            application_passwords: ApplicationPasswordsRequestBuilder::new(
-                api_base_url.clone(),
-                authentication.clone(),
-            )
-            .into(),
-            users: UsersRequestBuilder::new(api_base_url.clone(), authentication.clone()).into(),
-            plugins: PluginsRequestBuilder::new(api_base_url.clone(), authentication.clone())
-                .into(),
-            wp_site_health_tests: WpSiteHealthTestsRequestBuilder::new(
-                api_base_url.clone(),
-                authentication.clone(),
-            )
-            .into(),
-        }
+        macro_helper::wp_api_request_builder!(
+            api_base_url,
+            authentication;
+            application_passwords,
+            users,
+            plugins,
+            wp_site_health_tests
+        )
     }
 }
 
@@ -95,32 +87,15 @@ impl WpApiClient {
     ) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 
-        Self {
-            application_passwords: ApplicationPasswordsRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-            users: UsersRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-            plugins: PluginsRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-            wp_site_health_tests: WpSiteHealthTestsRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-        }
+        macro_helper::wp_api_client!(
+            api_base_url,
+            authentication,
+            request_executor;
+            application_passwords,
+            users,
+            plugins,
+            wp_site_health_tests
+        )
     }
 }
 
@@ -163,5 +138,36 @@ mod macro_helper {
         };
     }
 
+    macro_rules! wp_api_request_builder {
+        ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
+            paste::paste! {
+                Self {
+                    $($element: [<$element:camel RequestBuilder>]::new(
+                        $api_base_url.clone(),
+                        $authentication.clone(),
+                    )
+                    .into(),)*
+                }
+            }
+        };
+    }
+
+    macro_rules! wp_api_client {
+        ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+            paste::paste! {
+                Self {
+                    $($element: [<$element:camel RequestExecutor>]::new(
+                        $api_base_url.clone(),
+                        $authentication.clone(),
+                        $request_executor.clone(),
+                    )
+                    .into(),)*
+                }
+            }
+        };
+    }
+
     pub(super) use generate_endpoint_impl;
+    pub(super) use wp_api_client;
+    pub(super) use wp_api_request_builder;
 }
