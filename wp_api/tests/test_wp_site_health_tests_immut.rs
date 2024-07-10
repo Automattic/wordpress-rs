@@ -7,7 +7,6 @@ use crate::integration_test_common::{api_client, AssertResponse};
 
 pub mod integration_test_common;
 
-#[macro_export]
 macro_rules! generate_tests {
     ($ident:ident) => {
         paste::paste! {
