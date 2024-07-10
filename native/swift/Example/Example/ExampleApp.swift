@@ -26,7 +26,7 @@ struct ExampleApp: App {
                 WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
                 WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
                 WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates(),
-                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests(),
+                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests()
             ].map { $0.asListViewData }
         })
     ]
