@@ -19,6 +19,15 @@ struct ExampleApp: App {
         RootListData(name: "Plugins", callback: {
             try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
                 .map { $0.asListViewData }
+        }),
+        RootListData(name: "Site Health Tests", callback: {
+            return try await [
+                WordPressAPI.globalInstance.siteHealthTests.authorizationHeader(),
+                WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
+                WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
+                WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates(),
+                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests(),
+            ].map { $0.asListViewData }
         })
     ]
 

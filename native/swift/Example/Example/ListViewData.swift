@@ -70,3 +70,13 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
         ])
     }
 }
+
+extension SiteHealthTest: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.label, title: self.label, subtitle: self.status, fields: [:])
+    }
+
+    public var id: String {
+        self.label
+    }
+}

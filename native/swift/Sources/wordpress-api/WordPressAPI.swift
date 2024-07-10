@@ -51,6 +51,10 @@ public struct WordPressAPI {
         self.requestBuilder.applicationPasswords()
     }
 
+    public var siteHealthTests: WpSiteHealthTestRequestExecutor {
+        self.requestBuilder.wpSiteHealthTests()
+    }
+
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         try await withCheckedThrowingContinuation { continuation in
             self.perform(request: request) { result in
@@ -66,6 +70,11 @@ public struct WordPressAPI {
         let task = self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
             if let error {
                 callback(.failure(error))
+                return
+            }
+
+            // If the task is cancelled, we can save time/CPU/battery by skipping the parsing step
+            if Task.isCancelled {
                 return
             }
 
@@ -196,7 +205,7 @@ extension RequestMethod {
     }
 }
 
-extension ParsedUrl {
+public extension ParsedUrl {
     static func from(url: URL) throws -> ParsedUrl {
         try parse(input: url.absoluteString)
     }
