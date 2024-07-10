@@ -6,9 +6,9 @@ use crate::post_types::{PostType, SparsePostTypeDetailsField};
 #[Namespace("/wp/v2")]
 #[SparseField(SparsePostTypeDetailsField)]
 enum PostTypesRequest {
-    #[contextual_get(url = "/types", output = Vec<crate::post_types::SparsePostTypeResponse>)]
+    #[contextual_get(url = "/types", output = crate::post_types::SparseListPostTypesResponse)]
     List,
-    #[contextual_get(url = "/types/<post_type>", output = crate::post_types::SparsePostTypeResponse)]
+    #[contextual_get(url = "/types/<post_type>", output = crate::post_types::SparsePostTypeDetails)]
     Retrieve,
 }
 

@@ -38,7 +38,7 @@ impl Display for PostType {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-pub struct SparsePostTypeResponse {
+pub struct SparseListPostTypesResponse {
     #[WpContext(edit, embed, view)]
     pub post: SparsePostTypeDetails,
     #[WpContext(edit, embed, view)]
@@ -64,37 +64,38 @@ pub struct SparsePostTypeResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostTypeDetails {
     #[WpContext(edit)]
-    pub capabilities: Capabilities,
+    pub capabilities: Option<PostCapabilities>,
     #[WpContext(edit, view)]
     pub description: Option<String>,
     #[WpContext(edit, view)]
     pub hierarchical: Option<bool>,
-    #[WpContext(edit, view)]
+    #[WpContext(edit)]
     pub viewable: Option<bool>,
     #[WpContext(edit)]
-    pub labels: Labels,
+    pub labels: Option<PostTypeLabels>,
     #[WpContext(edit, embed, view)]
-    pub name: String,
+    pub name: Option<String>,
     #[WpContext(edit, embed, view)]
-    pub slug: String,
-    #[WpContext(edit, embed, view)]
-    pub supports: Supports,
-    #[WpContext(edit, view)]
-    pub has_archive: bool,
-    #[WpContext(edit, view)]
-    pub taxonomies: Vec<String>,
-    #[WpContext(edit, embed, view)]
-    pub rest_base: String,
-    #[WpContext(edit, embed, view)]
-    pub rest_namespace: String,
+    pub slug: Option<String>,
     #[WpContext(edit)]
-    pub visibility: PostTypeVisibility,
+    pub supports: Option<PostTypeSupports>,
+    #[WpContext(edit, view)]
+    pub has_archive: Option<bool>,
+    #[WpContext(edit, view)]
+    pub taxonomies: Option<Vec<String>>,
     #[WpContext(edit, embed, view)]
-    pub icon: String,
+    pub rest_base: Option<String>,
+    #[WpContext(edit, embed, view)]
+    pub rest_namespace: Option<String>,
+    #[WpContext(edit)]
+    pub visibility: Option<PostTypeVisibility>,
+    #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
+    pub icon: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
-pub struct Capabilities {
+pub struct PostCapabilities {
     pub edit_post: String,
     pub read_post: String,
     pub delete_post: String,
@@ -113,7 +114,7 @@ pub struct Capabilities {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
-pub struct Labels {
+pub struct PostTypeLabels {
     pub name: String,
     pub singular_name: String,
     pub add_new: String,
@@ -125,7 +126,7 @@ pub struct Labels {
     pub search_items: String,
     pub not_found: String,
     pub not_found_in_trash: String,
-    pub parent_item_colon: String,
+    pub parent_item_colon: Option<String>,
     pub all_items: String,
     pub archives: String,
     pub attributes: String,
@@ -152,19 +153,19 @@ pub struct Labels {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
-pub struct Supports {
-    pub title: bool,
-    pub editor: bool,
-    pub author: bool,
-    pub thumbnail: bool,
-    pub excerpt: bool,
-    pub trackbacks: bool,
+pub struct PostTypeSupports {
+    pub title: Option<bool>,
+    pub editor: Option<bool>,
+    pub author: Option<bool>,
+    pub thumbnail: Option<bool>,
+    pub excerpt: Option<bool>,
+    pub trackbacks: Option<bool>,
     #[serde(rename = "custom-fields")]
-    pub custom_fields: bool,
-    pub comments: bool,
-    pub revisions: bool,
+    pub custom_fields: Option<bool>,
+    pub comments: Option<bool>,
+    pub revisions: Option<bool>,
     #[serde(rename = "post-formats")]
-    pub post_formats: bool,
+    pub post_formats: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
