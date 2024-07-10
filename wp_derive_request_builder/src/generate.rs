@@ -224,7 +224,6 @@ pub enum PartOf {
 #[derive(Debug, Clone, Copy)]
 pub enum ContextAndFilterHandler {
     None,
-    NoFilterTakeContextAsArgument,
     NoFilterTakeContextAsFunctionName(WpContext),
     FilterTakeContextAsArgument,
     FilterNoContext,
@@ -233,15 +232,18 @@ pub enum ContextAndFilterHandler {
 impl ContextAndFilterHandler {
     fn from_request_type(request_type: RequestType) -> Vec<Self> {
         match request_type {
+            crate::parse::RequestType::Get => {
+                vec![Self::None, Self::FilterNoContext]
+            }
             crate::parse::RequestType::ContextualGet => {
                 let mut v: Vec<Self> = WpContext::iter()
                     .map(Self::NoFilterTakeContextAsFunctionName)
                     .collect();
-                v.push(ContextAndFilterHandler::FilterTakeContextAsArgument);
+                v.push(Self::FilterTakeContextAsArgument);
                 v
             }
             crate::parse::RequestType::Delete | crate::parse::RequestType::Post => {
-                vec![ContextAndFilterHandler::None]
+                vec![Self::None]
             }
         }
     }

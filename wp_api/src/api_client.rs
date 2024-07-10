@@ -5,6 +5,9 @@ use crate::request::{
         },
         plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
+        wp_site_health_tests_endpoint::{
+            WpSiteHealthTestRequestBuilder, WpSiteHealthTestRequestExecutor,
+        },
         ApiBaseUrl,
     },
     RequestExecutor,
@@ -37,6 +40,10 @@ impl UniffiWpApiRequestBuilder {
     fn plugins(&self) -> Arc<PluginsRequestBuilder> {
         self.inner.plugins.clone()
     }
+
+    fn wp_site_health_tests(&self) -> Arc<WpSiteHealthTestRequestBuilder> {
+        self.inner.wp_site_health_tests.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -44,6 +51,7 @@ pub struct WpApiRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
+    wp_site_health_tests: Arc<WpSiteHealthTestRequestBuilder>,
 }
 
 impl WpApiRequestBuilder {
@@ -59,6 +67,11 @@ impl WpApiRequestBuilder {
             users: UsersRequestBuilder::new(api_base_url.clone(), authentication.clone()).into(),
             plugins: PluginsRequestBuilder::new(api_base_url.clone(), authentication.clone())
                 .into(),
+            wp_site_health_tests: WpSiteHealthTestRequestBuilder::new(
+                api_base_url.clone(),
+                authentication.clone(),
+            )
+            .into(),
         }
     }
 
@@ -104,6 +117,10 @@ impl UniffiWpApiClient {
     fn plugins(&self) -> Arc<PluginsRequestExecutor> {
         self.inner.plugins.clone()
     }
+
+    fn wp_site_health_tests(&self) -> Arc<WpSiteHealthTestRequestExecutor> {
+        self.inner.wp_site_health_tests.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -111,6 +128,7 @@ pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
+    wp_site_health_tests: Arc<WpSiteHealthTestRequestExecutor>,
 }
 
 impl WpApiClient {
@@ -140,6 +158,12 @@ impl WpApiClient {
                 request_executor.clone(),
             )
             .into(),
+            wp_site_health_tests: WpSiteHealthTestRequestExecutor::new(
+                api_base_url.clone(),
+                authentication.clone(),
+                request_executor.clone(),
+            )
+            .into(),
         }
     }
 
@@ -153,5 +177,9 @@ impl WpApiClient {
 
     pub fn plugins(&self) -> &PluginsRequestExecutor {
         self.plugins.as_ref()
+    }
+
+    pub fn wp_site_health_tests(&self) -> &WpSiteHealthTestRequestExecutor {
+        self.wp_site_health_tests.as_ref()
     }
 }

@@ -17,6 +17,7 @@ pub mod login;
 pub mod plugins;
 pub mod request;
 pub mod users;
+pub mod wp_site_health_tests;
 
 #[cfg(test)]
 mod unit_test_common;

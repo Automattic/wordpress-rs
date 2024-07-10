@@ -48,4 +48,8 @@ public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicat
 public typealias ApplicationPasswordWithEditContext = WordPressAPIInternal.ApplicationPasswordWithEditContext
 public typealias ApplicationPasswordWithViewContext = WordPressAPIInternal.ApplicationPasswordWithViewContext
 public typealias ApplicationPasswordWithEmbedContext = WordPressAPIInternal.ApplicationPasswordWithEmbedContext
+
+// MARK: - Site Health Checks
+public typealias SiteHealthTest = WordPressAPIInternal.WpSiteHealthTest
+
 #endif

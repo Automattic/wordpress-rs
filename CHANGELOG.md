@@ -6,6 +6,8 @@ _None_
 
 ### New Features
 
+- [Wp Site Health Tests](https://developer.wordpress.org/rest-api/reference/wp-site-health-tests/) endpoint
+
 _None_
 
 ### Bug Fixes
@@ -13,6 +15,8 @@ _None_
 _None_
 
 ### Internal Changes
+
+- `WpDerivedRequest` now supports plain `get` requests
 
 _None_
 
