@@ -184,20 +184,26 @@ restore-wp-content-plugins:
 delete-wp-plugins-backup:
 	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
-lint: lint-rust lint-swift
+lint: lint-swift lint-rust
 	@# Help: Run the linter for all languages.
 
 lint-rust:
 	@# Help: Run the linter for Rust.
 	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all -- -D warnings"
 
-lint-swift:
+lint-swift: _lint-swift-check
 	@# Help: Run the linter for Swift.
 	swift package plugin swiftlint
 
-lintfix-swift:
+lintfix-swift:_lint-swift-check
 	@# Help: Run the linter for Swift and correct fixable issues.
 	swift package plugin swiftlint --autocorrect
+
+_lint-swift-check:
+	@if [ ! -d "target/libwordpressFFI.xcframework" ]; then \
+		echo "Error: libwordpressFFI.xcframework does not exist, make the XCFramework and try again"; \
+		exit 1; \
+	fi
 
 fmt-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt"
