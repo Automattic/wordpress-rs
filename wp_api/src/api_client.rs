@@ -110,7 +110,6 @@ mod macro_helper {
             paste::paste! {
                 #[uniffi::export]
                 impl UniffiWpApiRequestBuilder {
-
                     fn $ident(&self) -> Arc<[<$ident:camel RequestBuilder>]> {
                         self.inner.$ident.clone()
                     }
