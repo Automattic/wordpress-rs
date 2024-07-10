@@ -51,7 +51,7 @@ public struct WordPressAPI {
         self.requestBuilder.applicationPasswords()
     }
 
-    public var siteHealthTests: WpSiteHealthTestRequestExecutor {
+    public var siteHealthTests: WpSiteHealthTestsRequestExecutor {
         self.requestBuilder.wpSiteHealthTests()
     }
 

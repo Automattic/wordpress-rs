@@ -7,7 +7,7 @@ use crate::wp_site_health_tests::{
 #[derive(WpDerivedRequest)]
 #[Namespace("/wp-site-health/v1")]
 #[SparseField(SparseWpSiteHealthTestField)]
-enum WpSiteHealthTestRequest {
+enum WpSiteHealthTestsRequest {
     #[get(url = "/tests/background-updates", output = SparseWpSiteHealthTest)]
     BackgroundUpdates,
     #[get(url = "/tests/loopback-requests", output = SparseWpSiteHealthTest)]
@@ -35,7 +35,7 @@ mod tests {
     #[case(Some(vec![]), "/tests/background-updates?_fields=")]
     #[case(Some(vec![SparseWpSiteHealthTestField::Actions, SparseWpSiteHealthTestField::Badge]), "/tests/background-updates?_fields=actions%2Cbadge")]
     fn background_updates(
-        endpoint: WpSiteHealthTestRequestEndpoint,
+        endpoint: WpSiteHealthTestsRequestEndpoint,
         #[case] sparse_fields: Option<Vec<SparseWpSiteHealthTestField>>,
         #[case] expected_path: &str,
     ) {
@@ -53,7 +53,7 @@ mod tests {
     #[case(None, "/tests/loopback-requests")]
     #[case(Some(vec![SparseWpSiteHealthTestField::Description]), "/tests/loopback-requests?_fields=description")]
     fn loopback_requests(
-        endpoint: WpSiteHealthTestRequestEndpoint,
+        endpoint: WpSiteHealthTestsRequestEndpoint,
         #[case] sparse_fields: Option<Vec<SparseWpSiteHealthTestField>>,
         #[case] expected_path: &str,
     ) {
@@ -71,7 +71,7 @@ mod tests {
     #[case(None, "/tests/https-status")]
     #[case(Some(vec![SparseWpSiteHealthTestField::Label]), "/tests/https-status?_fields=label")]
     fn https_status(
-        endpoint: WpSiteHealthTestRequestEndpoint,
+        endpoint: WpSiteHealthTestsRequestEndpoint,
         #[case] sparse_fields: Option<Vec<SparseWpSiteHealthTestField>>,
         #[case] expected_path: &str,
     ) {
@@ -89,7 +89,7 @@ mod tests {
     #[case(None, "/tests/dotorg-communication")]
     #[case(Some(vec![SparseWpSiteHealthTestField::Status]), "/tests/dotorg-communication?_fields=status")]
     fn dotorg_communication(
-        endpoint: WpSiteHealthTestRequestEndpoint,
+        endpoint: WpSiteHealthTestsRequestEndpoint,
         #[case] sparse_fields: Option<Vec<SparseWpSiteHealthTestField>>,
         #[case] expected_path: &str,
     ) {
@@ -107,7 +107,7 @@ mod tests {
     #[case(None, "/tests/authorization-header")]
     #[case(Some(vec![SparseWpSiteHealthTestField::Test]), "/tests/authorization-header?_fields=test")]
     fn authorization_header(
-        endpoint: WpSiteHealthTestRequestEndpoint,
+        endpoint: WpSiteHealthTestsRequestEndpoint,
         #[case] sparse_fields: Option<Vec<SparseWpSiteHealthTestField>>,
         #[case] expected_path: &str,
     ) {
@@ -122,7 +122,7 @@ mod tests {
     }
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> WpSiteHealthTestRequestEndpoint {
-        WpSiteHealthTestRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> WpSiteHealthTestsRequestEndpoint {
+        WpSiteHealthTestsRequestEndpoint::new(fixture_api_base_url)
     }
 }

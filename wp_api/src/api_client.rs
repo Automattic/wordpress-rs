@@ -6,7 +6,7 @@ use crate::request::{
         plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         wp_site_health_tests_endpoint::{
-            WpSiteHealthTestRequestBuilder, WpSiteHealthTestRequestExecutor,
+            WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
         },
         ApiBaseUrl,
     },
@@ -28,22 +28,6 @@ impl UniffiWpApiRequestBuilder {
             inner: WpApiRequestBuilder::new(site_url, authentication),
         }
     }
-
-    fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestBuilder> {
-        self.inner.application_passwords.clone()
-    }
-
-    fn users(&self) -> Arc<UsersRequestBuilder> {
-        self.inner.users.clone()
-    }
-
-    fn plugins(&self) -> Arc<PluginsRequestBuilder> {
-        self.inner.plugins.clone()
-    }
-
-    fn wp_site_health_tests(&self) -> Arc<WpSiteHealthTestRequestBuilder> {
-        self.inner.wp_site_health_tests.clone()
-    }
 }
 
 #[derive(Debug)]
@@ -51,40 +35,20 @@ pub struct WpApiRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
-    wp_site_health_tests: Arc<WpSiteHealthTestRequestBuilder>,
+    wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
 }
 
 impl WpApiRequestBuilder {
     pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
-
-        Self {
-            application_passwords: ApplicationPasswordsRequestBuilder::new(
-                api_base_url.clone(),
-                authentication.clone(),
-            )
-            .into(),
-            users: UsersRequestBuilder::new(api_base_url.clone(), authentication.clone()).into(),
-            plugins: PluginsRequestBuilder::new(api_base_url.clone(), authentication.clone())
-                .into(),
-            wp_site_health_tests: WpSiteHealthTestRequestBuilder::new(
-                api_base_url.clone(),
-                authentication.clone(),
-            )
-            .into(),
-        }
-    }
-
-    pub fn application_passwords(&self) -> &ApplicationPasswordsRequestBuilder {
-        self.application_passwords.as_ref()
-    }
-
-    pub fn users(&self) -> &UsersRequestBuilder {
-        self.users.as_ref()
-    }
-
-    pub fn plugins(&self) -> &PluginsRequestBuilder {
-        self.plugins.as_ref()
+        macro_helper::wp_api_request_builder!(
+            api_base_url,
+            authentication;
+            application_passwords,
+            users,
+            plugins,
+            wp_site_health_tests
+        )
     }
 }
 
@@ -105,22 +69,6 @@ impl UniffiWpApiClient {
             inner: WpApiClient::new(site_url, authentication, request_executor),
         }
     }
-
-    fn application_passwords(&self) -> Arc<ApplicationPasswordsRequestExecutor> {
-        self.inner.application_passwords.clone()
-    }
-
-    fn users(&self) -> Arc<UsersRequestExecutor> {
-        self.inner.users.clone()
-    }
-
-    fn plugins(&self) -> Arc<PluginsRequestExecutor> {
-        self.inner.plugins.clone()
-    }
-
-    fn wp_site_health_tests(&self) -> Arc<WpSiteHealthTestRequestExecutor> {
-        self.inner.wp_site_health_tests.clone()
-    }
 }
 
 #[derive(Debug)]
@@ -128,7 +76,7 @@ pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
-    wp_site_health_tests: Arc<WpSiteHealthTestRequestExecutor>,
+    wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
 }
 
 impl WpApiClient {
@@ -139,47 +87,86 @@ impl WpApiClient {
     ) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 
-        Self {
-            application_passwords: ApplicationPasswordsRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-            users: UsersRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-            plugins: PluginsRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-            wp_site_health_tests: WpSiteHealthTestRequestExecutor::new(
-                api_base_url.clone(),
-                authentication.clone(),
-                request_executor.clone(),
-            )
-            .into(),
-        }
+        macro_helper::wp_api_client!(
+            api_base_url,
+            authentication,
+            request_executor;
+            application_passwords,
+            users,
+            plugins,
+            wp_site_health_tests
+        )
+    }
+}
+
+macro_helper::generate_endpoint_impl!(application_passwords);
+macro_helper::generate_endpoint_impl!(plugins);
+macro_helper::generate_endpoint_impl!(users);
+macro_helper::generate_endpoint_impl!(wp_site_health_tests);
+
+mod macro_helper {
+    macro_rules! generate_endpoint_impl {
+        ($ident:ident) => {
+            paste::paste! {
+                #[uniffi::export]
+                impl UniffiWpApiRequestBuilder {
+                    fn $ident(&self) -> Arc<[<$ident:camel RequestBuilder>]> {
+                        self.inner.$ident.clone()
+                    }
+                }
+
+                impl WpApiRequestBuilder {
+                    pub fn $ident(&self) -> &[<$ident:camel RequestBuilder>] {
+                        self.$ident.as_ref()
+                    }
+                }
+
+                #[uniffi::export]
+                impl UniffiWpApiClient {
+                    fn $ident(&self) -> Arc<[<$ident:camel RequestExecutor>]> {
+                        self.inner.$ident.clone()
+                    }
+                }
+
+                impl WpApiClient {
+                    pub fn $ident(&self) -> &[<$ident:camel RequestExecutor>] {
+                        self.$ident.as_ref()
+                    }
+                }
+            }
+        };
     }
 
-    pub fn application_passwords(&self) -> &ApplicationPasswordsRequestExecutor {
-        self.application_passwords.as_ref()
+    macro_rules! wp_api_request_builder {
+        ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
+            paste::paste! {
+                Self {
+                    $($element: [<$element:camel RequestBuilder>]::new(
+                        $api_base_url.clone(),
+                        $authentication.clone(),
+                    )
+                    .into(),)*
+                }
+            }
+        };
     }
 
-    pub fn users(&self) -> &UsersRequestExecutor {
-        self.users.as_ref()
+    macro_rules! wp_api_client {
+        ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+            paste::paste! {
+                Self {
+                    $($element: [<$element:camel RequestExecutor>]::new(
+                        $api_base_url.clone(),
+                        $authentication.clone(),
+                        $request_executor.clone(),
+                    )
+                    .into(),)*
+                }
+            }
+        };
     }
 
-    pub fn plugins(&self) -> &PluginsRequestExecutor {
-        self.plugins.as_ref()
-    }
-
-    pub fn wp_site_health_tests(&self) -> &WpSiteHealthTestRequestExecutor {
-        self.wp_site_health_tests.as_ref()
-    }
+    pub(super) use generate_endpoint_impl;
+    pub(super) use wp_api_client;
+    pub(super) use wp_api_request_builder;
 }
