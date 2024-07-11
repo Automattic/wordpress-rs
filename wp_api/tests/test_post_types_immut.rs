@@ -1,6 +1,6 @@
 use rstest::*;
 use serial_test::parallel;
-use wp_api::post_types::PostType;
+use wp_api::post_types::{PostType, PostTypeSupports};
 
 use crate::integration_test_common::{api_client, AssertResponse};
 
@@ -57,11 +57,25 @@ async fn retrieve_post_types_with_edit_context(
     )]
     post_type: PostType,
 ) {
-    api_client()
+    let post_type = api_client()
         .post_types()
         .retrieve_with_edit_context(&post_type)
         .await
         .assert_response();
+    // All post types in our current testing sites support `Title`, so we use this assertion
+    // to verify that we are able to parse it properly.
+    //
+    // To be clear, if we can't parse it as expected, we'd get an error back and the previous
+    // assertion would fail, but having some defensive validation may help guard against
+    // future changes.
+    //
+    // It's entirely possible that we might have more test sites in the future and some of their
+    // post types might not support a `Title` in which case it's perfectly fine to completely
+    // remove this assertion.
+    assert_eq!(
+        post_type.supports.get(&PostTypeSupports::Title),
+        Some(true).as_ref()
+    );
 }
 
 #[rstest]
