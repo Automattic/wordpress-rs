@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
@@ -78,7 +78,7 @@ pub struct SparsePostTypeDetails {
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit)]
-    pub supports: Option<PostTypeSupports>,
+    pub supports: Option<HashMap<PostTypeSupports, bool>>,
     #[WpContext(edit, view)]
     pub has_archive: Option<bool>,
     #[WpContext(edit, view)]
@@ -152,20 +152,25 @@ pub struct PostTypeLabels {
     pub name_admin_bar: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
-pub struct PostTypeSupports {
-    pub title: Option<bool>,
-    pub editor: Option<bool>,
-    pub author: Option<bool>,
-    pub thumbnail: Option<bool>,
-    pub excerpt: Option<bool>,
-    pub trackbacks: Option<bool>,
-    #[serde(rename = "custom-fields")]
-    pub custom_fields: Option<bool>,
-    pub comments: Option<bool>,
-    pub revisions: Option<bool>,
-    #[serde(rename = "post-formats")]
-    pub post_formats: Option<bool>,
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum PostTypeSupports {
+    Author,
+    Comments,
+    CustomFields,
+    Editor,
+    Excerpt,
+    PageAttributes,
+    PostFormats,
+    Revisions,
+    Slug,
+    Thumbnail,
+    Title,
+    Trackbacks,
+    #[serde(untagged)]
+    Other(String),
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
