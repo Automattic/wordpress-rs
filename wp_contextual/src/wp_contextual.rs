@@ -1,7 +1,8 @@
 use std::{fmt::Display, slice::Iter, str::FromStr};
 
+use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{spanned::Spanned, DeriveInput, Field, Ident};
 
 const IDENT_PREFIX: &str = "Sparse";
@@ -40,13 +41,25 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
             &ident_name_for_context(ident_name_without_prefix, current_context),
             original_ident.span(),
         );
+        let sparse_field_ident = Ident::new(
+            &ident_name_for_context(
+                format!("{}Field", original_ident_name).as_str(),
+                current_context,
+            ),
+            original_ident.span(),
+        );
         let sparse_ident = Ident::new(
             &ident_name_for_context(original_ident_name.as_str(), current_context),
             original_ident.span(),
         );
         let non_sparse_type = generate_type(non_sparse_ident, non_sparse_type_fields);
+        let sparse_field_type = generate_sparse_field_type(sparse_field_ident, &sparse_type_fields);
         let sparse_type = generate_type(sparse_ident, sparse_type_fields);
-        Ok(TokenStream::from_iter([non_sparse_type, sparse_type]))
+        Ok(TokenStream::from_iter([
+            non_sparse_type,
+            sparse_type,
+            sparse_field_type,
+        ]))
     });
     contextual_token_streams
         .collect::<Result<Vec<TokenStream>, syn::Error>>()
@@ -187,6 +200,40 @@ fn parse_fields(
     }
 
     Ok(parsed_fields)
+}
+
+fn generate_sparse_field_type(type_ident: Ident, fields: &[Field]) -> TokenStream {
+    let mut variant_idents = Vec::with_capacity(fields.len());
+    let mut as_field_names = Vec::with_capacity(fields.len());
+    for f in fields {
+        if let Some(f_ident) = &f.ident {
+            let field_name = f_ident.to_string();
+            let variant_ident = format_ident!("{}", field_name.to_case(Case::UpperCamel));
+            let field_name = field_name.as_str();
+
+            variant_idents.push(variant_ident.clone());
+            as_field_names.push(quote! {
+                Self::#variant_ident => #field_name
+            });
+        }
+    }
+    if variant_idents.is_empty() {
+        return TokenStream::new();
+    }
+    quote! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+        pub enum #type_ident {
+            #(#variant_idents,)*
+        }
+        impl #type_ident {
+            fn as_field_name(&self) -> &str {
+                match self {
+                    #(#as_field_names,)*
+                }
+            }
+        }
+    }
+    .into()
 }
 
 // Generates fields for the given context.

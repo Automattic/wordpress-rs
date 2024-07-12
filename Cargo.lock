@@ -3071,6 +3071,7 @@ dependencies = [
 name = "wp_contextual"
 version = "0.1.0"
 dependencies = [
+ "convert_case",
  "proc-macro2",
  "quote",
  "serde",
