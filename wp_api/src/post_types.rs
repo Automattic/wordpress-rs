@@ -181,6 +181,13 @@ pub struct PostTypeVisibility {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum SparsePostTypeDetailsField {
+    WithEditContext(SparsePostTypeDetailsFieldWithEditContext),
+    WithEmbedContext(SparsePostTypeDetailsFieldWithEmbedContext),
+    WithViewContext(SparsePostTypeDetailsFieldWithViewContext),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparsePostTypeDetailsFieldWithEditContext {
     Capabilities,
     Description,
     Hierarchical,
@@ -197,7 +204,39 @@ pub enum SparsePostTypeDetailsField {
     Icon,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparsePostTypeDetailsFieldWithEmbedContext {
+    Name,
+    Slug,
+    RestBase,
+    RestNamespace,
+    Icon,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparsePostTypeDetailsFieldWithViewContext {
+    Description,
+    Hierarchical,
+    Name,
+    Slug,
+    HasArchive,
+    Taxonomies,
+    RestBase,
+    RestNamespace,
+    Icon,
+}
+
 impl SparseField for SparsePostTypeDetailsField {
+    fn as_str(&self) -> &str {
+        match self {
+            SparsePostTypeDetailsField::WithEditContext(f) => f.as_str(),
+            SparsePostTypeDetailsField::WithEmbedContext(f) => f.as_str(),
+            SparsePostTypeDetailsField::WithViewContext(f) => f.as_str(),
+        }
+    }
+}
+
+impl SparseField for SparsePostTypeDetailsFieldWithEditContext {
     fn as_str(&self) -> &str {
         match self {
             Self::Capabilities => "capabilities",
@@ -213,6 +252,34 @@ impl SparseField for SparsePostTypeDetailsField {
             Self::RestBase => "rest_base",
             Self::RestNamespace => "rest_namespace",
             Self::Visibility => "visibility",
+            Self::Icon => "icon",
+        }
+    }
+}
+
+impl SparseField for SparsePostTypeDetailsFieldWithEmbedContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Name => "name",
+            Self::Slug => "slug",
+            Self::RestBase => "rest_base",
+            Self::RestNamespace => "rest_namespace",
+            Self::Icon => "icon",
+        }
+    }
+}
+
+impl SparseField for SparsePostTypeDetailsFieldWithViewContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Description => "description",
+            Self::Hierarchical => "hierarchical",
+            Self::Name => "name",
+            Self::Slug => "slug",
+            Self::HasArchive => "has_archive",
+            Self::Taxonomies => "taxonomies",
+            Self::RestBase => "rest_base",
+            Self::RestNamespace => "rest_namespace",
             Self::Icon => "icon",
         }
     }
