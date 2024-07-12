@@ -10,6 +10,9 @@ fn main() {
     let _ = FooWithEditContext { bar: 0 };
     let _ = FooWithEmbedContext { bar: 0 };
     let _ = FooWithViewContext { bar: 0 };
+    let _ = SparseFooWithEditContext { bar: None };
+    let _ = SparseFooWithEmbedContext { bar: Some(0) };
+    let _ = SparseFooWithViewContext { bar: Some(0) };
 }
 
 uniffi::setup_scaffolding!();

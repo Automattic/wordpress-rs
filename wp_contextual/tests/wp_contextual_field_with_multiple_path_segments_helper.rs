@@ -3,8 +3,8 @@
 
 use wp_contextual::WpContextual;
 
-#[derive(WpContextual)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseBar {
     #[WpContext(edit)]
-    pub baz: u32,
+    pub baz: Option<u32>,
 }

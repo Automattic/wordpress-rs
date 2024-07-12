@@ -9,6 +9,7 @@ pub struct SparseFoo {
 
 fn main() {
     let _ = FooWithEditContext { bar: None };
+    let _ = SparseFooWithEditContext { bar: Some(0) };
 }
 
 uniffi::setup_scaffolding!();

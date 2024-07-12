@@ -7,15 +7,18 @@ pub struct SparseFoo {
     pub bar: Option<SparseBar>,
 }
 
-#[derive(WpContextual)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseBar {
     #[WpContext(edit)]
-    pub baz: u32,
+    pub baz: Option<u32>,
 }
 
 fn main() {
     let _ = FooWithEditContext {
         bar: BarWithEditContext { baz: 0 },
+    };
+    let _ = SparseFooWithEditContext {
+        bar: Some(SparseBarWithEditContext { baz: Some(0) }),
     };
 }
 
