@@ -296,7 +296,7 @@ enum ItemVariantAttributeParseError {
     MoreThanOneOuterAttr,
     #[error("Expecting a syn::Meta::List found {:?}", meta)]
     MetaInWrongFormat { meta: syn::Meta },
-    #[error("Expecting key value pairs (url = \"\", params = FooParam, output = FooOutput)")]
+    #[error("Expecting key value pairs (url = \"\", params = FooParam, output = FooOutput, filter_by = FooSparseField)")]
     ExpectingKeyValuePairs,
     #[error("Did you mean '='?")]
     NotEqualsSign,
