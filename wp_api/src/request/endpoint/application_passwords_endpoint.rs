@@ -11,8 +11,6 @@ use crate::users::UserId;
 use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparseApplicationPasswordField)]
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
     Create,

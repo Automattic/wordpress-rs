@@ -8,8 +8,6 @@ use wp_derive_request_builder::WpDerivedRequest;
 use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparsePluginField)]
 enum PluginsRequest {
     #[post(url = "/plugins", params = &PluginCreateParams, output = PluginWithEditContext)]
     Create,

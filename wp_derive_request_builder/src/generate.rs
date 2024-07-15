@@ -2,15 +2,14 @@ use std::fmt::Display;
 
 use helpers_to_generate_tokens::*;
 use proc_macro2::{Span, TokenStream};
-use proc_macro_crate::{crate_name, FoundCrate};
+use proc_macro_crate::FoundCrate;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use syn::Ident;
 
 use crate::{
-    outer_attr::{NamespaceAttr, SparseFieldAttr},
-    parse::{ParsedEnum, ParsedVariant, RequestType},
+    parse::{ParsedEnum, RequestType},
     variant_attr::FilterByType,
 };
 
@@ -31,7 +30,6 @@ pub(crate) fn generate_types(parsed_enum: &ParsedEnum) -> TokenStream {
 fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_wp_authentication_type = &config.static_types.wp_authentication;
-    let static_inner_request_builder_type = &config.static_types.inner_request_builder;
     let static_request_executor_type = &config.static_types.request_executor;
     let static_wp_api_error_type = &config.static_types.wp_api_error;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
@@ -282,8 +280,6 @@ impl Display for WpContext {
 #[derive(Debug)]
 pub struct Config {
     pub crate_ident: Ident,
-    pub sparse_field_type: SparseFieldAttr,
-    pub namespace_attr: NamespaceAttr,
     pub generated_idents: ConfigGeneratedIdents,
     pub static_types: ConfigStaticTypes,
 }
@@ -303,8 +299,6 @@ impl Config {
 
         Self {
             crate_ident,
-            sparse_field_type: parsed_enum.outer_attr.sparse_field_attr.clone(),
-            namespace_attr: parsed_enum.outer_attr.namespace_attr.clone(),
             generated_idents,
             static_types,
         }

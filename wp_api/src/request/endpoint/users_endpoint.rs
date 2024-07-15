@@ -8,8 +8,6 @@ use wp_derive_request_builder::WpDerivedRequest;
 use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparseUserField)]
 enum UsersRequest {
     #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>, filter_by = SparseUserField)]
     List,

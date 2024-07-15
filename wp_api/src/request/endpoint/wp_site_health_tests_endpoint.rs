@@ -7,8 +7,6 @@ use crate::wp_site_health_tests::{
 use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp-site-health/v1")]
-#[SparseField(SparseWpSiteHealthTestField)]
 enum WpSiteHealthTestsRequest {
     #[get(url = "/tests/background-updates", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     BackgroundUpdates,

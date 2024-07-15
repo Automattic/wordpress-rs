@@ -1,32 +1,15 @@
 use convert_case::{Case, Casing};
-use proc_macro2::{Span, TokenStream, TokenTree};
+use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote};
 use syn::Ident;
 
 use super::{ContextAndFilterHandler, PartOf, WpContext};
 use crate::{
-    outer_attr::SparseFieldAttr,
-    parse::{ParsedEnum, RequestType},
+    parse::RequestType,
     variant_attr::{ParamsType, UrlPart},
 };
 
 const SPARSE_IDENT_PREFIX: &str = "Sparse";
-
-pub fn endpoint_ident(parsed_enum: &ParsedEnum) -> Ident {
-    format_ident!("{}Endpoint", parsed_enum.enum_ident)
-}
-
-pub fn request_builder_ident(parsed_enum: &ParsedEnum) -> Ident {
-    format_ident!("{}Builder", parsed_enum.enum_ident)
-}
-
-pub fn api_base_url_type(crate_ident: &Ident) -> TokenStream {
-    quote! { std::sync::Arc<#crate_ident::request::endpoint::ApiBaseUrl> }
-}
-
-pub fn request_builder_type(crate_ident: &Ident) -> TokenStream {
-    quote! { std::sync::Arc<#crate_ident::request::RequestBuilder> }
-}
 
 pub fn output_type(
     output_token_tree: Vec<TokenTree>,
@@ -380,13 +363,8 @@ pub fn fn_body_get_request_from_request_builder(
 #[cfg(test)]
 mod tests {
     #![allow(clippy::too_many_arguments)]
-    use std::str::FromStr;
-
-    use crate::variant_attr::FilterByType;
-
     use super::*;
-    use proc_macro2::Literal;
-    use quote::ToTokens;
+    use crate::variant_attr::FilterByType;
     use rstest::rstest;
     use syn::parse_quote;
 
