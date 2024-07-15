@@ -1,37 +1,27 @@
-#![allow(unused)]
-use std::error;
-
-use proc_macro2::{Literal, TokenStream, TokenTree};
 use syn::{
     braced,
     parse::{Parse, ParseBuffer, ParseStream},
     punctuated::Punctuated,
-    spanned::Spanned,
     token::Comma,
-    Ident, Token,
+    Attribute, Ident, Token,
 };
 
-use crate::{
-    outer_attr::{OuterAttr, SparseFieldAttr},
-    variant_attr::ParsedVariantAttribute,
-};
+use crate::variant_attr::ParsedVariantAttribute;
 
 #[derive(Debug, Clone)]
 pub struct ParsedEnum {
-    pub outer_attr: OuterAttr,
     pub enum_ident: Ident,
     pub variants: Punctuated<ParsedVariant, Comma>,
 }
 
 impl Parse for ParsedEnum {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let outer_attr = input.parse()?;
+        let _ = Attribute::parse_outer(input)?;
         let _enum_token: Token![enum] = input.parse()?;
         let enum_ident: Ident = input.parse()?;
         let content: ParseBuffer;
-        let brace_token = braced!(content in input);
+        let _brace_token = braced!(content in input);
         Ok(Self {
-            outer_attr,
             enum_ident,
             variants: content.parse_terminated(ParsedVariant::parse, Token![,])?,
         })

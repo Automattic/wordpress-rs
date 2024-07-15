@@ -1,5 +1,0 @@
-error: Expecting #[Namespace("_path_")] - Path should be a single literal separated by '/'
- --> tests/fail/namespace_attr_has_multiple_tokens.rs:2:13
-  |
-2 | #[Namespace("wp", "v2")]
-  |             ^^^^

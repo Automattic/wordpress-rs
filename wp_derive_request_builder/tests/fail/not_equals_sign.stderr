@@ -1,5 +1,5 @@
 error: Did you mean '='?
- --> tests/fail/not_equals_sign.rs:5:26
+ --> tests/fail/not_equals_sign.rs:3:26
   |
-5 |     #[contextual_get(url : "/users", params = &UserListParams, output = Vec<SparseUser>)]
+3 |     #[contextual_get(url : "/users", params = &UserListParams, output = Vec<SparseUser>)]
   |                          ^

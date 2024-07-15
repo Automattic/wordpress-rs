@@ -1,5 +1,0 @@
-error: Expecting #[Namespace("_path_")] - Path is missing
- --> tests/fail/namespace_attr_has_no_tokens.rs:2:1
-  |
-2 | #[Namespace()]
-  | ^

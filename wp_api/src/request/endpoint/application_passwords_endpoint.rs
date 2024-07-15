@@ -8,9 +8,9 @@ use crate::application_passwords::{
 };
 use crate::users::UserId;
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparseApplicationPasswordField)]
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
     Create,
@@ -18,14 +18,20 @@ enum ApplicationPasswordsRequest {
     Delete,
     #[delete(url = "/users/<user_id>/application-passwords", output = ApplicationPasswordDeleteAllResponse)]
     DeleteAll,
-    #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>, filter_by = SparseApplicationPasswordField)]
     List,
-    #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword, filter_by = SparseApplicationPasswordField)]
     Retrieve,
-    #[contextual_get(url = "/users/<user_id>/application-passwords/introspect", output = SparseApplicationPassword)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords/introspect", output = SparseApplicationPassword, filter_by = SparseApplicationPasswordField)]
     RetrieveCurrent,
     #[post(url = "/users/<user_id>/application-passwords/<application_password_uuid>", params = &ApplicationPasswordUpdateParams, output = ApplicationPasswordWithEditContext)]
     Update,
+}
+
+impl DerivedRequest for ApplicationPasswordsRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpV2
+    }
 }
 
 #[cfg(test)]

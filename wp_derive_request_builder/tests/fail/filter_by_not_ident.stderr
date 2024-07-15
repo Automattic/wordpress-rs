@@ -1,0 +1,5 @@
+error: Expecting key value pairs (url = "", params = FooParam, output = FooOutput, filter_by = FooSparseField)
+ --> tests/fail/filter_by_not_ident.rs:3:64
+  |
+3 |     #[contextual_get(url = "/users", output = Vec<SparseUser>, "filter_by" = SparseUserField)]
+  |                                                                ^^^^^^^^^^^
