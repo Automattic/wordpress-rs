@@ -15,6 +15,7 @@ path = "tests/all_tests.rs"
 trybuild = { version = "1.0", features = ["diff"] }
 
 [dependencies]
+convert_case = { workspace = true }
 proc-macro2 = "1.0"
 quote = "1.0"
 serde = { workspace = true }

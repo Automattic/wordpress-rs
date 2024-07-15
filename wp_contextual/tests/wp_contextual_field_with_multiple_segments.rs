@@ -23,6 +23,8 @@ fn main() {
             },
         ),
     };
+    let bar_field = SparseFooFieldWithEditContext::Bar;
+    assert_eq!(bar_field.as_field_name(), "bar");
 }
 
 uniffi::setup_scaffolding!();

@@ -20,7 +20,7 @@ trybuild = { version = "1.0", features = ["diff"] }
 url = { workspace = true }
 
 [dependencies]
-convert_case = "0.6"
+convert_case = { workspace = true }
 proc-macro-crate = "3.1.0"
 proc-macro2 = "1.0"
 quote = "1.0"

@@ -20,6 +20,8 @@ fn main() {
     let _ = SparseFooWithEditContext {
         bar: Some(SparseBarWithEditContext { baz: Some(0) }),
     };
+    let bar_field = SparseFooFieldWithEditContext::Bar;
+    assert_eq!(bar_field.as_field_name(), "bar");
 }
 
 uniffi::setup_scaffolding!();
