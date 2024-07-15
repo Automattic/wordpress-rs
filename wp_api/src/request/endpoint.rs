@@ -146,6 +146,25 @@ impl UrlExtension for Url {
     }
 }
 
+trait DerivedRequest {
+    fn namespace() -> Namespace;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Namespace {
+    WpSiteHealthV1,
+    WpV2,
+}
+
+impl Namespace {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::WpSiteHealthV1 => "/wp-site-health/v1",
+            Self::WpV2 => "/wp/v2",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -223,17 +242,22 @@ mod tests {
     }
 
     pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
-        validate_endpoint("/wp/v2", endpoint_url, path);
+        validate_endpoint(Namespace::WpV2, endpoint_url, path);
     }
 
     pub fn validate_wp_site_health_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
-        validate_endpoint("/wp-site-health/v1", endpoint_url, path);
+        validate_endpoint(Namespace::WpSiteHealthV1, endpoint_url, path);
     }
 
-    fn validate_endpoint(namespace: &str, endpoint_url: ApiEndpointUrl, path: &str) {
+    fn validate_endpoint(namespace: Namespace, endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
             endpoint_url.as_str(),
-            format!("{}{}{}", fixture_api_base_url().as_str(), namespace, path)
+            format!(
+                "{}{}{}",
+                fixture_api_base_url().as_str(),
+                namespace.as_str(),
+                path
+            )
         );
     }
 }

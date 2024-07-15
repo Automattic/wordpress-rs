@@ -4,6 +4,8 @@ use crate::wp_site_health_tests::{
     SparseWpSiteHealthTest, SparseWpSiteHealthTestField, WpSiteHealthTest,
 };
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
 #[Namespace("/wp-site-health/v1")]
 #[SparseField(SparseWpSiteHealthTestField)]
@@ -18,6 +20,12 @@ enum WpSiteHealthTestsRequest {
     DotorgCommunication,
     #[get(url = "/tests/authorization-header", output = SparseWpSiteHealthTest)]
     AuthorizationHeader,
+}
+
+impl DerivedRequest for WpSiteHealthTestsRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpSiteHealthV1
+    }
 }
 
 #[cfg(test)]

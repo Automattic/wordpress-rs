@@ -8,6 +8,8 @@ use crate::application_passwords::{
 };
 use crate::users::UserId;
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
 #[Namespace("/wp/v2")]
 #[SparseField(SparseApplicationPasswordField)]
@@ -26,6 +28,12 @@ enum ApplicationPasswordsRequest {
     RetrieveCurrent,
     #[post(url = "/users/<user_id>/application-passwords/<application_password_uuid>", params = &ApplicationPasswordUpdateParams, output = ApplicationPasswordWithEditContext)]
     Update,
+}
+
+impl DerivedRequest for ApplicationPasswordsRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpV2
+    }
 }
 
 #[cfg(test)]

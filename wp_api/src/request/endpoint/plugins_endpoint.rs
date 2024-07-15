@@ -5,6 +5,8 @@ use crate::{
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
 #[Namespace("/wp/v2")]
 #[SparseField(SparsePluginField)]
@@ -19,6 +21,12 @@ enum PluginsRequest {
     Retrieve,
     #[post(url = "/plugins/<plugin_slug>", params = &PluginUpdateParams, output = PluginWithEditContext)]
     Update,
+}
+
+impl DerivedRequest for PluginsRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpV2
+    }
 }
 
 #[cfg(test)]

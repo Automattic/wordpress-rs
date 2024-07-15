@@ -5,6 +5,8 @@ use crate::{
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
 #[Namespace("/wp/v2")]
 #[SparseField(SparseUserField)]
@@ -25,6 +27,12 @@ enum UsersRequest {
     Update,
     #[post(url = "/users/me", params = &UserUpdateParams, output = UserWithEditContext)]
     UpdateMe,
+}
+
+impl DerivedRequest for UsersRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpV2
+    }
 }
 
 #[cfg(test)]
