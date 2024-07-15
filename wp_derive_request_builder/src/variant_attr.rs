@@ -7,40 +7,57 @@ use syn::{
 
 use crate::parse::RequestType;
 
-// Use a wrapper for ParamsType to indicate that in case the `params` is Some, there is at least
-// one token in it
 #[derive(Debug, Clone)]
-pub struct ParamsType {
-    tokens: Option<Vec<TokenTree>>,
+pub struct FilterByType {
+    pub tokens: TokenStream,
 }
 
-impl ParamsType {
-    pub fn new(tokens: Option<Vec<TokenTree>>) -> Self {
-        Self {
-            tokens: tokens.and_then(|tokens| {
-                if tokens.is_empty() {
-                    None
-                } else {
-                    Some(tokens)
-                }
-            }),
-        }
-    }
-
-    pub fn tokens(&self) -> Option<&Vec<TokenTree>> {
-        self.tokens.as_ref()
-    }
+#[derive(Debug, Clone)]
+pub struct ParamsType {
+    pub tokens: TokenStream,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedVariantAttribute {
     pub request_type: RequestType,
     pub url_parts: Vec<UrlPart>,
-    pub params: ParamsType,
+    pub params: Option<ParamsType>,
     pub output: Vec<TokenTree>,
+    pub filter_by: Option<FilterByType>,
 }
 
 impl ParsedVariantAttribute {
+    fn new(
+        request_type: RequestType,
+        url_parts: Vec<UrlPart>,
+        params: Option<Vec<TokenTree>>,
+        output: Vec<TokenTree>,
+        filter_by: Option<Vec<TokenTree>>,
+    ) -> Self {
+        let non_empty_token_tree_or_none =
+            |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
+                tokens.and_then(|tokens| {
+                    if tokens.is_empty() {
+                        None
+                    } else {
+                        Some(tokens)
+                    }
+                })
+            };
+
+        Self {
+            request_type,
+            url_parts,
+            params: non_empty_token_tree_or_none(params).map(|tokens| ParamsType {
+                tokens: TokenStream::from_iter(tokens),
+            }),
+            output,
+            filter_by: non_empty_token_tree_or_none(filter_by).map(|tokens| FilterByType {
+                tokens: TokenStream::from_iter(tokens),
+            }),
+        }
+    }
+
     // Parses the attribute and finds the [syn::MetaList]
     //
     // Errors:
@@ -218,12 +235,14 @@ impl Parse for ParsedVariantAttribute {
         let mut url_tokens = None;
         let mut params_tokens = None;
         let mut output_tokens = None;
+        let mut filter_by_tokens = None;
 
         for (ident, tokens) in pair_vec.into_iter() {
             match ident.to_string().as_str() {
                 "url" => url_tokens = Some(tokens),
                 "params" => params_tokens = Some(tokens),
                 "output" => output_tokens = Some(tokens),
+                "filter_by" => filter_by_tokens = Some(tokens),
                 _ => {
                     return Err(ItemVariantAttributeParseError::ExpectingKeyValuePairs
                         .into_syn_error(meta_list_span));
@@ -259,12 +278,13 @@ impl Parse for ParsedVariantAttribute {
 
         let url_parts = UrlPart::split(url_str.to_string(), &meta_list_span)?;
 
-        Ok(Self {
+        Ok(ParsedVariantAttribute::new(
             request_type,
             url_parts,
-            params: ParamsType::new(params_tokens),
+            params_tokens,
             output,
-        })
+            filter_by_tokens,
+        ))
     }
 }
 

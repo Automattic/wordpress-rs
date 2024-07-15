@@ -20,11 +20,11 @@ enum ApplicationPasswordsRequest {
     Delete,
     #[delete(url = "/users/<user_id>/application-passwords", output = ApplicationPasswordDeleteAllResponse)]
     DeleteAll,
-    #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords", output = Vec<SparseApplicationPassword>, filter_by = SparseApplicationPasswordField)]
     List,
-    #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = SparseApplicationPassword, filter_by = SparseApplicationPasswordField)]
     Retrieve,
-    #[contextual_get(url = "/users/<user_id>/application-passwords/introspect", output = SparseApplicationPassword)]
+    #[contextual_get(url = "/users/<user_id>/application-passwords/introspect", output = SparseApplicationPassword, filter_by = SparseApplicationPasswordField)]
     RetrieveCurrent,
     #[post(url = "/users/<user_id>/application-passwords/<application_password_uuid>", params = &ApplicationPasswordUpdateParams, output = ApplicationPasswordWithEditContext)]
     Update,

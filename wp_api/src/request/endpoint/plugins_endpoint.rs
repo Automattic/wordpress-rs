@@ -15,9 +15,9 @@ enum PluginsRequest {
     Create,
     #[delete(url = "/plugins/<plugin_slug>", output = PluginDeleteResponse)]
     Delete,
-    #[contextual_get(url = "/plugins", params = &PluginListParams, output = Vec<SparsePlugin>)]
+    #[contextual_get(url = "/plugins", params = &PluginListParams, output = Vec<SparsePlugin>, filter_by = SparsePluginField)]
     List,
-    #[contextual_get(url = "/plugins/<plugin_slug>", output = SparsePlugin)]
+    #[contextual_get(url = "/plugins/<plugin_slug>", output = SparsePlugin, filter_by = SparsePluginField)]
     Retrieve,
     #[post(url = "/plugins/<plugin_slug>", params = &PluginUpdateParams, output = PluginWithEditContext)]
     Update,

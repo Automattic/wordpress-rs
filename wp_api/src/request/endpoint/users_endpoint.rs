@@ -11,7 +11,7 @@ use super::{DerivedRequest, Namespace};
 #[Namespace("/wp/v2")]
 #[SparseField(SparseUserField)]
 enum UsersRequest {
-    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>)]
+    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>, filter_by = SparseUserField)]
     List,
     #[post(url = "/users", params = &UserCreateParams, output = UserWithEditContext)]
     Create,
@@ -19,9 +19,9 @@ enum UsersRequest {
     Delete,
     #[delete(url = "/users/me", params = &UserDeleteParams, output = UserDeleteResponse)]
     DeleteMe,
-    #[contextual_get(url = "/users/<user_id>", output = SparseUser)]
+    #[contextual_get(url = "/users/<user_id>", output = SparseUser, filter_by = SparseUserField)]
     Retrieve,
-    #[contextual_get(url = "/users/me", output = SparseUser)]
+    #[contextual_get(url = "/users/me", output = SparseUser, filter_by = SparseUserField)]
     RetrieveMe,
     #[post(url = "/users/<user_id>", params = &UserUpdateParams, output = UserWithEditContext)]
     Update,

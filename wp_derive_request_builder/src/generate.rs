@@ -11,6 +11,7 @@ use syn::Ident;
 use crate::{
     outer_attr::{NamespaceAttr, SparseFieldAttr},
     parse::{ParsedEnum, ParsedVariant, RequestType},
+    variant_attr::FilterByType,
 };
 
 mod helpers_to_generate_tokens;
@@ -42,7 +43,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
 
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
-            Some(config.sparse_field_type.clone()),
+            variant.attr.filter_by.clone(),
         )
         .into_iter()
         .map(|context_and_filter_handler| {
@@ -50,7 +51,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
             let request_from_request_builder = fn_body_get_request_from_request_builder(
                 &variant.variant_ident,
                 url_parts,
-                params_type,
+                params_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
@@ -58,7 +59,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
                 PartOf::RequestExecutor,
                 &variant.variant_ident,
                 url_parts,
-                params_type,
+                params_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
@@ -107,14 +108,14 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
 
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
-            Some(config.sparse_field_type.clone()),
+            variant.attr.filter_by.clone(),
         )
         .into_iter()
         .map(|context_and_filter_handler| {
             let url_from_endpoint = fn_body_get_url_from_endpoint(
                 &variant.variant_ident,
                 url_parts,
-                params_type,
+                params_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
@@ -122,12 +123,12 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 PartOf::RequestBuilder,
                 &variant.variant_ident,
                 url_parts,
-                params_type,
+                params_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
             let fn_body_build_request_from_url =
-                fn_body_build_request_from_url(params_type, variant.attr.request_type);
+                fn_body_build_request_from_url(params_type.as_ref(), variant.attr.request_type);
             quote! {
                 pub #fn_signature -> #static_wp_network_request_type {
                     #url_from_endpoint
@@ -170,37 +171,34 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
         let request_type = variant.attr.request_type;
         let url_from_api_base_url =
             fn_body_get_url_from_api_base_url(&parsed_enum.enum_ident, url_parts);
-        let query_pairs = fn_body_query_pairs(params_type, request_type);
+        let query_pairs = fn_body_query_pairs(params_type.as_ref(), request_type);
 
-        ContextAndFilterHandler::from_request_type(
-            request_type,
-            Some(config.sparse_field_type.clone()),
-        )
-        .into_iter()
-        .map(|context_and_filter_handler| {
-            let fn_signature = fn_signature(
-                PartOf::Endpoint,
-                &variant.variant_ident,
-                url_parts,
-                params_type,
-                request_type,
-                &context_and_filter_handler,
-            );
-            let context_query_pair =
-                fn_body_context_query_pairs(&config.crate_ident, &context_and_filter_handler);
-            let fields_query_pairs =
-                fn_body_fields_query_pairs(&config.crate_ident, &context_and_filter_handler);
-            quote! {
-                pub #fn_signature -> #static_api_endpoint_url_type {
-                    #url_from_api_base_url
-                    #context_query_pair
-                    #query_pairs
-                    #fields_query_pairs
-                    url.into()
+        ContextAndFilterHandler::from_request_type(request_type, variant.attr.filter_by.clone())
+            .into_iter()
+            .map(|context_and_filter_handler| {
+                let fn_signature = fn_signature(
+                    PartOf::Endpoint,
+                    &variant.variant_ident,
+                    url_parts,
+                    params_type.as_ref(),
+                    request_type,
+                    &context_and_filter_handler,
+                );
+                let context_query_pair =
+                    fn_body_context_query_pairs(&config.crate_ident, &context_and_filter_handler);
+                let fields_query_pairs =
+                    fn_body_fields_query_pairs(&config.crate_ident, &context_and_filter_handler);
+                quote! {
+                    pub #fn_signature -> #static_api_endpoint_url_type {
+                        #url_from_api_base_url
+                        #context_query_pair
+                        #query_pairs
+                        #fields_query_pairs
+                        url.into()
+                    }
                 }
-            }
-        })
-        .collect::<TokenStream>()
+            })
+            .collect::<TokenStream>()
     });
 
     quote! {
@@ -230,20 +228,20 @@ pub enum PartOf {
 pub enum ContextAndFilterHandler {
     None,
     NoFilterTakeContextAsFunctionName(WpContext),
-    FilterTakeContextAsArgument(SparseFieldAttr),
-    FilterNoContext(SparseFieldAttr),
+    FilterTakeContextAsArgument(FilterByType),
+    FilterNoContext(FilterByType),
 }
 
 impl ContextAndFilterHandler {
     fn from_request_type(
         request_type: RequestType,
-        sparse_field_attr: Option<SparseFieldAttr>,
+        filter_by_type: Option<FilterByType>,
     ) -> Vec<Self> {
         match request_type {
             crate::parse::RequestType::Get => {
                 let mut v = vec![Self::None];
-                if let Some(sparse_field_attr) = sparse_field_attr {
-                    v.push(Self::FilterNoContext(sparse_field_attr));
+                if let Some(filter_by_type) = filter_by_type {
+                    v.push(Self::FilterNoContext(filter_by_type));
                 }
                 v
             }
@@ -251,8 +249,8 @@ impl ContextAndFilterHandler {
                 let mut v: Vec<Self> = WpContext::iter()
                     .map(Self::NoFilterTakeContextAsFunctionName)
                     .collect();
-                if let Some(sparse_field_attr) = sparse_field_attr {
-                    v.push(Self::FilterTakeContextAsArgument(sparse_field_attr));
+                if let Some(filter_by_type) = filter_by_type {
+                    v.push(Self::FilterTakeContextAsArgument(filter_by_type));
                 }
                 v
             }
