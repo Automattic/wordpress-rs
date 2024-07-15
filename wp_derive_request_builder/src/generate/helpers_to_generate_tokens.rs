@@ -30,7 +30,7 @@ pub fn request_builder_type(crate_ident: &Ident) -> TokenStream {
 
 pub fn output_type(
     output_token_tree: Vec<TokenTree>,
-    context_and_filter_handler: ContextAndFilterHandler,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     let strip_sparse_prefix = |token_tree: Vec<TokenTree>, context: Option<WpContext>| {
         token_tree
@@ -61,10 +61,10 @@ pub fn output_type(
     };
     match context_and_filter_handler {
         ContextAndFilterHandler::None => strip_sparse_prefix(output_token_tree, None),
-        ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => TokenStream::from_iter(output_token_tree),
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_)
+        | ContextAndFilterHandler::FilterNoContext(_) => TokenStream::from_iter(output_token_tree),
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => {
-            strip_sparse_prefix(output_token_tree, Some(context))
+            strip_sparse_prefix(output_token_tree, Some(*context))
         }
     }
 }
@@ -75,14 +75,13 @@ pub fn fn_signature(
     url_parts: &[UrlPart],
     params_type: &ParamsType,
     request_type: RequestType,
-    context_and_filter_handler: ContextAndFilterHandler,
-    sparse_field_type: &SparseFieldAttr,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     let fn_name = fn_name(variant_ident, context_and_filter_handler);
     let url_params = fn_url_params(url_parts);
     let context_param = fn_context_param(context_and_filter_handler);
     let provided_param = fn_provided_param(part_of, params_type, request_type);
-    let fields_param = fn_fields_param(context_and_filter_handler, sparse_field_type);
+    let fields_param = fn_fields_param(context_and_filter_handler);
     quote! { fn #fn_name(&self, #url_params #context_param #provided_param #fields_param) }
 }
 
@@ -125,26 +124,23 @@ pub fn fn_provided_param(
     }
 }
 
-pub fn fn_context_param(context_and_filter_handler: ContextAndFilterHandler) -> TokenStream {
+pub fn fn_context_param(context_and_filter_handler: &ContextAndFilterHandler) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_)
-        | ContextAndFilterHandler::FilterNoContext => TokenStream::new(),
-        ContextAndFilterHandler::FilterTakeContextAsArgument => {
+        | ContextAndFilterHandler::FilterNoContext(_) => TokenStream::new(),
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_) => {
             quote! { context: crate::WpContext, }
         }
     }
 }
 
-pub fn fn_fields_param(
-    context_and_filter_handler: ContextAndFilterHandler,
-    sparse_field_type: &SparseFieldAttr,
-) -> TokenStream {
+pub fn fn_fields_param(context_and_filter_handler: &ContextAndFilterHandler) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
-        ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => {
+        ContextAndFilterHandler::FilterTakeContextAsArgument(sparse_field_type)
+        | ContextAndFilterHandler::FilterNoContext(sparse_field_type) => {
             let sparse_field_type: &TokenStream = &sparse_field_type.tokens;
             quote! { fields: &[#sparse_field_type] }
         }
@@ -153,7 +149,7 @@ pub fn fn_fields_param(
 
 pub fn fn_name(
     variant_ident: &Ident,
-    context_and_filter_handler: ContextAndFilterHandler,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> Ident {
     let basic_fn_name = format_ident!("{}", variant_ident.to_string().to_case(Case::Snake));
     match context_and_filter_handler {
@@ -163,8 +159,8 @@ pub fn fn_name(
             basic_fn_name,
             context.to_string().to_lowercase()
         ),
-        ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => {
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_)
+        | ContextAndFilterHandler::FilterNoContext(_) => {
             format_ident!("filter_{}", basic_fn_name)
         }
     }
@@ -183,12 +179,12 @@ fn fn_arg_url_parts(url_parts: &[UrlPart]) -> TokenStream {
         .collect::<TokenStream>()
 }
 
-fn fn_arg_context(context_and_filter_handler: ContextAndFilterHandler) -> TokenStream {
+fn fn_arg_context(context_and_filter_handler: &ContextAndFilterHandler) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
-        | ContextAndFilterHandler::FilterNoContext
+        | ContextAndFilterHandler::FilterNoContext(_)
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
-        ContextAndFilterHandler::FilterTakeContextAsArgument => {
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_) => {
             quote! { context, }
         }
     }
@@ -217,12 +213,12 @@ fn fn_arg_provided_params(
     }
 }
 
-fn fn_arg_fields(context_and_filter_handler: ContextAndFilterHandler) -> TokenStream {
+fn fn_arg_fields(context_and_filter_handler: &ContextAndFilterHandler) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
-        ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => quote! { fields, },
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_)
+        | ContextAndFilterHandler::FilterNoContext(_) => quote! { fields, },
     }
 }
 
@@ -248,7 +244,7 @@ pub fn fn_body_get_url_from_endpoint(
     url_parts: &[UrlPart],
     params_type: &ParamsType,
     request_type: RequestType,
-    context_and_filter_handler: ContextAndFilterHandler,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     let fn_name = fn_name(variant_ident, context_and_filter_handler);
     let fn_arg_url_parts = fn_arg_url_parts(url_parts);
@@ -291,13 +287,13 @@ pub fn fn_body_query_pairs(params_type: &ParamsType, request_type: RequestType) 
 
 pub fn fn_body_fields_query_pairs(
     crate_ident: &Ident,
-    context_and_filter_handler: ContextAndFilterHandler,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
         | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_) => TokenStream::new(),
-        ContextAndFilterHandler::FilterTakeContextAsArgument
-        | ContextAndFilterHandler::FilterNoContext => quote! {
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_)
+        | ContextAndFilterHandler::FilterNoContext(_) => quote! {
             use #crate_ident::SparseField;
             url.query_pairs_mut().append_pair(
                 "_fields",
@@ -314,10 +310,10 @@ pub fn fn_body_fields_query_pairs(
 
 pub fn fn_body_context_query_pairs(
     crate_ident: &Ident,
-    context_and_filter_handler: ContextAndFilterHandler,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     match context_and_filter_handler {
-        ContextAndFilterHandler::None | ContextAndFilterHandler::FilterNoContext => {
+        ContextAndFilterHandler::None | ContextAndFilterHandler::FilterNoContext(_) => {
             TokenStream::new()
         }
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(context) => {
@@ -326,7 +322,7 @@ pub fn fn_body_context_query_pairs(
                 url.query_pairs_mut().append_pair("context", #crate_ident::WpContext::#context.as_str());
             }
         }
-        ContextAndFilterHandler::FilterTakeContextAsArgument => quote! {
+        ContextAndFilterHandler::FilterTakeContextAsArgument(_) => quote! {
             url.query_pairs_mut().append_pair("context", context.as_str());
         },
     }
@@ -362,7 +358,7 @@ pub fn fn_body_get_request_from_request_builder(
     url_parts: &[UrlPart],
     params_type: &ParamsType,
     request_type: RequestType,
-    context_and_filter_handler: ContextAndFilterHandler,
+    context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     let fn_name = fn_name(variant_ident, context_and_filter_handler);
     let fn_arg_url_parts = fn_arg_url_parts(url_parts);
@@ -451,16 +447,13 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
         ""
     )]
-    #[case(
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "context : crate :: WpContext ,"
-    )]
+    #[case(filter_take_context_as_argument(), "context : crate :: WpContext ,")]
     fn test_fn_context_param(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_context_param(context_and_filter_handler).to_string(),
+            fn_context_param(&context_and_filter_handler).to_string(),
             expected_str
         );
     }
@@ -477,49 +470,35 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
         "list_contents_with_embed_context"
     )]
-    #[case(
-        "List",
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "filter_list"
-    )]
+    #[case("List", filter_take_context_as_argument(), "filter_list")]
     fn test_fn_name(
         #[case] ident: &str,
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_name(&format_ident!("{}", ident), context_and_filter_handler).to_string(),
+            fn_name(&format_ident!("{}", ident), &context_and_filter_handler).to_string(),
             expected_str
         );
     }
 
     #[rstest]
-    #[case(ContextAndFilterHandler::None, quote! { SparseUserField }, "")]
-    #[case(ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::View), quote! { SparseUserField }, "")]
+    #[case(ContextAndFilterHandler::None, "")]
     #[case(
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
-        quote! { SparseUserField },
-        "fields : & [SparseUserField]"
+        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::View),
+        ""
     )]
     #[case(
-        ContextAndFilterHandler::FilterNoContext,
-        quote! { crate::SparseUserField },
+        filter_take_context_as_argument(),
         "fields : & [crate :: SparseUserField]"
     )]
+    #[case(filter_no_context(), "fields : & [crate :: SparseUserField]")]
     fn test_fn_fields_param(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
-        // Don't use the `sparse_field_type` fixture so we can test multi segment sparse field type
-        #[case] sparse_field_type: TokenStream,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_fields_param(
-                context_and_filter_handler,
-                &SparseFieldAttr {
-                    tokens: sparse_field_type,
-                }
-            )
-            .to_string(),
+            fn_fields_param(&context_and_filter_handler,).to_string(),
             expected_str
         );
     }
@@ -538,14 +517,14 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         ""
     )]
-    #[case(ContextAndFilterHandler::FilterTakeContextAsArgument, "context ,")]
-    #[case(ContextAndFilterHandler::FilterNoContext, "")]
+    #[case(filter_take_context_as_argument(), "context ,")]
+    #[case(filter_no_context(), "")]
     fn test_fn_arg_context(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_arg_context(context_and_filter_handler).to_string(),
+            fn_arg_context(&context_and_filter_handler).to_string(),
             expected_str
         );
     }
@@ -577,14 +556,14 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         ""
     )]
-    #[case(ContextAndFilterHandler::FilterTakeContextAsArgument, "fields ,")]
-    #[case(ContextAndFilterHandler::FilterNoContext, "fields ,")]
+    #[case(filter_take_context_as_argument(), "fields ,")]
+    #[case(filter_no_context(), "fields ,")]
     fn test_fn_arg_fields(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_arg_fields(context_and_filter_handler).to_string(),
+            fn_arg_fields(&context_and_filter_handler).to_string(),
             expected_str
         );
     }
@@ -607,8 +586,8 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::View),
         "std :: vec :: Vec < crate :: UserWithViewContext >"
     )]
-    #[case(parse_quote!(SparseUser), ContextAndFilterHandler::FilterTakeContextAsArgument, "SparseUser")]
-    #[case(parse_quote!(Vec<SparseUser>), ContextAndFilterHandler::FilterNoContext, "Vec < SparseUser >")]
+    #[case(parse_quote!(SparseUser), filter_take_context_as_argument(), "SparseUser")]
+    #[case(parse_quote!(Vec<SparseUser>), filter_no_context(), "Vec < SparseUser >")]
     fn test_output_type(
         #[case] output_token_stream: TokenStream,
         #[case] context_and_filter_handler: ContextAndFilterHandler,
@@ -617,7 +596,7 @@ mod tests {
         assert_eq!(
             output_type(
                 output_token_stream.into_iter().collect(),
-                context_and_filter_handler
+                &context_and_filter_handler
             )
             .to_string(),
             expected_str
@@ -639,24 +618,24 @@ mod tests {
         url_static_users(),
         &referenced_params_type("UserCreateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_create (& self , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_create (& self , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("Create"),
         url_static_users(),
         &referenced_params_type("UserCreateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_create (& self , params : &UserCreateParams , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_create (& self , params : &UserCreateParams , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestExecutor,
         format_ident!("Create"),
         url_static_users(),
         &referenced_params_type("UserCreateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_create (& self , params : &UserCreateParams , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_create (& self , params : &UserCreateParams , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Delete"),
@@ -671,8 +650,8 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserDeleteParams"),
         RequestType::Delete,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_delete (& self , user_id : & UserId , params : &UserDeleteParams , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_delete (& self , user_id : & UserId , params : &UserDeleteParams , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("DeleteMe"),
@@ -687,8 +666,8 @@ mod tests {
         url_static_users(),
         &referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "fn filter_list (& self , context : crate :: WpContext , params : &UserListParams , fields : & [SparseUserField])")]
+        filter_take_context_as_argument(),
+        "fn filter_list (& self , context : crate :: WpContext , params : &UserListParams , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Retrieve"),
@@ -703,8 +682,8 @@ mod tests {
         url_users_with_user_id(),
         &ParamsType::new(None),
         RequestType::ContextualGet,
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
-        "fn filter_retrieve (& self , user_id : & UserId , context : crate :: WpContext , fields : & [SparseUserField])")]
+        filter_take_context_as_argument(),
+        "fn filter_retrieve (& self , user_id : & UserId , context : crate :: WpContext , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Update"),
@@ -719,8 +698,8 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_update (& self , user_id : & UserId , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_update (& self , user_id : & UserId , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("Update"),
@@ -743,16 +722,16 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_update (& self , user_id : & UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_update (& self , user_id : & UserId , params : &UserUpdateParams , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestExecutor,
         format_ident!("Update"),
         url_users_with_user_id(),
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
-        "fn filter_update (& self , user_id : & UserId , params : &UserUpdateParams , fields : & [SparseUserField])")]
+        filter_no_context(),
+        "fn filter_update (& self , user_id : & UserId , params : &UserUpdateParams , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("List"),
@@ -777,7 +756,6 @@ mod tests {
         #[case] request_type: RequestType,
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
-        sparse_field_type: SparseFieldAttr,
     ) {
         assert_eq!(
             fn_signature(
@@ -786,8 +764,7 @@ mod tests {
                 &url_parts,
                 params_type,
                 request_type,
-                context_and_filter_handler,
-                &sparse_field_type,
+                &context_and_filter_handler,
             )
             .to_string(),
             expected_str
@@ -807,7 +784,7 @@ mod tests {
         url_static_users(),
         &referenced_params_type("UserCreateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
+        filter_no_context(),
         "let url = self . endpoint . filter_create (fields ,) ;")]
     #[case(
         format_ident!("Delete"),
@@ -821,7 +798,7 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserDeleteParams"),
         RequestType::Delete,
-        ContextAndFilterHandler::FilterNoContext,
+        filter_no_context(),
         "let url = self . endpoint . filter_delete (user_id , params , fields ,) ;")]
     #[case(
         format_ident!("DeleteMe"),
@@ -842,7 +819,7 @@ mod tests {
         url_static_users(),
         &referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        filter_take_context_as_argument(),
         "let url = self . endpoint . filter_list (context , params , fields ,) ;")]
     #[case(
         format_ident!("Retrieve"),
@@ -856,7 +833,7 @@ mod tests {
         url_users_with_user_id(),
         &ParamsType::new(None),
         RequestType::ContextualGet,
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        filter_take_context_as_argument(),
         "let url = self . endpoint . filter_retrieve (user_id , context , fields ,) ;")]
     #[case(
         format_ident!("Update"),
@@ -870,7 +847,7 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
+        filter_no_context(),
         "let url = self . endpoint . filter_update (user_id , fields ,) ;")]
     fn test_fn_body_get_url_from_endpoint(
         #[case] variant_ident: Ident,
@@ -886,7 +863,7 @@ mod tests {
                 &url_parts,
                 params_type,
                 request_type,
-                context_and_filter_handler
+                &context_and_filter_handler
             )
             .to_string(),
             expected_str
@@ -962,8 +939,8 @@ mod tests {
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         true
     )]
-    #[case(ContextAndFilterHandler::FilterTakeContextAsArgument, false)]
-    #[case(ContextAndFilterHandler::FilterNoContext, false)]
+    #[case(filter_take_context_as_argument(), false)]
+    #[case(filter_no_context(), false)]
     fn test_fn_body_fields_query_pairs(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] is_empty: bool,
@@ -972,7 +949,7 @@ mod tests {
         // Since this query pair is static, there is no need to compare the string value
         let crate_ident = format_ident!("crate");
         assert_eq!(
-            fn_body_fields_query_pairs(&crate_ident, context_and_filter_handler).is_empty(),
+            fn_body_fields_query_pairs(&crate_ident, &context_and_filter_handler).is_empty(),
             is_empty
         );
     }
@@ -984,17 +961,17 @@ mod tests {
         "url . query_pairs_mut () . append_pair (\"context\" , crate :: WpContext :: Edit . as_str ()) ;"
     )]
     #[case(
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        filter_take_context_as_argument(),
         "url . query_pairs_mut () . append_pair (\"context\" , context . as_str ()) ;"
     )]
-    #[case(ContextAndFilterHandler::FilterNoContext, "")]
+    #[case(filter_no_context(), "")]
     fn test_fn_body_context_query_pairs(
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
     ) {
         let crate_ident = format_ident!("crate");
         assert_eq!(
-            fn_body_context_query_pairs(&crate_ident, context_and_filter_handler).to_string(),
+            fn_body_context_query_pairs(&crate_ident, &context_and_filter_handler).to_string(),
             expected_str
         );
     }
@@ -1042,7 +1019,7 @@ mod tests {
         url_static_users(),
         &referenced_params_type("UserCreateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
+        filter_no_context(),
         "let request = self . request_builder . filter_create (params , fields ,) ;")]
     #[case(
         format_ident!("Delete"),
@@ -1056,7 +1033,7 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserDeleteParams"),
         RequestType::Delete,
-        ContextAndFilterHandler::FilterNoContext,
+        filter_no_context(),
         "let request = self . request_builder . filter_delete (user_id , params , fields ,) ;")]
     #[case(
         format_ident!("DeleteMe"),
@@ -1077,7 +1054,7 @@ mod tests {
         url_static_users(),
         &referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        filter_take_context_as_argument(),
         "let request = self . request_builder . filter_list (context , params , fields ,) ;")]
     #[case(
         format_ident!("Retrieve"),
@@ -1091,7 +1068,7 @@ mod tests {
         url_users_with_user_id(),
         &ParamsType::new(None),
         RequestType::ContextualGet,
-        ContextAndFilterHandler::FilterTakeContextAsArgument,
+        filter_take_context_as_argument(),
         "let request = self . request_builder . filter_retrieve (user_id , context , fields ,) ;")]
     #[case(
         format_ident!("Update"),
@@ -1105,7 +1082,7 @@ mod tests {
         url_users_with_user_id(),
         &referenced_params_type("UserUpdateParams"),
         RequestType::Post,
-        ContextAndFilterHandler::FilterNoContext,
+        filter_no_context(),
         "let request = self . request_builder . filter_update (user_id , params , fields ,) ;")]
     fn test_fn_body_get_request_from_request_builder(
         #[case] variant_ident: Ident,
@@ -1121,18 +1098,11 @@ mod tests {
                 &url_parts,
                 params_type,
                 request_type,
-                context_and_filter_handler
+                &context_and_filter_handler
             )
             .to_string(),
             expected_str
         );
-    }
-
-    #[rstest::fixture]
-    fn sparse_field_type() -> SparseFieldAttr {
-        SparseFieldAttr {
-            tokens: quote! { SparseUserField },
-        }
     }
 
     fn referenced_params_type(str: &str) -> ParamsType {
@@ -1173,5 +1143,17 @@ mod tests {
             UrlPart::Static("users".into()),
             UrlPart::Dynamic("user_id".into()),
         ]
+    }
+
+    fn filter_take_context_as_argument() -> ContextAndFilterHandler {
+        ContextAndFilterHandler::FilterTakeContextAsArgument(SparseFieldAttr {
+            tokens: quote! { crate::SparseUserField },
+        })
+    }
+
+    fn filter_no_context() -> ContextAndFilterHandler {
+        ContextAndFilterHandler::FilterNoContext(SparseFieldAttr {
+            tokens: quote! { crate::SparseUserField },
+        })
     }
 }
