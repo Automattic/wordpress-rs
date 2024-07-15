@@ -62,10 +62,9 @@ pub fn fn_signature(
 ) -> TokenStream {
     let fn_name = fn_name(variant_ident, context_and_filter_handler);
     let url_params = fn_url_params(url_parts);
-    let context_param = fn_context_param(context_and_filter_handler);
     let provided_param = fn_provided_param(part_of, params_type, request_type);
     let fields_param = fn_fields_param(context_and_filter_handler);
-    quote! { fn #fn_name(&self, #url_params #context_param #provided_param #fields_param) }
+    quote! { fn #fn_name(&self, #url_params #provided_param #fields_param) }
 }
 
 pub fn fn_url_params(url_parts: &[UrlPart]) -> TokenStream {
@@ -104,17 +103,6 @@ pub fn fn_provided_param(
         }
     } else {
         TokenStream::new()
-    }
-}
-
-pub fn fn_context_param(context_and_filter_handler: &ContextAndFilterHandler) -> TokenStream {
-    match context_and_filter_handler {
-        ContextAndFilterHandler::None
-        | ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(_)
-        | ContextAndFilterHandler::FilterNoContext(_) => TokenStream::new(),
-        ContextAndFilterHandler::FilterTakeContextAsArgument(_) => {
-            quote! { context: crate::WpContext, }
-        }
     }
 }
 
@@ -417,27 +405,6 @@ mod tests {
     ) {
         assert_eq!(
             fn_provided_param(part_of, params_type.as_ref(), request_type).to_string(),
-            expected_str
-        );
-    }
-
-    #[rstest]
-    #[case(ContextAndFilterHandler::None, "")]
-    #[case(
-        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
-        ""
-    )]
-    #[case(
-        ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
-        ""
-    )]
-    #[case(filter_take_context_as_argument(), "context : crate :: WpContext ,")]
-    fn test_fn_context_param(
-        #[case] context_and_filter_handler: ContextAndFilterHandler,
-        #[case] expected_str: &str,
-    ) {
-        assert_eq!(
-            fn_context_param(&context_and_filter_handler).to_string(),
             expected_str
         );
     }
