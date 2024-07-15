@@ -1,7 +1,6 @@
-use crate::{plugins::PluginListParams, PluginSlug};
 use crate::{
-    PluginCreateParams, PluginDeleteResponse, PluginUpdateParams, PluginWithEditContext,
-    PluginWithEmbedContext, PluginWithViewContext, SparsePlugin, SparsePluginField,
+    PluginSlug, SparseField, SparsePluginFieldWithEditContext, SparsePluginFieldWithEmbedContext,
+    SparsePluginFieldWithViewContext,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -9,15 +8,15 @@ use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
 enum PluginsRequest {
-    #[post(url = "/plugins", params = &PluginCreateParams, output = PluginWithEditContext)]
+    #[post(url = "/plugins", params = &crate::PluginCreateParams, output = crate::PluginWithEditContext)]
     Create,
-    #[delete(url = "/plugins/<plugin_slug>", output = PluginDeleteResponse)]
+    #[delete(url = "/plugins/<plugin_slug>", output = crate::PluginDeleteResponse)]
     Delete,
-    #[contextual_get(url = "/plugins", params = &PluginListParams, output = Vec<SparsePlugin>, filter_by = SparsePluginField)]
+    #[contextual_get(url = "/plugins", params = &crate::PluginListParams, output = Vec<crate::SparsePlugin>, filter_by = crate::SparsePluginField)]
     List,
-    #[contextual_get(url = "/plugins/<plugin_slug>", output = SparsePlugin, filter_by = SparsePluginField)]
+    #[contextual_get(url = "/plugins/<plugin_slug>", output = crate::SparsePlugin, filter_by = crate::SparsePluginField)]
     Retrieve,
-    #[post(url = "/plugins/<plugin_slug>", params = &PluginUpdateParams, output = PluginWithEditContext)]
+    #[post(url = "/plugins/<plugin_slug>", params = &crate::PluginUpdateParams, output = crate::PluginWithEditContext)]
     Update,
 }
 
@@ -26,6 +25,16 @@ impl DerivedRequest for PluginsRequest {
         Namespace::WpV2
     }
 }
+
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePluginFieldWithEditContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePluginFieldWithEmbedContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePluginFieldWithViewContext
+);
 
 #[cfg(test)]
 mod tests {

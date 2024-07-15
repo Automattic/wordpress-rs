@@ -226,7 +226,7 @@ fn generate_sparse_field_type(type_ident: Ident, fields: &[Field]) -> TokenStrea
             #(#variant_idents,)*
         }
         impl #type_ident {
-            fn as_field_name(&self) -> &str {
+            pub fn as_field_name(&self) -> &str {
                 match self {
                     #(#as_field_names,)*
                 }

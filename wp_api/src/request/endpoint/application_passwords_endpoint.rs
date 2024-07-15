@@ -4,9 +4,13 @@ use crate::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordDeleteAllResponse,
     ApplicationPasswordDeleteResponse, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
     ApplicationPasswordWithEditContext, ApplicationPasswordWithEmbedContext,
-    ApplicationPasswordWithViewContext, SparseApplicationPassword, SparseApplicationPasswordField,
+    ApplicationPasswordWithViewContext, SparseApplicationPasswordFieldWithEditContext,
+    SparseApplicationPasswordFieldWithEmbedContext, SparseApplicationPasswordFieldWithViewContext,
+    SparseApplicationPasswordWithEditContext, SparseApplicationPasswordWithEmbedContext,
+    SparseApplicationPasswordWithViewContext,
 };
 use crate::users::UserId;
+use crate::SparseField;
 
 use super::{DerivedRequest, Namespace};
 
@@ -33,6 +37,16 @@ impl DerivedRequest for ApplicationPasswordsRequest {
         Namespace::WpV2
     }
 }
+
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparseApplicationPasswordFieldWithEditContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparseApplicationPasswordFieldWithEmbedContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparseApplicationPasswordFieldWithViewContext
+);
 
 #[cfg(test)]
 mod tests {

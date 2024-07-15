@@ -1,7 +1,7 @@
 use crate::{
-    SparseUser, SparseUserField, UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId,
-    UserListParams, UserUpdateParams, UserWithEditContext, UserWithEmbedContext,
-    UserWithViewContext,
+    SparseField, SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
+    SparseUserFieldWithViewContext, UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId,
+    UserListParams, UserUpdateParams, UserWithEditContext,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -9,7 +9,7 @@ use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
 enum UsersRequest {
-    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>, filter_by = SparseUserField)]
+    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>, filter_by = crate::SparseUserField)]
     List,
     #[post(url = "/users", params = &UserCreateParams, output = UserWithEditContext)]
     Create,
@@ -17,9 +17,9 @@ enum UsersRequest {
     Delete,
     #[delete(url = "/users/me", params = &UserDeleteParams, output = UserDeleteResponse)]
     DeleteMe,
-    #[contextual_get(url = "/users/<user_id>", output = SparseUser, filter_by = SparseUserField)]
+    #[contextual_get(url = "/users/<user_id>", output = crate::SparseUser, filter_by = crate::SparseUserField)]
     Retrieve,
-    #[contextual_get(url = "/users/me", output = SparseUser, filter_by = SparseUserField)]
+    #[contextual_get(url = "/users/me", output = crate::SparseUser, filter_by = crate::SparseUserField)]
     RetrieveMe,
     #[post(url = "/users/<user_id>", params = &UserUpdateParams, output = UserWithEditContext)]
     Update,
@@ -32,6 +32,12 @@ impl DerivedRequest for UsersRequest {
         Namespace::WpV2
     }
 }
+
+super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFieldWithEditContext);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparseUserFieldWithEmbedContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFieldWithViewContext);
 
 #[cfg(test)]
 mod tests {
