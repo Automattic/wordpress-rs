@@ -2,7 +2,7 @@ use std::{fmt::Display, slice::Iter, str::FromStr};
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, DeriveInput, Ident};
+use syn::{spanned::Spanned, DeriveInput, Field, Ident};
 
 const IDENT_PREFIX: &str = "Sparse";
 
@@ -19,20 +19,34 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let parsed_fields = parse_fields(fields)?;
 
     let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
-        let cname = ident_name_for_context(ident_name_without_prefix, current_context);
-        let cident = Ident::new(&cname, original_ident.span());
-        let cfields = generate_context_fields(&parsed_fields, current_context)?;
-        if !cfields.is_empty() {
-            Ok(quote! {
-                #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-                pub struct #cident {
-                    #(#cfields,)*
+        let generate_type = |ident, generated_fields: Vec<Field>| {
+            if !generated_fields.is_empty() {
+                quote! {
+                    #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+                    pub struct #ident {
+                        #(#generated_fields,)*
+                    }
                 }
+                .into()
+            } else {
+                TokenStream::new()
             }
-            .into())
-        } else {
-            Ok(proc_macro::TokenStream::new())
-        }
+        };
+        let non_sparse_type_fields =
+            generate_context_fields(&parsed_fields, current_context, true)?;
+        let sparse_type_fields = generate_context_fields(&parsed_fields, current_context, false)?;
+
+        let non_sparse_ident = Ident::new(
+            &ident_name_for_context(ident_name_without_prefix, current_context),
+            original_ident.span(),
+        );
+        let sparse_ident = Ident::new(
+            &ident_name_for_context(original_ident_name.as_str(), current_context),
+            original_ident.span(),
+        );
+        let non_sparse_type = generate_type(non_sparse_ident, non_sparse_type_fields);
+        let sparse_type = generate_type(sparse_ident, sparse_type_fields);
+        Ok(TokenStream::from_iter([non_sparse_type, sparse_type]))
     });
     contextual_token_streams
         .collect::<Result<Vec<TokenStream>, syn::Error>>()
@@ -182,6 +196,7 @@ fn parse_fields(
 fn generate_context_fields(
     parsed_fields_attrs: &[WpParsedField],
     context: &WpContextAttr,
+    should_extract_option: bool,
 ) -> Result<Vec<syn::Field>, syn::Error> {
     parsed_fields_attrs
         .iter()
@@ -204,7 +219,11 @@ fn generate_context_fields(
             {
                 f.ty.clone()
             } else {
-                let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+                let mut new_type = if should_extract_option {
+                    extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone())
+                } else {
+                    f.ty.clone()
+                };
                 if f.attrs.iter().any(|attr| {
                     attr.path()
                         .segments
@@ -212,7 +231,11 @@ fn generate_context_fields(
                         .any(|s| is_wp_contextual_field_ident(&s.ident))
                 }) {
                     // If the field has #[WpContextualField] attr, map it to its contextual field type
-                    new_type = contextual_field_type(&new_type, context)?;
+                    new_type = if should_extract_option {
+                        contextual_non_sparse_field_type(&new_type, context)?
+                    } else {
+                        contextual_sparse_field_type(&new_type, context)?
+                    }
                 }
                 new_type
             };
@@ -240,7 +263,7 @@ fn generate_context_fields(
         .collect()
 }
 
-// Returns a contextual type for the given type.
+// Returns a contextual non-sparse type for the given type.
 //
 // ```
 // #[derive(WpContextual)]
@@ -271,7 +294,10 @@ fn generate_context_fields(
 //
 // In this case, this function takes the `Option<SparseBar>` type and `&WpContextAttr::Edit`
 // and turns it into `BarWithEditContext` type.
-fn contextual_field_type(ty: &syn::Type, context: &WpContextAttr) -> Result<syn::Type, syn::Error> {
+fn contextual_non_sparse_field_type(
+    ty: &syn::Type,
+    context: &WpContextAttr,
+) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
     let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
     let ident_name_without_prefix = match inner_segment.ident.to_string().strip_prefix(IDENT_PREFIX)
@@ -282,6 +308,50 @@ fn contextual_field_type(ty: &syn::Type, context: &WpContextAttr) -> Result<syn:
     }?;
     inner_segment.ident = Ident::new(
         &ident_name_for_context(&ident_name_without_prefix, context),
+        inner_segment.ident.span(),
+    );
+    Ok(ty)
+}
+
+// Returns a contextual sparse type for the given type.
+//
+// ```
+// #[derive(WpContextual)]
+// pub struct SparseFoo {
+//     #[WpContext(edit)]
+//     #[WpContextualField]
+//     pub bar: Option<SparseBar>,
+// }
+//
+// #[WpContextual]
+// pub struct SparseBar {
+//     #[WpContext(edit)]
+//     pub baz: Option<u32>,
+// }
+// ```
+//
+// Given the above, we'd like to generate:
+//
+// ```
+// pub struct SparseFooWithEditContext {
+//     pub bar: Option<SparseBarWithEditContext>,
+// }
+//
+// pub struct SparseBarWithEditContext {
+//     pub baz: Option<u32>,
+// }
+// ```
+//
+// In this case, this function takes the `Option<SparseBar>` type and `&WpContextAttr::Edit`
+// and turns it into `Option<SparseBarWithEditContext>` type.
+fn contextual_sparse_field_type(
+    ty: &syn::Type,
+    context: &WpContextAttr,
+) -> Result<syn::Type, syn::Error> {
+    let mut ty = ty.clone();
+    let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
+    inner_segment.ident = Ident::new(
+        &ident_name_for_context(inner_segment.ident.to_string().as_str(), context),
         inner_segment.ident.span(),
     );
     Ok(ty)

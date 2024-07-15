@@ -13,10 +13,10 @@ pub struct SparseFoo {
     pub bar_3: Option<std::vec::Vec<Vec<SparseBar>>>,
 }
 
-#[derive(WpContextual)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseBar {
     #[WpContext(edit)]
-    pub baz: u32,
+    pub baz: Option<u32>,
 }
 
 fn main() {
@@ -24,6 +24,11 @@ fn main() {
         bar: vec![BarWithEditContext { baz: 0 }],
         bar_2: vec![BarWithEditContext { baz: 0 }],
         bar_3: vec![vec![BarWithEditContext { baz: 0 }]],
+    };
+    let _ = SparseFooWithEditContext {
+        bar: Some(vec![SparseBarWithEditContext { baz: Some(0) }]),
+        bar_2: Some(vec![SparseBarWithEditContext { baz: Some(0) }]),
+        bar_3: Some(vec![vec![SparseBarWithEditContext { baz: Some(0) }]]),
     };
 }
 
