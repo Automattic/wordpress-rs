@@ -2,10 +2,9 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import uniffi.wp_api.SparseUserField
+import uniffi.wp_api.SparseUserFieldWithEditContext
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
-import uniffi.wp_api.WpContext
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
@@ -46,10 +45,9 @@ class UsersEndpointTest {
     @Test
     fun testFilterUserListRequest() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.users().filterList(
-                context = WpContext.EDIT,
+            requestBuilder.users().filterListWithEditContext(
                 params = UserListParams(),
-                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+                fields = listOf(SparseUserFieldWithEditContext.EMAIL, SparseUserFieldWithEditContext.NAME)
             )
         }
         assert(result is WpRequestSuccess)
@@ -62,10 +60,9 @@ class UsersEndpointTest {
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.users().filterRetrieve(
+            requestBuilder.users().filterRetrieveWithEditContext(
                 FIRST_USER_ID,
-                WpContext.EDIT,
-                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+                fields = listOf(SparseUserFieldWithEditContext.EMAIL, SparseUserFieldWithEditContext.NAME)
             )
         }
         assert(result is WpRequestSuccess)
@@ -77,9 +74,8 @@ class UsersEndpointTest {
     @Test
     fun testFilterRetrieveCurrentUserRequest() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.users().filterRetrieveMe(
-                WpContext.EDIT,
-                fields = listOf(SparseUserField.EMAIL, SparseUserField.NAME)
+            requestBuilder.users().filterRetrieveMeWithEditContext(
+                fields = listOf(SparseUserFieldWithEditContext.EMAIL, SparseUserFieldWithEditContext.NAME)
             )
         }
         assert(result is WpRequestSuccess)
