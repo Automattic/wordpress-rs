@@ -5,8 +5,8 @@ use serial_test::parallel;
 use wp_api::{
     generate,
     users::{
-        SparseUserFieldWithEditContext, SparseUserWithEditContext, UserId, UserListParams,
-        WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
+        SparseUserFieldWithEditContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
+        WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
     WpApiParamOrder,
 };
@@ -26,7 +26,7 @@ async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
         .await
         .assert_response()
         .iter()
-        .for_each(|user| validate_sparse_user_fields(user, fields));
+        .for_each(|user| user.assert_that_only_provided_fields_are_some(fields));
 }
 
 #[apply(filter_fields_cases_with_edit_context)]
@@ -38,7 +38,10 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext])
         .filter_retrieve_with_edit_context(&FIRST_USER_ID, fields)
         .await
         .assert_response();
-    validate_sparse_user_fields(&user, fields);
+    //let mut v = Vec::from(fields);
+    //v.push(SparseUserFieldWithEditContext::Name);
+    //user.assert_that_only_provided_fields_are_some(v.as_slice());
+    user.assert_that_only_provided_fields_are_some(fields);
 }
 
 #[apply(filter_fields_cases_with_edit_context)]
@@ -50,7 +53,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserFieldWithEditC
         .filter_retrieve_me_with_edit_context(fields)
         .await
         .assert_response();
-    validate_sparse_user_fields(&user, fields);
+    user.assert_that_only_provided_fields_are_some(fields);
 }
 
 #[apply(list_users_cases)]
@@ -212,80 +215,6 @@ async fn retrieve_me_with_view_context() {
         .assert_response();
     // FIRST_USER_ID is the current user's id
     assert_eq!(FIRST_USER_ID, user.id);
-}
-
-fn validate_sparse_user_fields(
-    user: &SparseUserWithEditContext,
-    fields: &[SparseUserFieldWithEditContext],
-) {
-    let field_included = |field| {
-        // If "fields" is empty the server will return all fields
-        fields.is_empty() || fields.contains(&field)
-    };
-    assert_eq!(
-        user.id.is_some(),
-        field_included(SparseUserFieldWithEditContext::Id)
-    );
-    assert_eq!(
-        user.username.is_some(),
-        field_included(SparseUserFieldWithEditContext::Username)
-    );
-    assert_eq!(
-        user.name.is_some(),
-        field_included(SparseUserFieldWithEditContext::Name)
-    );
-    assert_eq!(
-        user.last_name.is_some(),
-        field_included(SparseUserFieldWithEditContext::LastName)
-    );
-    assert_eq!(
-        user.email.is_some(),
-        field_included(SparseUserFieldWithEditContext::Email)
-    );
-    assert_eq!(
-        user.url.is_some(),
-        field_included(SparseUserFieldWithEditContext::Url)
-    );
-    assert_eq!(
-        user.description.is_some(),
-        field_included(SparseUserFieldWithEditContext::Description)
-    );
-    assert_eq!(
-        user.link.is_some(),
-        field_included(SparseUserFieldWithEditContext::Link)
-    );
-    assert_eq!(
-        user.locale.is_some(),
-        field_included(SparseUserFieldWithEditContext::Locale)
-    );
-    assert_eq!(
-        user.nickname.is_some(),
-        field_included(SparseUserFieldWithEditContext::Nickname)
-    );
-    assert_eq!(
-        user.slug.is_some(),
-        field_included(SparseUserFieldWithEditContext::Slug)
-    );
-    assert_eq!(
-        user.registered_date.is_some(),
-        field_included(SparseUserFieldWithEditContext::RegisteredDate)
-    );
-    assert_eq!(
-        user.roles.is_some(),
-        field_included(SparseUserFieldWithEditContext::Roles)
-    );
-    assert_eq!(
-        user.capabilities.is_some(),
-        field_included(SparseUserFieldWithEditContext::Capabilities)
-    );
-    assert_eq!(
-        user.extra_capabilities.is_some(),
-        field_included(SparseUserFieldWithEditContext::ExtraCapabilities)
-    );
-    assert_eq!(
-        user.avatar_urls.is_some(),
-        field_included(SparseUserFieldWithEditContext::AvatarUrls)
-    );
 }
 
 #[template]

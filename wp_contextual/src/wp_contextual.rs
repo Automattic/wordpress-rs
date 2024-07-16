@@ -20,7 +20,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let parsed_fields = parse_fields(fields)?;
 
     let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
-        let generate_type = |ident, generated_fields: Vec<Field>| {
+        let generate_type = |ident, generated_fields: &Vec<Field>| {
             if !generated_fields.is_empty() {
                 quote! {
                     #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
@@ -52,13 +52,17 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
             &ident_name_for_context(original_ident_name.as_str(), current_context),
             original_ident.span(),
         );
-        let non_sparse_type = generate_type(non_sparse_ident, non_sparse_type_fields);
-        let sparse_field_type = generate_sparse_field_type(sparse_field_ident, &sparse_type_fields);
-        let sparse_type = generate_type(sparse_ident, sparse_type_fields);
+        let non_sparse_type = generate_type(&non_sparse_ident, &non_sparse_type_fields);
+        let sparse_field_type =
+            generate_sparse_field_type(&sparse_field_ident, &sparse_type_fields);
+        let sparse_type = generate_type(&sparse_ident, &sparse_type_fields);
+        let integration_test_helpers =
+            generate_integration_test_helper(sparse_ident, sparse_field_ident, &sparse_type_fields);
         Ok(TokenStream::from_iter([
             non_sparse_type,
             sparse_type,
             sparse_field_type,
+            integration_test_helpers,
         ]))
     });
     contextual_token_streams
@@ -202,7 +206,7 @@ fn parse_fields(
     Ok(parsed_fields)
 }
 
-fn generate_sparse_field_type(type_ident: Ident, fields: &[Field]) -> TokenStream {
+fn generate_sparse_field_type(type_ident: &Ident, fields: &[Field]) -> TokenStream {
     let mut variant_idents = Vec::with_capacity(fields.len());
     let mut as_field_names = Vec::with_capacity(fields.len());
     for f in fields {
@@ -230,6 +234,45 @@ fn generate_sparse_field_type(type_ident: Ident, fields: &[Field]) -> TokenStrea
                 match self {
                     #(#as_field_names,)*
                 }
+            }
+        }
+    }
+    .into()
+}
+
+fn generate_integration_test_helper(
+    sparse_type_ident: Ident,
+    sparse_field_type_ident: Ident,
+    fields: &[Field],
+) -> TokenStream {
+    let assertions = fields.iter().filter_map(|f| {
+        f.ident.as_ref().map(|f_ident| {
+            let variant_ident = format_ident!("{}", f_ident.to_string().to_case(Case::UpperCamel));
+            let field_ident_str = f_ident.to_string();
+            quote! {
+                assert!(
+                    self.#f_ident.is_some() == field_included(#sparse_field_type_ident::#variant_ident),
+                    "Expected '{}' {} in fields: {:?}",
+                    #field_ident_str,
+                    if self.#f_ident.is_some() {
+                        "to be included"
+                    } else {
+                        "not to be included"
+                    },
+                    fields
+                );
+            }
+        })
+    });
+    quote! {
+        //#[cfg(feature = "integration-test")]
+        impl #sparse_type_ident {
+            pub fn assert_that_only_provided_fields_are_some(&self, fields: &[#sparse_field_type_ident]) {
+                let field_included = |field| {
+                    // If "fields" is empty the server will return all fields
+                    fields.is_empty() || fields.contains(&field)
+                };
+                #(#assertions)*
             }
         }
     }
