@@ -24,12 +24,14 @@ pub fn output_type(
                         ident.to_string().strip_prefix(SPARSE_IDENT_PREFIX)
                     {
                         if let Some(context) = context {
+                            // For example, given `SparseFoo`, it may be `FooWithEditContext`
                             format_ident!(
                                 "{}With{}Context",
                                 ident_without_sparse_prefix,
                                 context.to_string()
                             )
                         } else {
+                            // For example, given `SparseFoo`, it may be `Foo`
                             format_ident!("{}", ident_without_sparse_prefix,)
                         }
                     } else {
@@ -49,6 +51,7 @@ pub fn output_type(
             .map(|token| {
                 if let TokenTree::Ident(ident) = token {
                     let new_ident = if ident.to_string().starts_with(SPARSE_IDENT_PREFIX) {
+                        // For example, given `SparseFoo`, it may be `SparseFooWithEditContext`
                         format_ident!("{}With{}Context", ident, context.to_string())
                     } else {
                         ident
@@ -132,6 +135,7 @@ pub fn fn_fields_param(context_and_filter_handler: &ContextAndFilterHandler) -> 
                 .map(|token| {
                     if let TokenTree::Ident(ident) = token {
                         let new_ident = if ident.to_string().starts_with(SPARSE_IDENT_PREFIX) {
+                            // For example, given `SparseFooField`, it may be `SparseFooFieldWithEditContext`
                             format_ident!("{}With{}Context", ident, context.to_string())
                         } else {
                             ident
