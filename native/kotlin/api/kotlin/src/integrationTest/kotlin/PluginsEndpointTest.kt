@@ -7,8 +7,7 @@ import uniffi.wp_api.PluginListParams
 import uniffi.wp_api.PluginSlug
 import uniffi.wp_api.PluginStatus
 import uniffi.wp_api.PluginWpOrgDirectorySlug
-import uniffi.wp_api.SparsePluginField
-import uniffi.wp_api.WpContext
+import uniffi.wp_api.SparsePluginFieldWithEditContext
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
@@ -43,10 +42,9 @@ class PluginsEndpointTest {
     @Test
     fun testFilterPluginListRequest() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.plugins().filterList(
-                context = WpContext.EDIT,
+            requestBuilder.plugins().filterListWithEditContext(
                 params = PluginListParams(),
-                fields = listOf(SparsePluginField.AUTHOR, SparsePluginField.VERSION)
+                fields = listOf(SparsePluginFieldWithEditContext.AUTHOR, SparsePluginFieldWithEditContext.VERSION)
             )
         }
         assert(result is WpRequestSuccess)
@@ -64,13 +62,12 @@ class PluginsEndpointTest {
     fun testFilterRetrievePluginRequest() = runTest {
         val pluginSlug = PluginSlug(HELLO_DOLLY_PLUGIN_SLUG)
         val result = client.request { requestBuilder ->
-            requestBuilder.plugins().filterRetrieve(
-                context = WpContext.EDIT,
+            requestBuilder.plugins().filterRetrieveWithEditContext(
                 pluginSlug = pluginSlug,
                 fields = listOf(
-                    SparsePluginField.PLUGIN,
-                    SparsePluginField.REQUIRES_WP,
-                    SparsePluginField.STATUS
+                    SparsePluginFieldWithEditContext.PLUGIN,
+                    SparsePluginFieldWithEditContext.REQUIRES_WP,
+                    SparsePluginFieldWithEditContext.STATUS
                 )
             )
         }

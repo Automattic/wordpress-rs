@@ -3,10 +3,10 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::application_passwords::{
-    ApplicationPasswordUuid, SparseApplicationPassword, SparseApplicationPasswordField,
+    ApplicationPasswordUuid, SparseApplicationPasswordFieldWithEditContext,
+    SparseApplicationPasswordWithEditContext,
 };
 use wp_api::users::UserId;
-use wp_api::WpContext;
 
 use crate::integration_test_common::{
     api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
@@ -16,34 +16,35 @@ use crate::integration_test_common::{
 pub mod integration_test_common;
 pub mod reusable_test_cases;
 
-#[apply(filter_fields_cases)]
+#[apply(filter_fields_cases_with_edit_context)]
 #[tokio::test]
 #[parallel]
 async fn filter_list_application_passwords(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
-    #[case] fields: &[SparseApplicationPasswordField],
+    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
 ) {
     api_client()
         .application_passwords()
-        .filter_list(&user_id, WpContext::Edit, fields)
+        .filter_list_with_edit_context(&user_id, fields)
         .await
         .assert_response()
         .iter()
         .for_each(|p| validate_sparse_application_password_fields(p, fields));
 }
 
-#[apply(filter_fields_cases)]
+#[apply(filter_fields_cases_with_edit_context)]
 #[tokio::test]
 #[parallel]
-async fn filter_retrieve_application_password(#[case] fields: &[SparseApplicationPasswordField]) {
+async fn filter_retrieve_application_password(
+    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
+) {
     let p = api_client()
         .application_passwords()
-        .filter_retrieve(
+        .filter_retrieve_with_edit_context(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
                 uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
             },
-            WpContext::Edit,
             fields,
         )
         .await
@@ -51,15 +52,15 @@ async fn filter_retrieve_application_password(#[case] fields: &[SparseApplicatio
     validate_sparse_application_password_fields(&p, fields);
 }
 
-#[apply(filter_fields_cases)]
+#[apply(filter_fields_cases_with_edit_context)]
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_current_application_password(
-    #[case] fields: &[SparseApplicationPasswordField],
+    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
 ) {
     let p = api_client()
         .application_passwords()
-        .filter_retrieve_current(&FIRST_USER_ID, WpContext::Edit, fields)
+        .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
         .await
         .assert_response();
     validate_sparse_application_password_fields(&p, fields);
@@ -208,8 +209,8 @@ async fn retrieve_application_passwords_with_view_context() {
 }
 
 fn validate_sparse_application_password_fields(
-    app_password: &SparseApplicationPassword,
-    fields: &[SparseApplicationPasswordField],
+    app_password: &SparseApplicationPasswordWithEditContext,
+    fields: &[SparseApplicationPasswordFieldWithEditContext],
 ) {
     let field_included = |field| {
         // If "fields" is empty the server will return all fields
@@ -217,29 +218,29 @@ fn validate_sparse_application_password_fields(
     };
     assert_eq!(
         app_password.uuid.is_some(),
-        field_included(SparseApplicationPasswordField::Uuid)
+        field_included(SparseApplicationPasswordFieldWithEditContext::Uuid)
     );
     assert_eq!(
         app_password.app_id.is_some(),
-        field_included(SparseApplicationPasswordField::AppId)
+        field_included(SparseApplicationPasswordFieldWithEditContext::AppId)
     );
     assert_eq!(
         app_password.name.is_some(),
-        field_included(SparseApplicationPasswordField::Name)
+        field_included(SparseApplicationPasswordFieldWithEditContext::Name)
     );
     assert_eq!(
         app_password.created.is_some(),
-        field_included(SparseApplicationPasswordField::Created)
+        field_included(SparseApplicationPasswordFieldWithEditContext::Created)
     );
     // Do not test existence of `last_used`, `last_ip` or `password` as there is
     // no guarantee that they'll be included even if it's in the requested field list
-    if !field_included(SparseApplicationPasswordField::LastUsed) {
+    if !field_included(SparseApplicationPasswordFieldWithEditContext::LastUsed) {
         assert!(app_password.last_used.is_none());
     }
-    if !field_included(SparseApplicationPasswordField::LastIp) {
+    if !field_included(SparseApplicationPasswordFieldWithEditContext::LastIp) {
         assert!(app_password.last_ip.is_none());
     }
-    if !field_included(SparseApplicationPasswordField::Password) {
+    if !field_included(SparseApplicationPasswordFieldWithEditContext::Password) {
         assert!(app_password.password.is_none());
     }
 }
@@ -247,11 +248,14 @@ fn validate_sparse_application_password_fields(
 #[template]
 #[rstest]
 #[case(&[])]
-#[case(&[SparseApplicationPasswordField::Uuid])]
-#[case(&[SparseApplicationPasswordField::AppId])]
-#[case(&[SparseApplicationPasswordField::Name])]
-#[case(&[SparseApplicationPasswordField::Created])]
-#[case(&[SparseApplicationPasswordField::LastUsed])]
-#[case(&[SparseApplicationPasswordField::LastIp])]
-#[case(&[SparseApplicationPasswordField::Uuid, SparseApplicationPasswordField::Name])]
-fn filter_fields_cases(#[case] fields: &[SparseApplicationPasswordField]) {}
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid])]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::AppId])]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Name])]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Created])]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::LastUsed])]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::LastIp])]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
+fn filter_fields_cases_with_edit_context(
+    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
+) {
+}

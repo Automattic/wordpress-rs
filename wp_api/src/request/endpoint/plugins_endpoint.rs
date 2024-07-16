@@ -1,7 +1,6 @@
-use crate::{plugins::PluginListParams, PluginSlug};
 use crate::{
-    PluginCreateParams, PluginDeleteResponse, PluginUpdateParams, PluginWithEditContext,
-    PluginWithEmbedContext, PluginWithViewContext, SparsePlugin, SparsePluginField,
+    PluginSlug, SparseField, SparsePluginFieldWithEditContext, SparsePluginFieldWithEmbedContext,
+    SparsePluginFieldWithViewContext,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -9,15 +8,15 @@ use super::{DerivedRequest, Namespace};
 
 #[derive(WpDerivedRequest)]
 enum PluginsRequest {
-    #[post(url = "/plugins", params = &PluginCreateParams, output = PluginWithEditContext)]
+    #[post(url = "/plugins", params = &crate::PluginCreateParams, output = crate::PluginWithEditContext)]
     Create,
-    #[delete(url = "/plugins/<plugin_slug>", output = PluginDeleteResponse)]
+    #[delete(url = "/plugins/<plugin_slug>", output = crate::PluginDeleteResponse)]
     Delete,
-    #[contextual_get(url = "/plugins", params = &PluginListParams, output = Vec<SparsePlugin>, filter_by = SparsePluginField)]
+    #[contextual_get(url = "/plugins", params = &crate::PluginListParams, output = Vec<crate::SparsePlugin>, filter_by = crate::SparsePluginField)]
     List,
-    #[contextual_get(url = "/plugins/<plugin_slug>", output = SparsePlugin, filter_by = SparsePluginField)]
+    #[contextual_get(url = "/plugins/<plugin_slug>", output = crate::SparsePlugin, filter_by = crate::SparsePluginField)]
     Retrieve,
-    #[post(url = "/plugins/<plugin_slug>", params = &PluginUpdateParams, output = PluginWithEditContext)]
+    #[post(url = "/plugins/<plugin_slug>", params = &crate::PluginUpdateParams, output = crate::PluginWithEditContext)]
     Update,
 }
 
@@ -26,6 +25,16 @@ impl DerivedRequest for PluginsRequest {
         Namespace::WpV2
     }
 }
+
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePluginFieldWithEditContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePluginFieldWithEmbedContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePluginFieldWithViewContext
+);
 
 #[cfg(test)]
 mod tests {
@@ -36,7 +45,7 @@ mod tests {
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
-        PluginStatus, WpContext,
+        PluginListParams, PluginStatus,
     };
     use rstest::*;
     use std::sync::Arc;
@@ -98,40 +107,34 @@ mod tests {
     }
 
     #[rstest]
-    #[case(WpContext::Edit, PluginListParams::default(), &[], "/plugins?context=edit&_fields=")]
-    #[case(
-        WpContext::Edit,
-        generate!(PluginListParams, (search, Some("foo".to_string()))),
-        &[SparsePluginField::Author],
+    #[case(PluginListParams::default(), &[], "/plugins?context=edit&_fields=")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))),
+        &[SparsePluginFieldWithEditContext::Author],
         "/plugins?context=edit&search=foo&_fields=author"
     )]
     #[case(
-        WpContext::Embed,
         generate!(PluginListParams, (status, Some(PluginStatus::Active))),
-        &[SparsePluginField::AuthorUri, SparsePluginField::RequiresWp],
-        "/plugins?context=embed&status=active&_fields=author_uri%2Crequires_wp"
+        &[SparsePluginFieldWithEditContext::AuthorUri, SparsePluginFieldWithEditContext::RequiresWp],
+        "/plugins?context=edit&status=active&_fields=author_uri%2Crequires_wp"
     )]
     #[case(
-        WpContext::Embed,
         generate!(PluginListParams, (status, Some(PluginStatus::Active))),
-        &[SparsePluginField::Name, SparsePluginField::PluginUri],
-        "/plugins?context=embed&status=active&_fields=name%2Cplugin_uri"
+        &[SparsePluginFieldWithEditContext::Name, SparsePluginFieldWithEditContext::PluginUri],
+        "/plugins?context=edit&status=active&_fields=name%2Cplugin_uri"
     )]
     #[case(
-        WpContext::View,
         generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), 
-        &[SparsePluginField::NetworkOnly, SparsePluginField::RequiresPhp, SparsePluginField::Textdomain],
-        "/plugins?context=view&search=foo&status=inactive&_fields=network_only%2Crequires_php%2Ctextdomain"
+        &[SparsePluginFieldWithEditContext::NetworkOnly, SparsePluginFieldWithEditContext::RequiresPhp, SparsePluginFieldWithEditContext::Textdomain],
+        "/plugins?context=edit&search=foo&status=inactive&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
     fn filter_list_plugins_with_params(
         endpoint: PluginsRequestEndpoint,
-        #[case] context: WpContext,
         #[case] params: PluginListParams,
-        #[case] fields: &[SparsePluginField],
+        #[case] fields: &[SparsePluginFieldWithEditContext],
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
-            endpoint.filter_list(context, &params, fields),
+            endpoint.filter_list_with_edit_context(&params, fields),
             expected_path,
         );
     }
@@ -164,37 +167,32 @@ mod tests {
     #[rstest]
     #[case(
         "hello-dolly/hello".into(),
-        WpContext::View,
-        &[SparsePluginField::Name],
+        &[SparsePluginFieldWithViewContext::Name],
         "/plugins/hello-dolly/hello?context=view&_fields=name"
     )]
     #[case(
         "classic-editor/classic-editor".into(),
-        WpContext::Embed,
-        &[SparsePluginField::Description, SparsePluginField::Plugin],
-        "/plugins/classic-editor/classic-editor?context=embed&_fields=description%2Cplugin"
+        &[SparsePluginFieldWithViewContext::Description, SparsePluginFieldWithViewContext::Plugin],
+        "/plugins/classic-editor/classic-editor?context=view&_fields=description%2Cplugin"
     )]
     #[case(
         "foo/bar%baz".into(),
-        WpContext::Edit,
-        &[SparsePluginField::Status, SparsePluginField::Version],
-        "/plugins/foo/bar%25baz?context=edit&_fields=status%2Cversion"
+        &[SparsePluginFieldWithViewContext::Status, SparsePluginFieldWithViewContext::Version],
+        "/plugins/foo/bar%25baz?context=view&_fields=status%2Cversion"
     )]
     #[case(
         "foo/です".into(),
-        WpContext::View,
-        &[SparsePluginField::NetworkOnly, SparsePluginField::RequiresPhp, SparsePluginField::Textdomain],
+        &[SparsePluginFieldWithViewContext::NetworkOnly, SparsePluginFieldWithViewContext::RequiresPhp, SparsePluginFieldWithViewContext::Textdomain],
         "/plugins/foo/%E3%81%A7%E3%81%99?context=view&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
     fn filter_retrieve_plugin(
         endpoint: PluginsRequestEndpoint,
         #[case] plugin_slug: PluginSlug,
-        #[case] context: WpContext,
-        #[case] fields: &[SparsePluginField],
+        #[case] fields: &[SparsePluginFieldWithViewContext],
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
-            endpoint.filter_retrieve(&plugin_slug, context, fields),
+            endpoint.filter_retrieve_with_view_context(&plugin_slug, fields),
             expected_path,
         );
     }
