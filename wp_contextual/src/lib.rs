@@ -374,7 +374,7 @@ mod wp_contextual;
 ///     #[WpContext(edit)]
 ///     pub baz: Option<String>,
 ///     #[WpContext(edit)]
-///     pub qux: Vec<u32>,
+///     pub qux: Option<Vec<u32>>,
 /// }
 /// # // We need these 2 lines for UniFFI
 /// # uniffi::setup_scaffolding!();

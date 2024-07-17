@@ -3,7 +3,7 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::{
-    generate,
+    generate, generate_sparse_user_field_with_edit_context_test_cases,
     users::{
         SparseUserFieldWithEditContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
         WpApiParamUsersOrderBy, WpApiParamUsersWho,
@@ -16,7 +16,11 @@ use crate::integration_test_common::{api_client, AssertResponse, FIRST_USER_ID, 
 pub mod integration_test_common;
 pub mod reusable_test_cases;
 
-#[apply(filter_fields_cases_with_edit_context)]
+generate_sparse_user_field_with_edit_context_test_cases!();
+
+#[apply(sparse_user_field_with_edit_context_test_cases)]
+#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
+#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
 async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
@@ -29,7 +33,9 @@ async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
         .for_each(|user| user.assert_that_only_provided_fields_are_some(fields));
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_user_field_with_edit_context_test_cases)]
+#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
+#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext]) {
@@ -38,13 +44,12 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext])
         .filter_retrieve_with_edit_context(&FIRST_USER_ID, fields)
         .await
         .assert_response();
-    //let mut v = Vec::from(fields);
-    //v.push(SparseUserFieldWithEditContext::Name);
-    //user.assert_that_only_provided_fields_are_some(v.as_slice());
     user.assert_that_only_provided_fields_are_some(fields);
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_user_field_with_edit_context_test_cases)]
+#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
+#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserFieldWithEditContext]) {
@@ -225,26 +230,3 @@ async fn retrieve_me_with_view_context() {
 #[case(Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string()])))]
 #[case(Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))]
 fn list_users_has_published_posts_cases() {}
-
-#[template]
-#[rstest]
-#[case(&[])]
-#[case(&[SparseUserFieldWithEditContext::Id])]
-#[case(&[SparseUserFieldWithEditContext::Username])]
-#[case(&[SparseUserFieldWithEditContext::Name])]
-#[case(&[SparseUserFieldWithEditContext::LastName])]
-#[case(&[SparseUserFieldWithEditContext::Email])]
-#[case(&[SparseUserFieldWithEditContext::Url])]
-#[case(&[SparseUserFieldWithEditContext::Description])]
-#[case(&[SparseUserFieldWithEditContext::Link])]
-#[case(&[SparseUserFieldWithEditContext::Locale])]
-#[case(&[SparseUserFieldWithEditContext::Nickname])]
-#[case(&[SparseUserFieldWithEditContext::Slug])]
-#[case(&[SparseUserFieldWithEditContext::RegisteredDate])]
-#[case(&[SparseUserFieldWithEditContext::Roles])]
-#[case(&[SparseUserFieldWithEditContext::Capabilities])]
-#[case(&[SparseUserFieldWithEditContext::ExtraCapabilities])]
-#[case(&[SparseUserFieldWithEditContext::AvatarUrls])]
-#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
-#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
-fn filter_fields_cases_with_edit_context(#[case] fields: &[SparseUserFieldWithEditContext]) {}

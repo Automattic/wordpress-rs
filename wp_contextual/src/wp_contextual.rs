@@ -245,11 +245,16 @@ fn generate_integration_test_helper(
     sparse_field_type_ident: Ident,
     fields: &[Field],
 ) -> TokenStream {
-    let assertions = fields.iter().filter_map(|f| {
-        f.ident.as_ref().map(|f_ident| {
+    if fields.is_empty() {
+        return TokenStream::new();
+    }
+    let mut assertions = Vec::with_capacity(fields.len());
+    let mut rs_test_cases = Vec::with_capacity(fields.len());
+    for f in fields {
+        if let Some(f_ident) = &f.ident {
             let variant_ident = format_ident!("{}", f_ident.to_string().to_case(Case::UpperCamel));
             let field_ident_str = f_ident.to_string();
-            quote! {
+            assertions.push(quote! {
                 assert!(
                     self.#f_ident.is_some() == field_included(#sparse_field_type_ident::#variant_ident),
                     "Expected '{}' {} in fields: {:?}",
@@ -261,9 +266,18 @@ fn generate_integration_test_helper(
                     },
                     fields
                 );
-            }
-        })
-    });
+            });
+            let case_ident = format_ident!("single_field_{}", f_ident);
+            rs_test_cases.push(quote! {
+                #[case::#case_ident(&[#sparse_field_type_ident::#variant_ident])]
+            });
+        }
+    }
+    let test_cases_ident = format_ident!(
+        "{}_test_cases",
+        sparse_field_type_ident.to_string().to_case(Case::Snake)
+    );
+    let test_cases_macro_ident = format_ident!("generate_{}", test_cases_ident);
     quote! {
         //#[cfg(feature = "integration-test")]
         impl #sparse_type_ident {
@@ -273,6 +287,17 @@ fn generate_integration_test_helper(
                     fields.is_empty() || fields.contains(&field)
                 };
                 #(#assertions)*
+            }
+        }
+
+        #[macro_export]
+        macro_rules! #test_cases_macro_ident {
+            () => {
+                #[template]
+                #[rstest]
+                #[case::no_fields(&[])]
+                #(#rs_test_cases)*
+                pub fn #test_cases_ident(#[case] fields: &[#sparse_field_type_ident]) {}
             }
         }
     }
