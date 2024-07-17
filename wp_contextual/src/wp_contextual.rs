@@ -281,7 +281,7 @@ fn generate_integration_test_helper(
     quote! {
         //#[cfg(feature = "integration-test")]
         impl #sparse_type_ident {
-            pub fn assert_that_only_provided_fields_are_some(&self, fields: &[#sparse_field_type_ident]) {
+            pub fn assert_that_instance_fields_nullability_match_provided_fields(&self, fields: &[#sparse_field_type_ident]) {
                 let field_included = |field| {
                     // If "fields" is empty the server will return all fields
                     fields.is_empty() || fields.contains(&field)

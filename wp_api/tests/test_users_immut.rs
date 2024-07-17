@@ -30,7 +30,9 @@ async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
         .await
         .assert_response()
         .iter()
-        .for_each(|user| user.assert_that_only_provided_fields_are_some(fields));
+        .for_each(|user| {
+            user.assert_that_instance_fields_nullability_match_provided_fields(fields)
+        });
 }
 
 #[apply(sparse_user_field_with_edit_context_test_cases)]
@@ -44,7 +46,7 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext])
         .filter_retrieve_with_edit_context(&FIRST_USER_ID, fields)
         .await
         .assert_response();
-    user.assert_that_only_provided_fields_are_some(fields);
+    user.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
 #[apply(sparse_user_field_with_edit_context_test_cases)]
@@ -58,7 +60,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserFieldWithEditC
         .filter_retrieve_me_with_edit_context(fields)
         .await
         .assert_response();
-    user.assert_that_only_provided_fields_are_some(fields);
+    user.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
 #[apply(list_users_cases)]
