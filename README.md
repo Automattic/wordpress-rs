@@ -1,6 +1,6 @@
 # wordpress-rs
 
-A cross-platform networking library for the WordPress API written in Rust.
+A cross-platform implementation of the [WordPress REST API](https://developer.wordpress.org/rest-api/) written in Rust, with bindings for Kotlin, Swift, and more.
 
 ## Prerequisites
 
@@ -36,3 +36,16 @@ Many of the project scripts are managed in a Makefile found in the root of the p
 ```sh
 make help
 ```
+
+## Testing
+
+This project has several test suites. Integration tests require Docker, and you must run `make test-server && make dump-mysql && make backup-wp-content-plugins` prior to the test invocation.
+
+| Test Suite                       | Run on local machine.                 | Run in Docker                     |
+| -------------------------------- | ---------------------------------     | ---------------                   |
+| Rust Unit Tests                  | `cargo test --lib -- --nocapture`     | `make test-rust-lib`              |
+| Rust Documentation Tests         | `cargo test --doc -- --nocapture`     | `make test-rust-doc`              |
+| Rust Integration Tests           | `cargo test`                          | Coming soon                       |
+| Kotlin Integration Tests         | `cd native/kotlin && ./gradlew test`  | Coming soon                       |
+| Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
+
