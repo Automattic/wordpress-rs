@@ -1,4 +1,3 @@
-use integration_test_common::SECOND_USER_EMAIL;
 use wp_api::{
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
@@ -6,13 +5,10 @@ use wp_api::{
     },
     WpRestErrorCode,
 };
-
-use crate::integration_test_common::{
+use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
-    FIRST_USER_ID, SECOND_USER_ID, SECOND_USER_SLUG,
+    FIRST_USER_ID, SECOND_USER_EMAIL, SECOND_USER_ID, SECOND_USER_SLUG,
 };
-
-pub mod integration_test_common;
 
 #[tokio::test]
 async fn create_user_err_cannot_create_user() {

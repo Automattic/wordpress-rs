@@ -1,4 +1,3 @@
-use integration_test_common::api_client_as_subscriber;
 use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
@@ -7,13 +6,11 @@ use wp_api::application_passwords::{
     SparseApplicationPasswordWithEditContext,
 };
 use wp_api::users::UserId;
-
-use crate::integration_test_common::{
-    api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
+use wp_api_integration_tests::{
+    api_client, api_client_as_subscriber, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
     TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
 };
 
-pub mod integration_test_common;
 pub mod reusable_test_cases;
 
 #[apply(filter_fields_cases_with_edit_context)]

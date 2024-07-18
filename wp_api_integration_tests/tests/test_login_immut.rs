@@ -1,10 +1,8 @@
-use integration_test_common::{AssertResponse, AsyncWpNetworking};
 use rstest::rstest;
 use serial_test::serial;
 use std::sync::Arc;
 use wp_api::login::WpLoginClient;
-
-pub mod integration_test_common;
+use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
 
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
 const ORCHESTREMETROPOLITAIN_AUTH_URL: &str =

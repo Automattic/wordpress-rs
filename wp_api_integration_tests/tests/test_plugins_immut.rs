@@ -10,11 +10,9 @@ use wp_api::{
     WpContext,
 };
 
-use crate::integration_test_common::{
+use wp_api_integration_tests::{
     api_client, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
-
-pub mod integration_test_common;
 
 #[apply(filter_fields_cases_with_edit_context)]
 #[tokio::test]

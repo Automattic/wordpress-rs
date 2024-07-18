@@ -1,15 +1,11 @@
-use integration_test_common::AssertResponse;
 use rstest::rstest;
 use serial_test::serial;
 use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
-
-use crate::integration_test_common::{
-    api_client, run_and_restore_wp_content_plugins, CLASSIC_EDITOR_PLUGIN_SLUG,
+use wp_api_integration_tests::wp_db;
+use wp_api_integration_tests::{
+    api_client, run_and_restore_wp_content_plugins, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG,
     HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
-
-pub mod integration_test_common;
-pub mod wp_db;
 
 #[tokio::test]
 #[serial]
