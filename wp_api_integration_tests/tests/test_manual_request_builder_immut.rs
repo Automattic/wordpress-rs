@@ -1,7 +1,3 @@
-use integration_test_common::{
-    test_site_url, AsyncWpNetworking, FIRST_USER_ID, SECOND_USER_ID,
-    TEST_CREDENTIALS_ADMIN_PASSWORD, TEST_CREDENTIALS_ADMIN_USERNAME,
-};
 use reusable_test_cases::list_users_cases;
 use rstest::*;
 use rstest_reuse::{self, apply};
@@ -15,8 +11,11 @@ use wp_api::{
     },
     WpApiParamOrder, WpApiRequestBuilder, WpAuthentication,
 };
+use wp_api_integration_tests::{
+    test_site_url, AsyncWpNetworking, FIRST_USER_ID, SECOND_USER_ID,
+    TEST_CREDENTIALS_ADMIN_PASSWORD, TEST_CREDENTIALS_ADMIN_USERNAME,
+};
 
-pub mod integration_test_common;
 pub mod reusable_test_cases;
 
 #[apply(list_users_cases)]

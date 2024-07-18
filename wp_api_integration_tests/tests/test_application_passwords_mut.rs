@@ -1,4 +1,3 @@
-use integration_test_common::TEST_CREDENTIALS_ADMIN_PASSWORD_UUID;
 use serial_test::serial;
 use wp_api::{
     application_passwords::{
@@ -6,15 +5,11 @@ use wp_api::{
     },
     users::UserId,
 };
-use wp_db::DbUserMeta;
-
-use crate::integration_test_common::{
+use wp_api_integration_tests::wp_db::{self, DbUserMeta};
+use wp_api_integration_tests::{
     api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
-    TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
+    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
 };
-
-pub mod integration_test_common;
-pub mod wp_db;
 
 #[tokio::test]
 #[serial]
