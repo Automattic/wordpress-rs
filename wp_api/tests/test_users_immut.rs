@@ -3,10 +3,10 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::{
-    generate,
+    generate, generate_sparse_user_field_with_edit_context_test_cases,
     users::{
-        SparseUserFieldWithEditContext, SparseUserWithEditContext, UserId, UserListParams,
-        WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
+        SparseUserFieldWithEditContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
+        WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
     WpApiParamOrder,
 };
@@ -16,7 +16,11 @@ use crate::integration_test_common::{api_client, AssertResponse, FIRST_USER_ID, 
 pub mod integration_test_common;
 pub mod reusable_test_cases;
 
-#[apply(filter_fields_cases_with_edit_context)]
+generate_sparse_user_field_with_edit_context_test_cases!();
+
+#[apply(sparse_user_field_with_edit_context_test_cases)]
+#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
+#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
 async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
@@ -26,10 +30,14 @@ async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
         .await
         .assert_response()
         .iter()
-        .for_each(|user| validate_sparse_user_fields(user, fields));
+        .for_each(|user| {
+            user.assert_that_instance_fields_nullability_match_provided_fields(fields)
+        });
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_user_field_with_edit_context_test_cases)]
+#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
+#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext]) {
@@ -38,10 +46,12 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext])
         .filter_retrieve_with_edit_context(&FIRST_USER_ID, fields)
         .await
         .assert_response();
-    validate_sparse_user_fields(&user, fields);
+    user.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_user_field_with_edit_context_test_cases)]
+#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
+#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
 async fn filter_retrieve_current_user(#[case] fields: &[SparseUserFieldWithEditContext]) {
@@ -50,7 +60,7 @@ async fn filter_retrieve_current_user(#[case] fields: &[SparseUserFieldWithEditC
         .filter_retrieve_me_with_edit_context(fields)
         .await
         .assert_response();
-    validate_sparse_user_fields(&user, fields);
+    user.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
 #[apply(list_users_cases)]
@@ -214,80 +224,6 @@ async fn retrieve_me_with_view_context() {
     assert_eq!(FIRST_USER_ID, user.id);
 }
 
-fn validate_sparse_user_fields(
-    user: &SparseUserWithEditContext,
-    fields: &[SparseUserFieldWithEditContext],
-) {
-    let field_included = |field| {
-        // If "fields" is empty the server will return all fields
-        fields.is_empty() || fields.contains(&field)
-    };
-    assert_eq!(
-        user.id.is_some(),
-        field_included(SparseUserFieldWithEditContext::Id)
-    );
-    assert_eq!(
-        user.username.is_some(),
-        field_included(SparseUserFieldWithEditContext::Username)
-    );
-    assert_eq!(
-        user.name.is_some(),
-        field_included(SparseUserFieldWithEditContext::Name)
-    );
-    assert_eq!(
-        user.last_name.is_some(),
-        field_included(SparseUserFieldWithEditContext::LastName)
-    );
-    assert_eq!(
-        user.email.is_some(),
-        field_included(SparseUserFieldWithEditContext::Email)
-    );
-    assert_eq!(
-        user.url.is_some(),
-        field_included(SparseUserFieldWithEditContext::Url)
-    );
-    assert_eq!(
-        user.description.is_some(),
-        field_included(SparseUserFieldWithEditContext::Description)
-    );
-    assert_eq!(
-        user.link.is_some(),
-        field_included(SparseUserFieldWithEditContext::Link)
-    );
-    assert_eq!(
-        user.locale.is_some(),
-        field_included(SparseUserFieldWithEditContext::Locale)
-    );
-    assert_eq!(
-        user.nickname.is_some(),
-        field_included(SparseUserFieldWithEditContext::Nickname)
-    );
-    assert_eq!(
-        user.slug.is_some(),
-        field_included(SparseUserFieldWithEditContext::Slug)
-    );
-    assert_eq!(
-        user.registered_date.is_some(),
-        field_included(SparseUserFieldWithEditContext::RegisteredDate)
-    );
-    assert_eq!(
-        user.roles.is_some(),
-        field_included(SparseUserFieldWithEditContext::Roles)
-    );
-    assert_eq!(
-        user.capabilities.is_some(),
-        field_included(SparseUserFieldWithEditContext::Capabilities)
-    );
-    assert_eq!(
-        user.extra_capabilities.is_some(),
-        field_included(SparseUserFieldWithEditContext::ExtraCapabilities)
-    );
-    assert_eq!(
-        user.avatar_urls.is_some(),
-        field_included(SparseUserFieldWithEditContext::AvatarUrls)
-    );
-}
-
 #[template]
 #[rstest]
 #[case(None)]
@@ -296,26 +232,3 @@ fn validate_sparse_user_fields(
 #[case(Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string()])))]
 #[case(Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))]
 fn list_users_has_published_posts_cases() {}
-
-#[template]
-#[rstest]
-#[case(&[])]
-#[case(&[SparseUserFieldWithEditContext::Id])]
-#[case(&[SparseUserFieldWithEditContext::Username])]
-#[case(&[SparseUserFieldWithEditContext::Name])]
-#[case(&[SparseUserFieldWithEditContext::LastName])]
-#[case(&[SparseUserFieldWithEditContext::Email])]
-#[case(&[SparseUserFieldWithEditContext::Url])]
-#[case(&[SparseUserFieldWithEditContext::Description])]
-#[case(&[SparseUserFieldWithEditContext::Link])]
-#[case(&[SparseUserFieldWithEditContext::Locale])]
-#[case(&[SparseUserFieldWithEditContext::Nickname])]
-#[case(&[SparseUserFieldWithEditContext::Slug])]
-#[case(&[SparseUserFieldWithEditContext::RegisteredDate])]
-#[case(&[SparseUserFieldWithEditContext::Roles])]
-#[case(&[SparseUserFieldWithEditContext::Capabilities])]
-#[case(&[SparseUserFieldWithEditContext::ExtraCapabilities])]
-#[case(&[SparseUserFieldWithEditContext::AvatarUrls])]
-#[case(&[SparseUserFieldWithEditContext::Id, SparseUserFieldWithEditContext::Name])]
-#[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
-fn filter_fields_cases_with_edit_context(#[case] fields: &[SparseUserFieldWithEditContext]) {}
