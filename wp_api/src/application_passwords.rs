@@ -24,31 +24,6 @@ pub struct SparseApplicationPassword {
     pub password: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparseApplicationPasswordField {
-    Uuid,
-    AppId,
-    Name,
-    Created,
-    LastUsed,
-    LastIp,
-    Password,
-}
-
-impl crate::SparseField for SparseApplicationPasswordField {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Uuid => "uuid",
-            Self::AppId => "app_id",
-            Self::Name => "name",
-            Self::Created => "created",
-            Self::LastUsed => "last_used",
-            Self::LastIp => "last_ip",
-            Self::Password => "password",
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
 pub struct ApplicationPasswordUuid {
