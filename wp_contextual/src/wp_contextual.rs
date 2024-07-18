@@ -279,7 +279,7 @@ fn generate_integration_test_helper(
     );
     let test_cases_macro_ident = format_ident!("generate_{}", test_cases_ident);
     quote! {
-        //#[cfg(feature = "integration-test")]
+        #[cfg(feature = "integration-tests")]
         impl #sparse_type_ident {
             pub fn assert_that_instance_fields_nullability_match_provided_fields(&self, fields: &[#sparse_field_type_ident]) {
                 let field_included = |field| {
@@ -290,6 +290,7 @@ fn generate_integration_test_helper(
             }
         }
 
+        #[cfg(feature = "integration-tests")]
         #[macro_export]
         macro_rules! #test_cases_macro_ident {
             () => {

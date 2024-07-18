@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-wp_api = { path = "../wp_api" }
+wp_api = { path = "../wp_api", features = [ "integration-tests" ] }
 
 [dev-dependencies]
 async-trait = { workspace = true }
