@@ -5,6 +5,7 @@ use wp_api::application_passwords::{
     ApplicationPasswordUuid, SparseApplicationPasswordFieldWithEditContext,
     SparseApplicationPasswordWithEditContext,
 };
+use wp_api::generate_sparse_application_password_field_with_edit_context_test_cases;
 use wp_api::users::UserId;
 use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
@@ -13,29 +14,39 @@ use wp_api_integration_tests::{
 
 pub mod reusable_test_cases;
 
-#[apply(filter_fields_cases_with_edit_context)]
+generate_sparse_application_password_field_with_edit_context_test_cases!();
+
+#[apply(sparse_application_password_field_with_edit_context_test_cases)]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
 #[tokio::test]
 #[parallel]
-async fn filter_list_application_passwords(
+async fn filter_list_application_passwords_with_edit_context(
     #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
     #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
 ) {
+    if should_skip_filter_with_edit_context_test(fields) {
+        return;
+    }
     api_client()
         .application_passwords()
         .filter_list_with_edit_context(&user_id, fields)
         .await
         .assert_response()
         .iter()
-        .for_each(|p| validate_sparse_application_password_fields(p, fields));
+        .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_application_password_field_with_edit_context_test_cases)]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
 #[tokio::test]
 #[parallel]
-async fn filter_retrieve_application_password(
+async fn filter_retrieve_application_password_with_edit_context(
     #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
 ) {
-    let p = api_client()
+    if should_skip_filter_with_edit_context_test(fields) {
+        return;
+    }
+    let p: SparseApplicationPasswordWithEditContext = api_client()
         .application_passwords()
         .filter_retrieve_with_edit_context(
             &FIRST_USER_ID,
@@ -46,21 +57,25 @@ async fn filter_retrieve_application_password(
         )
         .await
         .assert_response();
-    validate_sparse_application_password_fields(&p, fields);
+    p.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_application_password_field_with_edit_context_test_cases)]
+#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
 #[tokio::test]
 #[parallel]
-async fn filter_retrieve_current_application_password(
+async fn filter_retrieve_current_application_password_with_edit_context(
     #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
 ) {
+    if should_skip_filter_with_edit_context_test(fields) {
+        return;
+    }
     let p = api_client()
         .application_passwords()
         .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
         .await
         .assert_response();
-    validate_sparse_application_password_fields(&p, fields);
+    p.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
 #[rstest]
@@ -205,54 +220,15 @@ async fn retrieve_application_passwords_with_view_context() {
     assert_eq!(a.uuid, uuid);
 }
 
-fn validate_sparse_application_password_fields(
-    app_password: &SparseApplicationPasswordWithEditContext,
+fn should_skip_filter_with_edit_context_test(
     fields: &[SparseApplicationPasswordFieldWithEditContext],
-) {
-    let field_included = |field| {
-        // If "fields" is empty the server will return all fields
-        fields.is_empty() || fields.contains(&field)
-    };
-    assert_eq!(
-        app_password.uuid.is_some(),
-        field_included(SparseApplicationPasswordFieldWithEditContext::Uuid)
-    );
-    assert_eq!(
-        app_password.app_id.is_some(),
-        field_included(SparseApplicationPasswordFieldWithEditContext::AppId)
-    );
-    assert_eq!(
-        app_password.name.is_some(),
-        field_included(SparseApplicationPasswordFieldWithEditContext::Name)
-    );
-    assert_eq!(
-        app_password.created.is_some(),
-        field_included(SparseApplicationPasswordFieldWithEditContext::Created)
-    );
-    // Do not test existence of `last_used`, `last_ip` or `password` as there is
-    // no guarantee that they'll be included even if it's in the requested field list
-    if !field_included(SparseApplicationPasswordFieldWithEditContext::LastUsed) {
-        assert!(app_password.last_used.is_none());
+) -> bool {
+    if fields.contains(&SparseApplicationPasswordFieldWithEditContext::Password) {
+        println!(
+            "Requesting password field returns invalid JSON as this field is only available after creating a new application token. Skipping this test..."
+        );
+        true
+    } else {
+        false
     }
-    if !field_included(SparseApplicationPasswordFieldWithEditContext::LastIp) {
-        assert!(app_password.last_ip.is_none());
-    }
-    if !field_included(SparseApplicationPasswordFieldWithEditContext::Password) {
-        assert!(app_password.password.is_none());
-    }
-}
-
-#[template]
-#[rstest]
-#[case(&[])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::AppId])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Name])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Created])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::LastUsed])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::LastIp])]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
-fn filter_fields_cases_with_edit_context(
-    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
-) {
 }
