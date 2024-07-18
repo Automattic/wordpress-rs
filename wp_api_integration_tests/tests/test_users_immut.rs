@@ -22,7 +22,7 @@ generate_sparse_user_field_with_edit_context_test_cases!();
 #[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
-async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
+async fn filter_users_with_edit_context(#[case] fields: &[SparseUserFieldWithEditContext]) {
     api_client()
         .users()
         .filter_list_with_edit_context(&UserListParams::default(), fields)
@@ -39,7 +39,7 @@ async fn filter_users(#[case] fields: &[SparseUserFieldWithEditContext]) {
 #[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
-async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext]) {
+async fn filter_retrieve_user_with_edit_context(#[case] fields: &[SparseUserFieldWithEditContext]) {
     let user = api_client()
         .users()
         .filter_retrieve_with_edit_context(&FIRST_USER_ID, fields)
@@ -53,7 +53,9 @@ async fn filter_retrieve_user(#[case] fields: &[SparseUserFieldWithEditContext])
 #[case(&[SparseUserFieldWithEditContext::Email, SparseUserFieldWithEditContext::Nickname])]
 #[tokio::test]
 #[parallel]
-async fn filter_retrieve_current_user(#[case] fields: &[SparseUserFieldWithEditContext]) {
+async fn filter_retrieve_current_user_with_edit_context(
+    #[case] fields: &[SparseUserFieldWithEditContext],
+) {
     let user = api_client()
         .users()
         .filter_retrieve_me_with_edit_context(fields)
