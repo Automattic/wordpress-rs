@@ -157,15 +157,10 @@ async fn retrieve_application_passwords_with_view_context() {
 
 mod filter {
     use super::*;
-    use wp_api::{
-        generate_sparse_application_password_field_with_edit_context_test_cases,
-        generate_sparse_application_password_field_with_embed_context_test_cases,
-        generate_sparse_application_password_field_with_view_context_test_cases,
-    };
 
-    generate_sparse_application_password_field_with_edit_context_test_cases!();
-    generate_sparse_application_password_field_with_embed_context_test_cases!();
-    generate_sparse_application_password_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_application_password_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_application_password_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_application_password_field_with_view_context_test_cases!();
 
     #[apply(sparse_application_password_field_with_edit_context_test_cases)]
     #[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
