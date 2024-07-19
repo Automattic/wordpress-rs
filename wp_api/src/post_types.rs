@@ -3,8 +3,6 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::SparseField;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum PostType {
     Post,
@@ -40,25 +38,25 @@ impl Display for PostType {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseListPostTypesResponse {
     #[WpContext(edit, embed, view)]
-    pub post: SparsePostTypeDetails,
+    pub post: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub page: SparsePostTypeDetails,
+    pub page: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub attachment: SparsePostTypeDetails,
+    pub attachment: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub nav_menu_item: SparsePostTypeDetails,
+    pub nav_menu_item: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub wp_block: SparsePostTypeDetails,
+    pub wp_block: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub wp_template: SparsePostTypeDetails,
+    pub wp_template: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub wp_template_part: SparsePostTypeDetails,
+    pub wp_template_part: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub wp_navigation: SparsePostTypeDetails,
+    pub wp_navigation: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub wp_font_family: SparsePostTypeDetails,
+    pub wp_font_family: Option<SparsePostTypeDetails>,
     #[WpContext(edit, embed, view)]
-    pub wp_font_face: SparsePostTypeDetails,
+    pub wp_font_face: Option<SparsePostTypeDetails>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record, WpContextual)]
@@ -177,110 +175,4 @@ pub enum PostTypeSupports {
 pub struct PostTypeVisibility {
     pub show_in_nav_menus: bool,
     pub show_ui: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparsePostTypeDetailsField {
-    WithEditContext(SparsePostTypeDetailsFieldWithEditContext),
-    WithEmbedContext(SparsePostTypeDetailsFieldWithEmbedContext),
-    WithViewContext(SparsePostTypeDetailsFieldWithViewContext),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparsePostTypeDetailsFieldWithEditContext {
-    Capabilities,
-    Description,
-    Hierarchical,
-    Viewable,
-    Labels,
-    Name,
-    Slug,
-    Supports,
-    HasArchive,
-    Taxonomies,
-    RestBase,
-    RestNamespace,
-    Visibility,
-    Icon,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparsePostTypeDetailsFieldWithEmbedContext {
-    Name,
-    Slug,
-    RestBase,
-    RestNamespace,
-    Icon,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparsePostTypeDetailsFieldWithViewContext {
-    Description,
-    Hierarchical,
-    Name,
-    Slug,
-    HasArchive,
-    Taxonomies,
-    RestBase,
-    RestNamespace,
-    Icon,
-}
-
-impl SparseField for SparsePostTypeDetailsField {
-    fn as_str(&self) -> &str {
-        match self {
-            SparsePostTypeDetailsField::WithEditContext(f) => f.as_str(),
-            SparsePostTypeDetailsField::WithEmbedContext(f) => f.as_str(),
-            SparsePostTypeDetailsField::WithViewContext(f) => f.as_str(),
-        }
-    }
-}
-
-impl SparseField for SparsePostTypeDetailsFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Capabilities => "capabilities",
-            Self::Description => "description",
-            Self::Hierarchical => "hierarchical",
-            Self::Viewable => "viewable",
-            Self::Labels => "labels",
-            Self::Name => "name",
-            Self::Slug => "slug",
-            Self::Supports => "supports",
-            Self::HasArchive => "has_archive",
-            Self::Taxonomies => "taxonomies",
-            Self::RestBase => "rest_base",
-            Self::RestNamespace => "rest_namespace",
-            Self::Visibility => "visibility",
-            Self::Icon => "icon",
-        }
-    }
-}
-
-impl SparseField for SparsePostTypeDetailsFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Name => "name",
-            Self::Slug => "slug",
-            Self::RestBase => "rest_base",
-            Self::RestNamespace => "rest_namespace",
-            Self::Icon => "icon",
-        }
-    }
-}
-
-impl SparseField for SparsePostTypeDetailsFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Description => "description",
-            Self::Hierarchical => "hierarchical",
-            Self::Name => "name",
-            Self::Slug => "slug",
-            Self::HasArchive => "has_archive",
-            Self::Taxonomies => "taxonomies",
-            Self::RestBase => "rest_base",
-            Self::RestNamespace => "rest_namespace",
-            Self::Icon => "icon",
-        }
-    }
 }
