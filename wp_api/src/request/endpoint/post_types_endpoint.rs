@@ -1,8 +1,10 @@
-use wp_derive_request_builder::WpDerivedRequest;
-
-use crate::post_types::PostType;
-
 use super::{DerivedRequest, Namespace};
+use crate::post_types::{
+    PostType, SparsePostTypeDetailsFieldWithEditContext,
+    SparsePostTypeDetailsFieldWithEmbedContext, SparsePostTypeDetailsFieldWithViewContext,
+};
+use crate::SparseField;
+use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 #[Namespace("/wp/v2")]
@@ -10,7 +12,7 @@ use super::{DerivedRequest, Namespace};
 enum PostTypesRequest {
     #[contextual_get(url = "/types", output = crate::post_types::SparseListPostTypesResponse)]
     List,
-    #[contextual_get(url = "/types/<post_type>", output = crate::post_types::SparsePostTypeDetails)]
+    #[contextual_get(url = "/types/<post_type>", output = crate::post_types::SparsePostTypeDetails, filter_by = crate::post_types::SparsePostTypeDetailsField)]
     Retrieve,
 }
 
@@ -19,6 +21,16 @@ impl DerivedRequest for PostTypesRequest {
         Namespace::WpV2
     }
 }
+
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePostTypeDetailsFieldWithEditContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePostTypeDetailsFieldWithEmbedContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparsePostTypeDetailsFieldWithViewContext
+);
 
 //#[cfg(test)]
 //mod tests {

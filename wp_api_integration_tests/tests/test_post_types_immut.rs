@@ -1,8 +1,10 @@
-#![allow(unused)]
 use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
-use wp_api::post_types::{PostType, PostTypeSupports, SparsePostTypeDetailsFieldWithEditContext};
+use wp_api::post_types::{
+    PostType, PostTypeSupports, SparsePostTypeDetailsFieldWithEditContext,
+    SparsePostTypeDetailsFieldWithEmbedContext, SparsePostTypeDetailsFieldWithViewContext,
+};
 
 use wp_api_integration_tests::{api_client, AssertResponse};
 
@@ -65,12 +67,8 @@ async fn retrieve_post_types_with_edit_context(
     // All post types in our current testing sites support `Title`, so we use this assertion
     // to verify that we are able to parse it properly.
     //
-    // To be clear, if we can't parse it as expected, we'd get an error back and the previous
-    // assertion would fail, but having some defensive validation may help guard against
-    // future changes.
-    //
     // It's entirely possible that we might have more test sites in the future and some of their
-    // post types might not support a `Title` in which case it's perfectly fine to completely
+    // post types might not support `Title` in which case it's perfectly fine to completely
     // remove this assertion.
     assert_eq!(
         post_type.supports.get(&PostTypeSupports::Title),
@@ -128,35 +126,91 @@ async fn retrieve_post_types_with_view_context(
         .assert_response();
 }
 
-//mod filter {
-//    use super::*;
-//
-//    wp_api::generate_sparse_post_type_details_field_with_edit_context_test_cases!();
-//
-//    #[apply(sparse_post_type_details_field_with_edit_context_test_cases)]
-//    #[tokio::test]
-//    #[parallel]
-//    async fn filter_retrieve_post_types_with_edit_context(
-//        #[values(
-//            PostType::Post,
-//            PostType::Page,
-//            PostType::Attachment,
-//            PostType::NavMenuItem,
-//            PostType::WpBlock,
-//            PostType::WpTemplate,
-//            PostType::WpTemplatePart,
-//            PostType::WpNavigation,
-//            PostType::WpFontFamily,
-//            PostType::WpFontFace
-//        )]
-//        post_type: PostType,
-//        #[case] fields: &[SparsePostTypeDetailsFieldWithEditContext],
-//    ) {
-//        let p = api_client()
-//            .post_types()
-//            .filter_retrieve_with_edit_context(&post_type, fields)
-//            .await
-//            .assert_response();
-//        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
-//    }
-//}
+mod filter {
+    use super::*;
+
+    wp_api::generate_sparse_post_type_details_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_post_type_details_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_post_type_details_field_with_view_context_test_cases!();
+
+    #[apply(sparse_post_type_details_field_with_edit_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_post_types_with_edit_context(
+        #[values(
+            PostType::Post,
+            PostType::Page,
+            PostType::Attachment,
+            PostType::NavMenuItem,
+            PostType::WpBlock,
+            PostType::WpTemplate,
+            PostType::WpTemplatePart,
+            PostType::WpNavigation,
+            PostType::WpFontFamily,
+            PostType::WpFontFace
+        )]
+        post_type: PostType,
+        #[case] fields: &[SparsePostTypeDetailsFieldWithEditContext],
+    ) {
+        let p = api_client()
+            .post_types()
+            .filter_retrieve_with_edit_context(&post_type, fields)
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_post_type_details_field_with_embed_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_post_types_with_embed_context(
+        #[values(
+            PostType::Post,
+            PostType::Page,
+            PostType::Attachment,
+            PostType::NavMenuItem,
+            PostType::WpBlock,
+            PostType::WpTemplate,
+            PostType::WpTemplatePart,
+            PostType::WpNavigation,
+            PostType::WpFontFamily,
+            PostType::WpFontFace
+        )]
+        post_type: PostType,
+        #[case] fields: &[SparsePostTypeDetailsFieldWithEmbedContext],
+    ) {
+        let p = api_client()
+            .post_types()
+            .filter_retrieve_with_embed_context(&post_type, fields)
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_post_type_details_field_with_view_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_post_types_with_view_context(
+        #[values(
+            PostType::Post,
+            PostType::Page,
+            PostType::Attachment,
+            PostType::NavMenuItem,
+            PostType::WpBlock,
+            PostType::WpTemplate,
+            PostType::WpTemplatePart,
+            PostType::WpNavigation,
+            PostType::WpFontFamily,
+            PostType::WpFontFace
+        )]
+        post_type: PostType,
+        #[case] fields: &[SparsePostTypeDetailsFieldWithViewContext],
+    ) {
+        let p = api_client()
+            .post_types()
+            .filter_retrieve_with_view_context(&post_type, fields)
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+}
