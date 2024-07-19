@@ -3,8 +3,6 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::SparseField;
-
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
@@ -71,41 +69,6 @@ pub struct SparsePlugin {
     pub requires_php: Option<String>,
     #[WpContext(edit, view)]
     pub textdomain: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparsePluginField {
-    Author,
-    AuthorUri,
-    Description,
-    Name,
-    NetworkOnly,
-    Plugin,
-    PluginUri,
-    RequiresPhp,
-    RequiresWp,
-    Status,
-    Textdomain,
-    Version,
-}
-
-impl SparseField for SparsePluginField {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Author => "author",
-            Self::AuthorUri => "author_uri",
-            Self::Description => "description",
-            Self::Name => "name",
-            Self::NetworkOnly => "network_only",
-            Self::Plugin => "plugin",
-            Self::PluginUri => "plugin_uri",
-            Self::RequiresPhp => "requires_php",
-            Self::RequiresWp => "requires_wp",
-            Self::Status => "status",
-            Self::Textdomain => "textdomain",
-            Self::Version => "version",
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

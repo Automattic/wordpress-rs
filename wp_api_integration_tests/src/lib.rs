@@ -10,6 +10,9 @@ use wp_api::{
     WpRestErrorCode, WpRestErrorWrapper,
 };
 
+// `pub` to avoid 'unused' & 'dead_code' warnings
+pub mod wp_db;
+
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
 // The first user is also the current user

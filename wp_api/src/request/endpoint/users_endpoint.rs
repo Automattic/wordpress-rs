@@ -1,15 +1,15 @@
 use crate::{
-    SparseUser, SparseUserField, UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId,
-    UserListParams, UserUpdateParams, UserWithEditContext, UserWithEmbedContext,
-    UserWithViewContext,
+    SparseField, SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
+    SparseUserFieldWithViewContext, UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId,
+    UserListParams, UserUpdateParams, UserWithEditContext,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparseUserField)]
 enum UsersRequest {
-    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>)]
+    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>, filter_by = crate::SparseUserField)]
     List,
     #[post(url = "/users", params = &UserCreateParams, output = UserWithEditContext)]
     Create,
@@ -17,15 +17,27 @@ enum UsersRequest {
     Delete,
     #[delete(url = "/users/me", params = &UserDeleteParams, output = UserDeleteResponse)]
     DeleteMe,
-    #[contextual_get(url = "/users/<user_id>", output = SparseUser)]
+    #[contextual_get(url = "/users/<user_id>", output = crate::SparseUser, filter_by = crate::SparseUserField)]
     Retrieve,
-    #[contextual_get(url = "/users/me", output = SparseUser)]
+    #[contextual_get(url = "/users/me", output = crate::SparseUser, filter_by = crate::SparseUserField)]
     RetrieveMe,
     #[post(url = "/users/<user_id>", params = &UserUpdateParams, output = UserWithEditContext)]
     Update,
     #[post(url = "/users/me", params = &UserUpdateParams, output = UserWithEditContext)]
     UpdateMe,
 }
+
+impl DerivedRequest for UsersRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpV2
+    }
+}
+
+super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFieldWithEditContext);
+super::macros::default_sparse_field_implementation_from_field_name!(
+    SparseUserFieldWithEmbedContext
+);
+super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFieldWithViewContext);
 
 #[cfg(test)]
 mod tests {
@@ -35,7 +47,7 @@ mod tests {
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
-        WpApiParamUsersHasPublishedPosts, WpContext,
+        WpApiParamUsersHasPublishedPosts,
     };
     use rstest::*;
     use std::sync::Arc;
@@ -110,7 +122,7 @@ mod tests {
     #[rstest]
     fn filter_list_users_default_params_empty_fields(endpoint: UsersRequestEndpoint) {
         validate_wp_v2_endpoint(
-            endpoint.filter_list(WpContext::Edit, &UserListParams::default(), &[]),
+            endpoint.filter_list_with_edit_context(&UserListParams::default(), &[]),
             "/users?context=edit&_fields=",
         );
     }
@@ -136,7 +148,7 @@ mod tests {
             ])),
         };
         validate_wp_v2_endpoint(
-            endpoint.filter_list(WpContext::Edit, &params, &[SparseUserField::Name, SparseUserField::Email]),
+            endpoint.filter_list_with_edit_context(&params, &[SparseUserFieldWithEditContext::Name, SparseUserFieldWithEditContext::Email]),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=post%2Cpage&_fields=name%2Cemail",
         );
     }
@@ -152,12 +164,14 @@ mod tests {
     #[rstest]
     fn filter_retrieve_user(endpoint: UsersRequestEndpoint) {
         validate_wp_v2_endpoint(
-            endpoint.filter_retrieve(
+            endpoint.filter_retrieve_with_view_context(
                 &UserId(98),
-                WpContext::View,
-                &[SparseUserField::Nickname, SparseUserField::Url],
+                &[
+                    SparseUserFieldWithViewContext::Name,
+                    SparseUserFieldWithViewContext::Url,
+                ],
             ),
-            "/users/98?context=view&_fields=nickname%2Curl",
+            "/users/98?context=view&_fields=name%2Curl",
         );
     }
 
@@ -172,11 +186,11 @@ mod tests {
     #[rstest]
     fn filter_retrieve_current_user(endpoint: UsersRequestEndpoint) {
         validate_wp_v2_endpoint(
-            endpoint.filter_retrieve_me(
-                WpContext::Embed,
-                &[SparseUserField::Roles, SparseUserField::Capabilities],
-            ),
-            "/users/me?context=embed&_fields=roles%2Ccapabilities",
+            endpoint.filter_retrieve_me_with_embed_context(&[
+                SparseUserFieldWithEmbedContext::Link,
+                SparseUserFieldWithEmbedContext::Url,
+            ]),
+            "/users/me?context=embed&_fields=link%2Curl",
         );
     }
 

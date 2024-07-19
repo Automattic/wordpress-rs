@@ -3,9 +3,7 @@ use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::wp_site_health_tests::{SparseWpSiteHealthTest, SparseWpSiteHealthTestField};
 
-use crate::integration_test_common::{api_client, AssertResponse};
-
-pub mod integration_test_common;
+use wp_api_integration_tests::{api_client, AssertResponse};
 
 macro_rules! generate_tests {
     ($ident:ident) => {

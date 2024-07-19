@@ -16,6 +16,15 @@ fn main() {
     let _ = FooWithEditContext {
         bar: wp_contextual_field_with_multiple_path_segments_helper::BarWithEditContext { baz: 0 },
     };
+    let _ = SparseFooWithEditContext {
+        bar: Some(
+            wp_contextual_field_with_multiple_path_segments_helper::SparseBarWithEditContext {
+                baz: Some(0),
+            },
+        ),
+    };
+    let bar_field = SparseFooFieldWithEditContext::Bar;
+    assert_eq!(bar_field.as_field_name(), "bar");
 }
 
 uniffi::setup_scaffolding!();

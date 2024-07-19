@@ -1,7 +1,8 @@
 use std::{fmt::Display, slice::Iter, str::FromStr};
 
+use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{spanned::Spanned, DeriveInput, Ident};
 
 const IDENT_PREFIX: &str = "Sparse";
@@ -19,20 +20,52 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let parsed_fields = parse_fields(fields)?;
 
     let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
-        let cname = ident_name_for_context(ident_name_without_prefix, current_context);
-        let cident = Ident::new(&cname, original_ident.span());
-        let cfields = generate_context_fields(&parsed_fields, current_context)?;
-        if !cfields.is_empty() {
-            Ok(quote! {
-                #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-                pub struct #cident {
-                    #(#cfields,)*
+        let generate_type = |ident, generated_fields: &Vec<ContextualField>| {
+            if !generated_fields.is_empty() {
+                let fields_to_add = generated_fields.iter().map(|f| &f.field);
+                quote! {
+                    #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+                    pub struct #ident {
+                        #(#fields_to_add,)*
+                    }
                 }
+                .into()
+            } else {
+                TokenStream::new()
             }
-            .into())
-        } else {
-            Ok(proc_macro::TokenStream::new())
-        }
+        };
+        let non_sparse_type_fields =
+            generate_contextual_fields(&parsed_fields, current_context, true)?;
+        let sparse_type_fields =
+            generate_contextual_fields(&parsed_fields, current_context, false)?;
+
+        let non_sparse_ident = Ident::new(
+            &ident_name_for_context(ident_name_without_prefix, current_context),
+            original_ident.span(),
+        );
+        let sparse_field_ident = Ident::new(
+            &ident_name_for_context(
+                format!("{}Field", original_ident_name).as_str(),
+                current_context,
+            ),
+            original_ident.span(),
+        );
+        let sparse_ident = Ident::new(
+            &ident_name_for_context(original_ident_name.as_str(), current_context),
+            original_ident.span(),
+        );
+        let non_sparse_type = generate_type(&non_sparse_ident, &non_sparse_type_fields);
+        let sparse_field_type =
+            generate_sparse_field_type(&sparse_field_ident, &sparse_type_fields);
+        let sparse_type = generate_type(&sparse_ident, &sparse_type_fields);
+        let integration_test_helpers =
+            generate_integration_test_helper(sparse_ident, sparse_field_ident, &sparse_type_fields);
+        Ok(TokenStream::from_iter([
+            non_sparse_type,
+            sparse_type,
+            sparse_field_type,
+            integration_test_helpers,
+        ]))
     });
     contextual_token_streams
         .collect::<Result<Vec<TokenStream>, syn::Error>>()
@@ -175,14 +208,122 @@ fn parse_fields(
     Ok(parsed_fields)
 }
 
+fn generate_sparse_field_type(type_ident: &Ident, fields: &[ContextualField]) -> TokenStream {
+    let mut variant_idents = Vec::with_capacity(fields.len());
+    let mut as_field_names = Vec::with_capacity(fields.len());
+    for f in fields {
+        if let Some(f_ident) = &f.field.ident {
+            let field_name = f_ident.to_string();
+            let variant_ident = format_ident!("{}", field_name.to_case(Case::UpperCamel));
+            let field_name = field_name.as_str();
+
+            variant_idents.push(variant_ident.clone());
+            as_field_names.push(quote! {
+                Self::#variant_ident => #field_name
+            });
+        }
+    }
+    if variant_idents.is_empty() {
+        return TokenStream::new();
+    }
+    quote! {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+        pub enum #type_ident {
+            #(#variant_idents,)*
+        }
+        impl #type_ident {
+            pub fn as_field_name(&self) -> &str {
+                match self {
+                    #(#as_field_names,)*
+                }
+            }
+        }
+    }
+    .into()
+}
+
+fn generate_integration_test_helper(
+    sparse_type_ident: Ident,
+    sparse_field_type_ident: Ident,
+    fields: &[ContextualField],
+) -> TokenStream {
+    if fields.is_empty() {
+        return TokenStream::new();
+    }
+    let mut assertions = Vec::with_capacity(fields.len());
+    let mut rs_test_cases = Vec::with_capacity(fields.len());
+    for f in fields {
+        if let Some(f_ident) = &f.field.ident {
+            let variant_ident = format_ident!("{}", f_ident.to_string().to_case(Case::UpperCamel));
+            let field_ident_str = f_ident.to_string();
+            if f.is_wp_contextual_option {
+                assertions.push(quote! {
+                    // TODO: Once we have logging, we can mark this as info! to avoid cluttering
+                    // the stdout
+                    println!("'{}' field is marked as #[WpContextualOption], skipping assertion...", #field_ident_str);
+                });
+            } else {
+                assertions.push(quote! {
+                    assert!(
+                        self.#f_ident.is_some() == field_included(#sparse_field_type_ident::#variant_ident),
+                        "Expected '{}' {} in fields: {:?}",
+                        #field_ident_str,
+                        if self.#f_ident.is_some() {
+                            "to be included"
+                        } else {
+                            "not to be included"
+                        },
+                        fields
+                    );
+            });
+            }
+            let case_ident = format_ident!("single_field_{}", f_ident);
+            rs_test_cases.push(quote! {
+                #[case::#case_ident(&[#sparse_field_type_ident::#variant_ident])]
+            });
+        }
+    }
+    let test_cases_ident = format_ident!(
+        "{}_test_cases",
+        sparse_field_type_ident.to_string().to_case(Case::Snake)
+    );
+    let test_cases_macro_ident = format_ident!("generate_{}", test_cases_ident);
+    quote! {
+        #[cfg(feature = "integration-tests")]
+        impl #sparse_type_ident {
+            pub fn assert_that_instance_fields_nullability_match_provided_fields(&self, fields: &[#sparse_field_type_ident]) {
+                let field_included = |field| {
+                    // If "fields" is empty the server will return all fields
+                    fields.is_empty() || fields.contains(&field)
+                };
+                #(#assertions)*
+            }
+        }
+
+        #[cfg(feature = "integration-tests")]
+        #[macro_export]
+        macro_rules! #test_cases_macro_ident {
+            () => {
+                #[template]
+                #[rstest]
+                #[case::no_fields(&[])]
+                #(#rs_test_cases)*
+                pub fn #test_cases_ident(#[case] fields: &[#sparse_field_type_ident]) {}
+            }
+        }
+    }
+    .into()
+}
+
 // Generates fields for the given context.
 //
 // It'll filter out any fields that don't have the given context, handle any mappings due to
 // #[WpContextualField] attribute and remove #[WpContext] and #[WpContextualField] attributes.
-fn generate_context_fields(
+fn generate_contextual_fields(
     parsed_fields_attrs: &[WpParsedField],
     context: &WpContextAttr,
-) -> Result<Vec<syn::Field>, syn::Error> {
+    should_extract_option: bool,
+) -> Result<Vec<ContextualField>, syn::Error> {
     parsed_fields_attrs
         .iter()
         .filter(|pf| {
@@ -197,14 +338,18 @@ fn generate_context_fields(
         })
         .map(|pf| {
             let f = &pf.field;
-
-            let new_type = if pf
+            let is_wp_contextual_option = pf
                 .parsed_attrs
-                .contains(&WpParsedAttr::ParsedWpContextualOption)
-            {
+                .contains(&WpParsedAttr::ParsedWpContextualOption);
+
+            let new_type = if is_wp_contextual_option {
                 f.ty.clone()
             } else {
-                let mut new_type = extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone());
+                let mut new_type = if should_extract_option {
+                    extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone())
+                } else {
+                    f.ty.clone()
+                };
                 if f.attrs.iter().any(|attr| {
                     attr.path()
                         .segments
@@ -212,11 +357,15 @@ fn generate_context_fields(
                         .any(|s| is_wp_contextual_field_ident(&s.ident))
                 }) {
                     // If the field has #[WpContextualField] attr, map it to its contextual field type
-                    new_type = contextual_field_type(&new_type, context)?;
+                    new_type = if should_extract_option {
+                        contextual_non_sparse_field_type(&new_type, context)?
+                    } else {
+                        contextual_sparse_field_type(&new_type, context)?
+                    }
                 }
                 new_type
             };
-            Ok::<syn::Field, syn::Error>(syn::Field {
+            let new_field = syn::Field {
                 // Remove the WpContext & WpContextualField attributes from the generated field
                 attrs: pf
                     .parsed_attrs
@@ -235,12 +384,16 @@ fn generate_context_fields(
                 ident: f.ident.clone(),
                 colon_token: f.colon_token,
                 ty: new_type,
+            };
+            Ok(ContextualField {
+                field: new_field,
+                is_wp_contextual_option,
             })
         })
         .collect()
 }
 
-// Returns a contextual type for the given type.
+// Returns a contextual non-sparse type for the given type.
 //
 // ```
 // #[derive(WpContextual)]
@@ -271,7 +424,10 @@ fn generate_context_fields(
 //
 // In this case, this function takes the `Option<SparseBar>` type and `&WpContextAttr::Edit`
 // and turns it into `BarWithEditContext` type.
-fn contextual_field_type(ty: &syn::Type, context: &WpContextAttr) -> Result<syn::Type, syn::Error> {
+fn contextual_non_sparse_field_type(
+    ty: &syn::Type,
+    context: &WpContextAttr,
+) -> Result<syn::Type, syn::Error> {
     let mut ty = ty.clone();
     let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
     let ident_name_without_prefix = match inner_segment.ident.to_string().strip_prefix(IDENT_PREFIX)
@@ -282,6 +438,50 @@ fn contextual_field_type(ty: &syn::Type, context: &WpContextAttr) -> Result<syn:
     }?;
     inner_segment.ident = Ident::new(
         &ident_name_for_context(&ident_name_without_prefix, context),
+        inner_segment.ident.span(),
+    );
+    Ok(ty)
+}
+
+// Returns a contextual sparse type for the given type.
+//
+// ```
+// #[derive(WpContextual)]
+// pub struct SparseFoo {
+//     #[WpContext(edit)]
+//     #[WpContextualField]
+//     pub bar: Option<SparseBar>,
+// }
+//
+// #[WpContextual]
+// pub struct SparseBar {
+//     #[WpContext(edit)]
+//     pub baz: Option<u32>,
+// }
+// ```
+//
+// Given the above, we'd like to generate:
+//
+// ```
+// pub struct SparseFooWithEditContext {
+//     pub bar: Option<SparseBarWithEditContext>,
+// }
+//
+// pub struct SparseBarWithEditContext {
+//     pub baz: Option<u32>,
+// }
+// ```
+//
+// In this case, this function takes the `Option<SparseBar>` type and `&WpContextAttr::Edit`
+// and turns it into `Option<SparseBarWithEditContext>` type.
+fn contextual_sparse_field_type(
+    ty: &syn::Type,
+    context: &WpContextAttr,
+) -> Result<syn::Type, syn::Error> {
+    let mut ty = ty.clone();
+    let inner_segment = find_contextual_field_inner_segment(&mut ty)?;
+    inner_segment.ident = Ident::new(
+        &ident_name_for_context(inner_segment.ident.to_string().as_str(), context),
         inner_segment.ident.span(),
     );
     Ok(ty)
@@ -475,6 +675,12 @@ fn parse_contexts_from_tokens(
 struct WpParsedField {
     field: syn::Field,
     parsed_attrs: Vec<WpParsedAttr>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct ContextualField {
+    field: syn::Field,
+    is_wp_contextual_option: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]

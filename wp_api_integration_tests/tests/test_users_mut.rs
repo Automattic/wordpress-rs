@@ -1,12 +1,7 @@
-use integration_test_common::AssertResponse;
 use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
-use wp_db::{DbUser, DbUserMeta};
-
-use crate::integration_test_common::{api_client, FIRST_USER_ID, SECOND_USER_ID};
-
-pub mod integration_test_common;
-pub mod wp_db;
+use wp_api_integration_tests::wp_db::{self, DbUser, DbUserMeta};
+use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
 
 #[tokio::test]
 #[serial]

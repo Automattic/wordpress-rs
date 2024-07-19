@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{SparseField, WpApiParamOrder};
+use crate::WpApiParamOrder;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersOrderBy {
@@ -381,50 +381,6 @@ pub struct SparseUser {
     #[WpContextualOption]
     pub avatar_urls: Option<HashMap<String, String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum SparseUserField {
-    Id,
-    Username,
-    Name,
-    LastName,
-    Email,
-    Url,
-    Description,
-    Link,
-    Locale,
-    Nickname,
-    Slug,
-    RegisteredDate,
-    Roles,
-    Capabilities,
-    ExtraCapabilities,
-    AvatarUrls,
-    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
-}
-
-impl SparseField for SparseUserField {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Id => "id",
-            Self::Username => "username",
-            Self::Name => "name",
-            Self::LastName => "last_name",
-            Self::Email => "email",
-            Self::Url => "url",
-            Self::Description => "description",
-            Self::Link => "link",
-            Self::Locale => "locale",
-            Self::Nickname => "nickname",
-            Self::Slug => "slug",
-            Self::RegisteredDate => "registered_date",
-            Self::Roles => "roles",
-            Self::Capabilities => "capabilities",
-            Self::ExtraCapabilities => "extra_capabilities",
-            Self::AvatarUrls => "avatar_urls",
-        }
-    }
 }
 
 #[cfg(test)]

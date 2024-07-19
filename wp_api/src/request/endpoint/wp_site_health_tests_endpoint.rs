@@ -4,20 +4,26 @@ use crate::wp_site_health_tests::{
     SparseWpSiteHealthTest, SparseWpSiteHealthTestField, WpSiteHealthTest,
 };
 
+use super::{DerivedRequest, Namespace};
+
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp-site-health/v1")]
-#[SparseField(SparseWpSiteHealthTestField)]
 enum WpSiteHealthTestsRequest {
-    #[get(url = "/tests/background-updates", output = SparseWpSiteHealthTest)]
+    #[get(url = "/tests/background-updates", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     BackgroundUpdates,
-    #[get(url = "/tests/loopback-requests", output = SparseWpSiteHealthTest)]
+    #[get(url = "/tests/loopback-requests", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     LoopbackRequests,
-    #[get(url = "/tests/https-status", output = SparseWpSiteHealthTest)]
+    #[get(url = "/tests/https-status", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     HttpsStatus,
-    #[get(url = "/tests/dotorg-communication", output = SparseWpSiteHealthTest)]
+    #[get(url = "/tests/dotorg-communication", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     DotorgCommunication,
-    #[get(url = "/tests/authorization-header", output = SparseWpSiteHealthTest)]
+    #[get(url = "/tests/authorization-header", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     AuthorizationHeader,
+}
+
+impl DerivedRequest for WpSiteHealthTestsRequest {
+    fn namespace() -> Namespace {
+        Namespace::WpSiteHealthV1
+    }
 }
 
 #[cfg(test)]

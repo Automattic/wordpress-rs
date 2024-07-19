@@ -5,14 +5,12 @@ use wp_api::application_passwords::{
 };
 use wp_api::WpRestErrorCode;
 
-use crate::integration_test_common::{
+use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
     FIRST_USER_ID, SECOND_USER_ID, TEST_CREDENTIALS_ADMIN_PASSWORD_UUID,
 };
 
-pub mod integration_test_common;
 pub mod reusable_test_cases;
-pub mod wp_db;
 
 #[rstest]
 #[tokio::test]

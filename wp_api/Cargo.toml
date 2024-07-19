@@ -3,20 +3,23 @@ name = "wp_api"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+integration-tests = []
+
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_api"
 
 [dependencies]
-async-trait = "0.1"
+async-trait = { workspace = true }
 base64 = { workspace = true }
-futures = "0.3"
+futures = { workspace = true }
 http = { workspace = true }
-indoc = "2.0"
+indoc = { workspace = true }
 url = { workspace = true }
-parse_link_header = "0.3"
-paste = "1.0"
-serde = { workspace = true }
+parse_link_header = { workspace = true }
+paste = { workspace = true }
+serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
@@ -24,15 +27,8 @@ wp_contextual = { path = "../wp_contextual" }
 wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }
 
 [dev-dependencies]
-chrono = { version = "0.4" }
-futures = "0.3"
-reqwest = "0.12"
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
-serde_json = { workspace = true }
-serial_test = "3.1"
-sqlx = { version = "0.7", features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
-tokio = { version = "1.37", features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }
