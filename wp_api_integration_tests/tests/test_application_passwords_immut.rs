@@ -3,9 +3,8 @@ use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::application_passwords::{
     ApplicationPasswordUuid, SparseApplicationPasswordFieldWithEditContext,
-    SparseApplicationPasswordWithEditContext,
+    SparseApplicationPasswordFieldWithEmbedContext, SparseApplicationPasswordFieldWithViewContext,
 };
-use wp_api::generate_sparse_application_password_field_with_edit_context_test_cases;
 use wp_api::users::UserId;
 use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
@@ -13,70 +12,6 @@ use wp_api_integration_tests::{
 };
 
 pub mod reusable_test_cases;
-
-generate_sparse_application_password_field_with_edit_context_test_cases!();
-
-#[apply(sparse_application_password_field_with_edit_context_test_cases)]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
-#[tokio::test]
-#[parallel]
-async fn filter_list_application_passwords_with_edit_context(
-    #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
-    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
-) {
-    if should_skip_filter_with_edit_context_test(fields) {
-        return;
-    }
-    api_client()
-        .application_passwords()
-        .filter_list_with_edit_context(&user_id, fields)
-        .await
-        .assert_response()
-        .iter()
-        .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
-}
-
-#[apply(sparse_application_password_field_with_edit_context_test_cases)]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
-#[tokio::test]
-#[parallel]
-async fn filter_retrieve_application_password_with_edit_context(
-    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
-) {
-    if should_skip_filter_with_edit_context_test(fields) {
-        return;
-    }
-    let p: SparseApplicationPasswordWithEditContext = api_client()
-        .application_passwords()
-        .filter_retrieve_with_edit_context(
-            &FIRST_USER_ID,
-            &ApplicationPasswordUuid {
-                uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
-            },
-            fields,
-        )
-        .await
-        .assert_response();
-    p.assert_that_instance_fields_nullability_match_provided_fields(fields);
-}
-
-#[apply(sparse_application_password_field_with_edit_context_test_cases)]
-#[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
-#[tokio::test]
-#[parallel]
-async fn filter_retrieve_current_application_password_with_edit_context(
-    #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
-) {
-    if should_skip_filter_with_edit_context_test(fields) {
-        return;
-    }
-    let p = api_client()
-        .application_passwords()
-        .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
-        .await
-        .assert_response();
-    p.assert_that_instance_fields_nullability_match_provided_fields(fields);
-}
 
 #[rstest]
 #[tokio::test]
@@ -220,15 +155,190 @@ async fn retrieve_application_passwords_with_view_context() {
     assert_eq!(a.uuid, uuid);
 }
 
-fn should_skip_filter_with_edit_context_test(
-    fields: &[SparseApplicationPasswordFieldWithEditContext],
-) -> bool {
-    if fields.contains(&SparseApplicationPasswordFieldWithEditContext::Password) {
-        println!(
+mod filter {
+    use super::*;
+    use wp_api::{
+        generate_sparse_application_password_field_with_edit_context_test_cases,
+        generate_sparse_application_password_field_with_embed_context_test_cases,
+        generate_sparse_application_password_field_with_view_context_test_cases,
+    };
+
+    generate_sparse_application_password_field_with_edit_context_test_cases!();
+    generate_sparse_application_password_field_with_embed_context_test_cases!();
+    generate_sparse_application_password_field_with_view_context_test_cases!();
+
+    #[apply(sparse_application_password_field_with_edit_context_test_cases)]
+    #[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_list_application_passwords_with_edit_context(
+        #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
+        #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
+    ) {
+        if should_skip_filter_with_edit_context_test(fields) {
+            return;
+        }
+        api_client()
+            .application_passwords()
+            .filter_list_with_edit_context(&user_id, fields)
+            .await
+            .assert_response()
+            .iter()
+            .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
+    }
+
+    #[apply(sparse_application_password_field_with_edit_context_test_cases)]
+    #[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_application_password_with_edit_context(
+        #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
+    ) {
+        if should_skip_filter_with_edit_context_test(fields) {
+            return;
+        }
+        let p = api_client()
+            .application_passwords()
+            .filter_retrieve_with_edit_context(
+                &FIRST_USER_ID,
+                &ApplicationPasswordUuid {
+                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                },
+                fields,
+            )
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_application_password_field_with_edit_context_test_cases)]
+    #[case(&[SparseApplicationPasswordFieldWithEditContext::Uuid, SparseApplicationPasswordFieldWithEditContext::Name])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_current_application_password_with_edit_context(
+        #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
+    ) {
+        if should_skip_filter_with_edit_context_test(fields) {
+            return;
+        }
+        let p = api_client()
+            .application_passwords()
+            .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_application_password_field_with_embed_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_list_application_passwords_with_embed_context(
+        #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
+        #[case] fields: &[SparseApplicationPasswordFieldWithEmbedContext],
+    ) {
+        api_client()
+            .application_passwords()
+            .filter_list_with_embed_context(&user_id, fields)
+            .await
+            .assert_response()
+            .iter()
+            .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
+    }
+
+    #[apply(sparse_application_password_field_with_embed_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_application_password_with_embed_context(
+        #[case] fields: &[SparseApplicationPasswordFieldWithEmbedContext],
+    ) {
+        let p = api_client()
+            .application_passwords()
+            .filter_retrieve_with_embed_context(
+                &FIRST_USER_ID,
+                &ApplicationPasswordUuid {
+                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                },
+                fields,
+            )
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_application_password_field_with_embed_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_current_application_password_with_embed_context(
+        #[case] fields: &[SparseApplicationPasswordFieldWithEmbedContext],
+    ) {
+        let p = api_client()
+            .application_passwords()
+            .filter_retrieve_current_with_embed_context(&FIRST_USER_ID, fields)
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_application_password_field_with_view_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_list_application_passwords_with_view_context(
+        #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
+        #[case] fields: &[SparseApplicationPasswordFieldWithViewContext],
+    ) {
+        api_client()
+            .application_passwords()
+            .filter_list_with_view_context(&user_id, fields)
+            .await
+            .assert_response()
+            .iter()
+            .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
+    }
+
+    #[apply(sparse_application_password_field_with_view_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_application_password_with_view_context(
+        #[case] fields: &[SparseApplicationPasswordFieldWithViewContext],
+    ) {
+        let p = api_client()
+            .application_passwords()
+            .filter_retrieve_with_view_context(
+                &FIRST_USER_ID,
+                &ApplicationPasswordUuid {
+                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                },
+                fields,
+            )
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_application_password_field_with_view_context_test_cases)]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_current_application_password_with_view_context(
+        #[case] fields: &[SparseApplicationPasswordFieldWithViewContext],
+    ) {
+        let p = api_client()
+            .application_passwords()
+            .filter_retrieve_current_with_view_context(&FIRST_USER_ID, fields)
+            .await
+            .assert_response();
+        p.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    fn should_skip_filter_with_edit_context_test(
+        fields: &[SparseApplicationPasswordFieldWithEditContext],
+    ) -> bool {
+        if fields.contains(&SparseApplicationPasswordFieldWithEditContext::Password) {
+            println!(
             "Requesting password field returns invalid JSON as this field is only available after creating a new application token. Skipping this test..."
         );
-        true
-    } else {
-        false
+            true
+        } else {
+            false
+        }
     }
 }
