@@ -11,9 +11,8 @@ use wp_api::{
     WpApiParamOrder,
 };
 
-use crate::integration_test_common::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
 
-pub mod integration_test_common;
 pub mod reusable_test_cases;
 
 generate_sparse_user_field_with_edit_context_test_cases!();

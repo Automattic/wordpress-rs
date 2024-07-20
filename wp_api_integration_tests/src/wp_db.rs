@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use futures::Future;
+use sqlx::types::chrono;
 use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
 
 pub async fn run_and_restore<F, Fut>(f: F)
