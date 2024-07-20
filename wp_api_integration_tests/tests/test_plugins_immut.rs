@@ -2,11 +2,8 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::{
-    generate,
-    plugins::{
-        PluginListParams, PluginSlug, PluginStatus, SparsePluginFieldWithEditContext,
-        SparsePluginWithEditContext,
-    },
+    generate, generate_sparse_plugin_field_with_edit_context_test_cases,
+    plugins::{PluginListParams, PluginSlug, PluginStatus, SparsePluginFieldWithEditContext},
     WpContext,
 };
 
@@ -14,10 +11,14 @@ use wp_api_integration_tests::{
     api_client, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
 };
 
-#[apply(filter_fields_cases_with_edit_context)]
+generate_sparse_plugin_field_with_edit_context_test_cases!();
+
+#[apply(sparse_plugin_field_with_edit_context_test_cases)]
+#[case(&[SparsePluginFieldWithEditContext::Author, SparsePluginFieldWithEditContext::Plugin])]
+#[case(&[SparsePluginFieldWithEditContext::Status, SparsePluginFieldWithEditContext::Version])]
 #[tokio::test]
 #[parallel]
-async fn filter_plugins(
+async fn filter_plugins_with_edit_context(
     #[case] fields: &[SparsePluginFieldWithEditContext],
     #[values(
         PluginListParams::default(),
@@ -32,22 +33,26 @@ async fn filter_plugins(
         .await
         .assert_response()
         .iter()
-        .for_each(|plugin| validate_sparse_plugin_fields(plugin, fields));
+        .for_each(|plugin| {
+            plugin.assert_that_instance_fields_nullability_match_provided_fields(fields)
+        });
 }
 
-#[apply(filter_fields_cases_with_edit_context)]
+#[apply(sparse_plugin_field_with_edit_context_test_cases)]
+#[case(&[SparsePluginFieldWithEditContext::Author, SparsePluginFieldWithEditContext::Plugin])]
+#[case(&[SparsePluginFieldWithEditContext::Status, SparsePluginFieldWithEditContext::Version])]
 #[tokio::test]
 #[parallel]
-async fn filter_retrieve_plugin(
+async fn filter_retrieve_plugin_with_edit_context(
     #[case] fields: &[SparsePluginFieldWithEditContext],
     #[values(CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG)] slug: &str,
 ) {
-    let response = api_client()
+    let plugin = api_client()
         .plugins()
         .filter_retrieve_with_edit_context(&slug.into(), fields)
         .await
         .assert_response();
-    validate_sparse_plugin_fields(&response, fields);
+    plugin.assert_that_instance_fields_nullability_match_provided_fields(fields);
 }
 
 #[rstest]
@@ -130,77 +135,3 @@ async fn retrieve_plugin(
         }
     };
 }
-
-fn validate_sparse_plugin_fields(
-    plugin: &SparsePluginWithEditContext,
-    fields: &[SparsePluginFieldWithEditContext],
-) {
-    let field_included = |field| {
-        // If "fields" is empty the server will return all fields
-        fields.is_empty() || fields.contains(&field)
-    };
-    assert_eq!(
-        plugin.author.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Author)
-    );
-
-    assert_eq!(
-        plugin.author.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Author)
-    );
-    assert_eq!(
-        plugin.description.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Description)
-    );
-    assert_eq!(
-        plugin.name.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Name)
-    );
-    assert_eq!(
-        plugin.network_only.is_some(),
-        field_included(SparsePluginFieldWithEditContext::NetworkOnly)
-    );
-    assert_eq!(
-        plugin.plugin.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Plugin)
-    );
-    assert_eq!(
-        plugin.plugin_uri.is_some(),
-        field_included(SparsePluginFieldWithEditContext::PluginUri)
-    );
-    assert_eq!(
-        plugin.requires_php.is_some(),
-        field_included(SparsePluginFieldWithEditContext::RequiresPhp)
-    );
-    assert_eq!(
-        plugin.status.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Status)
-    );
-    assert_eq!(
-        plugin.textdomain.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Textdomain)
-    );
-    assert_eq!(
-        plugin.version.is_some(),
-        field_included(SparsePluginFieldWithEditContext::Version)
-    );
-}
-
-#[template]
-#[rstest]
-#[case(&[])]
-#[case(&[SparsePluginFieldWithEditContext::Author])]
-#[case(&[SparsePluginFieldWithEditContext::AuthorUri])]
-#[case(&[SparsePluginFieldWithEditContext::Description])]
-#[case(&[SparsePluginFieldWithEditContext::Name])]
-#[case(&[SparsePluginFieldWithEditContext::NetworkOnly])]
-#[case(&[SparsePluginFieldWithEditContext::Plugin])]
-#[case(&[SparsePluginFieldWithEditContext::PluginUri])]
-#[case(&[SparsePluginFieldWithEditContext::RequiresWp])]
-#[case(&[SparsePluginFieldWithEditContext::RequiresPhp])]
-#[case(&[SparsePluginFieldWithEditContext::Status])]
-#[case(&[SparsePluginFieldWithEditContext::Textdomain])]
-#[case(&[SparsePluginFieldWithEditContext::Version])]
-#[case(&[SparsePluginFieldWithEditContext::Author, SparsePluginFieldWithEditContext::Plugin])]
-#[case(&[SparsePluginFieldWithEditContext::Status, SparsePluginFieldWithEditContext::Version])]
-fn filter_fields_cases_with_edit_context(#[case] fields: &[SparsePluginFieldWithEditContext]) {}
