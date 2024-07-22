@@ -43,9 +43,9 @@ This project has several test suites. Integration tests require Docker, and you 
 
 | Test Suite                       | Run on local machine.                 | Run in Docker                     |
 | -------------------------------- | ---------------------------------     | ---------------                   |
-| Rust Unit Tests                  | `cargo test --lib -- --nocapture`     | `make test-rust-lib`              |
-| Rust Documentation Tests         | `cargo test --doc -- --nocapture`     | `make test-rust-doc`              |
-| Rust Integration Tests           | `cargo test`                          | Coming soon                       |
-| Kotlin Integration Tests         | `cd native/kotlin && ./gradlew test`  | Coming soon                       |
+| Rust Unit Tests                  | `cargo test --lib`                    | `make test-rust-lib`              |
+| Rust Documentation Tests         | `cargo test --doc`                    | `make test-rust-doc`              |
+| Rust Integration Tests           | `cargo test --test '*'`               | Coming soon                       |
+| Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest`  | Coming soon                       |
 | Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
 
