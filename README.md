@@ -10,19 +10,19 @@ Given the multi-platform nature of this project, the development environment wil
 
 ### Kotlin
 
-| Dependency                                             | Platform |
-| ------------------------------------------------------ | -------- |
-| [Gradle](https://gradle.org/install/)                  | Core     |
-| [Android SDK](https://developer.android.com/tools)     | Android  |
-| [Docker](https://www.docker.com/) (recommended) or JVM | Server   |
+| Dependency                                                | Platform         |
+| --------------------------------------------------------- | ---------------- |
+| [Gradle](https://gradle.org/install/)                     | Core             |
+| [Android SDK](https://developer.android.com/tools)        | Android          |
+| [Docker](https://www.docker.com/) (for integration tests) | Core + Android   |
 
 ### Swift
 
-| Dependency                                              | Platform        |
-| ------------------------------------------------------- | --------------- |
-| [Swift toolchain](https://www.swift.org/install/macos/) | Core            |
-| [Xcode](https://developer.apple.com/xcode/)             | Apple Platforms |
-| [Docker](https://www.docker.com/)                       | Server          |
+| Dependency                                                                       | Platform        |
+| -------------------------------------------------------------------------------- | --------------- |
+| [Swift toolchain](https://www.swift.org/install/macos/)                          | Core            |
+| [Xcode](https://developer.apple.com/xcode/)                                      | Apple Platforms |
+| [Docker](https://www.docker.com/)  (for integration tests and server-side Swift) | Core + Server   |
 
 - **Core:** Required for all platforms.
 - **Android:** Required for Android development.
