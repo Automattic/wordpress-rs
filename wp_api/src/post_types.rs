@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum PostType {
     Post,
     Page,
@@ -15,6 +15,7 @@ pub enum PostType {
     WpNavigation,
     WpFontFamily,
     WpFontFace,
+    Custom { name: String },
 }
 
 impl Display for PostType {
@@ -30,6 +31,7 @@ impl Display for PostType {
             Self::WpNavigation => "wp_navigation",
             Self::WpFontFamily => "wp_font_family",
             Self::WpFontFace => "wp_font_face",
+            Self::Custom { name } => name.as_str(),
         };
         write!(f, "{}", s)
     }

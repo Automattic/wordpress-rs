@@ -38,3 +38,16 @@ async fn retrieve_post_types_err_forbidden_context(
         .await
         .assert_wp_error(WpRestErrorCode::ForbiddenContext);
 }
+
+#[rstest]
+#[tokio::test]
+#[parallel]
+async fn retrieve_post_types_err_type_invalid() {
+    api_client_as_subscriber()
+        .post_types()
+        .retrieve_with_edit_context(&PostType::Custom {
+            name: "doesnt_exist".to_string(),
+        })
+        .await
+        .assert_wp_error(WpRestErrorCode::TypeInvalid);
+}

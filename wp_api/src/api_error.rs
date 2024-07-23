@@ -107,6 +107,8 @@ pub enum WpRestErrorCode {
     InvalidParam,
     #[serde(rename = "rest_plugin_not_found")]
     PluginNotFound,
+    #[serde(rename = "rest_type_invalid")]
+    TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
     #[serde(rename = "rest_user_cannot_delete")]

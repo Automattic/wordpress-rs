@@ -145,6 +145,7 @@ fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) ->
         WpRestErrorCode::NetworkOnlyPlugin => &[400],
         WpRestErrorCode::NoAuthenticatedAppPassword => &[401],
         WpRestErrorCode::PluginNotFound => &[404],
+        WpRestErrorCode::TypeInvalid => &[404],
         WpRestErrorCode::InvalidParam => &[400],
         WpRestErrorCode::TrashNotSupported => &[501],
         WpRestErrorCode::Unauthorized => &[401],
