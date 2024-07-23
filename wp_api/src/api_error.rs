@@ -134,6 +134,8 @@ pub enum WpRestErrorCode {
     ApplicationPasswordsDisabledForUser,
     #[serde(rename = "rest_cannot_manage_application_passwords")]
     CannotManageApplicationPasswords,
+    #[serde(rename = "rest_cannot_read_type")]
+    CannotReadType,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
     // ---

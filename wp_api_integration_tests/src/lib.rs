@@ -136,6 +136,7 @@ fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) ->
         WpRestErrorCode::CannotManageNetworkPlugins => &[403],
         WpRestErrorCode::CannotManagePlugins => &[403],
         WpRestErrorCode::CannotReadApplicationPassword => &[403],
+        WpRestErrorCode::CannotReadType => REST_AUTHORIZATION_REQUIRED_CODE,
         WpRestErrorCode::CannotView => REST_AUTHORIZATION_REQUIRED_CODE,
         WpRestErrorCode::CannotViewPlugin => &[403],
         WpRestErrorCode::CannotViewPlugins => &[403],

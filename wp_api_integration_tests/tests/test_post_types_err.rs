@@ -1,7 +1,7 @@
 use rstest::*;
 use serial_test::parallel;
 use wp_api::{post_types::PostType, WpRestErrorCode};
-use wp_api_integration_tests::{api_client_as_subscriber, AssertWpError};
+use wp_api_integration_tests::{api_client, api_client_as_subscriber, AssertWpError};
 
 #[rstest]
 #[tokio::test]
@@ -50,4 +50,17 @@ async fn retrieve_post_types_err_type_invalid() {
         })
         .await
         .assert_wp_error(WpRestErrorCode::TypeInvalid);
+}
+
+#[rstest]
+#[tokio::test]
+#[parallel]
+async fn retrieve_post_types_err_cannot_read_type() {
+    api_client()
+        .post_types()
+        .retrieve_with_edit_context(&PostType::Custom {
+            name: "oembed_cache".to_string(),
+        })
+        .await
+        .assert_wp_error(WpRestErrorCode::CannotReadType);
 }
