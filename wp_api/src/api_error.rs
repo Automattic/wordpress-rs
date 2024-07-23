@@ -91,6 +91,8 @@ pub enum WpRestErrorCode {
     CannotManagePlugins,
     #[serde(rename = "rest_cannot_read_application_password")]
     CannotReadApplicationPassword,
+    #[serde(rename = "rest_cannot_view")]
+    CannotView,
     #[serde(rename = "rest_cannot_view_plugin")]
     CannotViewPlugin,
     #[serde(rename = "rest_cannot_view_plugins")]
