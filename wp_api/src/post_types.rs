@@ -175,7 +175,7 @@ pub enum PostTypeSupports {
     Title,
     Trackbacks,
     #[serde(untagged)]
-    Other(String),
+    Custom(String),
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
