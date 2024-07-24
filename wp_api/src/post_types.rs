@@ -15,7 +15,7 @@ pub enum PostType {
     WpNavigation,
     WpFontFamily,
     WpFontFace,
-    Custom { name: String },
+    Custom(String),
 }
 
 impl Display for PostType {
@@ -31,7 +31,7 @@ impl Display for PostType {
             Self::WpNavigation => "wp_navigation",
             Self::WpFontFamily => "wp_font_family",
             Self::WpFontFace => "wp_font_face",
-            Self::Custom { name } => name.as_str(),
+            Self::Custom(name) => name.as_str(),
         };
         write!(f, "{}", s)
     }
@@ -153,6 +153,8 @@ pub enum PostTypeCapabilities {
     Read,
     ReadPost,
     ReadPrivatePosts,
+    #[serde(untagged)]
+    Custom(String),
 }
 
 #[derive(

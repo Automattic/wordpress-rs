@@ -3,10 +3,12 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.PostType
+import uniffi.wp_api.PostTypeCapabilities
 import uniffi.wp_api.PostTypeSupports
+import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class PostTypesEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
@@ -28,22 +30,30 @@ class PostTypesEndpointTest {
     @Test
     fun testPostTypesRetrievePost() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.postTypes().retrieveWithEditContext(PostType.POST)
+            requestBuilder.postTypes().retrieveWithEditContext(PostType.Post)
         }
         assert(result is WpRequestSuccess)
         val postTypesPost = (result as WpRequestSuccess).data
-        assertTrue {
-            postTypesPost.supports[PostTypeSupports.Title]!!
-        }
+        assert(postTypesPost.supports[PostTypeSupports.Title]!!)
+        assertFalse(postTypesPost.capabilities[PostTypeCapabilities.EditPosts]!!.isEmpty())
     }
 
     @Test
     fun testPostTypesWpFontFaceDoesNotSupportAuthor() = runTest {
         val result = client.request { requestBuilder ->
-            requestBuilder.postTypes().retrieveWithEditContext(PostType.WP_FONT_FACE)
+            requestBuilder.postTypes().retrieveWithEditContext(PostType.WpFontFace)
         }
         assert(result is WpRequestSuccess)
         val postTypesPost = (result as WpRequestSuccess).data
         assertNull(postTypesPost.supports[PostTypeSupports.Author])
+    }
+
+    @Test
+    fun testPostTypesErrTypeInvalid() = runTest {
+        val result = client.request { requestBuilder ->
+            requestBuilder.postTypes().retrieveWithEditContext(PostType.Custom("does_not_exist"))
+        }
+        assert(result is RecognizedRestError)
+        assert((result as RecognizedRestError).error.code is WpRestErrorCode.TypeInvalid)
     }
 }

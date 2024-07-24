@@ -45,9 +45,7 @@ async fn retrieve_post_types_err_forbidden_context(
 async fn retrieve_post_types_err_type_invalid() {
     api_client_as_subscriber()
         .post_types()
-        .retrieve_with_edit_context(&PostType::Custom {
-            name: "doesnt_exist".to_string(),
-        })
+        .retrieve_with_edit_context(&PostType::Custom("does_not_exist".to_string()))
         .await
         .assert_wp_error(WpRestErrorCode::TypeInvalid);
 }
@@ -58,9 +56,7 @@ async fn retrieve_post_types_err_type_invalid() {
 async fn retrieve_post_types_err_cannot_read_type() {
     api_client()
         .post_types()
-        .retrieve_with_edit_context(&PostType::Custom {
-            name: "oembed_cache".to_string(),
-        })
+        .retrieve_with_edit_context(&PostType::Custom("oembed_cache".to_string()))
         .await
         .assert_wp_error(WpRestErrorCode::CannotReadType);
 }
