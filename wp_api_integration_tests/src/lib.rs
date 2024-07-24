@@ -20,6 +20,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
+pub const FIRST_USER_EMAIL: &str = "test@example.com";
 pub const SECOND_USER_ID: UserId = UserId(2);
 pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 pub const SECOND_USER_SLUG: &str = "themedemos";
