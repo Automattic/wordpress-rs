@@ -2,7 +2,7 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::post_types::{
-    PostType, PostTypeSupports, SparsePostTypeDetailsFieldWithEditContext,
+    PostType, PostTypeCapabilities, PostTypeSupports, SparsePostTypeDetailsFieldWithEditContext,
     SparsePostTypeDetailsFieldWithEmbedContext, SparsePostTypeDetailsFieldWithViewContext,
 };
 
@@ -65,15 +65,26 @@ async fn retrieve_post_types_with_edit_context(
         .await
         .assert_response();
     // All post types in our current testing sites support `Title`, so we use this assertion
-    // to verify that we are able to parse it properly.
+    // to verify that we are able to parse `supports` field properly.
     //
-    // It's entirely possible that we might have more test sites in the future and some of their
+    // It's possible that we might have more test sites in the future and some of their
     // post types might not support `Title` in which case it's perfectly fine to completely
     // remove this assertion.
     assert_eq!(
         post_type.supports.get(&PostTypeSupports::Title),
         Some(true).as_ref()
     );
+    // All post types in our current testing sites have `EditPost` capability, so we use this
+    // assertion to verify that we are able to parse `capabilities` field properly.
+    //
+    // It's possible that we might have more test sites in the future and some of their
+    // post types might not support `EditPost` capability in which case it's perfectly fine
+    // to completely remove this assertion.
+    assert!(!post_type
+        .capabilities
+        .get(&PostTypeCapabilities::EditPost)
+        .unwrap()
+        .is_empty());
 }
 
 #[rstest]

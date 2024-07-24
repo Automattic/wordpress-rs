@@ -64,7 +64,7 @@ pub struct SparseListPostTypesResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostTypeDetails {
     #[WpContext(edit)]
-    pub capabilities: Option<PostCapabilities>,
+    pub capabilities: Option<HashMap<PostTypeCapabilities, String>>,
     #[WpContext(edit, view)]
     pub description: Option<String>,
     #[WpContext(edit, view)]
@@ -92,25 +92,6 @@ pub struct SparsePostTypeDetails {
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
     pub icon: Option<String>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
-pub struct PostCapabilities {
-    pub edit_post: String,
-    pub read_post: String,
-    pub delete_post: String,
-    pub edit_posts: String,
-    pub edit_others_posts: String,
-    pub delete_posts: String,
-    pub publish_posts: String,
-    pub read_private_posts: String,
-    pub read: String,
-    pub delete_private_posts: String,
-    pub delete_published_posts: String,
-    pub delete_others_posts: String,
-    pub edit_private_posts: String,
-    pub edit_published_posts: String,
-    pub create_posts: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
@@ -150,6 +131,28 @@ pub struct PostTypeLabels {
     pub item_link_description: String,
     pub menu_name: String,
     pub name_admin_bar: String,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum PostTypeCapabilities {
+    CreatePosts,
+    DeleteOthersPosts,
+    DeletePost,
+    DeletePosts,
+    DeletePrivatePosts,
+    DeletePublishedPosts,
+    EditOthersPosts,
+    EditPost,
+    EditPosts,
+    EditPrivatePosts,
+    EditPublishedPosts,
+    PublishPosts,
+    Read,
+    ReadPost,
+    ReadPrivatePosts,
 }
 
 #[derive(
