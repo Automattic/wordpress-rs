@@ -39,6 +39,7 @@ generate_tests!(loopback_requests);
 generate_tests!(https_status);
 generate_tests!(dotorg_communication);
 generate_tests!(authorization_header);
+generate_tests!(page_cache);
 
 fn validate_sparse_wp_site_health_tests_fields(
     wp_site_health_test: &SparseWpSiteHealthTest,

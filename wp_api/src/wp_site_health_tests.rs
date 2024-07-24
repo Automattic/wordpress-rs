@@ -50,3 +50,61 @@ impl SparseField for SparseWpSiteHealthTestField {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SparseWpSiteHealthDirectorySizes {
+    pub database_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub fonts_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub plugins_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub themes_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub total_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub uploads_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub wordpress_size: Option<WpSiteHealthDirectorySizeInfo>,
+    pub raw: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct WpSiteHealthDirectorySizes {
+    pub database_size: WpSiteHealthDirectorySizeInfo,
+    pub fonts_size: WpSiteHealthDirectorySizeInfo,
+    pub plugins_size: WpSiteHealthDirectorySizeInfo,
+    pub themes_size: WpSiteHealthDirectorySizeInfo,
+    pub total_size: WpSiteHealthDirectorySizeInfo,
+    pub uploads_size: WpSiteHealthDirectorySizeInfo,
+    pub wordpress_size: WpSiteHealthDirectorySizeInfo,
+    pub raw: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct WpSiteHealthDirectorySizeInfo {
+    pub debug: String,
+    pub size: String,
+    pub raw: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SparseWpSiteHealthDirectorySizesField {
+    DatabaseSize,
+    FontsSize,
+    PluginsSize,
+    ThemesSize,
+    TotalSize,
+    UploadsSize,
+    WordpressSize,
+    Raw,
+}
+
+impl SparseField for SparseWpSiteHealthDirectorySizesField {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::DatabaseSize => "database_size",
+            Self::FontsSize => "fonts_size",
+            Self::PluginsSize => "plugins_size",
+            Self::ThemesSize => "themes_size",
+            Self::TotalSize => "total_size",
+            Self::UploadsSize => "uploads_size",
+            Self::WordpressSize => "wordpress_size",
+            Self::Raw => "raw",
+        }
+    }
+}
