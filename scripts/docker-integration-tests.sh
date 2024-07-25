@@ -15,4 +15,4 @@ fi
 cp -R /app/.wordpress/wp-content/plugins /app/.wordpress/wp-content/plugins-backup
 
 ## Run the integration tests
-cargo test
+cargo test --no-fail-fast

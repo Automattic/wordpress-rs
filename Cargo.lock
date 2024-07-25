@@ -3337,6 +3337,7 @@ dependencies = [
  "serial_test",
  "sqlx",
  "tokio",
+ "uu_cp",
  "wp_api",
 ]
 

@@ -16,4 +16,4 @@ export API_URL=http://localhost
 cp -R .wordpress/wp-content/plugins .wordpress/wp-content/plugins-backup
 
 ## Run the integration tests
-cargo test -p wp_api --test '*' -- --test-threads 1
+cargo test --no-fail-fast
