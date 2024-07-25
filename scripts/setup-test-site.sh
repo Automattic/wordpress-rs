@@ -8,7 +8,8 @@ set -e
 # for each WordPress version – if there are issues with DB migrations, different default themes
 # available, etc we don't want to have to deal with them.
 
-curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar --output /usr/bin/wp
+# Install wp-cli
+curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.phar --output /usr/bin/wp
 chmod +x /usr/bin/wp
 
 # Install `mysqlcheck` – needed for `wp db check`
@@ -21,9 +22,6 @@ chown -R www-data:www-data /var/www/.wp-cli/
 # Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
 # be any weird permissions issues)
 su -s /bin/bash www-data
-
-## Download WordPress
-wp core download --force
 
 ## Wait for the DB to be ready before attempting install – Docker can do this for us, but we get way better
 ## diagnostic information from `wp db check`, whereas if `wp core install` fails it won't tell us about issues
@@ -50,6 +48,10 @@ while true; do
 	tries=$(( $tries + 1 ))
 done
 
+echo "--- :wordpress: Setting up WordPress"
+wp core version --extra
+wp --info
+
 ## Install WordPress
 wp core install \
 	--url=localhost \
@@ -61,6 +63,11 @@ wp core install \
 
 ## Ensure URLs work as expected
 wp rewrite structure '/%year%/%monthnum%/%postname%/'
+
+## Work around https://core.trac.wordpress.org/ticket/61638
+mkdir -p wp-content/uploads/fonts
+
+echo "--- :card_file_box: Importing Data"
 
 ## Download the sample data (https://codex.wordpress.org/Theme_Unit_Test)
 curl https://raw.githubusercontent.com/WPTT/theme-unit-test/master/themeunittestdata.wordpress.xml -C - -o /tmp/testdata.xml
@@ -75,7 +82,7 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-
+touch /tmp/test_credentials
 {
   printf "http://localhost\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite

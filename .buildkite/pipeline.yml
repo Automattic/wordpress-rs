@@ -179,15 +179,17 @@ steps:
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix:
-          - '6.4'
-          - '6.3'
-          - '6.2'
-          - '6.1'
-          - '6.0'
-          - '5.9'
-          - '5.8'
-          - '5.7'
           - '5.6' # First version to introduce appliation passwords
+          - '5.7'
+          - '5.8'
+          - '5.9'
+          - '6.0'
+          - '6.1'
+          - '6.2'
+          - '6.3'
+          - '6.4'
+          - '6.5'
+          - '6.6'
 
   - label: ":rocket: Publish release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
