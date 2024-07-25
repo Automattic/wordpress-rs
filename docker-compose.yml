@@ -14,6 +14,9 @@ services:
             WORDPRESS_CONFIG_EXTRA: |
                 # Allow application passwords to be used without HTTPS
                 define( 'WP_ENVIRONMENT_TYPE', 'local' );
+
+                # Disable auto-update – it makes Dockerized tests super unstable
+                define( 'WP_AUTO_UPDATE_CORE', false );
         healthcheck:
             test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
             interval: 4s
