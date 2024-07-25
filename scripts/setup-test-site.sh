@@ -98,3 +98,8 @@ rm -rf /tmp/test_credentials && touch /tmp/test_credentials
 ## Used for integration tests
 wp plugin install hello-dolly --activate
 wp plugin install classic-editor
+
+cp -R wp-content/plugins wp-content/plugins-backup
+
+wp db export --add-drop-table wp-content/dump.sql
+
