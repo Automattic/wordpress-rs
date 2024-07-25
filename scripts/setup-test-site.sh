@@ -13,7 +13,8 @@ curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.p
 chmod +x /usr/bin/wp
 
 # Install `mysqlcheck` – needed for `wp db check`
-apt update && apt install -y default-mysql-client
+# Install `less` - needed for `wp_cli`
+apt update && apt install -y default-mysql-client less
 
 # Create wpcli working directory (it can't be created by the `www-data` user`)
 mkdir -p /var/www/.wp-cli
