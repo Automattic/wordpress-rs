@@ -207,15 +207,13 @@ test-rust-integration-local:
 
 test-server: stop-server
 	@# Help: Start the test server.
-
-
 	rm -rf .wordpress
 	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 
 	docker-compose up -d
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server: delete-wp-plugins-backup
+stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
 

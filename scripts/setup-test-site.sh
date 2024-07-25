@@ -83,7 +83,7 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-touch /tmp/test_credentials
+rm -rf /tmp/test_credentials && touch /tmp/test_credentials
 {
   printf "http://host.docker.internal\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
