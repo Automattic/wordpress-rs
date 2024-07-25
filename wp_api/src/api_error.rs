@@ -91,6 +91,8 @@ pub enum WpRestErrorCode {
     CannotManagePlugins,
     #[serde(rename = "rest_cannot_read_application_password")]
     CannotReadApplicationPassword,
+    #[serde(rename = "rest_cannot_view")]
+    CannotView,
     #[serde(rename = "rest_cannot_view_plugin")]
     CannotViewPlugin,
     #[serde(rename = "rest_cannot_view_plugins")]
@@ -105,6 +107,8 @@ pub enum WpRestErrorCode {
     InvalidParam,
     #[serde(rename = "rest_plugin_not_found")]
     PluginNotFound,
+    #[serde(rename = "rest_type_invalid")]
+    TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
     #[serde(rename = "rest_user_cannot_delete")]
@@ -130,6 +134,8 @@ pub enum WpRestErrorCode {
     ApplicationPasswordsDisabledForUser,
     #[serde(rename = "rest_cannot_manage_application_passwords")]
     CannotManageApplicationPasswords,
+    #[serde(rename = "rest_cannot_read_type")]
+    CannotReadType,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
     // ---

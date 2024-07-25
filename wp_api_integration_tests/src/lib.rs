@@ -10,6 +10,9 @@ use wp_api::{
     WpRestErrorCode, WpRestErrorWrapper,
 };
 
+// Source implementation: `is_user_logged_in() ? 403 : 401`
+const REST_AUTHORIZATION_REQUIRED_CODE: &[u16] = &[401, 403];
+
 // `pub` to avoid 'unused' & 'dead_code' warnings
 pub mod wp_db;
 
@@ -121,16 +124,20 @@ fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) ->
         WpRestErrorCode::CannotDeleteActivePlugin => &[400],
         WpRestErrorCode::CannotDeleteApplicationPassword => &[403],
         WpRestErrorCode::CannotDeleteApplicationPasswords => &[403],
-        WpRestErrorCode::CannotManageApplicationPasswords => &[401, 403],
+        WpRestErrorCode::CannotManageApplicationPasswords => REST_AUTHORIZATION_REQUIRED_CODE,
         WpRestErrorCode::CannotEdit => &[403],
         WpRestErrorCode::CannotEditApplicationPassword => &[403],
         WpRestErrorCode::CannotEditRoles => &[403],
-        WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser => &[401, 403],
+        WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser => {
+            REST_AUTHORIZATION_REQUIRED_CODE
+        }
         WpRestErrorCode::CannotInstallPlugin => &[403],
         WpRestErrorCode::CannotListApplicationPasswords => &[403],
         WpRestErrorCode::CannotManageNetworkPlugins => &[403],
         WpRestErrorCode::CannotManagePlugins => &[403],
         WpRestErrorCode::CannotReadApplicationPassword => &[403],
+        WpRestErrorCode::CannotReadType => REST_AUTHORIZATION_REQUIRED_CODE,
+        WpRestErrorCode::CannotView => REST_AUTHORIZATION_REQUIRED_CODE,
         WpRestErrorCode::CannotViewPlugin => &[403],
         WpRestErrorCode::CannotViewPlugins => &[403],
         WpRestErrorCode::ForbiddenContext => &[403],
@@ -139,6 +146,7 @@ fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) ->
         WpRestErrorCode::NetworkOnlyPlugin => &[400],
         WpRestErrorCode::NoAuthenticatedAppPassword => &[401],
         WpRestErrorCode::PluginNotFound => &[404],
+        WpRestErrorCode::TypeInvalid => &[404],
         WpRestErrorCode::InvalidParam => &[400],
         WpRestErrorCode::TrashNotSupported => &[501],
         WpRestErrorCode::Unauthorized => &[401],
