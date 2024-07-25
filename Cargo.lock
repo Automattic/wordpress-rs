@@ -2927,6 +2927,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "uu_cp"
+version = "0.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fb99d355ccb02e8c514e4a1d93e4aa4eedea9837de24635dfd24c165971444e"
+dependencies = [
+ "clap",
+ "filetime",
+ "indicatif",
+ "libc",
+ "quick-error",
+ "uucore",
+ "walkdir",
+ "xattr",
+]
+
+[[package]]
 name = "uucore"
 version = "0.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3314,7 +3330,7 @@ dependencies = [
  "thiserror",
  "uniffi",
  "url",
- "uu_cp",
+ "uu_cp 0.0.26",
  "wp_contextual",
  "wp_derive_request_builder",
 ]
@@ -3337,7 +3353,8 @@ dependencies = [
  "serial_test",
  "sqlx",
  "tokio",
- "uu_cp",
+ "url",
+ "uu_cp 0.0.27",
  "wp_api",
 ]
 

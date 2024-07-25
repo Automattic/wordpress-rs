@@ -33,7 +33,7 @@ where
         .await
         .expect("Failed to restore database");
 
-    return result;
+    result
 }
 
 #[derive(Debug)]

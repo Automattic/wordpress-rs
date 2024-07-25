@@ -37,16 +37,19 @@ const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
 #[case("automatticwidgets.wpcomstaging.com/ ", AUTOMATTIC_WIDGETS_AUTH_URL)]
 #[tokio::test]
 #[serial]
-async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
+async fn test_login_flow(
+    #[case] site_url: impl AsRef<str>,
+    #[case] expected_auth_url: impl AsRef<str>,
+) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
     let url_discovery = client
-        .api_discovery(site_url.to_string())
+        .api_discovery(site_url.as_ref().to_string())
         .await
         .assert_response();
     assert_eq!(
         url_discovery
             .api_details
             .find_application_passwords_authentication_url(),
-        Some(expected_auth_url.to_string())
+        Some(expected_auth_url.as_ref().to_string())
     );
 }

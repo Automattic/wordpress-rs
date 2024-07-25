@@ -14,7 +14,8 @@ serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
 wp_api = { path = "../wp_api", features = [ "integration-tests" ] }
 sqlx = { workspace = true, features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
-uu_cp = "0.0.26"
+url = { workspace = true }
+uu_cp = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
