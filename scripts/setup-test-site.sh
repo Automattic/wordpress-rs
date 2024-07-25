@@ -48,6 +48,10 @@ while true; do
 	tries=$(( $tries + 1 ))
 done
 
+echo "--- :wordpress: Setting up WordPress"
+wp core version --extra
+wp --info
+
 ## Install WordPress
 wp core install \
 	--url=localhost \
@@ -59,6 +63,11 @@ wp core install \
 
 ## Ensure URLs work as expected
 wp rewrite structure '/%year%/%monthnum%/%postname%/'
+
+## Work around https://core.trac.wordpress.org/ticket/61638
+mkdir -p wp-content/uploads/fonts
+
+echo "--- :card_file_box: Importing Data"
 
 ## Download the sample data (https://codex.wordpress.org/Theme_Unit_Test)
 curl https://raw.githubusercontent.com/WPTT/theme-unit-test/master/themeunittestdata.wordpress.xml -C - -o /tmp/testdata.xml
@@ -73,7 +82,7 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-
+touch /tmp/test_credentials
 {
   printf "http://localhost\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
