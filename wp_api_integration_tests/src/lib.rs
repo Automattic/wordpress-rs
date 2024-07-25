@@ -14,6 +14,7 @@ use wp_api::{
 const REST_AUTHORIZATION_REQUIRED_CODE: &[u16] = &[401, 403];
 
 // `pub` to avoid 'unused' & 'dead_code' warnings
+pub mod wp_cli;
 pub mod wp_db;
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
@@ -257,14 +258,4 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
         assert!(self.is_ok(), "Response was: '{:?}'", self);
         self.unwrap()
     }
-}
-
-pub fn run_wp_cli_command(args: impl AsRef<str>) -> std::process::ExitStatus {
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("run-wp-cli-command")
-        .arg(format!("ARGS={}", args.as_ref()))
-        .status()
-        .expect("Failed to run wp-cli command")
 }
