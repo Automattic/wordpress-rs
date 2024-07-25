@@ -2,7 +2,7 @@
 
 set -e
 
-export WP_CONTENT_PATH=/app/wp-content 
+export WP_CONTENT_PATH=/app/.wordpress/wp-content
 export DB_HOSTNAME=host.docker.internal 
 export API_URL=http://host.docker.internal
 

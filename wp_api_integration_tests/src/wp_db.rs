@@ -11,7 +11,7 @@ where
     let hostname = std::env::var("DB_HOSTNAME").unwrap_or("host.docker.internal".to_string());
     let wp_content_path =
         std::env::var("WP_CONTENT_PATH").unwrap_or("/app/.wordpress/wp-content".to_string());
-    let db_dump_path = wp_content_path + "/dump.sql";
+    let db_dump_path = format!("{}/dump.sql", wp_content_path);
 
     let options = MySqlConnectOptions::new()
         .host(hostname.as_str())
