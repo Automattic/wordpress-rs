@@ -8,7 +8,8 @@ set -e
 # for each WordPress version – if there are issues with DB migrations, different default themes
 # available, etc we don't want to have to deal with them.
 
-curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar --output /usr/bin/wp
+# Install wp-cli
+curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.phar --output /usr/bin/wp
 chmod +x /usr/bin/wp
 
 # Install `mysqlcheck` – needed for `wp db check`
