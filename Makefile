@@ -159,6 +159,14 @@ swift-linux-library: bindings
 	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/libwordpressFFI-linux/module.modulemap
 	cp target/release/libwp_api.a target/swift-bindings/libwordpressFFI-linux/
 
+swift-example-app: swift-example-app-mac swift-example-app-ios
+
+swift-example-app-mac:
+	xcodebuild -project native/swift/Example/Example.xcodeproj -scheme Example -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation build
+
+swift-example-app-ios:
+	xcodebuild -project native/swift/Example/Example.xcodeproj -scheme Example -destination 'platform=iOS,name=iPhone 15' -skipPackagePluginValidation build
+
 test-swift:
 	$(MAKE) test-swift-$(uname)
 

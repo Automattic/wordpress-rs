@@ -52,4 +52,10 @@ public typealias ApplicationPasswordWithEmbedContext = WordPressAPIInternal.Appl
 // MARK: - Site Health Checks
 public typealias SiteHealthTest = WordPressAPIInternal.WpSiteHealthTest
 
+// MARK: – Post Types
+public typealias SparsePostType = WordPressAPIInternal.SparsePostTypeDetails
+public typealias PostTypeWithEditContext = WordPressAPIInternal.PostTypeDetailsWithEditContext
+public typealias PostTypeWithViewContext = WordPressAPIInternal.PostTypeDetailsWithViewContext
+public typealias PostTypeWithEmbedContext = WordPressAPIInternal.PostTypeDetailsWithEmbedContext
+
 #endif

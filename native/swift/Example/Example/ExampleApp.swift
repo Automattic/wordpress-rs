@@ -20,6 +20,21 @@ struct ExampleApp: App {
             try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
                 .map { $0.asListViewData }
         }),
+        RootListData(name: "Post Types", callback: {
+            let postTypeList = try await WordPressAPI.globalInstance.postTypes.listWithViewContext()
+            return [
+                postTypeList.post.asListViewData,
+                postTypeList.page.asListViewData,
+                postTypeList.attachment.asListViewData,
+                postTypeList.navMenuItem.asListViewData,
+                postTypeList.wpBlock.asListViewData,
+                postTypeList.wpTemplate.asListViewData,
+                postTypeList.wpTemplatePart.asListViewData,
+                postTypeList.wpNavigation.asListViewData,
+                postTypeList.wpFontFamily.asListViewData,
+                postTypeList.wpFontFace.asListViewData
+            ]
+        }),
         RootListData(name: "Site Health Tests", callback: {
             return try await [
                 WordPressAPI.globalInstance.siteHealthTests.authorizationHeader(),

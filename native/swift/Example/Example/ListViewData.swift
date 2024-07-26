@@ -80,3 +80,25 @@ extension SiteHealthTest: ListViewDataConvertable {
         self.label
     }
 }
+
+extension PostTypeWithEditContext: ListViewDataConvertable {
+    public var id: String {
+        self.slug
+    }
+
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
+            "Has Archive": self.hasArchive ? "Yes" : "No"
+        ])
+    }
+}
+
+extension SparsePostType: ListViewDataConvertable {
+    public var id: String {
+        self.slug ?? self.name ?? UUID().uuidString
+    }
+
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id, title: self.name ?? "Unknown", subtitle: self.slug ?? "Unknown", fields: [:])
+    }
+}
