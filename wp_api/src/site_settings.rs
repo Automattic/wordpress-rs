@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
@@ -121,6 +123,17 @@ pub enum SiteSettingsPingStatus {
     Custom(String),
 }
 
+impl Display for SiteSettingsPingStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Custom(name) => name.as_str(),
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
 )]
@@ -130,4 +143,15 @@ pub enum SiteSettingsCommentStatus {
     Closed,
     #[serde(untagged)]
     Custom(String),
+}
+
+impl Display for SiteSettingsCommentStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Custom(name) => name.as_str(),
+        };
+        write!(f, "{}", s)
+    }
 }

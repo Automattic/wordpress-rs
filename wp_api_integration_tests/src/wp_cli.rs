@@ -41,7 +41,7 @@ pub struct WpCliSiteSettings {
     pub default_comment_status: Option<String>,
     pub site_icon: Option<String>,
     //pub site_icon: Option<u64>,
-    // Is not part of `wp option`
+    // Is not part of `wp option list`
     // pub language: Option<String>,
     // pub site_logo: Option<u64>,
 }
