@@ -1,5 +1,7 @@
 # wordpress-rs
 
+> This project is under heavy development and shouldn't be considered production-ready yet. We're happy to hear any feedback you might have, but we're not yet ready to accept significant code contributions from others. We look forward to engaging with the community on this project in late 2024.
+
 A cross-platform implementation of the [WordPress REST API](https://developer.wordpress.org/rest-api/) written in Rust, with bindings for Kotlin, Swift, and more.
 
 ## Prerequisites
