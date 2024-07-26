@@ -55,7 +55,7 @@ pub struct WpApiDetails {
     pub timezone_string: String,
     pub namespaces: Vec<String>,
     pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
-    pub site_icon_url: String,
+    pub site_icon_url: Option<String>,
 }
 
 #[uniffi::export]
