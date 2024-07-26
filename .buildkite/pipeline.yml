@@ -98,6 +98,20 @@ steps:
           IMAGE_ID: xcode-15.3
         agents:
           queue: mac
+      - label: ":swift: Example Apps"
+        command: |
+          .buildkite/download-xcframework.sh
+
+          echo "--- :computer: Building for macOS"
+          make swift-example-app-mac
+
+          echo "--- :iphone: Building for iOS"
+          make swift-example-app-ios
+        depends_on: xcframework
+        env:
+          IMAGE_ID: xcode-15.3
+        agents:
+          queue: mac
   #
   # Kotlin Group
   - group: ":kotlin: Kotlin Wrapper"
