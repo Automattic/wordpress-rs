@@ -17,7 +17,7 @@ where
     let conn = MySqlConnectOptions::connect(&options).await.unwrap();
     f(WordPressDb { conn }).await;
 
-    println!("Restoring WordPressDB..");
+    // Restore WordPressDB from backup
     Command::new("make")
         .arg("-C")
         .arg("../")
