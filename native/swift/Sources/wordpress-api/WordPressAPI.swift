@@ -55,6 +55,10 @@ public struct WordPressAPI {
         self.requestBuilder.wpSiteHealthTests()
     }
 
+    public var postTypes: PostTypesRequestExecutor {
+        self.requestBuilder.postTypes()
+    }
+
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         try await withCheckedThrowingContinuation { continuation in
             self.perform(request: request) { result in
