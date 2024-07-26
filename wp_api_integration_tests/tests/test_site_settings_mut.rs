@@ -23,7 +23,7 @@ macro_rules! generate_test {
                     let assertion_value = $assertion_value.to_string();
                     // First assert that the new value is not the same as the old value to avoid
                     // false positive assertion
-                    assert_ne!(assertion_value, WpCliSiteSettings::fetch().unwrap().$ident.unwrap());
+                    assert_ne!(Some(assertion_value.clone()), WpCliSiteSettings::fetch().unwrap().$ident);
                     let params = SiteSettingsUpdateParams {
                         $ident: Some(new_value.clone()),
                         ..Default::default()
@@ -34,7 +34,7 @@ macro_rules! generate_test {
                         .await
                         .assert_response();
                     // Assert that the value was updated to the new one
-                    assert_eq!(assertion_value, WpCliSiteSettings::fetch().unwrap().$ident.unwrap());
+                    assert_eq!(Some(assertion_value), WpCliSiteSettings::fetch().unwrap().$ident);
                 })
                 .await;
             }
@@ -42,7 +42,6 @@ macro_rules! generate_test {
     };
 }
 
-// `language` & `site_icon` are not part of `wp option list`, so they are not tested yet
 generate_test!(title, "new_title".to_string());
 generate_test!(description, "new_description".to_string());
 generate_test!(url, "https://example.com".to_string());
@@ -51,6 +50,7 @@ generate_test!(timezone, "EST".to_string());
 generate_test!(date_format, "YYYY-MM-DDTHH".to_string());
 generate_test!(time_format, "mm:ss.sssZ".to_string());
 generate_test!(start_of_week, 5);
+generate_test!(language, "en_CA".to_string());
 generate_test!(use_smilies, false, "");
 generate_test!(default_category, 2);
 generate_test!(default_post_format, "new_post_format".to_string());
@@ -60,4 +60,5 @@ generate_test!(page_on_front, 2);
 generate_test!(page_for_posts, 2);
 generate_test!(default_ping_status, SiteSettingsPingStatus::Closed);
 generate_test!(default_comment_status, SiteSettingsCommentStatus::Closed);
+generate_test!(site_logo, 1);
 generate_test!(site_icon, 1);
