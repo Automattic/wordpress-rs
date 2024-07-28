@@ -11,6 +11,7 @@ use users::*;
 mod api_client; // re-exported relevant types
 mod api_error; // re-exported relevant types
 mod parsed_url; // re-exported relevant types
+mod serde_helper; // internal module
 
 pub mod application_passwords;
 pub mod login;

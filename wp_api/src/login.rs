@@ -1,3 +1,4 @@
+use crate::serde_helper::deserialize_i64_or_string;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -51,7 +52,8 @@ pub struct WpApiDetails {
     pub description: String,
     pub url: String,
     pub home: String,
-    pub gmt_offset: String,
+    #[serde(deserialize_with = "deserialize_i64_or_string")]
+    pub gmt_offset: i64,
     pub timezone_string: String,
     pub namespaces: Vec<String>,
     pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
