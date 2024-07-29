@@ -143,11 +143,11 @@
 //!
 //! You should note a few things:
 //! * `PostContentWithEmbedContext` type is missing. That's because, in this example, there are
-//! no fields in `SparsePostContent` that's available in `embed` context.
+//!   no fields in `SparsePostContent` that's available in `embed` context.
 //! * The type of generated fields are `String` instead of `Option<String>` which is exactly what
-//! we did when we manually wrote these types.
+//!   we did when we manually wrote these types.
 //! * The information about which fields are available for each context are right there on top of
-//! the fields, so the syntax acts as a documentation.
+//!   the fields, so the syntax acts as a documentation.
 //!
 //! Let's do the same for `Post` type as well:
 //!
@@ -335,22 +335,22 @@ mod wp_contextual;
 /// `SparseFooWithEmbedContext` & `SparseFooWithViewContext` types by preserving `Option<T>`
 ///
 /// * `[WpContextual]` types have to start `Sparse` prefix. This is a design decision we have made
-/// to keep our type names descriptive and consistent.
+///   to keep our type names descriptive and consistent.
 /// * `[WpContext]` attribute is used to describe which `context`s the field belongs to.
 /// * `[WpContextualField]` is used when a [`WpContextual`] type is a **field** of another
-/// [`WpContextual`] type. This will tell the compiler to replace the given `Option<SparseBaz>`
-/// type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
-/// `BazWithViewContext`.
+///   [`WpContextual`] type. This will tell the compiler to replace the given `Option<SparseBaz>`
+///   type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
+///   `BazWithViewContext`.
 /// * `[WpContextualOption]` is used to tell the compiler to keep the field's `Option` type.
 /// * Generated types will have the following derive macros:
-/// `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. These types are meant
-/// to be used for the
-/// [WordPress.org REST API](https://developer.wordpress.org/rest-api/reference/), so
-/// [`serde::Serialize`] and [`serde::Deserialize`] are needed for parsing. We also would like
-/// to use these types through FFI, so they need to derive [`uniffi::Record`].
+///   `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. These types are meant
+///   to be used for the
+///   [WordPress.org REST API](https://developer.wordpress.org/rest-api/reference/), so
+///   [`serde::Serialize`] and [`serde::Deserialize`] are needed for parsing. We also would like
+///   to use these types through FFI, so they need to derive [`uniffi::Record`].
 /// * If the generated type won't have any fields, that type will not be generated.
 /// * If a **field** type is not `Option<T>`, it'll not be altered. Only `Option<T>` fields turn
-/// into `T`.
+///   into `T`.
 ///
 /// Here is a full example:
 ///
@@ -447,10 +447,10 @@ mod wp_contextual;
 /// ```
 ///
 /// * Notice that `BazWithEmbedContext` & `BazWithViewContext` types weren't generated since
-/// they wouldn't have any fields.
+///   they wouldn't have any fields.
 /// * Notice the type for `qux: Vec<u32>` was preserved as this wasn't an `Option<T>` type.
 /// * Notice the type for `foo_bar: Option<String>` was preserved since it's marked with
-/// `#[WpContextualOption]`.
+///   `#[WpContextualOption]`.
 #[proc_macro_derive(
     WpContextual,
     attributes(WpContext, WpContextualField, WpContextualOption)
