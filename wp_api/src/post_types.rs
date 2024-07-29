@@ -43,9 +43,10 @@ impl Display for PostType {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 #[serde(transparent)]
-pub struct SparseListPostTypesResponse {
-    #[WpContext(edit, embed, view)]
+pub struct SparsePostTypesResponse {
     #[serde(flatten)]
+    #[WpContext(edit, embed, view)]
+    #[WpContextualField]
     pub post_types: Option<HashMap<PostType, SparsePostTypeDetails>>,
 }
 

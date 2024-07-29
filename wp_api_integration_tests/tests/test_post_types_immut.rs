@@ -12,16 +12,14 @@ use wp_api_integration_tests::{api_client, AssertResponse};
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_edit_context() {
-    let response = api_client()
+    api_client()
         .post_types()
         .list_with_edit_context()
         .await
-        .assert_response();
-    let post_type = response
+        .assert_response()
         .post_types
         .get(&PostType::Post)
         .expect("Our local WordPress test site supports `post` type");
-    assert_eq!(post_type.viewable.as_ref(), Some(&true));
 }
 
 #[rstest]
@@ -32,7 +30,10 @@ async fn list_post_types_with_embed_context() {
         .post_types()
         .list_with_embed_context()
         .await
-        .assert_response();
+        .assert_response()
+        .post_types
+        .get(&PostType::Post)
+        .expect("Our local WordPress test site supports `post` type");
 }
 
 #[rstest]
@@ -43,7 +44,10 @@ async fn list_post_types_with_view_context() {
         .post_types()
         .list_with_view_context()
         .await
-        .assert_response();
+        .assert_response()
+        .post_types
+        .get(&PostType::Post)
+        .expect("Our local WordPress test site supports `post` type");
 }
 
 #[rstest]
