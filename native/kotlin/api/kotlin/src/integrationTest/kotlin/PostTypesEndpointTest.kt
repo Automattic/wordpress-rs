@@ -7,6 +7,7 @@ import uniffi.wp_api.PostTypeCapabilities
 import uniffi.wp_api.PostTypeSupports
 import uniffi.wp_api.WpRestErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
@@ -25,6 +26,8 @@ class PostTypesEndpointTest {
             requestBuilder.postTypes().listWithEditContext()
         }
         assert(result is WpRequestSuccess)
+        val postTypes = (result as WpRequestSuccess).data.postTypes
+        assertEquals("Posts", postTypes[PostType.Post]!!.name)
     }
 
     @Test
