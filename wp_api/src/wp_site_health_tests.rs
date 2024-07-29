@@ -79,6 +79,9 @@ pub struct WpSiteHealthDirectorySizes {
 pub struct WpSiteHealthDirectorySizeInfo {
     pub debug: String,
     pub size: String,
+    // `raw` is missing from `fonts_size` in our local WordPress test site. It's possible that it
+    // might be missing from other size types in different WordPress installations. We use
+    // `Option<u64>` for all of them to make sure we don't have parsing errors.
     pub raw: Option<u64>,
 }
 
