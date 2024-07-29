@@ -68,4 +68,12 @@ class WpSiteHealthTestsEndpointTest {
         val wpSiteHealthTest = (result as WpRequestSuccess).data
         assert(wpSiteHealthTest.test?.isBlank() == false)
     }
+
+    @Test
+    fun testDirectorySizes() = runTest {
+        val result = client.request { requestBuilder ->
+            requestBuilder.wpSiteHealthTests().directorySizes()
+        }
+        assert(result is WpRequestSuccess)
+    }
 }
