@@ -23,7 +23,7 @@ GEM
     artifactory (3.0.17)
     atomos (0.1.3)
     aws-eventstream (1.3.0)
-    aws-partitions (1.958.0)
+    aws-partitions (1.959.0)
     aws-sdk-core (3.201.3)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.651.0)
@@ -36,7 +36,7 @@ GEM
       aws-sdk-core (~> 3, >= 3.201.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.5)
-    aws-sigv4 (1.9.0)
+    aws-sigv4 (1.9.1)
       aws-eventstream (~> 1, >= 1.0.2)
     babosa (1.0.4)
     base64 (0.2.0)
@@ -129,7 +129,7 @@ GEM
     faraday_middleware (1.2.0)
       faraday (~> 1.0)
     fastimage (2.3.1)
-    fastlane (2.221.1)
+    fastlane (2.222.0)
       CFPropertyList (>= 2.3, < 4.0.0)
       addressable (>= 2.8, < 3.0.0)
       artifactory (~> 3.0)
@@ -331,8 +331,8 @@ PLATFORMS
 
 DEPENDENCIES
   cocoapods (~> 1.15)
-  fastlane (~> 2.221)
-  fastlane-plugin-wpmreleasetoolkit (~> 11.0)
+  fastlane (~> 2.222)
+  fastlane-plugin-wpmreleasetoolkit (~> 11.1)
 
 BUNDLED WITH
    2.3.23
