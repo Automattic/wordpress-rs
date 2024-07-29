@@ -12,11 +12,16 @@ use wp_api_integration_tests::{api_client, AssertResponse};
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_edit_context() {
-    api_client()
+    let response = api_client()
         .post_types()
         .list_with_edit_context()
         .await
         .assert_response();
+    let post_type = response
+        .post_types
+        .get(&PostType::Post)
+        .expect("Our local WordPress test site supports `post` type");
+    assert_eq!(post_type.viewable.as_ref(), Some(&true));
 }
 
 #[rstest]
