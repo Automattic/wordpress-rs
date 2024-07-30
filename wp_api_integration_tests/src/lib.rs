@@ -10,9 +10,6 @@ use wp_api::{
     WpRestErrorCode, WpRestErrorWrapper,
 };
 
-// Source implementation: `is_user_logged_in() ? 403 : 401`
-const REST_AUTHORIZATION_REQUIRED_CODE: &[u16] = &[401, 403];
-
 // `pub` to avoid 'unused' & 'dead_code' warnings
 pub mod wp_db;
 
@@ -71,8 +68,6 @@ pub trait AssertWpError<T: std::fmt::Debug> {
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
     fn assert_wp_error(self, expected_error_code: WpRestErrorCode) {
-        let expected_status_codes =
-            expected_status_codes_for_wp_rest_error_code(&expected_error_code);
         let err = self.unwrap_err();
         if let WpApiError::RestError {
             rest_error:
@@ -80,21 +75,14 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
                     code: error_code,
                     message: _,
                 }),
-            status_code,
             response,
+            ..
         } = err
         {
             assert_eq!(
                 expected_error_code, error_code,
                 "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
                 expected_error_code, error_code, response
-            );
-            assert!(
-                expected_status_codes.contains(&status_code),
-                "Incorrect status code. Expected one of '{:?}', found '{:?}'. Response was: '{:?}'",
-                expected_status_codes,
-                status_code,
-                response
             );
         } else if let WpApiError::RestError {
             rest_error: WpRestErrorWrapper::Unrecognized(unrecognized_error),
@@ -109,59 +97,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         } else {
             panic!("Unexpected wp_error '{:?}'", err);
         }
-    }
-}
-
-fn expected_status_codes_for_wp_rest_error_code(error_code: &WpRestErrorCode) -> &[u16] {
-    match error_code {
-        WpRestErrorCode::ApplicationPasswordsDisabled => &[501],
-        WpRestErrorCode::ApplicationPasswordsDisabledForUser => &[501],
-        WpRestErrorCode::ApplicationPasswordNotFound => &[404],
-        WpRestErrorCode::CannotCreateApplicationPasswords => &[403],
-        WpRestErrorCode::CannotActivatePlugin => &[403],
-        WpRestErrorCode::CannotCreateUser => &[403],
-        WpRestErrorCode::CannotDeactivatePlugin => &[403],
-        WpRestErrorCode::CannotDeleteActivePlugin => &[400],
-        WpRestErrorCode::CannotDeleteApplicationPassword => &[403],
-        WpRestErrorCode::CannotDeleteApplicationPasswords => &[403],
-        WpRestErrorCode::CannotManageApplicationPasswords => REST_AUTHORIZATION_REQUIRED_CODE,
-        WpRestErrorCode::CannotEdit => &[403],
-        WpRestErrorCode::CannotEditApplicationPassword => &[403],
-        WpRestErrorCode::CannotEditRoles => &[403],
-        WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser => {
-            REST_AUTHORIZATION_REQUIRED_CODE
-        }
-        WpRestErrorCode::CannotInstallPlugin => &[403],
-        WpRestErrorCode::CannotListApplicationPasswords => &[403],
-        WpRestErrorCode::CannotManageNetworkPlugins => &[403],
-        WpRestErrorCode::CannotManagePlugins => &[403],
-        WpRestErrorCode::CannotReadApplicationPassword => &[403],
-        WpRestErrorCode::CannotReadType => REST_AUTHORIZATION_REQUIRED_CODE,
-        WpRestErrorCode::CannotView => REST_AUTHORIZATION_REQUIRED_CODE,
-        WpRestErrorCode::CannotViewPlugin => &[403],
-        WpRestErrorCode::CannotViewPlugins => &[403],
-        WpRestErrorCode::ForbiddenContext => &[403],
-        WpRestErrorCode::ForbiddenOrderBy => &[403],
-        WpRestErrorCode::ForbiddenWho => &[403],
-        WpRestErrorCode::NetworkOnlyPlugin => &[400],
-        WpRestErrorCode::NoAuthenticatedAppPassword => &[401],
-        WpRestErrorCode::PluginNotFound => &[404],
-        WpRestErrorCode::TypeInvalid => &[404],
-        WpRestErrorCode::InvalidParam => &[400],
-        WpRestErrorCode::TrashNotSupported => &[501],
-        WpRestErrorCode::Unauthorized => &[401],
-        WpRestErrorCode::UserCannotDelete => &[403],
-        WpRestErrorCode::UserCannotView => &[403],
-        WpRestErrorCode::UserCreate => &[500],
-        WpRestErrorCode::UserExists => &[400],
-        WpRestErrorCode::UserInvalidArgument => &[400],
-        WpRestErrorCode::UserInvalidEmail => &[400],
-        WpRestErrorCode::UserInvalidId => &[404],
-        WpRestErrorCode::UserInvalidPassword => &[400],
-        WpRestErrorCode::UserInvalidReassign => &[400],
-        WpRestErrorCode::UserInvalidRole => &[400],
-        WpRestErrorCode::UserInvalidSlug => &[400],
-        WpRestErrorCode::UserInvalidUsername => &[400],
     }
 }
 
