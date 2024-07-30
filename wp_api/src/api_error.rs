@@ -26,7 +26,7 @@ pub enum WpApiError {
     },
     #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
     RestError {
-        rest_error: WpRestErrorWrapper,
+        rest_error: WpRestError,
         status_code: u16,
         response: String,
     },
@@ -42,22 +42,9 @@ pub enum WpApiError {
     UnknownError { status_code: u16, response: String },
 }
 
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
-#[serde(untagged)]
-pub enum WpRestErrorWrapper {
-    Recognized(WpRestError),
-    Unrecognized(UnrecognizedWpRestError),
-}
-
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
 pub struct WpRestError {
     pub code: WpRestErrorCode,
-    pub message: String,
-}
-
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct UnrecognizedWpRestError {
-    pub code: String,
     pub message: String,
 }
 

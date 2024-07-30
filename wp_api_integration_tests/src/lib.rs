@@ -7,7 +7,7 @@ use wp_api::{
     },
     users::UserId,
     ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpRestError,
-    WpRestErrorCode, WpRestErrorWrapper,
+    WpRestErrorCode,
 };
 
 // `pub` to avoid 'unused' & 'dead_code' warnings
@@ -71,10 +71,10 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         let err = self.unwrap_err();
         if let WpApiError::RestError {
             rest_error:
-                WpRestErrorWrapper::Recognized(WpRestError {
+                WpRestError {
                     code: error_code,
                     message: _,
-                }),
+                },
             response,
             ..
         } = err
@@ -83,16 +83,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
                 expected_error_code, error_code,
                 "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
                 expected_error_code, error_code, response
-            );
-        } else if let WpApiError::RestError {
-            rest_error: WpRestErrorWrapper::Unrecognized(unrecognized_error),
-            status_code,
-            response,
-        } = err
-        {
-            panic!(
-                "Received unhandled WpRestError variant: '{:?}' with status_code: '{}'. Response was: '{:?}'",
-                unrecognized_error, status_code, response
             );
         } else {
             panic!("Unexpected wp_error '{:?}'", err);
