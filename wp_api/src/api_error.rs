@@ -162,49 +162,41 @@ pub enum WpRestErrorCode {
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]
     UserInvalidPassword,
-}
-
-// All internal errors _should_ be wrapped as a `WpRestErrorCode` by the server. However, there
-// is a good chance that some internal errors do make it into the response, so these error types
-// are provided.
-//
-// Currently, we don't parse the response for these error types, but we could consider adding it
-// as a fallback. For the moment, clients can manually try parsing an `Unrecognized` error
-// into this type.
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WpInternalErrorCode {
+    // All WpCore internal errors _should_ be wrapped as a `WpRestErrorCode` by the server. However,
+    // there is a good chance that some internal errors do make it into the response, so these error
+    // types are provided.
     #[serde(rename = "fs_error")]
-    FsError,
+    WpCoreFsError,
     #[serde(rename = "fs_no_plugins_dir")]
-    FsNoPluginsDir,
+    WpCoreFsNoPluginsDir,
     #[serde(rename = "fs_unavailable")]
-    FsUnavailable,
+    WpCoreFsUnavailable,
     #[serde(rename = "could_not_remove_plugin")]
-    CouldNotRemovePlugin,
+    WpCoreCouldNotRemovePlugin,
     #[serde(rename = "could_not_resume_plugin")]
-    CouldNotResumePlugin,
+    WpCoreCouldNotResumePlugin,
     #[serde(rename = "no_plugin_header")]
-    NoPluginHeader,
+    WpCoreNoPluginHeader,
     #[serde(rename = "plugin_missing_dependencies")]
-    PluginMissingDependencies,
+    WpCorePluginMissingDependencies,
     #[serde(rename = "plugin_not_found")]
-    PluginNotFound,
+    WpCorePluginNotFound,
     #[serde(rename = "plugin_invalid")]
-    PluginInvalid,
+    WpCorePluginInvalid,
     #[serde(rename = "plugin_php_incompatible")]
-    PluginPhpIncompatible,
+    WpCorePluginPhpIncompatible,
     #[serde(rename = "plugin_wp_incompatible")]
-    PluginWpIncompatible,
+    WpCorePluginWpIncompatible,
     #[serde(rename = "plugin_wp_php_incompatible")]
-    PluginWpPhpIncompatible,
+    WpCorePluginWpPhpIncompatible,
     #[serde(rename = "plugins_invalid")]
-    PluginsInvalid,
+    WpCorePluginsInvalid,
     #[serde(rename = "unable_to_connect_to_filesystem")]
-    UnableToConnectToFilesystem,
+    WpCoreUnableToConnectToFilesystem,
     #[serde(rename = "unable_to_determine_installed_plugin")]
-    UnableToDetermineInstalledPlugin,
+    WpCoreUnableToDetermineInstalledPlugin,
     #[serde(rename = "unexpected_output")]
-    UnexpectedOutput,
+    WpCoreUnexpectedOutput,
 }
 
 impl From<RequestExecutionError> for WpApiError {
