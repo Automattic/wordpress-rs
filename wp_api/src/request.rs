@@ -5,7 +5,10 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{api_error::RequestExecutionError, WpApiError, WpAuthentication};
+use crate::{
+    api_error::{RequestExecutionError, WpError},
+    WpApiError, WpAuthentication,
+};
 
 use self::endpoint::WpEndpointUrl;
 
@@ -315,9 +318,10 @@ impl WpNetworkResponse {
         // TODO: Further parse the response body to include error message
         // TODO: Lots of unwraps to get a basic setup working
         let status = http::StatusCode::from_u16(self.status_code).unwrap();
-        if let Ok(rest_error) = serde_json::from_slice(&self.body) {
-            Err(WpApiError::RestError {
-                rest_error,
+        if let Ok(wp_error) = serde_json::from_slice::<WpError>(&self.body) {
+            Err(WpApiError::WpError {
+                error_code: wp_error.code,
+                error_message: wp_error.message,
                 status_code: self.status_code,
                 response: self.body_as_string(),
             })

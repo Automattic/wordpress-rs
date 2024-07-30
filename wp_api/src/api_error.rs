@@ -24,9 +24,10 @@ pub enum WpApiError {
         status_code: Option<u16>,
         reason: String,
     },
-    #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
-    RestError {
-        rest_error: WpRestError,
+    #[error("Rest error '{:?}' with Status Code '{}'", error_code, status_code)]
+    WpError {
+        error_code: WpRestErrorCode,
+        error_message: String,
         status_code: u16,
         response: String,
     },
@@ -42,8 +43,9 @@ pub enum WpApiError {
     UnknownError { status_code: u16, response: String },
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct WpRestError {
+// Used to parse the errors from API then converted to `WpApiError::WpError`
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub(crate) struct WpError {
     pub code: WpRestErrorCode,
     pub message: String,
 }

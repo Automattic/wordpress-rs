@@ -6,8 +6,7 @@ use wp_api::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
     users::UserId,
-    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpRestError,
-    WpRestErrorCode,
+    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpRestErrorCode,
 };
 
 // `pub` to avoid 'unused' & 'dead_code' warnings
@@ -69,12 +68,8 @@ pub trait AssertWpError<T: std::fmt::Debug> {
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
     fn assert_wp_error(self, expected_error_code: WpRestErrorCode) {
         let err = self.unwrap_err();
-        if let WpApiError::RestError {
-            rest_error:
-                WpRestError {
-                    code: error_code,
-                    message: _,
-                },
+        if let WpApiError::WpError {
+            error_code,
             response,
             ..
         } = err
