@@ -3,7 +3,7 @@ use wp_api::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
         WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
-    WpRestErrorCode,
+    WpErrorCode,
 };
 use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
@@ -16,7 +16,7 @@ async fn create_user_err_cannot_create_user() {
         .users()
         .create(&valid_user_create_params())
         .await
-        .assert_wp_error(WpRestErrorCode::CannotCreateUser);
+        .assert_wp_error(WpErrorCode::CannotCreateUser);
 }
 
 #[tokio::test]
@@ -30,7 +30,7 @@ async fn delete_user_err_user_cannot_delete() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::UserCannotDelete);
+        .assert_wp_error(WpErrorCode::UserCannotDelete);
 }
 
 #[tokio::test]
@@ -44,7 +44,7 @@ async fn delete_user_err_user_invalid_reassign() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::UserInvalidReassign);
+        .assert_wp_error(WpErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
@@ -55,7 +55,7 @@ async fn delete_current_user_err_user_invalid_reassign() {
             reassign: UserId(987654321),
         })
         .await
-        .assert_wp_error(WpRestErrorCode::UserInvalidReassign);
+        .assert_wp_error(WpErrorCode::UserInvalidReassign);
 }
 
 #[tokio::test]
@@ -64,7 +64,7 @@ async fn list_users_err_forbidden_context() {
         .users()
         .list_with_edit_context(&UserListParams::default())
         .await
-        .assert_wp_error(WpRestErrorCode::ForbiddenContext);
+        .assert_wp_error(WpErrorCode::ForbiddenContext);
 }
 
 #[tokio::test]
@@ -77,7 +77,7 @@ async fn list_users_err_forbidden_orderby_email() {
         .users()
         .list_with_view_context(&params)
         .await
-        .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
+        .assert_wp_error(WpErrorCode::ForbiddenOrderBy);
 }
 
 #[tokio::test]
@@ -90,7 +90,7 @@ async fn list_users_err_forbidden_who() {
         .users()
         .list_with_view_context(&params)
         .await
-        .assert_wp_error(WpRestErrorCode::ForbiddenWho);
+        .assert_wp_error(WpErrorCode::ForbiddenWho);
 }
 
 #[tokio::test]
@@ -103,7 +103,7 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
         .users()
         .list_with_edit_context(&params)
         .await
-        .assert_wp_error(WpRestErrorCode::UserCannotView);
+        .assert_wp_error(WpErrorCode::UserCannotView);
 }
 
 #[tokio::test]
@@ -116,7 +116,7 @@ async fn list_users_with_roles_err_user_cannot_view() {
         .users()
         .list_with_edit_context(&params)
         .await
-        .assert_wp_error(WpRestErrorCode::UserCannotView);
+        .assert_wp_error(WpErrorCode::UserCannotView);
 }
 
 #[tokio::test]
@@ -129,7 +129,7 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
         .users()
         .list_with_view_context(&params)
         .await
-        .assert_wp_error(WpRestErrorCode::ForbiddenOrderBy);
+        .assert_wp_error(WpErrorCode::ForbiddenOrderBy);
 }
 
 #[tokio::test]
@@ -143,7 +143,7 @@ async fn list_users_has_published_posts_err_invalid_param() {
             ..Default::default()
         })
         .await
-        .assert_wp_error(WpRestErrorCode::InvalidParam);
+        .assert_wp_error(WpErrorCode::InvalidParam);
 }
 
 #[tokio::test]
@@ -152,7 +152,7 @@ async fn retrieve_user_err_user_invalid_id() {
         .users()
         .retrieve_with_edit_context(&UserId(987654321))
         .await
-        .assert_wp_error(WpRestErrorCode::UserInvalidId);
+        .assert_wp_error(WpErrorCode::UserInvalidId);
 }
 
 #[tokio::test]
@@ -161,7 +161,7 @@ async fn retrieve_user_err_unauthorized() {
         .users()
         .retrieve_me_with_edit_context()
         .await
-        .assert_wp_error(WpRestErrorCode::Unauthorized);
+        .assert_wp_error(WpErrorCode::Unauthorized);
 }
 
 #[tokio::test]
@@ -175,7 +175,7 @@ async fn update_user_err_cannot_edit() {
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::CannotEdit);
+        .assert_wp_error(WpErrorCode::CannotEdit);
 }
 
 #[tokio::test]
@@ -189,7 +189,7 @@ async fn update_user_err_cannot_edit_roles() {
         .users()
         .update(&SECOND_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::CannotEditRoles);
+        .assert_wp_error(WpErrorCode::CannotEditRoles);
 }
 
 #[tokio::test]
@@ -203,7 +203,7 @@ async fn update_user_err_user_invalid_email() {
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::UserInvalidEmail);
+        .assert_wp_error(WpErrorCode::UserInvalidEmail);
 }
 
 #[tokio::test]
@@ -216,7 +216,7 @@ async fn update_user_email_err_invalid_param() {
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::InvalidParam);
+        .assert_wp_error(WpErrorCode::InvalidParam);
 }
 
 #[tokio::test]
@@ -229,7 +229,7 @@ async fn update_user_password_err_invalid_param() {
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::InvalidParam);
+        .assert_wp_error(WpErrorCode::InvalidParam);
 }
 
 #[tokio::test]
@@ -243,7 +243,7 @@ async fn update_user_err_user_invalid_role() {
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::UserInvalidRole);
+        .assert_wp_error(WpErrorCode::UserInvalidRole);
 }
 
 #[tokio::test]
@@ -257,7 +257,7 @@ async fn update_user_err_user_invalid_slug() {
         .users()
         .update(&FIRST_USER_ID, &params)
         .await
-        .assert_wp_error(WpRestErrorCode::UserInvalidSlug);
+        .assert_wp_error(WpErrorCode::UserInvalidSlug);
 }
 
 // Helpers

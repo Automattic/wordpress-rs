@@ -6,7 +6,7 @@ use wp_api::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
     users::UserId,
-    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpRestErrorCode,
+    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
 };
 
 // `pub` to avoid 'unused' & 'dead_code' warnings
@@ -62,11 +62,11 @@ pub fn test_site_url() -> Arc<ParsedUrl> {
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {
-    fn assert_wp_error(self, expected_error_code: WpRestErrorCode);
+    fn assert_wp_error(self, expected_error_code: WpErrorCode);
 }
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
-    fn assert_wp_error(self, expected_error_code: WpRestErrorCode) {
+    fn assert_wp_error(self, expected_error_code: WpErrorCode) {
         let err = self.unwrap_err();
         if let WpApiError::WpError {
             error_code,

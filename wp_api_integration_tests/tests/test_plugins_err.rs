@@ -1,5 +1,5 @@
 use wp_api::plugins::{PluginCreateParams, PluginListParams, PluginStatus, PluginUpdateParams};
-use wp_api::WpRestErrorCode;
+use wp_api::WpErrorCode;
 
 use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, AssertWpError, HELLO_DOLLY_PLUGIN_SLUG,
@@ -15,7 +15,7 @@ async fn create_plugin_err_cannot_install_plugin() {
             status: PluginStatus::Active,
         })
         .await
-        .assert_wp_error(WpRestErrorCode::CannotInstallPlugin);
+        .assert_wp_error(WpErrorCode::CannotInstallPlugin);
 }
 
 #[tokio::test]
@@ -24,7 +24,7 @@ async fn delete_plugin_err_cannot_delete_active_plugin() {
         .plugins()
         .delete(&HELLO_DOLLY_PLUGIN_SLUG.into())
         .await
-        .assert_wp_error(WpRestErrorCode::CannotDeleteActivePlugin);
+        .assert_wp_error(WpErrorCode::CannotDeleteActivePlugin);
 }
 
 #[tokio::test]
@@ -33,7 +33,7 @@ async fn list_plugins_err_cannot_view_plugins() {
         .plugins()
         .list_with_edit_context(&PluginListParams::default())
         .await
-        .assert_wp_error(WpRestErrorCode::CannotViewPlugins);
+        .assert_wp_error(WpErrorCode::CannotViewPlugins);
 }
 
 #[tokio::test]
@@ -42,7 +42,7 @@ async fn retrieve_plugin_err_cannot_view_plugin() {
         .plugins()
         .retrieve_with_edit_context(&HELLO_DOLLY_PLUGIN_SLUG.into())
         .await
-        .assert_wp_error(WpRestErrorCode::CannotViewPlugin);
+        .assert_wp_error(WpErrorCode::CannotViewPlugin);
 }
 
 #[tokio::test]
@@ -56,7 +56,7 @@ async fn update_plugin_err_plugin_not_found() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::PluginNotFound);
+        .assert_wp_error(WpErrorCode::PluginNotFound);
 }
 
 #[tokio::test]
@@ -70,5 +70,5 @@ async fn update_plugin_err_cannot_manage_plugins() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::CannotManagePlugins);
+        .assert_wp_error(WpErrorCode::CannotManagePlugins);
 }

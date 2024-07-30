@@ -1,6 +1,6 @@
 use rstest::*;
 use serial_test::parallel;
-use wp_api::{post_types::PostType, WpRestErrorCode};
+use wp_api::{post_types::PostType, WpErrorCode};
 use wp_api_integration_tests::{api_client, api_client_as_subscriber, AssertWpError};
 
 #[rstest]
@@ -11,7 +11,7 @@ async fn list_post_types_err_forbidden_context() {
         .post_types()
         .list_with_edit_context()
         .await
-        .assert_wp_error(WpRestErrorCode::CannotView);
+        .assert_wp_error(WpErrorCode::CannotView);
 }
 
 #[rstest]
@@ -36,7 +36,7 @@ async fn retrieve_post_types_err_forbidden_context(
         .post_types()
         .retrieve_with_edit_context(&post_type)
         .await
-        .assert_wp_error(WpRestErrorCode::ForbiddenContext);
+        .assert_wp_error(WpErrorCode::ForbiddenContext);
 }
 
 #[rstest]
@@ -47,7 +47,7 @@ async fn retrieve_post_types_err_type_invalid() {
         .post_types()
         .retrieve_with_edit_context(&PostType::Custom("does_not_exist".to_string()))
         .await
-        .assert_wp_error(WpRestErrorCode::TypeInvalid);
+        .assert_wp_error(WpErrorCode::TypeInvalid);
 }
 
 #[rstest]
@@ -58,5 +58,5 @@ async fn retrieve_post_types_err_cannot_read_type() {
         .post_types()
         .retrieve_with_edit_context(&PostType::Custom("oembed_cache".to_string()))
         .await
-        .assert_wp_error(WpRestErrorCode::CannotReadType);
+        .assert_wp_error(WpErrorCode::CannotReadType);
 }

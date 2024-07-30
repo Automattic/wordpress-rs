@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
-pub use api_error::{RequestExecutionError, WpApiError, WpRestErrorCode};
+pub use api_error::{RequestExecutionError, WpApiError, WpErrorCode};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use users::*;

@@ -26,7 +26,7 @@ pub enum WpApiError {
     },
     #[error("Rest error '{:?}' with Status Code '{}'", error_code, status_code)]
     WpError {
-        error_code: WpRestErrorCode,
+        error_code: WpErrorCode,
         error_message: String,
         status_code: u16,
         response: String,
@@ -46,12 +46,12 @@ pub enum WpApiError {
 // Used to parse the errors from API then converted to `WpApiError::WpError`
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub(crate) struct WpError {
-    pub code: WpRestErrorCode,
+    pub code: WpErrorCode,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WpRestErrorCode {
+pub enum WpErrorCode {
     #[serde(rename = "rest_application_password_not_found")]
     ApplicationPasswordNotFound,
     #[serde(rename = "rest_cannot_create_application_passwords")]
