@@ -28,23 +28,34 @@ extension URLSession: @retroactive RequestExecutor {}
 
 extension URLSession: SafeRequestExecutor {
 
-    // swiftlint:disable force_cast
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+        let (data, response): (Data, URLResponse)
         do {
-            let (data, response) = try await self.data(for: request.asURLRequest())
-            let urlResponse = response as! HTTPURLResponse
-
-            return .success(
-                WpNetworkResponse(
-                    body: data,
-                    statusCode: UInt16(urlResponse.statusCode),
-                    headerMap: try WpNetworkHeaderMap.fromMap(hashMap: urlResponse.httpHeaders)
-                )
-            )
+            (data, response) = try await self.data(for: request.asURLRequest())
         } catch {
-            // TODO: Translate error into the Rust type
-            return .failure(.RequestExecutionFailed(statusCode: nil, reason: ""))
+            return .failure(.RequestExecutionFailed(statusCode: nil, reason: error.localizedDescription))
         }
+
+        // swiftlint:disable force_cast
+        let urlResponse = response as! HTTPURLResponse
+        // swiftlint:enable force_cast
+
+        let headerMap: WpNetworkHeaderMap
+
+        do {
+            headerMap = try WpNetworkHeaderMap.fromMap(hashMap: urlResponse.httpHeaders)
+        } catch is WpNetworkHeaderMapError {
+            return .failure(.RequestExecutionFailed(statusCode: nil, reason: "Invalid header"))
+        } catch {
+            return .failure(.RequestExecutionFailed(statusCode: nil, reason: "Unknown error: \(error)"))
+        }
+
+        return .success(
+            WpNetworkResponse(
+                body: data,
+                statusCode: UInt16(urlResponse.statusCode),
+                headerMap: headerMap
+            )
+        )
     }
-    // swiftlint:enable force_cast
 }
