@@ -27,7 +27,7 @@ async fn create_plugin_err_plugins_api_failed() {
             status: PluginStatus::Active,
         })
         .await
-        .assert_wp_error(WpErrorCode::Fallback("plugins_api_failed".to_string()));
+        .assert_wp_error(WpErrorCode::WpCorePluginsApiFailed);
 }
 
 #[tokio::test]

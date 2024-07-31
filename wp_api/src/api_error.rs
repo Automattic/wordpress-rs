@@ -198,6 +198,8 @@ pub enum WpErrorCode {
     WpCorePluginWpPhpIncompatible,
     #[serde(rename = "plugins_invalid")]
     WpCorePluginsInvalid,
+    #[serde(rename = "plugins_api_failed")]
+    WpCorePluginsApiFailed,
     #[serde(rename = "unable_to_connect_to_filesystem")]
     WpCoreUnableToConnectToFilesystem,
     #[serde(rename = "unable_to_determine_installed_plugin")]
