@@ -176,6 +176,8 @@ pub enum WpErrorCode {
     WpCoreCouldNotRemovePlugin,
     #[serde(rename = "could_not_resume_plugin")]
     WpCoreCouldNotResumePlugin,
+    #[serde(rename = "folder_exists")]
+    WpCoreFolderExists,
     #[serde(rename = "fs_error")]
     WpCoreFsError,
     #[serde(rename = "fs_no_plugins_dir")]

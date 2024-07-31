@@ -19,6 +19,18 @@ async fn create_plugin_err_cannot_install_plugin() {
 }
 
 #[tokio::test]
+async fn create_plugin_err_folder_exists() {
+    api_client()
+        .plugins()
+        .create(&PluginCreateParams {
+            slug: "classic-editor".into(),
+            status: PluginStatus::Active,
+        })
+        .await
+        .assert_wp_error(WpErrorCode::WpCoreFolderExists);
+}
+
+#[tokio::test]
 async fn create_plugin_err_plugins_api_failed() {
     api_client()
         .plugins()
