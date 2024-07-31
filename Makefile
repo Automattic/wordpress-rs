@@ -208,8 +208,6 @@ test-rust-integration-local:
 test-server: stop-server
 	@# Help: Start the test server.
 
-	rm -rf target # Avoid cross-platform compilation issues
-
 	docker-compose up -d
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
