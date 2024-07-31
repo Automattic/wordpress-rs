@@ -95,15 +95,20 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
     }
 
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: "Site Health Directory Sizes", subtitle: "Total Size: \(totalSize.size)", fields: [
-            "Database Size": databaseSize.size,
-            "Fonts Size": fontsSize.size,
-            "Plugins Size": pluginsSize.size,
-            "Themes Size": themesSize.size,
-            "Total Size": totalSize.size,
-            "Uploads Size": uploadsSize.size,
-            "WordPress Size": wordpressSize.size
-        ])
+        ListViewData(
+            id: self.id,
+            title: "Site Health Directory Sizes",
+            subtitle: "Total Size: \(totalSize.size)",
+            fields: [
+                "Database Size": databaseSize.size,
+                "Fonts Size": fontsSize.size,
+                "Plugins Size": pluginsSize.size,
+                "Themes Size": themesSize.size,
+                "Total Size": totalSize.size,
+                "Uploads Size": uploadsSize.size,
+                "WordPress Size": wordpressSize.size
+            ]
+        )
     }
 }
 

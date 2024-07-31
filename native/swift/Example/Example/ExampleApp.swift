@@ -43,7 +43,7 @@ struct ExampleApp: App {
                 WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
                 WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
                 WordPressAPI.globalInstance.siteHealthTests.loopbackRequests(),
-                WordPressAPI.globalInstance.siteHealthTests.pageCache(),
+                WordPressAPI.globalInstance.siteHealthTests.pageCache()
             ]
 
             return items.map { $0.asListViewData }
