@@ -24,7 +24,13 @@ pub enum WpApiError {
         status_code: Option<u16>,
         reason: String,
     },
-    #[error("Rest error '{:?}' with Status Code '{}'", error_code, status_code)]
+    #[error(
+        "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"\n\tresponse: \"{}\"\n}}",
+        status_code,
+        error_code,
+        error_message,
+        response
+    )]
     WpError {
         error_code: WpErrorCode,
         error_message: String,
@@ -43,7 +49,7 @@ pub enum WpApiError {
     UnknownError { status_code: u16, response: String },
 }
 
-// Used to parse the errors from API then converted to `WpApiError::WpError`
+// This type is used to parse the API errors. It then gets converted to `WpApiError::WpError`.
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub(crate) struct WpError {
     pub code: WpErrorCode,
@@ -114,9 +120,9 @@ pub enum WpErrorCode {
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
-    // ---
+    // ------------------------------------------------------------------------------------
     // Untested, because we are unable to create the necessary conditions for them
-    // ---
+    // ------------------------------------------------------------------------------------
     #[serde(rename = "application_passwords_disabled")]
     ApplicationPasswordsDisabled,
     #[serde(rename = "application_passwords_disabled_for_user")]
@@ -127,18 +133,18 @@ pub enum WpErrorCode {
     CannotReadType,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
-    // ---
+    // ------------------------------------------------------------------------------------
     // Untested, because we believe these errors require multisite
-    // ---
+    // ------------------------------------------------------------------------------------
     #[serde(rename = "rest_cannot_manage_network_plugins")]
     CannotManageNetworkPlugins,
     #[serde(rename = "rest_network_only_plugin")]
     NetworkOnlyPlugin,
     #[serde(rename = "rest_user_create")]
     UserCreate,
-    // ---
+    // ------------------------------------------------------------------------------------
     // Untested, because we don't think these errors are possible to get while using this library
-    // ---
+    // ------------------------------------------------------------------------------------
     /// If a plugin is tried to be activated without the `activate_plugin` permission.
     /// However, in a default setup a prior check of `activate_plugins` will fail
     /// resulting in `CannotManagePlugins` error instead.
@@ -162,27 +168,28 @@ pub enum WpErrorCode {
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]
     UserInvalidPassword,
-    // All WpCore internal errors _should_ be wrapped as a `WpRestErrorCode` by the server. However,
-    // there is a good chance that some internal errors do make it into the response, so these error
-    // types are provided.
+    // ------------------------------------------------------------------------------------
+    // All WpCore internal errors _should_ be wrapped as a `WpRestErrorCode` by the server.
+    // However, in some cases they are sent back directly.
+    // ------------------------------------------------------------------------------------
+    #[serde(rename = "could_not_remove_plugin")]
+    WpCoreCouldNotRemovePlugin,
+    #[serde(rename = "could_not_resume_plugin")]
+    WpCoreCouldNotResumePlugin,
     #[serde(rename = "fs_error")]
     WpCoreFsError,
     #[serde(rename = "fs_no_plugins_dir")]
     WpCoreFsNoPluginsDir,
     #[serde(rename = "fs_unavailable")]
     WpCoreFsUnavailable,
-    #[serde(rename = "could_not_remove_plugin")]
-    WpCoreCouldNotRemovePlugin,
-    #[serde(rename = "could_not_resume_plugin")]
-    WpCoreCouldNotResumePlugin,
     #[serde(rename = "no_plugin_header")]
     WpCoreNoPluginHeader,
+    #[serde(rename = "plugin_invalid")]
+    WpCorePluginInvalid,
     #[serde(rename = "plugin_missing_dependencies")]
     WpCorePluginMissingDependencies,
     #[serde(rename = "plugin_not_found")]
     WpCorePluginNotFound,
-    #[serde(rename = "plugin_invalid")]
-    WpCorePluginInvalid,
     #[serde(rename = "plugin_php_incompatible")]
     WpCorePluginPhpIncompatible,
     #[serde(rename = "plugin_wp_incompatible")]
