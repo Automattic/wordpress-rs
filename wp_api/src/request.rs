@@ -301,7 +301,7 @@ impl WpNetworkResponse {
 
     pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WpApiError> {
         self.parse_response_for_generic_errors()?;
-        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
+        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ResponseParsingError {
             reason: err.to_string(),
             response: self.body_as_string(),
         })

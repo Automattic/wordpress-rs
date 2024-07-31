@@ -40,7 +40,7 @@ pub enum WpApiError {
     #[error("Error while parsing site url: {}", reason)]
     SiteUrlParsingError { reason: String },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
-    ParsingError { reason: String, response: String },
+    ResponseParsingError { reason: String, response: String },
     #[error(
         "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
         status_code,
