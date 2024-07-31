@@ -212,7 +212,7 @@ pub enum WpErrorCode {
     // Fallback to a `String` error code
     // ------------------------------------------------------------------------------------
     #[serde(untagged)]
-    Fallback(String),
+    CustomError(String),
 }
 
 impl From<RequestExecutionError> for WpApiError {
