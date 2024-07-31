@@ -43,6 +43,9 @@ struct ExampleApp: App {
                 WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates(),
                 WordPressAPI.globalInstance.siteHealthTests.loopbackRequests()
             ].map { $0.asListViewData }
+        }),
+        RootListData(name: "Site Settings", callback: {
+            return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().asListViewDataItems
         })
     ]
 
