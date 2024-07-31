@@ -36,13 +36,17 @@ struct ExampleApp: App {
             ]
         }),
         RootListData(name: "Site Health Tests", callback: {
-            return try await [
+            let items: [any ListViewDataConvertable] = try await [
                 WordPressAPI.globalInstance.siteHealthTests.authorizationHeader(),
-                WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
-                WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
                 WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates(),
-                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests()
-            ].map { $0.asListViewData }
+                WordPressAPI.globalInstance.siteHealthTests.directorySizes(),
+                WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
+                WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
+                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests(),
+                WordPressAPI.globalInstance.siteHealthTests.pageCache()
+            ]
+
+            return items.map { $0.asListViewData }
         })
     ]
 
