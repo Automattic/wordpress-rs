@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.PostType
 import uniffi.wp_api.PostTypeCapabilities
 import uniffi.wp_api.PostTypeSupports
-import uniffi.wp_api.WpRestErrorCode
+import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,32 +22,26 @@ class PostTypesEndpointTest {
 
     @Test
     fun testPostTypesListRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val postTypes = client.request { requestBuilder ->
             requestBuilder.postTypes().listWithEditContext()
-        }
-        assert(result is WpRequestSuccess)
-        val postTypes = (result as WpRequestSuccess).data.postTypes
+        }.assertSuccessAndRetrieveData().postTypes
         assertEquals("Posts", postTypes[PostType.Post]!!.name)
     }
 
     @Test
     fun testPostTypesRetrievePost() = runTest {
-        val result = client.request { requestBuilder ->
+        val postTypesPost = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.Post)
-        }
-        assert(result is WpRequestSuccess)
-        val postTypesPost = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assert(postTypesPost.supports[PostTypeSupports.Title]!!)
         assertFalse(postTypesPost.capabilities[PostTypeCapabilities.EditPosts]!!.isEmpty())
     }
 
     @Test
     fun testPostTypesWpFontFaceDoesNotSupportAuthor() = runTest {
-        val result = client.request { requestBuilder ->
+        val postTypesPost = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.WpFontFace)
-        }
-        assert(result is WpRequestSuccess)
-        val postTypesPost = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertNull(postTypesPost.supports[PostTypeSupports.Author])
     }
 
@@ -56,7 +50,6 @@ class PostTypesEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.Custom("does_not_exist"))
         }
-        assert(result is RecognizedRestError)
-        assert((result as RecognizedRestError).error.code is WpRestErrorCode.TypeInvalid)
+        assert(result.wpErrorCode() is WpErrorCode.TypeInvalid)
     }
 }

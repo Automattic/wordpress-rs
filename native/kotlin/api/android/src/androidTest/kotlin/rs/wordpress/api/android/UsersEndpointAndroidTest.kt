@@ -4,7 +4,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
 import rs.wordpress.api.kotlin.WpApiClient
-import rs.wordpress.api.kotlin.WpRequestSuccess
+import rs.wordpress.api.kotlin.WpRequestResult
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
@@ -25,8 +25,8 @@ class UsersEndpointAndroidTest {
         val result = client.request { requestBuilder ->
             requestBuilder.users().listWithEditContext(params = UserListParams())
         }
-        assert(result is WpRequestSuccess)
-        val userList = (result as WpRequestSuccess).data
+        assert(result is WpRequestResult.WpRequestSuccess)
+        val userList = (result as WpRequestResult.WpRequestSuccess).data
         Assert.assertEquals(NUMBER_OF_USERS, userList.count())
         Assert.assertEquals(FIRST_USER_EMAIL, userList.first().email)
     }

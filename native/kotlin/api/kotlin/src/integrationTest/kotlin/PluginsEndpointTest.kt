@@ -8,7 +8,7 @@ import uniffi.wp_api.PluginSlug
 import uniffi.wp_api.PluginStatus
 import uniffi.wp_api.PluginWpOrgDirectorySlug
 import uniffi.wp_api.SparsePluginFieldWithEditContext
-import uniffi.wp_api.WpRestErrorCode
+import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -31,24 +31,23 @@ class PluginsEndpointTest {
 
     @Test
     fun testPluginListRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val pluginList = client.request { requestBuilder ->
             requestBuilder.plugins().listWithEditContext(params = PluginListParams())
-        }
-        assert(result is WpRequestSuccess)
-        val pluginList = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_PLUGINS, pluginList.count())
     }
 
     @Test
     fun testFilterPluginListRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val pluginList = client.request { requestBuilder ->
             requestBuilder.plugins().filterListWithEditContext(
                 params = PluginListParams(),
-                fields = listOf(SparsePluginFieldWithEditContext.AUTHOR, SparsePluginFieldWithEditContext.VERSION)
+                fields = listOf(
+                    SparsePluginFieldWithEditContext.AUTHOR,
+                    SparsePluginFieldWithEditContext.VERSION
+                )
             )
-        }
-        assert(result is WpRequestSuccess)
-        val pluginList = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_PLUGINS, pluginList.count())
         pluginList.forEach {
             assertNotNull(it.author)
@@ -61,7 +60,7 @@ class PluginsEndpointTest {
     @Test
     fun testFilterRetrievePluginRequest() = runTest {
         val pluginSlug = PluginSlug(HELLO_DOLLY_PLUGIN_SLUG)
-        val result = client.request { requestBuilder ->
+        val sparsePlugin = client.request { requestBuilder ->
             requestBuilder.plugins().filterRetrieveWithEditContext(
                 pluginSlug = pluginSlug,
                 fields = listOf(
@@ -70,9 +69,7 @@ class PluginsEndpointTest {
                     SparsePluginFieldWithEditContext.STATUS
                 )
             )
-        }
-        assert(result is WpRequestSuccess)
-        val sparsePlugin = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(pluginSlug, sparsePlugin.plugin)
         assertNotNull(sparsePlugin.requiresWp)
         assertNotNull(sparsePlugin.status)
@@ -90,8 +87,7 @@ class PluginsEndpointTest {
                 )
             )
         }
-        assert(result is RecognizedRestError)
-        assert((result as RecognizedRestError).error.code is WpRestErrorCode.CannotInstallPlugin)
+        assert(result.wpErrorCode() is WpErrorCode.CannotInstallPlugin)
     }
 
     @Test
@@ -99,7 +95,6 @@ class PluginsEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.plugins().delete(PluginSlug(HELLO_DOLLY_PLUGIN_SLUG))
         }
-        assert(result is RecognizedRestError)
-        assert((result as RecognizedRestError).error.code is WpRestErrorCode.CannotDeleteActivePlugin)
+        assert(result.wpErrorCode() is WpErrorCode.CannotDeleteActivePlugin)
     }
 }

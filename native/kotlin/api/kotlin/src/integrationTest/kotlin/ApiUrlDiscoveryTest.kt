@@ -9,10 +9,10 @@ class ApiUrlDiscoveryTest {
 
     @Test
     fun testFindsCorrectApiUrls() = runTest {
-        val urlDiscovery = loginClient.apiDiscovery("https://orchestremetropolitain.com/fr/").getOrThrow()
-        assertEquals("https://orchestremetropolitain.com/wp-json/", urlDiscovery.apiRootUrl.url())
+        val urlDiscovery = loginClient.apiDiscovery("https://automatticwidgets.wpcomstaging.com/").getOrThrow()
+        assertEquals("https://automatticwidgets.wpcomstaging.com/wp-json/", urlDiscovery.apiRootUrl.url())
         assertEquals(
-            "https://orchestremetropolitain.com/wp-admin/authorize-application.php",
+            "https://automatticwidgets.wpcomstaging.com/wp-admin/authorize-application.php",
             urlDiscovery.apiDetails.findApplicationPasswordsAuthenticationUrl()
         )
     }
