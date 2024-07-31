@@ -72,12 +72,38 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
 }
 
 extension SiteHealthTest: ListViewDataConvertable {
+    public var id: String {
+        self.label
+    }
+
     var asListViewData: ListViewData {
         ListViewData(id: self.label, title: self.label, subtitle: self.status, fields: [:])
     }
+}
 
+extension SiteHealthDirectorySizes: ListViewDataConvertable {
     public var id: String {
-        self.label
+        [
+            self.databaseSize.size,
+            self.fontsSize.size,
+            self.pluginsSize.size,
+            self.themesSize.size,
+            self.totalSize.size,
+            self.uploadsSize.size,
+            self.wordpressSize.size
+        ].joined(separator: "-")
+    }
+
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id, title: "Site Health Directory Sizes", subtitle: "Total Size: \(totalSize.size)", fields: [
+            "Database Size": databaseSize.size,
+            "Fonts Size": fontsSize.size,
+            "Plugins Size": pluginsSize.size,
+            "Themes Size": themesSize.size,
+            "Total Size": totalSize.size,
+            "Uploads Size": uploadsSize.size,
+            "WordPress Size": wordpressSize.size
+        ])
     }
 }
 
