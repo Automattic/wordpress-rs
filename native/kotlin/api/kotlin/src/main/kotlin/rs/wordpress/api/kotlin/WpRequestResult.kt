@@ -1,9 +1,32 @@
 package rs.wordpress.api.kotlin
 
-import uniffi.wp_api.UnrecognizedWpRestError
-import uniffi.wp_api.WpRestError
+import uniffi.wp_api.WpErrorCode
 
-sealed class WpRequestResult<T>
-class RecognizedRestError<T>(val error: WpRestError) : WpRequestResult<T>()
-class UnrecognizedRestError<T>(val error: UnrecognizedWpRestError) : WpRequestResult<T>()
-class WpRequestSuccess<T>(val data: T) : WpRequestResult<T>()
+sealed class WpRequestResult<T> {
+    class WpRequestSuccess<T>(val data: T) : WpRequestResult<T>()
+    class WpError<T>(
+        val errorCode: WpErrorCode,
+        val errorMessage: String,
+        val statusCode: UShort,
+        val response: String,
+    ) : WpRequestResult<T>()
+
+    class RequestExecutionFailed<T>(
+        val statusCode: UShort?,
+        val reason: String,
+    ) : WpRequestResult<T>()
+
+    class SiteUrlParsingError<T>(
+        val reason: String,
+    ) : WpRequestResult<T>()
+
+    class ResponseParsingError<T>(
+        val reason: String,
+        val response: String,
+    ) : WpRequestResult<T>()
+
+    class UnknownError<T>(
+        val statusCode: UShort,
+        val response: String,
+    ) : WpRequestResult<T>()
+}
