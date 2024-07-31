@@ -204,6 +204,11 @@ pub enum WpErrorCode {
     WpCoreUnableToDetermineInstalledPlugin,
     #[serde(rename = "unexpected_output")]
     WpCoreUnexpectedOutput,
+    // ------------------------------------------------------------------------------------
+    // Fallback to a `String` error code
+    // ------------------------------------------------------------------------------------
+    #[serde(untagged)]
+    Fallback(String),
 }
 
 impl From<RequestExecutionError> for WpApiError {

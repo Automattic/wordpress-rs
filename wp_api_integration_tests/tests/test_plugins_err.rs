@@ -2,8 +2,8 @@ use wp_api::plugins::{PluginCreateParams, PluginListParams, PluginStatus, Plugin
 use wp_api::WpErrorCode;
 
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, AssertWpError, HELLO_DOLLY_PLUGIN_SLUG,
-    WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
+    api_client, api_client_as_subscriber, AssertWpError, CLASSIC_EDITOR_PLUGIN_SLUG,
+    HELLO_DOLLY_PLUGIN_SLUG, WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
 
 #[tokio::test]
@@ -16,6 +16,18 @@ async fn create_plugin_err_cannot_install_plugin() {
         })
         .await
         .assert_wp_error(WpErrorCode::CannotInstallPlugin);
+}
+
+#[tokio::test]
+async fn create_plugin_err_plugins_api_failed() {
+    api_client()
+        .plugins()
+        .create(&PluginCreateParams {
+            slug: CLASSIC_EDITOR_PLUGIN_SLUG.into(),
+            status: PluginStatus::Active,
+        })
+        .await
+        .assert_wp_error(WpErrorCode::Fallback("plugins_api_failed".to_string()));
 }
 
 #[tokio::test]
