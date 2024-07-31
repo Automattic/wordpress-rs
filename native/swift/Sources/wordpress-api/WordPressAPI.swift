@@ -59,6 +59,10 @@ public struct WordPressAPI {
         self.requestBuilder.postTypes()
     }
 
+    public var siteSettings: SiteSettingsRequestExecutor {
+        self.requestBuilder.siteSettings()
+    }
+
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         try await withCheckedThrowingContinuation { continuation in
             self.perform(request: request) { result in
