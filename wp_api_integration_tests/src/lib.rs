@@ -115,7 +115,7 @@ where
     println!("Restoring wp-content/plugins..");
 
     let wp_content_path =
-        std::env::var("WP_CONTENT_PATH").unwrap_or("/app/.wordpress/wp-content".to_string());
+        std::env::var("WP_CONTENT_PATH").unwrap_or("/var/www/html/wp-content".to_string());
 
     std::fs::remove_dir_all(wp_content_path.clone() + "/plugins")
         .expect("Failed to remove old plugins");

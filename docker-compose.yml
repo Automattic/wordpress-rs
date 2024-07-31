@@ -5,8 +5,7 @@ services:
         ports:
             - '80:80'
         volumes:
-            - .wordpress:/var/www/html
-            - ./test_credentials:/tmp/test_credentials
+            - ./:/app
         environment:
             WORDPRESS_DB_HOST: database
             WORDPRESS_DB_USER: wordpress

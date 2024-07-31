@@ -8,9 +8,9 @@ where
     F: FnOnce(WordPressDb) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let hostname = std::env::var("DB_HOSTNAME").unwrap_or("host.docker.internal".to_string());
+    let hostname = std::env::var("DB_HOSTNAME").unwrap_or("database".to_string());
     let wp_content_path =
-        std::env::var("WP_CONTENT_PATH").unwrap_or("/app/.wordpress/wp-content".to_string());
+        std::env::var("WP_CONTENT_PATH").unwrap_or("/var/www/html/wp-content".to_string());
     let db_dump_path = format!("{}/dump.sql", wp_content_path);
 
     let options = MySqlConnectOptions::new()

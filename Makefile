@@ -200,15 +200,15 @@ test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
 
 test-rust-integration:
-	docker run -v $(PWD):/app -w /app -i --add-host=host.docker.internal:host-gateway $(rust_docker_container) /bin/bash < ./scripts/docker-integration-tests.sh
+	docker exec -i wordpress /bin/bash < ./scripts/run-integration-tests.sh
 
 test-rust-integration-local:
 	./scripts/local-integration-tests.sh
 
 test-server: stop-server
 	@# Help: Start the test server.
-	rm -rf .wordpress
-	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
+
+	rm -rf target # Avoid cross-platform compilation issues
 
 	docker-compose up -d
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh

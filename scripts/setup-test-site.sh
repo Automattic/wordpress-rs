@@ -13,8 +13,10 @@ curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.p
 chmod +x /usr/bin/wp
 
 # Install `mysqlcheck` – needed for `wp db check`
-# Install `less` - needed for `wp_cli`
-apt update && apt install -y default-mysql-client less
+apt update && apt install -y default-mysql-client less libssl-dev
+
+# Install `rustup` – needed to run tests
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Create wpcli working directory (it can't be created by the `www-data` user`)
 mkdir -p /var/www/.wp-cli
@@ -85,7 +87,7 @@ wp plugin delete wordpress-importer
 
 rm -rf /tmp/test_credentials && touch /tmp/test_credentials
 {
-  printf "http://host.docker.internal\ntest@example.com\n"
+  printf "http://localhost\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
   wp user application-password create test@example.com test --porcelain 
   wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p'
