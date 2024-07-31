@@ -1,7 +1,9 @@
 use wp_derive_request_builder::WpDerivedRequest;
 
 use crate::wp_site_health_tests::{
-    SparseWpSiteHealthTest, SparseWpSiteHealthTestField, WpSiteHealthTest,
+    SparseWpSiteHealthDirectorySizes, SparseWpSiteHealthDirectorySizesField,
+    SparseWpSiteHealthTest, SparseWpSiteHealthTestField, WpSiteHealthDirectorySizes,
+    WpSiteHealthTest,
 };
 
 use super::{DerivedRequest, Namespace};
@@ -18,6 +20,10 @@ enum WpSiteHealthTestsRequest {
     DotorgCommunication,
     #[get(url = "/tests/authorization-header", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
     AuthorizationHeader,
+    #[get(url = "/tests/page-cache", output = SparseWpSiteHealthTest, filter_by = SparseWpSiteHealthTestField)]
+    PageCache,
+    #[get(url = "/directory-sizes", output = SparseWpSiteHealthDirectorySizes, filter_by = SparseWpSiteHealthDirectorySizesField)]
+    DirectorySizes,
 }
 
 impl DerivedRequest for WpSiteHealthTestsRequest {
@@ -124,6 +130,42 @@ mod tests {
             );
         } else {
             validate_wp_site_health_endpoint(endpoint.authorization_header(), expected_path);
+        }
+    }
+
+    #[rstest]
+    #[case(None, "/tests/page-cache")]
+    #[case(Some(vec![SparseWpSiteHealthTestField::Test]), "/tests/page-cache?_fields=test")]
+    fn page_cache(
+        endpoint: WpSiteHealthTestsRequestEndpoint,
+        #[case] sparse_fields: Option<Vec<SparseWpSiteHealthTestField>>,
+        #[case] expected_path: &str,
+    ) {
+        if let Some(sparse_fields) = sparse_fields {
+            validate_wp_site_health_endpoint(
+                endpoint.filter_page_cache(&sparse_fields),
+                expected_path,
+            );
+        } else {
+            validate_wp_site_health_endpoint(endpoint.page_cache(), expected_path);
+        }
+    }
+
+    #[rstest]
+    #[case(None, "/directory-sizes")]
+    #[case(Some(vec![SparseWpSiteHealthDirectorySizesField::WordpressSize]), "/directory-sizes?_fields=wordpress_size")]
+    fn directory_sizes(
+        endpoint: WpSiteHealthTestsRequestEndpoint,
+        #[case] sparse_fields: Option<Vec<SparseWpSiteHealthDirectorySizesField>>,
+        #[case] expected_path: &str,
+    ) {
+        if let Some(sparse_fields) = sparse_fields {
+            validate_wp_site_health_endpoint(
+                endpoint.filter_directory_sizes(&sparse_fields),
+                expected_path,
+            );
+        } else {
+            validate_wp_site_health_endpoint(endpoint.directory_sizes(), expected_path);
         }
     }
 
