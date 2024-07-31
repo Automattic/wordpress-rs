@@ -21,7 +21,7 @@ struct ExampleApp: App {
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Post Types", callback: {
-            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().postTypes.map { key, value in
+            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().postTypes.map { _, value in
                 value.asListViewData
             }
         }),
