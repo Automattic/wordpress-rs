@@ -3,7 +3,10 @@ use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum PostType {
     Post,
     Page,
@@ -15,6 +18,7 @@ pub enum PostType {
     WpNavigation,
     WpFontFamily,
     WpFontFace,
+    #[serde(untagged)]
     Custom(String),
 }
 
@@ -38,27 +42,12 @@ impl Display for PostType {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-pub struct SparseListPostTypesResponse {
+#[serde(transparent)]
+pub struct SparsePostTypesResponse {
+    #[serde(flatten)]
     #[WpContext(edit, embed, view)]
-    pub post: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub page: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub attachment: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub nav_menu_item: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub wp_block: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub wp_template: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub wp_template_part: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub wp_navigation: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub wp_font_family: Option<SparsePostTypeDetails>,
-    #[WpContext(edit, embed, view)]
-    pub wp_font_face: Option<SparsePostTypeDetails>,
+    #[WpContextualField]
+    pub post_types: Option<HashMap<PostType, SparsePostTypeDetails>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record, WpContextual)]

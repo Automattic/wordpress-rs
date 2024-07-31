@@ -21,19 +21,9 @@ struct ExampleApp: App {
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Post Types", callback: {
-            let postTypeList = try await WordPressAPI.globalInstance.postTypes.listWithViewContext()
-            return [
-                postTypeList.post.asListViewData,
-                postTypeList.page.asListViewData,
-                postTypeList.attachment.asListViewData,
-                postTypeList.navMenuItem.asListViewData,
-                postTypeList.wpBlock.asListViewData,
-                postTypeList.wpTemplate.asListViewData,
-                postTypeList.wpTemplatePart.asListViewData,
-                postTypeList.wpNavigation.asListViewData,
-                postTypeList.wpFontFamily.asListViewData,
-                postTypeList.wpFontFace.asListViewData
-            ]
+            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().postTypes.map { _, value in
+                value.asListViewData
+            }
         }),
         RootListData(name: "Site Health Tests", callback: {
             return try await [

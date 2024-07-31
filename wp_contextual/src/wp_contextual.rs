@@ -587,11 +587,18 @@ fn find_contextual_field_inner_segment(
             syn::PathArguments::AngleBracketed(ref mut path_args) => path_args
                 .args
                 .iter_mut()
-                .find_map(|generic_arg| {
+                .filter_map(|generic_arg| {
                     if let syn::GenericArgument::Type(tty) = generic_arg {
                         Some(find_contextual_field_inner_segment(tty))
                     } else {
                         None
+                    }
+                })
+                .find(|r| {
+                    if let Ok(p) = r {
+                        p.ident.to_string().starts_with(IDENT_PREFIX)
+                    } else {
+                        false
                     }
                 })
                 .ok_or(unsupported_err)?,
@@ -816,9 +823,9 @@ mod tests {
     #[test]
     fn find_contextual_field_inner_segment_simple() {
         validate_find_contextual_field_inner_segment(
-            "Bar",
+            "SparseBar",
             parse_quote! {
-                let foo: Option<Bar>;
+                let foo: Option<SparseBar>;
             },
         );
     }
@@ -826,9 +833,9 @@ mod tests {
     #[test]
     fn find_contextual_field_inner_segment_wrapped_in_vec() {
         validate_find_contextual_field_inner_segment(
-            "Bar",
+            "SparseBar",
             parse_quote! {
-                let foo: Option<Vec<Bar>>;
+                let foo: Option<Vec<SparseBar>>;
             },
         );
     }
@@ -836,9 +843,9 @@ mod tests {
     #[test]
     fn find_contextual_field_inner_segment_wrapped_in_segmented_vec() {
         validate_find_contextual_field_inner_segment(
-            "Bar",
+            "SparseBar",
             parse_quote! {
-                let foo: Option<std::vec::Vec<Bar>>;
+                let foo: Option<std::vec::Vec<SparseBar>>;
             },
         );
     }
@@ -846,9 +853,19 @@ mod tests {
     #[test]
     fn find_contextual_field_inner_segment_wrapped_in_multiple_vecs() {
         validate_find_contextual_field_inner_segment(
-            "Bar",
+            "SparseBar",
             parse_quote! {
-                let foo: Option<std::vec::Vec<Vec<Bar>>>;
+                let foo: Option<std::vec::Vec<Vec<SparseBar>>>;
+            },
+        );
+    }
+
+    #[test]
+    fn find_contextual_field_inner_segment_wrapped_in_hash_map() {
+        validate_find_contextual_field_inner_segment(
+            "SparseBar",
+            parse_quote! {
+                let foo: Option<HashMap<String, SparseBar>>;
             },
         );
     }

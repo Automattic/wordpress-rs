@@ -12,33 +12,57 @@ use wp_api_integration_tests::{api_client, AssertResponse};
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_edit_context() {
-    api_client()
+    let response = api_client()
         .post_types()
         .list_with_edit_context()
         .await
         .assert_response();
+    assert_eq!(
+        response
+            .post_types
+            .get(&PostType::Post)
+            .expect("Our local WordPress test site supports `post` type")
+            .name,
+        "Posts"
+    );
 }
 
 #[rstest]
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_embed_context() {
-    api_client()
+    let response = api_client()
         .post_types()
         .list_with_embed_context()
         .await
         .assert_response();
+    assert_eq!(
+        response
+            .post_types
+            .get(&PostType::Post)
+            .expect("Our local WordPress test site supports `post` type")
+            .name,
+        "Posts"
+    );
 }
 
 #[rstest]
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_view_context() {
-    api_client()
+    let response = api_client()
         .post_types()
         .list_with_view_context()
         .await
         .assert_response();
+    assert_eq!(
+        response
+            .post_types
+            .get(&PostType::Post)
+            .expect("Our local WordPress test site supports `post` type")
+            .name,
+        "Posts"
+    );
 }
 
 #[rstest]
