@@ -35,11 +35,8 @@ constructor(
             WpRequestResult.WpRequestSuccess(data = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
             when (exception) {
-                is WpApiException.WpException -> WpRequestResult.WpError(
-                    errorCode = exception.errorCode,
-                    errorMessage = exception.errorMessage,
+                is WpApiException.InvalidStatusCode -> WpRequestResult.InvalidStatusCode(
                     statusCode = exception.statusCode,
-                    response = exception.response,
                 )
                 is WpApiException.RequestExecutionFailed -> WpRequestResult.RequestExecutionFailed(
                     statusCode = exception.statusCode,
@@ -53,6 +50,12 @@ constructor(
                     reason = exception.reason,
                 )
                 is WpApiException.UnknownException -> WpRequestResult.UnknownError(
+                    statusCode = exception.statusCode,
+                    response = exception.response,
+                )
+                is WpApiException.WpException -> WpRequestResult.WpError(
+                    errorCode = exception.errorCode,
+                    errorMessage = exception.errorMessage,
                     statusCode = exception.statusCode,
                     response = exception.response,
                 )
