@@ -15,6 +15,8 @@ pub enum RequestExecutionError {
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
+    #[error("Status code ({}) is not valid", status_code)]
+    InvalidStatusCode { status_code: u16 },
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
         status_code,
@@ -24,6 +26,16 @@ pub enum WpApiError {
         status_code: Option<u16>,
         reason: String,
     },
+    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
+    ResponseParsingError { reason: String, response: String },
+    #[error("Error while parsing site url: {}", reason)]
+    SiteUrlParsingError { reason: String },
+    #[error(
+        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
+        status_code,
+        response
+    )]
+    UnknownError { status_code: u16, response: String },
     #[error(
         "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"\n\tresponse: \"{}\"\n}}",
         status_code,
@@ -37,18 +49,6 @@ pub enum WpApiError {
         status_code: u16,
         response: String,
     },
-    #[error("Error while parsing site url: {}", reason)]
-    SiteUrlParsingError { reason: String },
-    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
-    ResponseParsingError { reason: String, response: String },
-    #[error("Status code ({}) is not valid", status_code)]
-    InvalidStatusCode { status_code: u16 },
-    #[error(
-        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
-        status_code,
-        response
-    )]
-    UnknownError { status_code: u16, response: String },
 }
 
 // This type is used to parse the API errors. It then gets converted to `WpApiError::WpError`.
