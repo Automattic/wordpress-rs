@@ -41,6 +41,8 @@ pub enum WpApiError {
     SiteUrlParsingError { reason: String },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ResponseParsingError { reason: String, response: String },
+    #[error("Status code ({}) is not valid", status_code)]
+    InvalidStatusCode { status_code: u16 },
     #[error(
         "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
         status_code,
