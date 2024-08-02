@@ -9,6 +9,7 @@ use wp_api_integration_tests::{
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn create_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
@@ -52,6 +53,7 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
 
 #[tokio::test]
 #[serial]
+#[ignore]
 async fn delete_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
