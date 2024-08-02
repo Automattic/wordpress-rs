@@ -85,7 +85,7 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-rm -rf /tmp/test_credentials && touch /tmp/test_credentials
+rm -rf /app/test_credentials && touch /app/test_credentials
 {
   printf "http://localhost\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
@@ -95,7 +95,7 @@ rm -rf /tmp/test_credentials && touch /tmp/test_credentials
   ## Create an Application password for a subscriber user, and store it where it can be used by the test suite
   wp user application-password create themedemos test --porcelain
   wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p'
-} >> /tmp/test_credentials
+} >> /app/test_credentials
 
 ## Used for integration tests
 wp plugin install hello-dolly --activate

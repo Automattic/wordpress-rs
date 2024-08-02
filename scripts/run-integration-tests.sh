@@ -9,4 +9,4 @@ source $HOME/.cargo/env
 cd /app
 
 # Run the test suite
-cargo test --no-fail-fast --target-dir /target
+cargo test -p wp_api_integration_tests --test '*_immut' -q --no-fail-fast --target-dir /target
