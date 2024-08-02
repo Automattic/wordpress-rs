@@ -17,7 +17,6 @@ services:
 
                 # Disable auto-update – it makes Dockerized tests super unstable
                 define( 'WP_AUTO_UPDATE_CORE', false );
-            API_URL: http://localhost
         healthcheck:
             test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
             interval: 4s
