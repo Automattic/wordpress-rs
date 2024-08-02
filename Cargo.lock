@@ -3342,6 +3342,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "clap",
  "futures",
  "http 1.1.0",
  "paste",

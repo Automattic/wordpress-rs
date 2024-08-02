@@ -109,6 +109,10 @@ where
     Fut: Future<Output = ()>,
 {
     f().await;
+    restore_wp_content_plugins().await;
+}
+
+pub async fn restore_wp_content_plugins() {
     println!("Restoring wp-content/plugins..");
 
     let wp_content_path =
@@ -118,7 +122,7 @@ where
         .expect("Failed to remove old plugins");
 
     let options = uu_cp::Options {
-        attributes: uu_cp::Attributes::NONE,
+        attributes: uu_cp::Attributes::DEFAULT,
         attributes_only: false,
         copy_contents: false,
         cli_dereference: false,

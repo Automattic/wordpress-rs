@@ -202,6 +202,9 @@ test-rust-wp-derived-request-parser:
 test-rust-integration:
 	docker exec -i wordpress /bin/bash < ./scripts/run-integration-tests.sh
 
+restore-server-from-backup:
+	docker exec -i wordpress /bin/bash < ./scripts/restore-wp-content-plugins.sh
+
 test-server: stop-server
 	@# Help: Start the test server.
 
