@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::Future;
-use std::path::PathBuf;
-use std::{process::Command, sync::Arc};
+use std::sync::Arc;
 use wp_api::{
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
@@ -11,9 +10,9 @@ use wp_api::{
     WpRestErrorCode, WpRestErrorWrapper,
 };
 
-// `pub` to avoid 'unused' & 'dead_code' warnings
-pub mod wp_cli;
-pub mod wp_db;
+mod fs_utils;
+pub mod wp_cli; // `pub` to avoid 'unused' & 'dead_code' warnings
+pub mod wp_db; // `pub` to avoid 'unused' & 'dead_code' warnings
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
@@ -109,48 +108,7 @@ where
     Fut: Future<Output = ()>,
 {
     f().await;
-    restore_wp_content_plugins().await;
-}
-
-pub async fn restore_wp_content_plugins() {
-    println!("Restoring wp-content/plugins..");
-
-    let wp_content_path =
-        std::env::var("WP_CONTENT_PATH").unwrap_or("/var/www/html/wp-content".to_string());
-
-    std::fs::remove_dir_all(wp_content_path.clone() + "/plugins")
-        .expect("Failed to remove old plugins");
-
-    let options = uu_cp::Options {
-        attributes: uu_cp::Attributes::DEFAULT,
-        attributes_only: false,
-        copy_contents: false,
-        cli_dereference: false,
-        copy_mode: uu_cp::CopyMode::Copy,
-        dereference: true,
-        one_file_system: false,
-        parents: false,
-        update: uu_cp::UpdateMode::ReplaceAll,
-        debug: false,
-        verbose: false,
-        strip_trailing_slashes: false,
-        reflink_mode: uu_cp::ReflinkMode::Auto,
-        sparse_mode: uu_cp::SparseMode::Auto,
-        backup: uu_cp::BackupMode::NoBackup,
-        backup_suffix: "~".to_owned(),
-        no_target_dir: false,
-        overwrite: uu_cp::OverwriteMode::Clobber(uu_cp::ClobberMode::Standard),
-        recursive: true, // !
-        target_dir: None,
-        progress_bar: false,
-    };
-
-    uu_cp::copy(
-        &[PathBuf::from(wp_content_path.clone() + "/plugins-backup")],
-        &PathBuf::from(wp_content_path.clone() + "/plugins"),
-        &options,
-    )
-    .expect("Failed to restore wp-content/plugins");
+    fs_utils::restore_wp_content_plugins().await;
 }
 
 #[derive(Debug)]

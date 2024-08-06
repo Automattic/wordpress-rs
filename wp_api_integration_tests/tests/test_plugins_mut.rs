@@ -9,7 +9,6 @@ use wp_api_integration_tests::{
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn create_plugin() {
     run_and_restore_wp_content_plugins(|| {
         wp_db::run_and_restore(|mut _db| async move {
@@ -53,15 +52,15 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn delete_plugin() {
-    run_and_restore_wp_content_plugins(|| {
-        wp_db::run_and_restore(|mut _db| async move {
+    wp_db::run_and_restore(|mut _db| async move {
+        run_and_restore_wp_content_plugins(|| async move {
             let slug = CLASSIC_EDITOR_PLUGIN_SLUG.into();
             let deleted_plugin = api_client().plugins().delete(&slug).await.assert_response();
             assert_eq!(slug, deleted_plugin.previous.plugin);
             println!("Deleted Plugin: {:?}", deleted_plugin);
         })
+        .await
     })
     .await;
 }
