@@ -11,8 +11,8 @@ use wp_api::{
 };
 
 mod fs_utils;
-pub mod wp_cli; // `pub` to avoid 'unused' & 'dead_code' warnings
-pub mod wp_db; // `pub` to avoid 'unused' & 'dead_code' warnings
+pub mod wp_cli;
+pub mod wp_db;
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
