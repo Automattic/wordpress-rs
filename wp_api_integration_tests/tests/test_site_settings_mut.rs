@@ -17,7 +17,7 @@ macro_rules! generate_test {
         paste::paste! {
             #[tokio::test]
             #[serial]
-            async fn [<update_site_setttings_ $ident>]() {
+            async fn [<update_site_settings_ $ident>]() {
                 wp_db::run_and_restore(|_db| async move {
                     let new_value = $value;
                     let assertion_value = $assertion_value.to_string();

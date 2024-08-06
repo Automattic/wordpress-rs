@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashMap, ffi::OsStr, process::Command};
 
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +41,7 @@ pub struct WpCliSiteSettings {
 
 impl WpCliSiteSettings {
     pub fn fetch() -> Result<Self> {
-        let output = run_wp_cli_command("option list --format=json");
+        let output = run_wp_cli_command(["option", "list"]);
         let map = serde_json::from_slice::<Vec<WpCliSiteSettingsOption>>(&output.stdout)
             .with_context(|| {
                 "Failed to parse `wp option list --format=json` into Vec<WpCliSiteSettingsOption>"
@@ -53,12 +53,17 @@ impl WpCliSiteSettings {
     }
 }
 
-fn run_wp_cli_command(args: impl AsRef<str>) -> std::process::Output {
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("run-wp-cli-command")
-        .arg(format!("ARGS={}", args.as_ref()))
+fn run_wp_cli_command<I, S>(args: I) -> std::process::Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::new("wp")
+        .arg("--allow-root")
+        .arg("--http=http://localhost")
+        .arg("--path=/var/www/html")
+        .arg("--format=json")
+        .args(args)
         .output()
         .expect("Failed to run wp-cli command")
 }

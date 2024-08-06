@@ -22,6 +22,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 mkdir -p /var/www/.wp-cli
 chown -R www-data:www-data /var/www/.wp-cli/
 
+# Run this command as root user since that's what the Docker will use when we run
+# --http=http://localhost commands
+wp --allow-root package install wp-cli/restful
+
 # Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
 # be any weird permissions issues)
 su -s /bin/bash www-data
@@ -98,6 +102,7 @@ rm -rf /app/test_credentials && touch /app/test_credentials
 } >> /app/test_credentials
 
 ## Used for integration tests
+wp language core install en_CA
 wp plugin install hello-dolly --activate
 wp plugin install classic-editor
 
