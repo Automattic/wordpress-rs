@@ -10,11 +10,13 @@ use wp_api::{
     WpRestErrorCode, WpRestErrorWrapper,
 };
 
-mod fs_utils;
+pub mod fs_utils;
 pub mod wp_cli;
 pub mod wp_db;
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
+
+pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);

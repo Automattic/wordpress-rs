@@ -3,18 +3,17 @@ use sqlx::types::chrono;
 use sqlx::Executor;
 use sqlx::{mysql::MySqlConnectOptions, ConnectOptions, MySqlConnection};
 
+use crate::TEST_SITE_WP_CONTENT_PATH;
+
 pub async fn run_and_restore<F, Fut>(f: F)
 where
     F: FnOnce(WordPressDb) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let hostname = std::env::var("DB_HOSTNAME").unwrap_or("database".to_string());
-    let wp_content_path =
-        std::env::var("WP_CONTENT_PATH").unwrap_or("/var/www/html/wp-content".to_string());
-    let db_dump_path = format!("{}/dump.sql", wp_content_path);
+    let db_dump_path = format!("{}/dump.sql", TEST_SITE_WP_CONTENT_PATH);
 
     let options = MySqlConnectOptions::new()
-        .host(hostname.as_str())
+        .host("database")
         .username("wordpress")
         .password("wordpress")
         .database("wordpress");

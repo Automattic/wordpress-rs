@@ -2,14 +2,13 @@ use std::fs::metadata;
 use std::path::Path;
 use std::{fs, io};
 
+use crate::TEST_SITE_WP_CONTENT_PATH;
+
 pub async fn restore_wp_content_plugins() {
     println!("Restoring wp-content/plugins..");
 
-    let wp_content_path =
-        &std::env::var("WP_CONTENT_PATH").unwrap_or("/var/www/html/wp-content".to_string());
-
-    let plugins_folder = &format!("{}/plugins", wp_content_path);
-    let plugins_backup_folder = &format!("{}/plugins-backup", wp_content_path);
+    let plugins_folder = &format!("{}/plugins", TEST_SITE_WP_CONTENT_PATH);
+    let plugins_backup_folder = &format!("{}/plugins-backup", TEST_SITE_WP_CONTENT_PATH);
 
     std::fs::remove_dir_all(plugins_folder).expect("Failed to remove old plugins");
 

@@ -1,7 +1,5 @@
 use clap::{Parser, Subcommand};
-use fs_utils::restore_wp_content_plugins;
-
-mod fs_utils;
+use wp_api_integration_tests::fs_utils::restore_wp_content_plugins;
 
 #[tokio::main]
 async fn main() {
