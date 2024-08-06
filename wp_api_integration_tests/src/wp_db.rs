@@ -15,24 +15,20 @@ where
         .password("wordpress")
         .database("wordpress");
     let conn = MySqlConnectOptions::connect(&options).await.unwrap();
-    f(WordPressDb { conn }).await
+    f(WordPressDb { conn }).await;
+
+    // Restore WordPressDB from backup
+    Command::new("make")
+        .arg("-C")
+        .arg("../")
+        .arg("restore-mysql")
+        .status()
+        .expect("Failed to restore db");
 }
 
 #[derive(Debug)]
 pub struct WordPressDb {
     conn: MySqlConnection,
-}
-
-impl Drop for WordPressDb {
-    fn drop(&mut self) {
-        println!("Restoring WordPressDB..");
-        Command::new("make")
-            .arg("-C")
-            .arg("../")
-            .arg("restore-mysql")
-            .status()
-            .expect("Failed to restore db");
-    }
 }
 
 impl WordPressDb {

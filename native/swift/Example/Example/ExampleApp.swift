@@ -37,6 +37,9 @@ struct ExampleApp: App {
             ]
 
             return items.map { $0.asListViewData }
+        }),
+        RootListData(name: "Site Settings", callback: {
+            return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().asListViewDataItems
         })
     ]
 

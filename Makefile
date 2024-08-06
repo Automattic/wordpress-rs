@@ -213,7 +213,7 @@ dump-mysql:
 	docker exec -it wordpress-rs-database-1 mariadb-dump -u wordpress -pwordpress --no-tablespaces wordpress > dump.sql
 
 restore-mysql:
-	cat dump.sql | docker exec -i wordpress-rs-database-1 mariadb -u wordpress -pwordpress --database wordpress
+	@cat dump.sql | docker exec -i wordpress-rs-database-1 mariadb -u wordpress -pwordpress --database wordpress
 
 backup-wp-content-plugins:
 	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
@@ -279,7 +279,7 @@ setup-rust-android-targets:
 		aarch64-linux-android
 
 run-wp-cli-command:
-	docker exec -it wordpress /bin/bash -c "wp --allow-root $(ARGS)"
+	@docker exec wordpress /bin/bash -c "wp --allow-root $(ARGS)"
 
 help:
 	@printf "%-40s %s\n" "Target" "Description"

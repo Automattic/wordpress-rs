@@ -18,6 +18,7 @@ pub mod login;
 pub mod plugins;
 pub mod post_types;
 pub mod request;
+pub mod site_settings;
 pub mod users;
 pub mod wp_site_health_tests;
 

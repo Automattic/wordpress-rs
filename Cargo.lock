@@ -3119,6 +3119,7 @@ dependencies = [
 name = "wp_api_integration_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "chrono",
  "futures",
@@ -3127,6 +3128,7 @@ dependencies = [
  "reqwest",
  "rstest",
  "rstest_reuse",
+ "serde",
  "serde_json",
  "serial_test",
  "sqlx",

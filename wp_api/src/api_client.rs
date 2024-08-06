@@ -5,6 +5,7 @@ use crate::request::{
         },
         plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
         post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
+        site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         wp_site_health_tests_endpoint::{
             WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
@@ -37,6 +38,7 @@ pub struct WpApiRequestBuilder {
     users: Arc<UsersRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
+    site_settings: Arc<SiteSettingsRequestBuilder>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
 }
 
@@ -50,6 +52,7 @@ impl WpApiRequestBuilder {
             users,
             post_types,
             plugins,
+            site_settings,
             wp_site_health_tests
         )
     }
@@ -80,6 +83,7 @@ pub struct WpApiClient {
     users: Arc<UsersRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
+    site_settings: Arc<SiteSettingsRequestExecutor>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
 }
 
@@ -99,6 +103,7 @@ impl WpApiClient {
             users,
             post_types,
             plugins,
+            site_settings,
             wp_site_health_tests
         )
     }
@@ -107,6 +112,7 @@ impl WpApiClient {
 macro_helper::generate_endpoint_impl!(application_passwords);
 macro_helper::generate_endpoint_impl!(plugins);
 macro_helper::generate_endpoint_impl!(post_types);
+macro_helper::generate_endpoint_impl!(site_settings);
 macro_helper::generate_endpoint_impl!(users);
 macro_helper::generate_endpoint_impl!(wp_site_health_tests);
 

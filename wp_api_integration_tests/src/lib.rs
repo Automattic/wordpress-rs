@@ -11,12 +11,14 @@ use wp_api::{
 };
 
 // `pub` to avoid 'unused' & 'dead_code' warnings
+pub mod wp_cli;
 pub mod wp_db;
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
+pub const FIRST_USER_EMAIL: &str = "test@example.com";
 pub const SECOND_USER_ID: UserId = UserId(2);
 pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 pub const SECOND_USER_SLUG: &str = "themedemos";
@@ -191,14 +193,4 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
         assert!(self.is_ok(), "Response was: '{:?}'", self);
         self.unwrap()
     }
-}
-
-pub fn run_wp_cli_command(args: impl AsRef<str>) -> std::process::ExitStatus {
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("run-wp-cli-command")
-        .arg(format!("ARGS={}", args.as_ref()))
-        .status()
-        .expect("Failed to run wp-cli command")
 }

@@ -121,3 +121,23 @@ extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
         ListViewData(id: self.id, title: self.name, subtitle: self.slug, fields: [:])
     }
 }
+
+extension SiteSettingsWithEditContext {
+
+    var asListViewDataItems: [ListViewData] {
+        [
+            "Date Format": self.dateFormat,
+            "Default Post Format": self.defaultPostFormat,
+            "Description": self.description,
+            "Email": self.email,
+            "Language": self.language,
+            "Show on Front": self.showOnFront,
+            "Time Format": self.timeFormat,
+            "Timezone": self.timezone,
+            "Title": self.title,
+            "URL": self.url
+        ].map { key, value in
+            ListViewData(id: key, title: key, subtitle: value, fields: [:])
+        }
+    }
+}
