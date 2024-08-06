@@ -5,7 +5,10 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{api_error::RequestExecutionError, WpApiError, WpAuthentication};
+use crate::{
+    api_error::{RequestExecutionError, WpError},
+    WpApiError, WpAuthentication,
+};
 
 use self::endpoint::WpEndpointUrl;
 
@@ -297,8 +300,8 @@ impl WpNetworkResponse {
     }
 
     pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WpApiError> {
-        self.parse_response_for_generic_errors()?;
-        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ParsingError {
+        self.parse_response_for_errors()?;
+        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ResponseParsingError {
             reason: err.to_string(),
             response: self.body_as_string(),
         })
@@ -311,23 +314,28 @@ impl WpNetworkResponse {
         parser(self)
     }
 
-    fn parse_response_for_generic_errors(&self) -> Result<(), WpApiError> {
-        // TODO: Further parse the response body to include error message
-        // TODO: Lots of unwraps to get a basic setup working
-        let status = http::StatusCode::from_u16(self.status_code).unwrap();
-        if let Ok(rest_error) = serde_json::from_slice(&self.body) {
-            Err(WpApiError::RestError {
-                rest_error,
-                status_code: self.status_code,
-                response: self.body_as_string(),
-            })
-        } else if status.is_client_error() || status.is_server_error() {
-            Err(WpApiError::UnknownError {
+    fn parse_response_for_errors(&self) -> Result<(), WpApiError> {
+        if let Ok(wp_error) = serde_json::from_slice::<WpError>(&self.body) {
+            Err(WpApiError::WpError {
+                error_code: wp_error.code,
+                error_message: wp_error.message,
                 status_code: self.status_code,
                 response: self.body_as_string(),
             })
         } else {
-            Ok(())
+            let status = http::StatusCode::from_u16(self.status_code).map_err(|_| {
+                WpApiError::InvalidStatusCode {
+                    status_code: self.status_code,
+                }
+            })?;
+            if status.is_client_error() || status.is_server_error() {
+                Err(WpApiError::UnknownError {
+                    status_code: self.status_code,
+                    response: self.body_as_string(),
+                })
+            } else {
+                Ok(())
+            }
         }
     }
 }

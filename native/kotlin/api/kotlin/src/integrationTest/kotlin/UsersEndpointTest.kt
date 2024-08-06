@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseUserFieldWithEditContext
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
-import uniffi.wp_api.WpRestErrorCode
+import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,11 +20,9 @@ class UsersEndpointTest {
 
     @Test
     fun testUserListRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val userList = client.request { requestBuilder ->
             requestBuilder.users().listWithEditContext(params = UserListParams())
-        }
-        assert(result is WpRequestSuccess)
-        val userList = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_USERS, userList.count())
         assertEquals(FIRST_USER_EMAIL, userList.first().email)
     }
@@ -34,24 +32,24 @@ class UsersEndpointTest {
         val params = UserListParams(
             hasPublishedPosts = WpApiParamUsersHasPublishedPosts.PostTypes(listOf("post", "page"))
         )
-        val result =
+        val userList =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
-        assert(result is WpRequestSuccess)
-        val userList = (result as WpRequestSuccess).data
+                .assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_USERS, userList.count())
         assertEquals(FIRST_USER_EMAIL, userList.first().email)
     }
 
     @Test
     fun testFilterUserListRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val userList = client.request { requestBuilder ->
             requestBuilder.users().filterListWithEditContext(
                 params = UserListParams(),
-                fields = listOf(SparseUserFieldWithEditContext.EMAIL, SparseUserFieldWithEditContext.NAME)
+                fields = listOf(
+                    SparseUserFieldWithEditContext.EMAIL,
+                    SparseUserFieldWithEditContext.NAME
+                )
             )
-        }
-        assert(result is WpRequestSuccess)
-        val userList = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_USERS, userList.count())
         assertEquals(FIRST_USER_EMAIL, userList.first().email)
         assertNull(userList.first().slug)
@@ -59,27 +57,29 @@ class UsersEndpointTest {
 
     @Test
     fun testFilterRetrieveUserRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val sparseUser = client.request { requestBuilder ->
             requestBuilder.users().filterRetrieveWithEditContext(
                 FIRST_USER_ID,
-                fields = listOf(SparseUserFieldWithEditContext.EMAIL, SparseUserFieldWithEditContext.NAME)
+                fields = listOf(
+                    SparseUserFieldWithEditContext.EMAIL,
+                    SparseUserFieldWithEditContext.NAME
+                )
             )
-        }
-        assert(result is WpRequestSuccess)
-        val sparseUser = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
         assertNull(sparseUser.slug)
     }
 
     @Test
     fun testFilterRetrieveCurrentUserRequest() = runTest {
-        val result = client.request { requestBuilder ->
+        val sparseUser = client.request { requestBuilder ->
             requestBuilder.users().filterRetrieveMeWithEditContext(
-                fields = listOf(SparseUserFieldWithEditContext.EMAIL, SparseUserFieldWithEditContext.NAME)
+                fields = listOf(
+                    SparseUserFieldWithEditContext.EMAIL,
+                    SparseUserFieldWithEditContext.NAME
+                )
             )
-        }
-        assert(result is WpRequestSuccess)
-        val sparseUser = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
         assertNull(sparseUser.slug)
     }
@@ -91,7 +91,6 @@ class UsersEndpointTest {
         )
         val result =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
-        assert(result is RecognizedRestError)
-        assert((result as RecognizedRestError).error.code is WpRestErrorCode.InvalidParam)
+        assert(result.wpErrorCode() is WpErrorCode.InvalidParam)
     }
 }

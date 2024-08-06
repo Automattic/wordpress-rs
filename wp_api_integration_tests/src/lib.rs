@@ -6,8 +6,7 @@ use wp_api::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
     users::UserId,
-    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpRestError,
-    WpRestErrorCode, WpRestErrorWrapper,
+    ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
 };
 
 // `pub` to avoid 'unused' & 'dead_code' warnings
@@ -65,18 +64,14 @@ pub fn test_site_url() -> Arc<ParsedUrl> {
 }
 
 pub trait AssertWpError<T: std::fmt::Debug> {
-    fn assert_wp_error(self, expected_error_code: WpRestErrorCode);
+    fn assert_wp_error(self, expected_error_code: WpErrorCode);
 }
 
 impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
-    fn assert_wp_error(self, expected_error_code: WpRestErrorCode) {
+    fn assert_wp_error(self, expected_error_code: WpErrorCode) {
         let err = self.unwrap_err();
-        if let WpApiError::RestError {
-            rest_error:
-                WpRestErrorWrapper::Recognized(WpRestError {
-                    code: error_code,
-                    message: _,
-                }),
+        if let WpApiError::WpError {
+            error_code,
             response,
             ..
         } = err
@@ -85,16 +80,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
                 expected_error_code, error_code,
                 "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
                 expected_error_code, error_code, response
-            );
-        } else if let WpApiError::RestError {
-            rest_error: WpRestErrorWrapper::Unrecognized(unrecognized_error),
-            status_code,
-            response,
-        } = err
-        {
-            panic!(
-                "Received unhandled WpRestError variant: '{:?}' with status_code: '{}'. Response was: '{:?}'",
-                unrecognized_error, status_code, response
             );
         } else {
             panic!("Unexpected wp_error '{:?}'", err);
@@ -190,7 +175,7 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
     type Item = T;
 
     fn assert_response(self) -> T {
-        assert!(self.is_ok(), "Response was: '{:?}'", self);
+        assert!(self.is_ok(), "Request failed with: {}", self.unwrap_err());
         self.unwrap()
     }
 }

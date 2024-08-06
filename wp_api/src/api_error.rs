@@ -15,6 +15,8 @@ pub enum RequestExecutionError {
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
+    #[error("Status code ({}) is not valid", status_code)]
+    InvalidStatusCode { status_code: u16 },
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
         status_code,
@@ -24,45 +26,40 @@ pub enum WpApiError {
         status_code: Option<u16>,
         reason: String,
     },
-    #[error("Rest error '{:?}' with Status Code '{}'", rest_error, status_code)]
-    RestError {
-        rest_error: WpRestErrorWrapper,
-        status_code: u16,
-        response: String,
-    },
+    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
+    ResponseParsingError { reason: String, response: String },
     #[error("Error while parsing site url: {}", reason)]
     SiteUrlParsingError { reason: String },
-    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
-    ParsingError { reason: String, response: String },
     #[error(
         "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
         status_code,
         response
     )]
     UnknownError { status_code: u16, response: String },
+    #[error(
+        "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"\n\tresponse: \"{}\"\n}}",
+        status_code,
+        error_code,
+        error_message,
+        response
+    )]
+    WpError {
+        error_code: WpErrorCode,
+        error_message: String,
+        status_code: u16,
+        response: String,
+    },
 }
 
-#[derive(serde::Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
-#[serde(untagged)]
-pub enum WpRestErrorWrapper {
-    Recognized(WpRestError),
-    Unrecognized(UnrecognizedWpRestError),
-}
-
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct WpRestError {
-    pub code: WpRestErrorCode,
-    pub message: String,
-}
-
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Record)]
-pub struct UnrecognizedWpRestError {
-    pub code: String,
+// This type is used to parse the API errors. It then gets converted to `WpApiError::WpError`.
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub(crate) struct WpError {
+    pub code: WpErrorCode,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WpRestErrorCode {
+pub enum WpErrorCode {
     #[serde(rename = "rest_application_password_not_found")]
     ApplicationPasswordNotFound,
     #[serde(rename = "rest_cannot_create_application_passwords")]
@@ -125,9 +122,9 @@ pub enum WpRestErrorCode {
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
-    // ---
+    // ------------------------------------------------------------------------------------
     // Untested, because we are unable to create the necessary conditions for them
-    // ---
+    // ------------------------------------------------------------------------------------
     #[serde(rename = "application_passwords_disabled")]
     ApplicationPasswordsDisabled,
     #[serde(rename = "application_passwords_disabled_for_user")]
@@ -138,18 +135,18 @@ pub enum WpRestErrorCode {
     CannotReadType,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
-    // ---
+    // ------------------------------------------------------------------------------------
     // Untested, because we believe these errors require multisite
-    // ---
+    // ------------------------------------------------------------------------------------
     #[serde(rename = "rest_cannot_manage_network_plugins")]
     CannotManageNetworkPlugins,
     #[serde(rename = "rest_network_only_plugin")]
     NetworkOnlyPlugin,
     #[serde(rename = "rest_user_create")]
     UserCreate,
-    // ---
+    // ------------------------------------------------------------------------------------
     // Untested, because we don't think these errors are possible to get while using this library
-    // ---
+    // ------------------------------------------------------------------------------------
     /// If a plugin is tried to be activated without the `activate_plugin` permission.
     /// However, in a default setup a prior check of `activate_plugins` will fail
     /// resulting in `CannotManagePlugins` error instead.
@@ -173,49 +170,51 @@ pub enum WpRestErrorCode {
     UserInvalidUsername,
     #[serde(rename = "rest_user_invalid_password")]
     UserInvalidPassword,
-}
-
-// All internal errors _should_ be wrapped as a `WpRestErrorCode` by the server. However, there
-// is a good chance that some internal errors do make it into the response, so these error types
-// are provided.
-//
-// Currently, we don't parse the response for these error types, but we could consider adding it
-// as a fallback. For the moment, clients can manually try parsing an `Unrecognized` error
-// into this type.
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
-pub enum WpInternalErrorCode {
-    #[serde(rename = "fs_error")]
-    FsError,
-    #[serde(rename = "fs_no_plugins_dir")]
-    FsNoPluginsDir,
-    #[serde(rename = "fs_unavailable")]
-    FsUnavailable,
+    // ------------------------------------------------------------------------------------
+    // All WpCore internal errors _should_ be wrapped as a `WpRestErrorCode` by the server.
+    // However, in some cases they are sent back directly.
+    // ------------------------------------------------------------------------------------
     #[serde(rename = "could_not_remove_plugin")]
-    CouldNotRemovePlugin,
+    WpCoreCouldNotRemovePlugin,
     #[serde(rename = "could_not_resume_plugin")]
-    CouldNotResumePlugin,
+    WpCoreCouldNotResumePlugin,
+    #[serde(rename = "folder_exists")]
+    WpCoreFolderExists,
+    #[serde(rename = "fs_error")]
+    WpCoreFsError,
+    #[serde(rename = "fs_no_plugins_dir")]
+    WpCoreFsNoPluginsDir,
+    #[serde(rename = "fs_unavailable")]
+    WpCoreFsUnavailable,
     #[serde(rename = "no_plugin_header")]
-    NoPluginHeader,
-    #[serde(rename = "plugin_missing_dependencies")]
-    PluginMissingDependencies,
-    #[serde(rename = "plugin_not_found")]
-    PluginNotFound,
+    WpCoreNoPluginHeader,
     #[serde(rename = "plugin_invalid")]
-    PluginInvalid,
+    WpCorePluginInvalid,
+    #[serde(rename = "plugin_missing_dependencies")]
+    WpCorePluginMissingDependencies,
+    #[serde(rename = "plugin_not_found")]
+    WpCorePluginNotFound,
     #[serde(rename = "plugin_php_incompatible")]
-    PluginPhpIncompatible,
+    WpCorePluginPhpIncompatible,
     #[serde(rename = "plugin_wp_incompatible")]
-    PluginWpIncompatible,
+    WpCorePluginWpIncompatible,
     #[serde(rename = "plugin_wp_php_incompatible")]
-    PluginWpPhpIncompatible,
+    WpCorePluginWpPhpIncompatible,
     #[serde(rename = "plugins_invalid")]
-    PluginsInvalid,
+    WpCorePluginsInvalid,
+    #[serde(rename = "plugins_api_failed")]
+    WpCorePluginsApiFailed,
     #[serde(rename = "unable_to_connect_to_filesystem")]
-    UnableToConnectToFilesystem,
+    WpCoreUnableToConnectToFilesystem,
     #[serde(rename = "unable_to_determine_installed_plugin")]
-    UnableToDetermineInstalledPlugin,
+    WpCoreUnableToDetermineInstalledPlugin,
     #[serde(rename = "unexpected_output")]
-    UnexpectedOutput,
+    WpCoreUnexpectedOutput,
+    // ------------------------------------------------------------------------------------
+    // Fallback to a `String` error code
+    // ------------------------------------------------------------------------------------
+    #[serde(untagged)]
+    CustomError(String),
 }
 
 impl From<RequestExecutionError> for WpApiError {

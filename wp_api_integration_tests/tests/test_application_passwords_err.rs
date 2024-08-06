@@ -3,7 +3,7 @@ use serial_test::parallel;
 use wp_api::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
 };
-use wp_api::WpRestErrorCode;
+use wp_api::WpErrorCode;
 
 use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
@@ -21,7 +21,7 @@ async fn list_application_passwords_err_cannot_list_application_passwords() {
         .application_passwords()
         .list_with_edit_context(&FIRST_USER_ID)
         .await
-        .assert_wp_error(WpRestErrorCode::CannotListApplicationPasswords);
+        .assert_wp_error(WpErrorCode::CannotListApplicationPasswords);
 }
 
 #[rstest]
@@ -38,7 +38,7 @@ async fn retrieve_application_password_err_cannot_read_application_password() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::CannotReadApplicationPassword);
+        .assert_wp_error(WpErrorCode::CannotReadApplicationPassword);
 }
 
 #[rstest]
@@ -56,7 +56,7 @@ async fn create_application_password_err_cannot_create_application_passwords() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::CannotCreateApplicationPasswords);
+        .assert_wp_error(WpErrorCode::CannotCreateApplicationPasswords);
 }
 
 #[rstest]
@@ -77,7 +77,7 @@ async fn update_application_password_err_cannot_edit_application_password() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::CannotEditApplicationPassword);
+        .assert_wp_error(WpErrorCode::CannotEditApplicationPassword);
 }
 
 #[rstest]
@@ -94,7 +94,7 @@ async fn delete_application_password_err_cannot_delete_application_password() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::CannotDeleteApplicationPassword);
+        .assert_wp_error(WpErrorCode::CannotDeleteApplicationPassword);
 }
 
 #[rstest]
@@ -106,7 +106,7 @@ async fn delete_application_passwords_err_cannot_delete_application_passwords() 
         .application_passwords()
         .delete_all(&FIRST_USER_ID)
         .await
-        .assert_wp_error(WpRestErrorCode::CannotDeleteApplicationPasswords);
+        .assert_wp_error(WpErrorCode::CannotDeleteApplicationPasswords);
 }
 
 #[rstest]
@@ -119,7 +119,7 @@ async fn retrieve_application_password_err_cannot_introspect_app_password_for_no
         .application_passwords()
         .retrieve_current_with_edit_context(&SECOND_USER_ID)
         .await
-        .assert_wp_error(WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
+        .assert_wp_error(WpErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
 }
 
 #[rstest]
@@ -131,7 +131,7 @@ async fn retrieve_application_password_err_cannot_introspect_app_password_for_an
         .application_passwords()
         .retrieve_current_with_edit_context(&SECOND_USER_ID)
         .await
-        .assert_wp_error(WpRestErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
+        .assert_wp_error(WpErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
 }
 
 #[rstest]
@@ -147,5 +147,5 @@ async fn retrieve_application_password_err_application_password_not_found() {
             },
         )
         .await
-        .assert_wp_error(WpRestErrorCode::ApplicationPasswordNotFound);
+        .assert_wp_error(WpErrorCode::ApplicationPasswordNotFound);
 }
