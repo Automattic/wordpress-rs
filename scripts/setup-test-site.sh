@@ -101,7 +101,7 @@ rm -rf /app/test_credentials && touch /app/test_credentials
 wp plugin install hello-dolly --activate
 wp plugin install classic-editor
 
-cp -R wp-content/plugins wp-content/plugins-backup
+cp -rp wp-content/plugins wp-content/plugins-backup
 
 wp db export --add-drop-table wp-content/dump.sql
 

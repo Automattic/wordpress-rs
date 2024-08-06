@@ -27,7 +27,6 @@ wp_contextual = { path = "../wp_contextual" }
 wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }
 
 [dev-dependencies]
-uu_cp = "0.0.26"
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
 
