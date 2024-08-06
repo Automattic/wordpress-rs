@@ -17,7 +17,6 @@ wp_api = { path = "../wp_api", features = [ "integration-tests" ] }
 sqlx = { workspace = true, features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
 tokio = { workspace = true, features = [ "full" ] }
 url = { workspace = true }
-uu_cp = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
