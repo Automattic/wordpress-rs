@@ -171,7 +171,11 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
     type Item = T;
 
     fn assert_response(self) -> T {
-        assert!(self.is_ok(), "Request failed with: {}", self.unwrap_err());
+        assert!(
+            self.is_ok(),
+            "Request failed with: {:#?}",
+            self.unwrap_err()
+        );
         self.unwrap()
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     request::{WpNetworkHeaderMap, WpNetworkResponse},
@@ -55,18 +55,30 @@ pub enum UrlDiscoveryAttemptError {
     },
 }
 
+impl UrlDiscoveryAttemptError {
+    pub fn site_url(&self) -> String {
+        match self {
+            UrlDiscoveryAttemptError::FailedToParseSiteUrl { site_url, .. } => site_url.clone(),
+            UrlDiscoveryAttemptError::FetchApiRootUrlFailed { site_url, .. } => site_url.url(),
+            UrlDiscoveryAttemptError::FetchApiDetailsFailed { site_url, .. } => site_url.url(),
+        }
+    }
+}
+
 #[derive(Debug, uniffi::Record)]
 pub struct UrlDiscoverySuccess {
     pub site_url: Arc<ParsedUrl>,
     pub api_details: Arc<WpApiDetails>,
     pub api_root_url: Arc<ParsedUrl>,
-    pub attempts: Vec<UrlDiscoveryState>,
+    pub attempts: HashMap<String, UrlDiscoveryState>,
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum UrlDiscoveryError {
     #[error("Url discovery failed: {:?}", attempts)]
-    UrlDiscoveryFailed { attempts: Vec<UrlDiscoveryState> },
+    UrlDiscoveryFailed {
+        attempts: HashMap<String, UrlDiscoveryState>,
+    },
 }
 
 #[derive(Debug)]

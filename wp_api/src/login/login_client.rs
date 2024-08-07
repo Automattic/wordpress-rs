@@ -71,8 +71,8 @@ impl WpLoginClient {
         let attempts = attempts
             .into_iter()
             .map(|a| match a {
-                Ok(s) => UrlDiscoveryState::Success(s),
-                Err(e) => UrlDiscoveryState::Failure(e),
+                Ok(s) => (s.site_url.url(), UrlDiscoveryState::Success(s)),
+                Err(e) => (e.site_url(), UrlDiscoveryState::Failure(e)),
             })
             .collect();
         if let Some(s) = successful_attempt {
