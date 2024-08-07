@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::Future;
-use std::{process::Command, sync::Arc};
+use std::sync::Arc;
 use wp_api::{
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
@@ -9,11 +9,13 @@ use wp_api::{
     ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
 };
 
-// `pub` to avoid 'unused' & 'dead_code' warnings
+pub mod fs_utils;
 pub mod wp_cli;
 pub mod wp_db;
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
+
+pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
@@ -93,13 +95,7 @@ where
     Fut: Future<Output = ()>,
 {
     f().await;
-    println!("Restoring wp-content/plugins..");
-    Command::new("make")
-        .arg("-C")
-        .arg("../")
-        .arg("restore-wp-content-plugins")
-        .status()
-        .expect("Failed to restore wp-content/plugins");
+    fs_utils::restore_wp_content_plugins().await;
 }
 
 #[derive(Debug)]

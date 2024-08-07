@@ -3122,6 +3122,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "clap",
  "futures",
  "http 1.1.0",
  "paste",
@@ -3133,6 +3134,7 @@ dependencies = [
  "serial_test",
  "sqlx",
  "tokio",
+ "url",
  "wp_api",
 ]
 

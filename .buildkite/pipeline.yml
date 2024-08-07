@@ -185,24 +185,29 @@ steps:
     steps:
       - label: ":wordpress: WordPress {{matrix}}"
         command: |
+          # Give read/write permissions to `./` for all users
+          chmod -R a+rw ./
+
           echo "--- :docker: Setting up Test Server"
           make test-server
 
           echo "--- 🧪 Running Tests"
-          curl -u $(cat test_credentials | sed -n '2 p'):$(cat test_credentials | sed -n '3 p') 'http://localhost/wp-json/wp/v2/posts?context=edit' --fail-with-body | jq
+          make test-rust-integration
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix:
-          - '5.6' # First version to introduce appliation passwords
-          - '5.7'
-          - '5.8'
-          - '5.9'
-          - '6.0'
-          - '6.1'
-          - '6.2'
-          - '6.3'
-          - '6.4'
-          - '6.5'
+          # All versions except for the latest have been disabled until we have version specific 
+          # integration tests
+          # - '5.6' # First version to introduce appliation passwords
+          # - '5.7'
+          # - '5.8'
+          # - '5.9'
+          # - '6.0'
+          # - '6.1'
+          # - '6.2'
+          # - '6.3'
+          # - '6.4'
+          # - '6.5'
           - '6.6'
 
   - label: ":rocket: Publish release $NEW_VERSION"

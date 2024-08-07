@@ -199,30 +199,22 @@ test-rust-doc:
 test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
 
+test-rust-integration:
+	@# Help: Run integration tests in test server.
+	docker exec -i wordpress /bin/bash < ./scripts/run-integration-tests.sh
+
+restore-test-server:
+	@# Help: Restore the test server from backup.
+	docker exec -i wordpress /bin/bash < ./scripts/restore-test-server.sh
+
 test-server: stop-server
 	@# Help: Start the test server.
-	rm -rf test_credentials && touch test_credentials && chmod 777 test_credentials
 	docker-compose up -d
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
-stop-server: delete-wp-plugins-backup
+stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
-
-dump-mysql:
-	docker exec -it wordpress-rs-database-1 mariadb-dump -u wordpress -pwordpress --no-tablespaces wordpress > dump.sql
-
-restore-mysql:
-	@cat dump.sql | docker exec -i wordpress-rs-database-1 mariadb -u wordpress -pwordpress --database wordpress
-
-backup-wp-content-plugins:
-	docker exec -it wordpress /bin/bash -c "cp -R ./wp-content/plugins /tmp/backup_wp_plugins"
-
-restore-wp-content-plugins:
-	docker exec -it wordpress /bin/bash -c "rm -rf ./wp-content/plugins &&  cp -R /tmp/backup_wp_plugins ./wp-content/plugins"
-
-delete-wp-plugins-backup:
-	docker exec -it wordpress /bin/bash -c "rm -rf /tmp/backup_wp_plugins" || true
 
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.

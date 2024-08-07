@@ -13,12 +13,18 @@ curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.p
 chmod +x /usr/bin/wp
 
 # Install `mysqlcheck` – needed for `wp db check`
-# Install `less` - needed for `wp_cli`
-apt update && apt install -y default-mysql-client less
+apt update && apt install -y default-mysql-client less libssl-dev
+
+# Install `rustup` – needed to run tests
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Create wpcli working directory (it can't be created by the `www-data` user`)
 mkdir -p /var/www/.wp-cli
 chown -R www-data:www-data /var/www/.wp-cli/
+
+# Run this command as root user since that's what the Docker will use when we run
+# --http=http://localhost commands
+wp --allow-root package install wp-cli/restful
 
 # Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
 # be any weird permissions issues)
@@ -83,7 +89,7 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-touch /tmp/test_credentials
+rm -rf /app/test_credentials && touch /app/test_credentials
 {
   printf "http://localhost\ntest@example.com\n"
   ## Create an Application password for the admin user, and store it where it can be used by the test suite
@@ -93,8 +99,14 @@ touch /tmp/test_credentials
   ## Create an Application password for a subscriber user, and store it where it can be used by the test suite
   wp user application-password create themedemos test --porcelain
   wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p'
-} >> /tmp/test_credentials
+} >> /app/test_credentials
 
 ## Used for integration tests
+wp language core install en_CA
 wp plugin install hello-dolly --activate
 wp plugin install classic-editor
+
+cp -rp wp-content/plugins wp-content/plugins-backup
+
+wp db export --add-drop-table wp-content/dump.sql
+
