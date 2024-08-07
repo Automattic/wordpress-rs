@@ -250,6 +250,7 @@ prepare-dev-server:
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
 setup-rust:
+	@# Help: Install the necessary Rust toolchains on your development computer (for macOS).
 	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain
 	RUST_TOOLCHAIN=$(rust_nightly_toolchain) $(MAKE) setup-rust-toolchain
 
