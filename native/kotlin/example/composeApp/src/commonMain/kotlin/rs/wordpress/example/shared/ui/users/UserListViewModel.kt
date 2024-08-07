@@ -2,7 +2,7 @@ package rs.wordpress.example.shared.ui.users
 
 import kotlinx.coroutines.runBlocking
 import rs.wordpress.api.kotlin.WpApiClient
-import rs.wordpress.api.kotlin.WpRequestSuccess
+import rs.wordpress.api.kotlin.WpRequestResult
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import uniffi.wp_api.UserListParams
@@ -26,7 +26,7 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
                 }
             }
             return when (usersResult) {
-                is WpRequestSuccess -> usersResult.data
+                is WpRequestResult.WpRequestSuccess -> usersResult.data
                 else -> listOf()
             }
         }

@@ -2,7 +2,7 @@ package rs.wordpress.example.shared.ui.plugins
 
 import kotlinx.coroutines.runBlocking
 import rs.wordpress.api.kotlin.WpApiClient
-import rs.wordpress.api.kotlin.WpRequestSuccess
+import rs.wordpress.api.kotlin.WpRequestResult
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import uniffi.wp_api.PluginListParams
@@ -26,7 +26,7 @@ class PluginListViewModel(private val authRepository: AuthenticationRepository) 
                 }
             }
             return when (pluginsResult) {
-                is WpRequestSuccess -> pluginsResult.data
+                is WpRequestResult.WpRequestSuccess -> pluginsResult.data
                 else -> listOf()
             }
         }
