@@ -16,11 +16,9 @@ class SiteSettingsEndpointTest {
 
     @Test
     fun testRetrieveSiteSettings() = runTest {
-        val result = client.request { requestBuilder ->
+        val siteSettings = client.request { requestBuilder ->
             requestBuilder.siteSettings().retrieveWithEditContext()
-        }
-        assert(result is WpRequestSuccess)
-        val siteSettings = (result as WpRequestSuccess).data
+        }.assertSuccessAndRetrieveData()
         assertEquals(FIRST_USER_EMAIL, siteSettings.email)
     }
 }
