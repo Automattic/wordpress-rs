@@ -100,7 +100,7 @@ cargo {
     module = "$cargoProjectRoot/$moduleName/"
     libname = moduleName
     profile = "release"
-    targets = listOf("arm", "arm64", "x86", "x86_64", nativeRustTarget())
+    targets = listOf("arm", "arm64", "x86", "x86_64")
     targetDirectory = "$cargoProjectRoot/target"
     exec = { spec: ExecSpec, _: com.nishtahir.Toolchain ->
         // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
@@ -122,22 +122,6 @@ project.afterEvaluate {
                 // version is set by 'publish-to-s3' plugin
             }
         }
-    }
-}
-
-fun nativeRustTarget(): String {
-    return when (val resourcePrefix = com.sun.jna.Platform.RESOURCE_PREFIX) {
-        // For unit tests to work in Apple Silicon, we need to return "darwin-aarch64" here
-        // However, that runs the cargo task as `cargoBuildDarwin-aarch64` which is not properly
-        // cached by cargo and requires a rebuild every time. This results in a significant
-        // development time loss, so for now, we are returning "darwin" and using instrumented
-        // tests instead.
-        "darwin" -> "darwin"
-        "darwin-aarch64" -> "darwin-aarch64"
-        "darwin-x86-64" -> "darwin-x86-64"
-        "linux-x86-64" -> "linux-x86-64"
-        "win32-x86-64" -> "win32-x86-64-gnu"
-        else -> throw GradleException("Unsupported Platform: $resourcePrefix")
     }
 }
 
