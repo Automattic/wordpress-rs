@@ -123,6 +123,7 @@ impl StateParsedUrl {
             }),
             None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
                 header_map: response.header_map,
+                status_code: response.status_code,
             }),
         }
     }
@@ -180,7 +181,7 @@ pub(super) struct StateFetchedApiDetails {
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FetchApiRootUrlError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nResponse: '{}'",
         status_code,
         reason
     )]
@@ -188,8 +189,15 @@ pub enum FetchApiRootUrlError {
         status_code: Option<u16>,
         reason: String,
     },
-    #[error("Api root link header not found in header_map: {:?}", header_map)]
-    ApiRootLinkHeaderNotFound { header_map: Arc<WpNetworkHeaderMap> },
+    #[error(
+        "Api root link header not found!\nStatus Code: '{:#?}'\nHeader Map: '{:#?}'",
+        status_code,
+        header_map
+    )]
+    ApiRootLinkHeaderNotFound {
+        header_map: Arc<WpNetworkHeaderMap>,
+        status_code: u16,
+    },
 }
 
 impl From<RequestExecutionError> for FetchApiRootUrlError {
