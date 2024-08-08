@@ -53,7 +53,7 @@ class LoginTests: XCTestCase {
         } catch let WordPressLoginClient.Error.invalidSiteAddress(error) {
             switch error {
             case let .UrlDiscoveryFailed(attempts: attempts):
-                let notWordPressSiteError = attempts.contains {
+                let notWordPressSiteError = attempts.values.contains {
                     if case .failure(.fetchApiRootUrlFailed) = $0 {
                         return true
                     }
@@ -98,7 +98,7 @@ class LoginTests: XCTestCase {
         } catch let WordPressLoginClient.Error.invalidSiteAddress(error) {
             switch error {
             case let .UrlDiscoveryFailed(attempts: attempts):
-                let notWordPressSiteError = attempts.contains {
+                let notWordPressSiteError = attempts.values.contains {
                     if case .failure(.fetchApiDetailsFailed) = $0 {
                         return true
                     }
@@ -192,7 +192,7 @@ class LoginTests: XCTestCase {
             )
             let success = try result.get()
             XCTFail("Unexpected successful result: \(success)")
-        } catch WordPressLoginClient.Error.authenticationError(.RequestRejected) {
+        } catch WordPressLoginClient.Error.authenticationError(.UnsuccessfulLogin) {
             // Do nothing
         } catch {
             XCTFail("Unexpected error: \(error)")
@@ -236,9 +236,9 @@ class LoginTests: XCTestCase {
             authenticator: Authenticator().returning(.success(successfulURL))
         )
         let success = try result.get()
-        try XCTAssertEqual(success.siteUrl().url(), ParsedUrl.parse(input: "https://example.com").url())
-        XCTAssertEqual(success.username(), "admin")
-        XCTAssertEqual(success.password(), "123456")
+        XCTAssertEqual(success.siteUrl, "https://example.com")
+        XCTAssertEqual(success.userLogin, "admin")
+        XCTAssertEqual(success.password, "123456")
     }
 
 }

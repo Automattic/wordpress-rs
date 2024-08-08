@@ -98,6 +98,36 @@ pub enum OAuthResponseUrlError {
     UnsuccessfulLogin,
 }
 
+#[uniffi::export]
+pub fn create_application_password_authentication_url(
+    login_url: Arc<ParsedUrl>,
+    app_name: String,
+    app_id: Option<String>,
+    success_url: Option<String>,
+    reject_url: Option<String>,
+) -> ParsedUrl {
+    let mut auth_url = login_url.inner.clone();
+    auth_url
+        .query_pairs_mut()
+        .append_pair("app_name", app_name.as_str());
+    if let Some(app_id) = app_id {
+        auth_url
+            .query_pairs_mut()
+            .append_pair("app_id", app_id.as_str());
+    }
+    if let Some(success_url) = success_url {
+        auth_url
+            .query_pairs_mut()
+            .append_pair("success_url", success_url.as_str());
+    }
+    if let Some(reject_url) = reject_url {
+        auth_url
+            .query_pairs_mut()
+            .append_pair("reject_url", reject_url.as_str());
+    }
+    ParsedUrl::new(auth_url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +173,25 @@ mod tests {
                 user_login: "test".to_string(),
                 password: "1234".to_string(),
             })
+        );
+    }
+
+    #[rstest]
+    fn test_auth_url() {
+        let login_url = ParsedUrl::parse("https://example.com/wp-login.php").unwrap();
+        let auth_url = create_application_password_authentication_url(
+            login_url.into(),
+            "AppName".to_string(),
+            Some("app-id".to_string()),
+            Some("https://example.com/success".to_string()),
+            Some("https://example.com/reject".to_string()),
+        );
+        assert_eq!(
+            auth_url,
+            ParsedUrl::parse(
+                "https://example.com/wp-login.php?app_name=AppName&app_id=app-id&success_url=https%3A%2F%2Fexample.com%2Fsuccess&reject_url=https%3A%2F%2Fexample.com%2Freject"
+            )
+            .unwrap()
         );
     }
 }

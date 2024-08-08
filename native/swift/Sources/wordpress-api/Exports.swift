@@ -17,8 +17,6 @@ public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias UrlDiscoveryError = WordPressAPIInternal.UrlDiscoveryError
 public typealias UrlDiscoverySuccess = WordPressAPIInternal.UrlDiscoverySuccess
 public typealias UrlDiscoveryAttemptError = WordPressAPIInternal.UrlDiscoveryAttemptError
-public typealias ApplicationPasswordAuthenticationSuccess =
-    WordPressAPIInternal.ApplicationPasswordAuthenticationSuccess
 
 // MARK: - Users
 

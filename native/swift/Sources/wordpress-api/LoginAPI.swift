@@ -20,7 +20,7 @@ public final class WordPressLoginClient {
     public enum Error: Swift.Error {
         case invalidSiteAddress(UrlDiscoveryError)
         case missingLoginUrl
-        case authenticationError(ApplicationPasswordAuthenticationError)
+        case authenticationError(OAuthResponseUrlError)
         case invalidApplicationPasswordCallback
         case cancelled
         case unknown(Swift.Error)
@@ -41,7 +41,7 @@ public final class WordPressLoginClient {
         appName: String,
         appId: String?,
         contextProvider: ASWebAuthenticationPresentationContextProviding
-    ) async -> Result<ApplicationPasswordAuthenticationSuccess, Error> {
+    ) async -> Result<WpApiApplicationPasswordDetails, Error> {
         await login(
             site: site,
             appName: appName,
@@ -55,17 +55,17 @@ public final class WordPressLoginClient {
         appName: String,
         appId: String?,
         authenticator: Authenticator
-    ) async -> Result<ApplicationPasswordAuthenticationSuccess, Error> {
+    ) async -> Result<WpApiApplicationPasswordDetails, Error> {
         let loginURL = await self.loginURL(forSite: site)
         let authURL = loginURL
             .map { loginURL in
-                ApplicationPasswordAuthenticationRequest(
+                createApplicationPasswordAuthenticationUrl(
+                    loginUrl: loginURL,
                     appName: appName,
                     appId: appId,
                     successUrl: Self.callbackURL.absoluteString,
                     rejectUrl: Self.callbackURL.absoluteString
                 )
-                .authUrl(loginUrl: loginURL)
                 .asURL()
             }
 
@@ -100,14 +100,14 @@ public final class WordPressLoginClient {
 
     private func handleAuthenticationCallback(
         _ urlWithToken: URL
-    ) -> Result<ApplicationPasswordAuthenticationSuccess, Error> {
+    ) -> Result<WpApiApplicationPasswordDetails, Error> {
         guard let parsed = try? ParsedUrl.from(url: urlWithToken) else {
             return .failure(.invalidApplicationPasswordCallback)
         }
 
         do {
-            return try .success(ApplicationPasswordAuthenticationSuccess(callbackUrl: parsed))
-        } catch let error as ApplicationPasswordAuthenticationError {
+            return try .success(extractLoginDetailsFromUrl(url: parsed))
+        } catch let error as OAuthResponseUrlError {
             return .failure(.authenticationError(error))
         } catch {
             return .failure(.unknown(error))
