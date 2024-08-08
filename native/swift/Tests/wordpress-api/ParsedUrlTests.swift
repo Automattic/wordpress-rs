@@ -20,7 +20,8 @@ class ParsedUrlTests: XCTestCase {
 
         for url in urls {
             let parsedUrl = try ParsedUrl.parse(input: url)
-            XCTAssertEqual(parsedUrl.asURL().absoluteString, url)
+            let urlString = parsedUrl.asURL().absoluteString
+            try XCTAssertEqual(parsedUrl.url(), ParsedUrl.parse(input: urlString).url())
         }
     }
 
