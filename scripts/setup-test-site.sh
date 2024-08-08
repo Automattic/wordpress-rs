@@ -8,24 +8,6 @@ set -e
 # for each WordPress version – if there are issues with DB migrations, different default themes
 # available, etc we don't want to have to deal with them.
 
-# Install wp-cli
-curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.phar --output /usr/bin/wp
-chmod +x /usr/bin/wp
-
-# Install `mysqlcheck` – needed for `wp db check`
-apt update && apt install -y default-mysql-client less libssl-dev
-
-# Install `rustup` – needed to run tests
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-# Create wpcli working directory (it can't be created by the `www-data` user`)
-mkdir -p /var/www/.wp-cli
-chown -R www-data:www-data /var/www/.wp-cli/
-
-# Run this command as root user since that's what the Docker will use when we run
-# --http=http://localhost commands
-wp --allow-root package install wp-cli/restful
-
 # Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
 # be any weird permissions issues)
 su -s /bin/bash www-data

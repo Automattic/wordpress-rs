@@ -2,7 +2,20 @@
 common_params:
   plugins: &common_plugins
     - automattic/a8c-ci-toolkit#3.4.1
-  # Common environment values to use with the `env` key.
+  matrix: &wordpress_version_matrix
+    # All versions except for the latest have been disabled until we have version specific 
+    # integration tests
+    # - '5.6' # First version to introduce appliation passwords
+    # - '5.7'
+    # - '5.8'
+    # - '5.9'
+    # - '6.0'
+    # - '6.1'
+    # - '6.2'
+    # - '6.3'
+    # - '6.4'
+    # - '6.5'
+    - '6.6'
 
 steps:
   #
@@ -181,7 +194,7 @@ steps:
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
     steps:
-      - label: ":wordpress: WordPress {{matrix}}"
+      - label: ":wordpress: :rust: WordPress {{matrix}}"
         command: |
           # Give read/write permissions to `./` for all users
           chmod -R a+rw ./
@@ -189,26 +202,27 @@ steps:
           echo "--- :docker: Setting up Test Server"
           make test-server
 
-          echo "--- 🧪 Running Tests"
+          echo "--- 🧪 Running Rust Integration Tests"
           make test-rust-integration
         env:
           WORDPRESS_VERSION: "{{matrix}}"
-        matrix:
-          # All versions except for the latest have been disabled until we have version specific 
-          # integration tests
-          # - '5.6' # First version to introduce appliation passwords
-          # - '5.7'
-          # - '5.8'
-          # - '5.9'
-          # - '6.0'
-          # - '6.1'
-          # - '6.2'
-          # - '6.3'
-          # - '6.4'
-          # - '6.5'
-          - '6.6'
+        matrix: *wordpress_version_matrix
 
-  - label: ":rocket: Publish release $NEW_VERSION"
+      - label: ":wordpress: :kotlin: WordPress {{matrix}}"
+        command: |
+          # Give read/write permissions to `./` for all users
+          chmod -R a+rw ./
+
+          echo "--- :docker: Setting up Test Server"
+          make test-server
+
+          echo "--- 🧪 Running Kotlin Integration Tests"
+          make test-kotlin-integration
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
+
+  - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
     depends_on: swift
     plugins: *common_plugins

@@ -1,6 +1,8 @@
 services:
     wordpress:
-        image: 'public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION:-latest}'
+        build:
+            context: .
+            dockerfile: wordpress.Dockerfile
         container_name: 'wordpress'
         ports:
             - '80:80'
