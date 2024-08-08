@@ -2,23 +2,22 @@
 
 ### Breaking Changes
 
-_None_
+- [Condense error variants into WpError](https://github.com/Automattic/wordpress-rs/pull/230)
+- [Contextual filtering](https://github.com/Automattic/wordpress-rs/pull/176)
 
 ### New Features
 
+- [Post Types](https://developer.wordpress.org/rest-api/reference/post-types/) endpoint
+- [Site Settings](https://developer.wordpress.org/rest-api/reference/settings/) endpoint
 - [Wp Site Health Tests](https://developer.wordpress.org/rest-api/reference/wp-site-health-tests/) endpoint
-
-_None_
 
 ### Bug Fixes
 
-_None_
+- [Support both Integer and String for `WPApiDetails.gmt_offset`](https://github.com/Automattic/wordpress-rs/pull/209)
 
 ### Internal Changes
 
 - `WpDerivedRequest` now supports plain `get` requests
-
-_None_
 
 ## 0.1
 
