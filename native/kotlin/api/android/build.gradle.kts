@@ -77,7 +77,6 @@ dependencies {
         }
     }
     implementation(libs.okhttp)
-    implementation(libs.androidx.annotation)
     implementation(libs.jna) {
         artifact {
             type = "aar"
