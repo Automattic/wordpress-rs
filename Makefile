@@ -200,7 +200,11 @@ test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
 
 test-rust-integration:
-	@# Help: Run integration tests in test server.
+	@# Help: Run Rust integration tests in test server.
+	docker exec -i wordpress /bin/bash < ./scripts/run-integration-tests.sh
+
+test-kotlin-integration:
+	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-integration-tests.sh
 
 restore-test-server:
