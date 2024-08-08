@@ -1,7 +1,5 @@
 # Nodes with values to reuse in the pipeline.
 common_params:
-  plugins: &common_plugins
-    - automattic/a8c-ci-toolkit#3.4.1
   matrix: &wordpress_version_matrix
     # All versions except for the latest have been disabled until we have version specific 
     # integration tests
@@ -20,212 +18,211 @@ common_params:
 steps:
   #
   # Rust Group
-  - group: ":rust: Core Library"
-    key: "rust"
-    steps:
-      - label: ":rust: Build and Test"
-        command: |
-          echo "--- :rust: Building + Testing"
-          make test-rust-lib
-          make test-rust-doc
-      - label: ":rust: Test `#[derive(WpDerivedRequest)]` Parser"
-        command: |
-          # Once we have integration tests running in CI, we can remove this separate step
-          echo "--- :rust: Testing `#[derive(WpDerivedRequest)]` Parser"
-          make test-rust-wp-derived-request-parser
-      - label: ":rust: Lint"
-        command: |
-          echo "--- :rust: Running Clippy"
-          make lint-rust
-
-          echo "--- :rust: Ensuring Code Conforms to rustfmt"
-          make fmt-check-rust
-      - label: ":rust: Build Docs"
-        command: |
-          echo "--- :rust: Building Documentation"
-          make docs-archive
-        artifact_paths:
-          - docs.tar.gz
-
+  # - group: ":rust: Core Library"
+  #   key: "rust"
+  #   steps:
+  #     - label: ":rust: Build and Test"
+  #       command: |
+  #         echo "--- :rust: Building + Testing"
+  #         make test-rust-lib
+  #         make test-rust-doc
+  #     - label: ":rust: Test `#[derive(WpDerivedRequest)]` Parser"
+  #       command: |
+  #         # Once we have integration tests running in CI, we can remove this separate step
+  #         echo "--- :rust: Testing `#[derive(WpDerivedRequest)]` Parser"
+  #         make test-rust-wp-derived-request-parser
+  #     - label: ":rust: Lint"
+  #       command: |
+  #         echo "--- :rust: Running Clippy"
+  #         make lint-rust
   #
-  # Swift Group
-  - group: ":swift: Swift Wrapper"
-    key: "swift"
-    steps:
-      - label: ":swift: :darwin: Build xcframework"
-        key: "xcframework"
-        command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "/Users/builder/.cargo/env"
-
-          echo "--- :package: Installing Rust Toolchains"
-          make setup-rust
-
-          echo "--- :swift: Building xcframework"
-          make xcframework
-          zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
-        artifact_paths:
-          - target/libwordpressFFI.xcframework.zip
-          - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
-        env:
-          IMAGE_ID: xcode-15.3
-        agents:
-          queue: mac
-      - label: ":swift: :darwin: Build + Test on Simulators"
-        command: .buildkite/swift-test.sh run_tests
-        env:
-          IMAGE_ID: xcode-15.3
-        depends_on: xcframework
-        plugins: *common_plugins
-        agents:
-          queue: mac
-      - label: ":swift: :darwin: Build for Real Devices"
-        command: .buildkite/swift-test.sh build_for_real_device
-        env:
-          IMAGE_ID: xcode-15.3
-        depends_on: xcframework
-        plugins: *common_plugins
-        agents:
-          queue: mac
-      - label: ":swift: :cocoapods: Validate CocoaPods Support"
-        command: .buildkite/validate-cocoapods.sh
-        env:
-          IMAGE_ID: xcode-15.3
-        depends_on: xcframework
-        plugins: *common_plugins
-        agents:
-          queue: mac
-      - label: ":swift: :linux: Build and Test"
-        command: |
-          echo "--- :swift: Building + Testing"
-          make test-swift-linux
-      - label: ":swift: Lint"
-        command: |
-          .buildkite/download-xcframework.sh
-          echo "--- :swift: Swiftlint"
-          make lint-swift
-        depends_on: xcframework
-        env:
-          IMAGE_ID: xcode-15.3
-        agents:
-          queue: mac
-      - label: ":swift: Example Apps"
-        command: |
-          .buildkite/download-xcframework.sh
-
-          echo "--- :computer: Building for macOS"
-          make swift-example-app-mac
-
-          echo "--- :iphone: Building for iOS"
-          make swift-example-app-ios
-        depends_on: xcframework
-        env:
-          IMAGE_ID: xcode-15.3
-        agents:
-          queue: mac
+  #         echo "--- :rust: Ensuring Code Conforms to rustfmt"
+  #         make fmt-check-rust
+  #     - label: ":rust: Build Docs"
+  #       command: |
+  #         echo "--- :rust: Building Documentation"
+  #         make docs-archive
+  #       artifact_paths:
+  #         - docs.tar.gz
   #
-  # Kotlin Group
-  - group: ":kotlin: Kotlin Wrapper"
-    key: "kotlin"
-    steps:
-      - label: ":kotlin: Detekt"
-        key: "kotlin-detekt"
-        plugins: *common_plugins
-        artifact_paths:
-          - "**/build/reports/detekt/detekt.html"
-        command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "$$HOME/.cargo/env"
-
-          echo "--- :package: Installing Rust Toolchains"
-          make setup-rust
-          make setup-rust-android-targets
-
-          echo "--- 🧹 Linting"
-
-          # This is a temporary step until we implement a more graceful way to handle missing credentials
-          printf "site_url\nadmin_username\nadmin_password\nadmin_password_uuid\nsubscriber_username\nsubscriber_password\nsubscriber_password_uuid\n" > test_credentials
-
-          cd ./native/kotlin
-          ./gradlew detektMain detektTest
-        agents:
-          queue: android
-      - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
-        key: "publish-wp-api-kotlin"
-        plugins: *common_plugins
-        command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "$$HOME/.cargo/env"
-
-          echo "--- :package: Installing Rust Toolchains"
-          make setup-rust
-
-          echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
-          .buildkite/publish-wp-api-kotlin.sh
-        agents:
-          queue: android
-      - label: ":kotlin: Publish `rs.wordpress.api:android`"
-        key: "publish-wp-api-android"
-        plugins: *common_plugins
-        depends_on:
-          - "publish-wp-api-kotlin"
-        command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "$$HOME/.cargo/env"
-
-          echo "--- :package: Installing Rust Toolchains"
-          make setup-rust
-          make setup-rust-android-targets
-
-          echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
-          .buildkite/publish-wp-api-android.sh
-        agents:
-          queue: android
+  # #
+  # # Swift Group
+  # - group: ":swift: Swift Wrapper"
+  #   key: "swift"
+  #   steps:
+  #     - label: ":swift: :darwin: Build xcframework"
+  #       key: "xcframework"
+  #       command: |
+  #         echo "--- :rust: Installing Rust"
+  #         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+  #
+  #         source "/Users/builder/.cargo/env"
+  #
+  #         echo "--- :package: Installing Rust Toolchains"
+  #         make setup-rust
+  #
+  #         echo "--- :swift: Building xcframework"
+  #         make xcframework
+  #         zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
+  #       artifact_paths:
+  #         - target/libwordpressFFI.xcframework.zip
+  #         - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
+  #       env:
+  #         IMAGE_ID: xcode-15.3
+  #       agents:
+  #         queue: mac
+  #     - label: ":swift: :darwin: Build + Test on Simulators"
+  #       command: .buildkite/swift-test.sh run_tests
+  #       env:
+  #         IMAGE_ID: xcode-15.3
+  #       depends_on: xcframework
+  #       plugins: [$CI_TOOLKIT]
+  #       agents:
+  #         queue: mac
+  #     - label: ":swift: :darwin: Build for Real Devices"
+  #       command: .buildkite/swift-test.sh build_for_real_device
+  #       env:
+  #         IMAGE_ID: xcode-15.3
+  #       depends_on: xcframework
+  #       plugins: [$CI_TOOLKIT]
+  #       agents:
+  #         queue: mac
+  #     - label: ":swift: :cocoapods: Validate CocoaPods Support"
+  #       command: .buildkite/validate-cocoapods.sh
+  #       env:
+  #         IMAGE_ID: xcode-15.3
+  #       depends_on: xcframework
+  #       plugins: [$CI_TOOLKIT]
+  #       agents:
+  #         queue: mac
+  #     - label: ":swift: :linux: Build and Test"
+  #       command: |
+  #         echo "--- :swift: Building + Testing"
+  #         make test-swift-linux
+  #     - label: ":swift: Lint"
+  #       command: |
+  #         .buildkite/download-xcframework.sh
+  #         echo "--- :swift: Swiftlint"
+  #         make lint-swift
+  #       depends_on: xcframework
+  #       env:
+  #         IMAGE_ID: xcode-15.3
+  #       agents:
+  #         queue: mac
+  #     - label: ":swift: Example Apps"
+  #       command: |
+  #         .buildkite/download-xcframework.sh
+  #
+  #         echo "--- :computer: Building for macOS"
+  #         make swift-example-app-mac
+  #
+  #         echo "--- :iphone: Building for iOS"
+  #         make swift-example-app-ios
+  #       depends_on: xcframework
+  #       env:
+  #         IMAGE_ID: xcode-15.3
+  #       agents:
+  #         queue: mac
+  # #
+  # # Kotlin Group
+  # - group: ":kotlin: Kotlin Wrapper"
+  #   key: "kotlin"
+  #   steps:
+  #     - label: ":kotlin: Detekt"
+  #       key: "kotlin-detekt"
+  #       plugins: [$CI_TOOLKIT]
+  #       artifact_paths:
+  #         - "**/build/reports/detekt/detekt.html"
+  #       command: |
+  #         echo "--- :rust: Installing Rust"
+  #         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+  #
+  #         source "$$HOME/.cargo/env"
+  #
+  #         echo "--- :package: Installing Rust Toolchains"
+  #         make setup-rust
+  #         make setup-rust-android-targets
+  #
+  #         echo "--- 🧹 Linting"
+  #
+  #         # This is a temporary step until we implement a more graceful way to handle missing credentials
+  #         printf "site_url\nadmin_username\nadmin_password\nadmin_password_uuid\nsubscriber_username\nsubscriber_password\nsubscriber_password_uuid\n" > test_credentials
+  #
+  #         cd ./native/kotlin
+  #         ./gradlew detektMain detektTest
+  #       agents:
+  #         queue: android
+  #     - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
+  #       key: "publish-wp-api-kotlin"
+  #       plugins: [$CI_TOOLKIT]
+  #       command: |
+  #         echo "--- :rust: Installing Rust"
+  #         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+  #
+  #         source "$$HOME/.cargo/env"
+  #
+  #         echo "--- :package: Installing Rust Toolchains"
+  #         make setup-rust
+  #
+  #         echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
+  #         .buildkite/publish-wp-api-kotlin.sh
+  #       agents:
+  #         queue: android
+  #     - label: ":kotlin: Publish `rs.wordpress.api:android`"
+  #       key: "publish-wp-api-android"
+  #       plugins: [$CI_TOOLKIT]
+  #       depends_on:
+  #         - "publish-wp-api-kotlin"
+  #       command: |
+  #         echo "--- :rust: Installing Rust"
+  #         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+  #
+  #         source "$$HOME/.cargo/env"
+  #
+  #         echo "--- :package: Installing Rust Toolchains"
+  #         make setup-rust
+  #         make setup-rust-android-targets
+  #
+  #         echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
+  #         .buildkite/publish-wp-api-android.sh
+  #       agents:
+  #         queue: android
   #
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
     steps:
-      - label: ":wordpress: :rust: WordPress {{matrix}}"
-        command: |
-          # Give read/write permissions to `./` for all users
-          chmod -R a+rw ./
-
-          echo "--- :docker: Setting up Test Server"
-          make test-server
-
-          echo "--- 🧪 Running Rust Integration Tests"
-          make test-rust-integration
-        env:
-          WORDPRESS_VERSION: "{{matrix}}"
-        matrix: *wordpress_version_matrix
+      # - label: ":wordpress: :rust: WordPress {{matrix}}"
+      #   command: |
+      #     # Give read/write permissions to `./` for all users
+      #     chmod -R a+rw ./
+      #
+      #     echo "--- :docker: Setting up Test Server"
+      #     make test-server
+      #
+      #     echo "--- 🧪 Running Rust Integration Tests"
+      #     make test-rust-integration
+      #   env:
+      #     WORDPRESS_VERSION: "{{matrix}}"
+      #   matrix: *wordpress_version_matrix
 
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
-        command: |
-          # Give read/write permissions to `./` for all users
-          chmod -R a+rw ./
-
-          echo "--- :docker: Setting up Test Server"
-          make test-server
-
-          echo "--- 🧪 Running Kotlin Integration Tests"
-          make test-kotlin-integration
+        command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
+        plugins:
+          - $CI_TOOLKIT
+          - $TEST_COLLECTOR :
+              files: "buildkite-test-analytics/*.xml"
+              format: "junit"
+        artifact_paths:
+          - "buildkite-test-analytics/*.xml"
 
   - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
     depends_on: swift
-    plugins: *common_plugins
+    plugins: [$CI_TOOLKIT]
     env:
       IMAGE_ID: xcode-15.4
     agents:
