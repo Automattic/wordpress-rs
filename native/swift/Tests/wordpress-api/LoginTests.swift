@@ -122,7 +122,12 @@ class LoginTests: XCTestCase {
             )
         )
 
-        let wpJsonResponse = try XCTUnwrap(Bundle.module.url(forResource: "Responses/LoginTests-wp-json-missing-authentication-endpoint", withExtension: "json"))
+        let wpJsonResponse = try XCTUnwrap(
+            Bundle.module.url(
+                forResource: "Responses/LoginTests-wp-json-missing-authentication-endpoint",
+                withExtension: "json"
+            )
+        )
 
         try stubs.stub(
             url: "https://example.com/wp-json/",
@@ -160,7 +165,12 @@ class LoginTests: XCTestCase {
             )
         )
 
-        let wpJsonResponse = try XCTUnwrap(Bundle.module.url(forResource: "Responses/LoginTests-wp-json", withExtension: "json"))
+        let wpJsonResponse = try XCTUnwrap(
+            Bundle.module.url(
+                forResource: "Responses/LoginTests-wp-json",
+                withExtension: "json"
+            )
+        )
 
         try stubs.stub(
             url: "https://example.com/wp-json/",
@@ -199,7 +209,12 @@ class LoginTests: XCTestCase {
             )
         )
 
-        let wpJsonResponse = try XCTUnwrap(Bundle.module.url(forResource: "Responses/LoginTests-wp-json", withExtension: "json"))
+        let wpJsonResponse = try XCTUnwrap(
+            Bundle.module.url(
+                forResource: "Responses/LoginTests-wp-json",
+                withExtension: "json"
+            )
+        )
 
         try stubs.stub(
             url: "https://example.com/wp-json/",
@@ -211,6 +226,7 @@ class LoginTests: XCTestCase {
         )
 
         let client = WordPressLoginClient(requestExecutor: stubs)
+        // swiftlint:disable:next line_length
         let successfulURL = try XCTUnwrap(URL(string: "x-wordpress-app://login-callback?site_url=https%3A%2F%2Fexample.com&user_login=admin&password=123456"))
 
         let result = await client.login(
