@@ -16,7 +16,7 @@ pub enum RequestExecutionError {
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]
-    InvalidStatusCode { status_code: u16 },
+    InvalidHttpStatusCode { status_code: u16 },
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
         status_code,

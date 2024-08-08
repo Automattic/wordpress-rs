@@ -11,7 +11,7 @@ sealed class WpRequestResult<T> {
         val response: String,
     ) : WpRequestResult<T>()
 
-    class InvalidStatusCode<T>(
+    class InvalidHttpStatusCode<T>(
         val statusCode: UShort
     ) : WpRequestResult<T>()
 
