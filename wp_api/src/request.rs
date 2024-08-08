@@ -324,7 +324,7 @@ impl WpNetworkResponse {
             })
         } else {
             let status = http::StatusCode::from_u16(self.status_code).map_err(|_| {
-                WpApiError::InvalidStatusCode {
+                WpApiError::InvalidHttpStatusCode {
                     status_code: self.status_code,
                 }
             })?;

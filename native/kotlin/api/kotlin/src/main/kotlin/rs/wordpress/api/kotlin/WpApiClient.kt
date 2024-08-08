@@ -35,7 +35,7 @@ constructor(
             WpRequestResult.WpRequestSuccess(data = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
             when (exception) {
-                is WpApiException.InvalidStatusCode -> WpRequestResult.InvalidStatusCode(
+                is WpApiException.InvalidHttpStatusCode -> WpRequestResult.InvalidHttpStatusCode(
                     statusCode = exception.statusCode,
                 )
                 is WpApiException.RequestExecutionFailed -> WpRequestResult.RequestExecutionFailed(
