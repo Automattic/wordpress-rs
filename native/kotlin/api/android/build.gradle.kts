@@ -16,6 +16,11 @@ android {
 
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
+    // `ndkVersion` will be set to the version defined by Android Gradle Plugin, but it still needs
+    // to be manually installed: https://developer.android.com/build/releases/gradle-plugin#compatibility
+    // Note that if the project's AGP version is not up to date, we need to find the correct release
+    // notes from the list: https://developer.android.com/build/releases/past-releases (on the left side)
+
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
 
