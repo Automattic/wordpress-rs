@@ -1,9 +1,4 @@
-#!/bin/bash
-
-set -e
-
-# Load the Rust toolchain into this shell
-source $HOME/.cargo/env
+#!/bin/bash -eu
 
 # The project should be mounted to this location
 cd /app

@@ -1,4 +1,6 @@
 #!/bin/bash -eu
 
-cd ./native/kotlin
+# The project should be mounted to this location
+cd /app/native/kotlin
+
 ./gradlew :api:kotlin:integrationTest
