@@ -1,5 +1,8 @@
 import Foundation
+
+#if canImport(AuthenticationServices)
 import AuthenticationServices
+#endif
 
 #if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
@@ -36,6 +39,7 @@ public final class WordPressLoginClient {
         self.requestExecutor = requestExecutor
     }
 
+#if canImport(AuthenticationServices)
     public func login(
         site: String,
         appName: String,
@@ -49,6 +53,7 @@ public final class WordPressLoginClient {
             authenticator: AuthenticationServiceAuthenticator(contextProvider: contextProvider)
         )
     }
+#endif
 
     public func login(
         site: String,
@@ -115,6 +120,8 @@ public final class WordPressLoginClient {
     }
 }
 
+#if canImport(AuthenticationServices)
+
 extension WordPressLoginClient {
 
     class AuthenticationServiceAuthenticator: Authenticator {
@@ -151,4 +158,6 @@ extension WordPressLoginClient {
             }
         }
     }
-    }
+}
+
+#endif
