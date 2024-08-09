@@ -23,6 +23,7 @@ serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
+uuid = { workspace = true, features = [ "v4" ] }
 wp_contextual = { path = "../wp_contextual" }
 wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }
 

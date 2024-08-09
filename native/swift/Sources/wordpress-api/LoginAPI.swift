@@ -38,7 +38,7 @@ public final class WordPressLoginClient {
     public func login(
         site: String,
         appName: String,
-        appId: String?,
+        appId: WpUuid?,
         authenticator: Authenticator
     ) async -> Result<WpApiApplicationPasswordDetails, Error> {
         let loginURL = await self.loginURL(forSite: site)
@@ -144,7 +144,7 @@ extension WordPressLoginClient {
     public func login(
         site: String,
         appName: String,
-        appId: String?,
+        appId: WpUuid?,
         contextProvider: ASWebAuthenticationPresentationContextProviding
     ) async -> Result<WpApiApplicationPasswordDetails, Error> {
         await login(

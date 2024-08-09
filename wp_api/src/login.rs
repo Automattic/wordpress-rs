@@ -8,6 +8,7 @@ pub use login_client::WpLoginClient;
 pub use url_discovery::{UrlDiscoveryState, UrlDiscoverySuccess};
 
 use crate::ParsedUrl;
+use crate::WpUuid;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
@@ -98,11 +99,15 @@ pub enum OAuthResponseUrlError {
     UnsuccessfulLogin,
 }
 
+/// Return an URL to be used in application password authentication.
+///
+/// See the "Authorization Flow" section for details:
+/// https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/
 #[uniffi::export]
 pub fn create_application_password_authentication_url(
     login_url: Arc<ParsedUrl>,
     app_name: String,
-    app_id: Option<String>,
+    app_id: Option<Arc<WpUuid>>,
     success_url: Option<String>,
     reject_url: Option<String>,
 ) -> ParsedUrl {
@@ -113,7 +118,7 @@ pub fn create_application_password_authentication_url(
     if let Some(app_id) = app_id {
         auth_url
             .query_pairs_mut()
-            .append_pair("app_id", app_id.as_str());
+            .append_pair("app_id", app_id.uuid_string().as_str());
     }
     if let Some(success_url) = success_url {
         auth_url
@@ -178,20 +183,21 @@ mod tests {
 
     #[rstest]
     fn test_auth_url() {
+        let app_id = WpUuid::new();
+        let app_id_str = app_id.uuid_string();
         let login_url = ParsedUrl::parse("https://example.com/wp-login.php").unwrap();
         let auth_url = create_application_password_authentication_url(
             login_url.into(),
             "AppName".to_string(),
-            Some("app-id".to_string()),
+            Some(app_id.into()),
             Some("https://example.com/success".to_string()),
             Some("https://example.com/reject".to_string()),
         );
-        assert_eq!(
-            auth_url,
-            ParsedUrl::parse(
-                "https://example.com/wp-login.php?app_name=AppName&app_id=app-id&success_url=https%3A%2F%2Fexample.com%2Fsuccess&reject_url=https%3A%2F%2Fexample.com%2Freject"
-            )
-            .unwrap()
+
+        let expected_url = format!(
+            "https://example.com/wp-login.php?app_name=AppName&app_id={}&success_url=https%3A%2F%2Fexample.com%2Fsuccess&reject_url=https%3A%2F%2Fexample.com%2Freject",
+            app_id_str
         );
+        assert_eq!(auth_url, ParsedUrl::parse(expected_url.as_str()).unwrap());
     }
 }

@@ -9,6 +9,7 @@ import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
 public typealias ParsedUrl = WordPressAPIInternal.ParsedUrl
+public typealias WpUuid = WordPressAPIInternal.WpUuid
 
 // MARK: - Login
 
