@@ -53,6 +53,12 @@ testing {
     }
 }
 
+tasks.withType<Test>().configureEach {
+    afterTest(KotlinClosure2({ descriptor: TestDescriptor, result: TestResult ->
+        println("[${descriptor.className}] > ${descriptor.displayName}: ${result.resultType}")
+    }))
+}
+
 @Suppress("UnstableApiUsage")
 tasks.named("check") {
     dependsOn(testing.suites.named("integrationTest"))
