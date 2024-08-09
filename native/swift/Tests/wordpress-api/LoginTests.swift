@@ -9,6 +9,8 @@ import WordPressAPIInternal
 
 class LoginTests: XCTestCase {
 
+    let appId = { try! WpUuid.parse(input: "caa8b54a-eb5e-4134-8ae2-a3946a428ec7") }()
+
     var stubs: HTTPStubs!
 
     override func setUp() {
@@ -23,7 +25,7 @@ class LoginTests: XCTestCase {
             let result = await client.login(
                 site: "invalid url",
                 appName: "foo",
-                appId: "bar",
+                appId: appId,
                 authenticator: Authenticator()
             )
             let success = try result.get()
@@ -45,7 +47,7 @@ class LoginTests: XCTestCase {
             let result = await client.login(
                 site: "https://example.com/blog",
                 appName: "foo",
-                appId: "bar",
+                appId: appId,
                 authenticator: Authenticator()
             )
             let success = try result.get()
@@ -90,7 +92,7 @@ class LoginTests: XCTestCase {
             let result = await client.login(
                 site: "https://example.com",
                 appName: "foo",
-                appId: "bar",
+                appId: appId,
                 authenticator: Authenticator()
             )
             let success = try result.get()
@@ -143,7 +145,7 @@ class LoginTests: XCTestCase {
             let result = await client.login(
                 site: "https://example.com",
                 appName: "foo",
-                appId: "bar",
+                appId: appId,
                 authenticator: Authenticator()
             )
             let success = try result.get()
@@ -187,7 +189,7 @@ class LoginTests: XCTestCase {
             let result = await client.login(
                 site: "https://example.com",
                 appName: "foo",
-                appId: "bar",
+                appId: appId,
                 authenticator: Authenticator().returning(.success(rejectedURL))
             )
             let success = try result.get()
@@ -232,7 +234,7 @@ class LoginTests: XCTestCase {
         let result = await client.login(
             site: "https://example.com",
             appName: "foo",
-            appId: "bar",
+            appId: appId,
             authenticator: Authenticator().returning(.success(successfulURL))
         )
         let success = try result.get()
