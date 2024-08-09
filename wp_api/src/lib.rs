@@ -5,11 +5,13 @@ pub use api_error::{RequestExecutionError, WpApiError, WpErrorCode};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use users::*;
+pub use uuid::{WpUuid, WpUuidParseError};
 
 mod api_client; // re-exported relevant types
 mod api_error; // re-exported relevant types
 mod parsed_url; // re-exported relevant types
 mod serde_helper; // internal module
+mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
 pub mod login;
