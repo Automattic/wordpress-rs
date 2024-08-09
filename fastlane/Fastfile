@@ -72,6 +72,7 @@ lane :publish_github_release do
     path: xcframework_bindings_file_path,
     message: "Commit Swift Bindings for version #{version}"
   )
+  push_to_git_remote(tags: false)
 
   add_git_tag(tag: version)
   push_git_tags(tag: version, remote: GIT_REMOTE_NAME)
