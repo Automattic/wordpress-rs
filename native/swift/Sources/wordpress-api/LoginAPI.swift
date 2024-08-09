@@ -1,9 +1,5 @@
 import Foundation
 
-#if canImport(AuthenticationServices)
-import AuthenticationServices
-#endif
-
 #if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
 #endif
@@ -38,22 +34,6 @@ public final class WordPressLoginClient {
     init(requestExecutor: SafeRequestExecutor) {
         self.requestExecutor = requestExecutor
     }
-
-#if canImport(AuthenticationServices)
-    public func login(
-        site: String,
-        appName: String,
-        appId: String?,
-        contextProvider: ASWebAuthenticationPresentationContextProviding
-    ) async -> Result<WpApiApplicationPasswordDetails, Error> {
-        await login(
-            site: site,
-            appName: appName,
-            appId: appId,
-            authenticator: AuthenticationServiceAuthenticator(contextProvider: contextProvider)
-        )
-    }
-#endif
 
     public func login(
         site: String,
@@ -120,7 +100,9 @@ public final class WordPressLoginClient {
     }
 }
 
-#if canImport(AuthenticationServices)
+#if os(iOS) || os(macOS)
+
+import AuthenticationServices
 
 extension WordPressLoginClient {
 
@@ -158,6 +140,21 @@ extension WordPressLoginClient {
             }
         }
     }
+
+    public func login(
+        site: String,
+        appName: String,
+        appId: String?,
+        contextProvider: ASWebAuthenticationPresentationContextProviding
+    ) async -> Result<WpApiApplicationPasswordDetails, Error> {
+        await login(
+            site: site,
+            appName: appName,
+            appId: appId,
+            authenticator: AuthenticationServiceAuthenticator(contextProvider: contextProvider)
+        )
+    }
+
 }
 
 #endif
