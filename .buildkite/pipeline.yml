@@ -201,6 +201,7 @@ steps:
           make test-server
 
           echo "--- 🧪 Running Rust Integration Tests"
+          make integration-test-backend
           make test-rust-integration
         env:
           WORDPRESS_VERSION: "{{matrix}}"

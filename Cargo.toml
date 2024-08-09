@@ -2,6 +2,8 @@
 members = [
   "wp_api",
   "wp_api_integration_tests",
+  "wp_api_integration_tests_backend_support",
+  "wp_cli",
   "wp_contextual",
   "wp_derive_request_builder",
   "wp_uniffi_bindgen",
@@ -24,14 +26,15 @@ paste = "1.0"
 proc-macro-crate = "3.1.0"
 proc-macro2 = "1.0"
 quote = "1.0"
-reqwest = "0.12"
 regex = "1.10"
+reqwest = "0.12"
+rocket = "0.5"
 rstest = "0.21"
 rstest_reuse = "0.7.0"
 serde = "1.0"
 serde_json = "1.0"
 serial_test = "3.1"
-sqlx = "0.7"
+sqlx = "0.8"
 strum = "0.26"
 strum_macros = "0.26"
 syn = "2.0"

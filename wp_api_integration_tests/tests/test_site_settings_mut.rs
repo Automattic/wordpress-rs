@@ -2,12 +2,7 @@ use serial_test::serial;
 use wp_api::site_settings::{
     SiteSettingsCommentStatus, SiteSettingsPingStatus, SiteSettingsUpdateParams,
 };
-use wp_api_integration_tests::{
-    api_client,
-    wp_cli::WpCliSiteSettings,
-    wp_db::{self},
-    AssertResponse,
-};
+use wp_api_integration_tests::{api_client, run_and_restore_wp_db, AssertResponse, BackendSupport};
 
 macro_rules! generate_test {
     ($ident:ident, $value:expr) => {
@@ -18,12 +13,12 @@ macro_rules! generate_test {
             #[tokio::test]
             #[serial]
             async fn [<update_site_settings_ $ident>]() {
-                wp_db::run_and_restore(|_db| async move {
+                run_and_restore_wp_db(|| async {
                     let new_value = $value;
                     let assertion_value = $assertion_value.to_string();
                     // First assert that the new value is not the same as the old value to avoid
                     // false positive assertion
-                    assert_ne!(Some(assertion_value.clone()), WpCliSiteSettings::fetch().unwrap().$ident);
+                    assert_ne!(Some(assertion_value.clone()), BackendSupport::default().site_settings().await.unwrap().$ident);
                     let params = SiteSettingsUpdateParams {
                         $ident: Some(new_value.clone()),
                         ..Default::default()
@@ -34,7 +29,7 @@ macro_rules! generate_test {
                         .await
                         .assert_response();
                     // Assert that the value was updated to the new one
-                    assert_eq!(Some(assertion_value), WpCliSiteSettings::fetch().unwrap().$ident);
+                    assert_eq!(Some(assertion_value), BackendSupport::default().site_settings().await.unwrap().$ident);
                 })
                 .await;
             }

@@ -216,6 +216,9 @@ test-server: stop-server
 	docker-compose up -d --build
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
+integration-test-backend:
+	docker exec -i wordpress /bin/bash < ./scripts/start-wp-api-integration-tests-backend-support.sh
+
 stop-server:
 	@# Help: Stop the running server.
 	docker-compose down

@@ -13,7 +13,7 @@ where
     let db_dump_path = format!("{}/dump.sql", TEST_SITE_WP_CONTENT_PATH);
 
     let options = MySqlConnectOptions::new()
-        .host("database")
+        .host("localhost")
         .username("wordpress")
         .password("wordpress")
         .database("wordpress");

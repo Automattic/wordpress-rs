@@ -8,14 +8,19 @@ use wp_api::{
     users::UserId,
     ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
 };
+use wp_cli::wp_cli_settings::WpCliSiteSettings;
 
 pub mod fs_utils;
-pub mod wp_cli;
 pub mod wp_db;
 
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
+
+const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
+const BACKEND_PATH_RESTORE_WP_DB: &str = "/restore-wp-db";
+const BACKEND_PATH_RESTORE_WP_CONTENT_PLUGINS: &str = "/restore-wp-content-plugins";
+const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
@@ -89,13 +94,22 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
     }
 }
 
+pub async fn run_and_restore_wp_db<F, Fut>(f: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = ()>,
+{
+    f().await;
+    let _ = BackendSupport::default().restore_wp_db().await;
+}
+
 pub async fn run_and_restore_wp_content_plugins<F, Fut>(f: F)
 where
     F: FnOnce() -> Fut,
     Fut: Future<Output = ()>,
 {
     f().await;
-    fs_utils::restore_wp_content_plugins().await;
+    let _ = BackendSupport::default().restore_wp_content_plugins().await;
 }
 
 #[derive(Debug)]
@@ -177,5 +191,44 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
             self.unwrap_err()
         );
         self.unwrap()
+    }
+}
+
+#[derive(Debug)]
+pub struct BackendSupport {
+    client: reqwest::Client,
+}
+
+impl Default for BackendSupport {
+    fn default() -> Self {
+        Self {
+            client: reqwest::Client::new(),
+        }
+    }
+}
+
+impl BackendSupport {
+    pub async fn restore_wp_db(&self) -> Result<reqwest::Response, reqwest::Error> {
+        self.client
+            .get(format!("{}{}", BACKEND_ADDRESS, BACKEND_PATH_RESTORE_WP_DB))
+            .send()
+            .await
+    }
+    pub async fn restore_wp_content_plugins(&self) -> Result<reqwest::Response, reqwest::Error> {
+        self.client
+            .get(format!(
+                "{}{}",
+                BACKEND_ADDRESS, BACKEND_PATH_RESTORE_WP_CONTENT_PLUGINS
+            ))
+            .send()
+            .await
+    }
+    pub async fn site_settings(&self) -> Result<WpCliSiteSettings, reqwest::Error> {
+        self.client
+            .get(format!("{}{}", BACKEND_ADDRESS, BACKEND_PATH_SITE_SETTINGS))
+            .send()
+            .await?
+            .json()
+            .await
     }
 }
