@@ -37,6 +37,7 @@ Pod::Spec.new do |spec|
 
   spec.test_spec 'Tests' do |test_spec|
     test_spec.source_files = 'native/swift/Tests/**/*.{swift}'
+    test_spec.resource_bundles = { 'Resources' => ['native/swift/Tests/wordpress-api/Resources/*'] }
   end
 end
 EOT
