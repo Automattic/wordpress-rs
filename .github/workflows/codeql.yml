@@ -1,0 +1,93 @@
+name: "CodeQL"
+
+on:
+  push:
+    branches: [ "trunk" ]
+  pull_request:
+    branches: [ "*" ]
+  schedule:
+    - cron: '33 23 * * 4'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    # Runner size impacts CodeQL analysis time. To learn more, please see:
+    #   - https://gh.io/recommended-hardware-resources-for-running-codeql
+    #   - https://gh.io/supported-runners-and-hardware-resources
+    #   - https://gh.io/using-larger-runners (GitHub.com only)
+    # Consider using larger runners or machines with greater resources for possible analysis time improvements.
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      # required for all workflows
+      security-events: write
+
+      # required to fetch internal or private CodeQL packs
+      packages: read
+
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: java-kotlin
+          build-mode: manual
+        - language: ruby
+          build-mode: none
+        - language: swift
+          build-mode: manual
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - if: matrix.language == 'java-kotlin'
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: corretto
+
+    - name: Install NDK
+      if: matrix.language == 'java-kotlin'
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: "r25b"
+        link-to-sdk: true
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+        # If you wish to specify custom queries, you can do so here or in a config file.
+        # By default, queries listed here will override any specified in a config file.
+        # Prefix the list here with "+" to use these queries and those in the config file.
+
+        # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
+        # queries: security-extended,security-and-quality
+
+    - name: Restore Rust Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: "${{ matrix.language }}"
+
+    - name: Prepare Kotlin Project
+      if: matrix.language == 'java-kotlin'
+      shell: bash
+      run: |
+        make setup-rust-android-targets
+        cd native/kotlin
+        ./gradlew cargoBuild --info
+
+    - name: Prepare Swift Project
+      if: matrix.language == 'swift'
+      shell: bash
+      run: make setup-rust xcframework
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
