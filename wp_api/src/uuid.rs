@@ -28,16 +28,11 @@ pub enum WpUuidParseError {
 impl WpUuid {
     #[uniffi::constructor]
     pub fn parse(input: String) -> Result<Self, WpUuidParseError> {
-        let uuid = Uuid::parse_str(input.as_str());
-        match uuid {
-            Ok(uuid) => {
-                if uuid.get_version_num() != 4 {
-                    return Err(WpUuidParseError::NotVersion4);
-                }
-                Ok(Self { inner: uuid })
-            }
-            Err(_) => Err(WpUuidParseError::InvalidUuid),
+        let uuid = Uuid::parse_str(input.as_str()).map_err(|_| WpUuidParseError::InvalidUuid)?;
+        if uuid.get_version_num() != 4 {
+            return Err(WpUuidParseError::NotVersion4);
         }
+        Ok(Self { inner: uuid })
     }
 
     pub fn uuid_string(&self) -> String {
