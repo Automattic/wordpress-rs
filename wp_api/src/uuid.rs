@@ -70,7 +70,7 @@ mod tests {
     #[case("c7b130a6-9983-2e8f-b5d2-006e09d3b8a3")]
     fn test_parse_non_v4_uuid(#[case] uuid_str: String) {
         let uuid = WpUuid::parse(uuid_str);
-        assert!(matches!(uuid.unwrap_err(), WpUuidParseError::NotVersion4));
+        assert_eq!(uuid.unwrap_err(), WpUuidParseError::NotVersion4);
     }
 
     #[rstest]
