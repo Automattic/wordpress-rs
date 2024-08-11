@@ -99,7 +99,7 @@ pub enum OAuthResponseUrlError {
     UnsuccessfulLogin,
 }
 
-/// Return an URL to be used in application password authentication.
+/// Return a URL to be used in application password authentication.
 ///
 /// See the "Authorization Flow" section for details:
 /// https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/
