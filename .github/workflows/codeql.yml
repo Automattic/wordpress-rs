@@ -80,7 +80,7 @@ jobs:
       run: |
         make setup-rust-android-targets
         cd native/kotlin
-        ./gradlew cargoBuild --info
+        ./gradlew :api:android:assembleRelease
 
     - name: Prepare Swift Project
       if: matrix.language == 'swift'
