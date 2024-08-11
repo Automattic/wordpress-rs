@@ -1,7 +1,5 @@
 # Nodes with values to reuse in the pipeline.
 common_params:
-  plugins: &common_plugins
-    - automattic/a8c-ci-toolkit#3.4.1
   matrix: &wordpress_version_matrix
     # All versions except for the latest have been disabled until we have version specific 
     # integration tests
@@ -78,7 +76,7 @@ steps:
         env:
           IMAGE_ID: xcode-15.3
         depends_on: xcframework
-        plugins: *common_plugins
+        plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
       - label: ":swift: :darwin: Build for Real Devices"
@@ -86,7 +84,7 @@ steps:
         env:
           IMAGE_ID: xcode-15.3
         depends_on: xcframework
-        plugins: *common_plugins
+        plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
       - label: ":swift: :cocoapods: Validate CocoaPods Support"
@@ -94,7 +92,7 @@ steps:
         env:
           IMAGE_ID: xcode-15.3
         depends_on: xcframework
-        plugins: *common_plugins
+        plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
       - label: ":swift: :linux: Build and Test"
@@ -132,7 +130,7 @@ steps:
     steps:
       - label: ":kotlin: Detekt"
         key: "kotlin-detekt"
-        plugins: *common_plugins
+        plugins: [$CI_TOOLKIT]
         artifact_paths:
           - "**/build/reports/detekt/detekt.html"
         command: |
@@ -156,7 +154,7 @@ steps:
           queue: android
       - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
         key: "publish-wp-api-kotlin"
-        plugins: *common_plugins
+        plugins: [$CI_TOOLKIT]
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
@@ -172,7 +170,7 @@ steps:
           queue: android
       - label: ":kotlin: Publish `rs.wordpress.api:android`"
         key: "publish-wp-api-android"
-        plugins: *common_plugins
+        plugins: [$CI_TOOLKIT]
         depends_on:
           - "publish-wp-api-kotlin"
         command: |
@@ -189,7 +187,7 @@ steps:
           .buildkite/publish-wp-api-android.sh
         agents:
           queue: android
-  #
+
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
@@ -209,23 +207,22 @@ steps:
         matrix: *wordpress_version_matrix
 
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
-        command: |
-          # Give read/write permissions to `./` for all users
-          chmod -R a+rw ./
-
-          echo "--- :docker: Setting up Test Server"
-          make test-server
-
-          echo "--- 🧪 Running Kotlin Integration Tests"
-          make test-kotlin-integration
+        command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
+        plugins:
+          - $CI_TOOLKIT
+          - $TEST_COLLECTOR :
+              files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
+              format: "junit"
+        artifact_paths:
+          - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
 
   - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
     depends_on: swift
-    plugins: *common_plugins
+    plugins: [$CI_TOOLKIT]
     env:
       IMAGE_ID: xcode-15.4
     agents:
