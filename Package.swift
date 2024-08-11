@@ -15,7 +15,7 @@ let libwordpressFFI: Target = libwordpressFFIVersion.target
 #endif
 
 var package = Package(
-    name: "WordPress",
+    name: "WordPressAPI",
     platforms: [
         .iOS(.v13),
         .macOS(.v11),
