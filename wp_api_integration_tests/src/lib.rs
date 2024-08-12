@@ -1,5 +1,7 @@
 use async_trait::async_trait;
+use serde::Serialize;
 use std::sync::Arc;
+use url::Url;
 use wp_api::{
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
@@ -17,8 +19,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
-const BACKEND_PATH_RESTORE_WP_DB: &str = "/restore-wp-db";
-const BACKEND_PATH_RESTORE_WP_CONTENT_PLUGINS: &str = "/restore-wp-content-plugins";
+const BACKEND_PATH_RESTORE: &str = "/restore";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
 
 // The first user is also the current user
@@ -189,22 +190,20 @@ impl Default for BackendSupport {
 }
 
 impl BackendSupport {
-    pub async fn restore_db() -> Result<reqwest::Response, reqwest::Error> {
+    pub async fn restore(restore: ServerRestore) {
+        let mut url = Url::parse(BACKEND_ADDRESS)
+            .expect("BACKEND_ADDRESS is a valid URL")
+            .join(BACKEND_PATH_RESTORE)
+            .expect("BACKEND_PATH_RESTORE is a valid path");
+        url.query_pairs_mut()
+            .append_pair("db", restore.db.to_string().as_str())
+            .append_pair("plugins", restore.plugins.to_string().as_str());
         Self::default()
             .client
-            .get(format!("{}{}", BACKEND_ADDRESS, BACKEND_PATH_RESTORE_WP_DB))
+            .get(url)
             .send()
             .await
-    }
-    pub async fn restore_plugins() -> Result<reqwest::Response, reqwest::Error> {
-        Self::default()
-            .client
-            .get(format!(
-                "{}{}",
-                BACKEND_ADDRESS, BACKEND_PATH_RESTORE_WP_CONTENT_PLUGINS
-            ))
-            .send()
-            .await
+            .unwrap_or_else(|_| panic!("Restoring DB and/or plugins failed: {:#?}", restore));
     }
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::default()
@@ -214,5 +213,27 @@ impl BackendSupport {
             .await?
             .json()
             .await
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ServerRestore {
+    db: bool,
+    plugins: bool,
+}
+
+impl ServerRestore {
+    pub fn db() -> Self {
+        Self {
+            db: true,
+            plugins: false,
+        }
+    }
+
+    pub fn all() -> Self {
+        Self {
+            db: true,
+            plugins: true,
+        }
     }
 }

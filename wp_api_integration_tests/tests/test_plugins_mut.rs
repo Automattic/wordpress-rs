@@ -1,11 +1,11 @@
 use rstest::rstest;
 use serial_test::serial;
 use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
-use wp_api_integration_tests::BackendSupport;
 use wp_api_integration_tests::{
     api_client, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
     WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
 };
+use wp_api_integration_tests::{BackendSupport, ServerRestore};
 
 #[tokio::test]
 #[serial]
@@ -23,8 +23,7 @@ async fn create_plugin() {
     assert_eq!(created_plugin.status, status);
     println!("Created Plugin: {:?}", created_plugin);
 
-    let _ = BackendSupport::restore_plugins().await;
-    let _ = BackendSupport::restore_db().await;
+    BackendSupport::restore(ServerRestore::all()).await;
 }
 
 #[rstest]
@@ -42,8 +41,7 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
     assert_eq!(updated_plugin.status, new_status);
     println!("Updated Plugin: {:?}", updated_plugin);
 
-    let _ = BackendSupport::restore_plugins().await;
-    let _ = BackendSupport::restore_db().await;
+    BackendSupport::restore(ServerRestore::all()).await;
 }
 
 #[tokio::test]
@@ -54,6 +52,5 @@ async fn delete_plugin() {
     assert_eq!(slug, deleted_plugin.previous.plugin);
     println!("Deleted Plugin: {:?}", deleted_plugin);
 
-    let _ = BackendSupport::restore_plugins().await;
-    let _ = BackendSupport::restore_db().await;
+    BackendSupport::restore(ServerRestore::all()).await;
 }

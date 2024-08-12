@@ -22,6 +22,19 @@ fn wp_cli_site_settings() -> Json<WpCliSiteSettings> {
     Json(WpCliSiteSettings::fetch().unwrap())
 }
 
+#[get("/restore?<db>&<plugins>")]
+async fn restore_wp_server(db: bool, plugins: bool) -> Result<Status, Error> {
+    if plugins {
+        inner_restore_wp_content_plugins().await;
+    }
+    if db {
+        inner_restore_wp_db()
+            .await
+            .map_err(|e| Error::AsString(e.to_string()))?
+    }
+    Ok(Status::Ok)
+}
+
 #[get("/restore-wp-db")]
 async fn restore_wp_db() -> Result<Status, Error> {
     inner_restore_wp_db()
@@ -40,6 +53,7 @@ async fn restore_wp_content_plugins() -> Status {
 fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![restore_wp_db])
+        .mount("/", routes![restore_wp_server])
         .mount("/", routes![restore_wp_content_plugins])
         .mount("/wp-cli/", routes![wp_cli_site_settings])
 }

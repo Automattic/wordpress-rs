@@ -2,7 +2,7 @@ use serial_test::serial;
 use wp_api::site_settings::{
     SiteSettingsCommentStatus, SiteSettingsPingStatus, SiteSettingsUpdateParams,
 };
-use wp_api_integration_tests::{api_client, AssertResponse, BackendSupport};
+use wp_api_integration_tests::{api_client, AssertResponse, BackendSupport, ServerRestore};
 
 macro_rules! generate_test {
     ($ident:ident, $value:expr) => {
@@ -30,7 +30,7 @@ macro_rules! generate_test {
                 // Assert that the value was updated to the new one
                 assert_eq!(Some(assertion_value), BackendSupport::site_settings().await.unwrap().$ident);
 
-                let _ = BackendSupport::restore_db().await;
+                BackendSupport::restore(ServerRestore::db()).await;
             }
         }
     };
