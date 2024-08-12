@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 import WordPressAPI
 
-class UUIDTests: XCTestCase {
+class WPUUIDTests: XCTestCase {
 
     func testConvertToUUID() {
         let uuid = WpUuid().uuidString()
