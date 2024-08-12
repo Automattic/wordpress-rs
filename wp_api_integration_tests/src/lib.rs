@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use futures::Future;
 use std::sync::Arc;
 use wp_api::{
     request::{
@@ -92,24 +91,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
             panic!("Unexpected wp_error '{:?}'", err);
         }
     }
-}
-
-pub async fn run_and_restore_wp_db<F, Fut>(f: F)
-where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = ()>,
-{
-    f().await;
-    let _ = BackendSupport::default().restore_wp_db().await;
-}
-
-pub async fn run_and_restore_wp_content_plugins<F, Fut>(f: F)
-where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = ()>,
-{
-    f().await;
-    let _ = BackendSupport::default().restore_wp_content_plugins().await;
 }
 
 #[derive(Debug)]
@@ -208,14 +189,16 @@ impl Default for BackendSupport {
 }
 
 impl BackendSupport {
-    pub async fn restore_wp_db(&self) -> Result<reqwest::Response, reqwest::Error> {
-        self.client
+    pub async fn restore_db() -> Result<reqwest::Response, reqwest::Error> {
+        Self::default()
+            .client
             .get(format!("{}{}", BACKEND_ADDRESS, BACKEND_PATH_RESTORE_WP_DB))
             .send()
             .await
     }
-    pub async fn restore_wp_content_plugins(&self) -> Result<reqwest::Response, reqwest::Error> {
-        self.client
+    pub async fn restore_plugins() -> Result<reqwest::Response, reqwest::Error> {
+        Self::default()
+            .client
             .get(format!(
                 "{}{}",
                 BACKEND_ADDRESS, BACKEND_PATH_RESTORE_WP_CONTENT_PLUGINS
@@ -223,8 +206,9 @@ impl BackendSupport {
             .send()
             .await
     }
-    pub async fn site_settings(&self) -> Result<WpCliSiteSettings, reqwest::Error> {
-        self.client
+    pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
+        Self::default()
+            .client
             .get(format!("{}{}", BACKEND_ADDRESS, BACKEND_PATH_SITE_SETTINGS))
             .send()
             .await?
