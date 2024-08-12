@@ -5,6 +5,7 @@ pub struct WpUuid {
     inner: Uuid,
 }
 
+#[uniffi::export]
 impl WpUuid {
     #[uniffi::constructor]
     pub fn new() -> Self {
