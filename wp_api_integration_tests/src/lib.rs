@@ -190,21 +190,6 @@ impl Default for BackendSupport {
 }
 
 impl BackendSupport {
-    pub async fn restore(restore: ServerRestore) {
-        let mut url = Url::parse(BACKEND_ADDRESS)
-            .expect("BACKEND_ADDRESS is a valid URL")
-            .join(BACKEND_PATH_RESTORE)
-            .expect("BACKEND_PATH_RESTORE is a valid path");
-        url.query_pairs_mut()
-            .append_pair("db", restore.db.to_string().as_str())
-            .append_pair("plugins", restore.plugins.to_string().as_str());
-        Self::default()
-            .client
-            .get(url)
-            .send()
-            .await
-            .unwrap_or_else(|_| panic!("Restoring DB and/or plugins failed: {:#?}", restore));
-    }
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::default()
             .client
@@ -217,23 +202,30 @@ impl BackendSupport {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ServerRestore {
-    db: bool,
-    plugins: bool,
-}
+pub struct ServerRestore;
 
 impl ServerRestore {
-    pub fn db() -> Self {
-        Self {
-            db: true,
-            plugins: false,
-        }
+    pub async fn db() {
+        Self::restore(true, false).await;
     }
 
-    pub fn all() -> Self {
-        Self {
-            db: true,
-            plugins: true,
-        }
+    pub async fn all() {
+        Self::restore(true, true).await;
+    }
+
+    async fn restore(db: bool, plugins: bool) {
+        let mut url = Url::parse(BACKEND_ADDRESS)
+            .expect("BACKEND_ADDRESS is a valid URL")
+            .join(BACKEND_PATH_RESTORE)
+            .expect("BACKEND_PATH_RESTORE is a valid path");
+        url.query_pairs_mut()
+            .append_pair("db", db.to_string().as_str())
+            .append_pair("plugins", plugins.to_string().as_str());
+        reqwest::get(url).await.unwrap_or_else(|_| {
+            panic!(
+                "Restoring server failed: (db({}), plugins({}))",
+                db, plugins
+            )
+        });
     }
 }
