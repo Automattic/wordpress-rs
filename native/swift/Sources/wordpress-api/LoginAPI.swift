@@ -113,6 +113,7 @@ extension WordPressLoginClient {
             self.contextProvider = contextProvider
         }
 
+        @MainActor
         func authenticate(url: URL, callbackURL: URL) async -> Result<URL, WordPressLoginClient.Error> {
             await withCheckedContinuation { continuation in
                 let session = ASWebAuthenticationSession(
