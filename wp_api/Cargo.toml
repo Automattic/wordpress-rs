@@ -19,6 +19,7 @@ indoc = { workspace = true }
 url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

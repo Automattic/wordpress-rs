@@ -50,7 +50,15 @@ impl Default for WpUuid {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use regex::Regex;
     use rstest::*;
+
+    // Copied from WordPress Core:
+    // https://github.com/WordPress/wordpress-develop/blob/471a619/src/wp-includes/functions.php#L7912
+    static WP_DEFAULT_REGEX: &str =
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
+    static WP_V4_REGEX: &str =
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 
     #[rstest]
     #[case("caa8b54a-eb5e-4134-8ae2-a3946a428ec7")]
@@ -72,6 +80,29 @@ mod tests {
     fn test_parse_non_v4_uuid(#[case] uuid_str: String) {
         let uuid = WpUuid::parse(uuid_str);
         assert_eq!(uuid.unwrap_err(), WpUuidParseError::NotVersion4);
+    }
+
+    #[rstest]
+    #[case("CAA8B54A-EB5E-4134-8AE2-A3946A428EC7")]
+    #[case("550E8400-e29b-41d4-A716-446655440000")]
+    #[case("16fd27068baf433b82eb8c7fada847da")]
+    #[case("F47AC10B58CC4372A5670E02B2C3D479")]
+    fn test_parse_other_formats(#[case] uuid_str: String) {
+        let uuid = WpUuid::parse(uuid_str.to_string()).unwrap();
+        let uuid = uuid.uuid_string();
+        assert!(Regex::new(WP_DEFAULT_REGEX)
+            .unwrap()
+            .is_match(uuid.as_str()));
+        assert!(Regex::new(WP_V4_REGEX).unwrap().is_match(uuid.as_str()));
+    }
+
+    #[rstest]
+    fn test_new_uuid_is_compatible_with_wordpress() {
+        let uuid = WpUuid::new().uuid_string();
+        assert!(Regex::new(WP_DEFAULT_REGEX)
+            .unwrap()
+            .is_match(uuid.as_str()));
+        assert!(Regex::new(WP_V4_REGEX).unwrap().is_match(uuid.as_str()));
     }
 
     #[rstest]

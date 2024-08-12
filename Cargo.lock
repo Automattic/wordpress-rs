@@ -3113,6 +3113,7 @@ dependencies = [
  "indoc",
  "parse_link_header",
  "paste",
+ "regex",
  "rstest",
  "rstest_reuse",
  "serde",
