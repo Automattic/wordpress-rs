@@ -9,6 +9,7 @@ import WordPressAPIInternal
 
 class LoginTests: XCTestCase {
 
+    // swiftlint:disable:next force_try
     let appId = { try! WpUuid.parse(input: "caa8b54a-eb5e-4134-8ae2-a3946a428ec7") }()
 
     var stubs: HTTPStubs!
