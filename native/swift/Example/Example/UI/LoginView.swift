@@ -63,55 +63,18 @@ struct LoginView: View {
         self.loginTask = Task {
             do {
                 let loginClient = WordPressLoginClient(urlSession: .shared)
-                let discoveryResult = try await loginClient.discoverLoginUrl(for: url)
-
-                guard
-                    let authURLString = discoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl(),
-                    let authURL = URL(string: authURLString)
-                else {
-                    abort() // TODO: Better error handling
-                }
-                debugPrint(authURL)
-                let loginDetails = try await displayLoginView(withAuthenticationUrl: authURL)
+                let loginDetails = try await loginClient.login(
+                    site: url,
+                    appName: "WordPress SDK Example App",
+                    appId: nil,
+                    contextProvider: AuthenticationHelper()
+                ).get()
                 debugPrint(loginDetails)
                 try await loginManager.setLoginCredentials(to: loginDetails)
             } catch let err {
                 handleLoginError(err)
             }
         }
-    }
-
-    private func displayLoginView(withAuthenticationUrl authURL: URL) async throws -> WpApiApplicationPasswordDetails {
-        var appNameValue = "WordPress SDK Example App"
-
-        #if os(macOS)
-        if let deviceName = Host.current().localizedName {
-            appNameValue += " - (\(deviceName))"
-        }
-        #else
-        let deviceName = UIDevice.current.name
-        appNameValue += " - (\(deviceName))"
-        #endif
-
-        var mutableAuthURL = authURL
-
-        mutableAuthURL.append(queryItems: [
-            URLQueryItem(name: "app_name", value: appNameValue),
-            URLQueryItem(name: "app_id", value: "00000000-0000-4000-8000-000000000000"),
-            URLQueryItem(name: "success_url", value: "exampleauth://login")
-        ])
-
-        let urlWithToken = try await webAuthenticationSession.authenticate(
-            using: mutableAuthURL,
-            callbackURLScheme: "exampleauth"
-        )
-
-        guard let loginDetails = try WordPressAPI.Helpers.extractLoginDetails(from: urlWithToken) else {
-            debugPrint("Unable to parse login details")
-            abort()
-        }
-
-        return loginDetails
     }
 
     private func handleLoginError(_ error: Error) {
