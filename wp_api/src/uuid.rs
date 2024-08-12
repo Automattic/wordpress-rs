@@ -76,6 +76,6 @@ mod tests {
     #[rstest]
     fn test_invalid_uuid_error() {
         let uuid = WpUuid::parse("not uuid".to_string());
-        assert!(matches!(uuid.unwrap_err(), WpUuidParseError::InvalidUuid));
+        assert_eq!(uuid.unwrap_err(), WpUuidParseError::InvalidUuid);
     }
 }
