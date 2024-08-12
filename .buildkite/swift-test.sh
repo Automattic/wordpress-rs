@@ -18,7 +18,7 @@ function build_for_real_device() {
     echo "--- :swift: Building for $platform device"
     export NSUnbufferedIO=YES
     xcodebuild -destination "generic/platform=$platform" \
-        -scheme WordPress \
+        -scheme WordPressAPI \
         -derivedDataPath DerivedData \
         -skipPackagePluginValidation \
         build | xcbeautify
