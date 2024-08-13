@@ -5,7 +5,7 @@ use wp_api::{
     },
     users::UserId,
 };
-use wp_api_integration_tests::BackendSupport;
+use wp_api_integration_tests::Backend;
 use wp_api_integration_tests::{
     api_client, AssertResponse, ServerRestore, FIRST_USER_ID, SECOND_USER_ID,
     TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
@@ -142,7 +142,7 @@ async fn delete_all_application_passwords() {
 }
 
 async fn application_password_meta_for_user(user_id: &UserId) -> Option<WpCliUserMeta> {
-    BackendSupport::user_meta(user_id)
+    Backend::user_meta(user_id)
         .await
         .into_iter()
         .find(|m| m.meta_key == "_application_passwords")

@@ -2,7 +2,7 @@
 members = [
   "wp_api",
   "wp_api_integration_tests",
-  "wp_api_integration_tests_backend_support",
+  "wp_api_integration_tests_backend",
   "wp_cli",
   "wp_contextual",
   "wp_derive_request_builder",

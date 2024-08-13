@@ -180,11 +180,11 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
 }
 
 #[derive(Debug)]
-pub struct BackendSupport {
+pub struct Backend {
     client: reqwest::Client,
 }
 
-impl Default for BackendSupport {
+impl Default for Backend {
     fn default() -> Self {
         Self {
             client: reqwest::Client::new(),
@@ -192,7 +192,7 @@ impl Default for BackendSupport {
     }
 }
 
-impl BackendSupport {
+impl Backend {
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::default()
             .client

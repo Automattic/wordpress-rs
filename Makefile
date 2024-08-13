@@ -219,11 +219,11 @@ test-server: stop-server
 integration-test-backend:
 	@# Help: Start the integration test helper server.
 	docker exec -i wordpress /bin/bash -c " if pgrep wp_api_integ; then pkill wp_api_integ; fi" # Kill the previous server
-	docker exec -i wordpress /bin/bash < ./scripts/start-wp-api-integration-tests-backend-support.sh
+	docker exec -i wordpress /bin/bash < ./scripts/start-wp-api-integration-tests-backend.sh
 
 print-log-integration-test-server:
 	@# Help: Print the logs of integration test helper server.
-	docker exec -i wordpress /bin/bash -c "cat /app/target/release/wp_api_integration_tests_backend_support.log"
+	docker exec -i wordpress /bin/bash -c "cat /app/target/release/wp_api_integration_tests_backend.log"
 
 stop-server:
 	@# Help: Stop the running server.

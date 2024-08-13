@@ -2,7 +2,7 @@ use serial_test::serial;
 use wp_api::site_settings::{
     SiteSettingsCommentStatus, SiteSettingsPingStatus, SiteSettingsUpdateParams,
 };
-use wp_api_integration_tests::{api_client, AssertResponse, BackendSupport, ServerRestore};
+use wp_api_integration_tests::{api_client, AssertResponse, Backend, ServerRestore};
 
 macro_rules! generate_test {
     ($ident:ident, $value:expr) => {
@@ -17,7 +17,7 @@ macro_rules! generate_test {
                 let assertion_value = $assertion_value.to_string();
                 // First assert that the new value is not the same as the old value to avoid
                 // false positive assertion
-                assert_ne!(Some(assertion_value.clone()), BackendSupport::site_settings().await.unwrap().$ident);
+                assert_ne!(Some(assertion_value.clone()), Backend::site_settings().await.unwrap().$ident);
                 let params = SiteSettingsUpdateParams {
                     $ident: Some(new_value.clone()),
                     ..Default::default()
@@ -28,7 +28,7 @@ macro_rules! generate_test {
                     .await
                     .assert_response();
                 // Assert that the value was updated to the new one
-                assert_eq!(Some(assertion_value), BackendSupport::site_settings().await.unwrap().$ident);
+                assert_eq!(Some(assertion_value), Backend::site_settings().await.unwrap().$ident);
 
                 ServerRestore::db().await;
             }

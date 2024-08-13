@@ -1,7 +1,7 @@
 use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, BackendSupport, ServerRestore, FIRST_USER_ID, SECOND_USER_ID,
+    api_client, AssertResponse, Backend, ServerRestore, FIRST_USER_ID, SECOND_USER_ID,
 };
 use wp_cli::{WpCliUser, WpCliUserMeta};
 
@@ -21,7 +21,7 @@ async fn create_user() {
     let created_user = api_client().users().create(&params).await.assert_response();
 
     // Assert that the user is created
-    let created_user_from_wp_cli = BackendSupport::user(&created_user.id).await;
+    let created_user_from_wp_cli = Backend::user(&created_user.id).await;
     assert_eq!(created_user_from_wp_cli.username, username);
     assert_eq!(created_user_from_wp_cli.email, email);
 
@@ -43,7 +43,7 @@ async fn delete_user() {
 
     // Assert that the user was deleted
     assert!(
-        !BackendSupport::users()
+        !Backend::users()
             .await
             .into_iter()
             .any(|u| u.id == SECOND_USER_ID.0 as i64),
@@ -70,7 +70,7 @@ async fn delete_current_user() {
 
     // Assert that the user was deleted
     assert!(
-        !BackendSupport::users()
+        !Backend::users()
             .await
             .into_iter()
             .any(|u| u.id == FIRST_USER_ID.0 as i64),
@@ -210,7 +210,7 @@ async fn update_user_roles() {
         .await
         .assert_response();
 
-    let updated_user = BackendSupport::users()
+    let updated_user = Backend::users()
         .await
         .into_iter()
         .find(|u| u.id == SECOND_USER_ID.0 as i64)
@@ -249,9 +249,9 @@ where
         .await
         .assert_response();
 
-    let updated_user = BackendSupport::user(&FIRST_USER_ID).await;
+    let updated_user = Backend::user(&FIRST_USER_ID).await;
     //println!("{:#?}", updated_user);
-    let updated_user_meta = BackendSupport::user_meta(&FIRST_USER_ID).await;
+    let updated_user_meta = Backend::user_meta(&FIRST_USER_ID).await;
     assert(updated_user, updated_user_meta);
 
     ServerRestore::db().await;
