@@ -11,12 +11,7 @@ use wp_api::{
 };
 use wp_cli::{WpCliSiteSettings, WpCliUser, WpCliUserMeta};
 
-pub mod fs_utils;
-pub mod wp_db;
-
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
-
-pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
 const BACKEND_PATH_RESTORE: &str = "/restore";
