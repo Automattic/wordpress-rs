@@ -252,7 +252,6 @@ where
         .assert_response();
 
     let updated_user = Backend::user(&FIRST_USER_ID).await;
-    //println!("{:#?}", updated_user);
     let updated_user_meta = Backend::user_meta(&FIRST_USER_ID).await;
     assert(updated_user, updated_user_meta);
 
