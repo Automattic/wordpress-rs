@@ -3721,6 +3721,7 @@ dependencies = [
  "uuid",
  "wp_contextual",
  "wp_derive_request_builder",
+ "wp_serde_helper",
 ]
 
 [[package]]
@@ -3765,6 +3766,7 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
+ "wp_serde_helper",
 ]
 
 [[package]]
@@ -3798,6 +3800,15 @@ dependencies = [
  "trybuild",
  "uniffi",
  "url",
+]
+
+[[package]]
+name = "wp_serde_helper"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@ members = [
   "wp_cli",
   "wp_contextual",
   "wp_derive_request_builder",
+  "wp_serde_helper",
   "wp_uniffi_bindgen",
   "xcframework",
 ]

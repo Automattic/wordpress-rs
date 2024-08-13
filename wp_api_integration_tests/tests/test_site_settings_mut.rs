@@ -2,7 +2,7 @@ use serial_test::serial;
 use wp_api::site_settings::{
     SiteSettingsCommentStatus, SiteSettingsPingStatus, SiteSettingsUpdateParams,
 };
-use wp_api_integration_tests::{api_client, AssertResponse, ServerRestore};
+use wp_api_integration_tests::{api_client, AssertResponse, BackendSupport, ServerRestore};
 
 macro_rules! generate_test {
     ($ident:ident, $value:expr) => {

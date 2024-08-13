@@ -9,7 +9,7 @@ use wp_api::{
     users::UserId,
     ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
 };
-use wp_cli::wp_cli_settings::WpCliSiteSettings;
+use wp_cli::{WpCliSiteSettings, WpCliUser, WpCliUserMeta};
 
 pub mod fs_utils;
 pub mod wp_db;
@@ -21,6 +21,9 @@ pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
 const BACKEND_PATH_RESTORE: &str = "/restore";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
+const BACKEND_PATH_USER: &str = "/wp-cli/user";
+const BACKEND_PATH_USERS: &str = "/wp-cli/users";
+const BACKEND_PATH_USER_META: &str = "/wp-cli/user-meta";
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
@@ -198,6 +201,45 @@ impl BackendSupport {
             .await?
             .json()
             .await
+    }
+    pub async fn user(user_id: UserId) -> WpCliUser {
+        Self::default()
+            .client
+            .get(format!(
+                "{}{}?user_id={}",
+                BACKEND_ADDRESS, BACKEND_PATH_USER, user_id
+            ))
+            .send()
+            .await
+            .expect("Failed to fetch user from wp_cli")
+            .json()
+            .await
+            .expect("Failed to parse fetched user from wp_cli")
+    }
+    pub async fn users() -> Vec<WpCliUser> {
+        Self::default()
+            .client
+            .get(format!("{}{}", BACKEND_ADDRESS, BACKEND_PATH_USERS))
+            .send()
+            .await
+            .expect("Failed to fetch users from wp_cli")
+            .json()
+            .await
+            .expect("Failed to parse fetched users from wp_cli")
+    }
+    pub async fn user_meta(user_id: UserId) -> Vec<WpCliUserMeta> {
+        Self::default()
+            .client
+            .get(format!(
+                "{}{}?user_id={}",
+                BACKEND_ADDRESS, BACKEND_PATH_USER_META, user_id
+            ))
+            .send()
+            .await
+            .expect("Failed to fetch user meta from wp_cli")
+            .json()
+            .await
+            .expect("Failed to parse fetched user meta from wp_cli")
     }
 }
 

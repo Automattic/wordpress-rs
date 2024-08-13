@@ -209,7 +209,7 @@ test-kotlin-integration:
 
 restore-test-server:
 	@# Help: Restore the test server from backup.
-	docker exec -i wordpress /bin/bash < ./scripts/restore-test-server.sh
+	curl "http://localhost:4000/restore?db=true&plugins=true"
 
 test-server: stop-server
 	@# Help: Start the test server.
@@ -217,7 +217,13 @@ test-server: stop-server
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
 integration-test-backend:
+	@# Help: Start the integration test helper server.
+	docker exec -i wordpress /bin/bash -c " if pgrep wp_api_integ; then pkill wp_api_integ; fi" # Kill the previous server
 	docker exec -i wordpress /bin/bash < ./scripts/start-wp-api-integration-tests-backend-support.sh
+
+print-log-integration-test-server:
+	@# Help: Print the logs of integration test helper server.
+	docker exec -i wordpress /bin/bash -c "cat /app/target/release/wp_api_integration_tests_backend_support.log"
 
 stop-server:
 	@# Help: Stop the running server.

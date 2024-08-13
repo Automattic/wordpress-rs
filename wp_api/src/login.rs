@@ -1,8 +1,8 @@
-use crate::serde_helper::deserialize_i64_or_string;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
+use wp_serde_helper::deserialize_i64_or_string;
 
 pub use login_client::WpLoginClient;
 pub use url_discovery::{UrlDiscoveryState, UrlDiscoverySuccess};

@@ -7,7 +7,7 @@ use std::fs;
 use std::fs::metadata;
 use std::io;
 use std::path::Path;
-use wp_cli::wp_cli_settings::WpCliSiteSettings;
+use wp_cli::{WpCliSiteSettings, WpCliUser, WpCliUserMeta};
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 
@@ -18,8 +18,31 @@ enum Error {
 }
 
 #[get("/site-settings")]
-fn wp_cli_site_settings() -> Json<WpCliSiteSettings> {
-    Json(WpCliSiteSettings::fetch().unwrap())
+fn wp_cli_site_settings() -> Result<Json<WpCliSiteSettings>, Error> {
+    WpCliSiteSettings::list()
+        .map(|u| Json(u))
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/user?<user_id>")]
+fn wp_cli_user(user_id: i64) -> Result<Json<WpCliUser>, Error> {
+    WpCliUser::get(user_id)
+        .map(|u| Json(u))
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/users")]
+fn wp_cli_users() -> Result<Json<Vec<WpCliUser>>, Error> {
+    WpCliUser::list()
+        .map(|u| Json(u))
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/user-meta?<user_id>")]
+fn wp_cli_user_meta(user_id: i64) -> Result<Json<Vec<WpCliUserMeta>>, Error> {
+    WpCliUserMeta::list(user_id)
+        .map(|u| Json(u))
+        .map_err(|e| Error::AsString(e.to_string()))
 }
 
 #[get("/restore?<db>&<plugins>")]
@@ -56,6 +79,9 @@ fn rocket() -> _ {
         .mount("/", routes![restore_wp_server])
         .mount("/", routes![restore_wp_content_plugins])
         .mount("/wp-cli/", routes![wp_cli_site_settings])
+        .mount("/wp-cli/", routes![wp_cli_user])
+        .mount("/wp-cli/", routes![wp_cli_users])
+        .mount("/wp-cli/", routes![wp_cli_user_meta])
 }
 
 pub async fn inner_restore_wp_db() -> Result<(), sqlx::Error> {
