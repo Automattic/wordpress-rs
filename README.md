@@ -41,13 +41,13 @@ make help
 
 ## Testing
 
-This project has several test suites. Integration tests require Docker, and you must run `make test-server && make dump-mysql && make backup-wp-content-plugins` prior to the test invocation.
+This project has several test suites. Integration tests require Docker, and you must run `make test-server` prior to the test invocation.
 
 | Test Suite                       | Run on local machine.                 | Run in Docker                     |
 | -------------------------------- | ---------------------------------     | ---------------                   |
 | Rust Unit Tests                  | `cargo test --lib`                    | `make test-rust-lib`              |
 | Rust Documentation Tests         | `cargo test --doc`                    | `make test-rust-doc`              |
-| Rust Integration Tests           | `cargo test --test '*'`               | Coming soon                       |
-| Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest`  | Coming soon                       |
+| Rust Integration Tests           | `cargo test -p wp_api_integration_tests` | `make test-rust-integration`    |
+| Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest` | `make test-kotlin-integration`   |
 | Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
 
