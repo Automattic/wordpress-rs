@@ -202,7 +202,7 @@ impl BackendSupport {
             .json()
             .await
     }
-    pub async fn user(user_id: UserId) -> WpCliUser {
+    pub async fn user(user_id: &UserId) -> WpCliUser {
         Self::default()
             .client
             .get(format!(
@@ -227,7 +227,7 @@ impl BackendSupport {
             .await
             .expect("Failed to parse fetched users from wp_cli")
     }
-    pub async fn user_meta(user_id: UserId) -> Vec<WpCliUserMeta> {
+    pub async fn user_meta(user_id: &UserId) -> Vec<WpCliUserMeta> {
         Self::default()
             .client
             .get(format!(

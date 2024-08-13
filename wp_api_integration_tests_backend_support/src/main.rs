@@ -20,28 +20,28 @@ enum Error {
 #[get("/site-settings")]
 fn wp_cli_site_settings() -> Result<Json<WpCliSiteSettings>, Error> {
     WpCliSiteSettings::list()
-        .map(|u| Json(u))
+        .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
 
 #[get("/user?<user_id>")]
 fn wp_cli_user(user_id: i64) -> Result<Json<WpCliUser>, Error> {
     WpCliUser::get(user_id)
-        .map(|u| Json(u))
+        .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
 
 #[get("/users")]
 fn wp_cli_users() -> Result<Json<Vec<WpCliUser>>, Error> {
     WpCliUser::list()
-        .map(|u| Json(u))
+        .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
 
 #[get("/user-meta?<user_id>")]
 fn wp_cli_user_meta(user_id: i64) -> Result<Json<Vec<WpCliUserMeta>>, Error> {
     WpCliUserMeta::list(user_id)
-        .map(|u| Json(u))
+        .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
 

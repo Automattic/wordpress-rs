@@ -21,7 +21,7 @@ async fn create_user() {
     let created_user = api_client().users().create(&params).await.assert_response();
 
     // Assert that the user is created
-    let created_user_from_wp_cli = BackendSupport::user(created_user.id).await;
+    let created_user_from_wp_cli = BackendSupport::user(&created_user.id).await;
     assert_eq!(created_user_from_wp_cli.username, username);
     assert_eq!(created_user_from_wp_cli.email, email);
 
@@ -249,9 +249,9 @@ where
         .await
         .assert_response();
 
-    let updated_user = BackendSupport::user(FIRST_USER_ID).await;
+    let updated_user = BackendSupport::user(&FIRST_USER_ID).await;
     //println!("{:#?}", updated_user);
-    let updated_user_meta = BackendSupport::user_meta(FIRST_USER_ID).await;
+    let updated_user_meta = BackendSupport::user_meta(&FIRST_USER_ID).await;
     assert(updated_user, updated_user_meta);
 
     ServerRestore::db().await;
