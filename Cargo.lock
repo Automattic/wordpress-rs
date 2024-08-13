@@ -3784,6 +3784,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "wp_derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "thiserror",
+ "trybuild",
+]
+
+[[package]]
 name = "wp_derive_request_builder"
 version = "0.1.0"
 dependencies = [

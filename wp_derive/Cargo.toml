@@ -1,0 +1,24 @@
+[package]
+name = "wp_derive"
+version = "0.1.0"
+edition = "2021"
+autotests = false
+
+[features]
+generate_request_builder = []
+
+[lib]
+proc-macro = true
+
+[[test]]
+name = "tests"
+path = "tests/wp_derive_tests.rs"
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["extra-traits"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+trybuild = { workspace = true, features = ["diff"] }
