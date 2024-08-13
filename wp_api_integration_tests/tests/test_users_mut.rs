@@ -1,7 +1,9 @@
 use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, Backend, ServerRestore, FIRST_USER_ID, SECOND_USER_ID,
+    api_client,
+    backend::{Backend, RestoreServer},
+    AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
 };
 use wp_cli::{WpCliUser, WpCliUserMeta};
 
@@ -25,7 +27,7 @@ async fn create_user() {
     assert_eq!(created_user_from_wp_cli.username, username);
     assert_eq!(created_user_from_wp_cli.email, email);
 
-    ServerRestore::db().await;
+    RestoreServer::db().await;
 }
 
 #[tokio::test]
@@ -50,7 +52,7 @@ async fn delete_user() {
         "User wasn't deleted"
     );
 
-    ServerRestore::db().await;
+    RestoreServer::db().await;
 }
 
 #[tokio::test]
@@ -77,7 +79,7 @@ async fn delete_current_user() {
         "User wasn't deleted"
     );
 
-    ServerRestore::db().await;
+    RestoreServer::db().await;
 }
 
 #[tokio::test]
@@ -217,7 +219,7 @@ async fn update_user_roles() {
         .expect("Failed to find the updated user");
     assert_eq!(updated_user.roles, new_role);
 
-    ServerRestore::db().await;
+    RestoreServer::db().await;
 }
 
 #[tokio::test]
@@ -236,7 +238,7 @@ async fn update_user_password() {
         .await
         .assert_response();
 
-    ServerRestore::db().await;
+    RestoreServer::db().await;
 }
 
 async fn test_update_user<F>(params: UserUpdateParams, assert: F)
@@ -254,7 +256,7 @@ where
     let updated_user_meta = Backend::user_meta(&FIRST_USER_ID).await;
     assert(updated_user, updated_user_meta);
 
-    ServerRestore::db().await;
+    RestoreServer::db().await;
 }
 
 fn find_meta(meta_list: &[WpCliUserMeta], meta_key: &str) -> String {
