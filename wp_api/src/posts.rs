@@ -44,11 +44,11 @@ pub struct PostListParams {
     #[uniffi(default = None)]
     pub modified_after: Option<String>,
     /// Limit result set to posts assigned to specific authors.
-    #[uniffi(default = None)]
-    pub author: Option<Vec<UserId>>,
+    #[uniffi(default = [])]
+    pub author: Vec<UserId>,
     /// Ensure result set excludes posts assigned to specific authors.
-    #[uniffi(default = None)]
-    pub author_exclude: Option<Vec<UserId>>,
+    #[uniffi(default = [])]
+    pub author_exclude: Vec<UserId>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
     pub before: Option<String>,
@@ -56,11 +56,11 @@ pub struct PostListParams {
     #[uniffi(default = None)]
     pub modified_before: Option<String>,
     /// Ensure result set excludes specific IDs.
-    #[uniffi(default = None)]
-    pub exclude: Option<Vec<PostId>>,
+    #[uniffi(default = [])]
+    pub exclude: Vec<PostId>,
     /// Limit result set to specific IDs.
-    #[uniffi(default = None)]
-    pub include: Option<Vec<PostId>>,
+    #[uniffi(default = [])]
+    pub include: Vec<PostId>,
     /// Offset the result set by a specific number of items.
     #[uniffi(default = None)]
     pub offset: Option<u32>,
@@ -75,11 +75,11 @@ pub struct PostListParams {
     #[uniffi(default = None)]
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Array of column names to be searched.
-    #[uniffi(default = None)]
-    pub search_columns: Option<Vec<String>>,
+    #[uniffi(default = [])]
+    pub search_columns: Vec<String>,
     /// Limit result set to posts with one or more specific slugs.
-    #[uniffi(default = None)]
-    pub slug: Option<Vec<String>>,
+    #[uniffi(default = [])]
+    pub slug: Vec<String>,
     /// Limit result set to posts assigned one or more statuses.
     /// Default: publish
     #[uniffi(default = None)]
@@ -89,17 +89,17 @@ pub struct PostListParams {
     #[uniffi(default = None)]
     pub tax_relation: Option<WpApiParamPostsTaxRelation>,
     /// Limit result set to items with specific terms assigned in the categories taxonomy.
-    #[uniffi(default = None)]
-    pub categories: Option<Vec<CategoryId>>,
+    #[uniffi(default = [])]
+    pub categories: Vec<CategoryId>,
     /// Limit result set to items except those with specific terms assigned in the categories taxonomy.
-    #[uniffi(default = None)]
-    pub categories_exclude: Option<Vec<CategoryId>>,
+    #[uniffi(default = [])]
+    pub categories_exclude: Vec<CategoryId>,
     /// Limit result set to items with specific terms assigned in the tags taxonomy.
-    #[uniffi(default = None)]
-    pub tags: Option<Vec<TagId>>,
+    #[uniffi(default = [])]
+    pub tags: Vec<TagId>,
     /// Limit result set to items except those with specific terms assigned in the tags taxonomy.
-    #[uniffi(default = None)]
-    pub tags_exclude: Option<Vec<TagId>>,
+    #[uniffi(default = [])]
+    pub tags_exclude: Vec<TagId>,
     /// Limit result set to items that are sticky.
     #[uniffi(default = None)]
     pub sticky: Option<bool>,
@@ -107,10 +107,58 @@ pub struct PostListParams {
 
 impl PostListParams {
     pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
-        [("page", self.page.map(|x| x.to_string()))]
-            .into_iter()
-            // Remove `None` values
-            .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
+        [
+            ("page", self.page.map(|x| x.to_string())),
+            ("per_page", self.per_page.map(|x| x.to_string())),
+            ("search", self.search.clone()),
+            ("after", self.after.clone()),
+            ("modified_after", self.modified_after.clone()),
+            (
+                "author",
+                (!self.author.is_empty()).then_some(
+                    self.author
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "author_exclude",
+                (!self.author_exclude.is_empty()).then_some(
+                    self.author_exclude
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            ("before", self.before.clone()),
+            ("modified_before", self.modified_before.clone()),
+            (
+                "exclude",
+                (!self.exclude.is_empty()).then_some(
+                    self.exclude
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "include",
+                (!self.include.is_empty()).then_some(
+                    self.include
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+        ]
+        .into_iter()
+        // Remove `None` values
+        .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
     }
 }
 
