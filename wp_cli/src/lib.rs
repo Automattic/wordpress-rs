@@ -12,7 +12,8 @@ where
     S: AsRef<OsStr>,
 {
     let mut c = Command::new("wp");
-    c.arg("--path=/var/www/html")
+    c.arg("--http=http://localhost")
+        .arg("--path=/var/www/html")
         .arg("--format=json")
         .args(args);
     println!("Running wp_cli command: {:#?}", c);
