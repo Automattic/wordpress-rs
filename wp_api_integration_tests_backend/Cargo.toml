@@ -1,0 +1,11 @@
+[package]
+name = "wp_api_integration_tests_backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocket = { workspace = true, features = [ "json" ] }
+serde = { workspace = true, features = [ "derive" ] }
+serde_json = { workspace = true }
+sqlx = { workspace = true, features = [ "mysql", "runtime-tokio" ]}
+wp_cli = { path = "../wp_cli" }

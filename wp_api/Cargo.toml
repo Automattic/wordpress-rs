@@ -27,6 +27,7 @@ uniffi = { workspace = true }
 uuid = { workspace = true, features = [ "v4" ] }
 wp_contextual = { path = "../wp_contextual" }
 wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }
+wp_serde_helper = { path = "../wp_serde_helper" }
 
 [dev-dependencies]
 rstest = { workspace = true }

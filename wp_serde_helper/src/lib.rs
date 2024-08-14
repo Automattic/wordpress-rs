@@ -17,7 +17,7 @@ impl<'de> de::Visitor<'de> for DeserializeI64OrStringVisitor {
     where
         E: de::Error,
     {
-        i64::try_from(v).map_err(|e| E::invalid_value(Unexpected::Unsigned(v), &self))
+        i64::try_from(v).map_err(|_| E::invalid_value(Unexpected::Unsigned(v), &self))
     }
 
     fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
@@ -32,7 +32,7 @@ impl<'de> de::Visitor<'de> for DeserializeI64OrStringVisitor {
         E: de::Error,
     {
         v.parse::<i64>()
-            .map_err(|e| E::invalid_value(Unexpected::Str(v), &self))
+            .map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
     }
 }
 

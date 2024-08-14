@@ -4,8 +4,7 @@ use wp_api::site_settings::{
 };
 use wp_api_integration_tests::{
     api_client,
-    wp_cli::WpCliSiteSettings,
-    wp_db::{self},
+    backend::{Backend, RestoreServer},
     AssertResponse,
 };
 
@@ -18,25 +17,24 @@ macro_rules! generate_test {
             #[tokio::test]
             #[serial]
             async fn [<update_site_settings_ $ident>]() {
-                wp_db::run_and_restore(|_db| async move {
-                    let new_value = $value;
-                    let assertion_value = $assertion_value.to_string();
-                    // First assert that the new value is not the same as the old value to avoid
-                    // false positive assertion
-                    assert_ne!(Some(assertion_value.clone()), WpCliSiteSettings::fetch().unwrap().$ident);
-                    let params = SiteSettingsUpdateParams {
-                        $ident: Some(new_value.clone()),
-                        ..Default::default()
-                    };
-                    let _updated_site_settings = api_client()
-                        .site_settings()
-                        .update(&params)
-                        .await
-                        .assert_response();
-                    // Assert that the value was updated to the new one
-                    assert_eq!(Some(assertion_value), WpCliSiteSettings::fetch().unwrap().$ident);
-                })
-                .await;
+                let new_value = $value;
+                let assertion_value = $assertion_value.to_string();
+                // First assert that the new value is not the same as the old value to avoid
+                // false positive assertion
+                assert_ne!(Some(assertion_value.clone()), Backend::site_settings().await.unwrap().$ident);
+                let params = SiteSettingsUpdateParams {
+                    $ident: Some(new_value.clone()),
+                    ..Default::default()
+                };
+                let _updated_site_settings = api_client()
+                    .site_settings()
+                    .update(&params)
+                    .await
+                    .assert_response();
+                // Assert that the value was updated to the new one
+                assert_eq!(Some(assertion_value), Backend::site_settings().await.unwrap().$ident);
+
+                RestoreServer::db().await;
             }
         }
     };

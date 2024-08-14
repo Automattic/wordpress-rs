@@ -6,9 +6,12 @@ services:
         container_name: 'wordpress'
         ports:
             - '80:80'
+            - '4000:4000'
         volumes:
             - ./:/app
         environment:
+            ROCKET_ADDRESS: 0.0.0.0
+            ROCKET_PORT: 4000
             WORDPRESS_DB_HOST: database
             WORDPRESS_DB_USER: wordpress
             WORDPRESS_DB_PASSWORD: wordpress

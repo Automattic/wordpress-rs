@@ -209,12 +209,23 @@ test-kotlin-integration:
 
 restore-test-server:
 	@# Help: Restore the test server from backup.
-	docker exec -i wordpress /bin/bash < ./scripts/restore-test-server.sh
+	curl "http://localhost:4000/restore?db=true&plugins=true"
 
-test-server: stop-server
+start-test-server: stop-server
 	@# Help: Start the test server.
 	docker-compose up -d --build
 	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
+
+integration-test-backend:
+	@# Help: Start the integration test helper server.
+	docker exec -i wordpress /bin/bash -c " if pgrep wp_api_integ; then pkill wp_api_integ; fi" # Kill the previous server
+	docker exec -i wordpress /bin/bash < ./scripts/start-wp-api-integration-tests-backend.sh
+
+test-server: start-test-server integration-test-backend
+
+print-log-integration-test-server:
+	@# Help: Print the logs of integration test helper server.
+	docker exec -i wordpress /bin/bash -c "cat /app/target/release/wp_api_integration_tests_backend.log"
 
 stop-server:
 	@# Help: Stop the running server.
@@ -244,14 +255,6 @@ fmt-check-rust:
 build-in-docker:
 	$(call bindings)
 	$(docker_build_and_run)
-
-dev-server:
-	@# Help: Start the development server.
-	mkdir -p .wordpress
-	docker-compose up
-
-prepare-dev-server:
-	docker exec -i wordpress /bin/bash < ./scripts/setup-test-site.sh
 
 setup-rust:
 	@# Help: Install the necessary Rust toolchains on your development computer (for macOS).

@@ -10,13 +10,14 @@ async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 http = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = [ "json" ] }
 serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
-wp_api = { path = "../wp_api", features = [ "integration-tests" ] }
 sqlx = { workspace = true, features = [ "chrono", "mysql", "runtime-tokio", "tls-native-tls" ]}
 tokio = { workspace = true, features = [ "full" ] }
 url = { workspace = true }
+wp_api = { path = "../wp_api", features = [ "integration-tests" ] }
+wp_cli = { path = "../wp_cli" }
 
 [dev-dependencies]
 chrono = { workspace = true }

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use futures::Future;
 use std::sync::Arc;
 use wp_api::{
     request::{
@@ -9,13 +8,9 @@ use wp_api::{
     ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
 };
 
-pub mod fs_utils;
-pub mod wp_cli;
-pub mod wp_db;
-
 include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 
-pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
+pub mod backend;
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
@@ -87,15 +82,6 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
             panic!("Unexpected wp_error '{:?}'", err);
         }
     }
-}
-
-pub async fn run_and_restore_wp_content_plugins<F, Fut>(f: F)
-where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = ()>,
-{
-    f().await;
-    fs_utils::restore_wp_content_plugins().await;
 }
 
 #[derive(Debug)]
