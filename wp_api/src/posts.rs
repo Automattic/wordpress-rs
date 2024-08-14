@@ -18,10 +18,53 @@ pub enum WpApiParamPostsOrderBy {
     Title,
 }
 
+impl WpApiParamPostsOrderBy {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Author => "author",
+            Self::Date => "date",
+            Self::Id => "id",
+            Self::Include => "include",
+            Self::IncludeSlugs => "include_slugs",
+            Self::Modified => "modified",
+            Self::Parent => "parent",
+            Self::Relevance => "relevance",
+            Self::Slug => "slug",
+            Self::Title => "title",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamPostsTaxRelation {
     And,
     Or,
+}
+
+impl WpApiParamPostsTaxRelation {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::And => "AND",
+            Self::Or => "OR",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WpApiParamPostsSearchColumn {
+    PostContent,
+    PostExcerpt,
+    PostTitle,
+}
+
+impl WpApiParamPostsSearchColumn {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostContent => "post_content",
+            Self::PostExcerpt => "post_excerpt",
+            Self::PostTitle => "post_title",
+        }
+    }
 }
 
 #[derive(Debug, Default, uniffi::Record)]
@@ -76,14 +119,14 @@ pub struct PostListParams {
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
-    pub search_columns: Vec<String>,
+    pub search_columns: Vec<WpApiParamPostsSearchColumn>,
     /// Limit result set to posts with one or more specific slugs.
     #[uniffi(default = [])]
     pub slug: Vec<String>,
     /// Limit result set to posts assigned one or more statuses.
     /// Default: publish
-    #[uniffi(default = None)]
-    pub status: Option<PostStatus>,
+    #[uniffi(default = [])]
+    pub status: Vec<PostStatus>,
     /// Limit result set based on relationship between multiple taxonomies.
     /// One of: AND, OR
     #[uniffi(default = None)]
@@ -155,6 +198,87 @@ impl PostListParams {
                         .join(","),
                 ),
             ),
+            ("offset", self.offset.map(|x| x.to_string())),
+            ("order", self.order.as_ref().map(|x| x.as_str().to_string())),
+            (
+                "orderby",
+                self.orderby.as_ref().map(|x| x.as_str().to_string()),
+            ),
+            (
+                "search_columns",
+                (!self.search_columns.is_empty()).then_some(
+                    self.search_columns
+                        .iter()
+                        .map(|x| x.as_str().to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "slug",
+                (!self.slug.is_empty()).then_some(
+                    self.slug
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "status",
+                (!self.status.is_empty()).then_some(
+                    self.status
+                        .iter()
+                        .map(|x| x.as_str().to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "tax_relation",
+                self.tax_relation.as_ref().map(|x| x.as_str().to_string()),
+            ),
+            (
+                "categories",
+                (!self.categories.is_empty()).then_some(
+                    self.categories
+                        .iter()
+                        .map(|x| x.0.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "categories_exclude",
+                (!self.categories_exclude.is_empty()).then_some(
+                    self.categories_exclude
+                        .iter()
+                        .map(|x| x.0.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "tags",
+                (!self.tags.is_empty()).then_some(
+                    self.tags
+                        .iter()
+                        .map(|x| x.0.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            (
+                "tags_exclude",
+                (!self.tags_exclude.is_empty()).then_some(
+                    self.tags_exclude
+                        .iter()
+                        .map(|x| x.0.to_string())
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ),
+            ),
+            ("sticky", self.sticky.map(|x| x.to_string())),
         ]
         .into_iter()
         // Remove `None` values
@@ -220,11 +344,11 @@ pub struct SparsePost {
     #[WpContext(edit, embed, view)]
     pub featured_media: Option<i64>,
     #[WpContext(edit, view)]
-    pub comment_status: Option<String>,
+    pub comment_status: Option<PostCommentStatus>,
     #[WpContext(edit, view)]
-    pub ping_status: Option<String>,
+    pub ping_status: Option<PostPingStatus>,
     #[WpContext(edit, view)]
-    pub format: Option<String>,
+    pub format: Option<PostFormat>,
     #[WpContext(edit, view)]
     pub meta: Option<PostMeta>,
     #[WpContext(edit, view)]
@@ -285,6 +409,60 @@ pub enum PostStatus {
     Private,
     #[default]
     Publish,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+impl PostStatus {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Draft => "draft",
+            Self::Future => "future",
+            Self::Pending => "pending",
+            Self::Private => "private",
+            Self::Publish => "publish",
+            Self::Custom(status) => status,
+        }
+    }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum PostCommentStatus {
+    Open,
+    Closed,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum PostPingStatus {
+    Open,
+    Closed,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum PostFormat {
+    Standard,
+    Aside,
+    Chat,
+    Gallery,
+    Link,
+    Image,
+    Quote,
+    Status,
+    Video,
+    Audio,
     #[serde(untagged)]
     Custom(String),
 }
