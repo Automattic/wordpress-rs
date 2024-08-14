@@ -1,7 +1,28 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::UserId;
+use crate::{UserId, WpApiParamOrder};
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WpApiParamPostsOrderBy {
+    Author,
+    #[default]
+    Date,
+    Id,
+    Include,
+    IncludeSlugs,
+    Modified,
+    Parent,
+    Relevance,
+    Slug,
+    Title,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WpApiParamPostsTaxRelation {
+    And,
+    Or,
+}
 
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PostListParams {
@@ -9,6 +30,79 @@ pub struct PostListParams {
     /// Default: `1`
     #[uniffi(default = None)]
     pub page: Option<u32>,
+    /// Maximum number of items to be returned in result set.
+    /// Default: `10`
+    #[uniffi(default = None)]
+    pub per_page: Option<u32>,
+    /// Limit results to those matching a string.
+    #[uniffi(default = None)]
+    pub search: Option<String>,
+    /// Limit response to posts published after a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub after: Option<String>,
+    /// Limit response to posts modified after a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub modified_after: Option<String>,
+    /// Limit result set to posts assigned to specific authors.
+    #[uniffi(default = None)]
+    pub author: Option<Vec<UserId>>,
+    /// Ensure result set excludes posts assigned to specific authors.
+    #[uniffi(default = None)]
+    pub author_exclude: Option<Vec<UserId>>,
+    /// Limit response to posts published before a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub before: Option<String>,
+    /// Limit response to posts modified before a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub modified_before: Option<String>,
+    /// Ensure result set excludes specific IDs.
+    #[uniffi(default = None)]
+    pub exclude: Option<Vec<PostId>>,
+    /// Limit result set to specific IDs.
+    #[uniffi(default = None)]
+    pub include: Option<Vec<PostId>>,
+    /// Offset the result set by a specific number of items.
+    #[uniffi(default = None)]
+    pub offset: Option<u32>,
+    /// Order sort attribute ascending or descending.
+    /// Default: desc
+    /// One of: asc, desc
+    #[uniffi(default = None)]
+    pub order: Option<WpApiParamOrder>,
+    /// Sort collection by post attribute.
+    /// Default: date
+    /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title
+    #[uniffi(default = None)]
+    pub orderby: Option<WpApiParamPostsOrderBy>,
+    /// Array of column names to be searched.
+    #[uniffi(default = None)]
+    pub search_columns: Option<Vec<String>>,
+    /// Limit result set to posts with one or more specific slugs.
+    #[uniffi(default = None)]
+    pub slug: Option<Vec<String>>,
+    /// Limit result set to posts assigned one or more statuses.
+    /// Default: publish
+    #[uniffi(default = None)]
+    pub status: Option<PostStatus>,
+    /// Limit result set based on relationship between multiple taxonomies.
+    /// One of: AND, OR
+    #[uniffi(default = None)]
+    pub tax_relation: Option<WpApiParamPostsTaxRelation>,
+    /// Limit result set to items with specific terms assigned in the categories taxonomy.
+    #[uniffi(default = None)]
+    pub categories: Option<Vec<CategoryId>>,
+    /// Limit result set to items except those with specific terms assigned in the categories taxonomy.
+    #[uniffi(default = None)]
+    pub categories_exclude: Option<Vec<CategoryId>>,
+    /// Limit result set to items with specific terms assigned in the tags taxonomy.
+    #[uniffi(default = None)]
+    pub tags: Option<Vec<TagId>>,
+    /// Limit result set to items except those with specific terms assigned in the tags taxonomy.
+    #[uniffi(default = None)]
+    pub tags_exclude: Option<Vec<TagId>>,
+    /// Limit result set to items that are sticky.
+    #[uniffi(default = None)]
+    pub sticky: Option<bool>,
 }
 
 impl PostListParams {
@@ -24,9 +118,13 @@ uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostId(pub i32);
 
-uniffi::custom_newtype!(PostTag, i32);
+uniffi::custom_newtype!(TagId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PostTag(pub i32);
+pub struct TagId(pub i32);
+
+uniffi::custom_newtype!(CategoryId, i32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CategoryId(pub i32);
 
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -88,7 +186,7 @@ pub struct SparsePost {
     #[WpContext(edit, view)]
     pub categories: Option<Vec<i64>>,
     #[WpContext(edit, view)]
-    pub tags: Option<Vec<PostTag>>,
+    pub tags: Option<Vec<TagId>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
@@ -119,15 +217,26 @@ pub struct PostMeta {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum PostStatus {
-    Publish,
-    Future,
     Draft,
+    Future,
     Pending,
     Private,
+    #[default]
+    Publish,
     #[serde(untagged)]
     Custom(String),
 }
