@@ -1,8 +1,6 @@
 use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::{get, launch, routes, Responder};
-use sqlx::Executor;
-use sqlx::{mysql::MySqlConnectOptions, ConnectOptions};
 use std::fs;
 use std::fs::metadata;
 use std::io;
@@ -51,60 +49,28 @@ async fn restore_wp_server(db: bool, plugins: bool) -> Result<Status, Error> {
         inner_restore_wp_content_plugins().await;
     }
     if db {
-        inner_restore_wp_db()
-            .await
-            .map_err(|e| Error::AsString(e.to_string()))?
+        let output = wp_cli::restore_db();
+        if !output.status.success() {
+            return Err(Error::AsString(format!(
+                "Failed to restore db: {:#?}",
+                output
+            )));
+        }
     }
     Ok(Status::Ok)
-}
-
-#[get("/restore-wp-db")]
-async fn restore_wp_db() -> Result<Status, Error> {
-    inner_restore_wp_db()
-        .await
-        .map_err(|e| Error::AsString(e.to_string()))
-        .map(|_| Status::Ok)
-}
-
-#[get("/restore-wp-content-plugins")]
-async fn restore_wp_content_plugins() -> Status {
-    inner_restore_wp_content_plugins().await;
-    Status::Ok
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/", routes![restore_wp_db])
         .mount("/", routes![restore_wp_server])
-        .mount("/", routes![restore_wp_content_plugins])
         .mount("/wp-cli/", routes![wp_cli_site_settings])
         .mount("/wp-cli/", routes![wp_cli_user])
         .mount("/wp-cli/", routes![wp_cli_users])
         .mount("/wp-cli/", routes![wp_cli_user_meta])
 }
 
-pub async fn inner_restore_wp_db() -> Result<(), sqlx::Error> {
-    let db_dump_path = format!("{}/dump.sql", TEST_SITE_WP_CONTENT_PATH);
-
-    let options = MySqlConnectOptions::new()
-        .host("database")
-        .username("wordpress")
-        .password("wordpress")
-        .database("wordpress");
-
-    println!("Restoring WordPressDB from {:?}", db_dump_path);
-    let mut conn = MySqlConnectOptions::connect(&options).await?;
-
-    let db_schema = std::fs::read_to_string(db_dump_path).expect("Failed to read SQL dump");
-
-    let _ = &mut conn.execute(db_schema.as_str()).await?;
-
-    println!("Restored WordPressDB!");
-    Ok(())
-}
-
-pub async fn inner_restore_wp_content_plugins() {
+async fn inner_restore_wp_content_plugins() {
     println!("Restoring wp-content/plugins");
 
     let plugins_folder = &format!("{}/plugins", TEST_SITE_WP_CONTENT_PATH);

@@ -6,6 +6,12 @@ mod wp_cli_users;
 pub use wp_cli_settings::*;
 pub use wp_cli_users::*;
 
+const BACKUP_PATH: &str = "/var/www/html/wp-content/dump.sql";
+
+pub fn restore_db() -> std::process::Output {
+    run_wp_cli_command(["db", "import", BACKUP_PATH])
+}
+
 fn run_wp_cli_command<I, S>(args: I) -> std::process::Output
 where
     I: IntoIterator<Item = S>,
