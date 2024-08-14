@@ -5,6 +5,7 @@ use crate::request::{
         },
         plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
         post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
+        posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
         site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         wp_site_health_tests_endpoint::{
@@ -35,10 +36,11 @@ impl UniffiWpApiRequestBuilder {
 #[derive(Debug)]
 pub struct WpApiRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
-    users: Arc<UsersRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
+    posts: Arc<PostsRequestBuilder>,
     site_settings: Arc<SiteSettingsRequestBuilder>,
+    users: Arc<UsersRequestBuilder>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
 }
 
@@ -49,9 +51,10 @@ impl WpApiRequestBuilder {
             api_base_url,
             authentication;
             application_passwords,
-            users,
-            post_types,
             plugins,
+            post_types,
+            posts,
+            users,
             site_settings,
             wp_site_health_tests
         )
@@ -80,10 +83,11 @@ impl UniffiWpApiClient {
 #[derive(Debug)]
 pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
-    users: Arc<UsersRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
+    posts: Arc<PostsRequestExecutor>,
     site_settings: Arc<SiteSettingsRequestExecutor>,
+    users: Arc<UsersRequestExecutor>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
 }
 
@@ -100,10 +104,11 @@ impl WpApiClient {
             authentication,
             request_executor;
             application_passwords,
-            users,
-            post_types,
             plugins,
+            post_types,
+            posts,
             site_settings,
+            users,
             wp_site_health_tests
         )
     }
@@ -112,6 +117,7 @@ impl WpApiClient {
 macro_helper::generate_endpoint_impl!(application_passwords);
 macro_helper::generate_endpoint_impl!(plugins);
 macro_helper::generate_endpoint_impl!(post_types);
+macro_helper::generate_endpoint_impl!(posts);
 macro_helper::generate_endpoint_impl!(site_settings);
 macro_helper::generate_endpoint_impl!(users);
 macro_helper::generate_endpoint_impl!(wp_site_health_tests);
