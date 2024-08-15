@@ -7,5 +7,4 @@ edition = "2021"
 rocket = { workspace = true, features = [ "json" ] }
 serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
-sqlx = { workspace = true, features = [ "mysql", "runtime-tokio" ]}
 wp_cli = { path = "../wp_cli" }
