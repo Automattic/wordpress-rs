@@ -39,6 +39,7 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 #[case("vanilla.wpmt.co", VANILLA_WP_SITE_URL)]
 #[case("http://vanilla.wpmt.co", VANILLA_WP_SITE_URL)]
 #[case("https://optional-https.wpmt.co", "https://optional-https.wpmt.co/wp-admin/authorize-application.php")]
+#[case("https://gzip.wpmt.co", "https://gzip.wpmt.co/wp-admin/authorize-application.php")] // Returns a gzip-encoded response that the library should know how to deal with
 #[tokio::test]
 #[serial]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
