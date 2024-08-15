@@ -16,6 +16,7 @@ pub mod application_passwords;
 pub mod login;
 pub mod plugins;
 pub mod post_types;
+pub mod posts;
 pub mod request;
 pub mod site_settings;
 pub mod users;

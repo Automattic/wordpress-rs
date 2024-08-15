@@ -5,6 +5,7 @@ use crate::SparseField;
 pub(crate) mod application_passwords_endpoint;
 pub(crate) mod plugins_endpoint;
 pub(crate) mod post_types_endpoint;
+pub(crate) mod posts_endpoint;
 pub(crate) mod site_settings_endpoint;
 pub(crate) mod users_endpoint;
 pub(crate) mod wp_site_health_tests_endpoint;
