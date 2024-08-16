@@ -110,3 +110,59 @@ mod macro_helper {
         };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+    use url::Url;
+
+    #[rstest]
+    #[case("foo", 1, "foo=1")]
+    #[case("foo", "2", "foo=2")]
+    #[case("foo", "2".to_string(), "foo=2")]
+    #[case("foo", true, "foo=true")]
+    fn test_append_query_value_pair(
+        #[case] key: &str,
+        #[case] value: impl AsQueryValue,
+        #[case] expected_str: &str,
+    ) {
+        let mut url = Url::parse("https://example.com").unwrap();
+        url.query_pairs_mut().append_query_value_pair(key, &value);
+        assert_eq!(url.query(), Some(expected_str));
+    }
+
+    #[rstest]
+    #[case("foo", Some(1), "foo=1")]
+    #[case("foo", Some("2"), "foo=2")]
+    #[case("foo", Some("2".to_string()), "foo=2")]
+    #[case("foo", Some(true), "foo=true")]
+    #[case("foo", None::<bool>, "")]
+    fn test_append_option_query_value_pair(
+        #[case] key: &str,
+        #[case] value: Option<impl AsQueryValue>,
+        #[case] expected_str: &str,
+    ) {
+        let mut url = Url::parse("https://example.com").unwrap();
+        url.query_pairs_mut()
+            .append_option_query_value_pair(key, value.as_ref());
+        assert_eq!(url.query(), Some(expected_str));
+    }
+
+    #[rstest]
+    #[case("foo", vec![1], "foo=1")]
+    #[case("foo", vec!["2"], "foo=2")]
+    #[case("foo", vec!["1".to_string(), "2".to_string()], "foo=1%2C2")]
+    #[case("foo", vec![true, false], "foo=true%2Cfalse")]
+    #[case("foo", Vec::<bool>::new(), "")]
+    fn test_append_vec_query_value_pair(
+        #[case] key: &str,
+        #[case] value: Vec<impl AsQueryValue>,
+        #[case] expected_str: &str,
+    ) {
+        let mut url = Url::parse("https://example.com").unwrap();
+        url.query_pairs_mut()
+            .append_vec_query_value_pair(key, &value);
+        assert_eq!(url.query(), Some(expected_str));
+    }
+}
