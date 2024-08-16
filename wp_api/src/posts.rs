@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
 use crate::{
-    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
     UserId, WpApiParamOrder,
 };
 
@@ -20,6 +21,8 @@ pub enum WpApiParamPostsOrderBy {
     Slug,
     Title,
 }
+
+impl_as_query_value_from_as_str!(WpApiParamPostsOrderBy);
 
 impl WpApiParamPostsOrderBy {
     fn as_str(&self) -> &str {
@@ -44,6 +47,8 @@ pub enum WpApiParamPostsTaxRelation {
     Or,
 }
 
+impl_as_query_value_from_as_str!(WpApiParamPostsTaxRelation);
+
 impl WpApiParamPostsTaxRelation {
     fn as_str(&self) -> &str {
         match self {
@@ -59,6 +64,8 @@ pub enum WpApiParamPostsSearchColumn {
     PostExcerpt,
     PostTitle,
 }
+
+impl_as_query_value_from_as_str!(WpApiParamPostsSearchColumn);
 
 impl WpApiParamPostsSearchColumn {
     fn as_str(&self) -> &str {
@@ -163,31 +170,34 @@ impl AppendUrlQueryPairs for PostListParams {
             .append_vec_query_value_pair("author_exclude", &self.author_exclude)
             .append_option_query_value_pair("before", self.before.as_ref())
             .append_option_query_value_pair("modified_before", self.modified_before.as_ref())
-            //.append_vec_query_value_pair("exclude", &self.exclude)
-            //.append_vec_query_value_pair("include", &self.include)
+            .append_vec_query_value_pair("exclude", &self.exclude)
+            .append_vec_query_value_pair("include", &self.include)
             .append_option_query_value_pair("offset", self.offset.as_ref())
             .append_option_query_value_pair("order", self.order.as_ref())
-            //.append_option_query_value_pair("orderby", self.orderby.as_ref())
-            //.append_vec_query_value_pair("search_columns", &self.search_columns)
+            .append_option_query_value_pair("orderby", self.orderby.as_ref())
+            .append_vec_query_value_pair("search_columns", &self.search_columns)
             .append_vec_query_value_pair("slug", &self.slug)
-            //.append_vec_query_value_pair("status", &self.status)
-            //.append_option_query_value_pair("tax_relation", self.tax_relation.as_ref())
-            //.append_vec_query_value_pair("categories", &self.categories)
-            //.append_vec_query_value_pair("categories_exclude", &self.categories_exclude)
-            //.append_vec_query_value_pair("tags", &self.tags)
-            //.append_vec_query_value_pair("tags_exclude", &self.tags_exclude)
+            .append_vec_query_value_pair("status", &self.status)
+            .append_option_query_value_pair("tax_relation", self.tax_relation.as_ref())
+            .append_vec_query_value_pair("categories", &self.categories)
+            .append_vec_query_value_pair("categories_exclude", &self.categories_exclude)
+            .append_vec_query_value_pair("tags", &self.tags)
+            .append_vec_query_value_pair("tags_exclude", &self.tags_exclude)
             .append_option_query_value_pair("sticky", self.sticky.as_ref());
     }
 }
 
+impl_as_query_value_for_new_type!(PostId);
 uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostId(pub i32);
 
+impl_as_query_value_for_new_type!(TagId);
 uniffi::custom_newtype!(TagId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TagId(pub i32);
 
+impl_as_query_value_for_new_type!(CategoryId);
 uniffi::custom_newtype!(CategoryId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CategoryId(pub i32);
@@ -306,6 +316,8 @@ pub enum PostStatus {
     #[serde(untagged)]
     Custom(String),
 }
+
+impl_as_query_value_from_as_str!(PostStatus);
 
 impl PostStatus {
     fn as_str(&self) -> &str {
