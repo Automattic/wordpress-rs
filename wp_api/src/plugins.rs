@@ -3,7 +3,10 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension};
+use crate::{
+    impl_as_query_value_from_as_str,
+    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
+};
 
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
@@ -125,11 +128,7 @@ pub enum PluginStatus {
     NetworkActive,
 }
 
-impl AsQueryValue for PluginStatus {
-    fn as_query_value(&self) -> impl AsRef<str> {
-        self.as_str()
-    }
-}
+impl_as_query_value_from_as_str!(PluginStatus);
 
 impl PluginStatus {
     fn as_str(&self) -> &str {

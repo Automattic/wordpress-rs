@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
 use crate::{
+    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
     WpApiParamOrder,
 };
@@ -21,11 +23,7 @@ pub enum WpApiParamUsersOrderBy {
     Url,
 }
 
-impl AsQueryValue for WpApiParamUsersOrderBy {
-    fn as_query_value(&self) -> impl AsRef<str> {
-        self.as_str()
-    }
-}
+impl_as_query_value_from_as_str!(WpApiParamUsersOrderBy);
 
 impl WpApiParamUsersOrderBy {
     fn as_str(&self) -> &str {
@@ -66,11 +64,7 @@ pub enum WpApiParamUsersHasPublishedPosts {
     PostTypes(Vec<String>),
 }
 
-impl AsQueryValue for WpApiParamUsersHasPublishedPosts {
-    fn as_query_value(&self) -> impl AsRef<str> {
-        self.to_string()
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamUsersHasPublishedPosts);
 
 impl Display for WpApiParamUsersHasPublishedPosts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -315,15 +309,10 @@ pub struct UserDeleteResponse {
     pub previous: UserWithEditContext,
 }
 
+impl_as_query_value_for_new_type!(UserId);
 uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserId(pub i32);
-
-impl AsQueryValue for UserId {
-    fn as_query_value(&self) -> impl AsRef<str> {
-        self.0.as_query_value()
-    }
-}
 
 impl std::fmt::Display for UserId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

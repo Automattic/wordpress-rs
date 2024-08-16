@@ -75,11 +75,7 @@ pub enum WpApiParamOrder {
     Desc,
 }
 
-impl AsQueryValue for WpApiParamOrder {
-    fn as_query_value(&self) -> impl AsRef<str> {
-        self.as_str()
-    }
-}
+impl_as_query_value_from_as_str!(WpApiParamOrder);
 
 impl WpApiParamOrder {
     fn as_str(&self) -> &str {
