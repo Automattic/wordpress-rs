@@ -3,6 +3,8 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
+use crate::url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension};
+
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {
     /// Limit results to those matching a string.
@@ -13,15 +15,11 @@ pub struct PluginListParams {
     pub status: Option<PluginStatus>,
 }
 
-impl PluginListParams {
-    pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
-        [
-            ("search", self.search.clone()),
-            ("status", self.status.map(|x| x.as_str().to_string())),
-        ]
-        .into_iter()
-        // Remove `None` values
-        .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
+impl AppendUrlQueryPairs for PluginListParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut
+            .append_option_query_value_pair("search", self.search.as_ref())
+            .append_option_query_value_pair("status", self.status.as_ref());
     }
 }
 
@@ -127,6 +125,12 @@ pub enum PluginStatus {
     NetworkActive,
 }
 
+impl AsQueryValue for PluginStatus {
+    fn as_query_value(&self) -> impl AsRef<str> {
+        self.as_str()
+    }
+}
+
 impl PluginStatus {
     fn as_str(&self) -> &str {
         match self {
@@ -150,15 +154,12 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case(PluginListParams::default(), &[])]
-    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))), &[("search", "foo")])]
-    #[case(generate!(PluginListParams, (status, Some(PluginStatus::Active))), &[("status", "active")])]
-    #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), &[("search", "foo"), ("status", "inactive")])]
+    #[case(PluginListParams::default(), "")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string()))), "search=foo")]
+    #[case(generate!(PluginListParams, (status, Some(PluginStatus::Active))), "status=active")]
+    #[case(generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), "search=foo&status=inactive")]
     #[trace]
-    fn test_plugin_list_params(
-        #[case] params: PluginListParams,
-        #[case] expected_pairs: &[(&str, &str)],
-    ) {
-        assert_expected_query_pairs(params.query_pairs(), expected_pairs);
+    fn test_plugin_list_params(#[case] params: PluginListParams, #[case] expected_query: &str) {
+        assert_expected_query_pairs(params, expected_query);
     }
 }

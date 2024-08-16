@@ -4,6 +4,7 @@ pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{RequestExecutionError, WpApiError, WpErrorCode};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
+use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
 
@@ -19,6 +20,7 @@ pub mod post_types;
 pub mod posts;
 pub mod request;
 pub mod site_settings;
+pub mod url_query;
 pub mod users;
 pub mod wp_site_health_tests;
 
@@ -71,6 +73,12 @@ pub enum WpApiParamOrder {
     #[default]
     Asc,
     Desc,
+}
+
+impl AsQueryValue for WpApiParamOrder {
+    fn as_query_value(&self) -> impl AsRef<str> {
+        self.as_str()
+    }
 }
 
 impl WpApiParamOrder {
