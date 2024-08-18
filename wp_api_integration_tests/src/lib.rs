@@ -165,3 +165,17 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
         self.unwrap()
     }
 }
+
+pub trait AssertError {
+    type Item;
+    fn assert_error(self) -> Self::Item;
+}
+
+impl<T: std::fmt::Debug, E: std::error::Error> AssertError for Result<T, E> {
+    type Item = E;
+
+    fn assert_error(self) -> E {
+        assert!(self.is_err(), "Request was successful");
+        self.unwrap_err()
+    }
+}
