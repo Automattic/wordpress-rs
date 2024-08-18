@@ -261,6 +261,7 @@ pub fn fn_body_get_url_from_endpoint(
 }
 
 pub fn fn_body_query_pairs(
+    crate_ident: &Ident,
     params_type: Option<&ParamsType>,
     request_type: RequestType,
 ) -> TokenStream {
@@ -275,14 +276,20 @@ pub fn fn_body_query_pairs(
                 } else {
                     false
                 };
+                let append_query_pairs = quote! {
+                    use #crate_ident::url_query::AppendUrlQueryPairs;
+                    params.append_query_pairs(&mut url.query_pairs_mut());
+                };
                 if is_option {
                     quote! {
                         if let Some(params) = params {
-                            url.query_pairs_mut().extend_pairs(params.query_pairs());
+                            #append_query_pairs
                         }
                     }
                 } else {
-                    quote! { url.query_pairs_mut().extend_pairs(params.query_pairs()); }
+                    quote! {
+                        #append_query_pairs
+                    }
                 }
             } else {
                 TokenStream::new()
@@ -910,12 +917,12 @@ mod tests {
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
-        "url . query_pairs_mut () . extend_pairs (params . query_pairs ()) ;"
+        "use crate :: url_query :: AppendUrlQueryPairs ; params . append_query_pairs (& mut url . query_pairs_mut ()) ;"
     )]
     #[case(
         option_referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
-        "if let Some (params) = params { url . query_pairs_mut () . extend_pairs (params . query_pairs ()) ; }"
+        "if let Some (params) = params { use crate :: url_query :: AppendUrlQueryPairs ; params . append_query_pairs (& mut url . query_pairs_mut ()) ; }"
     )]
     #[case(option_referenced_params_type("UserListParams"), RequestType::Post, "")]
     fn test_fn_body_query_pairs(
@@ -923,8 +930,9 @@ mod tests {
         #[case] request_type: RequestType,
         #[case] expected_str: &str,
     ) {
+        let crate_ident = format_ident!("crate");
         assert_eq!(
-            fn_body_query_pairs(params.as_ref(), request_type).to_string(),
+            fn_body_query_pairs(&crate_ident, params.as_ref(), request_type).to_string(),
             expected_str
         );
     }

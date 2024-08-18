@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::{UserId, WpApiParamOrder};
+use crate::{
+    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
+    UserId, WpApiParamOrder,
+};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamPostsOrderBy {
@@ -17,6 +21,8 @@ pub enum WpApiParamPostsOrderBy {
     Slug,
     Title,
 }
+
+impl_as_query_value_from_as_str!(WpApiParamPostsOrderBy);
 
 impl WpApiParamPostsOrderBy {
     fn as_str(&self) -> &str {
@@ -41,6 +47,8 @@ pub enum WpApiParamPostsTaxRelation {
     Or,
 }
 
+impl_as_query_value_from_as_str!(WpApiParamPostsTaxRelation);
+
 impl WpApiParamPostsTaxRelation {
     fn as_str(&self) -> &str {
         match self {
@@ -56,6 +64,8 @@ pub enum WpApiParamPostsSearchColumn {
     PostExcerpt,
     PostTitle,
 }
+
+impl_as_query_value_from_as_str!(WpApiParamPostsSearchColumn);
 
 impl WpApiParamPostsSearchColumn {
     fn as_str(&self) -> &str {
@@ -148,152 +158,46 @@ pub struct PostListParams {
     pub sticky: Option<bool>,
 }
 
-impl PostListParams {
-    pub fn query_pairs(&self) -> impl IntoIterator<Item = (&str, String)> {
-        [
-            ("page", self.page.map(|x| x.to_string())),
-            ("per_page", self.per_page.map(|x| x.to_string())),
-            ("search", self.search.clone()),
-            ("after", self.after.clone()),
-            ("modified_after", self.modified_after.clone()),
-            (
-                "author",
-                (!self.author.is_empty()).then_some(
-                    self.author
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "author_exclude",
-                (!self.author_exclude.is_empty()).then_some(
-                    self.author_exclude
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            ("before", self.before.clone()),
-            ("modified_before", self.modified_before.clone()),
-            (
-                "exclude",
-                (!self.exclude.is_empty()).then_some(
-                    self.exclude
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "include",
-                (!self.include.is_empty()).then_some(
-                    self.include
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            ("offset", self.offset.map(|x| x.to_string())),
-            ("order", self.order.as_ref().map(|x| x.as_str().to_string())),
-            (
-                "orderby",
-                self.orderby.as_ref().map(|x| x.as_str().to_string()),
-            ),
-            (
-                "search_columns",
-                (!self.search_columns.is_empty()).then_some(
-                    self.search_columns
-                        .iter()
-                        .map(|x| x.as_str().to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "slug",
-                (!self.slug.is_empty()).then_some(
-                    self.slug
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "status",
-                (!self.status.is_empty()).then_some(
-                    self.status
-                        .iter()
-                        .map(|x| x.as_str().to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "tax_relation",
-                self.tax_relation.as_ref().map(|x| x.as_str().to_string()),
-            ),
-            (
-                "categories",
-                (!self.categories.is_empty()).then_some(
-                    self.categories
-                        .iter()
-                        .map(|x| x.0.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "categories_exclude",
-                (!self.categories_exclude.is_empty()).then_some(
-                    self.categories_exclude
-                        .iter()
-                        .map(|x| x.0.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "tags",
-                (!self.tags.is_empty()).then_some(
-                    self.tags
-                        .iter()
-                        .map(|x| x.0.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            (
-                "tags_exclude",
-                (!self.tags_exclude.is_empty()).then_some(
-                    self.tags_exclude
-                        .iter()
-                        .map(|x| x.0.to_string())
-                        .collect::<Vec<String>>()
-                        .join(","),
-                ),
-            ),
-            ("sticky", self.sticky.map(|x| x.to_string())),
-        ]
-        .into_iter()
-        // Remove `None` values
-        .filter_map(|(k, opt_v)| opt_v.map(|v| (k, v)))
+impl AppendUrlQueryPairs for PostListParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut
+            .append_option_query_value_pair("page", self.page.as_ref())
+            .append_option_query_value_pair("per_page", self.per_page.as_ref())
+            .append_option_query_value_pair("search", self.search.as_ref())
+            .append_option_query_value_pair("after", self.after.as_ref())
+            .append_option_query_value_pair("modified_after", self.modified_after.as_ref())
+            .append_vec_query_value_pair("author", &self.author)
+            .append_vec_query_value_pair("author_exclude", &self.author_exclude)
+            .append_option_query_value_pair("before", self.before.as_ref())
+            .append_option_query_value_pair("modified_before", self.modified_before.as_ref())
+            .append_vec_query_value_pair("exclude", &self.exclude)
+            .append_vec_query_value_pair("include", &self.include)
+            .append_option_query_value_pair("offset", self.offset.as_ref())
+            .append_option_query_value_pair("order", self.order.as_ref())
+            .append_option_query_value_pair("orderby", self.orderby.as_ref())
+            .append_vec_query_value_pair("search_columns", &self.search_columns)
+            .append_vec_query_value_pair("slug", &self.slug)
+            .append_vec_query_value_pair("status", &self.status)
+            .append_option_query_value_pair("tax_relation", self.tax_relation.as_ref())
+            .append_vec_query_value_pair("categories", &self.categories)
+            .append_vec_query_value_pair("categories_exclude", &self.categories_exclude)
+            .append_vec_query_value_pair("tags", &self.tags)
+            .append_vec_query_value_pair("tags_exclude", &self.tags_exclude)
+            .append_option_query_value_pair("sticky", self.sticky.as_ref());
     }
 }
 
+impl_as_query_value_for_new_type!(PostId);
 uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostId(pub i32);
 
+impl_as_query_value_for_new_type!(TagId);
 uniffi::custom_newtype!(TagId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TagId(pub i32);
 
+impl_as_query_value_for_new_type!(CategoryId);
 uniffi::custom_newtype!(CategoryId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CategoryId(pub i32);
@@ -412,6 +316,8 @@ pub enum PostStatus {
     #[serde(untagged)]
     Custom(String),
 }
+
+impl_as_query_value_from_as_str!(PostStatus);
 
 impl PostStatus {
     fn as_str(&self) -> &str {

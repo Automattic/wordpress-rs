@@ -66,7 +66,7 @@ mod tests {
                     reassign: UserId(98),
                 },
             ),
-            "/users/54?reassign=98&force=true",
+            "/users/54?force=true&reassign=98",
         );
     }
 
@@ -76,7 +76,7 @@ mod tests {
             endpoint.delete_me(&UserDeleteParams {
                 reassign: UserId(98),
             }),
-            "/users/me?reassign=98&force=true",
+            "/users/me?force=true&reassign=98",
         );
     }
 
