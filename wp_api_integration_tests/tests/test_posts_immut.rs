@@ -2,11 +2,13 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::posts::{
-    CategoryId, PostId, PostListParams, PostStatus, TagId, WpApiParamPostsOrderBy,
-    WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+    CategoryId, PostId, PostListParams, PostRetrieveParams, PostStatus, TagId,
+    WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
 };
 use wp_api::{generate, WpApiParamOrder};
-use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api_integration_tests::{
+    api_client, AssertResponse, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID,
+};
 
 #[tokio::test]
 #[apply(list_cases)]
@@ -37,6 +39,36 @@ async fn list_with_view_context(#[case] params: PostListParams) {
     api_client()
         .posts()
         .list_with_view_context(&params)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .posts()
+        .retrieve_with_edit_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context(#[case] params: PostRetrieveParams) {
+    api_client()
+        .posts()
+        .retrieve_with_embed_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context(#[case] params: PostRetrieveParams) {
+    api_client()
+        .posts()
+        .retrieve_with_view_context(&FIRST_POST_ID, &PostRetrieveParams::default())
         .await
         .assert_response();
 }

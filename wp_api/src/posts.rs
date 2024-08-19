@@ -187,6 +187,19 @@ impl AppendUrlQueryPairs for PostListParams {
     }
 }
 
+#[derive(Debug, Default, uniffi::Record)]
+pub struct PostRetrieveParams {
+    /// The password for the post if it is password protected.
+    #[uniffi(default = None)]
+    pub password: Option<String>,
+}
+
+impl AppendUrlQueryPairs for PostRetrieveParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_option_query_value_pair("password", self.password.as_ref());
+    }
+}
+
 impl_as_query_value_for_new_type!(PostId);
 uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
