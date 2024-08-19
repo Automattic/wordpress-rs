@@ -80,13 +80,6 @@ impl ApiBaseUrl {
         site_base_url.try_into()
     }
 
-    fn by_appending(&self, segment: &str) -> Url {
-        self.url
-            .clone()
-            .append(segment)
-            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
-    }
-
     pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
     where
         I: IntoIterator,
@@ -223,10 +216,6 @@ mod tests {
         let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
         let expected_wp_json_url = wp_json_endpoint(test_base_url);
         assert_eq!(expected_wp_json_url, api_base_url.as_str());
-        assert_eq!(
-            api_base_url.by_appending("bar").as_str(),
-            format!("{}/bar", expected_wp_json_url)
-        );
         assert_eq!(
             api_base_url
                 .by_extending_and_splitting_by_forward_slash(["bar", "baz"])
