@@ -23,6 +23,9 @@ pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 pub const FIRST_POST_ID: PostId = PostId(1);
+pub const PASSWORD_PROTECTED_POST_ID: PostId = PostId(1832);
+pub const PASSWORD_PROTECTED_POST_TITLE: &str = "Password_Protected";
+pub const PASSWORD_PROTECTED_POST_PASSWORD: &str = "INTEGRATION_TEST";
 
 pub fn api_client() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(

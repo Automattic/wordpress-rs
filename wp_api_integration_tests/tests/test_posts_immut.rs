@@ -7,7 +7,8 @@ use wp_api::posts::{
 };
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID,
+    api_client, AssertResponse, FIRST_POST_ID, FIRST_USER_ID, PASSWORD_PROTECTED_POST_ID,
+    PASSWORD_PROTECTED_POST_PASSWORD, PASSWORD_PROTECTED_POST_TITLE, SECOND_USER_ID,
 };
 
 #[tokio::test]
@@ -71,6 +72,54 @@ async fn retrieve_with_view_context(#[case] params: PostRetrieveParams) {
         .retrieve_with_view_context(&FIRST_POST_ID, &PostRetrieveParams::default())
         .await
         .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_edit_context() {
+    let post = api_client()
+        .posts()
+        .retrieve_with_edit_context(
+            &PASSWORD_PROTECTED_POST_ID,
+            &PostRetrieveParams {
+                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+            },
+        )
+        .await
+        .assert_response();
+    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_embed_context() {
+    let post = api_client()
+        .posts()
+        .retrieve_with_embed_context(
+            &PASSWORD_PROTECTED_POST_ID,
+            &PostRetrieveParams {
+                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+            },
+        )
+        .await
+        .assert_response();
+    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_view_context() {
+    let post = api_client()
+        .posts()
+        .retrieve_with_view_context(
+            &PASSWORD_PROTECTED_POST_ID,
+            &PostRetrieveParams {
+                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+            },
+        )
+        .await
+        .assert_response();
+    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
 }
 
 #[template]

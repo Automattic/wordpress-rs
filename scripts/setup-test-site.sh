@@ -88,6 +88,9 @@ wp language core install en_CA
 wp plugin install hello-dolly --activate
 wp plugin install classic-editor
 
+# Used in `test_posts_immut`. If the resulting ID changes, `PASSWORD_PROTECTED_POST_ID` needs to be updated
+wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected
+
 cp -rp wp-content/plugins wp-content/plugins-backup
 
 wp db export --add-drop-table wp-content/dump.sql
