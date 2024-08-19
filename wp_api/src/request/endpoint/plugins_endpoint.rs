@@ -123,7 +123,7 @@ mod tests {
         "/plugins?context=edit&status=active&_fields=name%2Cplugin_uri"
     )]
     #[case(
-        generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), 
+        generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))),
         &[SparsePluginFieldWithEditContext::NetworkOnly, SparsePluginFieldWithEditContext::RequiresPhp, SparsePluginFieldWithEditContext::Textdomain],
         "/plugins?context=edit&search=foo&status=inactive&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]

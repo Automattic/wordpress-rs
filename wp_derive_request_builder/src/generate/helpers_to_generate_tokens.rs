@@ -237,8 +237,7 @@ pub fn fn_body_get_url_from_api_base_url(enum_ident: &Ident, url_parts: &[UrlPar
         })
         .collect::<Vec<TokenStream>>();
     quote! {
-        let mut url = self.api_base_url
-            .by_extending_and_splitting_by_forward_slash([ #enum_ident::namespace().as_str() , #(#url_parts,)* ]);
+        let mut url = self.api_base_url.by_extending_and_splitting_by_forward_slash(Some(&#enum_ident::namespace()), [ #(#url_parts,)* ]);
     }
 }
 
@@ -880,27 +879,27 @@ mod tests {
     #[rstest]
     #[case(
         url_static_users(),
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash (Some (& Foo :: namespace ()) , [\"users\" ,]) ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , & user_id . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash (Some (& Foo :: namespace ()) , [\"users\" , & user_id . to_string () ,]) ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , & user_id . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash (Some (& Foo :: namespace ()) , [\"users\" , & user_id . to_string () ,]) ;"
     )]
     #[case(
         vec![UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())],
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash (Some (& Foo :: namespace ()) , [& user_id . to_string () , & user_type . to_string () ,]) ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash (Some (& Foo :: namespace ()) , [\"users\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Static("me".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , \"me\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = self . api_base_url . by_extending_and_splitting_by_forward_slash (Some (& Foo :: namespace ()) , [\"users\" , \"me\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
     )]
     fn test_fn_body_get_url_from_api_base_url(
         #[case] url_parts: Vec<UrlPart>,

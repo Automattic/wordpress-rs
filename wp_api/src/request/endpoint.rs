@@ -54,16 +54,71 @@ impl From<ApiEndpointUrl> for WpEndpointUrl {
 }
 
 #[derive(Debug, Clone)]
+enum WpSite {
+    WPCom { host: String },
+    SelfHosted { url: Url },
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct ApiBaseUrl {
-    url: Url,
+    site: WpSite,
+}
+
+impl ApiBaseUrl {
+    fn wordpress_com(host: &str) -> Self {
+        Self {
+            site: WpSite::WPCom {
+                host: host.to_string(),
+            },
+        }
+    }
+
+    fn self_hosted(url: Url) -> Self {
+        Self {
+            site: WpSite::SelfHosted { url },
+        }
+    }
+
+    fn url_at_namespace(&self, namespace: Option<&Namespace>) -> Url {
+        match &self.site {
+            WpSite::WPCom { host } => {
+                let mut url =
+                    Url::parse("https://public-api.wordpress.com").expect("Host is a valid url");
+
+                if let Some(namespace) = namespace {
+                    url.path_segments_mut()
+                        .expect("url is a full URL")
+                        .extend(namespace.path_segments());
+
+                    url.path_segments_mut()
+                        .expect("url is a full URL")
+                        .push("sites")
+                        .push(host);
+                }
+
+                url
+            }
+            WpSite::SelfHosted { url } => {
+                let mut url = url
+                    .clone()
+                    .extend(WP_JSON_PATH_SEGMENTS.iter())
+                    .expect("Host is a valid url");
+
+                if let Some(namespace) = namespace {
+                    url.path_segments_mut()
+                        .expect("url is a parsed full URL")
+                        .extend(namespace.path_segments());
+                }
+
+                url
+            }
+        }
+    }
 }
 
 impl From<Url> for ApiBaseUrl {
     fn from(url: Url) -> Self {
-        let url = url
-            .extend(WP_JSON_PATH_SEGMENTS)
-            .expect("Given url is already parsed, so this can't result in an error");
-        Self { url }
+        ApiBaseUrl::self_hosted(url)
     }
 }
 
@@ -80,13 +135,16 @@ impl ApiBaseUrl {
         site_base_url.try_into()
     }
 
-    pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
+    pub fn by_extending_and_splitting_by_forward_slash<I>(
+        &self,
+        namespace: Option<&Namespace>,
+        segments: I,
+    ) -> Url
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        self.url
-            .clone()
+        self.url_at_namespace(namespace)
             .extend(segments.into_iter().flat_map(|s| {
                 s.as_ref()
                     .split('/')
@@ -99,8 +157,8 @@ impl ApiBaseUrl {
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
-    fn as_str(&self) -> &str {
-        self.url.as_str()
+    fn root(&self) -> Url {
+        self.url_at_namespace(None)
     }
 }
 
@@ -147,7 +205,7 @@ trait DerivedRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Namespace {
+pub enum Namespace {
     WpSiteHealthV1,
     WpV2,
 }
@@ -158,6 +216,13 @@ impl Namespace {
             Self::WpSiteHealthV1 => "/wp-site-health/v1",
             Self::WpV2 => "/wp/v2",
         }
+    }
+
+    fn path_segments(&self) -> impl Iterator<Item = &str> {
+        self.as_str()
+            .split("/")
+            .map(|f| f.trim())
+            .filter(|f| !f.is_empty())
     }
 }
 
@@ -215,25 +280,49 @@ mod tests {
     ) {
         let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
         let expected_wp_json_url = wp_json_endpoint(test_base_url);
-        assert_eq!(expected_wp_json_url, api_base_url.as_str());
+        assert_eq!(expected_wp_json_url, api_base_url.root().as_str());
         assert_eq!(
             api_base_url
-                .by_extending_and_splitting_by_forward_slash(["bar", "baz"])
+                .by_extending_and_splitting_by_forward_slash(None, ["bar", "baz"])
                 .as_str(),
             format!("{}/bar/baz", expected_wp_json_url)
         );
         assert_eq!(
             api_base_url
-                .by_extending_and_splitting_by_forward_slash(["bar", "baz/quox"])
+                .by_extending_and_splitting_by_forward_slash(None, ["bar", "baz/quox"])
                 .as_str(),
             format!("{}/bar/baz/quox", expected_wp_json_url)
         );
         assert_eq!(
             api_base_url
-                .by_extending_and_splitting_by_forward_slash(["/bar", "/baz/quox"])
+                .by_extending_and_splitting_by_forward_slash(None, ["/bar", "/baz/quox"])
                 .as_str(),
             format!("{}/bar/baz/quox", expected_wp_json_url)
         );
+    }
+
+    #[rstest]
+    fn wp_com_url() {
+        let api_base_url: ApiBaseUrl = ApiBaseUrl::wordpress_com("example.com");
+        assert_eq!(
+            api_base_url.root().as_str(),
+            "https://public-api.wordpress.com/"
+        );
+        assert_eq!(
+            api_base_url
+                .url_at_namespace(Some(&Namespace::WpV2))
+                .as_str(),
+            "https://public-api.wordpress.com/wp/v2/sites/example.com"
+        );
+        assert_eq!(
+            api_base_url
+                .by_extending_and_splitting_by_forward_slash(
+                    Some(&Namespace::WpV2),
+                    ["users", "me"]
+                )
+                .as_str(),
+            "https://public-api.wordpress.com/wp/v2/sites/example.com/users/me"
+        )
     }
 
     fn wp_json_endpoint(base_url: &str) -> String {
@@ -246,7 +335,8 @@ mod tests {
 
     #[fixture]
     pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
-        ApiBaseUrl::try_from("https://example.com").unwrap().into()
+        let url = Url::parse("https://example.com").unwrap();
+        ApiBaseUrl::self_hosted(url).into()
     }
 
     pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
@@ -262,7 +352,7 @@ mod tests {
             endpoint_url.as_str(),
             format!(
                 "{}{}{}",
-                fixture_api_base_url().as_str(),
+                fixture_api_base_url().root().as_str(),
                 namespace.as_str(),
                 path
             )
