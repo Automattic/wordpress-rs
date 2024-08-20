@@ -299,6 +299,15 @@ pub fn fn_body_query_pairs(
     }
 }
 
+pub fn fn_body_additional_query_pairs(enum_ident: &Ident, variant_ident: &Ident) -> TokenStream {
+    quote! {
+        let additional_query_pairs = #enum_ident::additional_query_pairs(&#enum_ident::#variant_ident);
+        if !additional_query_pairs.is_empty() {
+            url.query_pairs_mut().extend_pairs(additional_query_pairs);
+        }
+    }
+}
+
 pub fn fn_body_fields_query_pairs(
     crate_ident: &Ident,
     context_and_filter_handler: &ContextAndFilterHandler,

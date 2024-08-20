@@ -171,6 +171,8 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
             fn_body_get_url_from_api_base_url(&parsed_enum.enum_ident, url_parts);
         let query_pairs =
             fn_body_query_pairs(&config.crate_ident, params_type.as_ref(), request_type);
+        let additional_query_pairs =
+            fn_body_additional_query_pairs(&parsed_enum.enum_ident, &variant.variant_ident);
 
         ContextAndFilterHandler::from_request_type(request_type, variant.attr.filter_by.clone())
             .into_iter()
@@ -192,6 +194,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
                         #url_from_api_base_url
                         #context_query_pair
                         #query_pairs
+                        #additional_query_pairs
                         #fields_query_pairs
                         url.into()
                     }

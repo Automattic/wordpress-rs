@@ -150,6 +150,18 @@ impl UrlExtension for Url {
 }
 
 trait DerivedRequest {
+    // This can be used to add additional parameters to a request if it has no params type.
+    //
+    // For example, `/posts` request has `Trash` & `Delete` variants. These variants don't have a
+    // params type such as `PostTrashParams` or `PostDeleteParams`. However, they still need to
+    // pass some static parameters, `force=false` and `force=true` respectively.
+    //
+    // In most cases overriding this shouldn't be necessary and `[AppendUrlQueryPairs]` trait for
+    // the request's params type should be used instead.
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        Vec::new()
+    }
+
     fn namespace() -> Namespace;
 }
 
