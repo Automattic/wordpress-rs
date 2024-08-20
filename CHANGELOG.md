@@ -18,6 +18,7 @@
 ### Internal Changes
 
 - `WpDerivedRequest` now supports plain `get` requests
+- `WpDerivedRequest` now supports `additional_query_pairs`
 
 ## 0.1
 
