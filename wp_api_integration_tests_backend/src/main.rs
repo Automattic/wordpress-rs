@@ -5,7 +5,7 @@ use std::fs;
 use std::fs::metadata;
 use std::io;
 use std::path::Path;
-use wp_cli::{WpCliSiteSettings, WpCliUser, WpCliUserMeta};
+use wp_cli::{WpCliPost, WpCliPostListArguments, WpCliSiteSettings, WpCliUser, WpCliUserMeta};
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 
@@ -18,6 +18,13 @@ enum Error {
 #[get("/site-settings")]
 fn wp_cli_site_settings() -> Result<Json<WpCliSiteSettings>, Error> {
     WpCliSiteSettings::list()
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/posts?<post_status>")]
+fn wp_cli_posts(post_status: Option<String>) -> Result<Json<Vec<WpCliPost>>, Error> {
+    WpCliPost::list(Some(WpCliPostListArguments { post_status }))
         .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
@@ -65,6 +72,7 @@ fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![restore_wp_server])
         .mount("/wp-cli/", routes![wp_cli_site_settings])
+        .mount("/wp-cli/", routes![wp_cli_posts])
         .mount("/wp-cli/", routes![wp_cli_user])
         .mount("/wp-cli/", routes![wp_cli_users])
         .mount("/wp-cli/", routes![wp_cli_user_meta])
