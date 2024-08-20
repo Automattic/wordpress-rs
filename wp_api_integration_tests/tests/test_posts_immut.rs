@@ -2,11 +2,14 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::posts::{
-    CategoryId, PostId, PostListParams, PostStatus, TagId, WpApiParamPostsOrderBy,
-    WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+    CategoryId, PostId, PostListParams, PostRetrieveParams, PostStatus, TagId,
+    WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
 };
 use wp_api::{generate, WpApiParamOrder};
-use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api_integration_tests::{
+    api_client, AssertResponse, FIRST_POST_ID, FIRST_USER_ID, PASSWORD_PROTECTED_POST_ID,
+    PASSWORD_PROTECTED_POST_PASSWORD, PASSWORD_PROTECTED_POST_TITLE, SECOND_USER_ID,
+};
 
 #[tokio::test]
 #[apply(list_cases)]
@@ -39,6 +42,84 @@ async fn list_with_view_context(#[case] params: PostListParams) {
         .list_with_view_context(&params)
         .await
         .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .posts()
+        .retrieve_with_edit_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context(#[case] params: PostRetrieveParams) {
+    api_client()
+        .posts()
+        .retrieve_with_embed_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context(#[case] params: PostRetrieveParams) {
+    api_client()
+        .posts()
+        .retrieve_with_view_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_edit_context() {
+    let post = api_client()
+        .posts()
+        .retrieve_with_edit_context(
+            &PASSWORD_PROTECTED_POST_ID,
+            &PostRetrieveParams {
+                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+            },
+        )
+        .await
+        .assert_response();
+    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_embed_context() {
+    let post = api_client()
+        .posts()
+        .retrieve_with_embed_context(
+            &PASSWORD_PROTECTED_POST_ID,
+            &PostRetrieveParams {
+                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+            },
+        )
+        .await
+        .assert_response();
+    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_view_context() {
+    let post = api_client()
+        .posts()
+        .retrieve_with_view_context(
+            &PASSWORD_PROTECTED_POST_ID,
+            &PostRetrieveParams {
+                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+            },
+        )
+        .await
+        .assert_response();
+    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
 }
 
 #[template]

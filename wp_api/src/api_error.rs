@@ -104,6 +104,8 @@ pub enum WpErrorCode {
     InvalidParam,
     #[serde(rename = "rest_plugin_not_found")]
     PluginNotFound,
+    #[serde(rename = "rest_post_incorrect_password")]
+    PostIncorrectPassword,
     #[serde(rename = "rest_type_invalid")]
     TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]

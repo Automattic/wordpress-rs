@@ -1,6 +1,6 @@
 use crate::{
     posts::{
-        PostListParams, SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
+        PostId, PostListParams, SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
         SparsePostFieldWithViewContext,
     },
     SparseField,
@@ -13,6 +13,8 @@ use super::{DerivedRequest, Namespace};
 enum PostsRequest {
     #[contextual_get(url = "/posts", params = &PostListParams, output = Vec<crate::posts::SparsePost>, filter_by = crate::posts::SparsePostField)]
     List,
+    #[contextual_get(url = "/posts/<post_id>", params = &crate::posts::PostRetrieveParams, output = crate::posts::SparsePost, filter_by = crate::posts::SparsePostField)]
+    Retrieve,
 }
 
 impl DerivedRequest for PostsRequest {
