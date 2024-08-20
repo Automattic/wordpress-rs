@@ -1,5 +1,5 @@
 use rstest::rstest;
-use serial_test::serial;
+use serial_test::parallel;
 use std::sync::Arc;
 use wp_api::login::WpLoginClient;
 use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
@@ -36,7 +36,7 @@ const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
 )]
 #[case("automatticwidgets.wpcomstaging.com/ ", AUTOMATTIC_WIDGETS_AUTH_URL)]
 #[tokio::test]
-#[serial]
+#[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
     let url_discovery = client

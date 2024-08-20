@@ -1,3 +1,4 @@
+use serial_test::parallel;
 use wp_api::{
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
@@ -11,6 +12,7 @@ use wp_api_integration_tests::{
 };
 
 #[tokio::test]
+#[parallel]
 async fn create_user_err_cannot_create_user() {
     api_client_as_subscriber()
         .users()
@@ -20,6 +22,7 @@ async fn create_user_err_cannot_create_user() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn delete_user_err_user_cannot_delete() {
     api_client_as_subscriber()
         .users()
@@ -34,6 +37,7 @@ async fn delete_user_err_user_cannot_delete() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn delete_user_err_user_invalid_reassign() {
     api_client()
         .users()
@@ -48,6 +52,7 @@ async fn delete_user_err_user_invalid_reassign() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn delete_current_user_err_user_invalid_reassign() {
     api_client()
         .users()
@@ -59,6 +64,7 @@ async fn delete_current_user_err_user_invalid_reassign() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_err_forbidden_context() {
     api_client_as_subscriber()
         .users()
@@ -68,6 +74,7 @@ async fn list_users_err_forbidden_context() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_err_forbidden_orderby_email() {
     let params = UserListParams {
         orderby: Some(WpApiParamUsersOrderBy::Email),
@@ -81,6 +88,7 @@ async fn list_users_err_forbidden_orderby_email() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_err_forbidden_who() {
     let params = UserListParams {
         who: Some(WpApiParamUsersWho::Authors),
@@ -94,6 +102,7 @@ async fn list_users_err_forbidden_who() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_with_capabilities_err_user_cannot_view() {
     let params = UserListParams {
         capabilities: vec!["foo".to_string()],
@@ -107,6 +116,7 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_with_roles_err_user_cannot_view() {
     let params = UserListParams {
         roles: vec!["foo".to_string()],
@@ -120,6 +130,7 @@ async fn list_users_with_roles_err_user_cannot_view() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_orderby_registered_date_err_forbidden_orderby() {
     let params = UserListParams {
         orderby: Some(WpApiParamUsersOrderBy::RegisteredDate),
@@ -133,6 +144,7 @@ async fn list_users_orderby_registered_date_err_forbidden_orderby() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_users_has_published_posts_err_invalid_param() {
     api_client()
         .users()
@@ -147,6 +159,7 @@ async fn list_users_has_published_posts_err_invalid_param() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_user_err_user_invalid_id() {
     api_client()
         .users()
@@ -156,6 +169,7 @@ async fn retrieve_user_err_user_invalid_id() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_user_err_unauthorized() {
     api_client_as_unauthenticated()
         .users()
@@ -165,6 +179,7 @@ async fn retrieve_user_err_unauthorized() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_err_cannot_edit() {
     let params = UserUpdateParams {
         slug: Some("new_slug".to_string()),
@@ -179,6 +194,7 @@ async fn update_user_err_cannot_edit() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_err_cannot_edit_roles() {
     let params = UserUpdateParams {
         roles: vec!["new_role".to_string()],
@@ -193,6 +209,7 @@ async fn update_user_err_cannot_edit_roles() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_err_user_invalid_email() {
     let params = UserUpdateParams {
         email: Some(SECOND_USER_EMAIL.to_string()),
@@ -207,6 +224,7 @@ async fn update_user_err_user_invalid_email() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_email_err_invalid_param() {
     let params = UserUpdateParams {
         email: Some("not_valid".to_string()),
@@ -220,6 +238,7 @@ async fn update_user_email_err_invalid_param() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_password_err_invalid_param() {
     let params = UserUpdateParams {
         password: Some("".to_string()),
@@ -233,6 +252,7 @@ async fn update_user_password_err_invalid_param() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_err_user_invalid_role() {
     let params = UserUpdateParams {
         roles: vec!["doesnt_exist".to_string()],
@@ -247,6 +267,7 @@ async fn update_user_err_user_invalid_role() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_user_err_user_invalid_slug() {
     let params = UserUpdateParams {
         slug: Some(SECOND_USER_SLUG.to_string()),
