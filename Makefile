@@ -279,7 +279,7 @@ setup-rust-android-targets:
 		aarch64-linux-android
 
 run-wp-cli-command:
-	@docker exec wordpress /bin/bash -c "wp --allow-root $(ARGS)"
+	@docker exec --user www-data wordpress /bin/bash -c "wp $(ARGS)"
 
 help:
 	@printf "%-40s %s\n" "Target" "Description"

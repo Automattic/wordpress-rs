@@ -12,6 +12,8 @@ set -e
 # be any weird permissions issues)
 su -s /bin/bash www-data
 
+wp package install wp-cli/restful
+
 ## Wait for the DB to be ready before attempting install – Docker can do this for us, but we get way better
 ## diagnostic information from `wp db check`, whereas if `wp core install` fails it won't tell us about issues
 ## like incompatible SSL cipher suites (which is a problem in the WP 5.7 image when used with MySQL 8+)

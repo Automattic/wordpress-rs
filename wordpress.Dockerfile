@@ -13,9 +13,6 @@ RUN mkdir -p /var/www/.wp-cli
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN chown -R www-data:www-data /var/www/.wp-cli/
 
-# Run this command as root user since that's what the Docker will use when we run --http=http://localhost commands
-RUN wp --allow-root package install wp-cli/restful
-
 # Setup Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 RUN rustup target add x86_64-linux-android i686-linux-android armv7-linux-androideabi aarch64-linux-android
