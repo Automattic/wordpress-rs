@@ -1,3 +1,4 @@
+use serial_test::parallel;
 use wp_api::plugins::{PluginCreateParams, PluginListParams, PluginStatus, PluginUpdateParams};
 use wp_api::WpErrorCode;
 
@@ -7,6 +8,7 @@ use wp_api_integration_tests::{
 };
 
 #[tokio::test]
+#[parallel]
 async fn create_plugin_err_cannot_install_plugin() {
     api_client_as_subscriber()
         .plugins()
@@ -19,6 +21,7 @@ async fn create_plugin_err_cannot_install_plugin() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn create_plugin_err_folder_exists() {
     api_client()
         .plugins()
@@ -31,6 +34,7 @@ async fn create_plugin_err_folder_exists() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn create_plugin_err_plugins_api_failed() {
     api_client()
         .plugins()
@@ -43,6 +47,7 @@ async fn create_plugin_err_plugins_api_failed() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn delete_plugin_err_cannot_delete_active_plugin() {
     api_client()
         .plugins()
@@ -52,6 +57,7 @@ async fn delete_plugin_err_cannot_delete_active_plugin() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn list_plugins_err_cannot_view_plugins() {
     api_client_as_subscriber()
         .plugins()
@@ -61,6 +67,7 @@ async fn list_plugins_err_cannot_view_plugins() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn retrieve_plugin_err_cannot_view_plugin() {
     api_client_as_subscriber()
         .plugins()
@@ -70,6 +77,7 @@ async fn retrieve_plugin_err_cannot_view_plugin() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_plugin_err_plugin_not_found() {
     api_client()
         .plugins()
@@ -84,6 +92,7 @@ async fn update_plugin_err_plugin_not_found() {
 }
 
 #[tokio::test]
+#[parallel]
 async fn update_plugin_err_cannot_manage_plugins() {
     api_client_as_subscriber()
         .plugins()
