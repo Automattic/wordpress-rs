@@ -200,6 +200,12 @@ impl AppendUrlQueryPairs for PostRetrieveParams {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct PostDeleteResponse {
+    pub deleted: bool,
+    pub previous: PostWithEditContext,
+}
+
 impl_as_query_value_for_new_type!(PostId);
 uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
