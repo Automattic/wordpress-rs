@@ -1,5 +1,5 @@
 use serial_test::serial;
-use wp_api::posts::{PostCreateParams, PostWithEditContext};
+use wp_api::posts::{PostCreateParams, PostUpdateParams, PostWithEditContext};
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
@@ -118,6 +118,40 @@ async fn trash_post() {
     RestoreServer::db().await;
 }
 
+#[tokio::test]
+#[serial]
+async fn update_title() {
+    let new_title = "new_title";
+    test_update_post(
+        &PostUpdateParams {
+            title: Some(new_title.to_string()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.title.raw, new_title);
+            assert_eq!(updated_post_from_wp_cli.title, new_title);
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_date() {
+    let new_date = "2024-09-09T12:00:00";
+    test_update_post(
+        &PostUpdateParams {
+            date: Some(new_date.to_string()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.date, new_date);
+            assert_eq!(updated_post_from_wp_cli.date, new_date.replace('T', " "));
+        },
+    )
+    .await;
+}
+
 async fn test_create_post<F>(params: &PostCreateParams, assert: F)
 where
     F: Fn(PostWithEditContext, WpCliPost),
@@ -125,5 +159,19 @@ where
     let created_post = api_client().posts().create(params).await.assert_response();
     let created_post_from_wp_cli = Backend::post(&created_post.id).await;
     assert(created_post, created_post_from_wp_cli);
+    RestoreServer::db().await;
+}
+
+async fn test_update_post<F>(params: &PostUpdateParams, assert: F)
+where
+    F: Fn(PostWithEditContext, WpCliPost),
+{
+    let updated_post = api_client()
+        .posts()
+        .update(&FIRST_POST_ID, params)
+        .await
+        .assert_response();
+    let updated_post_from_wp_cli = Backend::post(&FIRST_POST_ID).await;
+    assert(updated_post, updated_post_from_wp_cli);
     RestoreServer::db().await;
 }
