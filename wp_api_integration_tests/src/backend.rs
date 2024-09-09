@@ -1,10 +1,11 @@
 use serde::{de::DeserializeOwned, Serialize};
-use wp_api::users::UserId;
+use wp_api::{posts::PostId, users::UserId};
 use wp_cli::{WpCliPost, WpCliSiteSettings, WpCliUser, WpCliUserMeta};
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
 const BACKEND_PATH_RESTORE: &str = "/restore";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
+const BACKEND_PATH_POST: &str = "/wp-cli/post";
 const BACKEND_PATH_POSTS: &str = "/wp-cli/posts";
 const BACKEND_PATH_USER: &str = "/wp-cli/user";
 const BACKEND_PATH_USERS: &str = "/wp-cli/users";
@@ -20,6 +21,11 @@ impl Backend {
     }
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await
+    }
+    pub async fn post(post_id: &PostId) -> WpCliPost {
+        Self::get(format!("{}?post_id={}", BACKEND_PATH_POST, post_id))
+            .await
+            .expect("Failed to parse fetched post from wp_cli")
     }
     pub async fn posts(post_status: Option<&str>) -> Vec<WpCliPost> {
         let url = if let Some(post_status) = post_status {
