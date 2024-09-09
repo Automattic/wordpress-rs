@@ -122,7 +122,7 @@ async fn test_create_post<F>(params: &PostCreateParams, assert: F)
 where
     F: Fn(PostWithEditContext, WpCliPost),
 {
-    let created_post = api_client().posts().create(&params).await.assert_response();
+    let created_post = api_client().posts().create(params).await.assert_response();
     let created_post_from_wp_cli = Backend::post(&created_post.id).await;
     assert(created_post, created_post_from_wp_cli);
     RestoreServer::db().await;

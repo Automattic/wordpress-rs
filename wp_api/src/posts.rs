@@ -275,11 +275,11 @@ pub struct PostCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
     // The terms assigned to the post in the category taxonomy.
-    #[uniffi(default = None)]
+    #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub categories: Vec<CategoryId>,
     // The terms assigned to the post in the post_tag taxonomy.
-    #[uniffi(default = None)]
+    #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<TagId>,
 }
