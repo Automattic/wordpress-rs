@@ -11,6 +11,7 @@ use crate::ParsedUrl;
 use crate::WpUuid;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
+const KEY_OAUTH_2: &str = "oauth2";
 
 mod login_client;
 mod url_discovery;
@@ -57,27 +58,147 @@ pub struct WpApiDetails {
     pub gmt_offset: i64,
     pub timezone_string: String,
     pub namespaces: Vec<String>,
-    pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
+    pub authentication: HashMap<String, AuthenticationProtocol>,
     pub site_icon_url: Option<String>,
 }
 
 #[uniffi::export]
 impl WpApiDetails {
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
-        self.authentication
-            .get(KEY_APPLICATION_PASSWORDS)
-            .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
+        match self.authentication.get(KEY_APPLICATION_PASSWORDS) {
+            Some(AuthenticationProtocol::ApplicationPassword(scheme)) => {
+                Some(scheme.endpoints.authorization.clone())
+            }
+            _ => None,
+        }
+    }
+
+    pub fn find_oauth_server_details(&self) -> Option<WpApiOAuth2ServerDetails> {
+        match self.authentication.get(KEY_OAUTH_2) {
+            Some(AuthenticationProtocol::OAuth2(scheme)) => Some(scheme.clone().into()),
+            _ => None,
+        }
+    }
+
+    pub fn registered_authentication_methods(&self) -> Vec<WpAuthenticationProtocol> {
+        let mut methods: Vec<WpAuthenticationProtocol> = vec![];
+
+        for (name, protocol) in &self.authentication {
+            methods.push(protocol.clone().into())
+        }
+
+        methods
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct WpRestApiAuthenticationScheme {
-    pub endpoints: WpRestApiAuthenticationEndpoint,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum AuthenticationProtocol {
+    OAuth2(OAuth2Scheme),
+    ApplicationPassword(ApplicationPasswordScheme),
+    Other(UnknownAuthenticationData),
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct WpRestApiAuthenticationEndpoint {
-    pub authorization: String,
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum WpAuthenticationProtocol {
+    OAuth2(WpApiOAuth2ServerDetails),
+    ApplicationPassword(String),
+    Other(UnknownAuthenticationData),
+}
+
+impl From<AuthenticationProtocol> for WpAuthenticationProtocol {
+    fn from(protocol: AuthenticationProtocol) -> Self {
+        match protocol {
+            AuthenticationProtocol::OAuth2(scheme) => {
+                WpAuthenticationProtocol::OAuth2(scheme.clone().into())
+            }
+            AuthenticationProtocol::ApplicationPassword(scheme) => {
+                WpAuthenticationProtocol::ApplicationPassword(
+                    scheme.endpoints.authorization.clone(),
+                )
+            }
+            AuthenticationProtocol::Other(scheme) => {
+                WpAuthenticationProtocol::Other(scheme.clone())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Enum)]
+#[serde(untagged)]
+pub enum UnknownAuthenticationData {
+    Bool(bool),
+    Int(i64),
+    String(String),
+    Float(f64),
+    Object(HashMap<String, UnknownAuthenticationData>),
+    Dictionary(HashMap<String, String>),
+    List(Vec<UnknownAuthenticationData>),
+}
+
+/// An internal JSON representation of the WP Core `application-passwords` authentication method.
+///
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
+pub struct ApplicationPasswordScheme {
+    endpoints: ApplicationPasswordEndpoints,
+}
+
+/// An internal JSON representation of the WP Core `application-passwords` authentication method's endpoints.
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
+pub struct ApplicationPasswordEndpoints {
+    authorization: String,
+}
+
+/// An internal JSON representation of an `oauth2` authentication method as provided by https://wordpress.org/plugins/oauth2-provider/
+/// Provides a fallback for servers that use an `endpoints` key to match the `application-passwords` method.
+///
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum OAuth2Scheme {
+    WithoutEndpointKey(OAuth2SchemeWithoutEndpoint),
+    WithEndpointKey(OAuth2SchemeWithEndpoint),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OAuth2SchemeWithEndpoint {
+    endpoints: OAuth2Endpoints,
+}
+
+/// An internal JSON representation of the `oauth2` authentication method's endpoints.
+///
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OAuth2Endpoints {
+    authorization: String,
+    token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OAuth2SchemeWithoutEndpoint {
+    authorize: String,
+    token: String,
+}
+
+/// A derived representation of `OAuth2Scheme` for clients that normalizes the fields
+///
+#[derive(Debug, Serialize, Deserialize, Clone, uniffi::Record)]
+pub struct WpApiOAuth2ServerDetails {
+    pub authorization_url: String,
+    pub token_url: String,
+}
+
+impl From<OAuth2Scheme> for WpApiOAuth2ServerDetails {
+    fn from(scheme: OAuth2Scheme) -> Self {
+        match scheme {
+            OAuth2Scheme::WithoutEndpointKey(subscheme) => WpApiOAuth2ServerDetails {
+                authorization_url: subscheme.authorize.clone(),
+                token_url: subscheme.token.clone(),
+            },
+            OAuth2Scheme::WithEndpointKey(subscheme) => WpApiOAuth2ServerDetails {
+                authorization_url: subscheme.endpoints.authorization.clone(),
+                token_url: subscheme.endpoints.token.clone(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
@@ -199,5 +320,62 @@ mod tests {
             app_id_str
         );
         assert_eq!(auth_url, ParsedUrl::parse(expected_url.as_str()).unwrap());
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct AuthenticationTest {
+        authentication: HashMap<String, AuthenticationProtocol>,
+    }
+
+    #[rstest]
+    #[case(r#"{ "authentication": { } }"#)]
+    // #[case(r#"{ "authentication": [ ] }"#)] // TODO
+    fn test_empty_authentication_can_be_parsed(#[case] input_json: &str) {
+        let test_object: AuthenticationTest = serde_json::from_str(input_json).unwrap();
+        assert!(test_object.authentication.is_empty())
+    }
+
+    #[rstest]
+    fn test_authentication_with_valid_application_passwords() {
+        let input_json = r#"
+        { "authentication": { "application-passwords": { "endpoints": { "authorization": "http:\/\/localhost\/wp-admin\/authorize-application.php" } } } }"#;
+        let test_object: AuthenticationTest = serde_json::from_str(input_json).unwrap();
+        assert!(matches!(
+            test_object
+                .authentication
+                .get(KEY_APPLICATION_PASSWORDS)
+                .unwrap(),
+            AuthenticationProtocol::ApplicationPassword(_)
+        ));
+    }
+
+    #[rstest]
+    #[case(r#"{ "authentication": { "application-passwords": { } } }"#)]
+    #[case(r#"{ "authentication": { "application-passwords": [ ] } }"#)]
+    #[case(r#"{ "authentication": { "application-passwords": { "disabled": true } } }"#)]
+    #[case(r#"{ "authentication": { "application-passwords": { "florps": 42 } } }"#)]
+    #[case(r#"{ "authentication": { "application-passwords": { "florps": -42 } } }"#)]
+    #[case(r#"{ "authentication": { "application-passwords": { "florps": 0.5234 } } }"#)]
+    fn test_authentication_with_invalid_application_passwords_is_other(#[case] input_json: &str) {
+        let test_object: AuthenticationTest = serde_json::from_str(input_json).unwrap();
+        assert!(matches!(
+            test_object
+                .authentication
+                .get(KEY_APPLICATION_PASSWORDS)
+                .unwrap(),
+            AuthenticationProtocol::Other(_)
+        ))
+    }
+
+    #[rstest]
+    #[case(r#"{ "authentication": { "oauth2": { "authorize": "http:\/\/localhost\/oauth\/authorize", "token": "http:\/\/localhost\/oauth\/token", "me": "http:\/\/localhost\/oauth\/me", "version": "2.0", "software": "WP OAuth Server" } } }"#)]
+    #[case(r#"{ "authentication": { "oauth2": { "endpoints": { "authorization": "https:\/\/public-api.wordpress.com\/oauth2\/authorize", "token": "https:\/\/public-api.wordpress.com\/oauth2\/token" } } } }"#)]
+    fn test_authentication_with_valid_oauth2(#[case] input_json: &str) {
+        let test_object: AuthenticationTest = serde_json::from_str(input_json).unwrap();
+        println!("{:?}", test_object);
+        assert!(matches!(
+            test_object.authentication.get(KEY_OAUTH_2).unwrap(),
+            AuthenticationProtocol::OAuth2(_)
+        ));
     }
 }
