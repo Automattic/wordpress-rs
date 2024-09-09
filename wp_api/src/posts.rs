@@ -284,6 +284,84 @@ pub struct PostCreateParams {
     pub tags: Vec<TagId>,
 }
 
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct PostUpdateParams {
+    // The date the post was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    // The date the post was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<String>,
+    // An alphanumeric identifier for the post unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    // A named status for the post.
+    // One of: publish, future, draft, pending, private
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<PostStatus>,
+    // A password to protect access to the content and excerpt.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+    // The title for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // The content for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // The ID for the author of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // The excerpt for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excerpt: Option<String>,
+    // The ID of the featured media for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub featured_media: Option<MediaId>,
+    // Whether or not comments are open on the post.
+    // One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_status: Option<PostCommentStatus>,
+    // Whether or not the post can be pinged.
+    // One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ping_status: Option<PostPingStatus>,
+    // The format for the post.
+    // One of: standard, aside, chat, gallery, link, image, quote, status, video, audio
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<PostFormat>,
+    // Meta fields.
+    pub meta: Option<String>,
+    // Whether or not the post should be treated as sticky.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sticky: Option<bool>,
+    // The theme file to use to display the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+    // The terms assigned to the post in the category taxonomy.
+    #[uniffi(default = [])]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<CategoryId>,
+    // The terms assigned to the post in the post_tag taxonomy.
+    #[uniffi(default = [])]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<TagId>,
+}
+
 impl_as_query_value_for_new_type!(PostId);
 uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
