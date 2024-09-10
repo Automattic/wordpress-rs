@@ -1,5 +1,5 @@
 use serial_test::serial;
-use wp_api::posts::{PostCreateParams, PostUpdateParams, PostWithEditContext};
+use wp_api::posts::{PostCreateParams, PostStatus, PostUpdateParams, PostWithEditContext};
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
@@ -174,7 +174,6 @@ async fn update_date_gmt() {
 
 #[tokio::test]
 #[serial]
-#[ignore]
 async fn update_slug() {
     let new_slug = "new_slug";
     test_update_post(
@@ -185,6 +184,23 @@ async fn update_slug() {
         |updated_post, updated_post_from_wp_cli| {
             assert_eq!(updated_post.slug, new_slug);
             assert_eq!(updated_post_from_wp_cli.slug, new_slug);
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_status_to_draft() {
+    let new_status = PostStatus::Draft;
+    test_update_post(
+        &PostUpdateParams {
+            status: Some(new_status.clone()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.status, new_status);
+            assert_eq!(updated_post_from_wp_cli.post_status, new_status.as_str());
         },
     )
     .await;

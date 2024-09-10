@@ -520,7 +520,7 @@ pub enum PostStatus {
 impl_as_query_value_from_as_str!(PostStatus);
 
 impl PostStatus {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Draft => "draft",
             Self::Future => "future",
