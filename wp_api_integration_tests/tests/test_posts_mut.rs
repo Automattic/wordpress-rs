@@ -1,10 +1,15 @@
-use macro_helper::generate_update_test;
+use macro_helper::{
+    generate_ignored_update_test, generate_update_post_format_test, generate_update_test,
+};
 use serial_test::serial;
-use wp_api::posts::{PostCreateParams, PostStatus, PostUpdateParams, PostWithEditContext};
+use wp_api::posts::{
+    PostCommentStatus, PostCreateParams, PostFormat, PostPingStatus, PostStatus, PostUpdateParams,
+    PostWithEditContext,
+};
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, FIRST_POST_ID,
+    AssertResponse, FIRST_POST_ID, MEDIA_ID_611, SECOND_USER_ID,
 };
 use wp_cli::WpCliPost;
 
@@ -192,6 +197,98 @@ generate_update_test!(
     }
 );
 
+generate_update_test!(
+    update_author,
+    author,
+    SECOND_USER_ID,
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.author, SECOND_USER_ID);
+        assert_eq!(updated_post_from_wp_cli.author, SECOND_USER_ID.0 as i64);
+    }
+);
+
+generate_update_test!(
+    update_excerpt,
+    excerpt,
+    "new_excerpt".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.excerpt.raw, "new_excerpt");
+        assert_eq!(updated_post_from_wp_cli.excerpt, "new_excerpt");
+    }
+);
+
+generate_update_test!(
+    update_featured_media,
+    featured_media,
+    MEDIA_ID_611,
+    |updated_post, _| {
+        assert_eq!(updated_post.featured_media, MEDIA_ID_611);
+    }
+);
+
+generate_update_test!(
+    update_comment_status_to_open,
+    comment_status,
+    PostCommentStatus::Open,
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.comment_status, PostCommentStatus::Open);
+        assert_eq!(
+            updated_post_from_wp_cli.comment_status,
+            PostCommentStatus::Open.as_str()
+        );
+    }
+);
+
+generate_update_test!(
+    update_comment_status_to_closed,
+    comment_status,
+    PostCommentStatus::Closed,
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.comment_status, PostCommentStatus::Closed);
+        assert_eq!(
+            updated_post_from_wp_cli.comment_status,
+            PostCommentStatus::Closed.as_str()
+        );
+    }
+);
+
+generate_update_test!(
+    update_ping_status_to_open,
+    ping_status,
+    PostPingStatus::Open,
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.ping_status, PostPingStatus::Open);
+        assert_eq!(
+            updated_post_from_wp_cli.ping_status,
+            PostPingStatus::Open.as_str()
+        );
+    }
+);
+
+generate_update_test!(
+    update_ping_status_to_closed,
+    ping_status,
+    PostPingStatus::Closed,
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.ping_status, PostPingStatus::Closed);
+        assert_eq!(
+            updated_post_from_wp_cli.ping_status,
+            PostPingStatus::Closed.as_str()
+        );
+    }
+);
+
+generate_update_post_format_test!(Standard);
+generate_update_post_format_test!(Aside);
+generate_update_post_format_test!(Chat);
+generate_update_post_format_test!(Gallery);
+generate_update_post_format_test!(Link);
+generate_update_post_format_test!(Image);
+generate_update_post_format_test!(Quote);
+generate_update_post_format_test!(Status);
+generate_update_post_format_test!(Video);
+generate_update_post_format_test!(Audio);
+
 async fn test_create_post<F>(params: &PostCreateParams, assert: F)
 where
     F: Fn(PostWithEditContext, WpCliPost),
@@ -226,6 +323,45 @@ mod macro_helper {
                     let updated_value = $new_value;
                     test_update_post(
                         &PostUpdateParams {
+                            $field: Some(updated_value),
+                            ..Default::default()
+                        }, $assertion)
+                    .await;
+                }
+            }
+        };
+    }
+
+    macro_rules! generate_update_post_format_test {
+        ($format:ident) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn [<update_post_format_to_ $format:lower>]() {
+                    test_update_post(
+                        &PostUpdateParams {
+                            format: Some(PostFormat::$format),
+                            ..Default::default()
+                        },
+                        |updated_post, _| {
+                            assert_eq!(updated_post.format, PostFormat::$format);
+                        }
+                    ).await;
+                }
+            }
+        };
+    }
+
+    macro_rules! generate_ignored_update_test {
+        ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                #[ignore]
+                async fn $ident() {
+                    let updated_value = $new_value;
+                    test_update_post(
+                        &PostUpdateParams {
                             $field: Some(updated_value.clone()),
                             ..Default::default()
                         }, $assertion)
@@ -235,5 +371,7 @@ mod macro_helper {
         };
     }
 
+    pub(super) use generate_ignored_update_test;
+    pub(super) use generate_update_post_format_test;
     pub(super) use generate_update_test;
 }

@@ -430,7 +430,7 @@ pub struct SparsePost {
     #[WpContextualField]
     pub excerpt: Option<SparsePostExcerpt>,
     #[WpContext(edit, embed, view)]
-    pub featured_media: Option<i64>,
+    pub featured_media: Option<MediaId>,
     #[WpContext(edit, view)]
     pub comment_status: Option<PostCommentStatus>,
     #[WpContext(edit, view)]
@@ -543,6 +543,16 @@ pub enum PostCommentStatus {
     Custom(String),
 }
 
+impl PostCommentStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Custom(comment_status) => comment_status,
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
 )]
@@ -552,6 +562,16 @@ pub enum PostPingStatus {
     Closed,
     #[serde(untagged)]
     Custom(String),
+}
+
+impl PostPingStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Custom(ping_status) => ping_status,
+        }
+    }
 }
 
 #[derive(
@@ -571,4 +591,22 @@ pub enum PostFormat {
     Audio,
     #[serde(untagged)]
     Custom(String),
+}
+
+impl PostFormat {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Standard => "standard",
+            Self::Aside => "aside",
+            Self::Chat => "chat",
+            Self::Gallery => "gallery",
+            Self::Link => "link",
+            Self::Image => "image",
+            Self::Quote => "quote",
+            Self::Status => "status",
+            Self::Video => "video",
+            Self::Audio => "audio",
+            Self::Custom(post_format) => post_format,
+        }
+    }
 }
