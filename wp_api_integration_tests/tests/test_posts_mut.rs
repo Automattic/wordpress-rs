@@ -7,7 +7,8 @@ use wp_api::posts::{
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, CATEGORY_ID_1, FIRST_POST_ID, MEDIA_ID_611, SECOND_USER_ID, TAG_ID_100,
+    AssertResponse, CATEGORY_ID_1, FIRST_POST_ID, MEDIA_ID_611, POST_TEMPLATE_SINGLE_WITH_SIDEBAR,
+    SECOND_USER_ID, TAG_ID_100,
 };
 use wp_cli::WpCliPost;
 
@@ -273,6 +274,15 @@ generate_update_test!(
             updated_post_from_wp_cli.ping_status,
             PostPingStatus::Closed.as_str()
         );
+    }
+);
+
+generate_update_test!(
+    update_template,
+    template,
+    POST_TEMPLATE_SINGLE_WITH_SIDEBAR.to_string(),
+    |updated_post, _| {
+        assert_eq!(updated_post.template, POST_TEMPLATE_SINGLE_WITH_SIDEBAR);
     }
 );
 

@@ -41,6 +41,7 @@ pub const PASSWORD_PROTECTED_POST_PASSWORD: &str = "INTEGRATION_TEST";
 pub const MEDIA_ID_611: MediaId = MediaId(611);
 pub const CATEGORY_ID_1: CategoryId = CategoryId(1);
 pub const TAG_ID_100: TagId = TagId(100);
+pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 
 pub fn api_client() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
