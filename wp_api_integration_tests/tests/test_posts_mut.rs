@@ -1,6 +1,4 @@
-use macro_helper::{
-    generate_ignored_update_test, generate_update_post_format_test, generate_update_test,
-};
+use macro_helper::{generate_update_post_format_test, generate_update_test};
 use serial_test::serial;
 use wp_api::posts::{
     PostCommentStatus, PostCreateParams, PostFormat, PostPingStatus, PostStatus, PostUpdateParams,
@@ -9,7 +7,7 @@ use wp_api::posts::{
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, FIRST_POST_ID, MEDIA_ID_611, SECOND_USER_ID,
+    AssertResponse, CATEGORY_ID_1, FIRST_POST_ID, MEDIA_ID_611, SECOND_USER_ID, TAG_ID_100,
 };
 use wp_cli::WpCliPost;
 
@@ -278,6 +276,46 @@ generate_update_test!(
     }
 );
 
+generate_update_test!(update_sticky_to_true, sticky, true, |updated_post, _| {
+    assert_eq!(updated_post.sticky, true);
+});
+
+generate_update_test!(update_sticky_to_false, sticky, false, |updated_post, _| {
+    assert_eq!(updated_post.sticky, false);
+});
+
+#[tokio::test]
+#[serial]
+async fn update_categories() {
+    let updated_value = vec![CATEGORY_ID_1];
+    test_update_post(
+        &PostUpdateParams {
+            categories: updated_value.clone(),
+            ..Default::default()
+        },
+        |updated_post, _| {
+            assert_eq!(updated_post.categories, updated_value);
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_tags() {
+    let updated_value = vec![TAG_ID_100];
+    test_update_post(
+        &PostUpdateParams {
+            tags: updated_value.clone(),
+            ..Default::default()
+        },
+        |updated_post, _| {
+            assert_eq!(updated_post.tags, updated_value);
+        },
+    )
+    .await;
+}
+
 generate_update_post_format_test!(Standard);
 generate_update_post_format_test!(Aside);
 generate_update_post_format_test!(Chat);
@@ -352,26 +390,6 @@ mod macro_helper {
         };
     }
 
-    macro_rules! generate_ignored_update_test {
-        ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
-            paste::paste! {
-                #[tokio::test]
-                #[serial]
-                #[ignore]
-                async fn $ident() {
-                    let updated_value = $new_value;
-                    test_update_post(
-                        &PostUpdateParams {
-                            $field: Some(updated_value.clone()),
-                            ..Default::default()
-                        }, $assertion)
-                    .await;
-                }
-            }
-        };
-    }
-
-    pub(super) use generate_ignored_update_test;
     pub(super) use generate_update_post_format_test;
     pub(super) use generate_update_test;
 }

@@ -444,7 +444,7 @@ pub struct SparsePost {
     #[WpContext(edit, view)]
     pub template: Option<String>,
     #[WpContext(edit, view)]
-    pub categories: Option<Vec<i64>>,
+    pub categories: Option<Vec<CategoryId>>,
     #[WpContext(edit, view)]
     pub tags: Option<Vec<TagId>>,
 }

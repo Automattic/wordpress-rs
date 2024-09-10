@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use wp_api::{
-    posts::{MediaId, PostId},
+    posts::{CategoryId, MediaId, PostId, TagId},
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
@@ -39,6 +39,8 @@ pub const PASSWORD_PROTECTED_POST_ID: PostId = PostId(1832);
 pub const PASSWORD_PROTECTED_POST_TITLE: &str = "Password_Protected";
 pub const PASSWORD_PROTECTED_POST_PASSWORD: &str = "INTEGRATION_TEST";
 pub const MEDIA_ID_611: MediaId = MediaId(611);
+pub const CATEGORY_ID_1: CategoryId = CategoryId(1);
+pub const TAG_ID_100: TagId = TagId(100);
 
 pub fn api_client() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
