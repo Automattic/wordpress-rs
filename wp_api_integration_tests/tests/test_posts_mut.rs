@@ -276,13 +276,35 @@ generate_update_test!(
     }
 );
 
-generate_update_test!(update_sticky_to_true, sticky, true, |updated_post, _| {
-    assert_eq!(updated_post.sticky, true);
-});
+#[tokio::test]
+#[serial]
+async fn update_sticky_to_true() {
+    test_update_post(
+        &PostUpdateParams {
+            sticky: Some(true),
+            ..Default::default()
+        },
+        |updated_post, _| {
+            assert!(updated_post.sticky);
+        },
+    )
+    .await;
+}
 
-generate_update_test!(update_sticky_to_false, sticky, false, |updated_post, _| {
-    assert_eq!(updated_post.sticky, false);
-});
+#[tokio::test]
+#[serial]
+async fn update_sticky_to_false() {
+    test_update_post(
+        &PostUpdateParams {
+            sticky: Some(false),
+            ..Default::default()
+        },
+        |updated_post, _| {
+            assert!(!updated_post.sticky);
+        },
+    )
+    .await;
+}
 
 #[tokio::test]
 #[serial]
