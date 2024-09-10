@@ -120,23 +120,6 @@ async fn trash_post() {
 
 #[tokio::test]
 #[serial]
-async fn update_title() {
-    let new_title = "new_title";
-    test_update_post(
-        &PostUpdateParams {
-            title: Some(new_title.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.title.raw, new_title);
-            assert_eq!(updated_post_from_wp_cli.title, new_title);
-        },
-    )
-    .await;
-}
-
-#[tokio::test]
-#[serial]
 async fn update_date() {
     let new_date = "2024-09-09T12:00:00";
     test_update_post(
@@ -201,6 +184,58 @@ async fn update_status_to_draft() {
         |updated_post, updated_post_from_wp_cli| {
             assert_eq!(updated_post.status, new_status);
             assert_eq!(updated_post_from_wp_cli.post_status, new_status.as_str());
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_password() {
+    let new_password = "new_password";
+    test_update_post(
+        &PostUpdateParams {
+            password: Some(new_password.to_string()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.password, new_password);
+            assert_eq!(updated_post_from_wp_cli.password, new_password);
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_title() {
+    let new_title = "new_title";
+    test_update_post(
+        &PostUpdateParams {
+            title: Some(new_title.to_string()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.title.raw, new_title);
+            assert_eq!(updated_post_from_wp_cli.title, new_title);
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore]
+async fn update_content() {
+    let new_content = "new_content";
+    test_update_post(
+        &PostUpdateParams {
+            content: Some(new_content.to_string()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.content.raw, new_content);
+            assert_eq!(updated_post_from_wp_cli.content, new_content);
         },
     )
     .await;
