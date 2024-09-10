@@ -1,3 +1,4 @@
+use macro_helper::generate_update_test;
 use serial_test::serial;
 use wp_api::posts::{PostCreateParams, PostStatus, PostUpdateParams, PostWithEditContext};
 use wp_api_integration_tests::{
@@ -118,128 +119,78 @@ async fn trash_post() {
     RestoreServer::db().await;
 }
 
-#[tokio::test]
-#[serial]
-async fn update_date() {
-    let new_date = "2024-09-09T12:00:00";
-    test_update_post(
-        &PostUpdateParams {
-            date: Some(new_date.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.date, new_date);
-            assert_eq!(updated_post_from_wp_cli.date, new_date.replace('T', " "));
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_date,
+    date,
+    "2024-09-09T12:00:00".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.date, "2024-09-09T12:00:00");
+        assert_eq!(updated_post_from_wp_cli.date, "2024-09-09 12:00:00");
+    }
+);
 
-#[tokio::test]
-#[serial]
-async fn update_date_gmt() {
-    let new_date_gmt = "2024-09-09T12:00:00";
-    test_update_post(
-        &PostUpdateParams {
-            date_gmt: Some(new_date_gmt.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.date_gmt, new_date_gmt);
-            assert_eq!(
-                updated_post_from_wp_cli.date_gmt,
-                new_date_gmt.replace('T', " ")
-            );
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_date_gmt,
+    date_gmt,
+    "2024-09-09T12:00:00".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.date_gmt, "2024-09-09T12:00:00");
+        assert_eq!(updated_post_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
+    }
+);
 
-#[tokio::test]
-#[serial]
-async fn update_slug() {
-    let new_slug = "new_slug";
-    test_update_post(
-        &PostUpdateParams {
-            slug: Some(new_slug.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.slug, new_slug);
-            assert_eq!(updated_post_from_wp_cli.slug, new_slug);
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_slug,
+    slug,
+    "new_slug".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.slug, "new_slug");
+        assert_eq!(updated_post_from_wp_cli.slug, "new_slug");
+    }
+);
 
-#[tokio::test]
-#[serial]
-async fn update_status_to_draft() {
-    let new_status = PostStatus::Draft;
-    test_update_post(
-        &PostUpdateParams {
-            status: Some(new_status.clone()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.status, new_status);
-            assert_eq!(updated_post_from_wp_cli.post_status, new_status.as_str());
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_status_to_draft,
+    status,
+    PostStatus::Draft,
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.status, PostStatus::Draft);
+        assert_eq!(
+            updated_post_from_wp_cli.post_status,
+            PostStatus::Draft.as_str()
+        );
+    }
+);
 
-#[tokio::test]
-#[serial]
-async fn update_password() {
-    let new_password = "new_password";
-    test_update_post(
-        &PostUpdateParams {
-            password: Some(new_password.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.password, new_password);
-            assert_eq!(updated_post_from_wp_cli.password, new_password);
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_password,
+    password,
+    "new_password".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.password, "new_password");
+        assert_eq!(updated_post_from_wp_cli.password, "new_password");
+    }
+);
 
-#[tokio::test]
-#[serial]
-async fn update_title() {
-    let new_title = "new_title";
-    test_update_post(
-        &PostUpdateParams {
-            title: Some(new_title.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.title.raw, new_title);
-            assert_eq!(updated_post_from_wp_cli.title, new_title);
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_title,
+    title,
+    "new_title".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.title.raw, "new_title");
+        assert_eq!(updated_post_from_wp_cli.title, "new_title");
+    }
+);
 
-#[tokio::test]
-#[serial]
-#[ignore]
-async fn update_content() {
-    let new_content = "new_content";
-    test_update_post(
-        &PostUpdateParams {
-            content: Some(new_content.to_string()),
-            ..Default::default()
-        },
-        |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.content.raw, new_content);
-            assert_eq!(updated_post_from_wp_cli.content, new_content);
-        },
-    )
-    .await;
-}
+generate_update_test!(
+    update_content,
+    content,
+    "new_content".to_string(),
+    |updated_post, updated_post_from_wp_cli| {
+        assert_eq!(updated_post.content.raw, "new_content");
+        assert_eq!(updated_post_from_wp_cli.content, "new_content");
+    }
+);
 
 async fn test_create_post<F>(params: &PostCreateParams, assert: F)
 where
@@ -263,4 +214,26 @@ where
     let updated_post_from_wp_cli = Backend::post(&FIRST_POST_ID).await;
     assert(updated_post, updated_post_from_wp_cli);
     RestoreServer::db().await;
+}
+
+mod macro_helper {
+    macro_rules! generate_update_test {
+        ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn $ident() {
+                    let updated_value = $new_value;
+                    test_update_post(
+                        &PostUpdateParams {
+                            $field: Some(updated_value.clone()),
+                            ..Default::default()
+                        }, $assertion)
+                    .await;
+                }
+            }
+        };
+    }
+
+    pub(super) use generate_update_test;
 }
