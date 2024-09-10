@@ -4,7 +4,7 @@ use wp_serde_helper::deserialize_i64_or_string;
 
 use crate::run_wp_cli_command;
 
-const POST_FIELDS_ARG: &str = "--fields=ID, post_title, post_date, post_status, post_author, post_date_gmt, post_content, post_excerpt, comment_status, ping_status, post_password, post_modified, post_modified_gmt, guid, post_type";
+const POST_FIELDS_ARG: &str = "--fields=ID,post_name,post_title,post_date,post_status,post_author,post_date_gmt,post_content,post_excerpt,comment_status,ping_status,post_password,post_modified,post_modified_gmt,guid,post_type";
 
 #[derive(Debug, Default)]
 pub struct WpCliPostListArguments {
@@ -56,6 +56,8 @@ pub struct WpCliPost {
     pub ping_status: String,
     pub post_status: String,
     pub post_type: String,
+    #[serde(rename = "post_name")]
+    pub slug: String,
     #[serde(rename = "post_title")]
     pub title: String,
 }
