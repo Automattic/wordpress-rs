@@ -1,4 +1,6 @@
-use macro_helper::{generate_update_post_format_test, generate_update_test};
+use macro_helper::{
+    generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
+};
 use serial_test::serial;
 use wp_api::posts::{
     PostCommentStatus, PostCreateParams, PostFormat, PostPingStatus, PostStatus, PostUpdateParams,
@@ -150,19 +152,6 @@ generate_update_test!(
     |updated_post, updated_post_from_wp_cli| {
         assert_eq!(updated_post.slug, "new_slug");
         assert_eq!(updated_post_from_wp_cli.slug, "new_slug");
-    }
-);
-
-generate_update_test!(
-    update_status_to_draft,
-    status,
-    PostStatus::Draft,
-    |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.status, PostStatus::Draft);
-        assert_eq!(
-            updated_post_from_wp_cli.post_status,
-            PostStatus::Draft.as_str()
-        );
     }
 );
 
@@ -348,6 +337,33 @@ async fn update_tags() {
     .await;
 }
 
+#[tokio::test]
+#[serial]
+async fn update_status_to_future() {
+    test_update_post(
+        &PostUpdateParams {
+            status: Some(PostStatus::Future),
+            // Publish date has to be in the future
+            date: Some("2026-09-09T12:00:00".to_string()),
+            ..Default::default()
+        },
+        |updated_post, updated_post_from_wp_cli| {
+            assert_eq!(updated_post.status, PostStatus::Future);
+            assert_eq!(
+                updated_post_from_wp_cli.post_status,
+                PostStatus::Future.as_str()
+            );
+        },
+    )
+    .await;
+}
+
+// See `update_status_to_future` test case for `PostStatus::Future`
+generate_update_post_status_test!(Draft);
+generate_update_post_status_test!(Pending);
+generate_update_post_status_test!(Private);
+generate_update_post_status_test!(Publish);
+
 generate_update_post_format_test!(Standard);
 generate_update_post_format_test!(Aside);
 generate_update_post_format_test!(Chat);
@@ -402,6 +418,30 @@ mod macro_helper {
         };
     }
 
+    macro_rules! generate_update_post_status_test {
+        ($status:ident) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn [<update_post_status_to_ $status:lower>]() {
+                    test_update_post(
+                        &PostUpdateParams {
+                            status: Some(PostStatus::$status),
+                            ..Default::default()
+                        },
+                        |updated_post, updated_post_from_wp_cli| {
+                            assert_eq!(updated_post.status, PostStatus::$status);
+                            assert_eq!(
+                                updated_post_from_wp_cli.post_status,
+                                PostStatus::$status.as_str()
+                            );
+                        }
+                    ).await;
+                }
+            }
+        };
+    }
+
     macro_rules! generate_update_post_format_test {
         ($format:ident) => {
             paste::paste! {
@@ -423,5 +463,6 @@ mod macro_helper {
     }
 
     pub(super) use generate_update_post_format_test;
+    pub(super) use generate_update_post_status_test;
     pub(super) use generate_update_test;
 }
