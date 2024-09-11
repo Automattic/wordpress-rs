@@ -1,9 +1,81 @@
 use serial_test::serial;
+use wp_api::posts::{PostCreateParams, PostWithEditContext};
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    FIRST_POST_ID,
+    AssertResponse, FIRST_POST_ID,
 };
+use wp_cli::WpCliPost;
+
+#[tokio::test]
+#[serial]
+async fn create_post_with_just_title() {
+    test_create_post(
+        &PostCreateParams {
+            title: Some("foo".to_string()),
+            ..Default::default()
+        },
+        |created_post, post_from_wp_cli| {
+            assert_eq!(created_post.title.raw, "foo");
+            assert_eq!(post_from_wp_cli.title, "foo");
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_post_with_just_content() {
+    test_create_post(
+        &PostCreateParams {
+            content: Some("foo".to_string()),
+            ..Default::default()
+        },
+        |created_post, post_from_wp_cli| {
+            assert_eq!(created_post.content.raw, "foo");
+            assert_eq!(post_from_wp_cli.content, "foo");
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_post_with_just_excerpt() {
+    test_create_post(
+        &PostCreateParams {
+            excerpt: Some("foo".to_string()),
+            ..Default::default()
+        },
+        |created_post, post_from_wp_cli| {
+            assert_eq!(created_post.excerpt.raw, "foo");
+            assert_eq!(post_from_wp_cli.excerpt, "foo");
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_post_with_title_content_and_excerpt() {
+    test_create_post(
+        &PostCreateParams {
+            title: Some("foo".to_string()),
+            content: Some("bar".to_string()),
+            excerpt: Some("baz".to_string()),
+            ..Default::default()
+        },
+        |created_post, post_from_wp_cli| {
+            assert_eq!(created_post.title.raw, "foo");
+            assert_eq!(post_from_wp_cli.title, "foo");
+            assert_eq!(created_post.content.raw, "bar");
+            assert_eq!(post_from_wp_cli.content, "bar");
+            assert_eq!(created_post.excerpt.raw, "baz");
+            assert_eq!(post_from_wp_cli.excerpt, "baz");
+        },
+    )
+    .await;
+}
 
 #[tokio::test]
 #[serial]
@@ -43,5 +115,15 @@ async fn trash_post() {
         "Post wasn't trashed"
     );
 
+    RestoreServer::db().await;
+}
+
+async fn test_create_post<F>(params: &PostCreateParams, assert: F)
+where
+    F: Fn(PostWithEditContext, WpCliPost),
+{
+    let created_post = api_client().posts().create(params).await.assert_response();
+    let created_post_from_wp_cli = Backend::post(&created_post.id).await;
+    assert(created_post, created_post_from_wp_cli);
     RestoreServer::db().await;
 }

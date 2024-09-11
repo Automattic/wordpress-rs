@@ -22,6 +22,13 @@ fn wp_cli_site_settings() -> Result<Json<WpCliSiteSettings>, Error> {
         .map_err(|e| Error::AsString(e.to_string()))
 }
 
+#[get("/post?<post_id>")]
+fn wp_cli_post(post_id: i64) -> Result<Json<WpCliPost>, Error> {
+    WpCliPost::get(post_id)
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
 #[get("/posts?<post_status>")]
 fn wp_cli_posts(post_status: Option<String>) -> Result<Json<Vec<WpCliPost>>, Error> {
     WpCliPost::list(Some(WpCliPostListArguments { post_status }))
@@ -72,6 +79,7 @@ fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![restore_wp_server])
         .mount("/wp-cli/", routes![wp_cli_site_settings])
+        .mount("/wp-cli/", routes![wp_cli_post])
         .mount("/wp-cli/", routes![wp_cli_posts])
         .mount("/wp-cli/", routes![wp_cli_user])
         .mount("/wp-cli/", routes![wp_cli_users])

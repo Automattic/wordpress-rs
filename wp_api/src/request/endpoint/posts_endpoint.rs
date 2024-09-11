@@ -15,6 +15,8 @@ enum PostsRequest {
     List,
     #[contextual_get(url = "/posts/<post_id>", params = &crate::posts::PostRetrieveParams, output = crate::posts::SparsePost, filter_by = crate::posts::SparsePostField)]
     Retrieve,
+    #[post(url = "/posts", params = &crate::posts::PostCreateParams, output = crate::posts::PostWithEditContext)]
+    Create,
     #[delete(url = "/posts/<post_id>", output = crate::posts::PostDeleteResponse)]
     Delete,
     #[delete(url = "/posts/<post_id>", output = crate::posts::PostWithEditContext)]
@@ -50,6 +52,11 @@ mod tests {
     };
     use rstest::*;
     use std::sync::Arc;
+
+    #[rstest]
+    fn create_post(endpoint: PostsRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.create(), "/posts");
+    }
 
     #[rstest]
     fn delete_post(endpoint: PostsRequestEndpoint) {
