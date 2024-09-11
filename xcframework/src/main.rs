@@ -198,7 +198,8 @@ impl LibraryGroup {
         recreate_directory(&dir)?;
 
         let dest = dir.join(LIBRARY_FILENAME);
-        Command::new("lipo")
+        Command::new("xcrun")
+            .arg("lipo")
             .arg("-create")
             .args(libraries)
             .arg("-output")
