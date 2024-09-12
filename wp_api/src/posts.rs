@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
+use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
@@ -265,7 +266,7 @@ pub struct PostCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<String>,
+    pub meta: Option<PostMeta>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -343,7 +344,7 @@ pub struct PostUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<String>,
+    pub meta: Option<PostMeta>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -489,7 +490,15 @@ pub struct SparsePostExcerpt {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostMeta {
-    pub footnotes: String,
+    #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
+    #[serde(serialize_with = "serialize_as_json_string")]
+    pub footnotes: Vec<PostFootnote>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
+pub struct PostFootnote {
+    pub id: String,
+    pub content: String,
 }
 
 #[derive(

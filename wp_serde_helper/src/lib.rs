@@ -1,8 +1,49 @@
 use serde::{
-    de::{self, Unexpected},
-    Deserializer,
+    de::{self, DeserializeOwned, Unexpected},
+    ser, Deserializer, Serialize, Serializer,
 };
-use std::fmt;
+use std::{fmt, marker::PhantomData};
+
+pub fn serialize_as_json_string<T, S, E>(value: &T, s: S) -> Result<S::Ok, E>
+where
+    T: Serialize,
+    S: Serializer<Error = E>,
+    E: serde::ser::Error,
+{
+    serde_json::to_string(value)
+        .map_err(|e| ser::Error::custom(e.to_string()))?
+        .serialize(s)
+}
+
+// Use `PhantomData` to avoid "unused generic `T` error"
+struct StringOfJsonArrayVisitor<T>(PhantomData<T>);
+
+impl<'de, T: DeserializeOwned> de::Visitor<'de> for StringOfJsonArrayVisitor<T> {
+    type Value = Vec<T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string containing json array")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v.is_empty() {
+            Ok(vec![])
+        } else {
+            serde_json::from_str(v).map_err(E::custom)
+        }
+    }
+}
+
+pub fn deserialize_from_string_of_json_array<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    T: DeserializeOwned,
+    D: de::Deserializer<'de>,
+{
+    deserializer.deserialize_any(StringOfJsonArrayVisitor::<T>(PhantomData))
+}
 
 struct DeserializeI64OrStringVisitor;
 

@@ -3,8 +3,8 @@ use macro_helper::{
 };
 use serial_test::serial;
 use wp_api::posts::{
-    PostCommentStatus, PostCreateParams, PostFormat, PostPingStatus, PostStatus, PostUpdateParams,
-    PostWithEditContext,
+    PostCommentStatus, PostCreateParams, PostFootnote, PostFormat, PostMeta, PostPingStatus,
+    PostStatus, PostUpdateParams, PostWithEditContext,
 };
 use wp_api_integration_tests::{
     api_client,
@@ -25,6 +25,31 @@ async fn create_post_with_just_title() {
         |created_post, post_from_wp_cli| {
             assert_eq!(created_post.title.raw, "foo");
             assert_eq!(post_from_wp_cli.title, "foo");
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_post_with_title_and_meta() {
+    test_create_post(
+        &PostCreateParams {
+            title: Some("foo".to_string()),
+            meta: Some(PostMeta {
+                footnotes: vec![PostFootnote {
+                    id: "bar".to_string(),
+                    content: "baz".to_string(),
+                }],
+            }),
+            ..Default::default()
+        },
+        |created_post, post_from_wp_cli| {
+            let footnote = created_post.meta.footnotes.first().unwrap();
+            assert_eq!(created_post.title.raw, "foo");
+            assert_eq!(post_from_wp_cli.title, "foo");
+            assert_eq!(footnote.id, "bar");
+            assert_eq!(footnote.content, "baz");
         },
     )
     .await;
@@ -272,6 +297,22 @@ generate_update_test!(
     POST_TEMPLATE_SINGLE_WITH_SIDEBAR.to_string(),
     |updated_post, _| {
         assert_eq!(updated_post.template, POST_TEMPLATE_SINGLE_WITH_SIDEBAR);
+    }
+);
+
+generate_update_test!(
+    update_meta_to_add_footnote,
+    meta,
+    PostMeta {
+        footnotes: vec![PostFootnote {
+            id: "foo".to_string(),
+            content: "bar".to_string()
+        }]
+    },
+    |updated_post, _| {
+        let footnote = updated_post.meta.footnotes.first().unwrap();
+        assert_eq!(footnote.id, "foo");
+        assert_eq!(footnote.content, "bar");
     }
 );
 
