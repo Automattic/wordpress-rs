@@ -198,7 +198,8 @@ impl LibraryGroup {
         recreate_directory(&dir)?;
 
         let dest = dir.join(LIBRARY_FILENAME);
-        Command::new("lipo")
+        Command::new("xcrun")
+            .arg("lipo")
             .arg("-create")
             .args(libraries)
             .arg("-output")
@@ -352,8 +353,10 @@ impl ExecuteCommand for Command {
             Ok(output)
         } else {
             anyhow::bail!(
-                "Command failed with exit code: {}\n$ {:?}",
+                "Command failed with exit code: {}\nstdout: {:?}\nstderr: {:?}\n$ {:?}",
                 output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
                 self
             )
         }

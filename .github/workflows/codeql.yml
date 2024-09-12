@@ -70,6 +70,7 @@ jobs:
         # queries: security-extended,security-and-quality
 
     - name: Restore Rust Cache
+      if: matrix.language != 'swift'
       uses: Swatinem/rust-cache@v2
       with:
         key: "${{ matrix.language }}"
