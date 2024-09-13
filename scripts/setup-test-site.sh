@@ -71,6 +71,9 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
+# We need an `author` user for some of the integration tests
+wp user create test_author test_author@example.com --role=author
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME
@@ -86,6 +89,8 @@ create_test_credentials () {
   SUBSCRIBER_USERNAME="themedemos"
   SUBSCRIBER_PASSWORD="$(wp user application-password create themedemos test --porcelain)"
   SUBSCRIBER_PASSWORD_UUID="$(wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p')"
+  AUTHOR_USERNAME="test_author"
+  AUTHOR_PASSWORD="$(wp user application-password create test_author test --porcelain)"
 
   rm -rf /app/test_credentials.json
   jo -p \
@@ -96,6 +101,8 @@ create_test_credentials () {
     subscriber_username="$SUBSCRIBER_USERNAME" \
     subscriber_password="$SUBSCRIBER_PASSWORD" \
     subscriber_password_uuid="$SUBSCRIBER_PASSWORD_UUID" \
+    author_username="$AUTHOR_USERNAME" \
+    author_password="$AUTHOR_PASSWORD" \
     > /app/test_credentials.json
 }
 create_test_credentials
