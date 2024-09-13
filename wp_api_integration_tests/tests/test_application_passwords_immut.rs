@@ -7,8 +7,8 @@ use wp_api::application_passwords::{
 };
 use wp_api::users::UserId;
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
-    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
+    api_client, api_client_as_subscriber, AssertResponse, TestCredentials, FIRST_USER_ID,
+    SECOND_USER_ID,
 };
 
 pub mod reusable_test_cases;
@@ -76,7 +76,7 @@ async fn retrieve_current_application_passwords_with_edit_context() {
     assert_eq!(
         a.uuid,
         ApplicationPasswordUuid {
-            uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string()
+            uuid: TestCredentials::instance().admin_password_uuid
         }
     );
 }
@@ -92,7 +92,7 @@ async fn retrieve_current_application_passwords_with_embed_context() {
     assert_eq!(
         a.uuid,
         ApplicationPasswordUuid {
-            uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string()
+            uuid: TestCredentials::instance().subscriber_password_uuid
         }
     );
 }
@@ -108,7 +108,7 @@ async fn retrieve_current_application_passwords_with_view_context() {
     assert_eq!(
         a.uuid,
         ApplicationPasswordUuid {
-            uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string()
+            uuid: TestCredentials::instance().admin_password_uuid
         }
     );
 }
@@ -117,7 +117,7 @@ async fn retrieve_current_application_passwords_with_view_context() {
 #[parallel]
 async fn retrieve_application_passwords_with_edit_context() {
     let uuid = ApplicationPasswordUuid {
-        uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+        uuid: TestCredentials::instance().admin_password_uuid,
     };
     let a = api_client()
         .application_passwords()
@@ -131,7 +131,7 @@ async fn retrieve_application_passwords_with_edit_context() {
 #[parallel]
 async fn retrieve_application_passwords_with_embed_context() {
     let uuid = ApplicationPasswordUuid {
-        uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+        uuid: TestCredentials::instance().admin_password_uuid,
     };
     let a = api_client()
         .application_passwords()
@@ -145,7 +145,7 @@ async fn retrieve_application_passwords_with_embed_context() {
 #[parallel]
 async fn retrieve_application_passwords_with_view_context() {
     let uuid = ApplicationPasswordUuid {
-        uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string(),
+        uuid: TestCredentials::instance().subscriber_password_uuid,
     };
     let a = api_client()
         .application_passwords()
@@ -197,7 +197,7 @@ mod filter {
             .filter_retrieve_with_edit_context(
                 &FIRST_USER_ID,
                 &ApplicationPasswordUuid {
-                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                    uuid: TestCredentials::instance().admin_password_uuid,
                 },
                 fields,
             )
@@ -251,7 +251,7 @@ mod filter {
             .filter_retrieve_with_embed_context(
                 &FIRST_USER_ID,
                 &ApplicationPasswordUuid {
-                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                    uuid: TestCredentials::instance().admin_password_uuid,
                 },
                 fields,
             )
@@ -301,7 +301,7 @@ mod filter {
             .filter_retrieve_with_view_context(
                 &FIRST_USER_ID,
                 &ApplicationPasswordUuid {
-                    uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                    uuid: TestCredentials::instance().admin_password_uuid,
                 },
                 fields,
             )

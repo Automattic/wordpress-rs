@@ -18,24 +18,29 @@ fn generate_test_credentials_file() -> Result<(), Box<dyn Error>> {
     let dest_path = Path::new(&out_dir).join("generated_test_credentials.rs");
     let mut buf_writer = BufWriter::new(File::create(dest_path)?);
 
-    let generated_content = if let Ok(file) = fs::File::open("../test_credentials.json") {
-        serde_json::from_reader::<File, serde_json::Value>(file)
+    let instance = if let Ok(file) = fs::File::open("../test_credentials.json") {
+        let fields = serde_json::from_reader::<File, serde_json::Value>(file)
             .expect("test_credentials.json should be a valid JSON file")
             .as_object()
             .expect("test_credentials.json should be a valid JSON Object")
             .into_iter()
-            .map(|(k, v)| {
-                format!(
-                    "pub const TEST_CREDENTIALS_{}: &str = {};",
-                    k.to_uppercase(),
-                    v
-                )
-            })
+            .map(|(k, v)| format!("{}: {}.to_string(),", k, v))
             .collect::<Vec<String>>()
-            .join("\n")
+            .join("\n");
+        format!("TestCredentials {{ {} }}", fields)
     } else {
-        "".to_string()
+        "TestCredentials::default()".to_string()
     };
+    let generated_content = format!(
+        r#"
+            impl TestCredentials {{
+                pub fn instance() -> Self {{
+                    {}
+                }}
+            }}
+        "#,
+        instance
+    );
 
     write!(buf_writer, "{}", generated_content)?;
 

@@ -7,8 +7,7 @@ use wp_api::{
 };
 use wp_api_integration_tests::backend::{Backend, RestoreServer};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
-    TEST_CREDENTIALS_ADMIN_PASSWORD_UUID, TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID,
+    api_client, AssertResponse, TestCredentials, FIRST_USER_ID, SECOND_USER_ID,
 };
 use wp_cli::WpCliUserMeta;
 
@@ -65,7 +64,7 @@ async fn update_application_password() {
         .update(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
-                uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                uuid: TestCredentials::instance().admin_password_uuid,
             },
             &params,
         )
@@ -85,15 +84,16 @@ async fn update_application_password() {
 #[tokio::test]
 #[serial]
 async fn delete_single_application_password() {
+    let subscriber_password_uuid = TestCredentials::instance().subscriber_password_uuid;
     let uuid = ApplicationPasswordUuid {
-        uuid: TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID.to_string(),
+        uuid: subscriber_password_uuid.clone(),
     };
     // Assert that the application password exists
     assert!(application_password_meta_for_user(&SECOND_USER_ID)
         .await
         .unwrap()
         .meta_value
-        .contains(TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID));
+        .contains(&subscriber_password_uuid));
     // Delete the user's application passwords using the API and ensure it's successful
     let response = api_client()
         .application_passwords()
@@ -108,7 +108,7 @@ async fn delete_single_application_password() {
         .await
         .unwrap()
         .meta_value
-        .contains(TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID));
+        .contains(&subscriber_password_uuid));
 
     RestoreServer::db().await;
 }
@@ -116,12 +116,13 @@ async fn delete_single_application_password() {
 #[tokio::test]
 #[serial]
 async fn delete_all_application_passwords() {
+    let subscriber_password_uuid = TestCredentials::instance().subscriber_password_uuid;
     // Assert that the application password exists
     assert!(application_password_meta_for_user(&SECOND_USER_ID)
         .await
         .unwrap()
         .meta_value
-        .contains(TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID));
+        .contains(&subscriber_password_uuid));
     // Delete the user's application passwords using the API and ensure it's successful
     let response = api_client()
         .application_passwords()
@@ -136,7 +137,7 @@ async fn delete_all_application_passwords() {
         .await
         .unwrap()
         .meta_value
-        .contains(TEST_CREDENTIALS_SUBSCRIBER_PASSWORD_UUID));
+        .contains(&subscriber_password_uuid));
 
     RestoreServer::db().await;
 }
