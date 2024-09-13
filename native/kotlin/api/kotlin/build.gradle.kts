@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.rustAndroid)
     alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.publishToS3)
     id("java-library")
     id("jvm-test-suite")
@@ -40,6 +41,7 @@ testing {
 
                 implementation(rootProject.libs.kotlin.test)
                 implementation(rootProject.libs.kotlinx.coroutines.test)
+                implementation(libs.kotlinx.serialization)
             }
 
             targets {

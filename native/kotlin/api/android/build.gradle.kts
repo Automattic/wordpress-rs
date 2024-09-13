@@ -31,29 +31,6 @@ android {
         buildConfig = true
     }
 
-    buildTypes {
-        debug {
-            // TODO: Test credentials shouldn't be included while publishing
-            readTestCredentials()?.let {
-                buildConfigField("String", "TEST_SITE_URL", "\"${it.siteUrl}\"")
-                buildConfigField("String", "TEST_ADMIN_USERNAME", "\"${it.adminUsername}\"")
-                buildConfigField("String", "TEST_ADMIN_PASSWORD", "\"${it.adminPassword}\"")
-                buildConfigField("String", "TEST_ADMIN_PASSWORD_UUID", "\"${it.adminPasswordUuid}\"")
-                buildConfigField(
-                    "String",
-                    "TEST_SUBSCRIBER_USERNAME",
-                    "\"${it.subscriberUsername}\""
-                )
-                buildConfigField(
-                    "String",
-                    "TEST_SUBSCRIBER_PASSWORD",
-                    "\"${it.subscriberPassword}\""
-                )
-                buildConfigField("String", "TEST_SUBSCRIBER_PASSWORD_UUID", "\"${it.subscriberPasswordUuid}\"")
-            }
-        }
-    }
-
     // There is an incorrect lint error in generated wp_api.kt about the usage of NewApi
     // that's related to the usage of `android.system.SystemCleaner`.
     //
@@ -128,37 +105,3 @@ project.afterEvaluate {
         }
     }
 }
-
-fun readTestCredentials(): TestCredentials? {
-    val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")
-    val credentialsFile = rootProject.file("$cargoProjectRoot/test_credentials")
-    if (!credentialsFile.exists()) {
-        return null
-    }
-    val lines = credentialsFile.readLines()
-    // https://developer.android.com/studio/run/emulator-networking
-    val siteUrl = if (lines[0] == "http://localhost") {
-        "http://10.0.2.2"
-    } else {
-        lines[0]
-    }
-    return TestCredentials(
-        siteUrl = siteUrl,
-        adminUsername = lines[1],
-        adminPassword = lines[2],
-        adminPasswordUuid = lines[3],
-        subscriberUsername = lines[4],
-        subscriberPassword = lines[5],
-        subscriberPasswordUuid = lines[6]
-    )
-}
-
-data class TestCredentials(
-    val siteUrl: String,
-    val adminUsername: String,
-    val adminPassword: String,
-    val adminPasswordUuid: String,
-    val subscriberUsername: String,
-    val subscriberPassword: String,
-    val subscriberPasswordUuid: String,
-)

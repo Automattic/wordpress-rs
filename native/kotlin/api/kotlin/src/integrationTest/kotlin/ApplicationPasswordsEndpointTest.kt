@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 
 class ApplicationPasswordsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.siteUrl
+    private val siteUrl = testCredentials.parsedSiteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
