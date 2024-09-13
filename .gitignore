@@ -38,6 +38,7 @@ native/swift/Sources/wordpress-api-wrapper/*.swift
 # Test Server
 .wordpress
 test_credentials
+test_credentials.json
 /logs
 dump.sql
 
