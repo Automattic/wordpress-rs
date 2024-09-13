@@ -21,6 +21,8 @@ pub struct TestCredentials {
     pub subscriber_username: String,
     pub subscriber_password: String,
     pub subscriber_password_uuid: String,
+    pub author_username: String,
+    pub author_password: String,
 }
 
 pub mod backend;
@@ -47,6 +49,18 @@ pub fn api_client() -> WpApiClient {
     let authentication = WpAuthentication::from_username_and_password(
         TestCredentials::instance().admin_username,
         TestCredentials::instance().admin_password,
+    );
+    WpApiClient::new(
+        test_site_url(),
+        authentication,
+        Arc::new(AsyncWpNetworking::default()),
+    )
+}
+
+pub fn api_client_as_author() -> WpApiClient {
+    let authentication = WpAuthentication::from_username_and_password(
+        TestCredentials::instance().author_username,
+        TestCredentials::instance().author_password,
     );
     WpApiClient::new(
         test_site_url(),
