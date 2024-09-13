@@ -7,7 +7,7 @@ use wp_api::WpErrorCode;
 
 use wp_api_integration_tests::{
     api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
-    FIRST_USER_ID, SECOND_USER_ID, TEST_CREDENTIALS_ADMIN_PASSWORD_UUID,
+    TestCredentials, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 pub mod reusable_test_cases;
@@ -69,7 +69,7 @@ async fn update_application_password_err_cannot_edit_application_password() {
         .update(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
-                uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                uuid: TestCredentials::instance().admin_password_uuid,
             },
             &ApplicationPasswordUpdateParams {
                 app_id: None,
@@ -90,7 +90,7 @@ async fn delete_application_password_err_cannot_delete_application_password() {
         .delete(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
-                uuid: TEST_CREDENTIALS_ADMIN_PASSWORD_UUID.to_string(),
+                uuid: TestCredentials::instance().admin_password_uuid,
             },
         )
         .await

@@ -1,7 +1,7 @@
 FROM public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION:-latest}
 
 RUN apt-get update  \
-  && apt-get install -y openjdk-17-jdk-headless android-sdk wget default-mysql-client less libssl-dev \
+  && apt-get install -y openjdk-17-jdk-headless android-sdk wget default-mysql-client less libssl-dev jo \
   && apt-get -y autoclean
 
 # Install wp-cli

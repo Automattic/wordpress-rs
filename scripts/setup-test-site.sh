@@ -71,17 +71,34 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-rm -rf /app/test_credentials && touch /app/test_credentials
-{
-  printf "http://localhost\ntest@example.com\n"
-  ## Create an Application password for the admin user, and store it where it can be used by the test suite
-  wp user application-password create test@example.com test --porcelain 
-  wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p'
-  printf "themedemos\n"
-  ## Create an Application password for a subscriber user, and store it where it can be used by the test suite
-  wp user application-password create themedemos test --porcelain
-  wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p'
-} >> /app/test_credentials
+create_test_credentials () {
+  local SITE_URL
+  local ADMIN_USERNAME
+  local ADMIN_PASSWORD_UUID
+  local ADMIN_PASSWORD
+  local SUBSCRIBER_USERNAME
+  local SUBSCRIBER_PASSWORD
+  local SUBSCRIBER_PASSWORD_UUID
+  SITE_URL="http://localhost"
+  ADMIN_USERNAME="test@example.com"
+  ADMIN_PASSWORD="$(wp user application-password create test@example.com test --porcelain )"
+  ADMIN_PASSWORD_UUID="$(wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p')"
+  SUBSCRIBER_USERNAME="themedemos"
+  SUBSCRIBER_PASSWORD="$(wp user application-password create themedemos test --porcelain)"
+  SUBSCRIBER_PASSWORD_UUID="$(wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p')"
+
+  rm -rf /app/test_credentials.json
+  jo -p \
+    site_url="$SITE_URL" \
+    admin_username="$ADMIN_USERNAME" \
+    admin_password="$ADMIN_PASSWORD" \
+    admin_password_uuid="$ADMIN_PASSWORD_UUID" \
+    subscriber_username="$SUBSCRIBER_USERNAME" \
+    subscriber_password="$SUBSCRIBER_PASSWORD" \
+    subscriber_password_uuid="$SUBSCRIBER_PASSWORD_UUID" \
+    > /app/test_credentials.json
+}
+create_test_credentials
 
 ## Used for integration tests
 wp language core install en_CA

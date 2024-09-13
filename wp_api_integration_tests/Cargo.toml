@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[build-dependencies]
+serde_json = { workspace = true }
+
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }

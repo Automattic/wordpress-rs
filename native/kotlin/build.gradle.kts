@@ -6,6 +6,7 @@ plugins {
     // alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.kotlinJvm) apply false
+    alias(libs.plugins.kotlinSerialization) apply false
     alias(libs.plugins.rustAndroid) apply false
     alias(libs.plugins.publishToS3) apply false
 
@@ -77,7 +78,7 @@ fun setupJniAndBindings() {
     }
 
     tasks.register<Copy>("copyTestCredentials") {
-        from("$cargoProjectRoot/test_credentials")
+        from("$cargoProjectRoot/test_credentials.json")
         into(generatedTestResourcesPath)
     }
 }
