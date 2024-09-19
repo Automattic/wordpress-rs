@@ -7,8 +7,7 @@ use wp_api::posts::{
 };
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, FIRST_POST_ID, FIRST_USER_ID, PASSWORD_PROTECTED_POST_ID,
-    PASSWORD_PROTECTED_POST_PASSWORD, PASSWORD_PROTECTED_POST_TITLE, SECOND_USER_ID,
+    api_client, AssertResponse, TestCredentials, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 #[tokio::test]
@@ -77,49 +76,73 @@ async fn retrieve_with_view_context(#[case] params: PostRetrieveParams) {
 #[tokio::test]
 #[parallel]
 async fn retrieve_password_protected_with_edit_context() {
+    let test_credentials = TestCredentials::instance();
     let post = api_client()
         .posts()
         .retrieve_with_edit_context(
-            &PASSWORD_PROTECTED_POST_ID,
+            &PostId(test_credentials.password_protected_post_id),
             &PostRetrieveParams {
-                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+                password: Some(
+                    test_credentials
+                        .password_protected_post_password
+                        .to_string(),
+                ),
             },
         )
         .await
         .assert_response();
-    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+    assert_eq!(
+        post.title.rendered,
+        test_credentials.password_protected_post_title
+    );
 }
 
 #[tokio::test]
 #[parallel]
 async fn retrieve_password_protected_with_embed_context() {
+    let test_credentials = TestCredentials::instance();
     let post = api_client()
         .posts()
         .retrieve_with_embed_context(
-            &PASSWORD_PROTECTED_POST_ID,
+            &PostId(test_credentials.password_protected_post_id),
             &PostRetrieveParams {
-                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+                password: Some(
+                    test_credentials
+                        .password_protected_post_password
+                        .to_string(),
+                ),
             },
         )
         .await
         .assert_response();
-    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+    assert_eq!(
+        post.title.rendered,
+        test_credentials.password_protected_post_title
+    );
 }
 
 #[tokio::test]
 #[parallel]
 async fn retrieve_password_protected_with_view_context() {
+    let test_credentials = TestCredentials::instance();
     let post = api_client()
         .posts()
         .retrieve_with_view_context(
-            &PASSWORD_PROTECTED_POST_ID,
+            &PostId(test_credentials.password_protected_post_id),
             &PostRetrieveParams {
-                password: Some(PASSWORD_PROTECTED_POST_PASSWORD.to_string()),
+                password: Some(
+                    test_credentials
+                        .password_protected_post_password
+                        .to_string(),
+                ),
             },
         )
         .await
         .assert_response();
-    assert_eq!(post.title.rendered, PASSWORD_PROTECTED_POST_TITLE);
+    assert_eq!(
+        post.title.rendered,
+        test_credentials.password_protected_post_title
+    );
 }
 
 #[template]

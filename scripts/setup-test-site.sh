@@ -82,15 +82,23 @@ create_test_credentials () {
   local SUBSCRIBER_USERNAME
   local SUBSCRIBER_PASSWORD
   local SUBSCRIBER_PASSWORD_UUID
+  local TRASHED_POST_ID
+  local PASSWORD_PROTECTED_POST_ID
   SITE_URL="http://localhost"
   ADMIN_USERNAME="test@example.com"
-  ADMIN_PASSWORD="$(wp user application-password create test@example.com test --porcelain )"
+  ADMIN_PASSWORD="$(wp user application-password create test@example.com test --porcelain)"
   ADMIN_PASSWORD_UUID="$(wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p')"
   SUBSCRIBER_USERNAME="themedemos"
   SUBSCRIBER_PASSWORD="$(wp user application-password create themedemos test --porcelain)"
   SUBSCRIBER_PASSWORD_UUID="$(wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p')"
   AUTHOR_USERNAME="test_author"
   AUTHOR_PASSWORD="$(wp user application-password create test_author test --porcelain)"
+
+  PASSWORD_PROTECTED_POST_ID="$(wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected --porcelain)"
+  TRASHED_POST_ID="$(wp post create --post_type=post --post_title=Trashed_Post --porcelain)"
+
+  # Trash the post
+  wp post delete "$TRASHED_POST_ID"
 
   rm -rf /app/test_credentials.json
   jo -p \
@@ -103,6 +111,10 @@ create_test_credentials () {
     subscriber_password_uuid="$SUBSCRIBER_PASSWORD_UUID" \
     author_username="$AUTHOR_USERNAME" \
     author_password="$AUTHOR_PASSWORD" \
+    password_protected_post_id="$PASSWORD_PROTECTED_POST_ID" \
+    password_protected_post_password="INTEGRATION_TEST" \
+    password_protected_post_title="Password_Protected" \
+    trashed_post_id="$TRASHED_POST_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
@@ -111,9 +123,6 @@ create_test_credentials
 wp language core install en_CA
 wp plugin install hello-dolly --activate
 wp plugin install classic-editor
-
-# Used in `test_posts_immut`. If the resulting ID changes, `PASSWORD_PROTECTED_POST_ID` needs to be updated
-wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected
 
 # Update the timezone, so that the `date` & `date_gmt` values will be different
 # Otherwise, the integration tests might result in false positives
