@@ -24,9 +24,13 @@ data class TestCredentials(
     val subscriberPasswordUuid: String
 ) {
     companion object {
+        private val json by lazy {
+            Json { ignoreUnknownKeys = true }
+        }
         val INSTANCE: TestCredentials by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-            val file = File(Companion::class.java.classLoader.getResource("test_credentials.json")!!.file)
-            Json.decodeFromString<TestCredentials>(file.readText())
+            val file =
+                File(Companion::class.java.classLoader.getResource("test_credentials.json")!!.file)
+            json.decodeFromString<TestCredentials>(file.readText())
         }
     }
 
