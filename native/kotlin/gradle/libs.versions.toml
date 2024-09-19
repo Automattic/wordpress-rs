@@ -20,7 +20,7 @@ landscapist = "2.3.6"
 lifecycle = "2.8.5"
 okHttp = "4.12.0"
 navigation = "2.8.0"
-navigationCompose = "2.8.0-alpha09"
+navigationCompose = "2.8.0-alpha10"
 publish-to-s3-plugin = "0.10.0"
 rust-android-plugin = "0.9.4"
 
