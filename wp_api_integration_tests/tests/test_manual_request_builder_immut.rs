@@ -22,8 +22,8 @@ pub mod reusable_test_cases;
 #[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().admin_username,
-        TestCredentials::instance().admin_password,
+        TestCredentials::instance().admin_username.to_string(),
+        TestCredentials::instance().admin_password.to_string(),
     );
     let async_wp_networking = AsyncWpNetworking::default();
 
