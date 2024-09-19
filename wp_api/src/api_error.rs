@@ -60,12 +60,18 @@ pub(crate) struct WpError {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpErrorCode {
+    #[serde(rename = "rest_already_trashed")]
+    AlreadyTrashed,
     #[serde(rename = "rest_application_password_not_found")]
     ApplicationPasswordNotFound,
+    #[serde(rename = "rest_cannot_create")]
+    CannotCreate,
     #[serde(rename = "rest_cannot_create_application_passwords")]
     CannotCreateApplicationPasswords,
     #[serde(rename = "rest_cannot_create_user")]
     CannotCreateUser,
+    #[serde(rename = "rest_cannot_delete")]
+    CannotDelete,
     #[serde(rename = "rest_cannot_delete_active_plugin")]
     CannotDeleteActivePlugin,
     #[serde(rename = "rest_cannot_delete_application_password")]
@@ -78,10 +84,10 @@ pub enum WpErrorCode {
     CannotEditApplicationPassword,
     #[serde(rename = "rest_cannot_edit_roles")]
     CannotEditRoles,
-    #[serde(rename = "rest_cannot_introspect_app_password_for_non_authenticated_user")]
-    CannotIntrospectAppPasswordForNonAuthenticatedUser,
     #[serde(rename = "rest_cannot_install_plugin")]
     CannotInstallPlugin,
+    #[serde(rename = "rest_cannot_introspect_app_password_for_non_authenticated_user")]
+    CannotIntrospectAppPasswordForNonAuthenticatedUser,
     #[serde(rename = "rest_cannot_list_application_passwords")]
     CannotListApplicationPasswords,
     #[serde(rename = "rest_cannot_manage_plugins")]
@@ -102,12 +108,24 @@ pub enum WpErrorCode {
     ForbiddenOrderBy,
     #[serde(rename = "rest_forbidden_who")]
     ForbiddenWho,
+    #[serde(rename = "rest_invalid_author")]
+    InvalidAuthor,
+    #[serde(rename = "rest_invalid_field")]
+    InvalidField,
     #[serde(rename = "rest_invalid_param")]
     InvalidParam,
+    #[serde(rename = "rest_no_search_term_defined")]
+    NoSearchTermDefined,
+    #[serde(rename = "rest_orderby_include_missing_include")]
+    OrderbyIncludeMissingInclude,
     #[serde(rename = "rest_plugin_not_found")]
     PluginNotFound,
     #[serde(rename = "rest_post_incorrect_password")]
     PostIncorrectPassword,
+    #[serde(rename = "rest_post_invalid_id")]
+    PostInvalidId,
+    #[serde(rename = "rest_post_invalid_page_number")]
+    PostInvalidPageNumber,
     #[serde(rename = "rest_type_invalid")]
     TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]
@@ -133,12 +151,26 @@ pub enum WpErrorCode {
     ApplicationPasswordsDisabled,
     #[serde(rename = "application_passwords_disabled_for_user")]
     ApplicationPasswordsDisabledForUser,
+    #[serde(rename = "rest_cannot_assign_sticky")]
+    CannotAssignSticky,
+    #[serde(rename = "rest_cannot_assign_term")]
+    CannotAssignTerm,
+    #[serde(rename = "rest_cannot_edit_others")]
+    CannotEditOthers,
     #[serde(rename = "rest_cannot_manage_application_passwords")]
     CannotManageApplicationPasswords,
+    #[serde(rename = "rest_cannot_publish")]
+    CannotPublish,
     #[serde(rename = "rest_cannot_read_type")]
     CannotReadType,
+    #[serde(rename = "rest_forbidden_status")]
+    ForbiddenStatus,
+    #[serde(rename = "rest_invalid_featured_media")]
+    InvalidFeaturedMedia,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
+    #[serde(rename = "rest_user_cannot_delete_post")]
+    UserCannotDeletePost, // See `rest_cannot_delete` instead
     // ------------------------------------------------------------------------------------
     // Untested, because we believe these errors require multisite
     // ------------------------------------------------------------------------------------
@@ -161,10 +193,14 @@ pub enum WpErrorCode {
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_deactivate_plugin")]
     CannotDeactivatePlugin,
+    // If the create post request includes an id.
+    #[serde(rename = "rest_post_exists")]
+    PostExists,
     // If `force=true` is missing from delete user request.
+    // If trash is not supported for the post type: https://github.com/WordPress/WordPress/blob/6.6.2/wp-includes/rest-api/endpoints/class-wp-rest-posts-controller.php#L1011-L1029
     #[serde(rename = "rest_trash_not_supported")]
     TrashNotSupported,
-    // If the create user url includes an existing user id.
+    // If the create user request includes an id.
     #[serde(rename = "rest_user_exists")]
     UserExists,
     // If username is included in the update user request.
