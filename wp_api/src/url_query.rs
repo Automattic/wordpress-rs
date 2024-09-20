@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use url::{form_urlencoded, UrlQuery};
 
-use crate::impl_as_query_value_from_to_string;
+use crate::{date::WpDateTimeISO8601, impl_as_query_value_from_to_string};
 
 pub(crate) type QueryPairs<'a> = form_urlencoded::Serializer<'a, UrlQuery<'a>>;
 
@@ -73,6 +75,12 @@ impl AsQueryValue for &str {
 impl AsQueryValue for String {
     fn as_query_value(&self) -> impl AsRef<str> {
         self
+    }
+}
+
+impl AsQueryValue for Arc<WpDateTimeISO8601> {
+    fn as_query_value(&self) -> impl AsRef<str> {
+        self.to_rfc3339()
     }
 }
 

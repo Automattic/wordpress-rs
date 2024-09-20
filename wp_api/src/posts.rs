@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 use crate::{
+    date::{WpDateTimeISO8601, WpGmtDateTime, WpNaiveDateTime},
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
     UserId, WpApiParamOrder,
@@ -93,10 +96,10 @@ pub struct PostListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<String>,
+    pub after: Option<Arc<WpDateTimeISO8601>>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<String>,
+    pub modified_after: Option<Arc<WpDateTimeISO8601>>,
     /// Limit result set to posts assigned to specific authors.
     #[uniffi(default = [])]
     pub author: Vec<UserId>,
@@ -105,10 +108,10 @@ pub struct PostListParams {
     pub author_exclude: Vec<UserId>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<String>,
+    pub before: Option<Arc<WpDateTimeISO8601>>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<String>,
+    pub modified_before: Option<Arc<WpDateTimeISO8601>>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<PostId>,
@@ -394,18 +397,18 @@ pub struct SparsePost {
     #[WpContext(edit, embed, view)]
     pub id: Option<PostId>,
     #[WpContext(edit, view)]
-    pub date: Option<String>,
+    pub date: Option<Arc<WpNaiveDateTime>>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<Arc<WpGmtDateTime>>,
     #[WpContext(edit, view)]
     #[WpContextualField]
     pub guid: Option<SparsePostGuid>,
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
     #[WpContext(edit, view)]
-    pub modified: Option<String>,
+    pub modified: Option<Arc<WpNaiveDateTime>>,
     #[WpContext(edit, view)]
-    pub modified_gmt: Option<String>,
+    pub modified_gmt: Option<Arc<WpGmtDateTime>>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]

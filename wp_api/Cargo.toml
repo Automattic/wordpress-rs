@@ -13,6 +13,7 @@ name = "wp_api"
 [dependencies]
 async-trait = { workspace = true }
 base64 = { workspace = true }
+chrono = { workspace = true, features = [ "serde" ] }
 futures = { workspace = true }
 http = { workspace = true }
 indoc = { workspace = true }
@@ -20,7 +21,7 @@ url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
-serde = { workspace = true, features = [ "derive" ] }
+serde = { workspace = true, features = [ "derive", "rc" ] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
