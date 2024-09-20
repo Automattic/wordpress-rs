@@ -2,8 +2,10 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::posts::{
-    CategoryId, PostId, PostListParams, PostRetrieveParams, PostStatus, TagId,
-    WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+    CategoryId, PostId, PostListParams, PostRetrieveParams, PostStatus,
+    SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
+    SparsePostFieldWithViewContext, TagId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
+    WpApiParamPostsTaxRelation,
 };
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
@@ -172,3 +174,140 @@ async fn retrieve_password_protected_with_view_context() {
 #[case::tags_exclude(generate!(PostListParams, (tags_exclude, vec![TagId(1)])))]
 #[case::sticky(generate!(PostListParams, (sticky, Some(true))))]
 pub fn list_cases(#[case] params: PostListParams) {}
+
+mod filter {
+    use super::*;
+
+    wp_api::generate_sparse_post_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_post_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_post_field_with_view_context_test_cases!();
+
+    #[apply(sparse_post_field_with_edit_context_test_cases)]
+    #[case(&[SparsePostFieldWithEditContext::Id, SparsePostFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_posts_with_edit_context(
+        #[case] fields: &[SparsePostFieldWithEditContext],
+        #[values(
+            PostListParams::default(),
+            generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
+            generate!(PostListParams, (search, Some("foo".to_string())))
+        )]
+        params: PostListParams,
+    ) {
+        api_client()
+            .posts()
+            .filter_list_with_edit_context(&params, fields)
+            .await
+            .assert_response()
+            .iter()
+            .for_each(|post| {
+                post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+            });
+    }
+
+    #[apply(sparse_post_field_with_edit_context_test_cases)]
+    #[case(&[SparsePostFieldWithEditContext::Id, SparsePostFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_posts_with_edit_context(
+        #[case] fields: &[SparsePostFieldWithEditContext],
+    ) {
+        let post = api_client()
+            .posts()
+            .filter_retrieve_with_edit_context(
+                &FIRST_POST_ID,
+                &PostRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response();
+        post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
+    #[apply(sparse_post_field_with_embed_context_test_cases)]
+    #[case(&[SparsePostFieldWithEmbedContext::Id, SparsePostFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_posts_with_embed_context(
+        #[case] fields: &[SparsePostFieldWithEmbedContext],
+        #[values(
+            PostListParams::default(),
+            generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
+            generate!(PostListParams, (search, Some("foo".to_string())))
+        )]
+        params: PostListParams,
+    ) {
+        api_client()
+            .posts()
+            .filter_list_with_embed_context(&params, fields)
+            .await
+            .assert_response()
+            .iter()
+            .for_each(|post| {
+                post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+            });
+    }
+
+    #[apply(sparse_post_field_with_embed_context_test_cases)]
+    #[case(&[SparsePostFieldWithEmbedContext::Id, SparsePostFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_posts_with_embed_context(
+        #[case] fields: &[SparsePostFieldWithEmbedContext],
+    ) {
+        let post = api_client()
+            .posts()
+            .filter_retrieve_with_embed_context(
+                &FIRST_POST_ID,
+                &PostRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response();
+        post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
+    #[apply(sparse_post_field_with_view_context_test_cases)]
+    #[case(&[SparsePostFieldWithViewContext::Id, SparsePostFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_posts_with_view_context(
+        #[case] fields: &[SparsePostFieldWithViewContext],
+        #[values(
+            PostListParams::default(),
+            generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
+            generate!(PostListParams, (search, Some("foo".to_string())))
+        )]
+        params: PostListParams,
+    ) {
+        api_client()
+            .posts()
+            .filter_list_with_view_context(&params, fields)
+            .await
+            .assert_response()
+            .iter()
+            .for_each(|post| {
+                post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+            });
+    }
+
+    #[apply(sparse_post_field_with_view_context_test_cases)]
+    #[case(&[SparsePostFieldWithViewContext::Id, SparsePostFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_posts_with_view_context(
+        #[case] fields: &[SparsePostFieldWithViewContext],
+    ) {
+        let post = api_client()
+            .posts()
+            .filter_retrieve_with_view_context(
+                &FIRST_POST_ID,
+                &PostRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response();
+        post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+}
