@@ -40,11 +40,32 @@ impl DerivedRequest for PostsRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(SparsePostFieldWithEditContext);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePostFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(SparsePostFieldWithViewContext);
+impl SparseField for SparsePostFieldWithEditContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
+
+impl SparseField for SparsePostFieldWithEmbedContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
+
+impl SparseField for SparsePostFieldWithViewContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
