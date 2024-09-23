@@ -92,7 +92,8 @@ async fn retrieve_password_protected_with_edit_context() {
             },
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         post.title.rendered,
         test_credentials.password_protected_post_title
@@ -116,7 +117,8 @@ async fn retrieve_password_protected_with_embed_context() {
             },
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         post.title.rendered,
         test_credentials.password_protected_post_title
@@ -140,7 +142,8 @@ async fn retrieve_password_protected_with_view_context() {
             },
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         post.title.rendered,
         test_credentials.password_protected_post_title
@@ -200,6 +203,7 @@ mod filter {
             .filter_list_with_edit_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -221,7 +225,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
@@ -243,6 +248,7 @@ mod filter {
             .filter_list_with_embed_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -264,7 +270,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
@@ -286,6 +293,7 @@ mod filter {
             .filter_list_with_view_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -307,7 +315,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }
