@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use convert_case::{Case, Casing};
 use helpers_to_generate_tokens::*;
 use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::FoundCrate;
@@ -45,7 +46,6 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
         )
         .into_iter()
         .map(|context_and_filter_handler| {
-            let output_type = output_type(variant.attr.output.clone(), &context_and_filter_handler);
             let request_from_request_builder = fn_body_get_request_from_request_builder(
                 &variant.variant_ident,
                 url_parts,
@@ -61,8 +61,13 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
+            let response_type_ident = ident_response_type(
+                &parsed_enum.enum_ident,
+                &variant.variant_ident,
+                &context_and_filter_handler,
+            );
             quote! {
-                pub async #fn_signature -> Result<#output_type, #static_wp_api_error_type> {
+                pub async #fn_signature -> Result<#response_type_ident, #static_wp_api_error_type> {
                     #request_from_request_builder
                     self.request_executor.execute(std::sync::Arc::new(request)).await?.parse()
                }
@@ -71,7 +76,35 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
         .collect::<TokenStream>()
     });
 
+    let generated_return_types = parsed_enum.variants.iter().map(|variant| {
+        ContextAndFilterHandler::from_request_type(
+            variant.attr.request_type,
+            variant.attr.filter_by.clone(),
+        )
+        .into_iter()
+        .map(|context_and_filter_handler| {
+            let output_type = output_type(variant.attr.output.clone(), &context_and_filter_handler);
+            let response_type_ident = ident_response_type(
+                &parsed_enum.enum_ident,
+                &variant.variant_ident,
+                &context_and_filter_handler,
+            );
+            quote! {
+                #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+                #[serde(transparent)]
+                pub struct #response_type_ident {
+                    pub data: #output_type,
+                    #[serde(skip)]
+                    pub foo: u32
+                }
+            }
+        })
+        .collect::<TokenStream>()
+    });
+
     quote! {
+        #(#generated_return_types)*
+
         #[derive(Debug, uniffi::Object)]
         pub struct #generated_request_executor_ident {
             request_builder: #generated_request_builder_ident,
