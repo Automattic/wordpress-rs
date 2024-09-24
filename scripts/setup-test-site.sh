@@ -108,6 +108,10 @@ wp plugin install classic-editor
 # Used in `test_posts_immut`. If the resulting ID changes, `PASSWORD_PROTECTED_POST_ID` needs to be updated
 wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected
 
+# Update the timezone, so that the `date` & `date_gmt` values will be different
+# Otherwise, the integration tests might result in false positives
+wp option update timezone_string "America/New_York"
+
 cp -rp wp-content/plugins wp-content/plugins-backup
 
 wp db export --add-drop-table wp-content/dump.sql

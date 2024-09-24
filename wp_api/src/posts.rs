@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
+use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
@@ -265,7 +266,85 @@ pub struct PostCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<String>,
+    pub meta: Option<PostMeta>,
+    // Whether or not the post should be treated as sticky.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sticky: Option<bool>,
+    // The theme file to use to display the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+    // The terms assigned to the post in the category taxonomy.
+    #[uniffi(default = [])]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<CategoryId>,
+    // The terms assigned to the post in the post_tag taxonomy.
+    #[uniffi(default = [])]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<TagId>,
+}
+
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct PostUpdateParams {
+    // The date the post was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    // The date the post was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<String>,
+    // An alphanumeric identifier for the post unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    // A named status for the post.
+    // One of: publish, future, draft, pending, private
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<PostStatus>,
+    // A password to protect access to the content and excerpt.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+    // The title for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // The content for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // The ID for the author of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // The excerpt for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excerpt: Option<String>,
+    // The ID of the featured media for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub featured_media: Option<MediaId>,
+    // Whether or not comments are open on the post.
+    // One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_status: Option<PostCommentStatus>,
+    // Whether or not the post can be pinged.
+    // One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ping_status: Option<PostPingStatus>,
+    // The format for the post.
+    // One of: standard, aside, chat, gallery, link, image, quote, status, video, audio
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<PostFormat>,
+    // Meta fields.
+    pub meta: Option<PostMeta>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -352,7 +431,7 @@ pub struct SparsePost {
     #[WpContextualField]
     pub excerpt: Option<SparsePostExcerpt>,
     #[WpContext(edit, embed, view)]
-    pub featured_media: Option<i64>,
+    pub featured_media: Option<MediaId>,
     #[WpContext(edit, view)]
     pub comment_status: Option<PostCommentStatus>,
     #[WpContext(edit, view)]
@@ -366,7 +445,7 @@ pub struct SparsePost {
     #[WpContext(edit, view)]
     pub template: Option<String>,
     #[WpContext(edit, view)]
-    pub categories: Option<Vec<i64>>,
+    pub categories: Option<Vec<CategoryId>>,
     #[WpContext(edit, view)]
     pub tags: Option<Vec<TagId>>,
 }
@@ -411,7 +490,15 @@ pub struct SparsePostExcerpt {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostMeta {
-    pub footnotes: String,
+    #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
+    #[serde(serialize_with = "serialize_as_json_string")]
+    pub footnotes: Vec<PostFootnote>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
+pub struct PostFootnote {
+    pub id: String,
+    pub content: String,
 }
 
 #[derive(
@@ -442,7 +529,7 @@ pub enum PostStatus {
 impl_as_query_value_from_as_str!(PostStatus);
 
 impl PostStatus {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Draft => "draft",
             Self::Future => "future",
@@ -465,6 +552,16 @@ pub enum PostCommentStatus {
     Custom(String),
 }
 
+impl PostCommentStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Custom(comment_status) => comment_status,
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
 )]
@@ -474,6 +571,16 @@ pub enum PostPingStatus {
     Closed,
     #[serde(untagged)]
     Custom(String),
+}
+
+impl PostPingStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Open => "open",
+            Self::Closed => "closed",
+            Self::Custom(ping_status) => ping_status,
+        }
+    }
 }
 
 #[derive(
@@ -493,4 +600,22 @@ pub enum PostFormat {
     Audio,
     #[serde(untagged)]
     Custom(String),
+}
+
+impl PostFormat {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Standard => "standard",
+            Self::Aside => "aside",
+            Self::Chat => "chat",
+            Self::Gallery => "gallery",
+            Self::Link => "link",
+            Self::Image => "image",
+            Self::Quote => "quote",
+            Self::Status => "status",
+            Self::Video => "video",
+            Self::Audio => "audio",
+            Self::Custom(post_format) => post_format,
+        }
+    }
 }

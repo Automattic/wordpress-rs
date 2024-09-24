@@ -1,6 +1,7 @@
 use crate::{
     posts::{
-        PostId, PostListParams, SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
+        PostId, PostListParams, PostUpdateParams, PostWithEditContext,
+        SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
         SparsePostFieldWithViewContext,
     },
     SparseField,
@@ -21,6 +22,8 @@ enum PostsRequest {
     Delete,
     #[delete(url = "/posts/<post_id>", output = crate::posts::PostWithEditContext)]
     Trash,
+    #[post(url = "/posts/<post_id>", params = &PostUpdateParams, output = PostWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for PostsRequest {
