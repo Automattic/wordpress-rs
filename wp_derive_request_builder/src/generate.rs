@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use convert_case::{Case, Casing};
 use helpers_to_generate_tokens::*;
 use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::FoundCrate;
@@ -101,7 +100,18 @@ fn generate_async_request_executor(
                 pub struct #response_type_ident {
                     pub data: #output_type,
                     #[serde(skip)]
-                    pub foo: u32
+                    pub header_wp_total: Option<u32>,
+                    #[serde(skip)]
+                    pub header_wp_total_pages: Option<u32>,
+                }
+                impl From<#response_type_ident> for crate::request::ParsedResponse<#output_type> {
+                    fn from(value: #response_type_ident) -> Self {
+                        Self {
+                            data: value.data,
+                            header_wp_total: value.header_wp_total,
+                            header_wp_total_pages: value.header_wp_total_pages,
+                        }
+                    }
                 }
             }
         })
