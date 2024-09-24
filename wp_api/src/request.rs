@@ -17,6 +17,16 @@ pub mod endpoint;
 const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ParsedResponse<T> {
+    pub data: T,
+    #[serde(skip)]
+    pub header_wp_total: Option<u32>,
+    #[serde(skip)]
+    pub header_wp_total_pages: Option<u32>,
+}
+
 #[derive(Debug)]
 struct InnerRequestBuilder {
     authentication: WpAuthentication,

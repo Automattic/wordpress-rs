@@ -397,7 +397,7 @@ pub fn ident_response_type(
     variant_ident: &Ident,
     context_and_filter_handler: &ContextAndFilterHandler,
 ) -> Ident {
-    let fn_name = fn_name(&variant_ident, &context_and_filter_handler);
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
     format_ident!(
         "{}{}Response",
         enum_ident,
