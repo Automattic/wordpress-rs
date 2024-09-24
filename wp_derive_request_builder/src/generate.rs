@@ -107,6 +107,15 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
                         }
                     }
                 }
+                impl From<crate::request::ParsedResponse<#output_type>> for #response_type_ident {
+                    fn from(value: crate::request::ParsedResponse<#output_type>) -> Self {
+                        Self {
+                            data: value.data,
+                            header_wp_total: value.header_wp_total,
+                            header_wp_total_pages: value.header_wp_total_pages,
+                        }
+                    }
+                }
             }
         })
         .collect::<TokenStream>()
