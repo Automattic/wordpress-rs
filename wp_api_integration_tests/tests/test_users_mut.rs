@@ -20,7 +20,12 @@ async fn create_user() {
         email.to_string(),
         password.to_string(),
     );
-    let created_user = api_client().users().create(&params).await.assert_response();
+    let created_user = api_client()
+        .users()
+        .create(&params)
+        .await
+        .assert_response()
+        .data;
 
     // Assert that the user is created
     let created_user_from_wp_cli = Backend::user(&created_user.id).await;
@@ -66,7 +71,8 @@ async fn delete_current_user() {
         .users()
         .delete_me(&user_delete_params)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert!(deleted_user.deleted);
     assert_eq!(FIRST_USER_ID, deleted_user.previous.id);
 

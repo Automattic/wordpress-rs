@@ -61,7 +61,8 @@ async fn list_application_passwords_ensure_last_ip() {
         .application_passwords()
         .list_with_edit_context(&FIRST_USER_ID)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert!(list.first().unwrap().last_ip.is_some());
 }
 
@@ -72,7 +73,8 @@ async fn retrieve_current_application_passwords_with_edit_context() {
         .application_passwords()
         .retrieve_current_with_edit_context(&FIRST_USER_ID)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         a.uuid,
         ApplicationPasswordUuid {
@@ -88,7 +90,8 @@ async fn retrieve_current_application_passwords_with_embed_context() {
         .application_passwords()
         .retrieve_current_with_embed_context(&SECOND_USER_ID)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         a.uuid,
         ApplicationPasswordUuid {
@@ -106,7 +109,8 @@ async fn retrieve_current_application_passwords_with_view_context() {
         .application_passwords()
         .retrieve_current_with_view_context(&FIRST_USER_ID)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         a.uuid,
         ApplicationPasswordUuid {
@@ -125,7 +129,8 @@ async fn retrieve_application_passwords_with_edit_context() {
         .application_passwords()
         .retrieve_with_edit_context(&FIRST_USER_ID, &uuid)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(a.uuid, uuid);
 }
 
@@ -139,7 +144,8 @@ async fn retrieve_application_passwords_with_embed_context() {
         .application_passwords()
         .retrieve_with_embed_context(&FIRST_USER_ID, &uuid)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(a.uuid, uuid);
 }
 
@@ -155,7 +161,8 @@ async fn retrieve_application_passwords_with_view_context() {
         .application_passwords()
         .retrieve_with_view_context(&SECOND_USER_ID, &uuid)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(a.uuid, uuid);
 }
 
@@ -182,6 +189,7 @@ mod filter {
             .filter_list_with_edit_context(&user_id, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
     }
@@ -206,7 +214,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -224,7 +233,8 @@ mod filter {
             .application_passwords()
             .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -240,6 +250,7 @@ mod filter {
             .filter_list_with_embed_context(&user_id, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
     }
@@ -260,7 +271,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -274,7 +286,8 @@ mod filter {
             .application_passwords()
             .filter_retrieve_current_with_embed_context(&FIRST_USER_ID, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -290,6 +303,7 @@ mod filter {
             .filter_list_with_view_context(&user_id, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|p| p.assert_that_instance_fields_nullability_match_provided_fields(fields));
     }
@@ -310,7 +324,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -324,7 +339,8 @@ mod filter {
             .application_passwords()
             .filter_retrieve_current_with_view_context(&FIRST_USER_ID, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
