@@ -1,0 +1,9 @@
+[bindings.kotlin]
+android = false
+android_cleaner = false
+generate_immutable_records = true
+
+[bindings.swift]
+ffi_module_name = "libwordpressFFI"
+ffi_module_filename = "libwordpressFFI"
+generate_immutable_records = true

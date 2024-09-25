@@ -31,7 +31,7 @@ android {
         buildConfig = true
     }
 
-    // There is an incorrect lint error in generated wp_api.kt about the usage of NewApi
+    // There is an incorrect lint error in generated jetpack_api.kt about the usage of NewApi
     // that's related to the usage of `android.system.SystemCleaner`.
     //
     // At the time of this comment, generated bindings only use this `SystemCleaner` for
@@ -76,7 +76,7 @@ dependencies {
 }
 
 val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")!!
-val moduleName = "wp_api"
+val moduleName = "jetpack_api"
 cargo {
     module = "$cargoProjectRoot/$moduleName/"
     libname = moduleName

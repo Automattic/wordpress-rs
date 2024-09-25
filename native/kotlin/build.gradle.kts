@@ -31,14 +31,14 @@ allprojects {
         }
 
         // Exclude generated bindings
-        exclude("**/wp_api.kt")
+        exclude("**/jetpack_api.kt")
     }
 
     tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
         jvmTarget = "1.8"
 
         // Exclude generated bindings
-        exclude("**/wp_api.kt")
+        exclude("**/jetpack_api.kt")
     }
 
     dependencies {
@@ -49,7 +49,7 @@ allprojects {
 val cargoProjectRoot = "${project.rootDir}/../.."
 val jniLibsPath = "${layout.buildDirectory.get()}/jniLibs/"
 val generatedTestResourcesPath = "${layout.buildDirectory.get()}/generatedTestResources/"
-val rustModuleName = "wp_api"
+val rustModuleName = "jetpack_api"
 val nativeLibraryPath =
     "$cargoProjectRoot/target/release/lib${rustModuleName}${getNativeLibraryExtension()}"
 rootProject.ext.set("cargoProjectRoot", cargoProjectRoot)
