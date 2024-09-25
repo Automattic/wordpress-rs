@@ -69,7 +69,7 @@ async fn update_application_password_err_cannot_edit_application_password() {
         .update(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
-                uuid: TestCredentials::instance().admin_password_uuid,
+                uuid: TestCredentials::instance().admin_password_uuid.to_string(),
             },
             &ApplicationPasswordUpdateParams {
                 app_id: None,
@@ -90,7 +90,7 @@ async fn delete_application_password_err_cannot_delete_application_password() {
         .delete(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
-                uuid: TestCredentials::instance().admin_password_uuid,
+                uuid: TestCredentials::instance().admin_password_uuid.to_string(),
             },
         )
         .await

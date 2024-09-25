@@ -24,7 +24,7 @@ fn generate_test_credentials_file() -> Result<(), Box<dyn Error>> {
             .as_object()
             .expect("test_credentials.json should be a valid JSON Object")
             .into_iter()
-            .map(|(k, v)| format!("{}: {}.to_string(),", k, v))
+            .map(|(k, v)| format!("{}: {},", k, v))
             .collect::<Vec<String>>()
             .join("\n");
         format!("TestCredentials {{ {} }}", fields)

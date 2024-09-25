@@ -64,7 +64,7 @@ async fn update_application_password() {
         .update(
             &FIRST_USER_ID,
             &ApplicationPasswordUuid {
-                uuid: TestCredentials::instance().admin_password_uuid,
+                uuid: TestCredentials::instance().admin_password_uuid.to_string(),
             },
             &params,
         )
@@ -86,14 +86,14 @@ async fn update_application_password() {
 async fn delete_single_application_password() {
     let subscriber_password_uuid = TestCredentials::instance().subscriber_password_uuid;
     let uuid = ApplicationPasswordUuid {
-        uuid: subscriber_password_uuid.clone(),
+        uuid: subscriber_password_uuid.to_string(),
     };
     // Assert that the application password exists
     assert!(application_password_meta_for_user(&SECOND_USER_ID)
         .await
         .unwrap()
         .meta_value
-        .contains(&subscriber_password_uuid));
+        .contains(subscriber_password_uuid));
     // Delete the user's application passwords using the API and ensure it's successful
     let response = api_client()
         .application_passwords()
@@ -108,7 +108,7 @@ async fn delete_single_application_password() {
         .await
         .unwrap()
         .meta_value
-        .contains(&subscriber_password_uuid));
+        .contains(subscriber_password_uuid));
 
     RestoreServer::db().await;
 }
@@ -122,7 +122,7 @@ async fn delete_all_application_passwords() {
         .await
         .unwrap()
         .meta_value
-        .contains(&subscriber_password_uuid));
+        .contains(subscriber_password_uuid));
     // Delete the user's application passwords using the API and ensure it's successful
     let response = api_client()
         .application_passwords()
@@ -137,7 +137,7 @@ async fn delete_all_application_passwords() {
         .await
         .unwrap()
         .meta_value
-        .contains(&subscriber_password_uuid));
+        .contains(subscriber_password_uuid));
 
     RestoreServer::db().await;
 }

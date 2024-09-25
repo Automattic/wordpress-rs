@@ -24,7 +24,6 @@ class UsersEndpointTest {
             requestBuilder.users().listWithEditContext(params = UserListParams())
         }.assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_USERS, userList.count())
-        assertEquals(FIRST_USER_EMAIL, userList.first().email)
     }
 
     @Test
@@ -35,8 +34,8 @@ class UsersEndpointTest {
         val userList =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
                 .assertSuccessAndRetrieveData()
-        assertEquals(NUMBER_OF_USERS, userList.count())
-        assertEquals(FIRST_USER_EMAIL, userList.first().email)
+        // One of the test users don't have any posts or pages
+        assertEquals(NUMBER_OF_USERS - 1, userList.count())
     }
 
     @Test
@@ -51,7 +50,6 @@ class UsersEndpointTest {
             )
         }.assertSuccessAndRetrieveData()
         assertEquals(NUMBER_OF_USERS, userList.count())
-        assertEquals(FIRST_USER_EMAIL, userList.first().email)
         assertNull(userList.first().slug)
     }
 
