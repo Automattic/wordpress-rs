@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use endpoint::ApiEndpointUrl;
 use http::{HeaderMap, HeaderName, HeaderValue};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
 use crate::{
@@ -24,9 +24,7 @@ const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 pub struct ParsedResponse<T> {
     pub data: T,
     #[serde(skip)]
-    pub header_wp_total: Option<u32>,
-    #[serde(skip)]
-    pub header_wp_total_pages: Option<u32>,
+    pub header_map: Arc<WpNetworkHeaderMap>,
 }
 
 #[derive(Debug)]
@@ -198,6 +196,21 @@ impl WpNetworkHeaderMap {
         Self { inner: header_map }
     }
 
+    pub fn wp_total(&self) -> Option<u32> {
+        self.header_value_as_u32(HEADER_KEY_WP_TOTAL)
+    }
+
+    pub fn wp_total_pages(&self) -> Option<u32> {
+        self.header_value_as_u32(HEADER_KEY_WP_TOTAL_PAGES)
+    }
+
+    pub fn header_value_as_u32(&self, header_name: &str) -> Option<u32> {
+        self.inner
+            .get(header_name)
+            .and_then(|h_v| h_v.to_str().ok())
+            .and_then(|h| h.parse().ok())
+    }
+
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
         header_name: String,
@@ -313,9 +326,9 @@ impl WpNetworkResponse {
         request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<'de, T, D, E>(&'de self) -> Result<T, E>
+    pub fn parse<T, D, E>(self) -> Result<T, E>
     where
-        T: Deserialize<'de>,
+        T: DeserializeOwned,
         T: From<ParsedResponse<D>>,
         ParsedResponse<D>: From<T>,
         E: ParsedRequestError,
@@ -328,18 +341,9 @@ impl WpNetworkResponse {
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
                 let mut p = ParsedResponse::<D>::from(x);
-                p.header_wp_total = self.header_value_as_u32(HEADER_KEY_WP_TOTAL);
-                p.header_wp_total_pages = self.header_value_as_u32(HEADER_KEY_WP_TOTAL_PAGES);
+                p.header_map = self.header_map;
                 T::from(p)
             })
-    }
-
-    pub fn header_value_as_u32(&self, header_name: &str) -> Option<u32> {
-        self.header_map
-            .inner
-            .get(header_name)
-            .and_then(|h_v| h_v.to_str().ok())
-            .and_then(|h| h.parse().ok())
     }
 
     pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WpApiError>
