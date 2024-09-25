@@ -100,16 +100,13 @@ fn generate_async_request_executor(
                 pub struct #response_type_ident {
                     pub data: #output_type,
                     #[serde(skip)]
-                    pub header_wp_total: Option<u32>,
-                    #[serde(skip)]
-                    pub header_wp_total_pages: Option<u32>,
+                    pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
                 }
                 impl From<#response_type_ident> for crate::request::ParsedResponse<#output_type> {
                     fn from(value: #response_type_ident) -> Self {
                         Self {
                             data: value.data,
-                            header_wp_total: value.header_wp_total,
-                            header_wp_total_pages: value.header_wp_total_pages,
+                            header_map: value.header_map,
                         }
                     }
                 }
@@ -117,8 +114,7 @@ fn generate_async_request_executor(
                     fn from(value: crate::request::ParsedResponse<#output_type>) -> Self {
                         Self {
                             data: value.data,
-                            header_wp_total: value.header_wp_total,
-                            header_wp_total_pages: value.header_wp_total_pages,
+                            header_map: value.header_map,
                         }
                     }
                 }

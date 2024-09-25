@@ -20,8 +20,8 @@ async fn list_with_edit_context_number_of_pages() {
         .list_with_edit_context(&PostListParams::default())
         .await
         .assert_response();
-    assert_eq!(p.header_wp_total, Some(57));
-    assert_eq!(p.header_wp_total_pages, Some(6));
+    assert_eq!(p.header_map.wp_total(), Some(57));
+    assert_eq!(p.header_map.wp_total_pages(), Some(6));
 }
 
 #[tokio::test]
