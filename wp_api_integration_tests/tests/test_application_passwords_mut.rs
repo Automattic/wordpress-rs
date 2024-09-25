@@ -31,7 +31,8 @@ async fn create_application_password() {
         .application_passwords()
         .create(&SECOND_USER_ID, &params)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
 
     // Assert that the application password is created
     let user_meta_after_update = application_password_meta_for_user(&SECOND_USER_ID).await;
@@ -69,7 +70,8 @@ async fn update_application_password() {
             &params,
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
 
     // Assert that the application password is created
     let user_meta_after_update = application_password_meta_for_user(&FIRST_USER_ID).await;
@@ -99,7 +101,8 @@ async fn delete_single_application_password() {
         .application_passwords()
         .delete(&SECOND_USER_ID, &uuid)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
 
     // Assert that the application password is deleted
     assert!(response.deleted);
@@ -128,7 +131,8 @@ async fn delete_all_application_passwords() {
         .application_passwords()
         .delete_all(&SECOND_USER_ID)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
 
     // Assert that the application password is deleted
     assert!(response.deleted);

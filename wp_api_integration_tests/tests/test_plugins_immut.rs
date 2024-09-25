@@ -69,7 +69,8 @@ async fn retrieve_plugin(
                 .plugins()
                 .retrieve_with_edit_context(&plugin_slug)
                 .await
-                .assert_response();
+                .assert_response()
+                .data;
             assert_eq!(&plugin_slug, &plugin.plugin);
             assert_eq!(expected_author, plugin.author);
             assert_eq!(expected_plugin_uri, plugin.plugin_uri);
@@ -79,7 +80,8 @@ async fn retrieve_plugin(
                 .plugins()
                 .retrieve_with_embed_context(&plugin_slug)
                 .await
-                .assert_response();
+                .assert_response()
+                .data;
             assert_eq!(&plugin_slug, &plugin.plugin);
         }
         WpContext::View => {
@@ -87,7 +89,8 @@ async fn retrieve_plugin(
                 .plugins()
                 .retrieve_with_view_context(&plugin_slug)
                 .await
-                .assert_response();
+                .assert_response()
+                .data;
             assert_eq!(&plugin_slug, &plugin.plugin);
             assert_eq!(expected_author, plugin.author);
             assert_eq!(expected_plugin_uri, plugin.plugin_uri);
@@ -121,6 +124,7 @@ mod filter {
             .filter_list_with_edit_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|plugin| {
                 plugin.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -140,7 +144,8 @@ mod filter {
             .plugins()
             .filter_retrieve_with_edit_context(&slug.into(), fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         plugin.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -161,6 +166,7 @@ mod filter {
             .filter_list_with_embed_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|plugin| {
                 plugin.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -178,7 +184,8 @@ mod filter {
             .plugins()
             .filter_retrieve_with_embed_context(&slug.into(), fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         plugin.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -199,6 +206,7 @@ mod filter {
             .filter_list_with_view_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|plugin| {
                 plugin.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -216,7 +224,8 @@ mod filter {
             .plugins()
             .filter_retrieve_with_view_context(&slug.into(), fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         plugin.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 }
