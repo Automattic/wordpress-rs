@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 http = { workspace = true }
+jetpack_api = { path = "../jetpack_api", features = [ "integration-tests" ] }
 reqwest = { workspace = true, features = [ "json" ] }
 serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }

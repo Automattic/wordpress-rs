@@ -993,6 +993,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 
 [[package]]
+name = "jetpack_api"
+version = "0.1.0"
+dependencies = [
+ "paste",
+ "serde",
+ "serde_json",
+ "uniffi",
+ "wp_api",
+ "wp_contextual",
+ "wp_derive_request_builder",
+ "wp_serde_helper",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3059,6 +3073,7 @@ dependencies = [
  "clap",
  "futures",
  "http 1.1.0",
+ "jetpack_api",
  "paste",
  "reqwest",
  "rstest",

@@ -138,6 +138,7 @@ impl AsyncWpNetworking {
         &self,
         wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
+        println!("Requesting: '{:#?}'", wp_request.url());
         let mut request = self
             .client
             .request(
