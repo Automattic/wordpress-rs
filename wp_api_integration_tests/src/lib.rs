@@ -134,6 +134,15 @@ impl Default for AsyncWpNetworking {
 }
 
 impl AsyncWpNetworking {
+    pub fn with_cookie_store() -> Self {
+        Self {
+            client: reqwest::ClientBuilder::new()
+                .cookie_store(true)
+                .build()
+                .unwrap(),
+        }
+    }
+
     pub async fn async_request(
         &self,
         wp_request: Arc<WpNetworkRequest>,

@@ -67,6 +67,7 @@ impl InnerRequestBuilder {
         );
         match self.authentication {
             WpAuthentication::None => (),
+            WpAuthentication::UserAccount { ref login } => (),
             WpAuthentication::AuthorizationHeader { ref token } => {
                 let hv = HeaderValue::from_str(&format!("Basic {}", token));
                 let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
@@ -101,7 +102,7 @@ pub struct WpNetworkRequestBody {
 }
 
 impl WpNetworkRequestBody {
-    fn new(body: Vec<u8>) -> Self {
+    pub fn new(body: Vec<u8>) -> Self {
         Self { inner: body }
     }
 }
@@ -114,7 +115,7 @@ impl WpNetworkRequestBody {
 }
 
 // Has custom `Debug` trait implementation
-#[derive(uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct WpNetworkRequest {
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,

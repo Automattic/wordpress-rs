@@ -1,11 +1,14 @@
 use std::str;
 use std::sync::Arc;
 
-use crate::request::endpoint::WpEndpointUrl;
+use url::Url;
+
+use crate::request::endpoint::{ApiBaseUrl, WpEndpointUrl};
 use crate::request::{
-    RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+    RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkRequestBody,
+    WpNetworkResponse,
 };
-use crate::ParsedUrl;
+use crate::{ParsedUrl, WpLoginCredentials};
 
 use super::url_discovery::{
     self, FetchApiDetailsError, FetchApiRootUrlError, StateInitial, UrlDiscoveryAttemptError,
@@ -155,5 +158,93 @@ impl WpLoginClient {
             )
             .await
             .map_err(FetchApiDetailsError::from)
+    }
+
+    pub(crate) async fn insert_rest_nonce(
+        &self,
+        request: &WpNetworkRequest,
+        api_base_url: &ApiBaseUrl,
+        login: &WpLoginCredentials,
+    ) -> Option<WpNetworkRequest> {
+        // Only attempt login if the request is to the WordPress site.
+        if Url::parse(api_base_url.as_str()).ok()?.host_str()
+            != Url::parse(request.url.0.as_str()).ok()?.host_str()
+        {
+            return None;
+        }
+
+        let nonce = self.get_rest_nonce(api_base_url, login).await?;
+
+        let mut request = request.clone();
+        let mut headers = request.header_map.as_header_map();
+        headers.insert(
+            http::header::HeaderName::from_bytes("X-WP-Nonce".as_bytes())
+                .expect("This conversion should never fail"),
+            nonce.try_into().expect("This conversion should never fail"),
+        );
+        request.header_map = WpNetworkHeaderMap::new(headers).into();
+
+        Some(request)
+    }
+
+    async fn get_rest_nonce(
+        &self,
+        api_base_url: &ApiBaseUrl,
+        login: &WpLoginCredentials,
+    ) -> Option<String> {
+        let rest_nonce_url = api_base_url.derived_rest_nonce_url();
+        let rest_nonce_url_clone = rest_nonce_url.clone();
+        let nonce_request = WpNetworkRequest {
+            method: RequestMethod::GET,
+            url: rest_nonce_url.into(),
+            header_map: WpNetworkHeaderMap::new(http::HeaderMap::new()).into(),
+            body: None,
+        };
+
+        let nonce_from_request = |request: WpNetworkRequest| async move {
+            self.request_executor
+                .execute(request.into())
+                .await
+                .ok()
+                .and_then(|response| {
+                    // A 200 OK response from the `rest_nonce_url` (a.k.a `wp-admin/admin-ajax.php`)
+                    // should be the nonce value. However, just in case the site is configured to
+                    // return a 200 OK response with other content (for example redirection to
+                    // other webpage), here we check the body length here for a light validation of
+                    // the nonce value.
+                    if response.status_code == 200 {
+                        let body = response.body_as_string();
+                        if body.len() < 50 {
+                            return Some(body);
+                        }
+                    }
+                    None
+                })
+        };
+
+        if let Some(nonce) = nonce_from_request(nonce_request).await {
+            return Some(nonce);
+        }
+
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded".parse().unwrap(),
+        );
+        let body = serde_urlencoded::to_string([
+            ["log", login.username.as_str()],
+            ["pwd", login.password.as_str()],
+            ["rememberme", "true"],
+            ["redirect_to", rest_nonce_url_clone.to_string().as_str()],
+        ])
+        .unwrap();
+        let login_request = WpNetworkRequest {
+            method: RequestMethod::POST,
+            url: api_base_url.derived_wp_login_url().into(),
+            header_map: WpNetworkHeaderMap::new(headers).into(),
+            body: Some(WpNetworkRequestBody::new(body.into_bytes()).into()),
+        };
+
+        nonce_from_request(login_request).await
     }
 }

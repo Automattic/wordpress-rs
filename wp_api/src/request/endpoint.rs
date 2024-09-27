@@ -80,6 +80,39 @@ impl ApiBaseUrl {
         site_base_url.try_into()
     }
 
+    pub(crate) fn derived_wp_login_url(&self) -> Url {
+        let mut url = self.url.clone();
+
+        if let Some(segments) = url.path_segments() {
+            if segments.last() == Some("") {
+                url.path_segments_mut()
+                    .expect("ApiBaseUrl is a full HTTP URL")
+                    .pop();
+            }
+        }
+
+        url.path_segments_mut()
+            .expect("ApiBaseUrl is a full HTTP URL")
+            .pop()
+            .push("wp-login.php");
+
+        url
+    }
+
+    pub(crate) fn derived_rest_nonce_url(&self) -> Url {
+        let mut url = self.derived_wp_login_url();
+
+        url.path_segments_mut()
+            .expect("login url is a full HTTP URL")
+            .pop()
+            .push("wp-admin")
+            .push("admin-ajax.php");
+
+        url.query_pairs_mut().append_pair("action", "rest-nonce");
+
+        url
+    }
+
     fn by_appending(&self, segment: &str) -> Url {
         self.url
             .clone()
@@ -106,7 +139,7 @@ impl ApiBaseUrl {
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         self.url.as_str()
     }
 }

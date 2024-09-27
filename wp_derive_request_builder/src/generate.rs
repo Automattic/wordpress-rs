@@ -64,7 +64,23 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
             quote! {
                 pub async #fn_signature -> Result<#output_type, #static_wp_api_error_type> {
                     #request_from_request_builder
-                    self.request_executor.execute(std::sync::Arc::new(request)).await?.parse()
+
+                    let cloned_request = request.clone();
+                    let result = self.request_executor.execute(request.into()).await;
+
+                    if let Ok(response) = &result {
+                        if response.status_code == 401 {
+                            if let crate::WpAuthentication::UserAccount { ref login } = self.request_builder.inner.authentication {
+                                let client = crate::login::WpLoginClient::new(self.request_executor.clone());
+                                let api_base_url = self.request_builder.endpoint.api_base_url.clone();
+                                if let Some(request) = client.insert_rest_nonce(&cloned_request, &api_base_url, login).await {
+                                    return self.request_executor.execute(request.into()).await?.parse();
+                                }
+                            }
+                        }
+                    }
+
+                    result?.parse()
                }
             }
         })

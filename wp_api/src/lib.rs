@@ -45,9 +45,17 @@ impl WpContext {
     }
 }
 
+/// WordPress site user account which is used to login from wp-login.php.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct WpLoginCredentials {
+    pub username: String,
+    pub password: String,
+}
+
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WpAuthentication {
     AuthorizationHeader { token: String },
+    UserAccount { login: WpLoginCredentials },
     None,
 }
 
