@@ -11,7 +11,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
-#[ErrorType(crate::WpApiErrorWrapper)]
+#[ErrorType(crate::WpApiError)]
 enum PostsRequest {
     #[contextual_get(url = "/posts", params = &PostListParams, output = Vec<crate::posts::SparsePost>, filter_by = crate::posts::SparsePostField)]
     List,

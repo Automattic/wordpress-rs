@@ -10,21 +10,36 @@ where
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum WpApiErrorWrapper {
-    #[error("{}", inner)]
-    Inner { inner: WpApiError },
-}
-
-impl From<WpApiError> for WpApiErrorWrapper {
-    fn from(value: WpApiError) -> Self {
-        Self::Inner { inner: value }
+impl ParsedRequestError for WpApiError {
+    fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
+        if let Ok(wp_error) = serde_json::from_slice::<WpError>(&response.body) {
+            Some(Self::WpError {
+                error_code: wp_error.code,
+                error_message: wp_error.message,
+                status_code: response.status_code,
+                response: response.body_as_string(),
+            })
+        } else {
+            match http::StatusCode::from_u16(response.status_code) {
+                Ok(status) => {
+                    if status.is_client_error() || status.is_server_error() {
+                        Some(Self::UnknownError {
+                            status_code: response.status_code,
+                            response: response.body_as_string(),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => Some(WpApiError::InvalidHttpStatusCode {
+                    status_code: response.status_code,
+                }),
+            }
+        }
     }
-}
 
-impl From<RequestExecutionError> for WpApiErrorWrapper {
-    fn from(value: RequestExecutionError) -> Self {
-        WpApiError::from(value).into()
+    fn as_parse_error(reason: String, response: String) -> Self {
+        Self::ResponseParsingError { reason, response }
     }
 }
 

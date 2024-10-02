@@ -4,7 +4,7 @@ use super::JetpackNamespace;
 use wp_api::request::endpoint::{AsNamespace, DerivedRequest};
 
 #[derive(WpDerivedRequest)]
-#[ErrorType(crate::JpApiErrorWrapper)]
+#[ErrorType(crate::JpApiError)]
 enum ConnectionRequest {
     #[get(url = "/connection", output = crate::jetpack_connection::JetpackConnectionStatus)]
     Status,

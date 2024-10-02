@@ -70,7 +70,7 @@ fn generate_async_request_executor(
             quote! {
                 pub async #fn_signature -> Result<#output_type, #error_type> {
                     #request_from_request_builder
-                    self.request_executor.execute(std::sync::Arc::new(request)).await.map_err(|err| #error_type::from(err))?.parse().map_err(|err| #error_type::from(err))
+                    self.request_executor.execute(std::sync::Arc::new(request)).await?.parse()
                }
             }
         })
