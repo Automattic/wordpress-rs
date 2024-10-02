@@ -8,6 +8,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
+#[ErrorType(crate::WpApiError)]
 enum UsersRequest {
     #[contextual_get(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>, filter_by = crate::SparseUserField)]
     List,

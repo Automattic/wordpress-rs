@@ -6,10 +6,11 @@ use syn::{
     Ident, Token,
 };
 
-use crate::variant_attr::ParsedVariantAttribute;
+use crate::{outer_attr::OuterAttr, variant_attr::ParsedVariantAttribute};
 
 #[derive(Debug, Clone)]
 pub struct ParsedEnum {
+    pub outer_attr: OuterAttr,
     pub enum_ident: Ident,
     pub variants: Punctuated<ParsedVariant, Comma>,
 }
@@ -21,6 +22,7 @@ impl Parse for ParsedEnum {
         let content: ParseBuffer;
         let _brace_token = braced!(content in input);
         Ok(Self {
+            outer_attr,
             enum_ident,
             variants: content.parse_terminated(ParsedVariant::parse, Token![,])?,
         })

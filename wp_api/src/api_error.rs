@@ -11,6 +11,24 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum WpApiErrorWrapper {
+    #[error("{}", inner)]
+    Inner { inner: WpApiError },
+}
+
+impl From<WpApiError> for WpApiErrorWrapper {
+    fn from(value: WpApiError) -> Self {
+        Self::Inner { inner: value }
+    }
+}
+
+impl From<RequestExecutionError> for WpApiErrorWrapper {
+    fn from(value: RequestExecutionError) -> Self {
+        WpApiError::from(value).into()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]
     InvalidHttpStatusCode { status_code: u16 },

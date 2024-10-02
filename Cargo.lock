@@ -999,6 +999,7 @@ dependencies = [
  "paste",
  "serde",
  "serde_json",
+ "thiserror",
  "uniffi",
  "wp_api",
  "wp_contextual",

@@ -7,6 +7,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
+#[ErrorType(crate::WpApiError)]
 enum PluginsRequest {
     #[post(url = "/plugins", params = &crate::PluginCreateParams, output = crate::PluginWithEditContext)]
     Create,
