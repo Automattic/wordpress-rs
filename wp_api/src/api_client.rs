@@ -1,19 +1,25 @@
-use crate::request::{
-    endpoint::{
-        application_passwords_endpoint::{
-            ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
-        },
-        plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
-        post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
-        posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
-        site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
-        users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
-        wp_site_health_tests_endpoint::{
-            WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
-        },
-        ApiBaseUrl,
+use crate::{
+    authenticator::{
+        ApplicationPasswordAuthenticator, AuthenticatedRequestExecutor, Authenticator,
+        CookieAuthenticator, NilAuthenticator,
     },
-    RequestExecutor,
+    request::{
+        endpoint::{
+            application_passwords_endpoint::{
+                ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
+            },
+            plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
+            post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
+            posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
+            site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
+            users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
+            wp_site_health_tests_endpoint::{
+                WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
+            },
+            ApiBaseUrl,
+        },
+        RequestExecutor,
+    },
 };
 use crate::{ParsedUrl, WpAuthentication};
 use std::sync::Arc;
@@ -26,9 +32,9 @@ struct UniffiWpApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(site_url: Arc<ParsedUrl>) -> Self {
         Self {
-            inner: WpApiRequestBuilder::new(site_url, authentication),
+            inner: WpApiRequestBuilder::new(site_url),
         }
     }
 }
@@ -45,11 +51,10 @@ pub struct WpApiRequestBuilder {
 }
 
 impl WpApiRequestBuilder {
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(site_url: Arc<ParsedUrl>) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
         macro_helper::wp_api_request_builder!(
-            api_base_url,
-            authentication;
+            api_base_url;
             application_passwords,
             plugins,
             post_types,
@@ -99,9 +104,25 @@ impl WpApiClient {
     ) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 
+        let authenticator: Arc<dyn Authenticator> = match &authentication {
+            WpAuthentication::AuthorizationHeader { token } => {
+                Arc::new(ApplicationPasswordAuthenticator::new(token.clone()))
+            }
+            WpAuthentication::UserAccount { login } => Arc::new(CookieAuthenticator::new(
+                site_url.inner.clone().into(),
+                login.clone(),
+                request_executor.clone(),
+            )),
+            WpAuthentication::None => Arc::new(NilAuthenticator {}),
+        };
+
+        let request_executor = Arc::new(AuthenticatedRequestExecutor::new(
+            authenticator,
+            request_executor,
+        ));
+
         macro_helper::wp_api_client!(
             api_base_url,
-            authentication,
             request_executor;
             application_passwords,
             plugins,
@@ -156,12 +177,11 @@ mod macro_helper {
     }
 
     macro_rules! wp_api_request_builder {
-        ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
+        ($api_base_url:ident; $($element:expr),*) => {
             paste::paste! {
                 Self {
                     $($element: [<$element:camel RequestBuilder>]::new(
-                        $api_base_url.clone(),
-                        $authentication.clone(),
+                        $api_base_url.clone()
                     )
                     .into(),)*
                 }
@@ -170,12 +190,11 @@ mod macro_helper {
     }
 
     macro_rules! wp_api_client {
-        ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+        ($api_base_url:ident, $request_executor:ident; $($element:expr),*) => {
             paste::paste! {
                 Self {
                     $($element: [<$element:camel RequestExecutor>]::new(
                         $api_base_url.clone(),
-                        $authentication.clone(),
                         $request_executor.clone(),
                     )
                     .into(),)*

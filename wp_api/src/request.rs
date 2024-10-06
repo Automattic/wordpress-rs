@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::{
     api_error::{RequestExecutionError, WpError},
-    WpApiError, WpAuthentication,
+    WpApiError,
 };
 
 use self::endpoint::WpEndpointUrl;
@@ -18,13 +18,11 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug)]
-struct InnerRequestBuilder {
-    authentication: WpAuthentication,
-}
+struct InnerRequestBuilder {}
 
 impl InnerRequestBuilder {
-    fn new(authentication: WpAuthentication) -> Self {
-        Self { authentication }
+    fn new() -> Self {
+        Self {}
     }
 
     fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
@@ -65,15 +63,6 @@ impl InnerRequestBuilder {
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        match self.authentication {
-            WpAuthentication::None => (),
-            WpAuthentication::UserAccount { ref login } => (),
-            WpAuthentication::AuthorizationHeader { ref token } => {
-                let hv = HeaderValue::from_str(&format!("Basic {}", token));
-                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
-                header_map.insert(http::header::AUTHORIZATION, hv);
-            }
-        };
         header_map.into()
     }
 
@@ -143,6 +132,14 @@ impl WpNetworkRequest {
 
     pub fn body_as_string(&self) -> Option<String> {
         self.body.as_ref().map(|b| body_as_string(&b.inner))
+    }
+}
+
+impl WpNetworkRequest {
+    pub fn add_header(&mut self, name: HeaderName, value: HeaderValue) {
+        let mut header_map = self.header_map.inner.clone();
+        header_map.insert(name, value);
+        self.header_map = WpNetworkHeaderMap::new(header_map).into();
     }
 }
 
