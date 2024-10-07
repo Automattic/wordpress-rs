@@ -42,7 +42,7 @@ GEM
     babosa (1.0.4)
     base64 (0.2.0)
     bigdecimal (3.1.8)
-    buildkit (1.6.0)
+    buildkit (1.6.1)
       sawyer (>= 0.6)
     chroma (0.2.0)
     claide (1.1.0)
@@ -171,7 +171,7 @@ GEM
       xcodeproj (>= 1.13.0, < 2.0.0)
       xcpretty (~> 0.3.0)
       xcpretty-travis-formatter (>= 0.0.3, < 2.0.0)
-    fastlane-plugin-wpmreleasetoolkit (12.1.0)
+    fastlane-plugin-wpmreleasetoolkit (12.2.0)
       activesupport (>= 6.1.7.1)
       buildkit (~> 1.5)
       chroma (= 0.2.0)
@@ -236,7 +236,7 @@ GEM
     http-cookie (1.0.7)
       domain_name (~> 0.5)
     httpclient (2.8.3)
-    i18n (1.14.5)
+    i18n (1.14.6)
       concurrent-ruby (~> 1.0)
     java-properties (0.3.0)
     jmespath (1.6.2)
@@ -273,7 +273,7 @@ GEM
     public_suffix (4.0.7)
     racc (1.8.1)
     rake (13.2.1)
-    rake-compiler (1.2.7)
+    rake-compiler (1.2.8)
       rake
     rchardet (1.8.0)
     representable (3.2.0)
@@ -334,7 +334,7 @@ PLATFORMS
 DEPENDENCIES
   cocoapods (~> 1.15)
   fastlane (~> 2.224)
-  fastlane-plugin-wpmreleasetoolkit (~> 12.1)
+  fastlane-plugin-wpmreleasetoolkit (~> 12.2)
 
 BUNDLED WITH
    2.4.10
