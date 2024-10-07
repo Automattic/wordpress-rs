@@ -170,10 +170,12 @@ docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
 
 swift-linux-library: bindings
+	rm -rvf target/swift-bindings/libwordpressFFI-linux
 	mkdir -p target/swift-bindings/libwordpressFFI-linux
 	cp target/swift-bindings/*.h target/swift-bindings/libwordpressFFI-linux/
-	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/libwordpressFFI-linux/module.modulemap
+	cp target/swift-bindings/module.modulemap target/swift-bindings/libwordpressFFI-linux/
 	cp target/release/libwp_api.a target/swift-bindings/libwordpressFFI-linux/
+	cp target/release/libjetpack_api.a target/swift-bindings/libwordpressFFI-linux/
 
 swift-example-app: swift-example-app-mac swift-example-app-ios
 
@@ -190,7 +192,7 @@ test-swift-linux: docker-image-swift
 	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
-	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
+	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api -Xlinker -ljetpack_api
 
 test-swift-darwin: xcframework
 	swift test
