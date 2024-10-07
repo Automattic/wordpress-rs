@@ -39,7 +39,8 @@ impl CreateXCFramework {
 
         XCFramework::new(&self.targets, &self.profile)?.create(&temp_dir)?;
 
-        Ok(())
+        std::fs::remove_dir_all(&temp_dir)
+            .with_context(|| format!("Failed to remove temporary dir: {:?}", temp_dir))
     }
 }
 
