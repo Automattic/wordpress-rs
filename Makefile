@@ -38,12 +38,21 @@ clean:
 	@# Help: Remove untracked files from the project via Git.
 	git clean -ffXd
 
+export MODULEMAP_CONTENT
 bindings:
 	rm -rf target/swift-bindings
+	mkdir target/swift-bindings
 	cargo build --release
 
+	echo '// Auto-generated' > target/swift-bindings/libwordpressFFI.h
+
 	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
+	echo '#include "wp_api_uniffi.h"' >> target/swift-bindings/libwordpressFFI.h
+
 	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libjetpack_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
+	echo '#include "jetpack_api_uniffi.h"' >> target/swift-bindings/libwordpressFFI.h
+
+	echo "$$MODULEMAP_CONTENT" > target/swift-bindings/module.modulemap
 	cp target/swift-bindings/*.swift native/swift/Sources/wordpress-api-wrapper/
 
 .PHONY: docs # Rebuild docs each time we run this command
@@ -85,14 +94,11 @@ release-on-ci:
 	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
 
 # An XCFramework relies on the .h file and the modulemap to interact with the precompiled binary
-export MODULEMAP_CONTENT
 xcframework-headers: bindings
 	rm -rvf target/swift-bindings/headers
 	mkdir -p target/swift-bindings/headers
-
 	cp target/swift-bindings/*.h target/swift-bindings/headers
-	find target/swift-bindings/headers -name '*.h' -exec basename {} \; | xargs -I {} echo '#include "{}"' > target/swift-bindings/headers/libwordpressFFI.h
-	echo "$$MODULEMAP_CONTENT" > target/swift-bindings/headers/module.modulemap
+	cp target/swift-bindings/module.modulemap target/swift-bindings/headers/
 
 apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
 apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
