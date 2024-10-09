@@ -24,6 +24,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 syn = { workspace = true, features = ["extra-traits"] }
 thiserror = { workspace = true }
+toml = { workspace = true }
 uniffi = { workspace = true }
 
 [dev-dependencies]
