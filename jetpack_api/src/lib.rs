@@ -1,7 +1,8 @@
 #![allow(dead_code, unused_variables)]
 
 pub use jetpack_client::{JetpackClient, JetpackRequestBuilder};
-use wp_api::{ParsedRequestError, RequestExecutionError, WpError, WpErrorCode};
+use request::JetpackRequestExecutionError;
+use wp_api::{ParsedRequestError, WpError, WpErrorCode};
 
 mod jetpack_client; // re-exported relevant types
 
@@ -46,10 +47,10 @@ pub enum JpApiError {
     },
 }
 
-impl From<RequestExecutionError> for JpApiError {
-    fn from(value: RequestExecutionError) -> Self {
+impl From<JetpackRequestExecutionError> for JpApiError {
+    fn from(value: JetpackRequestExecutionError) -> Self {
         match value {
-            RequestExecutionError::RequestExecutionFailed {
+            JetpackRequestExecutionError::RequestExecutionFailed {
                 status_code,
                 reason,
             } => Self::RequestExecutionFailed {
@@ -61,28 +62,28 @@ impl From<RequestExecutionError> for JpApiError {
 }
 
 impl ParsedRequestError for JpApiError {
-    fn try_parse(response: &wp_api::request::WpNetworkResponse) -> Option<Self> {
-        if let Ok(wp_error) = serde_json::from_slice::<WpError>(&response.body) {
+    fn try_parse(response_body: &Vec<u8>, response_status_code: u16) -> Option<Self> {
+        if let Ok(wp_error) = serde_json::from_slice::<WpError>(response_body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
-                status_code: response.status_code,
-                response: response.body_as_string(),
+                status_code: response_status_code,
+                response: String::from_utf8_lossy(response_body).to_string(),
             })
         } else {
-            match http::StatusCode::from_u16(response.status_code) {
+            match http::StatusCode::from_u16(response_status_code) {
                 Ok(status) => {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
-                            status_code: response.status_code,
-                            response: response.body_as_string(),
+                            status_code: response_status_code,
+                            response: String::from_utf8_lossy(response_body).to_string(),
                         })
                     } else {
                         None
                     }
                 }
                 Err(_) => Some(Self::InvalidHttpStatusCode {
-                    status_code: response.status_code,
+                    status_code: response_status_code,
                 }),
             }
         }

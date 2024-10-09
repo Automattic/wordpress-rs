@@ -5,7 +5,6 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod generate;
-mod outer_attr;
 mod parse;
 mod variant_attr;
 

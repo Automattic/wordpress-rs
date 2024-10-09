@@ -7,7 +7,6 @@ use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
-#[ErrorType(crate::WpApiError)]
 enum SiteSettingsRequest {
     #[contextual_get(url = "/settings", output = crate::site_settings::SparseSiteSettings, filter_by = crate::site_settings::SparseSiteSettingsField)]
     Retrieve,

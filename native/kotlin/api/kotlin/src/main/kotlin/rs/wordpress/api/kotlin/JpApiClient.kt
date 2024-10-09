@@ -3,10 +3,10 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import uniffi.jetpack_api.JetpackRequestExecutor
 import uniffi.jetpack_api.JpApiException
 import uniffi.jetpack_api.UniffiJetpackClient
 import uniffi.wp_api.ParsedUrl
-import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpAuthentication
 
 class JpApiClient
@@ -14,7 +14,7 @@ class JpApiClient
 constructor(
     siteUrl: ParsedUrl,
     authentication: WpAuthentication,
-    private val requestExecutor: RequestExecutor = WpRequestExecutor(),
+    private val requestExecutor: JetpackRequestExecutor = JpRequestExecutor(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used

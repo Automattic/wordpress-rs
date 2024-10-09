@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use wp_api::{
-    api_client_generate_api_client, api_client_generate_endpoint_impl,
-    api_client_generate_request_builder,
-    request::{endpoint::ApiBaseUrl, RequestExecutor},
-    ParsedUrl, WpAuthentication,
-};
-
 use crate::request::endpoint::connection_endpoint::{
     ConnectionRequestBuilder, ConnectionRequestExecutor,
+};
+use crate::request::JetpackRequestExecutor;
+use wp_api::{
+    api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder, request::endpoint::ApiBaseUrl, ParsedUrl,
+    WpAuthentication,
 };
 
 #[derive(Debug, uniffi::Object)]
@@ -53,7 +52,7 @@ impl UniffiJetpackClient {
     fn new(
         site_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
+        request_executor: Arc<dyn JetpackRequestExecutor>,
     ) -> Self {
         Self {
             inner: JetpackClient::new(site_url, authentication, request_executor),
@@ -70,7 +69,7 @@ impl JetpackClient {
     pub fn new(
         site_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
+        request_executor: Arc<dyn JetpackRequestExecutor>,
     ) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 

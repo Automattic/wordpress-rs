@@ -8,8 +8,8 @@ import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 class JetpackEndpointTest {
     // These credentials are from a throwaway site
     private val client = JpApiClient(
-        ParsedUrl.parse("https://solitary-warbler.jurassic.ninja/"), wpAuthenticationFromUsernameAndPassword(
-            username = "demo", password = "4vhX miDF aYSd MNSL Gka5 m6WF"
+        ParsedUrl.parse("https://moral-manx-partridge.jurassic.ninja/"), wpAuthenticationFromUsernameAndPassword(
+            username = "demo", password = "NZKM 5vE2 4pu3 bUg8 hRIh PKR4"
         )
     )
 

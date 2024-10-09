@@ -11,28 +11,28 @@ where
 }
 
 impl ParsedRequestError for WpApiError {
-    fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
-        if let Ok(wp_error) = serde_json::from_slice::<WpError>(&response.body) {
+    fn try_parse(response_body: &Vec<u8>, response_status_code: u16) -> Option<Self> {
+        if let Ok(wp_error) = serde_json::from_slice::<WpError>(response_body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
-                status_code: response.status_code,
-                response: response.body_as_string(),
+                status_code: response_status_code,
+                response: String::from_utf8_lossy(response_body).to_string(),
             })
         } else {
-            match http::StatusCode::from_u16(response.status_code) {
+            match http::StatusCode::from_u16(response_status_code) {
                 Ok(status) => {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
-                            status_code: response.status_code,
-                            response: response.body_as_string(),
+                            status_code: response_status_code,
+                            response: String::from_utf8_lossy(response_body).to_string(),
                         })
                     } else {
                         None
                     }
                 }
                 Err(_) => Some(WpApiError::InvalidHttpStatusCode {
-                    status_code: response.status_code,
+                    status_code: response_status_code,
                 }),
             }
         }
