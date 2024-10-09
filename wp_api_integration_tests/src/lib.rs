@@ -198,7 +198,7 @@ impl jetpack_api::request::JetpackRequestExecutor for AsyncWpNetworking {
                 status_code: err.status().map(|s| s.as_u16()),
                 reason: err.to_string(),
             })
-            .map(|response| JpNetworkResponse::from(response))
+            .map(JpNetworkResponse::from)
     }
 }
 

@@ -11,13 +11,13 @@ where
 }
 
 impl ParsedRequestError for WpApiError {
-    fn try_parse(response_body: &Vec<u8>, response_status_code: u16) -> Option<Self> {
+    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
         if let Ok(wp_error) = serde_json::from_slice::<WpError>(response_body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
                 status_code: response_status_code,
-                response: String::from_utf8_lossy(response_body).to_string(),
+                response: request_or_response_body_as_string(response_body),
             })
         } else {
             match http::StatusCode::from_u16(response_status_code) {
@@ -25,7 +25,7 @@ impl ParsedRequestError for WpApiError {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
                             status_code: response_status_code,
-                            response: String::from_utf8_lossy(response_body).to_string(),
+                            response: request_or_response_body_as_string(response_body),
                         })
                     } else {
                         None

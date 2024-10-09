@@ -2,7 +2,9 @@ use std::{fmt::Debug, sync::Arc};
 
 use serde::Deserialize;
 use wp_api::{
-    request::{WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse},
+    request::{
+        request_or_response_body_as_string, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+    },
     ParsedRequestError, WpError,
 };
 
@@ -58,10 +60,6 @@ impl From<WpNetworkResponse> for JpNetworkResponse {
 }
 
 impl JpNetworkResponse {
-    pub fn body_as_string(&self) -> String {
-        String::from_utf8_lossy(&self.body).to_string()
-    }
-
     pub fn parse<'de, T, E>(&'de self) -> Result<T, E>
     where
         T: Deserialize<'de>,
@@ -70,8 +68,12 @@ impl JpNetworkResponse {
         if let Some(err) = E::try_parse(&self.body, self.status_code) {
             return Err(err);
         }
-        serde_json::from_slice(&self.body)
-            .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
+        serde_json::from_slice(&self.body).map_err(|err| {
+            E::as_parse_error(
+                err.to_string(),
+                request_or_response_body_as_string(&self.body),
+            )
+        })
     }
 
     pub fn parse_with<F, T>(&self, parser: F) -> Result<T, JpApiError>
@@ -87,7 +89,7 @@ impl JpNetworkResponse {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
                 status_code: self.status_code,
-                response: self.body_as_string(),
+                response: request_or_response_body_as_string(&self.body),
             })
         } else {
             let status = http::StatusCode::from_u16(self.status_code).map_err(|_| {
@@ -98,7 +100,7 @@ impl JpNetworkResponse {
             if status.is_client_error() || status.is_server_error() {
                 Err(JpApiError::UnknownError {
                     status_code: self.status_code,
-                    response: self.body_as_string(),
+                    response: request_or_response_body_as_string(&self.body),
                 })
             } else {
                 Ok(())
@@ -119,7 +121,7 @@ impl Debug for JpNetworkResponse {
                 "},
             self.status_code,
             self.header_map,
-            self.body_as_string()
+            request_or_response_body_as_string(&self.body),
         );
         s.pop(); // Remove the new line at the end
         write!(f, "{}", s)

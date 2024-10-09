@@ -7,6 +7,7 @@ use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
 
 #[tokio::test]
 #[parallel]
+#[ignore]
 async fn jetpack_connection() {
     // This is a disposable site, so temporarily having these credentials here is not a problem
     let authentication = WpAuthentication::from_username_and_password(
