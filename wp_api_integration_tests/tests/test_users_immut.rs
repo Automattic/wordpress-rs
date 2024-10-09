@@ -108,7 +108,8 @@ async fn retrieve_user_with_edit_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
         .users()
         .retrieve_with_edit_context(&user_id)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(user_id, user.id);
 }
 
@@ -123,7 +124,8 @@ async fn retrieve_user_with_embed_context(
         .users()
         .retrieve_with_embed_context(&user_id)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(user_id, user.id);
 }
 
@@ -136,7 +138,8 @@ async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
         .users()
         .retrieve_with_view_context(&user_id)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(user_id, user.id);
 }
 
@@ -147,7 +150,8 @@ async fn retrieve_me_with_edit_context() {
         .users()
         .retrieve_me_with_edit_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     // FIRST_USER_ID is the current user's id
     assert_eq!(FIRST_USER_ID, user.id);
 }
@@ -159,7 +163,8 @@ async fn retrieve_me_with_embed_context() {
         .users()
         .retrieve_me_with_embed_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     // FIRST_USER_ID is the current user's id
     assert_eq!(FIRST_USER_ID, user.id);
 }
@@ -171,7 +176,8 @@ async fn retrieve_me_with_view_context() {
         .users()
         .retrieve_me_with_view_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     // FIRST_USER_ID is the current user's id
     assert_eq!(FIRST_USER_ID, user.id);
 }
@@ -203,6 +209,7 @@ mod filter {
             .filter_list_with_edit_context(&UserListParams::default(), fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|user| {
                 user.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -221,7 +228,8 @@ mod filter {
             .users()
             .filter_retrieve_with_edit_context(&FIRST_USER_ID, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         user.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -237,7 +245,8 @@ mod filter {
             .users()
             .filter_retrieve_me_with_edit_context(fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         user.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -250,6 +259,7 @@ mod filter {
             .filter_list_with_embed_context(&UserListParams::default(), fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|user| {
                 user.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -266,7 +276,8 @@ mod filter {
             .users()
             .filter_retrieve_with_embed_context(&FIRST_USER_ID, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         user.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -280,7 +291,8 @@ mod filter {
             .users()
             .filter_retrieve_me_with_embed_context(fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         user.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -293,6 +305,7 @@ mod filter {
             .filter_list_with_view_context(&UserListParams::default(), fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|user| {
                 user.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -309,7 +322,8 @@ mod filter {
             .users()
             .filter_retrieve_with_view_context(&FIRST_USER_ID, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         user.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -323,7 +337,8 @@ mod filter {
             .users()
             .filter_retrieve_me_with_view_context(fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         user.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 }

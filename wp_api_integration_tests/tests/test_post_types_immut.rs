@@ -16,7 +16,8 @@ async fn list_post_types_with_edit_context() {
         .post_types()
         .list_with_edit_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         response
             .post_types
@@ -35,7 +36,8 @@ async fn list_post_types_with_embed_context() {
         .post_types()
         .list_with_embed_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         response
             .post_types
@@ -54,7 +56,8 @@ async fn list_post_types_with_view_context() {
         .post_types()
         .list_with_view_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         response
             .post_types
@@ -87,7 +90,8 @@ async fn retrieve_post_types_with_edit_context(
         .post_types()
         .retrieve_with_edit_context(&post_type)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     // All post types in our current testing sites support `Title`, so we use this assertion
     // to verify that we are able to parse `supports` field properly.
     //
@@ -191,7 +195,8 @@ mod filter {
             .post_types()
             .filter_retrieve_with_edit_context(&post_type, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -218,7 +223,8 @@ mod filter {
             .post_types()
             .filter_retrieve_with_embed_context(&post_type, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -245,7 +251,8 @@ mod filter {
             .post_types()
             .filter_retrieve_with_view_context(&post_type, fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 }

@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use endpoint::ApiEndpointUrl;
 use http::{HeaderMap, HeaderName, HeaderValue};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
 use crate::{
@@ -16,6 +16,16 @@ pub mod endpoint;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
+const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
+const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ParsedResponse<T> {
+    pub data: T,
+    #[serde(skip)]
+    pub header_map: Arc<WpNetworkHeaderMap>,
+}
 
 #[derive(Debug)]
 struct InnerRequestBuilder {
@@ -184,6 +194,21 @@ impl WpNetworkHeaderMap {
         Self { inner: header_map }
     }
 
+    pub fn wp_total(&self) -> Option<u32> {
+        self.header_value_as_u32(HEADER_KEY_WP_TOTAL)
+    }
+
+    pub fn wp_total_pages(&self) -> Option<u32> {
+        self.header_value_as_u32(HEADER_KEY_WP_TOTAL_PAGES)
+    }
+
+    pub fn header_value_as_u32(&self, header_name: &str) -> Option<u32> {
+        self.inner
+            .get(header_name)
+            .and_then(|h_v| h_v.to_str().ok())
+            .and_then(|h| h.parse().ok())
+    }
+
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
         header_name: String,
@@ -299,12 +324,23 @@ impl WpNetworkResponse {
         body_as_string(&self.body)
     }
 
-    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WpApiError> {
+    pub fn parse<T, D>(self) -> Result<T, WpApiError>
+    where
+        T: DeserializeOwned,
+        T: From<ParsedResponse<D>>,
+        ParsedResponse<D>: From<T>,
+    {
         self.parse_response_for_errors()?;
-        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ResponseParsingError {
-            reason: err.to_string(),
-            response: self.body_as_string(),
-        })
+        serde_json::from_slice(&self.body)
+            .map_err(|err| WpApiError::ResponseParsingError {
+                reason: err.to_string(),
+                response: self.body_as_string(),
+            })
+            .map(|x| {
+                let mut p = ParsedResponse::<D>::from(x);
+                p.header_map = self.header_map;
+                T::from(p)
+            })
     }
 
     pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WpApiError>

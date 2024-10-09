@@ -17,7 +17,8 @@ macro_rules! generate_tests {
                     .wp_site_health_tests()
                     .$ident()
                     .await
-                    .assert_response();
+                    .assert_response()
+                    .data;
                 assert!(!t.test.is_empty());
             }
 
@@ -38,7 +39,8 @@ macro_rules! generate_tests {
                     .wp_site_health_tests()
                     .[<filter_$ident>](fields)
                     .await
-                    .assert_response();
+                    .assert_response()
+                    .data;
                 validate_sparse_wp_site_health_tests_fields(&wp_site_health_test, fields);
             }
         }
@@ -114,7 +116,8 @@ async fn filter_directory_sizes(#[case] fields: &[SparseWpSiteHealthDirectorySiz
         .wp_site_health_tests()
         .filter_directory_sizes(fields)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     validate_sparse_wp_site_health_directory_sizes_fields(&directory_sizes, fields);
 }
 

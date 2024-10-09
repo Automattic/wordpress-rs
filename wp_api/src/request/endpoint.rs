@@ -2,13 +2,13 @@ use url::Url;
 
 use crate::SparseField;
 
-pub(crate) mod application_passwords_endpoint;
-pub(crate) mod plugins_endpoint;
-pub(crate) mod post_types_endpoint;
-pub(crate) mod posts_endpoint;
-pub(crate) mod site_settings_endpoint;
-pub(crate) mod users_endpoint;
-pub(crate) mod wp_site_health_tests_endpoint;
+pub mod application_passwords_endpoint;
+pub mod plugins_endpoint;
+pub mod post_types_endpoint;
+pub mod posts_endpoint;
+pub mod site_settings_endpoint;
+pub mod users_endpoint;
+pub mod wp_site_health_tests_endpoint;
 
 const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 

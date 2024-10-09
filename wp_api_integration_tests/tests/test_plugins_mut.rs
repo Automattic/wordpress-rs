@@ -19,7 +19,8 @@ async fn create_plugin() {
         .plugins()
         .create(&params)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(created_plugin.status, status);
     println!("Created Plugin: {:?}", created_plugin);
 
@@ -37,7 +38,8 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
         .plugins()
         .update(&slug, &PluginUpdateParams { status: new_status })
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(updated_plugin.status, new_status);
     println!("Updated Plugin: {:?}", updated_plugin);
 
@@ -48,7 +50,12 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
 #[serial]
 async fn delete_plugin() {
     let slug = CLASSIC_EDITOR_PLUGIN_SLUG.into();
-    let deleted_plugin = api_client().plugins().delete(&slug).await.assert_response();
+    let deleted_plugin = api_client()
+        .plugins()
+        .delete(&slug)
+        .await
+        .assert_response()
+        .data;
     assert_eq!(slug, deleted_plugin.previous.plugin);
     println!("Deleted Plugin: {:?}", deleted_plugin);
 
