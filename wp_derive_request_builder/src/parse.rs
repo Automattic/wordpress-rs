@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseBuffer, ParseStream},
     punctuated::Punctuated,
     token::Comma,
-    Attribute, Ident, Token,
+    Ident, Token,
 };
 
 use crate::variant_attr::ParsedVariantAttribute;
@@ -16,7 +16,6 @@ pub struct ParsedEnum {
 
 impl Parse for ParsedEnum {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let _ = Attribute::parse_outer(input)?;
         let _enum_token: Token![enum] = input.parse()?;
         let enum_ident: Ident = input.parse()?;
         let content: ParseBuffer;

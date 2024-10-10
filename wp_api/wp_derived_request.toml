@@ -1,0 +1,2 @@
+error_type = "crate::WpApiError"
+request_executor = "crate::request::RequestExecutor"

@@ -7,8 +7,6 @@ use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparsePostTypeDetailsField)]
 enum PostTypesRequest {
     #[contextual_get(url = "/types", output = crate::post_types::SparsePostTypesResponse)]
     List,
