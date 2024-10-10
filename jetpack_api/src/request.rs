@@ -8,14 +8,6 @@ use wp_api::{
 
 pub mod endpoint;
 
-pub trait JetpackParsedRequestError
-where
-    Self: Sized,
-{
-    fn try_parse(response: &JetpackNetworkResponse) -> Option<Self>;
-    fn as_parse_error(reason: String, response: String) -> Self;
-}
-
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait JetpackRequestExecutor: Send + Sync + Debug {
