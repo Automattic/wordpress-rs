@@ -4,17 +4,17 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.jetpack_api.JetpackRequestExecutor
-import uniffi.jetpack_api.JpApiException
+import uniffi.jetpack_api.JetpackApiException
 import uniffi.jetpack_api.UniffiJetpackClient
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.WpAuthentication
 
-class JpApiClient
-@Throws(JpApiException::class)
+class JetpackApiClient
+@Throws(JetpackApiException::class)
 constructor(
     siteUrl: ParsedUrl,
     authentication: WpAuthentication,
-    private val requestExecutor: JetpackRequestExecutor = JpRequestExecutor(),
+    private val requestExecutor: JetpackRequestExecutor = JetpackRequestExecutor(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
@@ -33,27 +33,27 @@ constructor(
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
             WpRequestResult.WpRequestSuccess(data = executeRequest(requestBuilder))
-        } catch (exception: JpApiException) {
+        } catch (exception: JetpackApiException) {
             when (exception) {
-                is JpApiException.InvalidHttpStatusCode -> WpRequestResult.InvalidHttpStatusCode(
+                is JetpackApiException.InvalidHttpStatusCode -> WpRequestResult.InvalidHttpStatusCode(
                     statusCode = exception.statusCode,
                 )
-                is JpApiException.RequestExecutionFailed -> WpRequestResult.RequestExecutionFailed(
+                is JetpackApiException.RequestExecutionFailed -> WpRequestResult.RequestExecutionFailed(
                     statusCode = exception.statusCode,
                     reason = exception.reason
                 )
-                is JpApiException.ResponseParsingException -> WpRequestResult.ResponseParsingError(
+                is JetpackApiException.ResponseParsingException -> WpRequestResult.ResponseParsingError(
                     reason = exception.reason,
                     response = exception.response,
                 )
-                is JpApiException.SiteUrlParsingException -> WpRequestResult.SiteUrlParsingError(
+                is JetpackApiException.SiteUrlParsingException -> WpRequestResult.SiteUrlParsingError(
                     reason = exception.reason,
                 )
-                is JpApiException.UnknownException -> WpRequestResult.UnknownError(
+                is JetpackApiException.UnknownException -> WpRequestResult.UnknownError(
                     statusCode = exception.statusCode,
                     response = exception.response,
                 )
-                is JpApiException.WpException -> WpRequestResult.WpError(
+                is JetpackApiException.WpException -> WpRequestResult.WpError(
                     errorCode = exception.errorCode,
                     errorMessage = exception.errorMessage,
                     statusCode = exception.statusCode,

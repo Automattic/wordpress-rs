@@ -12,7 +12,7 @@ pub mod jetpack_connection;
 pub mod request;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum JpApiError {
+pub enum JetpackApiError {
     #[error("Status code ({}) is not valid", status_code)]
     InvalidHttpStatusCode { status_code: u16 },
     #[error(
@@ -49,7 +49,7 @@ pub enum JpApiError {
     },
 }
 
-impl From<JetpackRequestExecutionError> for JpApiError {
+impl From<JetpackRequestExecutionError> for JetpackApiError {
     fn from(value: JetpackRequestExecutionError) -> Self {
         match value {
             JetpackRequestExecutionError::RequestExecutionFailed {
@@ -63,7 +63,7 @@ impl From<JetpackRequestExecutionError> for JpApiError {
     }
 }
 
-impl ParsedRequestError for JpApiError {
+impl ParsedRequestError for JetpackApiError {
     fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
         if let Ok(wp_error) = serde_json::from_slice::<WpError>(response_body) {
             Some(Self::WpError {

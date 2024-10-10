@@ -7,7 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.jetpack_api.JetpackRequestExecutor
-import uniffi.jetpack_api.JpNetworkResponse
+import uniffi.jetpack_api.JetpackNetworkResponse
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -41,12 +41,12 @@ class WpRequestExecutor(
         }
 }
 
-class JpRequestExecutor(
+class JetpackRequestExecutor(
     private val okHttpClient: OkHttpClient = OkHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : JetpackRequestExecutor {
 
-    override suspend fun execute(request: WpNetworkRequest): JpNetworkResponse =
+    override suspend fun execute(request: WpNetworkRequest): JetpackNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
             requestBuilder.method(
@@ -60,10 +60,12 @@ class JpRequestExecutor(
             }
 
             okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
-                return@withContext JpNetworkResponse(
-                    body = response.body?.bytes() ?: ByteArray(0),
-                    statusCode = response.code.toUShort(),
-                    headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
+                return@withContext JetpackNetworkResponse(
+                    WpNetworkResponse(
+                        body = response.body?.bytes() ?: ByteArray(0),
+                        statusCode = response.code.toUShort(),
+                        headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
+                    )
                 )
             }
         }

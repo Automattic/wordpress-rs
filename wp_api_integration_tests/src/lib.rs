@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use jetpack_api::request::{JetpackRequestExecutionError, JpNetworkResponse};
+use jetpack_api::request::{JetpackNetworkResponse, JetpackRequestExecutionError};
 use std::sync::Arc;
 use wp_api::{
     posts::{CategoryId, MediaId, PostId, TagId},
@@ -139,7 +139,6 @@ impl AsyncWpNetworking {
         &self,
         wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
-        println!("Requesting: '{:#?}'", wp_request.url());
         let mut request = self
             .client
             .request(
@@ -191,14 +190,14 @@ impl jetpack_api::request::JetpackRequestExecutor for AsyncWpNetworking {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
-    ) -> Result<JpNetworkResponse, JetpackRequestExecutionError> {
+    ) -> Result<JetpackNetworkResponse, JetpackRequestExecutionError> {
         self.async_request(request)
             .await
             .map_err(|err| JetpackRequestExecutionError::RequestExecutionFailed {
                 status_code: err.status().map(|s| s.as_u16()),
                 reason: err.to_string(),
             })
-            .map(JpNetworkResponse::from)
+            .map(JetpackNetworkResponse::from)
     }
 }
 

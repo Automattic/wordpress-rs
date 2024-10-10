@@ -1,2 +1,2 @@
-error_type = "crate::JpApiError"
+error_type = "crate::JetpackApiError"
 request_executor = "crate::request::JetpackRequestExecutor"
