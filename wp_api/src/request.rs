@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{
-    api_error::{RequestExecutionError, WpError},
+    api_error::{ParsedRequestError, RequestExecutionError, WpError},
     WpApiError, WpAuthentication,
 };
 
@@ -18,16 +18,16 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
 #[derive(Debug)]
-struct InnerRequestBuilder {
+pub struct InnerRequestBuilder {
     authentication: WpAuthentication,
 }
 
 impl InnerRequestBuilder {
-    fn new(authentication: WpAuthentication) -> Self {
+    pub fn new(authentication: WpAuthentication) -> Self {
         Self { authentication }
     }
 
-    fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+    pub fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             method: RequestMethod::GET,
             url: url.into(),
@@ -36,7 +36,7 @@ impl InnerRequestBuilder {
         }
     }
 
-    fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
+    pub fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
     {
@@ -50,7 +50,7 @@ impl InnerRequestBuilder {
         }
     }
 
-    fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
+    pub fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             method: RequestMethod::DELETE,
             url: url.into(),
@@ -141,7 +141,9 @@ impl WpNetworkRequest {
     }
 
     pub fn body_as_string(&self) -> Option<String> {
-        self.body.as_ref().map(|b| body_as_string(&b.inner))
+        self.body
+            .as_ref()
+            .map(|b| request_or_response_body_as_string(&b.inner))
     }
 }
 
@@ -296,15 +298,19 @@ impl WpNetworkResponse {
     }
 
     pub fn body_as_string(&self) -> String {
-        body_as_string(&self.body)
+        request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<'de, T: Deserialize<'de>>(&'de self) -> Result<T, WpApiError> {
-        self.parse_response_for_errors()?;
-        serde_json::from_slice(&self.body).map_err(|err| WpApiError::ResponseParsingError {
-            reason: err.to_string(),
-            response: self.body_as_string(),
-        })
+    pub fn parse<'de, T, E>(&'de self) -> Result<T, E>
+    where
+        T: Deserialize<'de>,
+        E: ParsedRequestError,
+    {
+        if let Some(err) = E::try_parse(&self.body, self.status_code) {
+            return Err(err);
+        }
+        serde_json::from_slice(&self.body)
+            .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
     }
 
     pub fn parse_with<F, T>(&self, parser: F) -> Result<T, WpApiError>
@@ -368,7 +374,7 @@ pub enum RequestMethod {
     HEAD,
 }
 
-fn body_as_string(body: &[u8]) -> String {
+pub fn request_or_response_body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
 }
 

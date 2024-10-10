@@ -1,16 +1,13 @@
 use serde::Deserialize;
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum RequestExecutionError {
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
-        status_code,
-        reason
-    )]
-    RequestExecutionFailed {
-        status_code: Option<u16>,
-        reason: String,
-    },
+use crate::request::request_or_response_body_as_string;
+
+pub trait ParsedRequestError
+where
+    Self: Sized,
+{
+    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self>;
+    fn as_parse_error(reason: String, response: String) -> Self;
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -51,11 +48,50 @@ pub enum WpApiError {
     },
 }
 
+impl ParsedRequestError for WpApiError {
+    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
+        if let Some(wp_error) = WpError::try_parse(response_body, response_status_code) {
+            Some(Self::WpError {
+                error_code: wp_error.code,
+                error_message: wp_error.message,
+                status_code: response_status_code,
+                response: request_or_response_body_as_string(response_body),
+            })
+        } else {
+            match http::StatusCode::from_u16(response_status_code) {
+                Ok(status) => {
+                    if status.is_client_error() || status.is_server_error() {
+                        Some(Self::UnknownError {
+                            status_code: response_status_code,
+                            response: request_or_response_body_as_string(response_body),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => Some(WpApiError::InvalidHttpStatusCode {
+                    status_code: response_status_code,
+                }),
+            }
+        }
+    }
+
+    fn as_parse_error(reason: String, response: String) -> Self {
+        Self::ResponseParsingError { reason, response }
+    }
+}
+
 // This type is used to parse the API errors. It then gets converted to `WpApiError::WpError`.
 #[derive(Debug, Deserialize, PartialEq, Eq)]
-pub(crate) struct WpError {
+pub struct WpError {
     pub code: WpErrorCode,
     pub message: String,
+}
+
+impl WpError {
+    pub fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
+        serde_json::from_slice::<WpError>(response_body).ok()
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
@@ -255,6 +291,19 @@ pub enum WpErrorCode {
     // ------------------------------------------------------------------------------------
     #[serde(untagged)]
     CustomError(String),
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum RequestExecutionError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
 }
 
 impl From<RequestExecutionError> for WpApiError {
