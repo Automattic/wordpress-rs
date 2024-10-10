@@ -1,4 +1,4 @@
-use super::{DerivedRequest, Namespace};
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::site_settings::{
     SparseSiteSettingsFieldWithEditContext, SparseSiteSettingsFieldWithEmbedContext,
     SparseSiteSettingsFieldWithViewContext,
@@ -15,8 +15,8 @@ enum SiteSettingsRequest {
 }
 
 impl DerivedRequest for SiteSettingsRequest {
-    fn namespace() -> Namespace {
-        Namespace::WpV2
+    fn namespace() -> impl AsNamespace {
+        WpNamespace::WpV2
     }
 }
 

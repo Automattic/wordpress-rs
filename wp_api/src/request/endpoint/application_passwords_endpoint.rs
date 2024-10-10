@@ -12,7 +12,7 @@ use crate::application_passwords::{
 use crate::users::UserId;
 use crate::SparseField;
 
-use super::{DerivedRequest, Namespace};
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
 enum ApplicationPasswordsRequest {
@@ -33,8 +33,8 @@ enum ApplicationPasswordsRequest {
 }
 
 impl DerivedRequest for ApplicationPasswordsRequest {
-    fn namespace() -> Namespace {
-        Namespace::WpV2
+    fn namespace() -> impl AsNamespace {
+        WpNamespace::WpV2
     }
 }
 
