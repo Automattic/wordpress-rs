@@ -11,10 +11,10 @@ async fn jetpack_connection() {
     // This is a disposable site, so temporarily having these credentials here is not a problem
     let authentication = WpAuthentication::from_username_and_password(
         "demo".to_string(),
-        "kFWq bf8y YOr1 YhTZ l4Jm GoBl".to_string(),
+        "81D9 k7ZP bVy5 E5Qy mRqY tt1d".to_string(),
     );
 
-    let site_url = ParsedUrl::parse("https://dreamily-ideal-lynx.jurassic.ninja/").unwrap();
+    let site_url = ParsedUrl::parse("https://almost-existing-peafowl.jurassic.ninja/").unwrap();
     let jetpack_client = JetpackClient::new(
         site_url.into(),
         authentication,
