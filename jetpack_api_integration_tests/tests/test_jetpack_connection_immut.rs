@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use jetpack_api::JetpackClient;
+use jetpack_api_integration_tests::AsyncJpNetworking;
 use serial_test::parallel;
 use wp_api::{ParsedUrl, WpAuthentication};
-use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
+use wp_api_integration_tests::AssertResponse;
 
 #[tokio::test]
 #[parallel]
@@ -18,7 +19,7 @@ async fn jetpack_connection() {
     let jetpack_client = JetpackClient::new(
         site_url.into(),
         authentication,
-        Arc::new(AsyncWpNetworking::default()),
+        Arc::new(AsyncJpNetworking::default()),
     );
     let connection_status = jetpack_client.connection().status().await.assert_response();
     assert!(!connection_status.is_active, "{:#?}", connection_status);
