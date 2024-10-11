@@ -10,39 +10,6 @@ where
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
-impl ParsedRequestError for WpApiError {
-    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
-        if let Ok(wp_error) = serde_json::from_slice::<WpError>(response_body) {
-            Some(Self::WpError {
-                error_code: wp_error.code,
-                error_message: wp_error.message,
-                status_code: response_status_code,
-                response: request_or_response_body_as_string(response_body),
-            })
-        } else {
-            match http::StatusCode::from_u16(response_status_code) {
-                Ok(status) => {
-                    if status.is_client_error() || status.is_server_error() {
-                        Some(Self::UnknownError {
-                            status_code: response_status_code,
-                            response: request_or_response_body_as_string(response_body),
-                        })
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => Some(WpApiError::InvalidHttpStatusCode {
-                    status_code: response_status_code,
-                }),
-            }
-        }
-    }
-
-    fn as_parse_error(reason: String, response: String) -> Self {
-        Self::ResponseParsingError { reason, response }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]

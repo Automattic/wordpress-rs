@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use jetpack_api::request::{JetpackNetworkResponse, JetpackRequestExecutionError};
+use jetpack_api::{request::JetpackNetworkResponse, JetpackRequestExecutionError};
 use std::sync::Arc;
 use wp_api::{
     posts::{CategoryId, MediaId, PostId, TagId},
