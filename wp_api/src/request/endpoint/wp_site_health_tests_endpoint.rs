@@ -6,7 +6,7 @@ use crate::wp_site_health_tests::{
     WpSiteHealthTest,
 };
 
-use super::{DerivedRequest, Namespace};
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
 enum WpSiteHealthTestsRequest {
@@ -27,8 +27,8 @@ enum WpSiteHealthTestsRequest {
 }
 
 impl DerivedRequest for WpSiteHealthTestsRequest {
-    fn namespace() -> Namespace {
-        Namespace::WpSiteHealthV1
+    fn namespace() -> impl AsNamespace {
+        WpNamespace::WpSiteHealthV1
     }
 }
 

@@ -15,7 +15,10 @@ use crate::request::{
     },
     RequestExecutor,
 };
-use crate::{ParsedUrl, WpAuthentication};
+use crate::{
+    api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder, ParsedUrl, WpAuthentication,
+};
 use std::sync::Arc;
 
 #[derive(Debug, uniffi::Object)]
@@ -47,7 +50,7 @@ pub struct WpApiRequestBuilder {
 impl WpApiRequestBuilder {
     pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
-        macro_helper::wp_api_request_builder!(
+        api_client_generate_request_builder!(
             api_base_url,
             authentication;
             application_passwords,
@@ -99,7 +102,7 @@ impl WpApiClient {
     ) -> Self {
         let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
 
-        macro_helper::wp_api_client!(
+        api_client_generate_api_client!(
             api_base_url,
             authentication,
             request_executor;
@@ -114,77 +117,75 @@ impl WpApiClient {
     }
 }
 
-macro_helper::generate_endpoint_impl!(application_passwords);
-macro_helper::generate_endpoint_impl!(plugins);
-macro_helper::generate_endpoint_impl!(post_types);
-macro_helper::generate_endpoint_impl!(posts);
-macro_helper::generate_endpoint_impl!(site_settings);
-macro_helper::generate_endpoint_impl!(users);
-macro_helper::generate_endpoint_impl!(wp_site_health_tests);
+api_client_generate_endpoint_impl!(WpApi, application_passwords);
+api_client_generate_endpoint_impl!(WpApi, plugins);
+api_client_generate_endpoint_impl!(WpApi, post_types);
+api_client_generate_endpoint_impl!(WpApi, posts);
+api_client_generate_endpoint_impl!(WpApi, site_settings);
+api_client_generate_endpoint_impl!(WpApi, users);
+api_client_generate_endpoint_impl!(WpApi, wp_site_health_tests);
 
-mod macro_helper {
-    macro_rules! generate_endpoint_impl {
-        ($ident:ident) => {
-            paste::paste! {
-                #[uniffi::export]
-                impl UniffiWpApiRequestBuilder {
-                    fn $ident(&self) -> Arc<[<$ident:camel RequestBuilder>]> {
-                        self.inner.$ident.clone()
-                    }
-                }
+#[macro_export]
+macro_rules! api_client_generate_endpoint_impl {
+    ($client_name_prefix: ident, $feature:ident) => {
+        paste::paste! {
+            #[uniffi::export]
 
-                impl WpApiRequestBuilder {
-                    pub fn $ident(&self) -> &[<$ident:camel RequestBuilder>] {
-                        self.$ident.as_ref()
-                    }
-                }
-
-                #[uniffi::export]
-                impl UniffiWpApiClient {
-                    fn $ident(&self) -> Arc<[<$ident:camel RequestExecutor>]> {
-                        self.inner.$ident.clone()
-                    }
-                }
-
-                impl WpApiClient {
-                    pub fn $ident(&self) -> &[<$ident:camel RequestExecutor>] {
-                        self.$ident.as_ref()
-                    }
+            impl [<Uniffi $client_name_prefix RequestBuilder>] {
+                fn $feature(&self) -> Arc<[<$feature:camel RequestBuilder>]> {
+                    self.inner.$feature.clone()
                 }
             }
-        };
-    }
 
-    macro_rules! wp_api_request_builder {
-        ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
-            paste::paste! {
-                Self {
-                    $($element: [<$element:camel RequestBuilder>]::new(
-                        $api_base_url.clone(),
-                        $authentication.clone(),
-                    )
-                    .into(),)*
+            impl [<$client_name_prefix RequestBuilder>] {
+                pub fn $feature(&self) -> &[<$feature:camel RequestBuilder>] {
+                    self.$feature.as_ref()
                 }
             }
-        };
-    }
 
-    macro_rules! wp_api_client {
-        ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
-            paste::paste! {
-                Self {
-                    $($element: [<$element:camel RequestExecutor>]::new(
-                        $api_base_url.clone(),
-                        $authentication.clone(),
-                        $request_executor.clone(),
-                    )
-                    .into(),)*
+            #[uniffi::export]
+            impl [<Uniffi $client_name_prefix Client>] {
+                fn $feature(&self) -> Arc<[<$feature:camel RequestExecutor>]> {
+                    self.inner.$feature.clone()
                 }
             }
-        };
-    }
 
-    pub(super) use generate_endpoint_impl;
-    pub(super) use wp_api_client;
-    pub(super) use wp_api_request_builder;
+            impl [<$client_name_prefix Client>] {
+                pub fn $feature(&self) -> &[<$feature:camel RequestExecutor>] {
+                    self.$feature.as_ref()
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! api_client_generate_request_builder {
+    ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
+        paste::paste! {
+            Self {
+                $($element: [<$element:camel RequestBuilder>]::new(
+                    $api_base_url.clone(),
+                    $authentication.clone(),
+                )
+                .into(),)*
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! api_client_generate_api_client {
+    ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+        paste::paste! {
+            Self {
+                $($element: [<$element:camel RequestExecutor>]::new(
+                    $api_base_url.clone(),
+                    $authentication.clone(),
+                    $request_executor.clone(),
+                )
+                .into(),)*
+            }
+        }
+    };
 }

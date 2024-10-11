@@ -5,7 +5,7 @@ use crate::{
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
-use super::{DerivedRequest, Namespace};
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
 enum UsersRequest {
@@ -28,8 +28,8 @@ enum UsersRequest {
 }
 
 impl DerivedRequest for UsersRequest {
-    fn namespace() -> Namespace {
-        Namespace::WpV2
+    fn namespace() -> impl AsNamespace {
+        WpNamespace::WpV2
     }
 }
 

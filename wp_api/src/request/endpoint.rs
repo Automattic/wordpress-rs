@@ -23,7 +23,7 @@ impl From<Url> for WpEndpointUrl {
 }
 
 #[derive(Debug)]
-pub(crate) struct ApiEndpointUrl {
+pub struct ApiEndpointUrl {
     url: Url,
 }
 
@@ -54,7 +54,7 @@ impl From<ApiEndpointUrl> for WpEndpointUrl {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ApiBaseUrl {
+pub struct ApiBaseUrl {
     url: Url,
 }
 
@@ -149,7 +149,7 @@ impl UrlExtension for Url {
     }
 }
 
-trait DerivedRequest {
+pub trait DerivedRequest {
     // This can be used to add additional parameters to a request if it has no params type.
     //
     // For example, `/posts` request has `Trash` & `Delete` variants. These variants don't have a
@@ -162,16 +162,20 @@ trait DerivedRequest {
         Vec::new()
     }
 
-    fn namespace() -> Namespace;
+    fn namespace() -> impl AsNamespace;
+}
+
+pub trait AsNamespace {
+    fn as_str(&self) -> &str;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Namespace {
+enum WpNamespace {
     WpSiteHealthV1,
     WpV2,
 }
 
-impl Namespace {
+impl AsNamespace for WpNamespace {
     fn as_str(&self) -> &str {
         match self {
             Self::WpSiteHealthV1 => "/wp-site-health/v1",
@@ -273,14 +277,14 @@ mod tests {
     }
 
     pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
-        validate_endpoint(Namespace::WpV2, endpoint_url, path);
+        validate_endpoint(WpNamespace::WpV2, endpoint_url, path);
     }
 
     pub fn validate_wp_site_health_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
-        validate_endpoint(Namespace::WpSiteHealthV1, endpoint_url, path);
+        validate_endpoint(WpNamespace::WpSiteHealthV1, endpoint_url, path);
     }
 
-    fn validate_endpoint(namespace: Namespace, endpoint_url: ApiEndpointUrl, path: &str) {
+    fn validate_endpoint(namespace: WpNamespace, endpoint_url: ApiEndpointUrl, path: &str) {
         assert_eq!(
             endpoint_url.as_str(),
             format!(
