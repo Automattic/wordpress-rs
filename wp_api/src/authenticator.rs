@@ -135,6 +135,10 @@ impl CookieAuthenticator {
         };
 
         if let Some(nonce) = nonce_from_request(nonce_request).await {
+            self.nonce
+                .write()
+                .expect("Failed to unlock nonce")
+                .replace(nonce.clone());
             return Some(nonce);
         }
 
@@ -158,7 +162,15 @@ impl CookieAuthenticator {
             body: Some(WpNetworkRequestBody::new(body.into_bytes()).into()),
         };
 
-        nonce_from_request(login_request).await
+        if let Some(nonce) = nonce_from_request(login_request).await {
+            self.nonce
+                .write()
+                .expect("Failed to unlock nonce")
+                .replace(nonce.clone());
+            return Some(nonce);
+        }
+
+        None
     }
 }
 
