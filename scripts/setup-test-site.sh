@@ -2,7 +2,7 @@
 
 set -e
 
-# This script sets up a WordPress test site on the `wordpress` docker image. 
+# This script sets up a WordPress test site on the `wordpress` docker image.
 # You might wonder "why not do this work once, then just import the database for each run?"
 # We do each step each time for each build because we're trying to get a "mint" condition site
 # for each WordPress version – if there are issues with DB migrations, different default themes
@@ -41,13 +41,16 @@ echo "--- :wordpress: Setting up WordPress"
 wp core version --extra
 wp --info
 
+ADMIN_USERNAME="test@example.com"
+ADMIN_ACCOUNT_PASSWORD="strongpassword"
+
 ## Install WordPress
 wp core install \
 	--url=localhost \
 	--title=my-test-site \
-	--admin_user=test@example.com \
-	--admin_email=test@example.com \
-	--admin_password=strongpassword \
+	--admin_user=$ADMIN_USERNAME \
+	--admin_email=$ADMIN_USERNAME \
+	--admin_password=$ADMIN_ACCOUNT_PASSWORD \
 	--skip-email
 
 ## Ensure URLs work as expected
@@ -76,7 +79,6 @@ wp user create test_author test_author@example.com --role=author
 
 create_test_credentials () {
   local SITE_URL
-  local ADMIN_USERNAME
   local ADMIN_PASSWORD_UUID
   local ADMIN_PASSWORD
   local SUBSCRIBER_USERNAME
@@ -85,9 +87,8 @@ create_test_credentials () {
   local TRASHED_POST_ID
   local PASSWORD_PROTECTED_POST_ID
   SITE_URL="http://localhost"
-  ADMIN_USERNAME="test@example.com"
-  ADMIN_PASSWORD="$(wp user application-password create test@example.com test --porcelain)"
-  ADMIN_PASSWORD_UUID="$(wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p')"
+  ADMIN_PASSWORD="$(wp user application-password create $ADMIN_USERNAME test --porcelain)"
+  ADMIN_PASSWORD_UUID="$(wp user application-password list $ADMIN_USERNAME --fields=uuid --format=csv | sed -n '2 p')"
   SUBSCRIBER_USERNAME="themedemos"
   SUBSCRIBER_PASSWORD="$(wp user application-password create themedemos test --porcelain)"
   SUBSCRIBER_PASSWORD_UUID="$(wp user application-password list themedemos --fields=uuid --format=csv | sed -n '2 p')"
@@ -104,6 +105,7 @@ create_test_credentials () {
   jo -p \
     site_url="$SITE_URL" \
     admin_username="$ADMIN_USERNAME" \
+    admin_account_password="$ADMIN_ACCOUNT_PASSWORD" \
     admin_password="$ADMIN_PASSWORD" \
     admin_password_uuid="$ADMIN_PASSWORD_UUID" \
     subscriber_username="$SUBSCRIBER_USERNAME" \
@@ -131,4 +133,3 @@ wp option update timezone_string "America/New_York"
 cp -rp wp-content/plugins wp-content/plugins-backup
 
 wp db export --add-drop-table wp-content/dump.sql
-

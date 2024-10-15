@@ -16,6 +16,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 pub struct TestCredentials {
     pub site_url: &'static str,
     pub admin_username: &'static str,
+    pub admin_account_password: &'static str,
     pub admin_password: &'static str,
     pub admin_password_uuid: &'static str,
     pub subscriber_username: &'static str,

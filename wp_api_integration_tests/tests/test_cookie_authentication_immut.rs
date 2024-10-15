@@ -8,8 +8,8 @@ use serial_test::serial;
 #[serial]
 async fn test_cookie_authentication() {
     let login = WpLoginCredentials {
-        username: "test@example.com".to_string(),
-        password: "strongpassword".to_string(),
+        username: TestCredentials::instance().admin_username.to_string(),
+        password: TestCredentials::instance().admin_account_password.to_string(),
     };
     let request_executor = std::sync::Arc::new(AsyncWpNetworking::with_cookie_store());
     let client = WpApiClient::new(
@@ -29,7 +29,7 @@ async fn test_cookie_authentication() {
 #[serial]
 async fn test_fail_with_incorrect_password() {
     let login = WpLoginCredentials {
-        username: "test@example.com".to_string(),
+        username: TestCredentials::instance().admin_username.to_string(),
         password: "incorrect".to_string(),
     };
     let request_executor = std::sync::Arc::new(AsyncWpNetworking::with_cookie_store());
@@ -49,8 +49,8 @@ async fn test_fail_with_incorrect_password() {
 #[serial]
 async fn test_fail_without_cookie_store() {
     let login = WpLoginCredentials {
-        username: "test@example.com".to_string(),
-        password: "strongpassword".to_string(),
+        username: TestCredentials::instance().admin_username.to_string(),
+        password: TestCredentials::instance().admin_account_password.to_string(),
     };
     let request_executor = std::sync::Arc::new(AsyncWpNetworking::default());
     let client = WpApiClient::new(
