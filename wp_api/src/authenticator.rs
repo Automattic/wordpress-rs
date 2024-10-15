@@ -13,21 +13,13 @@ use crate::{
 
 const CONTENT_TYPE_FORM: &str = "application/x-www-form-urlencoded";
 
-#[derive(Debug)]
-pub enum AuthenticationError {
-    ReAuthenticationNotApplicable,
-    IncorrectCredentials,
-    RequestUrlDoesNotMatchSite,
-    InvalidWebFormContent,
-}
-
 #[async_trait::async_trait]
 pub trait Authenticator: Send + Sync + std::fmt::Debug {
     // The host of the site to which the authenticator is associated.
     // This can be used to prevent credentials from being sent to other sites.
     fn host(&self) -> &str;
 
-    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError>;
+    async fn authentication_headers(&self) -> Option<HeaderMap>;
 
     fn reset(&self);
 
@@ -37,13 +29,13 @@ pub trait Authenticator: Send + Sync + std::fmt::Debug {
         &self,
         request: &WpNetworkRequest,
         previous_response: &WpNetworkResponse,
-    ) -> Result<Option<HeaderMap>, AuthenticationError> {
+    ) -> Option<HeaderMap> {
         if self.should_authenticate(&request.url.0, Some(previous_response.status_code)) {
             self.reset();
             return self.authentication_headers().await;
         }
 
-        Err(AuthenticationError::ReAuthenticationNotApplicable)
+        None
     }
 }
 
@@ -60,8 +52,8 @@ impl Authenticator for NilAuthenticator {
         ""
     }
 
-    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError> {
-        Ok(None)
+    async fn authentication_headers(&self) -> Option<HeaderMap> {
+        None
     }
 
     fn reset(&self) {
@@ -93,7 +85,7 @@ impl Authenticator for ApplicationPasswordAuthenticator {
         self.host.as_str()
     }
 
-    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError> {
+    async fn authentication_headers(&self) -> Option<HeaderMap> {
         let mut headers = HeaderMap::new();
         headers.append(
             http::header::AUTHORIZATION,
@@ -102,7 +94,7 @@ impl Authenticator for ApplicationPasswordAuthenticator {
                 .expect("token is always a valid header value"),
         );
 
-        Ok(Some(headers))
+        Some(headers)
     }
 
     fn reset(&self) {
@@ -144,9 +136,9 @@ impl CookieAuthenticator {
         }
     }
 
-    async fn get_rest_nonce(&self) -> Result<String, AuthenticationError> {
+    async fn get_rest_nonce(&self) -> Option<String> {
         if let Some(cache) = self.nonce.read().expect("Failed to unlock nonce").clone() {
-            return Ok(cache);
+            return Some(cache);
         }
 
         let mut fetched = self.nonce_from_request(self.nonce_request()).await;
@@ -162,10 +154,10 @@ impl CookieAuthenticator {
                 .write()
                 .expect("Failed to unlock nonce")
                 .replace(fetched.clone());
-            return Ok(fetched);
+            return Some(fetched);
         }
 
-        Err(AuthenticationError::IncorrectCredentials)
+        None
     }
 
     fn nonce_request(&self) -> WpNetworkRequest {
@@ -177,7 +169,7 @@ impl CookieAuthenticator {
         }
     }
 
-    fn nonce_request_via_login(&self) -> Result<WpNetworkRequest, AuthenticationError> {
+    fn nonce_request_via_login(&self) -> Option<WpNetworkRequest> {
         let mut headers = http::HeaderMap::new();
         headers.insert(
             http::header::CONTENT_TYPE,
@@ -193,9 +185,9 @@ impl CookieAuthenticator {
                 self.api_base_url.derived_rest_nonce_url().as_str(),
             ],
         ])
-        .map_err(|err| AuthenticationError::InvalidWebFormContent)?;
+        .ok()?;
 
-        Ok(WpNetworkRequest {
+        Some(WpNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_base_url.derived_wp_login_url().into(),
             header_map: WpNetworkHeaderMap::new(headers).into(),
@@ -246,7 +238,7 @@ impl Authenticator for CookieAuthenticator {
         true
     }
 
-    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError> {
+    async fn authentication_headers(&self) -> Option<HeaderMap> {
         self.get_rest_nonce().await.map(|nonce| {
             let mut headers = HeaderMap::new();
             headers.insert(
@@ -255,7 +247,7 @@ impl Authenticator for CookieAuthenticator {
                     .try_into()
                     .expect("This conversion should never fail since nonce is a short string"),
             );
-            Some(headers)
+            headers
         })
     }
 
@@ -292,14 +284,8 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
 
         // Authenticate the initial request.
         if self.authenticator.should_authenticate(&request.url.0, None) {
-            match self.authenticator.authentication_headers().await {
-                Ok(Some(headers)) => {
-                    original.add_headers(&headers);
-                }
-                _ => {
-                    // Do nothing.
-                    // Any authentication error will be returned later after sending the request.
-                }
+            if let Some(headers) = self.authenticator.authentication_headers().await {
+                original.add_headers(&headers);
             }
         }
 
@@ -308,7 +294,7 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
         // Retry if the request fails due to authentication failure
         if let Ok(response) = &initial_response {
             let mut original = (*request).clone();
-            if let Ok(Some(headers)) = self
+            if let Some(headers) = self
                 .authenticator
                 .re_authenticate(&original, response)
                 .await
