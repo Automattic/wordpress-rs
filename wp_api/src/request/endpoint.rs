@@ -304,6 +304,44 @@ mod tests {
         format!("{}{}", wp_json_endpoint(base_url), suffix)
     }
 
+    #[rstest]
+    fn derived_login_url(
+        #[values(
+            "http://example.com",
+            "https://example.com",
+            "https://www.example.com",
+            "https://f.example.com",
+            "https://example.com/f"
+        )]
+        test_base_url: &str,
+    ) {
+        let expected_login_url = format!("{}/wp-login.php", test_base_url);
+
+        let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
+        let derived_login_url = api_base_url.derived_wp_login_url();
+        assert_eq!(derived_login_url.to_string(), expected_login_url);
+    }
+    #[rstest]
+    fn derived_rest_nonce_url(
+        #[values(
+            "http://example.com",
+            "https://example.com",
+            "https://www.example.com",
+            "https://f.example.com",
+            "https://example.com/f"
+        )]
+        test_base_url: &str,
+    ) {
+        let expected_login_url = format!(
+            "{}/wp-admin/admin-ajax.php?action=rest-nonce",
+            test_base_url
+        );
+
+        let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
+        let derived_login_url = api_base_url.derived_rest_nonce_url();
+        assert_eq!(derived_login_url.to_string(), expected_login_url);
+    }
+
     #[fixture]
     pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
         ApiBaseUrl::try_from("https://example.com").unwrap().into()
