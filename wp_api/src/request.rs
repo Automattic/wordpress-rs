@@ -17,7 +17,7 @@ pub mod endpoint;
 const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct InnerRequestBuilder {}
 
 impl InnerRequestBuilder {
