@@ -80,6 +80,39 @@ impl ApiBaseUrl {
         site_base_url.try_into()
     }
 
+    pub(crate) fn derived_wp_login_url(&self) -> Url {
+        let mut url = self.url.clone();
+
+        if let Some(segments) = url.path_segments() {
+            if segments.last() == Some("") {
+                url.path_segments_mut()
+                    .expect("ApiBaseUrl is a full HTTP URL")
+                    .pop();
+            }
+        }
+
+        url.path_segments_mut()
+            .expect("ApiBaseUrl is a full HTTP URL")
+            .pop()
+            .push("wp-login.php");
+
+        url
+    }
+
+    pub(crate) fn derived_rest_nonce_url(&self) -> Url {
+        let mut url = self.derived_wp_login_url();
+
+        url.path_segments_mut()
+            .expect("login url is a full HTTP URL")
+            .pop()
+            .push("wp-admin")
+            .push("admin-ajax.php");
+
+        url.query_pairs_mut().append_pair("action", "rest-nonce");
+
+        url
+    }
+
     fn by_appending(&self, segment: &str) -> Url {
         self.url
             .clone()
@@ -106,8 +139,13 @@ impl ApiBaseUrl {
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
 
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         self.url.as_str()
+    }
+
+    pub fn host_str(&self) -> &str {
+        // HTTP URL always has a host.
+        self.url.host_str().unwrap_or("")
     }
 }
 
@@ -269,6 +307,44 @@ mod tests {
 
     fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
         format!("{}{}", wp_json_endpoint(base_url), suffix)
+    }
+
+    #[rstest]
+    fn derived_login_url(
+        #[values(
+            "http://example.com",
+            "https://example.com",
+            "https://www.example.com",
+            "https://f.example.com",
+            "https://example.com/f"
+        )]
+        test_base_url: &str,
+    ) {
+        let expected_login_url = format!("{}/wp-login.php", test_base_url);
+
+        let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
+        let derived_login_url = api_base_url.derived_wp_login_url();
+        assert_eq!(derived_login_url.to_string(), expected_login_url);
+    }
+    #[rstest]
+    fn derived_rest_nonce_url(
+        #[values(
+            "http://example.com",
+            "https://example.com",
+            "https://www.example.com",
+            "https://f.example.com",
+            "https://example.com/f"
+        )]
+        test_base_url: &str,
+    ) {
+        let expected_login_url = format!(
+            "{}/wp-admin/admin-ajax.php?action=rest-nonce",
+            test_base_url
+        );
+
+        let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
+        let derived_login_url = api_base_url.derived_rest_nonce_url();
+        assert_eq!(derived_login_url.to_string(), expected_login_url);
     }
 
     #[fixture]

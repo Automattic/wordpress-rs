@@ -34,7 +34,6 @@ fn generate_async_request_executor(
     crate_config: &CrateConfig,
 ) -> TokenStream {
     let static_api_base_url_type = &config.static_types.api_base_url;
-    let static_wp_authentication_type = &config.static_types.wp_authentication;
     let static_request_executor_type = &crate_config.request_executor;
     let static_request_executor_type = quote! { std::sync::Arc<dyn #static_request_executor_type> };
     let error_type = &crate_config.error_type;
@@ -84,9 +83,9 @@ fn generate_async_request_executor(
             request_executor: #static_request_executor_type,
         }
         impl #generated_request_executor_ident {
-            pub fn new(api_base_url: #static_api_base_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type) -> Self {
+            pub fn new(api_base_url: #static_api_base_url_type, request_executor: #static_request_executor_type) -> Self {
                 Self {
-                    request_builder: #generated_request_builder_ident::new(api_base_url, authentication),
+                    request_builder: #generated_request_builder_ident::new(api_base_url),
                     request_executor,
                 }
             }
@@ -101,7 +100,6 @@ fn generate_async_request_executor(
 fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_inner_request_builder_type = &config.static_types.inner_request_builder;
-    let static_wp_authentication_type = &config.static_types.wp_authentication;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
@@ -150,10 +148,10 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
             inner: #static_inner_request_builder_type,
         }
         impl #generated_request_builder_ident {
-            pub fn new(api_base_url: #static_api_base_url_type, authentication: #static_wp_authentication_type) -> Self {
+            pub fn new(api_base_url: #static_api_base_url_type) -> Self {
                 Self {
                     endpoint: #generated_endpoint_ident::new(api_base_url),
-                    inner: #static_inner_request_builder_type::new(authentication),
+                    inner: #static_inner_request_builder_type::new(),
                 }
             }
         }
@@ -340,7 +338,6 @@ pub struct ConfigStaticTypes {
     pub api_base_url: TokenStream,
     pub api_endpoint_url: TokenStream,
     pub inner_request_builder: TokenStream,
-    pub wp_authentication: TokenStream,
     pub wp_network_request: TokenStream,
 }
 
@@ -350,7 +347,6 @@ impl ConfigStaticTypes {
             api_base_url: quote! { std::sync::Arc<#crate_ident::request::endpoint::ApiBaseUrl> },
             api_endpoint_url: quote! { #crate_ident::request::endpoint::ApiEndpointUrl },
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
-            wp_authentication: quote! { #crate_ident::WpAuthentication },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
         }
     }

@@ -16,6 +16,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_test_credentials.rs"));
 pub struct TestCredentials {
     pub site_url: &'static str,
     pub admin_username: &'static str,
+    pub admin_account_password: &'static str,
     pub admin_password: &'static str,
     pub admin_password_uuid: &'static str,
     pub subscriber_username: &'static str,
@@ -134,6 +135,15 @@ impl Default for AsyncWpNetworking {
 }
 
 impl AsyncWpNetworking {
+    pub fn with_cookie_store() -> Self {
+        Self {
+            client: reqwest::ClientBuilder::new()
+                .cookie_store(true)
+                .build()
+                .unwrap(),
+        }
+    }
+
     pub async fn async_request(
         &self,
         wp_request: Arc<WpNetworkRequest>,
