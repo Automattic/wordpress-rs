@@ -1,4 +1,8 @@
 use crate::{
+    api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder, ParsedUrl, WpAuthentication,
+};
+use crate::{
     authenticator::{
         ApplicationPasswordAuthenticator, AuthenticatedRequestExecutor, Authenticator,
         CookieAuthenticator, NilAuthenticator,
@@ -20,10 +24,6 @@ use crate::{
         },
         RequestExecutor,
     },
-};
-use crate::{
-    api_client_generate_api_client, api_client_generate_endpoint_impl,
-    api_client_generate_request_builder, ParsedUrl, WpAuthentication,
 };
 use std::sync::Arc;
 
