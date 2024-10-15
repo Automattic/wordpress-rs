@@ -1,6 +1,7 @@
 use http::header::HeaderMap;
 use http::header::HeaderValue;
 use std::sync::{Arc, RwLock};
+use url::Url;
 
 use crate::{
     request::{
@@ -22,20 +23,28 @@ pub enum AuthenticationError {
 
 #[async_trait::async_trait]
 pub trait Authenticator: Send + Sync + std::fmt::Debug {
-    async fn authenticate(
-        &self,
-        request: &WpNetworkRequest,
-    ) -> Result<HeaderMap, AuthenticationError>;
+    // The host of the site to which the authenticator is associated.
+    // This can be used to prevent credentials from being sent to other sites.
+    fn host(&self) -> &str;
 
-    fn should_reauthenticate(&self, response: &WpNetworkResponse) -> bool {
-        response.status_code == 401
-    }
+    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError>;
+
+    fn reset(&self);
+
+    fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool;
 
     async fn re_authenticate(
         &self,
         request: &WpNetworkRequest,
         previous_response: &WpNetworkResponse,
-    ) -> Result<HeaderMap, AuthenticationError>;
+    ) -> Result<Option<HeaderMap>, AuthenticationError> {
+        if self.should_authenticate(&request.url.0, Some(previous_response.status_code)) {
+            self.reset();
+            return self.authentication_headers().await;
+        }
+
+        Err(AuthenticationError::ReAuthenticationNotApplicable)
+    }
 }
 
 #[derive(Debug)]
@@ -43,45 +52,48 @@ pub(crate) struct NilAuthenticator {}
 
 #[async_trait::async_trait]
 impl Authenticator for NilAuthenticator {
-    async fn authenticate(
-        &self,
-        _request: &WpNetworkRequest,
-    ) -> Result<HeaderMap, AuthenticationError> {
-        Ok(HeaderMap::default())
+    fn should_authenticate(&self, _request_url: &str, _response_status_code: Option<u16>) -> bool {
+        false
     }
 
-    async fn re_authenticate(
-        &self,
-        _request: &WpNetworkRequest,
-        _previous_response: &WpNetworkResponse,
-    ) -> Result<HeaderMap, AuthenticationError> {
-        Ok(HeaderMap::default())
+    fn host(&self) -> &str {
+        ""
+    }
+
+    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError> {
+        Ok(None)
+    }
+
+    fn reset(&self) {
+        // Do nothing.
     }
 }
 
 #[derive(Debug)]
 pub struct ApplicationPasswordAuthenticator {
+    host: String,
     token: String,
 }
 
 impl ApplicationPasswordAuthenticator {
-    pub fn new(token: String) -> Self {
-        Self { token }
+    pub fn new(host: String, token: String) -> Self {
+        Self { host, token }
     }
 
-    pub fn with_application_password(username: String, password: String) -> Self {
+    pub fn with_application_password(host: String, username: String, password: String) -> Self {
         use base64::prelude::*;
         let token = BASE64_STANDARD.encode(format!("{}:{}", username, password));
-        Self::new(token)
+        Self::new(host, token)
     }
 }
 
 #[async_trait::async_trait]
 impl Authenticator for ApplicationPasswordAuthenticator {
-    async fn authenticate(
-        &self,
-        request: &WpNetworkRequest,
-    ) -> Result<HeaderMap, AuthenticationError> {
+    fn host(&self) -> &str {
+        self.host.as_str()
+    }
+
+    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError> {
         let mut headers = HeaderMap::new();
         headers.append(
             http::header::AUTHORIZATION,
@@ -90,15 +102,23 @@ impl Authenticator for ApplicationPasswordAuthenticator {
                 .expect("token is always a valid header value"),
         );
 
-        Ok(headers)
+        Ok(Some(headers))
     }
 
-    async fn re_authenticate(
-        &self,
-        request: &WpNetworkRequest,
-        previous_response: &WpNetworkResponse,
-    ) -> Result<HeaderMap, AuthenticationError> {
-        Err(AuthenticationError::ReAuthenticationNotApplicable)
+    fn reset(&self) {
+        // Do nothing.
+    }
+
+    fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool {
+        let is_same_host = Url::parse(request_url)
+            .ok()
+            .map(|f| f.host_str() == Some(self.host()));
+        if is_same_host != Some(true) {
+            return false;
+        }
+
+        // Authenticated has already been sent. No need to make a second attempt.
+        response_status_code.is_none()
     }
 }
 
@@ -207,20 +227,26 @@ impl CookieAuthenticator {
 
 #[async_trait::async_trait]
 impl Authenticator for CookieAuthenticator {
-    async fn authenticate(
-        &self,
-        request: &WpNetworkRequest,
-    ) -> Result<HeaderMap, AuthenticationError> {
-        // Only attempt login if the request is to the WordPress site.
-        if let (Ok(api_base_url), Ok(request_url)) = (
-            url::Url::parse(self.api_base_url.as_str()),
-            url::Url::parse(request.url.0.as_str()),
-        ) {
-            if api_base_url.host_str() != request_url.host_str() {
-                return Err(AuthenticationError::RequestUrlDoesNotMatchSite);
-            }
+    fn host(&self) -> &str {
+        self.api_base_url.host_str()
+    }
+
+    fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool {
+        let is_same_host = Url::parse(request_url)
+            .ok()
+            .map(|f| f.host_str() == Some(self.host()));
+        if is_same_host != Some(true) {
+            return false;
         }
 
+        if let Some(response_status_code) = response_status_code {
+            return response_status_code == 401;
+        }
+
+        true
+    }
+
+    async fn authentication_headers(&self) -> Result<Option<HeaderMap>, AuthenticationError> {
         self.get_rest_nonce().await.map(|nonce| {
             let mut headers = HeaderMap::new();
             headers.insert(
@@ -229,18 +255,12 @@ impl Authenticator for CookieAuthenticator {
                     .try_into()
                     .expect("This conversion should never fail since nonce is a short string"),
             );
-            headers
+            Some(headers)
         })
     }
 
-    async fn re_authenticate(
-        &self,
-        request: &WpNetworkRequest,
-        previous_response: &WpNetworkResponse,
-    ) -> Result<HeaderMap, AuthenticationError> {
+    fn reset(&self) {
         *self.nonce.write().expect("Failed to unlock nonce") = None;
-
-        return self.authenticate(request).await;
     }
 }
 
@@ -271,13 +291,15 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
         let mut original = (*request).clone();
 
         // Authenticate the initial request.
-        match self.authenticator.authenticate(&original).await {
-            Ok(headers) => {
-                original.add_headers(&headers);
-            }
-            Err(error) => {
-                // Do nothing.
-                // Any authentication error will be returned later after sending the request.
+        if self.authenticator.should_authenticate(&request.url.0, None) {
+            match self.authenticator.authentication_headers().await {
+                Ok(Some(headers)) => {
+                    original.add_headers(&headers);
+                }
+                _ => {
+                    // Do nothing.
+                    // Any authentication error will be returned later after sending the request.
+                }
             }
         }
 
@@ -285,17 +307,15 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
 
         // Retry if the request fails due to authentication failure
         if let Ok(response) = &initial_response {
-            if self.authenticator.should_reauthenticate(response) {
-                let mut original = (*request).clone();
-                if let Ok(headers) = self
-                    .authenticator
-                    .re_authenticate(&original, response)
-                    .await
-                {
-                    original.add_headers(&headers);
+            let mut original = (*request).clone();
+            if let Ok(Some(headers)) = self
+                .authenticator
+                .re_authenticate(&original, response)
+                .await
+            {
+                original.add_headers(&headers);
 
-                    return self.request_executor.execute(original.into()).await;
-                }
+                return self.request_executor.execute(original.into()).await;
             }
         }
 

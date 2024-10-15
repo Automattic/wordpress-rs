@@ -22,6 +22,7 @@ pub mod reusable_test_cases;
 #[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let authenticator = ApplicationPasswordAuthenticator::with_application_password(
+        test_site_url().inner.host_str().unwrap_or("").to_string(),
         TestCredentials::instance().admin_username.to_string(),
         TestCredentials::instance().admin_password.to_string(),
     );
@@ -29,7 +30,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 
     let request_builder = WpApiRequestBuilder::new(test_site_url());
     let mut wp_request = request_builder.users().list_with_edit_context(&params);
-    if let Ok(headers) = authenticator.authenticate(&wp_request).await {
+    if let Ok(Some(headers)) = authenticator.authentication_headers().await {
         wp_request.add_headers(&headers);
     }
     let response = async_wp_networking.async_request(wp_request.into()).await;

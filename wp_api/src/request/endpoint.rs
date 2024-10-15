@@ -142,6 +142,11 @@ impl ApiBaseUrl {
     pub fn as_str(&self) -> &str {
         self.url.as_str()
     }
+
+    pub fn host_str(&self) -> &str {
+        // HTTP URL always has a host.
+        self.url.host_str().unwrap_or("")
+    }
 }
 
 trait UrlExtension {
