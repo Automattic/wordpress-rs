@@ -1,4 +1,4 @@
-use super::{DerivedRequest, Namespace};
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::post_types::{
     PostType, SparsePostTypeDetailsFieldWithEditContext,
     SparsePostTypeDetailsFieldWithEmbedContext, SparsePostTypeDetailsFieldWithViewContext,
@@ -7,8 +7,6 @@ use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
-#[Namespace("/wp/v2")]
-#[SparseField(SparsePostTypeDetailsField)]
 enum PostTypesRequest {
     #[contextual_get(url = "/types", output = crate::post_types::SparsePostTypesResponse)]
     List,
@@ -17,8 +15,8 @@ enum PostTypesRequest {
 }
 
 impl DerivedRequest for PostTypesRequest {
-    fn namespace() -> Namespace {
-        Namespace::WpV2
+    fn namespace() -> impl AsNamespace {
+        WpNamespace::WpV2
     }
 }
 

@@ -5,12 +5,11 @@ use serial_test::parallel;
 use wp_api::authenticator::{ApplicationPasswordAuthenticator, Authenticator};
 use wp_api::{
     generate,
-    users::UserWithEditContext,
     users::{
-        UserListParams, WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy,
-        WpApiParamUsersWho,
+        UserListParams, UserWithEditContext, WpApiParamUsersHasPublishedPosts,
+        WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
-    WpApiParamOrder, WpApiRequestBuilder,
+    WpApiError, WpApiParamOrder, WpApiRequestBuilder,
 };
 use wp_api_integration_tests::{
     test_site_url, AsyncWpNetworking, TestCredentials, FIRST_USER_ID, SECOND_USER_ID,
@@ -32,6 +31,8 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let mut wp_request = request_builder.users().list_with_edit_context(&params);
     authenticator.authenticate(&mut wp_request).await;
     let response = async_wp_networking.async_request(wp_request.into()).await;
-    let result = response.unwrap().parse::<Vec<UserWithEditContext>>();
+    let result = response
+        .unwrap()
+        .parse::<Vec<UserWithEditContext>, WpApiError>();
     assert!(result.is_ok(), "Response was: '{:?}'", result);
 }

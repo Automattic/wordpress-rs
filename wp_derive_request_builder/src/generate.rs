@@ -4,6 +4,7 @@ use helpers_to_generate_tokens::*;
 use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::FoundCrate;
 use quote::{format_ident, quote};
+use serde::{de::Error, Deserialize, Deserializer};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use syn::Ident;
@@ -15,22 +16,27 @@ use crate::{
 
 mod helpers_to_generate_tokens;
 
-pub(crate) fn generate_types(parsed_enum: &ParsedEnum) -> TokenStream {
+pub(crate) fn generate_types(parsed_enum: &ParsedEnum, crate_config: &CrateConfig) -> TokenStream {
     let config = Config::new(parsed_enum);
     TokenStream::from_iter(
         &mut [
             generate_endpoint_type(&config, parsed_enum),
             generate_request_builder(&config, parsed_enum),
-            generate_async_request_executor(&config, parsed_enum),
+            generate_async_request_executor(&config, parsed_enum, crate_config),
         ]
         .into_iter(),
     )
 }
 
-fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
+fn generate_async_request_executor(
+    config: &Config,
+    parsed_enum: &ParsedEnum,
+    crate_config: &CrateConfig,
+) -> TokenStream {
     let static_api_base_url_type = &config.static_types.api_base_url;
-    let static_request_executor_type = &config.static_types.request_executor;
-    let static_wp_api_error_type = &config.static_types.wp_api_error;
+    let static_request_executor_type = &crate_config.request_executor;
+    let static_request_executor_type = quote! { std::sync::Arc<dyn #static_request_executor_type> };
+    let error_type = &crate_config.error_type;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
     let generated_request_executor_ident = &config.generated_idents.request_executor;
 
@@ -61,7 +67,7 @@ fn generate_async_request_executor(config: &Config, parsed_enum: &ParsedEnum) ->
                 &context_and_filter_handler,
             );
             quote! {
-                pub async #fn_signature -> Result<#output_type, #static_wp_api_error_type> {
+                pub async #fn_signature -> Result<#output_type, #error_type> {
                     #request_from_request_builder
                     self.request_executor.execute(std::sync::Arc::new(request)).await?.parse()
                }
@@ -283,6 +289,22 @@ impl Display for WpContext {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CrateConfig {
+    #[serde(deserialize_with = "from_string_to_token_stream")]
+    error_type: TokenStream,
+    #[serde(deserialize_with = "from_string_to_token_stream")]
+    request_executor: TokenStream,
+}
+
+fn from_string_to_token_stream<'de, D>(deserializer: D) -> Result<TokenStream, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    s.parse().map_err(D::Error::custom)
+}
+
 #[derive(Debug)]
 pub struct Config {
     pub crate_ident: Ident,
@@ -316,8 +338,6 @@ pub struct ConfigStaticTypes {
     pub api_base_url: TokenStream,
     pub api_endpoint_url: TokenStream,
     pub inner_request_builder: TokenStream,
-    pub request_executor: TokenStream,
-    pub wp_api_error: TokenStream,
     pub wp_network_request: TokenStream,
 }
 
@@ -327,8 +347,6 @@ impl ConfigStaticTypes {
             api_base_url: quote! { std::sync::Arc<#crate_ident::request::endpoint::ApiBaseUrl> },
             api_endpoint_url: quote! { #crate_ident::request::endpoint::ApiEndpointUrl },
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
-            request_executor: quote! { std::sync::Arc<dyn #crate_ident::request::RequestExecutor> },
-            wp_api_error: quote! { #crate_ident::WpApiError },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
         }
     }
