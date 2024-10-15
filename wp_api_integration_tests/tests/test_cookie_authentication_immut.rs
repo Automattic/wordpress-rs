@@ -9,7 +9,9 @@ use serial_test::serial;
 async fn test_cookie_authentication() {
     let login = WpLoginCredentials {
         username: TestCredentials::instance().admin_username.to_string(),
-        password: TestCredentials::instance().admin_account_password.to_string(),
+        password: TestCredentials::instance()
+            .admin_account_password
+            .to_string(),
     };
     let request_executor = std::sync::Arc::new(AsyncWpNetworking::with_cookie_store());
     let client = WpApiClient::new(
@@ -50,7 +52,9 @@ async fn test_fail_with_incorrect_password() {
 async fn test_fail_without_cookie_store() {
     let login = WpLoginCredentials {
         username: TestCredentials::instance().admin_username.to_string(),
-        password: TestCredentials::instance().admin_account_password.to_string(),
+        password: TestCredentials::instance()
+            .admin_account_password
+            .to_string(),
     };
     let request_executor = std::sync::Arc::new(AsyncWpNetworking::default());
     let client = WpApiClient::new(

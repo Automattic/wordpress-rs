@@ -85,7 +85,7 @@ pub trait RequestExecutor: Send + Sync + Debug {
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
-#[derive(uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct WpNetworkRequestBody {
     inner: Vec<u8>,
 }
@@ -141,6 +141,14 @@ impl WpNetworkRequest {
     pub fn add_header(&mut self, name: HeaderName, value: HeaderValue) {
         let mut header_map = self.header_map.inner.clone();
         header_map.insert(name, value);
+        self.header_map = WpNetworkHeaderMap::new(header_map).into();
+    }
+
+    pub fn add_headers(&mut self, headers: &HeaderMap) {
+        let mut header_map = self.header_map.inner.clone();
+        headers.iter().for_each(|(name, value)| {
+            header_map.insert(name.clone(), value.clone());
+        });
         self.header_map = WpNetworkHeaderMap::new(header_map).into();
     }
 }

@@ -29,7 +29,9 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 
     let request_builder = WpApiRequestBuilder::new(test_site_url());
     let mut wp_request = request_builder.users().list_with_edit_context(&params);
-    authenticator.authenticate(&mut wp_request).await;
+    if let Ok(headers) = authenticator.authenticate(&wp_request).await {
+        wp_request.add_headers(&headers);
+    }
     let response = async_wp_networking.async_request(wp_request.into()).await;
     let result = response
         .unwrap()

@@ -1,3 +1,4 @@
+use http::header::HeaderMap;
 use std::sync::{Arc, RwLock};
 
 use crate::{
@@ -8,16 +9,30 @@ use crate::{
     RequestExecutionError, WpLoginCredentials,
 };
 
+#[derive(Debug)]
+pub enum AuthenticationError {
+    ReAuthenticationNotApplicable,
+    IncorrectCredentials,
+    RequestUrlDoesNotMatchSite,
+    InvalidWebFormContent,
+}
+
 #[async_trait::async_trait]
 pub trait Authenticator: Send + Sync + std::fmt::Debug {
-    // TODO: Use Result instead
-    async fn authenticate(&self, request: &mut WpNetworkRequest) -> bool;
+    async fn authenticate(
+        &self,
+        request: &WpNetworkRequest,
+    ) -> Result<HeaderMap, AuthenticationError>;
+
+    fn should_reauthenticate(&self, response: &WpNetworkResponse) -> bool {
+        response.status_code == 401
+    }
 
     async fn re_authenticate(
         &self,
-        request: &mut WpNetworkRequest,
+        request: &WpNetworkRequest,
         previous_response: &WpNetworkResponse,
-    ) -> bool;
+    ) -> Result<HeaderMap, AuthenticationError>;
 }
 
 #[derive(Debug)]
@@ -25,16 +40,19 @@ pub(crate) struct NilAuthenticator {}
 
 #[async_trait::async_trait]
 impl Authenticator for NilAuthenticator {
-    async fn authenticate(&self, _request: &mut WpNetworkRequest) -> bool {
-        false
+    async fn authenticate(
+        &self,
+        _request: &WpNetworkRequest,
+    ) -> Result<HeaderMap, AuthenticationError> {
+        Ok(HeaderMap::default())
     }
 
     async fn re_authenticate(
         &self,
-        _request: &mut WpNetworkRequest,
+        _request: &WpNetworkRequest,
         _previous_response: &WpNetworkResponse,
-    ) -> bool {
-        false
+    ) -> Result<HeaderMap, AuthenticationError> {
+        Ok(HeaderMap::default())
     }
 }
 
@@ -57,23 +75,27 @@ impl ApplicationPasswordAuthenticator {
 
 #[async_trait::async_trait]
 impl Authenticator for ApplicationPasswordAuthenticator {
-    async fn authenticate(&self, request: &mut WpNetworkRequest) -> bool {
-        request.add_header(
+    async fn authenticate(
+        &self,
+        request: &WpNetworkRequest,
+    ) -> Result<HeaderMap, AuthenticationError> {
+        let mut headers = HeaderMap::new();
+        headers.append(
             http::header::AUTHORIZATION,
             format!("Basic {}", self.token)
                 .try_into()
                 .expect("token is always a valid header value"),
         );
 
-        true
+        Ok(headers)
     }
 
     async fn re_authenticate(
         &self,
-        request: &mut WpNetworkRequest,
+        request: &WpNetworkRequest,
         previous_response: &WpNetworkResponse,
-    ) -> bool {
-        false
+    ) -> Result<HeaderMap, AuthenticationError> {
+        Err(AuthenticationError::ReAuthenticationNotApplicable)
     }
 }
 
@@ -99,121 +121,124 @@ impl CookieAuthenticator {
         }
     }
 
-    async fn get_rest_nonce(&self) -> Option<String> {
-        if let Some(nonce) = self.nonce.read().expect("Failed to unlock nonce").clone() {
-            return Some(nonce);
+    async fn get_rest_nonce(&self) -> Result<String, AuthenticationError> {
+        if let Some(cache) = self.nonce.read().expect("Failed to unlock nonce").clone() {
+            return Ok(cache);
         }
 
-        let rest_nonce_url = self.api_base_url.derived_rest_nonce_url();
-        let rest_nonce_url_clone = rest_nonce_url.clone();
-        let nonce_request = WpNetworkRequest {
-            method: RequestMethod::GET,
-            url: rest_nonce_url.into(),
-            header_map: WpNetworkHeaderMap::new(http::HeaderMap::new()).into(),
-            body: None,
-        };
+        let mut fetched = self.nonce_from_request(self.nonce_request()).await;
 
-        let nonce_from_request = |request: WpNetworkRequest| async move {
-            self.request_executor
-                .execute(request.into())
-                .await
-                .ok()
-                .and_then(|response| {
-                    // A 200 OK response from the `rest_nonce_url` (a.k.a `wp-admin/admin-ajax.php`)
-                    // should be the nonce value. However, just in case the site is configured to
-                    // return a 200 OK response with other content (for example redirection to
-                    // other webpage), here we check the body length here for a light validation of
-                    // the nonce value.
-                    if response.status_code == 200 {
-                        let body = response.body_as_string();
-                        if body.len() < 50 {
-                            return Some(body);
-                        }
-                    }
-                    None
-                })
-        };
+        if fetched.is_none() {
+            fetched = self
+                .nonce_from_request(self.nonce_request_via_login()?)
+                .await;
+        }
 
-        if let Some(nonce) = nonce_from_request(nonce_request).await {
+        if let Some(fetched) = fetched {
             self.nonce
                 .write()
                 .expect("Failed to unlock nonce")
-                .replace(nonce.clone());
-            return Some(nonce);
+                .replace(fetched.clone());
+            return Ok(fetched);
         }
 
+        Err(AuthenticationError::IncorrectCredentials)
+    }
+
+    fn nonce_request(&self) -> WpNetworkRequest {
+        WpNetworkRequest {
+            method: RequestMethod::GET,
+            url: self.api_base_url.derived_rest_nonce_url().into(),
+            header_map: WpNetworkHeaderMap::default().into(),
+            body: None,
+        }
+    }
+
+    fn nonce_request_via_login(&self) -> Result<WpNetworkRequest, AuthenticationError> {
         let mut headers = http::HeaderMap::new();
         headers.insert(
             http::header::CONTENT_TYPE,
             http::header::HeaderValue::from_str("application/x-www-form-urlencoded")
                 .expect("This conversion should never fail"),
         );
+
         let body = serde_urlencoded::to_string([
             ["log", self.credentials.username.as_str()],
             ["pwd", self.credentials.password.as_str()],
             ["rememberme", "true"],
-            ["redirect_to", rest_nonce_url_clone.to_string().as_str()],
+            [
+                "redirect_to",
+                self.api_base_url.derived_rest_nonce_url().as_str(),
+            ],
         ])
-        .unwrap();
-        let login_request = WpNetworkRequest {
+        .map_err(|err| AuthenticationError::InvalidWebFormContent)?;
+
+        Ok(WpNetworkRequest {
             method: RequestMethod::POST,
             url: self.api_base_url.derived_wp_login_url().into(),
             header_map: WpNetworkHeaderMap::new(headers).into(),
             body: Some(WpNetworkRequestBody::new(body.into_bytes()).into()),
-        };
+        })
+    }
 
-        if let Some(nonce) = nonce_from_request(login_request).await {
-            self.nonce
-                .write()
-                .expect("Failed to unlock nonce")
-                .replace(nonce.clone());
-            return Some(nonce);
-        }
-
-        None
+    async fn nonce_from_request(&self, request: WpNetworkRequest) -> Option<String> {
+        self.request_executor
+            .execute(request.into())
+            .await
+            .ok()
+            .and_then(|response| {
+                // A 200 OK response from the `rest_nonce_url` (a.k.a `wp-admin/admin-ajax.php`)
+                // should be the nonce value. However, just in case the site is configured to
+                // return a 200 OK response with other content (for example redirection to
+                // other webpage), here we check the body length here for a light validation of
+                // the nonce value.
+                if response.status_code == 200 {
+                    let body = response.body_as_string();
+                    if body.len() < 50 {
+                        return Some(body);
+                    }
+                }
+                None
+            })
     }
 }
 
 #[async_trait::async_trait]
 impl Authenticator for CookieAuthenticator {
-    async fn authenticate(&self, request: &mut WpNetworkRequest) -> bool {
+    async fn authenticate(
+        &self,
+        request: &WpNetworkRequest,
+    ) -> Result<HeaderMap, AuthenticationError> {
         // Only attempt login if the request is to the WordPress site.
         if let (Ok(api_base_url), Ok(request_url)) = (
             url::Url::parse(self.api_base_url.as_str()),
             url::Url::parse(request.url.0.as_str()),
         ) {
             if api_base_url.host_str() != request_url.host_str() {
-                return false;
+                return Err(AuthenticationError::RequestUrlDoesNotMatchSite);
             }
         }
 
-        if let Some(nonce) = self.get_rest_nonce().await {
-            request.add_header(
-                "X-WP-Nonce"
+        self.get_rest_nonce().await.map(|nonce| {
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                "X-WP-Nonce",
+                nonce
                     .try_into()
-                    .expect("This conversion should never fail"),
-                nonce.try_into().expect("This conversion should never fail"),
+                    .expect("This conversion should never fail since nonce is a short string"),
             );
-            return true;
-        }
-
-        false
+            headers
+        })
     }
 
     async fn re_authenticate(
         &self,
-        request: &mut WpNetworkRequest,
+        request: &WpNetworkRequest,
         previous_response: &WpNetworkResponse,
-    ) -> bool {
-        if previous_response.status_code == 401 {
-            *self.nonce.write().expect("Failed to unlock nonce") = None;
+    ) -> Result<HeaderMap, AuthenticationError> {
+        *self.nonce.write().expect("Failed to unlock nonce") = None;
 
-            if self.authenticate(request).await {
-                return true;
-            }
-        }
-
-        false
+        return self.authenticate(request).await;
     }
 }
 
@@ -241,21 +266,37 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
         &self,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        let mut request = (*request).clone();
-        self.authenticator.authenticate(&mut request).await;
+        let mut original = (*request).clone();
 
-        let result = self.request_executor.execute(request.clone().into()).await;
-
-        if let Ok(response) = &result {
-            if self
-                .authenticator
-                .re_authenticate(&mut request, response)
-                .await
-            {
-                return self.request_executor.execute(request.clone().into()).await;
+        // Authenticate the initial request.
+        match self.authenticator.authenticate(&original).await {
+            Ok(headers) => {
+                original.add_headers(&headers);
+            }
+            Err(error) => {
+                // Do nothing.
+                // Any authentication error will be returned later after sending the request.
             }
         }
 
-        result
+        let initial_response = self.request_executor.execute(original.into()).await;
+
+        // Retry if the request fails due to authentication failure
+        if let Ok(response) = &initial_response {
+            if self.authenticator.should_reauthenticate(response) {
+                let mut original = (*request).clone();
+                if let Ok(headers) = self
+                    .authenticator
+                    .re_authenticate(&original, response)
+                    .await
+                {
+                    original.add_headers(&headers);
+
+                    return self.request_executor.execute(original.into()).await;
+                }
+            }
+        }
+
+        initial_response
     }
 }
