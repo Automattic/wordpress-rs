@@ -1,4 +1,5 @@
 use http::header::HeaderMap;
+use http::header::HeaderValue;
 use std::sync::{Arc, RwLock};
 
 use crate::{
@@ -8,6 +9,8 @@ use crate::{
     },
     RequestExecutionError, WpLoginCredentials,
 };
+
+const CONTENT_TYPE_FORM: &str = "application/x-www-form-urlencoded";
 
 #[derive(Debug)]
 pub enum AuthenticationError {
@@ -158,8 +161,7 @@ impl CookieAuthenticator {
         let mut headers = http::HeaderMap::new();
         headers.insert(
             http::header::CONTENT_TYPE,
-            http::header::HeaderValue::from_str("application/x-www-form-urlencoded")
-                .expect("This conversion should never fail"),
+            HeaderValue::from_static(CONTENT_TYPE_FORM),
         );
 
         let body = serde_urlencoded::to_string([
