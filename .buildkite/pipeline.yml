@@ -152,9 +152,27 @@ steps:
           ./gradlew detektMain detektTest
         agents:
           queue: android
+      - label: ":kotlin: Publish `rs.wordpress.api:bindings`"
+        key: "publish-wp-api-kotlin-bindings"
+        plugins: [$CI_TOOLKIT]
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- :kotlin: Publishing `rs.wordpress.api:bindings`"
+          .buildkite/publish-wp-api-kotlin-bindings.sh
+        agents:
+          queue: android
       - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
         key: "publish-wp-api-kotlin"
         plugins: [$CI_TOOLKIT]
+        depends_on:
+          - "publish-wp-api-kotlin-bindings"
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y

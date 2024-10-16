@@ -28,6 +28,7 @@ dependencyResolutionManagement {
     }
 }
 
+include(":api:bindings")
 include(":api:kotlin")
 include(":api:android")
 include(":example:composeApp")
