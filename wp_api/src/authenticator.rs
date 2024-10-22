@@ -137,7 +137,7 @@ impl CookieAuthenticator {
         }
     }
 
-    async fn get_rest_nonce(&self) -> Option<String> {
+    async fn fetch_rest_nonce(&self) -> Option<String> {
         let mut nonce_guard = self.nonce.lock().await;
         if let Some(cache) = (*nonce_guard).clone() {
             return Some(cache);
@@ -238,7 +238,7 @@ impl Authenticator for CookieAuthenticator {
     }
 
     async fn authentication_headers(&self) -> Option<HeaderMap> {
-        self.get_rest_nonce().await.map(|nonce| {
+        self.fetch_rest_nonce().await.map(|nonce| {
             let mut headers = HeaderMap::new();
             headers.insert(
                 "X-WP-Nonce",
