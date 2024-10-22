@@ -119,7 +119,7 @@ impl WpApiClient {
                 ))
             }
             WpAuthentication::UserAccount { login } => Arc::new(CookieAuthenticator::new(
-                site_url.inner.clone().into(),
+                (*api_base_url).clone(),
                 login.clone(),
                 request_executor.clone(),
             )),
