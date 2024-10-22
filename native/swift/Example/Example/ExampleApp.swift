@@ -10,18 +10,21 @@ struct ExampleApp: App {
     let rootListItems = [
         RootListData(name: "Application Passwords", callback: {
             try await WordPressAPI.globalInstance.applicationPasswords.listWithEditContext(userId: 1)
+                .data
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Users", callback: {
             try await WordPressAPI.globalInstance.users.listWithEditContext(params: .init())
+                .data
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Plugins", callback: {
             try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
+                .data
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Post Types", callback: {
-            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().postTypes.map { _, value in
+            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().data.postTypes.map { _, value in
                 value.asListViewData
             }
         }),
@@ -36,10 +39,10 @@ struct ExampleApp: App {
                 WordPressAPI.globalInstance.siteHealthTests.pageCache()
             ]
 
-            return items.map { $0.asListViewData }
+            return items.map { $0.data.asListViewData }
         }),
         RootListData(name: "Site Settings", callback: {
-            return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().asListViewDataItems
+            return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().data.asListViewDataItems
         })
     ]
 
