@@ -18,7 +18,7 @@ class SiteSettingsEndpointTest {
     fun testRetrieveSiteSettings() = runTest {
         val siteSettings = client.request { requestBuilder ->
             requestBuilder.siteSettings().retrieveWithEditContext()
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(FIRST_USER_EMAIL, siteSettings.email)
     }
 }
