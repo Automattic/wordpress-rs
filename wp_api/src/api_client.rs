@@ -110,7 +110,11 @@ impl WpApiClient {
         let authenticator: Arc<dyn Authenticator> = match &authentication {
             WpAuthentication::AuthorizationHeader { token } => {
                 Arc::new(ApplicationPasswordAuthenticator::new(
-                    site_url.inner.host_str().unwrap_or("").into(),
+                    site_url
+                        .inner
+                        .host_str()
+                        .expect("HTTP URLs always have host")
+                        .into(),
                     token.clone(),
                 ))
             }

@@ -144,8 +144,7 @@ impl ApiBaseUrl {
     }
 
     pub fn host_str(&self) -> &str {
-        // HTTP URL always has a host.
-        self.url.host_str().unwrap_or("")
+        self.url.host_str().expect("HTTP URLs always have host")
     }
 }
 
