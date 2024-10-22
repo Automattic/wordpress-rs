@@ -76,6 +76,11 @@ impl InnerRequestBuilder {
     }
 }
 
+/// A trait for sending HTTP requests.
+///
+/// The implementation must have cookie-jar support, where response cookies are
+/// stored and will automatically be included (when appropriate) in subsequent
+/// requests.
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait RequestExecutor: Send + Sync + Debug {
