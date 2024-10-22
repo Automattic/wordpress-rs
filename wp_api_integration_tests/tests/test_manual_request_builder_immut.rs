@@ -4,11 +4,12 @@ use rstest_reuse::{self, apply};
 use serial_test::parallel;
 use wp_api::{
     generate,
+    request::endpoint::users_endpoint::UsersRequestListWithEditContextResponse,
     users::{
         UserListParams, WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy,
         WpApiParamUsersWho,
     },
-    WpApiParamOrder, WpApiRequestBuilder, WpAuthentication,
+    WpApiError, WpApiParamOrder, WpApiRequestBuilder, WpAuthentication,
 };
 use wp_api_integration_tests::{
     test_site_url, AsyncWpNetworking, TestCredentials, FIRST_USER_ID, SECOND_USER_ID,
@@ -20,10 +21,6 @@ pub mod reusable_test_cases;
 #[tokio::test]
 #[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
-    use wp_api::{
-        request::endpoint::users_endpoint::UsersRequestListWithEditContextResponse, WpApiError,
-    };
-
     let authentication = WpAuthentication::from_username_and_password(
         TestCredentials::instance().admin_username.to_string(),
         TestCredentials::instance().admin_password.to_string(),
