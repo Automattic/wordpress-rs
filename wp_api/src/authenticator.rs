@@ -1,6 +1,7 @@
 use http::header::HeaderMap;
 use http::header::HeaderValue;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use futures::lock::Mutex;
 use url::Url;
 
 use crate::{
@@ -21,7 +22,7 @@ pub trait Authenticator: Send + Sync + std::fmt::Debug {
 
     async fn authentication_headers(&self) -> Option<HeaderMap>;
 
-    fn reset(&self);
+    async fn reset(&self);
 
     fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool;
 
@@ -31,7 +32,7 @@ pub trait Authenticator: Send + Sync + std::fmt::Debug {
         previous_response: &WpNetworkResponse,
     ) -> Option<HeaderMap> {
         if self.should_authenticate(&request.url.0, Some(previous_response.status_code)) {
-            self.reset();
+            self.reset().await;
             return self.authentication_headers().await;
         }
 
@@ -56,7 +57,7 @@ impl Authenticator for NilAuthenticator {
         None
     }
 
-    fn reset(&self) {
+    async fn reset(&self) {
         // Do nothing.
     }
 }
@@ -97,7 +98,7 @@ impl Authenticator for ApplicationPasswordAuthenticator {
         Some(headers)
     }
 
-    fn reset(&self) {
+    async fn reset(&self) {
         // Do nothing.
     }
 
@@ -119,7 +120,7 @@ pub(crate) struct CookieAuthenticator {
     api_base_url: ApiBaseUrl,
     credentials: WpLoginCredentials,
     request_executor: std::sync::Arc<dyn RequestExecutor>,
-    nonce: RwLock<Option<String>>,
+    nonce: Mutex<Option<String>>,
 }
 
 impl CookieAuthenticator {
@@ -137,7 +138,8 @@ impl CookieAuthenticator {
     }
 
     async fn get_rest_nonce(&self) -> Option<String> {
-        if let Some(cache) = self.nonce.read().expect("Failed to unlock nonce").clone() {
+        let mut nonce_guard = self.nonce.lock().await;
+        if let Some(cache) = (*nonce_guard).clone() {
             return Some(cache);
         }
 
@@ -150,10 +152,7 @@ impl CookieAuthenticator {
         }
 
         if let Some(fetched) = fetched {
-            self.nonce
-                .write()
-                .expect("Failed to unlock nonce")
-                .replace(fetched.clone());
+            (*nonce_guard).replace(fetched.clone());
             return Some(fetched);
         }
 
@@ -251,8 +250,8 @@ impl Authenticator for CookieAuthenticator {
         })
     }
 
-    fn reset(&self) {
-        *self.nonce.write().expect("Failed to unlock nonce") = None;
+    async fn reset(&self) {
+        *self.nonce.lock().await = None;
     }
 }
 
