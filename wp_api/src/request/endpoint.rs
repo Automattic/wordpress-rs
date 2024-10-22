@@ -121,9 +121,8 @@ trait UrlExtension {
 }
 
 impl UrlExtension for Url {
-    fn append(mut self, segment: &str) -> Result<Url, ()> {
-        self.path_segments_mut()?.push(segment);
-        Ok(self)
+    fn append(self, segment: &str) -> Result<Url, ()> {
+        self.extend([segment])
     }
 
     fn extend<I>(mut self, segments: I) -> Result<Url, ()>
@@ -131,6 +130,13 @@ impl UrlExtension for Url {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
+        // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
+        if let Some(segments) = self.path_segments() {
+            if segments.last() == Some("") {
+                self.path_segments_mut()?.pop();
+            }
+        }
+
         self.path_segments_mut()?.extend(segments);
         Ok(self)
     }
