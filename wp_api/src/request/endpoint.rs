@@ -229,10 +229,15 @@ mod tests {
     fn api_base_url(
         #[values(
             "http://example.com",
+            "http://example.com/",
             "https://example.com",
+            "https://example.com/",
             "https://www.example.com",
+            "https://www.example.com/",
             "https://f.example.com",
-            "https://example.com/f"
+            "https://f.example.com/",
+            "https://example.com/f",
+            "https://example.com/f/"
         )]
         test_base_url: &str,
     ) {
@@ -264,7 +269,13 @@ mod tests {
     }
 
     fn wp_json_endpoint(base_url: &str) -> String {
-        format!("{}/{}", base_url, WP_JSON_PATH_SEGMENTS.join("/"))
+        let mut url = base_url.to_string();
+        if !url.ends_with("/") {
+            url.push('/')
+        }
+        url.push_str(WP_JSON_PATH_SEGMENTS.join("/").as_str());
+
+        url
     }
 
     fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
