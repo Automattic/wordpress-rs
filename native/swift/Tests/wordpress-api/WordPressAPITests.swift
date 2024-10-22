@@ -47,7 +47,7 @@ final class WordPressAPITests: XCTestCase {
             executor: stubs
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
-        XCTAssertEqual(user.name, "User Name")
+        XCTAssertEqual(user.data.name, "User Name")
     }
 
 #if !os(Linux)
