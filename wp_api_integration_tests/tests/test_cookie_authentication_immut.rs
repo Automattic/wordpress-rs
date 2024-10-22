@@ -7,7 +7,7 @@ use wp_api::{
 };
 use wp_api_integration_tests::*;
 
-use serial_test::serial;
+use serial_test::parallel;
 
 #[derive(Debug)]
 struct TrackRequestExecutor<T: RequestExecutor> {
@@ -55,7 +55,7 @@ impl<T: RequestExecutor> RequestExecutor for TrackRequestExecutor<T> {
 }
 
 #[tokio::test]
-#[serial]
+#[parallel]
 async fn test_cookie_authentication() {
     let login = WpLoginCredentials {
         username: TestCredentials::instance().admin_username.to_string(),
@@ -78,7 +78,7 @@ async fn test_cookie_authentication() {
 }
 
 #[tokio::test]
-#[serial]
+#[parallel]
 async fn test_fail_with_incorrect_password() {
     let login = WpLoginCredentials {
         username: TestCredentials::instance().admin_username.to_string(),
@@ -98,7 +98,7 @@ async fn test_fail_with_incorrect_password() {
 }
 
 #[tokio::test]
-#[serial]
+#[parallel]
 async fn test_fail_without_cookie_store() {
     let login = WpLoginCredentials {
         username: TestCredentials::instance().admin_username.to_string(),
@@ -120,7 +120,7 @@ async fn test_fail_without_cookie_store() {
 }
 
 #[tokio::test]
-#[serial_test::parallel]
+#[parallel]
 async fn test_nonce_is_reused_across_requests() {
     let login = WpLoginCredentials {
         username: TestCredentials::instance().admin_username.to_string(),
