@@ -1,13 +1,13 @@
+use futures::lock::Mutex;
 use http::header::HeaderMap;
 use http::header::HeaderValue;
 use std::sync::Arc;
-use futures::lock::Mutex;
 use url::Url;
 
 use crate::{
     request::{
-        endpoint::ApiBaseUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest,
-        WpNetworkRequestBody, WpNetworkResponse,
+        endpoint::ApiBaseUrl, endpoint::WpEndpointUrl, RequestExecutor, RequestMethod,
+        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkRequestBody, WpNetworkResponse,
     },
     RequestExecutionError, WpLoginCredentials,
 };
@@ -28,10 +28,10 @@ pub trait Authenticator: Send + Sync + std::fmt::Debug {
 
     async fn re_authenticate(
         &self,
-        request: &WpNetworkRequest,
-        previous_response: &WpNetworkResponse,
+        request_url: &WpEndpointUrl,
+        previous_response_status_code: u16,
     ) -> Option<HeaderMap> {
-        if self.should_authenticate(&request.url.0, Some(previous_response.status_code)) {
+        if self.should_authenticate(&request_url.0, Some(previous_response_status_code)) {
             self.reset().await;
             return self.authentication_headers().await;
         }
@@ -295,7 +295,7 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
             let mut original = (*request).clone();
             if let Some(headers) = self
                 .authenticator
-                .re_authenticate(&original, response)
+                .re_authenticate(&original.url, response.status_code)
                 .await
             {
                 original.add_headers(&headers);
