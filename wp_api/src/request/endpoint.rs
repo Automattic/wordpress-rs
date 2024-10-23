@@ -329,14 +329,23 @@ mod tests {
     fn derived_login_url(
         #[values(
             "http://example.com",
+            "http://example.com/",
             "https://example.com",
+            "https://example.com/",
             "https://www.example.com",
+            "https://www.example.com/",
             "https://f.example.com",
-            "https://example.com/f"
+            "https://f.example.com/",
+            "https://example.com/f",
+            "https://example.com/f/"
         )]
         test_base_url: &str,
     ) {
-        let expected_login_url = format!("{}/wp-login.php", test_base_url);
+        let mut expected_login_url = test_base_url.to_string();
+        if !expected_login_url.ends_with("/") {
+            expected_login_url.push('/');
+        }
+        expected_login_url.push_str("wp-login.php");
 
         let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
         let derived_login_url = api_base_url.derived_wp_login_url();
@@ -346,17 +355,23 @@ mod tests {
     fn derived_rest_nonce_url(
         #[values(
             "http://example.com",
+            "http://example.com/",
             "https://example.com",
+            "https://example.com/",
             "https://www.example.com",
+            "https://www.example.com/",
             "https://f.example.com",
-            "https://example.com/f"
+            "https://f.example.com/",
+            "https://example.com/f",
+            "https://example.com/f/"
         )]
         test_base_url: &str,
     ) {
-        let expected_login_url = format!(
-            "{}/wp-admin/admin-ajax.php?action=rest-nonce",
-            test_base_url
-        );
+        let mut expected_login_url = test_base_url.to_string();
+        if !expected_login_url.ends_with("/") {
+            expected_login_url.push('/');
+        }
+        expected_login_url.push_str("wp-admin/admin-ajax.php?action=rest-nonce");
 
         let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
         let derived_login_url = api_base_url.derived_rest_nonce_url();
