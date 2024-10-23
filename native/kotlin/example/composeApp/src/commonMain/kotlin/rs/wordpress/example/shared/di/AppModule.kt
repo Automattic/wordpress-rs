@@ -14,8 +14,8 @@ val authModule = module {
             localTestSiteUrl = localTestSiteUrl().siteUrl,
             localTestSiteUsername = "test@example.com",
             // Until this works with the included test credentials, you can grab it from the
-            // `test_credentials` file `make test-server` will generate in the root of the repo
-            // It's the 3rd line in that file
+            // `test_credentials.json` file `make test-server` will generate in the root of the repo
+            // The key is `admin_password`
             localTestSitePassword = "s3N7vlbdrFPDDI3MbyFUvS3P"
         )
     }
