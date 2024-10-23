@@ -29,17 +29,17 @@ struct ExampleApp: App {
             }
         }),
         RootListData(name: "Site Health Tests", callback: {
-            let items: [any ListViewDataConvertable] = try await [
-                WordPressAPI.globalInstance.siteHealthTests.authorizationHeader(),
-                WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates(),
-                WordPressAPI.globalInstance.siteHealthTests.directorySizes(),
-                WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
-                WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
-                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests(),
-                WordPressAPI.globalInstance.siteHealthTests.pageCache()
+            let items: [any ListViewDataConvertable] = [
+                try await WordPressAPI.globalInstance.siteHealthTests.authorizationHeader().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.directorySizes().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.httpsStatus().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.loopbackRequests().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.pageCache().data
             ]
 
-            return items.map { $0.data.asListViewData }
+            return items.map { $0.asListViewData }
         }),
         RootListData(name: "Site Settings", callback: {
             return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().data.asListViewDataItems
