@@ -113,6 +113,9 @@ steps:
         command: |
           .buildkite/download-xcframework.sh
 
+          echo "--- :rubygems: Setting up Gems"
+          install_gems
+
           echo "--- :computer: Building for macOS"
           make swift-example-app-mac
 
