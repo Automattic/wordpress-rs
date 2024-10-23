@@ -1,7 +1,7 @@
 # Nodes with values to reuse in the pipeline.
 common_params:
   matrix: &wordpress_version_matrix
-    # All versions except for the latest have been disabled until we have version specific 
+    # All versions except for the latest have been disabled until we have version specific
     # integration tests
     # - '5.6' # First version to introduce appliation passwords
     # - '5.7'
@@ -68,13 +68,13 @@ steps:
           - target/libwordpressFFI.xcframework.zip
           - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
         env:
-          IMAGE_ID: xcode-15.3
+          IMAGE_ID: xcode-16.0-v7
         agents:
           queue: mac
       - label: ":swift: :darwin: Build + Test on Simulators"
         command: .buildkite/swift-test.sh run_tests
         env:
-          IMAGE_ID: xcode-15.3
+          IMAGE_ID: xcode-16.0-v7
         depends_on: xcframework
         plugins: [$CI_TOOLKIT]
         agents:
@@ -82,7 +82,7 @@ steps:
       - label: ":swift: :darwin: Build for Real Devices"
         command: .buildkite/swift-test.sh build_for_real_device
         env:
-          IMAGE_ID: xcode-15.3
+          IMAGE_ID: xcode-16.0-v7
         depends_on: xcframework
         plugins: [$CI_TOOLKIT]
         agents:
@@ -90,7 +90,7 @@ steps:
       - label: ":swift: :cocoapods: Validate CocoaPods Support"
         command: .buildkite/validate-cocoapods.sh
         env:
-          IMAGE_ID: xcode-15.3
+          IMAGE_ID: xcode-16.0-v7
         depends_on: xcframework
         plugins: [$CI_TOOLKIT]
         agents:
@@ -106,7 +106,7 @@ steps:
           make lint-swift
         depends_on: xcframework
         env:
-          IMAGE_ID: xcode-15.3
+          IMAGE_ID: xcode-16.0-v7
         agents:
           queue: mac
       - label: ":swift: Example Apps"
@@ -120,7 +120,7 @@ steps:
           make swift-example-app-ios
         depends_on: xcframework
         env:
-          IMAGE_ID: xcode-15.3
+          IMAGE_ID: xcode-16.0-v7
         agents:
           queue: mac
   #
@@ -224,7 +224,7 @@ steps:
     depends_on: swift
     plugins: [$CI_TOOLKIT]
     env:
-      IMAGE_ID: xcode-15.4
+      IMAGE_ID: xcode-16.0-v7
     agents:
       queue: mac
     if: build.env("NEW_VERSION") != null
