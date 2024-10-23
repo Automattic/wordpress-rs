@@ -83,17 +83,9 @@ impl ApiBaseUrl {
     pub(crate) fn derived_wp_login_url(&self) -> Url {
         let mut url = self.url.clone();
 
-        if let Some(segments) = url.path_segments() {
-            if segments.last() == Some("") {
-                url.path_segments_mut()
-                    .expect("ApiBaseUrl is a full HTTP URL")
-                    .pop();
-            }
-        }
-
         url.path_segments_mut()
             .expect("ApiBaseUrl is a full HTTP URL")
-            .pop()
+            .pop() // Remove the "wp-json" part
             .push("wp-login.php");
 
         url
@@ -104,7 +96,7 @@ impl ApiBaseUrl {
 
         url.path_segments_mut()
             .expect("login url is a full HTTP URL")
-            .pop()
+            .pop() // Remove the "wp-login.php" part
             .push("wp-admin")
             .push("admin-ajax.php");
 
