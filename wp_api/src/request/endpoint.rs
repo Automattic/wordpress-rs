@@ -158,9 +158,8 @@ trait UrlExtension {
 }
 
 impl UrlExtension for Url {
-    fn append(mut self, segment: &str) -> Result<Url, ()> {
-        self.path_segments_mut()?.push(segment);
-        Ok(self)
+    fn append(self, segment: &str) -> Result<Url, ()> {
+        self.extend([segment])
     }
 
     fn extend<I>(mut self, segments: I) -> Result<Url, ()>
@@ -168,6 +167,13 @@ impl UrlExtension for Url {
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
+        // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
+        if let Some(segments) = self.path_segments() {
+            if segments.last() == Some("") {
+                self.path_segments_mut()?.pop();
+            }
+        }
+
         self.path_segments_mut()?.extend(segments);
         Ok(self)
     }
@@ -266,10 +272,15 @@ mod tests {
     fn api_base_url(
         #[values(
             "http://example.com",
+            "http://example.com/",
             "https://example.com",
+            "https://example.com/",
             "https://www.example.com",
+            "https://www.example.com/",
             "https://f.example.com",
-            "https://example.com/f"
+            "https://f.example.com/",
+            "https://example.com/f",
+            "https://example.com/f/"
         )]
         test_base_url: &str,
     ) {
@@ -301,7 +312,13 @@ mod tests {
     }
 
     fn wp_json_endpoint(base_url: &str) -> String {
-        format!("{}/{}", base_url, WP_JSON_PATH_SEGMENTS.join("/"))
+        let mut url = base_url.to_string();
+        if !url.ends_with("/") {
+            url.push('/')
+        }
+        url.push_str(WP_JSON_PATH_SEGMENTS.join("/").as_str());
+
+        url
     }
 
     fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
