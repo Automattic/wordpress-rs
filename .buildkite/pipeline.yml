@@ -122,6 +122,7 @@ steps:
           echo "--- :iphone: Building for iOS"
           make swift-example-app-ios
         depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
         env:
           IMAGE_ID: xcode-16.0-v7
         agents:
