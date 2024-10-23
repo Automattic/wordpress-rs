@@ -22,7 +22,7 @@ class UsersEndpointTest {
     fun testUserListRequest() = runTest {
         val userList = client.request { requestBuilder ->
             requestBuilder.users().listWithEditContext(params = UserListParams())
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(NUMBER_OF_USERS, userList.count())
     }
 
@@ -33,7 +33,7 @@ class UsersEndpointTest {
         )
         val userList =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
-                .assertSuccessAndRetrieveData()
+                .assertSuccessAndRetrieveData().data
         // One of the test users don't have any posts or pages
         assertEquals(NUMBER_OF_USERS - 1, userList.count())
     }
@@ -48,7 +48,7 @@ class UsersEndpointTest {
                     SparseUserFieldWithEditContext.NAME
                 )
             )
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(NUMBER_OF_USERS, userList.count())
         assertNull(userList.first().slug)
     }
@@ -63,7 +63,7 @@ class UsersEndpointTest {
                     SparseUserFieldWithEditContext.NAME
                 )
             )
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
         assertNull(sparseUser.slug)
     }
@@ -77,7 +77,7 @@ class UsersEndpointTest {
                     SparseUserFieldWithEditContext.NAME
                 )
             )
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(FIRST_USER_EMAIL, sparseUser.email)
         assertNull(sparseUser.slug)
     }

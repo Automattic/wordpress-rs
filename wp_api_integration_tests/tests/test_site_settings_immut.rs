@@ -15,7 +15,8 @@ async fn retrieve_site_settings_with_edit_context() {
         .site_settings()
         .retrieve_with_edit_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(FIRST_USER_EMAIL, site_settings.email);
 }
 
@@ -27,7 +28,8 @@ async fn retrieve_site_settings_with_embed_context() {
         .site_settings()
         .retrieve_with_embed_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(FIRST_USER_EMAIL, site_settings.email);
 }
 
@@ -39,7 +41,8 @@ async fn retrieve_site_settings_with_view_context() {
         .site_settings()
         .retrieve_with_view_context()
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(FIRST_USER_EMAIL, site_settings.email);
 }
 
@@ -60,7 +63,8 @@ mod filter {
             .site_settings()
             .filter_retrieve_with_edit_context(fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -74,7 +78,8 @@ mod filter {
             .site_settings()
             .filter_retrieve_with_embed_context(fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
@@ -88,7 +93,8 @@ mod filter {
             .site_settings()
             .filter_retrieve_with_view_context(fields)
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 }

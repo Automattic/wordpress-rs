@@ -24,7 +24,7 @@ class PostTypesEndpointTest {
     fun testPostTypesListRequest() = runTest {
         val postTypes = client.request { requestBuilder ->
             requestBuilder.postTypes().listWithEditContext()
-        }.assertSuccessAndRetrieveData().postTypes
+        }.assertSuccessAndRetrieveData().data.postTypes
         assertEquals("Posts", postTypes[PostType.Post]!!.name)
     }
 
@@ -32,7 +32,7 @@ class PostTypesEndpointTest {
     fun testPostTypesRetrievePost() = runTest {
         val postTypesPost = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.Post)
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(postTypesPost.supports[PostTypeSupports.Title]!!)
         assertFalse(postTypesPost.capabilities[PostTypeCapabilities.EditPosts]!!.isEmpty())
     }
@@ -41,7 +41,7 @@ class PostTypesEndpointTest {
     fun testPostTypesWpFontFaceDoesNotSupportAuthor() = runTest {
         val postTypesPost = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.WpFontFace)
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertNull(postTypesPost.supports[PostTypeSupports.Author])
     }
 
