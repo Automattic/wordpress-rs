@@ -30,7 +30,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 
     let request_builder = WpApiRequestBuilder::new(test_site_url());
     let mut wp_request = request_builder.users().list_with_edit_context(&params);
-    if let Some(headers) = authenticator.authentication_headers().await {
+    if let Some(headers) = authenticator.authentication_headers(&wp_request, None).await {
         wp_request.add_headers(&headers);
     }
     let response = async_wp_networking.async_request(wp_request.into()).await;
