@@ -22,6 +22,7 @@ paste = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
 uuid = { workspace = true, features = [ "v4" ] }
@@ -30,8 +31,10 @@ wp_derive_request_builder = { path = "../wp_derive_request_builder", features = 
 wp_serde_helper = { path = "../wp_serde_helper" }
 
 [dev-dependencies]
+rand = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
+tokio = { workspace = true, features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

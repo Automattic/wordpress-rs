@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpError},
-    WpApiError, WpAuthentication,
+    WpApiError,
 };
 
 use self::endpoint::WpEndpointUrl;
@@ -17,14 +17,12 @@ pub mod endpoint;
 const CONTENT_TYPE_JSON: &str = "application/json";
 const LINK_HEADER_KEY: &str = "Link";
 
-#[derive(Debug)]
-pub struct InnerRequestBuilder {
-    authentication: WpAuthentication,
-}
+#[derive(Debug, Default)]
+pub struct InnerRequestBuilder {}
 
 impl InnerRequestBuilder {
-    pub fn new(authentication: WpAuthentication) -> Self {
-        Self { authentication }
+    pub fn new() -> Self {
+        Self {}
     }
 
     pub fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
@@ -65,14 +63,6 @@ impl InnerRequestBuilder {
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        match self.authentication {
-            WpAuthentication::None => (),
-            WpAuthentication::AuthorizationHeader { ref token } => {
-                let hv = HeaderValue::from_str(&format!("Basic {}", token));
-                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
-                header_map.insert(http::header::AUTHORIZATION, hv);
-            }
-        };
         header_map.into()
     }
 
@@ -86,6 +76,11 @@ impl InnerRequestBuilder {
     }
 }
 
+/// A trait for sending HTTP requests.
+///
+/// The implementation must have cookie-jar support, where response cookies are
+/// stored and will automatically be included (when appropriate) in subsequent
+/// requests.
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait RequestExecutor: Send + Sync + Debug {
@@ -95,13 +90,13 @@ pub trait RequestExecutor: Send + Sync + Debug {
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
-#[derive(uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct WpNetworkRequestBody {
     inner: Vec<u8>,
 }
 
 impl WpNetworkRequestBody {
-    fn new(body: Vec<u8>) -> Self {
+    pub fn new(body: Vec<u8>) -> Self {
         Self { inner: body }
     }
 }
@@ -114,7 +109,7 @@ impl WpNetworkRequestBody {
 }
 
 // Has custom `Debug` trait implementation
-#[derive(uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct WpNetworkRequest {
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
@@ -144,6 +139,22 @@ impl WpNetworkRequest {
         self.body
             .as_ref()
             .map(|b| request_or_response_body_as_string(&b.inner))
+    }
+}
+
+impl WpNetworkRequest {
+    pub fn add_header(&mut self, name: HeaderName, value: HeaderValue) {
+        let mut header_map = self.header_map.inner.clone();
+        header_map.insert(name, value);
+        self.header_map = WpNetworkHeaderMap::new(header_map).into();
+    }
+
+    pub fn add_headers(&mut self, headers: &HeaderMap) {
+        let mut header_map = self.header_map.inner.clone();
+        headers.iter().for_each(|(name, value)| {
+            header_map.insert(name.clone(), value.clone());
+        });
+        self.header_map = WpNetworkHeaderMap::new(header_map).into();
     }
 }
 
@@ -217,8 +228,8 @@ impl WpNetworkHeaderMap {
             .collect()
     }
 
-    pub fn as_header_map(&self) -> HeaderMap {
-        self.inner.clone()
+    pub fn as_header_map(&self) -> &HeaderMap {
+        &self.inner
     }
 }
 
