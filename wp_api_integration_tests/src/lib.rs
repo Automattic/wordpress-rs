@@ -154,7 +154,7 @@ impl AsyncWpNetworking {
                 Self::request_method(wp_request.method()),
                 wp_request.url().0.as_str(),
             )
-            .headers(wp_request.header_map().as_header_map());
+            .headers(wp_request.header_map().as_header_map().clone());
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }

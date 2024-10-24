@@ -6,8 +6,8 @@ use url::Url;
 
 use crate::{
     request::{
-        endpoint::ApiBaseUrl, endpoint::WpEndpointUrl, RequestExecutor, RequestMethod,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkRequestBody, WpNetworkResponse,
+        endpoint::ApiBaseUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest,
+        WpNetworkRequestBody, WpNetworkResponse,
     },
     RequestExecutionError, WpLoginCredentials,
 };
@@ -20,24 +20,11 @@ pub trait Authenticator: Send + Sync + std::fmt::Debug {
     // This can be used to prevent credentials from being sent to other sites.
     fn host(&self) -> &str;
 
-    async fn authentication_headers(&self) -> Option<HeaderMap>;
-
-    async fn reset(&self);
-
-    fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool;
-
-    async fn re_authenticate(
+    async fn authentication_headers(
         &self,
-        request_url: &WpEndpointUrl,
-        previous_response_status_code: u16,
-    ) -> Option<HeaderMap> {
-        if self.should_authenticate(&request_url.0, Some(previous_response_status_code)) {
-            self.reset().await;
-            return self.authentication_headers().await;
-        }
-
-        None
-    }
+        request: &WpNetworkRequest,
+        previous_response: Option<&WpNetworkResponse>,
+    ) -> Option<HeaderMap>;
 }
 
 #[derive(Debug)]
@@ -45,20 +32,16 @@ pub(crate) struct NilAuthenticator {}
 
 #[async_trait::async_trait]
 impl Authenticator for NilAuthenticator {
-    fn should_authenticate(&self, _request_url: &str, _response_status_code: Option<u16>) -> bool {
-        false
-    }
-
     fn host(&self) -> &str {
         ""
     }
 
-    async fn authentication_headers(&self) -> Option<HeaderMap> {
+    async fn authentication_headers(
+        &self,
+        request: &WpNetworkRequest,
+        previous_response: Option<&WpNetworkResponse>,
+    ) -> Option<HeaderMap> {
         None
-    }
-
-    async fn reset(&self) {
-        // Do nothing.
     }
 }
 
@@ -86,7 +69,11 @@ impl Authenticator for ApplicationPasswordAuthenticator {
         self.host.as_str()
     }
 
-    async fn authentication_headers(&self) -> Option<HeaderMap> {
+    async fn authentication_headers(
+        &self,
+        request: &WpNetworkRequest,
+        previous_response: Option<&WpNetworkResponse>,
+    ) -> Option<HeaderMap> {
         let mut headers = HeaderMap::new();
         headers.append(
             http::header::AUTHORIZATION,
@@ -96,22 +83,6 @@ impl Authenticator for ApplicationPasswordAuthenticator {
         );
 
         Some(headers)
-    }
-
-    async fn reset(&self) {
-        // Do nothing.
-    }
-
-    fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool {
-        let is_same_host = Url::parse(request_url)
-            .ok()
-            .map(|f| f.host_str() == Some(self.host()));
-        if is_same_host != Some(true) {
-            return false;
-        }
-
-        // Authenticated has already been sent. No need to make a second attempt.
-        response_status_code.is_none()
     }
 }
 
@@ -137,7 +108,17 @@ impl CookieAuthenticator {
         }
     }
 
-    async fn fetch_rest_nonce(&self) -> Option<String> {
+    /// Fetches the REST nonce (wp-rest-nonce) from the site.
+    ///
+    /// You can pass an already known invalid nonce to force fetching a new nonce.
+    async fn update_rest_nonce(&self, invalid: Option<String>) -> Option<String> {
+        if invalid.is_some() {
+            let mut nonce_guard = self.nonce.lock().await;
+            if invalid == *nonce_guard {
+                *nonce_guard = None;
+            }
+        }
+
         let mut nonce_guard = self.nonce.lock().await;
         if let Some(cache) = (*nonce_guard).clone() {
             return Some(cache);
@@ -222,23 +203,24 @@ impl Authenticator for CookieAuthenticator {
         self.api_base_url.host_str()
     }
 
-    fn should_authenticate(&self, request_url: &str, response_status_code: Option<u16>) -> bool {
-        let is_same_host = Url::parse(request_url)
-            .ok()
-            .map(|f| f.host_str() == Some(self.host()));
-        if is_same_host != Some(true) {
-            return false;
+    async fn authentication_headers(
+        &self,
+        request: &WpNetworkRequest,
+        previous_response: Option<&WpNetworkResponse>,
+    ) -> Option<HeaderMap> {
+        // No need to proceed if the request has been already sent and its response is not 401.
+        if let Some(previous_response) = previous_response {
+            if previous_response.status_code != 401 {
+                return None;
+            }
         }
 
-        if let Some(response_status_code) = response_status_code {
-            return response_status_code == 401;
-        }
-
-        true
-    }
-
-    async fn authentication_headers(&self) -> Option<HeaderMap> {
-        self.fetch_rest_nonce().await.map(|nonce| {
+        let used_nonce = request
+            .header_map
+            .as_header_map()
+            .get("X-WP-Nonce")
+            .and_then(|f| f.to_str().ok().map(|f| f.to_string()));
+        self.update_rest_nonce(used_nonce).await.map(|nonce| {
             let mut headers = HeaderMap::new();
             headers.insert(
                 "X-WP-Nonce",
@@ -248,10 +230,6 @@ impl Authenticator for CookieAuthenticator {
             );
             headers
         })
-    }
-
-    async fn reset(&self) {
-        *self.nonce.lock().await = None;
     }
 }
 
@@ -279,28 +257,41 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
         &self,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let should_attempt_authentication = Url::parse(request.url.0.as_str())
+            .ok()
+            .map(|f| f.host_str() == Some(self.authenticator.host()))
+            .unwrap_or(false);
+
+        if !should_attempt_authentication {
+            return self.request_executor.execute(request).await;
+        }
+
         let mut original = (*request).clone();
 
         // Authenticate the initial request.
-        if self.authenticator.should_authenticate(&request.url.0, None) {
-            if let Some(headers) = self.authenticator.authentication_headers().await {
-                original.add_headers(&headers);
-            }
+        if let Some(headers) = self
+            .authenticator
+            .authentication_headers(&original, None)
+            .await
+        {
+            original.add_headers(&headers);
         }
 
         let initial_response = self.request_executor.execute(original.into()).await;
 
         // Retry if the request fails due to authentication failure
         if let Ok(response) = &initial_response {
-            let mut original = (*request).clone();
-            if let Some(headers) = self
-                .authenticator
-                .re_authenticate(&original.url, response.status_code)
-                .await
-            {
-                original.add_headers(&headers);
-
-                return self.request_executor.execute(original.into()).await;
+            // Only retry if the response status code is 4xx.
+            if (400..500).contains(&response.status_code) {
+                let mut original = (*request).clone();
+                if let Some(headers) = self
+                    .authenticator
+                    .authentication_headers(&original, Some(response))
+                    .await
+                {
+                    original.add_headers(&headers);
+                    return self.request_executor.execute(original.into()).await;
+                }
             }
         }
 
