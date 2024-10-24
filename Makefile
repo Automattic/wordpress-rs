@@ -165,7 +165,7 @@ swift-example-app-mac:
 	xcodebuild -project native/swift/Example/Example.xcodeproj -scheme Example -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation build
 
 swift-example-app-ios:
-	xcodebuild -project native/swift/Example/Example.xcodeproj -scheme Example -destination 'platform=iOS,name=iPhone 15' -skipPackagePluginValidation build
+	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 16 (18.0)"
 
 test-swift:
 	$(MAKE) test-swift-$(uname)
@@ -182,13 +182,13 @@ test-swift-darwin: xcframework
 test-swift-macOS: test-swift-darwin
 
 test-swift-iOS: xcframework
-	scripts/xcodebuild-test.sh iOS-17-4
+	scripts/xcodebuild-test.sh iOS-18-0
 
 test-swift-tvOS: xcframework
-	scripts/xcodebuild-test.sh tvOS-17-4
+	scripts/xcodebuild-test.sh tvOS-18-0
 
 test-swift-watchOS: xcframework
-	scripts/xcodebuild-test.sh watchOS-10-4
+	scripts/xcodebuild-test.sh watchOS-11-0
 
 test-rust-lib:
 	$(rust_docker_run) cargo test --lib -- --nocapture
