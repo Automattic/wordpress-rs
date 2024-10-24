@@ -165,7 +165,7 @@ swift-example-app-mac:
 	xcodebuild -project native/swift/Example/Example.xcodeproj -scheme Example -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation build
 
 swift-example-app-ios:
-	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone"
+	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 16 (18.0)"
 
 test-swift:
 	$(MAKE) test-swift-$(uname)
