@@ -22,7 +22,7 @@ pub trait Authenticator: Send + Sync + std::fmt::Debug {
 
     async fn authentication_headers(
         &self,
-        request: &WpNetworkRequest,
+        previous_authentication_headers: Option<&HeaderMap>,
         previous_response: Option<&WpNetworkResponse>,
     ) -> Option<HeaderMap>;
 }
@@ -38,7 +38,7 @@ impl Authenticator for NilAuthenticator {
 
     async fn authentication_headers(
         &self,
-        request: &WpNetworkRequest,
+        previous_authentication_headers: Option<&HeaderMap>,
         previous_response: Option<&WpNetworkResponse>,
     ) -> Option<HeaderMap> {
         None
@@ -71,7 +71,7 @@ impl Authenticator for ApplicationPasswordAuthenticator {
 
     async fn authentication_headers(
         &self,
-        request: &WpNetworkRequest,
+        previous_authentication_headers: Option<&HeaderMap>,
         previous_response: Option<&WpNetworkResponse>,
     ) -> Option<HeaderMap> {
         let mut headers = HeaderMap::new();
@@ -112,14 +112,12 @@ impl CookieAuthenticator {
     ///
     /// You can pass an already known invalid nonce to force fetching a new nonce.
     async fn update_rest_nonce(&self, invalid: Option<String>) -> Option<String> {
-        if invalid.is_some() {
-            let mut nonce_guard = self.nonce.lock().await;
-            if invalid == *nonce_guard {
-                *nonce_guard = None;
-            }
+        let mut nonce_guard = self.nonce.lock().await;
+
+        if invalid.is_some() && invalid == *nonce_guard {
+            *nonce_guard = None;
         }
 
-        let mut nonce_guard = self.nonce.lock().await;
         if let Some(cache) = (*nonce_guard).clone() {
             return Some(cache);
         }
@@ -205,7 +203,7 @@ impl Authenticator for CookieAuthenticator {
 
     async fn authentication_headers(
         &self,
-        request: &WpNetworkRequest,
+        previous_authentication_headers: Option<&HeaderMap>,
         previous_response: Option<&WpNetworkResponse>,
     ) -> Option<HeaderMap> {
         // No need to proceed if the request has been already sent and its response is not 401.
@@ -215,10 +213,8 @@ impl Authenticator for CookieAuthenticator {
             }
         }
 
-        let used_nonce = request
-            .header_map
-            .as_header_map()
-            .get("X-WP-Nonce")
+        let used_nonce = previous_authentication_headers
+            .and_then(|f| f.get("X-WP-Nonce"))
             .and_then(|f| f.to_str().ok().map(|f| f.to_string()));
         self.update_rest_nonce(used_nonce).await.map(|nonce| {
             let mut headers = HeaderMap::new();
@@ -267,14 +263,11 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
         }
 
         let mut original = (*request).clone();
+        let auth_headers = self.authenticator.authentication_headers(None, None).await;
 
         // Authenticate the initial request.
-        if let Some(headers) = self
-            .authenticator
-            .authentication_headers(&original, None)
-            .await
-        {
-            original.add_headers(&headers);
+        if let Some(headers) = &auth_headers {
+            original.add_headers(headers);
         }
 
         let initial_response = self.request_executor.execute(original.into()).await;
@@ -286,7 +279,7 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
                 let mut original = (*request).clone();
                 if let Some(headers) = self
                     .authenticator
-                    .authentication_headers(&original, Some(response))
+                    .authentication_headers(auth_headers.as_ref(), Some(response))
                     .await
                 {
                     original.add_headers(&headers);
