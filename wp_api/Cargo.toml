@@ -31,8 +31,10 @@ wp_derive_request_builder = { path = "../wp_derive_request_builder", features = 
 wp_serde_helper = { path = "../wp_serde_helper" }
 
 [dev-dependencies]
+rand = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
+tokio = { workspace = true, features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

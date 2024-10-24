@@ -291,3 +291,209 @@ impl RequestExecutor for AuthenticatedRequestExecutor {
         initial_response
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashSet;
+
+    use crate::request::endpoint::WpEndpointUrl;
+    use rand::{distributions::Alphanumeric, Rng};
+    use rstest::*;
+
+    use super::*;
+
+    #[derive(Debug)]
+    enum NonceRequestExecutorStrategy {
+        Fail,
+        Fixed { nonce: String },
+        Random,
+    }
+
+    #[derive(Debug)]
+    struct NonceRequestExecutor {
+        strategy: NonceRequestExecutorStrategy,
+    }
+
+    #[async_trait::async_trait]
+    impl RequestExecutor for NonceRequestExecutor {
+        async fn execute(
+            &self,
+            request: Arc<WpNetworkRequest>,
+        ) -> Result<WpNetworkResponse, RequestExecutionError> {
+            match self.strategy {
+                NonceRequestExecutorStrategy::Fail => {
+                    Err(RequestExecutionError::RequestExecutionFailed {
+                        status_code: Some(500),
+                        reason: "Unavailable".to_string(),
+                    })
+                }
+                NonceRequestExecutorStrategy::Fixed { ref nonce } => Ok(WpNetworkResponse {
+                    status_code: 200,
+                    header_map: WpNetworkHeaderMap::default().into(),
+                    body: nonce.as_bytes().to_vec(),
+                }),
+                NonceRequestExecutorStrategy::Random => {
+                    let random_nonce: String = rand::thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(8)
+                        .map(char::from)
+                        .collect();
+                    Ok(WpNetworkResponse {
+                        status_code: 200,
+                        header_map: WpNetworkHeaderMap::default().into(),
+                        body: random_nonce.as_bytes().to_vec(),
+                    })
+                }
+            }
+        }
+    }
+
+    fn cookie_authenticator(strategy: NonceRequestExecutorStrategy) -> CookieAuthenticator {
+        CookieAuthenticator::new(
+            "https://example.com".try_into().unwrap(),
+            WpLoginCredentials {
+                username: "admin".to_string(),
+                password: "password".to_string(),
+            },
+            std::sync::Arc::new(NonceRequestExecutor { strategy }),
+        )
+    }
+
+    fn request_with_nonce(nonce: Option<String>) -> WpNetworkRequest {
+        let mut request = WpNetworkRequest {
+            method: RequestMethod::GET,
+            url: WpEndpointUrl("https://example.com/wp-json/wp/v2/posts".to_string()),
+            header_map: WpNetworkHeaderMap::default().into(),
+            body: None,
+        };
+
+        if let Some(nonce) = nonce {
+            request.add_header("X-WP-Nonce".try_into().unwrap(), nonce.try_into().unwrap());
+        }
+
+        request
+    }
+
+    fn response_with_status_code(status_code: u16) -> WpNetworkResponse {
+        WpNetworkResponse {
+            status_code,
+            header_map: WpNetworkHeaderMap::default().into(),
+            body: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn cookie_authenticator_nonce_failure() {
+        let authenticator = cookie_authenticator(NonceRequestExecutorStrategy::Fail);
+        let headers = authenticator.authentication_headers(None, None).await;
+        assert!(headers.is_none());
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(500, None)]
+    #[case(400, None)]
+    #[case(401, Some("1a2b3c4d"))]
+    async fn cookie_authenticator_401_only(
+        #[case] status_code: u16,
+        #[case] expected: Option<&str>,
+    ) {
+        let cookie_authenticator = cookie_authenticator(NonceRequestExecutorStrategy::Fixed {
+            nonce: "1a2b3c4d".to_string(),
+        });
+
+        let response = response_with_status_code(status_code);
+
+        let headers = cookie_authenticator
+            .authentication_headers(None, Some(&response))
+            .await;
+        let nonce = headers
+            .as_ref()
+            .and_then(|f| f.get("X-WP-Nonce"))
+            .map(|f| f.to_str().unwrap());
+        assert_eq!(nonce, expected);
+    }
+
+    #[tokio::test]
+    async fn cookie_authenticator_nonce_is_cached() {
+        let authenticator = cookie_authenticator(NonceRequestExecutorStrategy::Random);
+
+        let headers = authenticator.authentication_headers(None, None).await;
+        let first_nonce = headers
+            .as_ref()
+            .and_then(|f| f.get("X-WP-Nonce"))
+            .map(|f| f.to_str().unwrap());
+
+        let headers = authenticator.authentication_headers(None, None).await;
+        let second_nonce = headers
+            .as_ref()
+            .and_then(|f| f.get("X-WP-Nonce"))
+            .map(|f| f.to_str().unwrap());
+
+        assert!(first_nonce.is_some());
+        assert!(second_nonce.is_some());
+        assert_eq!(first_nonce, second_nonce);
+    }
+
+    #[tokio::test]
+    async fn cookie_authenticator_nonce_is_re_fetched() {
+        // Scenario:
+        // 1. CookieAuthenticator is used to fetch the rest nonce.
+        // 2. Later, a request that uses the rest nonce value results in a 401 response.
+        // 3. CookieAuthenticator makes another fetch based on the failed request and response info.
+        // Expected behavior: CookieAuthenticator re-fetches nonce upon 401 response.
+
+        let authenticator = cookie_authenticator(NonceRequestExecutorStrategy::Random);
+
+        let first_auth_headers = authenticator.authentication_headers(None, None).await;
+        let first_nonce = first_auth_headers
+            .as_ref()
+            .and_then(|f| f.get("X-WP-Nonce"))
+            .map(|f| f.to_str().unwrap());
+
+        let unauthenticated_response = response_with_status_code(401);
+        let second_auth_headers = authenticator
+            .authentication_headers(first_auth_headers.as_ref(), Some(&unauthenticated_response))
+            .await;
+        let second_nonce = second_auth_headers
+            .as_ref()
+            .and_then(|f| f.get("X-WP-Nonce"))
+            .map(|f| f.to_str().unwrap());
+
+        assert!(first_nonce.is_some());
+        assert!(second_nonce.is_some());
+        assert_ne!(first_nonce, second_nonce);
+    }
+
+    #[tokio::test]
+    async fn cookie_authenticator_nonce_no_duplicated_re_fetch() {
+        // Scenario:
+        // 1. 5 concurrent HTTP requests are made. They use an invalid nonce.
+        // 2. 401 responses are returned for all of them.
+        // 3. CookieAuthenticator will be used to re-authenticate and fetch a new nonce.
+        // Expected behavior: there should only be one nonce-fetching request for all of them.
+
+        let authenticator = cookie_authenticator(NonceRequestExecutorStrategy::Random);
+
+        let request = request_with_nonce(Some("invalid".to_string()));
+        let unauthenticated_response = response_with_status_code(401);
+
+        let all_auth_headers = futures::future::join_all((0..5).map(|_| {
+            authenticator.authentication_headers(
+                Some(request.header_map.as_header_map()),
+                Some(&unauthenticated_response),
+            )
+        }))
+        .await;
+
+        let nonce_values: HashSet<Option<String>> = all_auth_headers
+            .iter()
+            .map(|f| {
+                f.as_ref()
+                    .and_then(|f| f.get("X-WP-Nonce"))
+                    .map(|f| f.to_str().unwrap().to_string())
+            })
+            .collect();
+        assert_eq!(nonce_values.len(), 1);
+    }
+}
