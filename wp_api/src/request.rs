@@ -25,6 +25,10 @@ pub struct ParsedResponse<T> {
     pub data: T,
     #[serde(skip)]
     pub header_map: Arc<WpNetworkHeaderMap>,
+    #[serde(skip)]
+    pub next_page: Option<Arc<WpPaginationRequest>>,
+    #[serde(skip)]
+    pub previous_page: Option<Arc<WpPaginationRequest>>,
 }
 
 #[derive(Debug)]
@@ -326,7 +330,7 @@ impl WpNetworkResponse {
         request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<T, D, E>(self) -> Result<T, E>
+    pub fn parse<T, D, E>(self, request_header_map: Arc<WpNetworkHeaderMap>) -> Result<T, E>
     where
         T: DeserializeOwned,
         T: From<ParsedResponse<D>>,
@@ -341,6 +345,24 @@ impl WpNetworkResponse {
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
                 let mut p = ParsedResponse::<D>::from(x);
+                p.next_page = self.get_link_header("next").first_mut().map(|url| {
+                    let inner = WpNetworkRequest {
+                        method: RequestMethod::GET,
+                        url: WpEndpointUrl(url.to_string()),
+                        header_map: request_header_map.clone(),
+                        body: None,
+                    };
+                    Arc::new(WpPaginationRequest { inner })
+                });
+                p.previous_page = self.get_link_header("prev").first_mut().map(|url| {
+                    let inner = WpNetworkRequest {
+                        method: RequestMethod::GET,
+                        url: WpEndpointUrl(url.to_string()),
+                        header_map: request_header_map.clone(),
+                        body: None,
+                    };
+                    Arc::new(WpPaginationRequest { inner })
+                });
                 p.header_map = self.header_map;
                 T::from(p)
             })
@@ -409,6 +431,11 @@ pub enum RequestMethod {
 
 pub fn request_or_response_body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
+}
+
+#[derive(Debug, uniffi::Object)]
+pub struct WpPaginationRequest {
+    pub(crate) inner: WpNetworkRequest,
 }
 
 #[cfg(test)]

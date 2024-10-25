@@ -33,6 +33,7 @@ fn generate_async_request_executor(
     parsed_enum: &ParsedEnum,
     crate_config: &CrateConfig,
 ) -> TokenStream {
+    let crate_ident = &config.crate_ident;
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_wp_authentication_type = &config.static_types.wp_authentication;
     let static_request_executor_type = &crate_config.request_executor;
@@ -74,7 +75,9 @@ fn generate_async_request_executor(
             quote! {
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
                     #request_from_request_builder
-                    self.request_executor.execute(std::sync::Arc::new(request)).await?.parse()
+                    // TODO: Check if it's OK to clone
+                    let request_header_map = request.header_map.clone();
+                    self.request_executor.execute(std::sync::Arc::new(request)).await?.parse(request_header_map)
                }
             }
         })
@@ -100,21 +103,29 @@ fn generate_async_request_executor(
                 pub struct #response_type_ident {
                     pub data: #output_type,
                     #[serde(skip)]
-                    pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
+                    pub header_map: std::sync::Arc<#crate_ident::request::WpNetworkHeaderMap>,
+                    #[serde(skip)]
+                    pub next_page: Option<std::sync::Arc<#crate_ident::request::WpPaginationRequest>>,
+                    #[serde(skip)]
+                    pub previous_page: Option<std::sync::Arc<#crate_ident::request::WpPaginationRequest>>,
                 }
-                impl From<#response_type_ident> for crate::request::ParsedResponse<#output_type> {
+                impl From<#response_type_ident> for #crate_ident::request::ParsedResponse<#output_type> {
                     fn from(value: #response_type_ident) -> Self {
                         Self {
                             data: value.data,
                             header_map: value.header_map,
+                            next_page: value.next_page,
+                            previous_page: value.previous_page,
                         }
                     }
                 }
-                impl From<crate::request::ParsedResponse<#output_type>> for #response_type_ident {
-                    fn from(value: crate::request::ParsedResponse<#output_type>) -> Self {
+                impl From<#crate_ident::request::ParsedResponse<#output_type>> for #response_type_ident {
+                    fn from(value: #crate_ident::request::ParsedResponse<#output_type>) -> Self {
                         Self {
                             data: value.data,
                             header_map: value.header_map,
+                            next_page: value.next_page,
+                            previous_page: value.previous_page,
                         }
                     }
                 }

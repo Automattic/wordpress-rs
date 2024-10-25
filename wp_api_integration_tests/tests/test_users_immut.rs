@@ -26,6 +26,22 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
         .assert_response();
 }
 
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn pagination() {
+    let r = api_client()
+        .users()
+        .list_with_edit_context(&UserListParams {
+            per_page: Some(2),
+            ..Default::default()
+        })
+        .await
+        .assert_response();
+    println!("next_page: {:#?}", r.next_page);
+    println!("prev_page: {:#?}", r.previous_page);
+}
+
 #[apply(list_users_cases)]
 #[tokio::test]
 #[parallel]
