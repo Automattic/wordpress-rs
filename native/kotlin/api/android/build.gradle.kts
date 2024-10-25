@@ -41,6 +41,8 @@ android {
     // Instead of completely ignoring this issue, we are tracking it through the baseline lint
     // file - at least for now.
     lint.baseline = file("${project.rootDir}/config/lint/baseline.xml")
+
+    sourceSets["androidTest"].jniLibs.srcDirs.plus("${layout.buildDirectory.get()}/rustJniLibs/android")
 }
 
 dependencies {
@@ -89,6 +91,11 @@ cargo {
     }
 }
 tasks.matching { it.name.matches("merge.*JniLibFolders".toRegex()) }.configureEach {
+    inputs.dir(File("${layout.buildDirectory.get()}/rustJniLibs/android"))
+    dependsOn("cargoBuild")
+}
+
+tasks.matching { it.name.matches("test".toRegex()) }.configureEach {
     dependsOn("cargoBuild")
 }
 
