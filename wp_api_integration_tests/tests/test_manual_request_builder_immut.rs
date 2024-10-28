@@ -29,8 +29,9 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 
     let request_builder = WpApiRequestBuilder::new(test_site_url(), authentication);
     let wp_request = request_builder.users().list_with_edit_context(&params);
+    let request_headers = wp_request.header_map().clone();
     let response = async_wp_networking.async_request(wp_request.into()).await;
     let result: Result<UsersRequestListWithEditContextResponse, WpApiError> =
-        response.unwrap().parse();
+        response.unwrap().parse(request_headers);
     assert!(result.is_ok(), "Response was: '{:?}'", result);
 }

@@ -84,6 +84,14 @@ pub fn fn_signature(
     quote! { fn #fn_name(&self, #url_params #provided_param #fields_param) }
 }
 
+pub fn execute_request_fn_name(
+    variant_ident: &Ident,
+    context_and_filter_handler: &ContextAndFilterHandler,
+) -> Ident {
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
+    format_ident!("execute_{}", fn_name)
+}
+
 pub fn fn_url_params(url_parts: &[UrlPart]) -> TokenStream {
     let params = url_parts.iter().filter_map(|p| {
         if let UrlPart::Dynamic(p) = p {
@@ -390,6 +398,19 @@ pub fn fn_body_get_request_from_request_builder(
     quote! {
         let request = self.request_builder.#fn_name(#fn_arg_url_parts #fn_arg_provided_params #fn_arg_fields);
     }
+}
+
+pub fn ident_request_type(
+    enum_ident: &Ident,
+    variant_ident: &Ident,
+    context_and_filter_handler: &ContextAndFilterHandler,
+) -> Ident {
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
+    format_ident!(
+        "{}{}Request",
+        enum_ident,
+        fn_name.to_string().to_case(Case::UpperCamel)
+    )
 }
 
 pub fn ident_response_type(

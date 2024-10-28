@@ -31,6 +31,11 @@ pub struct ParsedResponse<T> {
     pub previous_page: Option<Arc<WpPaginationRequest>>,
 }
 
+#[derive(Debug, uniffi::Object)]
+pub struct WpPaginationRequest {
+    pub(crate) inner: WpNetworkRequest,
+}
+
 #[derive(Debug)]
 pub struct InnerRequestBuilder {
     authentication: WpAuthentication,
@@ -128,7 +133,7 @@ impl WpNetworkRequestBody {
 }
 
 // Has custom `Debug` trait implementation
-#[derive(uniffi::Object)]
+#[derive(uniffi::Object, Clone)]
 pub struct WpNetworkRequest {
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
@@ -431,11 +436,6 @@ pub enum RequestMethod {
 
 pub fn request_or_response_body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
-}
-
-#[derive(Debug, uniffi::Object)]
-pub struct WpPaginationRequest {
-    pub(crate) inner: WpNetworkRequest,
 }
 
 #[cfg(test)]

@@ -67,6 +67,13 @@ fn generate_async_request_executor(
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
+            let execute_request_fn_name =
+                execute_request_fn_name(&variant.variant_ident, &context_and_filter_handler);
+            let request_type_ident = ident_request_type(
+                &parsed_enum.enum_ident,
+                &variant.variant_ident,
+                &context_and_filter_handler,
+            );
             let response_type_ident = ident_response_type(
                 &parsed_enum.enum_ident,
                 &variant.variant_ident,
@@ -75,10 +82,13 @@ fn generate_async_request_executor(
             quote! {
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
                     #request_from_request_builder
+                    self.#execute_request_fn_name(#request_type_ident { inner: request }.into()).await
+                }
+                pub async fn #execute_request_fn_name(&self, request: std::sync::Arc<#request_type_ident>) -> Result<#response_type_ident, #error_type> {
                     // TODO: Check if it's OK to clone
-                    let request_header_map = request.header_map.clone();
-                    self.request_executor.execute(std::sync::Arc::new(request)).await?.parse(request_header_map)
-               }
+                    let request_header_map = request.inner.header_map.clone();
+                    self.request_executor.execute(std::sync::Arc::new(request.inner.clone())).await?.parse(request_header_map)
+                }
             }
         })
         .collect::<TokenStream>()
@@ -93,6 +103,11 @@ fn generate_async_request_executor(
         .map(|context_and_filter_handler| {
             let output_type = output_type(variant.attr.output.clone(), &context_and_filter_handler);
             let response_type_ident = ident_response_type(
+                &parsed_enum.enum_ident,
+                &variant.variant_ident,
+                &context_and_filter_handler,
+            );
+            let request_type_ident = ident_request_type(
                 &parsed_enum.enum_ident,
                 &variant.variant_ident,
                 &context_and_filter_handler,
@@ -128,6 +143,10 @@ fn generate_async_request_executor(
                             previous_page: value.previous_page,
                         }
                     }
+                }
+                #[derive(Debug, uniffi::Object)]
+                pub struct #request_type_ident {
+                    pub(crate) inner: #crate_ident::request::WpNetworkRequest,
                 }
             }
         })
