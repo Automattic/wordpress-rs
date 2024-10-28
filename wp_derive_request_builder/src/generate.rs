@@ -120,11 +120,11 @@ fn generate_async_request_executor(
                     #[serde(skip)]
                     pub header_map: std::sync::Arc<#crate_ident::request::WpNetworkHeaderMap>,
                     #[serde(skip)]
-                    pub next_page: Option<std::sync::Arc<#crate_ident::request::WpPaginationRequest>>,
+                    pub next_page: Option<std::sync::Arc<#request_type_ident>>,
                     #[serde(skip)]
-                    pub previous_page: Option<std::sync::Arc<#crate_ident::request::WpPaginationRequest>>,
+                    pub previous_page: Option<std::sync::Arc<#request_type_ident>>,
                 }
-                impl From<#response_type_ident> for #crate_ident::request::ParsedResponse<#output_type> {
+                impl From<#response_type_ident> for #crate_ident::request::ParsedResponse<#output_type, #request_type_ident> {
                     fn from(value: #response_type_ident) -> Self {
                         Self {
                             data: value.data,
@@ -134,8 +134,8 @@ fn generate_async_request_executor(
                         }
                     }
                 }
-                impl From<#crate_ident::request::ParsedResponse<#output_type>> for #response_type_ident {
-                    fn from(value: #crate_ident::request::ParsedResponse<#output_type>) -> Self {
+                impl From<#crate_ident::request::ParsedResponse<#output_type, #request_type_ident>> for #response_type_ident {
+                    fn from(value: #crate_ident::request::ParsedResponse<#output_type, #request_type_ident>) -> Self {
                         Self {
                             data: value.data,
                             header_map: value.header_map,
@@ -147,6 +147,11 @@ fn generate_async_request_executor(
                 #[derive(Debug, uniffi::Object)]
                 pub struct #request_type_ident {
                     pub(crate) inner: #crate_ident::request::WpNetworkRequest,
+                }
+                impl From<#crate_ident::request::WpNetworkRequest> for #request_type_ident {
+                    fn from(inner: #crate_ident::request::WpNetworkRequest) -> Self {
+                        Self { inner }
+                    }
                 }
             }
         })

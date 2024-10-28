@@ -30,16 +30,27 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
 #[parallel]
 #[ignore]
 async fn pagination() {
-    let r = api_client()
+    let first_page_response = api_client()
         .users()
         .list_with_edit_context(&UserListParams {
-            per_page: Some(2),
+            per_page: Some(1),
             ..Default::default()
         })
         .await
         .assert_response();
-    println!("next_page: {:#?}", r.next_page);
-    println!("prev_page: {:#?}", r.previous_page);
+    println!("Page 1: {:#?}", first_page_response);
+    let second_page_response = api_client()
+        .users()
+        .execute_list_with_edit_context(first_page_response.next_page.unwrap())
+        .await
+        .assert_response();
+    println!("Page 2: {:#?}", second_page_response);
+    let third_page_response = api_client()
+        .users()
+        .execute_list_with_edit_context(second_page_response.next_page.unwrap())
+        .await
+        .assert_response();
+    println!("Page 3: {:#?}", third_page_response);
 }
 
 #[apply(list_users_cases)]

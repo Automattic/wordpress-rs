@@ -21,14 +21,14 @@ const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ParsedResponse<T> {
+pub struct ParsedResponse<T, R> {
     pub data: T,
     #[serde(skip)]
     pub header_map: Arc<WpNetworkHeaderMap>,
     #[serde(skip)]
-    pub next_page: Option<Arc<WpPaginationRequest>>,
+    pub next_page: Option<Arc<R>>,
     #[serde(skip)]
-    pub previous_page: Option<Arc<WpPaginationRequest>>,
+    pub previous_page: Option<Arc<R>>,
 }
 
 #[derive(Debug, uniffi::Object)]
@@ -335,11 +335,12 @@ impl WpNetworkResponse {
         request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<T, D, E>(self, request_header_map: Arc<WpNetworkHeaderMap>) -> Result<T, E>
+    pub fn parse<T, D, R, E>(self, request_header_map: Arc<WpNetworkHeaderMap>) -> Result<T, E>
     where
         T: DeserializeOwned,
-        T: From<ParsedResponse<D>>,
-        ParsedResponse<D>: From<T>,
+        T: From<ParsedResponse<D, R>>,
+        ParsedResponse<D, R>: From<T>,
+        R: From<WpNetworkRequest>,
         E: ParsedRequestError,
     {
         if let Some(err) = E::try_parse(&self.body, self.status_code) {
@@ -349,7 +350,7 @@ impl WpNetworkResponse {
         serde_json::from_slice(&self.body)
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
-                let mut p = ParsedResponse::<D>::from(x);
+                let mut p = ParsedResponse::<D, R>::from(x);
                 p.next_page = self.get_link_header("next").first_mut().map(|url| {
                     let inner = WpNetworkRequest {
                         method: RequestMethod::GET,
@@ -357,7 +358,7 @@ impl WpNetworkResponse {
                         header_map: request_header_map.clone(),
                         body: None,
                     };
-                    Arc::new(WpPaginationRequest { inner })
+                    Arc::new(inner.into())
                 });
                 p.previous_page = self.get_link_header("prev").first_mut().map(|url| {
                     let inner = WpNetworkRequest {
@@ -366,7 +367,7 @@ impl WpNetworkResponse {
                         header_map: request_header_map.clone(),
                         body: None,
                     };
-                    Arc::new(WpPaginationRequest { inner })
+                    Arc::new(inner.into())
                 });
                 p.header_map = self.header_map;
                 T::from(p)
