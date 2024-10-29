@@ -33,7 +33,7 @@ class PluginsEndpointTest {
     fun testPluginListRequest() = runTest {
         val pluginList = client.request { requestBuilder ->
             requestBuilder.plugins().listWithEditContext(params = PluginListParams())
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(NUMBER_OF_PLUGINS, pluginList.count())
     }
 
@@ -47,7 +47,7 @@ class PluginsEndpointTest {
                     SparsePluginFieldWithEditContext.VERSION
                 )
             )
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(NUMBER_OF_PLUGINS, pluginList.count())
         pluginList.forEach {
             assertNotNull(it.author)
@@ -69,7 +69,7 @@ class PluginsEndpointTest {
                     SparsePluginFieldWithEditContext.STATUS
                 )
             )
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(pluginSlug, sparsePlugin.plugin)
         assertNotNull(sparsePlugin.requiresWp)
         assertNotNull(sparsePlugin.status)

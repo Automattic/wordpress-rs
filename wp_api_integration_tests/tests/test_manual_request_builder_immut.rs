@@ -4,9 +4,10 @@ use rstest_reuse::{self, apply};
 use serial_test::parallel;
 use wp_api::{
     generate,
+    request::endpoint::users_endpoint::UsersRequestListWithEditContextResponse,
     users::{
-        UserListParams, UserWithEditContext, WpApiParamUsersHasPublishedPosts,
-        WpApiParamUsersOrderBy, WpApiParamUsersWho,
+        UserListParams, WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy,
+        WpApiParamUsersWho,
     },
     WpApiError, WpApiParamOrder, WpApiRequestBuilder, WpAuthentication,
 };
@@ -29,8 +30,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let request_builder = WpApiRequestBuilder::new(test_site_url(), authentication);
     let wp_request = request_builder.users().list_with_edit_context(&params);
     let response = async_wp_networking.async_request(wp_request.into()).await;
-    let result = response
-        .unwrap()
-        .parse::<Vec<UserWithEditContext>, WpApiError>();
+    let result: Result<UsersRequestListWithEditContextResponse, WpApiError> =
+        response.unwrap().parse();
     assert!(result.is_ok(), "Response was: '{:?}'", result);
 }

@@ -13,6 +13,18 @@ use wp_api_integration_tests::{
 };
 
 #[tokio::test]
+#[parallel]
+async fn list_with_edit_context_number_of_pages() {
+    let p = api_client()
+        .posts()
+        .list_with_edit_context(&PostListParams::default())
+        .await
+        .assert_response();
+    assert_eq!(p.header_map.wp_total(), Some(57));
+    assert_eq!(p.header_map.wp_total_pages(), Some(6));
+}
+
+#[tokio::test]
 #[apply(list_cases)]
 #[parallel]
 async fn list_with_edit_context(#[case] params: PostListParams) {
@@ -92,7 +104,8 @@ async fn retrieve_password_protected_with_edit_context() {
             },
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         post.title.rendered,
         test_credentials.password_protected_post_title
@@ -116,7 +129,8 @@ async fn retrieve_password_protected_with_embed_context() {
             },
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         post.title.rendered,
         test_credentials.password_protected_post_title
@@ -140,7 +154,8 @@ async fn retrieve_password_protected_with_view_context() {
             },
         )
         .await
-        .assert_response();
+        .assert_response()
+        .data;
     assert_eq!(
         post.title.rendered,
         test_credentials.password_protected_post_title
@@ -200,6 +215,7 @@ mod filter {
             .filter_list_with_edit_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -221,7 +237,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
@@ -243,6 +260,7 @@ mod filter {
             .filter_list_with_embed_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -264,7 +282,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
@@ -286,6 +305,7 @@ mod filter {
             .filter_list_with_view_context(&params, fields)
             .await
             .assert_response()
+            .data
             .iter()
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
@@ -307,7 +327,8 @@ mod filter {
                 fields,
             )
             .await
-            .assert_response();
+            .assert_response()
+            .data;
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }

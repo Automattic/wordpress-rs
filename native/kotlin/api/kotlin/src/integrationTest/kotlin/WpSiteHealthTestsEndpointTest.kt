@@ -17,7 +17,7 @@ class WpSiteHealthTestsEndpointTest {
     fun testBackgroundUpdates() = runTest {
         val wpSiteHealthTest = client.request { requestBuilder ->
             requestBuilder.wpSiteHealthTests().backgroundUpdates()
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(wpSiteHealthTest.test.isNotBlank())
     }
 
@@ -25,7 +25,7 @@ class WpSiteHealthTestsEndpointTest {
     fun testLoopbackRequests() = runTest {
         val wpSiteHealthTest = client.request { requestBuilder ->
             requestBuilder.wpSiteHealthTests().loopbackRequests()
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(wpSiteHealthTest.test.isNotBlank())
     }
 
@@ -33,7 +33,7 @@ class WpSiteHealthTestsEndpointTest {
     fun testHttpsStatus() = runTest {
         val wpSiteHealthTest = client.request { requestBuilder ->
             requestBuilder.wpSiteHealthTests().httpsStatus()
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(wpSiteHealthTest.test.isNotBlank())
     }
 
@@ -41,7 +41,7 @@ class WpSiteHealthTestsEndpointTest {
     fun testDotOrgCommunication() = runTest {
         val wpSiteHealthTest = client.request { requestBuilder ->
             requestBuilder.wpSiteHealthTests().dotorgCommunication()
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(wpSiteHealthTest.test.isNotBlank())
     }
 
@@ -49,7 +49,7 @@ class WpSiteHealthTestsEndpointTest {
     fun testAuthorizationHeader() = runTest {
         val wpSiteHealthTest = client.request { requestBuilder ->
             requestBuilder.wpSiteHealthTests().authorizationHeader()
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(wpSiteHealthTest.test.isNotBlank())
     }
 
@@ -58,7 +58,7 @@ class WpSiteHealthTestsEndpointTest {
         val wpSiteHealthTest = client.request { requestBuilder ->
             requestBuilder.wpSiteHealthTests()
                 .filterBackgroundUpdates(listOf(SparseWpSiteHealthTestField.TEST))
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assert(wpSiteHealthTest.test?.isBlank() == false)
     }
 

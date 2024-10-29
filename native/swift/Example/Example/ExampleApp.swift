@@ -10,36 +10,39 @@ struct ExampleApp: App {
     let rootListItems = [
         RootListData(name: "Application Passwords", callback: {
             try await WordPressAPI.globalInstance.applicationPasswords.listWithEditContext(userId: 1)
+                .data
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Users", callback: {
             try await WordPressAPI.globalInstance.users.listWithEditContext(params: .init())
+                .data
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Plugins", callback: {
             try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
+                .data
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Post Types", callback: {
-            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().postTypes.map { _, value in
+            try await WordPressAPI.globalInstance.postTypes.listWithViewContext().data.postTypes.map { _, value in
                 value.asListViewData
             }
         }),
         RootListData(name: "Site Health Tests", callback: {
-            let items: [any ListViewDataConvertable] = try await [
-                WordPressAPI.globalInstance.siteHealthTests.authorizationHeader(),
-                WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates(),
-                WordPressAPI.globalInstance.siteHealthTests.directorySizes(),
-                WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication(),
-                WordPressAPI.globalInstance.siteHealthTests.httpsStatus(),
-                WordPressAPI.globalInstance.siteHealthTests.loopbackRequests(),
-                WordPressAPI.globalInstance.siteHealthTests.pageCache()
+            let items: [any ListViewDataConvertable] = [
+                try await WordPressAPI.globalInstance.siteHealthTests.authorizationHeader().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.directorySizes().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.httpsStatus().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.loopbackRequests().data,
+                try await WordPressAPI.globalInstance.siteHealthTests.pageCache().data
             ]
 
             return items.map { $0.asListViewData }
         }),
         RootListData(name: "Site Settings", callback: {
-            return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().asListViewDataItems
+            return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().data.asListViewDataItems
         })
     ]
 

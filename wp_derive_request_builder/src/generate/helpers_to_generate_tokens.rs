@@ -392,6 +392,19 @@ pub fn fn_body_get_request_from_request_builder(
     }
 }
 
+pub fn ident_response_type(
+    enum_ident: &Ident,
+    variant_ident: &Ident,
+    context_and_filter_handler: &ContextAndFilterHandler,
+) -> Ident {
+    let fn_name = fn_name(variant_ident, context_and_filter_handler);
+    format_ident!(
+        "{}{}Response",
+        enum_ident,
+        fn_name.to_string().to_case(Case::UpperCamel)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::too_many_arguments)]

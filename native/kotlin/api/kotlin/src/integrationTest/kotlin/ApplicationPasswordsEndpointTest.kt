@@ -18,7 +18,7 @@ class ApplicationPasswordsEndpointTest {
     fun testApplicationPasswordListRequest() = runTest {
         val applicationPasswordList = client.request { requestBuilder ->
             requestBuilder.applicationPasswords().listWithEditContext(FIRST_USER_ID)
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(
             ApplicationPasswordUuid(testCredentials.adminPasswordUuid),
             applicationPasswordList.first().uuid
@@ -30,7 +30,7 @@ class ApplicationPasswordsEndpointTest {
         val uuid = ApplicationPasswordUuid(testCredentials.adminPasswordUuid)
         val applicationPasswordList = client.request { requestBuilder ->
             requestBuilder.applicationPasswords().retrieveWithEditContext(FIRST_USER_ID, uuid)
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(uuid, applicationPasswordList.uuid)
     }
 
@@ -38,7 +38,7 @@ class ApplicationPasswordsEndpointTest {
     fun testApplicationPasswordRetrieveCurrentRequest() = runTest {
         val applicationPasswordList = client.request { requestBuilder ->
             requestBuilder.applicationPasswords().retrieveCurrentWithEditContext(FIRST_USER_ID)
-        }.assertSuccessAndRetrieveData()
+        }.assertSuccessAndRetrieveData().data
         assertEquals(
             ApplicationPasswordUuid(testCredentials.adminPasswordUuid),
             applicationPasswordList.uuid
