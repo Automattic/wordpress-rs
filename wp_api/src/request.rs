@@ -21,10 +21,14 @@ const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ParsedResponse<T> {
+pub struct ParsedResponse<T, P> {
     pub data: T,
     #[serde(skip)]
     pub header_map: Arc<WpNetworkHeaderMap>,
+    #[serde(skip)]
+    pub next_page_params: Option<P>,
+    #[serde(skip)]
+    pub prev_page_params: Option<P>,
 }
 
 #[derive(Debug)]
@@ -326,11 +330,11 @@ impl WpNetworkResponse {
         request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<T, D, E>(self) -> Result<T, E>
+    pub fn parse<T, D, P, E>(self) -> Result<T, E>
     where
         T: DeserializeOwned,
-        T: From<ParsedResponse<D>>,
-        ParsedResponse<D>: From<T>,
+        T: From<ParsedResponse<D, P>>,
+        ParsedResponse<D, P>: From<T>,
         E: ParsedRequestError,
     {
         if let Some(err) = E::try_parse(&self.body, self.status_code) {
@@ -340,7 +344,7 @@ impl WpNetworkResponse {
         serde_json::from_slice(&self.body)
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
-                let mut p = ParsedResponse::<D>::from(x);
+                let mut p = ParsedResponse::<D, P>::from(x);
                 p.header_map = self.header_map;
                 T::from(p)
             })
