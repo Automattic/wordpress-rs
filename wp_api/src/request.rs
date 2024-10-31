@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpError},
-    WpApiError, WpAuthentication,
+    FromUrlQueryPairs, WpApiError, WpAuthentication,
 };
 
 use self::endpoint::WpEndpointUrl;
@@ -335,6 +335,7 @@ impl WpNetworkResponse {
         T: DeserializeOwned,
         T: From<ParsedResponse<D, P>>,
         ParsedResponse<D, P>: From<T>,
+        P: FromUrlQueryPairs,
         E: ParsedRequestError,
     {
         if let Some(err) = E::try_parse(&self.body, self.status_code) {
@@ -345,6 +346,15 @@ impl WpNetworkResponse {
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
                 let mut p = ParsedResponse::<D, P>::from(x);
+                // TODO: Use constants for "next" & "prev"
+                p.next_page_params = self
+                    .get_link_header("next")
+                    .first()
+                    .and_then(|u| P::from_url_query_pairs(u));
+                p.prev_page_params = self
+                    .get_link_header("prev")
+                    .first()
+                    .and_then(|u| P::from_url_query_pairs(u));
                 p.header_map = self.header_map;
                 T::from(p)
             })

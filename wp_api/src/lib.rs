@@ -2,8 +2,11 @@
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
+use application_passwords::{ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
+use posts::{PostCreateParams, PostListParams, PostRetrieveParams, PostUpdateParams};
+use site_settings::SiteSettingsUpdateParams;
 use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
@@ -88,6 +91,51 @@ impl WpApiParamOrder {
 
 trait SparseField {
     fn as_str(&self) -> &str;
+}
+
+pub trait FromUrlQueryPairs
+where
+    Self: Sized,
+{
+    // TODO: We shouldn't have a default implementation
+    fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
+        None
+    }
+}
+
+impl FromUrlQueryPairs for () {
+    fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
+        None
+    }
+}
+
+// Temporary empty implementations for `FromUrlQueryPairs`
+temp_from_url_query_pairs_impl!(
+    ApplicationPasswordCreateParams,
+    ApplicationPasswordUpdateParams,
+    PluginCreateParams,
+    PluginListParams,
+    PluginUpdateParams,
+    PostCreateParams,
+    PostListParams,
+    PostRetrieveParams,
+    PostUpdateParams,
+    SiteSettingsUpdateParams,
+    UserCreateParams,
+    UserDeleteParams,
+    UserListParams,
+    UserUpdateParams
+);
+
+#[macro_export]
+macro_rules! temp_from_url_query_pairs_impl {
+    ( $( $type_name:ident ), *) => {
+        $(impl FromUrlQueryPairs for $type_name {
+            fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
+                None
+            }
+        })*
+    };
 }
 
 #[macro_export]
