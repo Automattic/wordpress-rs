@@ -213,7 +213,7 @@ fn get_csv<T: FromStr>(h: &HashMap<Cow<'_, str>, Cow<'_, str>>, key: &str) -> Ve
                 .map(|s| T::from_str(s).ok())
                 .collect::<Option<Vec<_>>>()
         })
-        .unwrap_or(Vec::default())
+        .unwrap_or_default()
 }
 
 impl FromUrlQueryPairs for UserListParams {
@@ -401,7 +401,7 @@ impl FromStr for UserId {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(|user_id| UserId(user_id))
+        s.parse().map(Self)
     }
 }
 
@@ -511,7 +511,7 @@ mod tests {
         };
         original_params.append_query_pairs(&mut url.query_pairs_mut());
         println!("original: {:#?}", original_params);
-        println!("url: {}", url.to_string());
+        println!("url: {}", url);
         let p = UserListParams::from_url_query_pairs(&url);
         assert!(p.is_some());
         let p = p.unwrap();
