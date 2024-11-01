@@ -111,10 +111,11 @@ pub fn fn_provided_param(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
-                crate::parse::RequestType::Post => TokenStream::new(),
+                RequestType::ContextualGet
+                | RequestType::ContextualPaged
+                | RequestType::Delete
+                | RequestType::Get => tokens,
+                RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
@@ -204,10 +205,11 @@ fn fn_arg_provided_params(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
-                crate::parse::RequestType::Post => TokenStream::new(),
+                RequestType::ContextualGet
+                | RequestType::ContextualPaged
+                | RequestType::Delete
+                | RequestType::Get => tokens,
+                RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
@@ -266,7 +268,10 @@ pub fn fn_body_query_pairs(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Delete | RequestType::Get => {
+        RequestType::ContextualGet
+        | RequestType::ContextualPaged
+        | RequestType::Delete
+        | RequestType::Get => {
             if let Some(params_type) = params_type {
                 let is_option = if let Some(TokenTree::Ident(ref ident)) =
                     params_type.tokens.clone().into_iter().next()
@@ -354,7 +359,7 @@ pub fn fn_body_build_request_from_url(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Get => quote! {
+        RequestType::ContextualGet | RequestType::ContextualPaged | RequestType::Get => quote! {
             self.inner.get(url)
         },
         RequestType::Delete => quote! {

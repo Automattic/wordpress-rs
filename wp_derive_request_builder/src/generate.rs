@@ -95,19 +95,24 @@ fn generate_async_request_executor(
                 &context_and_filter_handler,
             );
             // TODO: Move to helpers and test it
-            let response_params_type = variant.attr.params.as_ref().map(|p| {
-                p.tokens
-                    .clone()
-                    .into_iter()
-                    .filter(|t| {
-                        if let TokenTree::Punct(punct) = t {
-                            punct.as_char() != '&'
-                        } else {
-                            true
-                        }
+            // TODO: If `ContextualPaged` doesn't have params, fail during parsing
+            let response_params_type = if variant.attr.request_type == RequestType::ContextualPaged {
+                    variant.attr.params.as_ref().map(|p| {
+                        p.tokens
+                            .clone()
+                            .into_iter()
+                            .filter(|t| {
+                                if let TokenTree::Punct(punct) = t {
+                                    punct.as_char() != '&'
+                                } else {
+                                    true
+                                }
+                            })
+                            .collect::<TokenStream>()
                     })
-                    .collect::<TokenStream>()
-            });
+                } else {
+                    None
+                };
             let response_pagination_params_fields = response_params_type.as_ref().map(|p| {
                 quote! {
                     #[serde(skip)]
@@ -343,7 +348,8 @@ impl ContextAndFilterHandler {
                 }
                 v
             }
-            crate::parse::RequestType::ContextualGet => {
+            crate::parse::RequestType::ContextualGet
+            | crate::parse::RequestType::ContextualPaged => {
                 let mut v = vec![];
                 WpContext::iter().for_each(|context| {
                     v.push(Self::NoFilterTakeContextAsFunctionName(context));

@@ -111,6 +111,7 @@ impl ParsedVariantAttribute {
 
         match path_segment.ident.to_string().as_str() {
             "contextual_get" => Ok(RequestType::ContextualGet),
+            "contextual_paged" => Ok(RequestType::ContextualPaged),
             "delete" => Ok(RequestType::Delete),
             "get" => Ok(RequestType::Get),
             "post" => Ok(RequestType::Post),
