@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, fmt::Display, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
@@ -7,7 +7,7 @@ use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    WpApiParamOrder,
+    FromUrlQueryPairs, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -40,6 +40,25 @@ impl WpApiParamUsersOrderBy {
     }
 }
 
+// TODO: Improve error handling
+impl FromStr for WpApiParamUsersOrderBy {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "id" => Ok(Self::Id),
+            "include" => Ok(Self::Include),
+            "name" => Ok(Self::Name),
+            "registered_date" => Ok(Self::RegisteredDate),
+            "slug" => Ok(Self::Slug),
+            "include_slugs" => Ok(Self::IncludeSlugs),
+            "email" => Ok(Self::Email),
+            "url" => Ok(Self::Url),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersWho {
     #[default]
@@ -57,11 +76,39 @@ impl WpApiParamUsersWho {
     }
 }
 
+// TODO: Improve error handling
+impl FromStr for WpApiParamUsersWho {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            // TODO: Check if this is how it's returned from server
+            "" => Ok(Self::All),
+            "authors" => Ok(Self::Authors),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersHasPublishedPosts {
     True,
     False,
     PostTypes(Vec<String>),
+}
+
+// TODO: Improve error handling
+impl FromStr for WpApiParamUsersHasPublishedPosts {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "true" => Ok(Self::True),
+            "false" => Ok(Self::False),
+            // TODO: How is Self::PostTypes handled?
+            _ => Err(()),
+        }
+    }
 }
 
 impl_as_query_value_from_to_string!(WpApiParamUsersHasPublishedPosts);
@@ -80,7 +127,7 @@ impl Display for WpApiParamUsersHasPublishedPosts {
     }
 }
 
-#[derive(Debug, Default, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -152,6 +199,42 @@ impl AppendUrlQueryPairs for UserListParams {
                 "has_published_posts",
                 self.has_published_posts.as_ref(),
             );
+    }
+}
+
+fn get_parsed<T: FromStr>(h: &HashMap<Cow<'_, str>, Cow<'_, str>>, key: &str) -> Option<T> {
+    h.get(key).and_then(|v| v.parse().ok())
+}
+
+fn get_csv<T: FromStr>(h: &HashMap<Cow<'_, str>, Cow<'_, str>>, key: &str) -> Vec<T> {
+    h.get(key)
+        .and_then(|v| {
+            v.split(',')
+                .map(|s| T::from_str(s).ok())
+                .collect::<Option<Vec<_>>>()
+        })
+        .unwrap_or(Vec::default())
+}
+
+impl FromUrlQueryPairs for UserListParams {
+    fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
+        let h: HashMap<Cow<'_, str>, Cow<'_, str>> = url.query_pairs().into_iter().collect();
+        let get_string = |s: &str| h.get(s).map(|v| v.to_string());
+        Some(UserListParams {
+            page: get_parsed(&h, "page"),
+            per_page: get_parsed(&h, "per_page"),
+            search: get_parsed(&h, "search"),
+            exclude: get_csv(&h, "exclude"),
+            include: get_csv(&h, "include"),
+            offset: get_parsed(&h, "offset"),
+            order: get_parsed(&h, "order"),
+            orderby: get_parsed(&h, "orderby"),
+            slug: get_csv(&h, "slug"),
+            roles: get_csv(&h, "roles"),
+            capabilities: get_csv(&h, "capabilities"),
+            who: get_parsed(&h, "who"),
+            has_published_posts: get_parsed(&h, "has_published_posts"),
+        })
     }
 }
 
@@ -314,6 +397,14 @@ uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserId(pub i32);
 
+impl FromStr for UserId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(|user_id| UserId(user_id))
+    }
+}
+
 impl std::fmt::Display for UserId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -367,6 +458,7 @@ mod tests {
     use super::*;
     use crate::{generate, unit_test_common::assert_expected_query_pairs};
     use rstest::*;
+    use url::Url;
 
     #[rstest]
     #[case(UserListParams::default(), "")]
@@ -396,5 +488,35 @@ mod tests {
     fn test_user_delete_params() {
         let params = UserDeleteParams::new(UserId(987));
         assert_expected_query_pairs(params, "force=true&reassign=987");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_user_list_params_from_query_pairs() {
+        let mut url = Url::parse("https://example.com").unwrap();
+        let original_params = UserListParams {
+            page: Some(2),
+            per_page: Some(3),
+            search: Some("ss".to_string()),
+            exclude: vec![UserId(1), UserId(7)],
+            include: vec![UserId(1), UserId(7)],
+            offset: Some(10),
+            order: Some(WpApiParamOrder::Asc),
+            orderby: Some(WpApiParamUsersOrderBy::Email),
+            slug: vec!["s1".to_string(), "s2".to_string()],
+            roles: vec!["r1".to_string(), "r2".to_string()],
+            capabilities: vec!["c1".to_string(), "c2".to_string()],
+            who: Some(WpApiParamUsersWho::Authors),
+            has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
+        };
+        original_params.append_query_pairs(&mut url.query_pairs_mut());
+        println!("original: {:#?}", original_params);
+        println!("url: {}", url.to_string());
+        let p = UserListParams::from_url_query_pairs(&url);
+        assert!(p.is_some());
+        let p = p.unwrap();
+
+        println!("params: {:#?}", p);
+        assert_eq!(original_params, p);
     }
 }

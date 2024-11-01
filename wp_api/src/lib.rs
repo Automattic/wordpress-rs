@@ -1,5 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
+use std::str::FromStr;
+
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
 use application_passwords::{ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams};
@@ -89,6 +91,19 @@ impl WpApiParamOrder {
     }
 }
 
+// TODO: Improve error handling
+impl FromStr for WpApiParamOrder {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "asc" => Ok(Self::Asc),
+            "desc" => Ok(Self::Desc),
+            _ => Err(()),
+        }
+    }
+}
+
 trait SparseField {
     fn as_str(&self) -> &str;
 }
@@ -123,7 +138,6 @@ temp_from_url_query_pairs_impl!(
     SiteSettingsUpdateParams,
     UserCreateParams,
     UserDeleteParams,
-    UserListParams,
     UserUpdateParams
 );
 

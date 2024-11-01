@@ -26,6 +26,50 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
         .assert_response();
 }
 
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn paginate_list_users_with_edit_context() {
+    let first_page_response = api_client()
+        .users()
+        .list_with_edit_context(&UserListParams {
+            per_page: Some(1),
+            ..Default::default()
+        })
+        .await
+        .assert_response();
+    let second_page_params = first_page_response.next_page_params.unwrap();
+    println!(
+        "first_page_data: {:#?}",
+        first_page_response
+            .data
+            .into_iter()
+            .map(|u| u.id)
+            .collect::<Vec<UserId>>()
+    );
+    println!("second_page_params: {:#?}", second_page_params);
+    let second_page_response = api_client()
+        .users()
+        .list_with_edit_context(&second_page_params)
+        .await
+        .assert_response();
+    let first_page_params_from_second_response = second_page_response.prev_page_params.unwrap();
+    let third_page_params = second_page_response.next_page_params.unwrap();
+    println!(
+        "second_page_data: {:#?}",
+        second_page_response
+            .data
+            .into_iter()
+            .map(|u| u.id)
+            .collect::<Vec<UserId>>()
+    );
+    println!("third_page_params: {:#?}", third_page_params);
+    println!(
+        "first_page_params_from_second_response: {:#?}",
+        first_page_params_from_second_response
+    );
+}
+
 #[apply(list_users_cases)]
 #[tokio::test]
 #[parallel]
