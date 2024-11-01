@@ -202,11 +202,11 @@ impl AppendUrlQueryPairs for UserListParams {
     }
 }
 
-fn get_parsed<T: FromStr>(h: &HashMap<Cow<'_, str>, Cow<'_, str>>, key: &str) -> Option<T> {
+fn get_parsed<T: FromStr>(h: &HashMap<Cow<str>, Cow<str>>, key: &str) -> Option<T> {
     h.get(key).and_then(|v| v.parse().ok())
 }
 
-fn get_csv<T: FromStr>(h: &HashMap<Cow<'_, str>, Cow<'_, str>>, key: &str) -> Vec<T> {
+fn get_csv<T: FromStr>(h: &HashMap<Cow<str>, Cow<str>>, key: &str) -> Vec<T> {
     h.get(key)
         .and_then(|v| {
             v.split(',')
@@ -217,23 +217,22 @@ fn get_csv<T: FromStr>(h: &HashMap<Cow<'_, str>, Cow<'_, str>>, key: &str) -> Ve
 }
 
 impl FromUrlQueryPairs for UserListParams {
-    fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
-        let h: HashMap<Cow<'_, str>, Cow<'_, str>> = url.query_pairs().into_iter().collect();
-        let get_string = |s: &str| h.get(s).map(|v| v.to_string());
+    fn from_url_query_pairs(query_pairs: HashMap<Cow<str>, Cow<str>>) -> Option<Self> {
+        let get_string = |s: &str| query_pairs.get(s).map(|v| v.to_string());
         Some(UserListParams {
-            page: get_parsed(&h, "page"),
-            per_page: get_parsed(&h, "per_page"),
-            search: get_parsed(&h, "search"),
-            exclude: get_csv(&h, "exclude"),
-            include: get_csv(&h, "include"),
-            offset: get_parsed(&h, "offset"),
-            order: get_parsed(&h, "order"),
-            orderby: get_parsed(&h, "orderby"),
-            slug: get_csv(&h, "slug"),
-            roles: get_csv(&h, "roles"),
-            capabilities: get_csv(&h, "capabilities"),
-            who: get_parsed(&h, "who"),
-            has_published_posts: get_parsed(&h, "has_published_posts"),
+            page: get_parsed(&query_pairs, "page"),
+            per_page: get_parsed(&query_pairs, "per_page"),
+            search: get_parsed(&query_pairs, "search"),
+            exclude: get_csv(&query_pairs, "exclude"),
+            include: get_csv(&query_pairs, "include"),
+            offset: get_parsed(&query_pairs, "offset"),
+            order: get_parsed(&query_pairs, "order"),
+            orderby: get_parsed(&query_pairs, "orderby"),
+            slug: get_csv(&query_pairs, "slug"),
+            roles: get_csv(&query_pairs, "roles"),
+            capabilities: get_csv(&query_pairs, "capabilities"),
+            who: get_parsed(&query_pairs, "who"),
+            has_published_posts: get_parsed(&query_pairs, "has_published_posts"),
         })
     }
 }
@@ -512,7 +511,7 @@ mod tests {
         original_params.append_query_pairs(&mut url.query_pairs_mut());
         println!("original: {:#?}", original_params);
         println!("url: {}", url);
-        let p = UserListParams::from_url_query_pairs(&url);
+        let p = UserListParams::from_url_query_pairs(url.query_pairs().into_iter().collect());
         assert!(p.is_some());
         let p = p.unwrap();
 

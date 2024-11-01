@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_variables)]
 
-use std::str::FromStr;
+use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
@@ -109,14 +109,11 @@ pub trait FromUrlQueryPairs
 where
     Self: Sized,
 {
-    // TODO: We shouldn't have a default implementation
-    fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
-        None
-    }
+    fn from_url_query_pairs(query_pairs: HashMap<Cow<str>, Cow<str>>) -> Option<Self>;
 }
 
 impl FromUrlQueryPairs for () {
-    fn from_url_query_pairs(url: &url::Url) -> Option<Self> {
+    fn from_url_query_pairs(query_pairs: HashMap<Cow<str>, Cow<str>>) -> Option<Self> {
         None
     }
 }

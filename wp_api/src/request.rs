@@ -350,11 +350,11 @@ impl WpNetworkResponse {
                 p.next_page_params = self
                     .get_link_header("next")
                     .first()
-                    .and_then(|u| P::from_url_query_pairs(u));
+                    .and_then(|u| P::from_url_query_pairs(u.query_pairs().into_iter().collect()));
                 p.prev_page_params = self
                     .get_link_header("prev")
                     .first()
-                    .and_then(|u| P::from_url_query_pairs(u));
+                    .and_then(|u| P::from_url_query_pairs(u.query_pairs().into_iter().collect()));
                 p.header_map = self.header_map;
                 T::from(p)
             })
