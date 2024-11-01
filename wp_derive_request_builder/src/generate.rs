@@ -94,25 +94,7 @@ fn generate_async_request_executor(
                 &variant.variant_ident,
                 &context_and_filter_handler,
             );
-            // TODO: Move to helpers and test it
-            // TODO: If `ContextualPaged` doesn't have params, fail during parsing
-            let response_params_type = if variant.attr.request_type == RequestType::ContextualPaged {
-                    variant.attr.params.as_ref().map(|p| {
-                        p.tokens
-                            .clone()
-                            .into_iter()
-                            .filter(|t| {
-                                if let TokenTree::Punct(punct) = t {
-                                    punct.as_char() != '&'
-                                } else {
-                                    true
-                                }
-                            })
-                            .collect::<TokenStream>()
-                    })
-                } else {
-                    None
-                };
+            let response_params_type = response_params_type(variant.attr.params.as_ref(), variant.attr.request_type);
             let response_pagination_params_fields = response_params_type.as_ref().map(|p| {
                 quote! {
                     #[serde(skip)]
@@ -136,7 +118,7 @@ fn generate_async_request_executor(
                     prev_page_params: value.prev_page_params,
                 }
             });
-            // Generic type <P> can't be `None` in `ParsedResponse<T, P>`
+            // Generic type <P> of `ParsedResponse<T, P>` can't be `None`
             let parsed_response_params_type = response_params_type.unwrap_or(quote! { () });
             quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]

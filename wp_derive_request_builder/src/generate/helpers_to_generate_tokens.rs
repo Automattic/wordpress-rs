@@ -410,6 +410,31 @@ pub fn ident_response_type(
     )
 }
 
+// TODO: Test it
+// TODO: If `ContextualPaged` doesn't have params, fail during parsing
+pub fn response_params_type(
+    params_type: Option<&ParamsType>,
+    request_type: RequestType,
+) -> Option<TokenStream> {
+    if request_type == RequestType::ContextualPaged {
+        params_type.map(|p| {
+            p.tokens
+                .clone()
+                .into_iter()
+                .filter(|t| {
+                    if let TokenTree::Punct(punct) = t {
+                        punct.as_char() != '&'
+                    } else {
+                        true
+                    }
+                })
+                .collect::<TokenStream>()
+        })
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::too_many_arguments)]
