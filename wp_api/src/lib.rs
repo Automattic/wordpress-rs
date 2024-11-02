@@ -115,13 +115,13 @@ impl<'a> UrlQueryPairsMap<'a> {
         Self { inner: query_pairs }
     }
 
-    fn get<T: FromStr>(&self, key: &str) -> Option<T> {
-        self.inner.get(key).and_then(|v| v.parse().ok())
+    fn get<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
+        self.inner.get(key.into()).and_then(|v| v.parse().ok())
     }
 
-    fn get_csv<T: FromStr>(&self, key: &str) -> Vec<T> {
+    fn get_csv<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Vec<T> {
         self.inner
-            .get(key)
+            .get(key.into())
             .and_then(|v| {
                 v.split(',')
                     .map(|s| T::from_str(s).ok())

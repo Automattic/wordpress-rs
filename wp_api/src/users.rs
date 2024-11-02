@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
+use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 use crate::{
@@ -177,26 +178,71 @@ pub struct UserListParams {
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
+enum UserListParamsField {
+    #[strum(serialize = "page")]
+    Page,
+    #[strum(serialize = "per_page")]
+    PerPage,
+    #[strum(serialize = "search")]
+    Search,
+    #[strum(serialize = "exclude")]
+    Exclude,
+    #[strum(serialize = "include")]
+    Include,
+    #[strum(serialize = "offset")]
+    Offset,
+    #[strum(serialize = "order")]
+    Order,
+    #[strum(serialize = "orderby")]
+    Orderby,
+    #[strum(serialize = "slug")]
+    Slug,
+    #[strum(serialize = "roles")]
+    Roles,
+    #[strum(serialize = "capabilities")]
+    Capabilities,
+    #[strum(serialize = "who")]
+    Who,
+    #[strum(serialize = "has_published_posts")]
+    HasPublishedPosts,
+}
+
 impl AppendUrlQueryPairs for UserListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair("page", self.page.as_ref())
-            .append_option_query_value_pair("per_page", self.per_page.as_ref())
-            .append_option_query_value_pair("search", self.search.as_ref())
-            .append_vec_query_value_pair("exclude", &self.exclude)
-            .append_vec_query_value_pair("include", &self.include)
-            .append_option_query_value_pair("offset", self.offset.as_ref())
-            .append_option_query_value_pair("order", self.order.as_ref())
-            .append_option_query_value_pair("orderby", self.orderby.as_ref())
-            .append_vec_query_value_pair("slug", &self.slug)
-            .append_vec_query_value_pair("roles", &self.roles)
-            .append_vec_query_value_pair("capabilities", &self.capabilities)
+            .append_option_query_value_pair(UserListParamsField::Page.into(), self.page.as_ref())
             .append_option_query_value_pair(
-                "who",
+                UserListParamsField::PerPage.into(),
+                self.per_page.as_ref(),
+            )
+            .append_option_query_value_pair(
+                UserListParamsField::Search.into(),
+                self.search.as_ref(),
+            )
+            .append_vec_query_value_pair(UserListParamsField::Exclude.into(), &self.exclude)
+            .append_vec_query_value_pair(UserListParamsField::Include.into(), &self.include)
+            .append_option_query_value_pair(
+                UserListParamsField::Offset.into(),
+                self.offset.as_ref(),
+            )
+            .append_option_query_value_pair(UserListParamsField::Order.into(), self.order.as_ref())
+            .append_option_query_value_pair(
+                UserListParamsField::Orderby.into(),
+                self.orderby.as_ref(),
+            )
+            .append_vec_query_value_pair(UserListParamsField::Slug.into(), &self.slug)
+            .append_vec_query_value_pair(UserListParamsField::Roles.into(), &self.roles)
+            .append_vec_query_value_pair(
+                UserListParamsField::Capabilities.into(),
+                &self.capabilities,
+            )
+            .append_option_query_value_pair(
+                UserListParamsField::Who.into(),
                 self.who.as_ref().and_then(|w| w.as_str()).as_ref(),
             )
             .append_option_query_value_pair(
-                "has_published_posts",
+                UserListParamsField::HasPublishedPosts.into(),
                 self.has_published_posts.as_ref(),
             );
     }
@@ -205,19 +251,19 @@ impl AppendUrlQueryPairs for UserListParams {
 impl FromUrlQueryPairs for UserListParams {
     fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
         Some(UserListParams {
-            page: query_pairs.get("page"),
-            per_page: query_pairs.get("per_page"),
-            search: query_pairs.get("search"),
-            exclude: query_pairs.get_csv("exclude"),
-            include: query_pairs.get_csv("include"),
-            offset: query_pairs.get("offset"),
-            order: query_pairs.get("order"),
-            orderby: query_pairs.get("orderby"),
-            slug: query_pairs.get_csv("slug"),
-            roles: query_pairs.get_csv("roles"),
-            capabilities: query_pairs.get_csv("capabilities"),
-            who: query_pairs.get("who"),
-            has_published_posts: query_pairs.get("has_published_posts"),
+            page: query_pairs.get(UserListParamsField::Page),
+            per_page: query_pairs.get(UserListParamsField::PerPage),
+            search: query_pairs.get(UserListParamsField::Search),
+            exclude: query_pairs.get_csv(UserListParamsField::Exclude),
+            include: query_pairs.get_csv(UserListParamsField::Include),
+            offset: query_pairs.get(UserListParamsField::Offset),
+            order: query_pairs.get(UserListParamsField::Order),
+            orderby: query_pairs.get(UserListParamsField::Orderby),
+            slug: query_pairs.get_csv(UserListParamsField::Slug),
+            roles: query_pairs.get_csv(UserListParamsField::Roles),
+            capabilities: query_pairs.get_csv(UserListParamsField::Capabilities),
+            who: query_pairs.get(UserListParamsField::Who),
+            has_published_posts: query_pairs.get(UserListParamsField::HasPublishedPosts),
         })
     }
 }
