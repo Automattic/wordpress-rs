@@ -9,27 +9,39 @@ pub(crate) trait AppendUrlQueryPairs {
 }
 
 pub(crate) trait QueryPairsExtension {
-    fn append_query_value_pair<T>(&mut self, key: &str, value: &T) -> &mut Self
+    fn append_query_value_pair<'a, T>(&mut self, key: impl Into<&'a str>, value: &T) -> &mut Self
     where
         T: AsQueryValue;
-    fn append_option_query_value_pair<T>(&mut self, key: &str, value: Option<&T>) -> &mut Self
+    fn append_option_query_value_pair<'a, T>(
+        &mut self,
+        key: impl Into<&'a str>,
+        value: Option<&T>,
+    ) -> &mut Self
     where
         T: AsQueryValue;
-    fn append_vec_query_value_pair<T>(&mut self, key: &str, value: &[T]) -> &mut Self
+    fn append_vec_query_value_pair<'a, T>(
+        &mut self,
+        key: impl Into<&'a str>,
+        value: &[T],
+    ) -> &mut Self
     where
         T: AsQueryValue;
 }
 
 impl QueryPairsExtension for QueryPairs<'_> {
-    fn append_query_value_pair<T>(&mut self, key: &str, value: &T) -> &mut Self
+    fn append_query_value_pair<'a, T>(&mut self, key: impl Into<&'a str>, value: &T) -> &mut Self
     where
         T: AsQueryValue,
     {
-        self.append_pair(key, value.as_query_value().as_ref());
+        self.append_pair(key.into(), value.as_query_value().as_ref());
         self
     }
 
-    fn append_option_query_value_pair<T>(&mut self, key: &str, value: Option<&T>) -> &mut Self
+    fn append_option_query_value_pair<'a, T>(
+        &mut self,
+        key: impl Into<&'a str>,
+        value: Option<&T>,
+    ) -> &mut Self
     where
         T: AsQueryValue,
     {
@@ -39,7 +51,11 @@ impl QueryPairsExtension for QueryPairs<'_> {
         self
     }
 
-    fn append_vec_query_value_pair<T>(&mut self, key: &str, value: &[T]) -> &mut Self
+    fn append_vec_query_value_pair<'a, T>(
+        &mut self,
+        key: impl Into<&'a str>,
+        value: &[T],
+    ) -> &mut Self
     where
         T: AsQueryValue,
     {
@@ -50,7 +66,7 @@ impl QueryPairsExtension for QueryPairs<'_> {
                 acc
             });
             csv.pop(); // remove the last ','
-            self.append_pair(key, &csv);
+            self.append_pair(key.into(), &csv);
         }
         self
     }

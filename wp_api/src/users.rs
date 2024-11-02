@@ -211,38 +211,23 @@ enum UserListParamsField {
 impl AppendUrlQueryPairs for UserListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair(UserListParamsField::Page.into(), self.page.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Page, self.page.as_ref())
+            .append_option_query_value_pair(UserListParamsField::PerPage, self.per_page.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Search, self.search.as_ref())
+            .append_vec_query_value_pair(UserListParamsField::Exclude, &self.exclude)
+            .append_vec_query_value_pair(UserListParamsField::Include, &self.include)
+            .append_option_query_value_pair(UserListParamsField::Offset, self.offset.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Order, self.order.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Orderby, self.orderby.as_ref())
+            .append_vec_query_value_pair(UserListParamsField::Slug, &self.slug)
+            .append_vec_query_value_pair(UserListParamsField::Roles, &self.roles)
+            .append_vec_query_value_pair(UserListParamsField::Capabilities, &self.capabilities)
             .append_option_query_value_pair(
-                UserListParamsField::PerPage.into(),
-                self.per_page.as_ref(),
-            )
-            .append_option_query_value_pair(
-                UserListParamsField::Search.into(),
-                self.search.as_ref(),
-            )
-            .append_vec_query_value_pair(UserListParamsField::Exclude.into(), &self.exclude)
-            .append_vec_query_value_pair(UserListParamsField::Include.into(), &self.include)
-            .append_option_query_value_pair(
-                UserListParamsField::Offset.into(),
-                self.offset.as_ref(),
-            )
-            .append_option_query_value_pair(UserListParamsField::Order.into(), self.order.as_ref())
-            .append_option_query_value_pair(
-                UserListParamsField::Orderby.into(),
-                self.orderby.as_ref(),
-            )
-            .append_vec_query_value_pair(UserListParamsField::Slug.into(), &self.slug)
-            .append_vec_query_value_pair(UserListParamsField::Roles.into(), &self.roles)
-            .append_vec_query_value_pair(
-                UserListParamsField::Capabilities.into(),
-                &self.capabilities,
-            )
-            .append_option_query_value_pair(
-                UserListParamsField::Who.into(),
+                UserListParamsField::Who,
                 self.who.as_ref().and_then(|w| w.as_str()).as_ref(),
             )
             .append_option_query_value_pair(
-                UserListParamsField::HasPublishedPosts.into(),
+                UserListParamsField::HasPublishedPosts,
                 self.has_published_posts.as_ref(),
             );
     }
