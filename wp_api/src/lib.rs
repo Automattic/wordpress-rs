@@ -105,15 +105,41 @@ trait SparseField {
     fn as_str(&self) -> &str;
 }
 
+#[derive(Debug)]
+pub struct UrlQueryPairsMap<'a> {
+    inner: HashMap<Cow<'a, str>, Cow<'a, str>>,
+}
+
+impl<'a> UrlQueryPairsMap<'a> {
+    fn new(query_pairs: HashMap<Cow<'a, str>, Cow<'a, str>>) -> Self {
+        Self { inner: query_pairs }
+    }
+
+    fn get<T: FromStr>(&self, key: &str) -> Option<T> {
+        self.inner.get(key).and_then(|v| v.parse().ok())
+    }
+
+    fn get_csv<T: FromStr>(&self, key: &str) -> Vec<T> {
+        self.inner
+            .get(key)
+            .and_then(|v| {
+                v.split(',')
+                    .map(|s| T::from_str(s).ok())
+                    .collect::<Option<Vec<_>>>()
+            })
+            .unwrap_or_default()
+    }
+}
+
 pub trait FromUrlQueryPairs
 where
     Self: Sized,
 {
-    fn from_url_query_pairs(query_pairs: HashMap<Cow<str>, Cow<str>>) -> Option<Self>;
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self>;
 }
 
 impl FromUrlQueryPairs for () {
-    fn from_url_query_pairs(query_pairs: HashMap<Cow<str>, Cow<str>>) -> Option<Self> {
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
         None
     }
 }

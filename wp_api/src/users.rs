@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Display, num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, fmt::Display, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
@@ -7,7 +7,7 @@ use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    FromUrlQueryPairs, WpApiParamOrder,
+    FromUrlQueryPairs, UrlQueryPairsMap, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -202,37 +202,22 @@ impl AppendUrlQueryPairs for UserListParams {
     }
 }
 
-fn get_parsed<T: FromStr>(h: &HashMap<Cow<str>, Cow<str>>, key: &str) -> Option<T> {
-    h.get(key).and_then(|v| v.parse().ok())
-}
-
-fn get_csv<T: FromStr>(h: &HashMap<Cow<str>, Cow<str>>, key: &str) -> Vec<T> {
-    h.get(key)
-        .and_then(|v| {
-            v.split(',')
-                .map(|s| T::from_str(s).ok())
-                .collect::<Option<Vec<_>>>()
-        })
-        .unwrap_or_default()
-}
-
 impl FromUrlQueryPairs for UserListParams {
-    fn from_url_query_pairs(query_pairs: HashMap<Cow<str>, Cow<str>>) -> Option<Self> {
-        let get_string = |s: &str| query_pairs.get(s).map(|v| v.to_string());
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
         Some(UserListParams {
-            page: get_parsed(&query_pairs, "page"),
-            per_page: get_parsed(&query_pairs, "per_page"),
-            search: get_parsed(&query_pairs, "search"),
-            exclude: get_csv(&query_pairs, "exclude"),
-            include: get_csv(&query_pairs, "include"),
-            offset: get_parsed(&query_pairs, "offset"),
-            order: get_parsed(&query_pairs, "order"),
-            orderby: get_parsed(&query_pairs, "orderby"),
-            slug: get_csv(&query_pairs, "slug"),
-            roles: get_csv(&query_pairs, "roles"),
-            capabilities: get_csv(&query_pairs, "capabilities"),
-            who: get_parsed(&query_pairs, "who"),
-            has_published_posts: get_parsed(&query_pairs, "has_published_posts"),
+            page: query_pairs.get("page"),
+            per_page: query_pairs.get("per_page"),
+            search: query_pairs.get("search"),
+            exclude: query_pairs.get_csv("exclude"),
+            include: query_pairs.get_csv("include"),
+            offset: query_pairs.get("offset"),
+            order: query_pairs.get("order"),
+            orderby: query_pairs.get("orderby"),
+            slug: query_pairs.get_csv("slug"),
+            roles: query_pairs.get_csv("roles"),
+            capabilities: query_pairs.get_csv("capabilities"),
+            who: query_pairs.get("who"),
+            has_published_posts: query_pairs.get("has_published_posts"),
         })
     }
 }
@@ -511,7 +496,9 @@ mod tests {
         original_params.append_query_pairs(&mut url.query_pairs_mut());
         println!("original: {:#?}", original_params);
         println!("url: {}", url);
-        let p = UserListParams::from_url_query_pairs(url.query_pairs().into_iter().collect());
+        let p = UserListParams::from_url_query_pairs(UrlQueryPairsMap::new(
+            url.query_pairs().into_iter().collect(),
+        ));
         assert!(p.is_some());
         let p = p.unwrap();
 
