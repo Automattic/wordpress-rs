@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpError},
-    FromUrlQueryPairs, UrlQueryPairsMap, WpApiError, WpAuthentication,
+    UrlQueryPairsMap, WpApiError, WpAuthentication,
 };
 
 use self::endpoint::WpEndpointUrl;
@@ -29,6 +29,46 @@ pub struct ParsedResponse<T, P> {
     pub next_page_params: Option<P>,
     #[serde(skip)]
     pub prev_page_params: Option<P>,
+}
+
+pub trait FromUrlQueryPairs
+where
+    Self: Sized,
+{
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self>;
+
+    // Used to avoid unnecessary parsing of the `next` & `prev` headers for params types that don't
+    // support pagination.
+    //
+    // All manually implemented types should return `true` and the implementation for `()` should
+    // return `false` since `#[derive(WpDerivedRequest)]` will use `()` for parameter `P` of
+    // `ParsedRequest<T, P>`.
+    fn supports_pagination() -> bool;
+}
+
+impl FromUrlQueryPairs for () {
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+        None
+    }
+
+    fn supports_pagination() -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PaginationHeaderKey {
+    Next,
+    Prev,
+}
+
+impl PaginationHeaderKey {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Next => "next",
+            Self::Prev => "prev",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -326,6 +366,19 @@ impl WpNetworkResponse {
         .collect()
     }
 
+    pub fn get_pagination_header<P: FromUrlQueryPairs>(
+        &self,
+        header_key: PaginationHeaderKey,
+    ) -> Option<P> {
+        self.get_link_header(header_key.as_str())
+            .first()
+            .and_then(|u| {
+                P::from_url_query_pairs(UrlQueryPairsMap::new(
+                    u.query_pairs().into_iter().collect(),
+                ))
+            })
+    }
+
     pub fn body_as_string(&self) -> String {
         request_or_response_body_as_string(&self.body)
     }
@@ -345,20 +398,15 @@ impl WpNetworkResponse {
         serde_json::from_slice(&self.body)
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
-                let mut p = ParsedResponse::<D, P>::from(x);
-                // TODO: Use constants for "next" & "prev"
-                p.next_page_params = self.get_link_header("next").first().and_then(|u| {
-                    P::from_url_query_pairs(UrlQueryPairsMap::new(
-                        u.query_pairs().into_iter().collect(),
-                    ))
-                });
-                p.prev_page_params = self.get_link_header("prev").first().and_then(|u| {
-                    P::from_url_query_pairs(UrlQueryPairsMap::new(
-                        u.query_pairs().into_iter().collect(),
-                    ))
-                });
-                p.header_map = self.header_map;
-                T::from(p)
+                let mut parsed_response = ParsedResponse::<D, P>::from(x);
+                if P::supports_pagination() {
+                    parsed_response.next_page_params =
+                        self.get_pagination_header(PaginationHeaderKey::Next);
+                    parsed_response.prev_page_params =
+                        self.get_pagination_header(PaginationHeaderKey::Prev);
+                }
+                parsed_response.header_map = self.header_map;
+                T::from(parsed_response)
             })
     }
 

@@ -7,8 +7,9 @@ use wp_contextual::WpContextual;
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     impl_as_query_value_from_to_string,
+    request::FromUrlQueryPairs,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    FromUrlQueryPairs, UrlQueryPairsMap, WpApiParamOrder,
+    UrlQueryPairsMap, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -250,6 +251,10 @@ impl FromUrlQueryPairs for UserListParams {
             who: query_pairs.get(UserListParamsField::Who),
             has_published_posts: query_pairs.get(UserListParamsField::HasPublishedPosts),
         })
+    }
+
+    fn supports_pagination() -> bool {
+        true
     }
 }
 

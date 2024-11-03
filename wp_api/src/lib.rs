@@ -131,19 +131,6 @@ impl<'a> UrlQueryPairsMap<'a> {
     }
 }
 
-pub trait FromUrlQueryPairs
-where
-    Self: Sized,
-{
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self>;
-}
-
-impl FromUrlQueryPairs for () {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        None
-    }
-}
-
 #[macro_export]
 macro_rules! generate {
     ($type_name:ident) => {
