@@ -21,14 +21,14 @@ const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ParsedResponse<T, P> {
-    pub data: T,
+pub struct ParsedResponse<DataType, ParamsType> {
+    pub data: DataType,
     #[serde(skip)]
     pub header_map: Arc<WpNetworkHeaderMap>,
     #[serde(skip)]
-    pub next_page_params: Option<P>,
+    pub next_page_params: Option<ParamsType>,
     #[serde(skip)]
-    pub prev_page_params: Option<P>,
+    pub prev_page_params: Option<ParamsType>,
 }
 
 pub trait FromUrlQueryPairs
@@ -383,12 +383,12 @@ impl WpNetworkResponse {
         request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<T, D, P, E>(self) -> Result<T, E>
+    pub fn parse<ResponseType, DataType, ParamsType, E>(self) -> Result<ResponseType, E>
     where
-        T: DeserializeOwned,
-        T: From<ParsedResponse<D, P>>,
-        ParsedResponse<D, P>: From<T>,
-        P: FromUrlQueryPairs,
+        ResponseType: DeserializeOwned,
+        ResponseType: From<ParsedResponse<DataType, ParamsType>>,
+        ParsedResponse<DataType, ParamsType>: From<ResponseType>,
+        ParamsType: FromUrlQueryPairs,
         E: ParsedRequestError,
     {
         if let Some(err) = E::try_parse(&self.body, self.status_code) {
@@ -398,15 +398,15 @@ impl WpNetworkResponse {
         serde_json::from_slice(&self.body)
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
-                let mut parsed_response = ParsedResponse::<D, P>::from(x);
-                if P::supports_pagination() {
+                let mut parsed_response = ParsedResponse::<DataType, ParamsType>::from(x);
+                if ParamsType::supports_pagination() {
                     parsed_response.next_page_params =
                         self.get_pagination_header(PaginationHeaderKey::Next);
                     parsed_response.prev_page_params =
                         self.get_pagination_header(PaginationHeaderKey::Prev);
                 }
                 parsed_response.header_map = self.header_map;
-                T::from(parsed_response)
+                ResponseType::from(parsed_response)
             })
     }
 
