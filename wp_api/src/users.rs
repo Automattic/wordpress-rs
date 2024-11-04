@@ -9,7 +9,7 @@ use crate::{
     impl_as_query_value_from_to_string,
     request::FromUrlQueryPairs,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    UrlQueryPairsMap, WpApiParamOrder,
+    EnumFromStrParsingError, UrlQueryPairsMap, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -42,9 +42,8 @@ impl WpApiParamUsersOrderBy {
     }
 }
 
-// TODO: Improve error handling
 impl FromStr for WpApiParamUsersOrderBy {
-    type Err = ();
+    type Err = EnumFromStrParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -56,7 +55,9 @@ impl FromStr for WpApiParamUsersOrderBy {
             "include_slugs" => Ok(Self::IncludeSlugs),
             "email" => Ok(Self::Email),
             "url" => Ok(Self::Url),
-            _ => Err(()),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
         }
     }
 }
@@ -78,16 +79,17 @@ impl WpApiParamUsersWho {
     }
 }
 
-// TODO: Improve error handling
 impl FromStr for WpApiParamUsersWho {
-    type Err = ();
+    type Err = EnumFromStrParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             // TODO: Check if this is how it's returned from server
             "" => Ok(Self::All),
             "authors" => Ok(Self::Authors),
-            _ => Err(()),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
         }
     }
 }
@@ -99,16 +101,17 @@ pub enum WpApiParamUsersHasPublishedPosts {
     PostTypes(Vec<String>),
 }
 
-// TODO: Improve error handling
 impl FromStr for WpApiParamUsersHasPublishedPosts {
-    type Err = ();
+    type Err = EnumFromStrParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO: How is Self::PostTypes handled?
         match s {
             "true" => Ok(Self::True),
             "false" => Ok(Self::False),
-            // TODO: How is Self::PostTypes handled?
-            _ => Err(()),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
         }
     }
 }

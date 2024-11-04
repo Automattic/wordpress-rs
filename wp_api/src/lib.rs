@@ -88,15 +88,16 @@ impl WpApiParamOrder {
     }
 }
 
-// TODO: Improve error handling
 impl FromStr for WpApiParamOrder {
-    type Err = ();
+    type Err = EnumFromStrParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "asc" => Ok(Self::Asc),
             "desc" => Ok(Self::Desc),
-            _ => Err(()),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
         }
     }
 }
@@ -129,6 +130,12 @@ impl<'a> UrlQueryPairsMap<'a> {
             })
             .unwrap_or_default()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
+pub enum EnumFromStrParsingError {
+    #[error("'{}' is not a valid variant for this enum", value)]
+    UnknownVariant { value: String },
 }
 
 #[macro_export]
