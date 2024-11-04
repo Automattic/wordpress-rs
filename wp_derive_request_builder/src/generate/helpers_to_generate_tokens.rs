@@ -410,14 +410,14 @@ pub fn ident_response_type(
     )
 }
 
-// TODO: Test it
 // TODO: If `ContextualPaged` doesn't have params, fail during parsing
 pub fn response_params_type(
     params_type: Option<&ParamsType>,
     request_type: RequestType,
 ) -> Option<TokenStream> {
     if request_type == RequestType::ContextualPaged {
-        params_type.map(|p| {
+        let p = params_type.expect("`contextual_paged` should only be used when the request has a params type. This is validated during parsing, so this panic should never occur.");
+        Some(
             p.tokens
                 .clone()
                 .into_iter()
@@ -428,8 +428,8 @@ pub fn response_params_type(
                         true
                     }
                 })
-                .collect::<TokenStream>()
-        })
+                .collect::<TokenStream>(),
+        )
     } else {
         None
     }
@@ -1159,6 +1159,37 @@ mod tests {
             .to_string(),
             expected_str
         );
+    }
+
+    #[rstest]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::ContextualPaged, Some("UserListParams"))]
+    #[case(Some(ParamsType { tokens: quote!{ &UserListParams } }), RequestType::ContextualPaged, Some("UserListParams"))]
+    #[case(Some(ParamsType { tokens: quote!{ wp_api::users::UserListParams } }), RequestType::ContextualPaged, Some("wp_api :: users :: UserListParams"))]
+    #[case(Some(ParamsType { tokens: quote!{ &wp_api::users::UserListParams } }), RequestType::ContextualPaged, Some("wp_api :: users :: UserListParams"))]
+    #[case(None, RequestType::ContextualGet, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::ContextualGet, None)]
+    #[case(None, RequestType::Delete, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::Delete, None)]
+    #[case(None, RequestType::Get, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::Get, None)]
+    #[case(None, RequestType::Post, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::Post, None)]
+    fn test_response_params_type(
+        #[case] params_type: Option<ParamsType>,
+        #[case] request_type: RequestType,
+        #[case] expected_str: Option<&str>,
+    ) {
+        assert_eq!(
+            response_params_type(params_type.as_ref(), request_type).map(|t| t.to_string()),
+            expected_str.map(|e| e.to_string())
+        );
+    }
+
+    #[test]
+    fn test_response_params_type_panic() {
+        let result =
+            std::panic::catch_unwind(|| response_params_type(None, RequestType::ContextualPaged));
+        assert!(result.is_err());
     }
 
     fn referenced_params_type(str: &str) -> Option<ParamsType> {
