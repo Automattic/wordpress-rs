@@ -410,7 +410,6 @@ pub fn ident_response_type(
     )
 }
 
-// TODO: If `ContextualPaged` doesn't have params, fail during parsing
 pub fn response_params_type(
     params_type: Option<&ParamsType>,
     request_type: RequestType,

@@ -33,7 +33,7 @@ impl ParsedVariantAttribute {
         params: Option<Vec<TokenTree>>,
         output: Vec<TokenTree>,
         filter_by: Option<Vec<TokenTree>>,
-    ) -> Self {
+    ) -> Result<Self, ItemVariantAttributeParseError> {
         let non_empty_token_tree_or_none =
             |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
                 tokens.and_then(|tokens| {
@@ -44,18 +44,23 @@ impl ParsedVariantAttribute {
                     }
                 })
             };
+        let params_type = non_empty_token_tree_or_none(params).map(|tokens| ParamsType {
+            tokens: TokenStream::from_iter(tokens),
+        });
 
-        Self {
+        if request_type == RequestType::ContextualPaged && params_type.is_none() {
+            return Err(ItemVariantAttributeParseError::ContextualPagedRequiresParamsType);
+        }
+
+        Ok(Self {
             request_type,
             url_parts,
-            params: non_empty_token_tree_or_none(params).map(|tokens| ParamsType {
-                tokens: TokenStream::from_iter(tokens),
-            }),
+            params: params_type,
             output,
             filter_by: non_empty_token_tree_or_none(filter_by).map(|tokens| FilterByType {
                 tokens: TokenStream::from_iter(tokens),
             }),
-        }
+        })
     }
 
     // Parses the attribute and finds the [syn::MetaList]
@@ -279,18 +284,21 @@ impl Parse for ParsedVariantAttribute {
 
         let url_parts = UrlPart::split(url_str.to_string(), &meta_list_span)?;
 
-        Ok(ParsedVariantAttribute::new(
+        ParsedVariantAttribute::new(
             request_type,
             url_parts,
             params_tokens,
             output,
             filter_by_tokens,
-        ))
+        )
+        .map_err(|e| e.into_syn_error(meta_list_span))
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 enum ItemVariantAttributeParseError {
+    #[error("#[contextual_paged(params = ?)] is missing `params` type")]
+    ContextualPagedRequiresParamsType,
     #[error("Missing variant attribute")]
     MissingAttr,
     #[error("Only a single attribute is supported")]
@@ -307,7 +315,7 @@ enum ItemVariantAttributeParseError {
     UrlShouldBeLiteral,
     #[error("Missing (output = crate::Foo)")]
     MissingOutput,
-    #[error("Only 'contextual_get', 'get', 'post' & 'delete' are supported")]
+    #[error("Only 'contextual_get', 'contextual_paged', 'get', 'post' & 'delete' are supported")]
     UnsupportedRequestType,
 }
 
