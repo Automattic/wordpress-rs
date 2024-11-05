@@ -251,7 +251,7 @@ impl FromUrlQueryPairs for UserListParams {
             slug: query_pairs.get_csv(UserListParamsField::Slug),
             roles: query_pairs.get_csv(UserListParamsField::Roles),
             capabilities: query_pairs.get_csv(UserListParamsField::Capabilities),
-            who: query_pairs.get_option(UserListParamsField::Who),
+            who: query_pairs.get_using_option_from_str(UserListParamsField::Who),
             has_published_posts: query_pairs.get(UserListParamsField::HasPublishedPosts),
         })
     }

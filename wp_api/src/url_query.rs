@@ -107,7 +107,10 @@ impl<'a> UrlQueryPairsMap<'a> {
         self.inner.get(key.into()).and_then(|v| v.parse().ok())
     }
 
-    pub(crate) fn get_option<'b, T: OptionFromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
+    pub(crate) fn get_using_option_from_str<'b, T: OptionFromStr>(
+        &self,
+        key: impl Into<&'b str>,
+    ) -> Option<T> {
         self.inner
             .get(key.into())
             .and_then(|v| T::option_from_str(v).ok().flatten())
