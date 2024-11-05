@@ -106,6 +106,14 @@ trait SparseField {
     fn as_str(&self) -> &str;
 }
 
+trait OptionFromStr {
+    type Err;
+
+    fn option_from_str(s: &str) -> Result<Option<Self>, Self::Err>
+    where
+        Self: Sized;
+}
+
 #[derive(Debug)]
 pub struct UrlQueryPairsMap<'a> {
     inner: HashMap<Cow<'a, str>, Cow<'a, str>>,
@@ -118,6 +126,12 @@ impl<'a> UrlQueryPairsMap<'a> {
 
     fn get<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
         self.inner.get(key.into()).and_then(|v| v.parse().ok())
+    }
+
+    fn get_option<'b, T: OptionFromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
+        self.inner
+            .get(key.into())
+            .and_then(|v| T::option_from_str(v).ok().flatten())
     }
 
     fn get_csv<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Vec<T> {

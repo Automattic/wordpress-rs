@@ -9,7 +9,7 @@ use crate::{
     impl_as_query_value_from_to_string,
     request::FromUrlQueryPairs,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    EnumFromStrParsingError, UrlQueryPairsMap, WpApiParamOrder,
+    EnumFromStrParsingError, OptionFromStr, UrlQueryPairsMap, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -79,14 +79,12 @@ impl WpApiParamUsersWho {
     }
 }
 
-impl FromStr for WpApiParamUsersWho {
+impl OptionFromStr for WpApiParamUsersWho {
     type Err = EnumFromStrParsingError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn option_from_str(s: &str) -> Result<Option<Self>, Self::Err> {
         match s {
-            // TODO: Check if this is how it's returned from server
-            "" => Ok(Self::All),
-            "authors" => Ok(Self::Authors),
+            "authors" => Ok(Some(Self::Authors)),
             value => Err(EnumFromStrParsingError::UnknownVariant {
                 value: value.to_string(),
             }),
@@ -251,7 +249,7 @@ impl FromUrlQueryPairs for UserListParams {
             slug: query_pairs.get_csv(UserListParamsField::Slug),
             roles: query_pairs.get_csv(UserListParamsField::Roles),
             capabilities: query_pairs.get_csv(UserListParamsField::Capabilities),
-            who: query_pairs.get(UserListParamsField::Who),
+            who: query_pairs.get_option(UserListParamsField::Who),
             has_published_posts: query_pairs.get(UserListParamsField::HasPublishedPosts),
         })
     }
@@ -500,7 +498,6 @@ mod tests {
     #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), "roles=author%2Ceditor")]
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), "slug=foo%2Cbar&roles=author%2Ceditor")]
     #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), "capabilities=edit_themes%2Cdelete_pages")]
-    //#[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))), "")]
     #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), "who=authors")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))), "has_published_posts=true")]
     //#[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))), "has_published_posts=post%2Cpage")]
@@ -522,6 +519,20 @@ mod tests {
     #[trace]
     fn test_user_list_query_pairs(#[case] params: UserListParams, #[case] expected_query: &str) {
         assert_expected_and_from_query_pairs(params, expected_query);
+    }
+
+    #[test]
+    fn test_user_list_params_who_all_should_be_empty() {
+        // This test is separate from `test_user_list_query_pairs` because converting the empty
+        // query back to `UserListParams` will result in `who: None` instead of
+        // `who: WpApiParamUsersWho::All`.
+        assert_expected_query_pairs(
+            UserListParams {
+                who: Some(WpApiParamUsersWho::All),
+                ..Default::default()
+            },
+            "",
+        );
     }
 
     #[test]
