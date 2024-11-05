@@ -98,9 +98,13 @@ class UsersEndpointTest {
             requestBuilder.users().listWithEditContext(params = UserListParams(perPage = 1u))
         }.assertSuccessAndRetrieveData()
         assert(firstPageResponse.data.isNotEmpty())
-        val secondPageResponse = client.request { requestBuilder ->
+        val nextPageResponse = client.request { requestBuilder ->
             requestBuilder.users().listWithEditContext(firstPageResponse.nextPageParams!!)
         }.assertSuccessAndRetrieveData()
-        assert(secondPageResponse.data.isNotEmpty())
+        assert(nextPageResponse.data.isNotEmpty())
+        val prevPageResponse = client.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(nextPageResponse.prevPageParams!!)
+        }.assertSuccessAndRetrieveData()
+        assert(prevPageResponse.data.isNotEmpty())
     }
 }
