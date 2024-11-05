@@ -105,13 +105,12 @@ impl FromStr for WpApiParamUsersHasPublishedPosts {
     type Err = EnumFromStrParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO: How is Self::PostTypes handled?
         match s {
             "true" => Ok(Self::True),
             "false" => Ok(Self::False),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
+            value => Ok(Self::PostTypes(
+                value.split(',').map(|s| s.to_string()).collect(),
+            )),
         }
     }
 }
@@ -502,7 +501,7 @@ mod tests {
     #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), "capabilities=edit_themes%2Cdelete_pages")]
     #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), "who=authors")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))), "has_published_posts=true")]
-    //#[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))), "has_published_posts=post%2Cpage")]
+    #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))), "has_published_posts=post%2Cpage")]
     #[case(UserListParams {
             page: Some(11),
             per_page: Some(22),
