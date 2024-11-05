@@ -7,9 +7,11 @@ use wp_contextual::WpContextual;
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     impl_as_query_value_from_to_string,
-    request::FromUrlQueryPairs,
-    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    EnumFromStrParsingError, OptionFromStr, UrlQueryPairsMap, WpApiParamOrder,
+    url_query::{
+        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
+        UrlQueryPairsMap,
+    },
+    EnumFromStrParsingError, OptionFromStr, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]

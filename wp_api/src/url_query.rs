@@ -1,6 +1,7 @@
+use std::{borrow::Cow, collections::HashMap, str::FromStr};
 use url::{form_urlencoded, UrlQuery};
 
-use crate::impl_as_query_value_from_to_string;
+use crate::{impl_as_query_value_from_to_string, OptionFromStr};
 
 pub(crate) type QueryPairs<'a> = form_urlencoded::Serializer<'a, UrlQuery<'a>>;
 
@@ -89,6 +90,63 @@ impl AsQueryValue for &str {
 impl AsQueryValue for String {
     fn as_query_value(&self) -> impl AsRef<str> {
         self
+    }
+}
+
+#[derive(Debug)]
+pub struct UrlQueryPairsMap<'a> {
+    inner: HashMap<Cow<'a, str>, Cow<'a, str>>,
+}
+
+impl<'a> UrlQueryPairsMap<'a> {
+    pub(crate) fn new(query_pairs: HashMap<Cow<'a, str>, Cow<'a, str>>) -> Self {
+        Self { inner: query_pairs }
+    }
+
+    pub(crate) fn get<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
+        self.inner.get(key.into()).and_then(|v| v.parse().ok())
+    }
+
+    pub(crate) fn get_option<'b, T: OptionFromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
+        self.inner
+            .get(key.into())
+            .and_then(|v| T::option_from_str(v).ok().flatten())
+    }
+
+    pub(crate) fn get_csv<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Vec<T> {
+        self.inner
+            .get(key.into())
+            .and_then(|v| {
+                v.split(',')
+                    .map(|s| T::from_str(s).ok())
+                    .collect::<Option<Vec<_>>>()
+            })
+            .unwrap_or_default()
+    }
+}
+
+pub trait FromUrlQueryPairs
+where
+    Self: Sized,
+{
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self>;
+
+    // Used to avoid unnecessary parsing of the `next` & `prev` headers for params types that don't
+    // support pagination.
+    //
+    // All manually implemented types should return `true` and the implementation for `()` should
+    // return `false` since `#[derive(WpDerivedRequest)]` will use `()` for parameter `P` of
+    // `ParsedRequest<T, P>`.
+    fn supports_pagination() -> bool;
+}
+
+impl FromUrlQueryPairs for () {
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+        None
+    }
+
+    fn supports_pagination() -> bool {
+        false
     }
 }
 

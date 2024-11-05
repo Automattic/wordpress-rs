@@ -1,6 +1,4 @@
-use crate::request::FromUrlQueryPairs;
-use crate::url_query::AppendUrlQueryPairs;
-use crate::UrlQueryPairsMap;
+use crate::url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, UrlQueryPairsMap};
 use url::Url;
 
 #[cfg(test)]

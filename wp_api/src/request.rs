@@ -7,7 +7,8 @@ use url::Url;
 
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpError},
-    UrlQueryPairsMap, WpApiError, WpAuthentication,
+    url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
+    WpApiError, WpAuthentication,
 };
 
 use self::endpoint::WpEndpointUrl;
@@ -29,31 +30,6 @@ pub struct ParsedResponse<DataType, ParamsType> {
     pub next_page_params: Option<ParamsType>,
     #[serde(skip)]
     pub prev_page_params: Option<ParamsType>,
-}
-
-pub trait FromUrlQueryPairs
-where
-    Self: Sized,
-{
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self>;
-
-    // Used to avoid unnecessary parsing of the `next` & `prev` headers for params types that don't
-    // support pagination.
-    //
-    // All manually implemented types should return `true` and the implementation for `()` should
-    // return `false` since `#[derive(WpDerivedRequest)]` will use `()` for parameter `P` of
-    // `ParsedRequest<T, P>`.
-    fn supports_pagination() -> bool;
-}
-
-impl FromUrlQueryPairs for () {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        None
-    }
-
-    fn supports_pagination() -> bool {
-        false
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

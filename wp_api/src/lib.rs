@@ -1,11 +1,10 @@
 #![allow(dead_code, unused_variables)]
 
-use std::{borrow::Cow, collections::HashMap, str::FromStr};
-
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
+use std::str::FromStr;
 use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
@@ -112,38 +111,6 @@ trait OptionFromStr {
     fn option_from_str(s: &str) -> Result<Option<Self>, Self::Err>
     where
         Self: Sized;
-}
-
-#[derive(Debug)]
-pub struct UrlQueryPairsMap<'a> {
-    inner: HashMap<Cow<'a, str>, Cow<'a, str>>,
-}
-
-impl<'a> UrlQueryPairsMap<'a> {
-    fn new(query_pairs: HashMap<Cow<'a, str>, Cow<'a, str>>) -> Self {
-        Self { inner: query_pairs }
-    }
-
-    fn get<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
-        self.inner.get(key.into()).and_then(|v| v.parse().ok())
-    }
-
-    fn get_option<'b, T: OptionFromStr>(&self, key: impl Into<&'b str>) -> Option<T> {
-        self.inner
-            .get(key.into())
-            .and_then(|v| T::option_from_str(v).ok().flatten())
-    }
-
-    fn get_csv<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Vec<T> {
-        self.inner
-            .get(key.into())
-            .and_then(|v| {
-                v.split(',')
-                    .map(|s| T::from_str(s).ok())
-                    .collect::<Option<Vec<_>>>()
-            })
-            .unwrap_or_default()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
