@@ -162,6 +162,35 @@ async fn retrieve_password_protected_with_view_context() {
     );
 }
 
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(PostListParams { per_page: Some(1), ..Default::default() })]
+#[case(PostListParams { per_page: Some(1), order: Some(WpApiParamOrder::Desc), ..Default::default() })]
+#[case(PostListParams { per_page: Some(1), orderby: Some(WpApiParamPostsOrderBy::Modified), ..Default::default() })]
+async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
+    let first_page_response = api_client()
+        .posts()
+        .list_with_edit_context(&params)
+        .await
+        .assert_response();
+    assert!(!first_page_response.data.is_empty());
+    let next_page_params = first_page_response.next_page_params.unwrap();
+    let next_page_response = api_client()
+        .posts()
+        .list_with_edit_context(&next_page_params)
+        .await
+        .assert_response();
+    assert!(!next_page_response.data.is_empty());
+    let prev_page_params = next_page_response.prev_page_params.unwrap();
+    let prev_page_response = api_client()
+        .posts()
+        .list_with_edit_context(&prev_page_params)
+        .await
+        .assert_response();
+    assert!(!prev_page_response.data.is_empty());
+}
+
 #[template]
 #[rstest]
 #[case::default(PostListParams::default())]
