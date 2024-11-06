@@ -135,7 +135,7 @@ impl FromStr for WpApiParamPostsSearchColumn {
     }
 }
 
-#[derive(Debug, Default, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct PostListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -817,5 +817,92 @@ impl PostFormat {
             Self::Audio => "audio",
             Self::Custom(post_format) => post_format,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{generate, unit_test_common::assert_expected_and_from_query_pairs};
+    use rstest::*;
+
+    #[rstest]
+    #[case(PostListParams::default(), "")]
+    #[case(generate!(PostListParams, (page, Some(2))), "page=2")]
+    #[case(generate!(PostListParams, (per_page, Some(2))), "per_page=2")]
+    #[case(generate!(PostListParams, (search, Some("foo".to_string()))), "search=foo")]
+    #[case(generate!(PostListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
+    #[case(generate!(PostListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])), "exclude=1%2C2")]
+    #[case(generate!(PostListParams, (include, vec![PostId(1), PostId(2)])), "include=1%2C2")]
+    #[case(generate!(PostListParams, (offset, Some(2))), "offset=2")]
+    #[case(generate!(PostListParams, (order, Some(WpApiParamOrder::Asc))), "order=asc")]
+    #[case(generate!(PostListParams, (order, Some(WpApiParamOrder::Desc))), "order=desc")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), "orderby=author")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Date))), "orderby=date")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))), "orderby=id")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Include))), "orderby=include")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::IncludeSlugs))), "orderby=include_slugs")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Modified))), "orderby=modified")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Parent))), "orderby=parent")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Relevance))), "orderby=relevance")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Slug))), "orderby=slug")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Title))), "orderby=title")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent])), "search_columns=post_content")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostExcerpt])), "search_columns=post_excerpt")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_title")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt, WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_content%2Cpost_excerpt%2Cpost_title")]
+    #[case(generate!(PostListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), "slug=foo%2Cbar")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Draft])), "status=draft")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Future])), "status=future")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Pending])), "status=pending")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Private])), "status=private")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Publish])), "status=publish")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Custom("foo".to_string())])), "status=foo")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Future, PostStatus::Pending, PostStatus::Private, PostStatus::Publish, PostStatus::Custom("foo".to_string())])), "status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
+    #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))), "tax_relation=AND")]
+    #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::Or))), "tax_relation=OR")]
+    #[case(generate!(PostListParams, (categories, vec![CategoryId(1), CategoryId(2)])), "categories=1%2C2")]
+    #[case(generate!(PostListParams, (categories_exclude, vec![CategoryId(1), CategoryId(2)])), "categories_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (tags, vec![TagId(1), TagId(2)])), "tags=1%2C2")]
+    #[case(generate!(PostListParams, (tags_exclude, vec![TagId(1), TagId(2)])), "tags_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
+    #[case(PostListParams {
+        page: Some(11),
+        per_page: Some(22),
+        search: Some("s_q".to_string()),
+        after: Some("d_a".to_string()),
+        modified_after: Some("d_m_a".to_string()),
+        author: vec![UserId(111), UserId(112)],
+        author_exclude: vec![UserId(211), UserId(212)],
+        before: Some("d_b".to_string()),
+        modified_before: Some("d_m_b".to_string()),
+        exclude: vec![PostId(1111), PostId(1112)],
+        include: vec![PostId(2111), PostId(2112)],
+        offset: Some(11111),
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Slug),
+        search_columns: vec![
+            WpApiParamPostsSearchColumn::PostContent,
+            WpApiParamPostsSearchColumn::PostExcerpt,
+        ],
+        slug: vec!["sl_1".to_string(), "sl_2".to_string()],
+        status: vec![PostStatus::Draft, PostStatus::Future],
+        tax_relation: Some(WpApiParamPostsTaxRelation::Or),
+        categories: vec![CategoryId(333333), CategoryId(333334)],
+        categories_exclude: vec![CategoryId(444444), CategoryId(444445)],
+        tags: vec![TagId(555555), TagId(555556)],
+        tags_exclude: vec![TagId(666666), TagId(666667)],
+        sticky: Some(true),
+        },
+        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=draft%2Cfuture&tax_relation=OR&categories=333333%2C333334&categories_exclude=444444%2C444445&tags=555555%2C555556&tags_exclude=666666%2C666667&sticky=true"
+    )]
+    #[trace]
+    fn test_post_list_query_pairs(#[case] params: PostListParams, #[case] expected_query: &str) {
+        assert_expected_and_from_query_pairs(params, expected_query);
     }
 }
