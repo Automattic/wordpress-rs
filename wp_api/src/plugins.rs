@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
@@ -6,6 +6,7 @@ use wp_contextual::WpContextual;
 use crate::{
     impl_as_query_value_from_as_str,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
+    EnumFromStrParsingError,
 };
 
 #[derive(Debug, Default, uniffi::Record)]
@@ -136,6 +137,21 @@ impl PluginStatus {
             Self::Active => "active",
             Self::Inactive => "inactive",
             Self::NetworkActive => "network-active",
+        }
+    }
+}
+
+impl FromStr for PluginStatus {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "active" => Ok(Self::Active),
+            "inactive" => Ok(Self::Inactive),
+            "network-active" => Ok(Self::NetworkActive),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
         }
     }
 }
