@@ -105,7 +105,7 @@ mod tests {
     #[case("https://example.com:foo", ParseUrlError::InvalidPort)]
     #[case("https://1.2.3.4.5", ParseUrlError::InvalidIpv4Address)]
     #[case("https://[1", ParseUrlError::InvalidIpv6Address)]
-    #[case("https:// .com", ParseUrlError::InvalidDomainCharacter)]
+    #[case("foo://example>", ParseUrlError::InvalidDomainCharacter)]
     #[case("", ParseUrlError::RelativeUrlWithoutBase)]
     // https://www.unicode.org/reports/tr46/#Validity_Criteria
     #[case("https://xn--u-ccb.com", ParseUrlError::IdnaError)]
