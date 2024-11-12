@@ -9,7 +9,7 @@ use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
 enum UsersRequest {
-    #[contextual_get(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>, filter_by = crate::SparseUserField)]
+    #[contextual_paged(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>, filter_by = crate::SparseUserField)]
     List,
     #[post(url = "/users", params = &UserCreateParams, output = UserWithEditContext)]
     Create,

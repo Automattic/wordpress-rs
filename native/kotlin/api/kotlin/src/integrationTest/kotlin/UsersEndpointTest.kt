@@ -91,4 +91,20 @@ class UsersEndpointTest {
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
         assert(result.wpErrorCode() is WpErrorCode.InvalidParam)
     }
+
+    @Test
+    fun testUserListPagination() = runTest {
+        val firstPageResponse = client.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams(perPage = 1u))
+        }.assertSuccessAndRetrieveData()
+        assert(firstPageResponse.data.isNotEmpty())
+        val nextPageResponse = client.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(firstPageResponse.nextPageParams!!)
+        }.assertSuccessAndRetrieveData()
+        assert(nextPageResponse.data.isNotEmpty())
+        val prevPageResponse = client.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(nextPageResponse.prevPageParams!!)
+        }.assertSuccessAndRetrieveData()
+        assert(prevPageResponse.data.isNotEmpty())
+    }
 }

@@ -111,10 +111,11 @@ pub fn fn_provided_param(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
-                crate::parse::RequestType::Post => TokenStream::new(),
+                RequestType::ContextualGet
+                | RequestType::ContextualPaged
+                | RequestType::Delete
+                | RequestType::Get => tokens,
+                RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
@@ -204,10 +205,11 @@ fn fn_arg_provided_params(
             // Endpoints don't need the params type if it's a Post request because params will
             // be part of the body.
             PartOf::Endpoint => match request_type {
-                crate::parse::RequestType::ContextualGet
-                | crate::parse::RequestType::Delete
-                | crate::parse::RequestType::Get => tokens,
-                crate::parse::RequestType::Post => TokenStream::new(),
+                RequestType::ContextualGet
+                | RequestType::ContextualPaged
+                | RequestType::Delete
+                | RequestType::Get => tokens,
+                RequestType::Post => TokenStream::new(),
             },
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
@@ -266,7 +268,10 @@ pub fn fn_body_query_pairs(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Delete | RequestType::Get => {
+        RequestType::ContextualGet
+        | RequestType::ContextualPaged
+        | RequestType::Delete
+        | RequestType::Get => {
             if let Some(params_type) = params_type {
                 let is_option = if let Some(TokenTree::Ident(ref ident)) =
                     params_type.tokens.clone().into_iter().next()
@@ -354,7 +359,7 @@ pub fn fn_body_build_request_from_url(
     request_type: RequestType,
 ) -> TokenStream {
     match request_type {
-        RequestType::ContextualGet | RequestType::Get => quote! {
+        RequestType::ContextualGet | RequestType::ContextualPaged | RequestType::Get => quote! {
             self.inner.get(url)
         },
         RequestType::Delete => quote! {
@@ -403,6 +408,30 @@ pub fn ident_response_type(
         enum_ident,
         fn_name.to_string().to_case(Case::UpperCamel)
     )
+}
+
+pub fn response_params_type(
+    params_type: Option<&ParamsType>,
+    request_type: RequestType,
+) -> Option<TokenStream> {
+    if request_type == RequestType::ContextualPaged {
+        let p = params_type.expect("`contextual_paged` should only be used when the request has a params type. This is validated during parsing, so this panic should never occur.");
+        Some(
+            p.tokens
+                .clone()
+                .into_iter()
+                .filter(|t| {
+                    if let TokenTree::Punct(punct) = t {
+                        punct.as_char() != '&'
+                    } else {
+                        true
+                    }
+                })
+                .collect::<TokenStream>(),
+        )
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -1129,6 +1158,37 @@ mod tests {
             .to_string(),
             expected_str
         );
+    }
+
+    #[rstest]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::ContextualPaged, Some("UserListParams"))]
+    #[case(Some(ParamsType { tokens: quote!{ &UserListParams } }), RequestType::ContextualPaged, Some("UserListParams"))]
+    #[case(Some(ParamsType { tokens: quote!{ wp_api::users::UserListParams } }), RequestType::ContextualPaged, Some("wp_api :: users :: UserListParams"))]
+    #[case(Some(ParamsType { tokens: quote!{ &wp_api::users::UserListParams } }), RequestType::ContextualPaged, Some("wp_api :: users :: UserListParams"))]
+    #[case(None, RequestType::ContextualGet, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::ContextualGet, None)]
+    #[case(None, RequestType::Delete, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::Delete, None)]
+    #[case(None, RequestType::Get, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::Get, None)]
+    #[case(None, RequestType::Post, None)]
+    #[case(Some(ParamsType { tokens: quote!{ UserListParams } }), RequestType::Post, None)]
+    fn test_response_params_type(
+        #[case] params_type: Option<ParamsType>,
+        #[case] request_type: RequestType,
+        #[case] expected_str: Option<&str>,
+    ) {
+        assert_eq!(
+            response_params_type(params_type.as_ref(), request_type).map(|t| t.to_string()),
+            expected_str.map(|e| e.to_string())
+        );
+    }
+
+    #[test]
+    fn test_response_params_type_panic() {
+        let result =
+            std::panic::catch_unwind(|| response_params_type(None, RequestType::ContextualPaged));
+        assert!(result.is_err());
     }
 
     fn referenced_params_type(str: &str) -> Option<ParamsType> {

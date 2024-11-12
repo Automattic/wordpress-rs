@@ -44,9 +44,10 @@ impl Parse for ParsedVariant {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum RequestType {
     ContextualGet,
+    ContextualPaged,
     Delete,
     Get,
     Post,

@@ -1,13 +1,17 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
+use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     impl_as_query_value_from_to_string,
-    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    WpApiParamOrder,
+    url_query::{
+        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
+        UrlQueryPairsMap,
+    },
+    EnumFromStrParsingError, OptionFromStr, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -40,6 +44,26 @@ impl WpApiParamUsersOrderBy {
     }
 }
 
+impl FromStr for WpApiParamUsersOrderBy {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "id" => Ok(Self::Id),
+            "include" => Ok(Self::Include),
+            "name" => Ok(Self::Name),
+            "registered_date" => Ok(Self::RegisteredDate),
+            "slug" => Ok(Self::Slug),
+            "include_slugs" => Ok(Self::IncludeSlugs),
+            "email" => Ok(Self::Email),
+            "url" => Ok(Self::Url),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersWho {
     #[default]
@@ -57,11 +81,38 @@ impl WpApiParamUsersWho {
     }
 }
 
+impl OptionFromStr for WpApiParamUsersWho {
+    type Err = EnumFromStrParsingError;
+
+    fn option_from_str(s: &str) -> Result<Option<Self>, Self::Err> {
+        match s {
+            "authors" => Ok(Some(Self::Authors)),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersHasPublishedPosts {
     True,
     False,
     PostTypes(Vec<String>),
+}
+
+impl FromStr for WpApiParamUsersHasPublishedPosts {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "true" => Ok(Self::True),
+            "false" => Ok(Self::False),
+            value => Ok(Self::PostTypes(
+                value.split(',').map(|s| s.to_string()).collect(),
+            )),
+        }
+    }
 }
 
 impl_as_query_value_from_to_string!(WpApiParamUsersHasPublishedPosts);
@@ -80,7 +131,7 @@ impl Display for WpApiParamUsersHasPublishedPosts {
     }
 }
 
-#[derive(Debug, Default, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -130,28 +181,82 @@ pub struct UserListParams {
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
+enum UserListParamsField {
+    #[strum(serialize = "page")]
+    Page,
+    #[strum(serialize = "per_page")]
+    PerPage,
+    #[strum(serialize = "search")]
+    Search,
+    #[strum(serialize = "exclude")]
+    Exclude,
+    #[strum(serialize = "include")]
+    Include,
+    #[strum(serialize = "offset")]
+    Offset,
+    #[strum(serialize = "order")]
+    Order,
+    #[strum(serialize = "orderby")]
+    Orderby,
+    #[strum(serialize = "slug")]
+    Slug,
+    #[strum(serialize = "roles")]
+    Roles,
+    #[strum(serialize = "capabilities")]
+    Capabilities,
+    #[strum(serialize = "who")]
+    Who,
+    #[strum(serialize = "has_published_posts")]
+    HasPublishedPosts,
+}
+
 impl AppendUrlQueryPairs for UserListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair("page", self.page.as_ref())
-            .append_option_query_value_pair("per_page", self.per_page.as_ref())
-            .append_option_query_value_pair("search", self.search.as_ref())
-            .append_vec_query_value_pair("exclude", &self.exclude)
-            .append_vec_query_value_pair("include", &self.include)
-            .append_option_query_value_pair("offset", self.offset.as_ref())
-            .append_option_query_value_pair("order", self.order.as_ref())
-            .append_option_query_value_pair("orderby", self.orderby.as_ref())
-            .append_vec_query_value_pair("slug", &self.slug)
-            .append_vec_query_value_pair("roles", &self.roles)
-            .append_vec_query_value_pair("capabilities", &self.capabilities)
+            .append_option_query_value_pair(UserListParamsField::Page, self.page.as_ref())
+            .append_option_query_value_pair(UserListParamsField::PerPage, self.per_page.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Search, self.search.as_ref())
+            .append_vec_query_value_pair(UserListParamsField::Exclude, &self.exclude)
+            .append_vec_query_value_pair(UserListParamsField::Include, &self.include)
+            .append_option_query_value_pair(UserListParamsField::Offset, self.offset.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Order, self.order.as_ref())
+            .append_option_query_value_pair(UserListParamsField::Orderby, self.orderby.as_ref())
+            .append_vec_query_value_pair(UserListParamsField::Slug, &self.slug)
+            .append_vec_query_value_pair(UserListParamsField::Roles, &self.roles)
+            .append_vec_query_value_pair(UserListParamsField::Capabilities, &self.capabilities)
             .append_option_query_value_pair(
-                "who",
+                UserListParamsField::Who,
                 self.who.as_ref().and_then(|w| w.as_str()).as_ref(),
             )
             .append_option_query_value_pair(
-                "has_published_posts",
+                UserListParamsField::HasPublishedPosts,
                 self.has_published_posts.as_ref(),
             );
+    }
+}
+
+impl FromUrlQueryPairs for UserListParams {
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+        Some(UserListParams {
+            page: query_pairs.get(UserListParamsField::Page),
+            per_page: query_pairs.get(UserListParamsField::PerPage),
+            search: query_pairs.get(UserListParamsField::Search),
+            exclude: query_pairs.get_csv(UserListParamsField::Exclude),
+            include: query_pairs.get_csv(UserListParamsField::Include),
+            offset: query_pairs.get(UserListParamsField::Offset),
+            order: query_pairs.get(UserListParamsField::Order),
+            orderby: query_pairs.get(UserListParamsField::Orderby),
+            slug: query_pairs.get_csv(UserListParamsField::Slug),
+            roles: query_pairs.get_csv(UserListParamsField::Roles),
+            capabilities: query_pairs.get_csv(UserListParamsField::Capabilities),
+            who: query_pairs.get_using_option_from_str(UserListParamsField::Who),
+            has_published_posts: query_pairs.get(UserListParamsField::HasPublishedPosts),
+        })
+    }
+
+    fn supports_pagination() -> bool {
+        true
     }
 }
 
@@ -314,6 +419,14 @@ uniffi::custom_newtype!(UserId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserId(pub i32);
 
+impl FromStr for UserId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
 impl std::fmt::Display for UserId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -365,7 +478,10 @@ pub struct SparseUser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, unit_test_common::assert_expected_query_pairs};
+    use crate::{
+        generate,
+        unit_test_common::{assert_expected_and_from_query_pairs, assert_expected_query_pairs},
+    };
     use rstest::*;
 
     #[rstest]
@@ -383,13 +499,41 @@ mod tests {
     #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), "roles=author%2Ceditor")]
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), "slug=foo%2Cbar&roles=author%2Ceditor")]
     #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), "capabilities=edit_themes%2Cdelete_pages")]
-    #[case::who_all_param_should_be_empty(generate!(UserListParams, (who, Some(WpApiParamUsersWho::All))), "")]
     #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), "who=authors")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))), "has_published_posts=true")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))), "has_published_posts=post%2Cpage")]
+    #[case(UserListParams {
+            page: Some(11),
+            per_page: Some(22),
+            search: Some("s_q".to_string()),
+            exclude: vec![UserId(111), UserId(112)],
+            include: vec![UserId(211), UserId(212)],
+            offset: Some(311),
+            order: Some(WpApiParamOrder::Asc),
+            orderby: Some(WpApiParamUsersOrderBy::Email),
+            slug: vec!["s1".to_string(), "s2".to_string()],
+            roles: vec!["r1".to_string(), "r2".to_string()],
+            capabilities: vec!["c1".to_string(), "c2".to_string()],
+            who: Some(WpApiParamUsersWho::Authors),
+            has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
+        }, "page=11&per_page=22&search=s_q&exclude=111%2C112&include=211%2C212&offset=311&order=asc&orderby=email&slug=s1%2Cs2&roles=r1%2Cr2&capabilities=c1%2Cc2&who=authors&has_published_posts=true")]
     #[trace]
-    fn test_user_list_params2(#[case] params: UserListParams, #[case] expected_query: &str) {
-        assert_expected_query_pairs(params, expected_query);
+    fn test_user_list_query_pairs(#[case] params: UserListParams, #[case] expected_query: &str) {
+        assert_expected_and_from_query_pairs(params, expected_query);
+    }
+
+    #[test]
+    fn test_user_list_params_who_all_should_be_empty() {
+        // This test is separate from `test_user_list_query_pairs` because converting the empty
+        // query back to `UserListParams` will result in `who: None` instead of
+        // `who: WpApiParamUsersWho::All`.
+        assert_expected_query_pairs(
+            UserListParams {
+                who: Some(WpApiParamUsersWho::All),
+                ..Default::default()
+            },
+            "",
+        );
     }
 
     #[test]

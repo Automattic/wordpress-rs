@@ -94,6 +94,32 @@ fn generate_async_request_executor(
                 &variant.variant_ident,
                 &context_and_filter_handler,
             );
+            let response_params_type = response_params_type(variant.attr.params.as_ref(), variant.attr.request_type);
+            let response_pagination_params_fields = response_params_type.as_ref().map(|p| {
+                quote! {
+                    #[serde(skip)]
+                    pub next_page_params: Option<#p>,
+                    #[serde(skip)]
+                    pub prev_page_params: Option<#p>,
+                }
+            });
+            let from_concrete_response_impl_for_pagination_params = response_params_type.as_ref().map(|_| {
+                quote! {
+                    next_page_params: value.next_page_params,
+                    prev_page_params: value.prev_page_params,
+                }
+            }).unwrap_or(quote! {
+                next_page_params: None,
+                prev_page_params: None,
+            });
+            let from_parsed_response_impl_for_pagination_params = response_params_type.as_ref().map(|_| {
+                quote! {
+                    next_page_params: value.next_page_params,
+                    prev_page_params: value.prev_page_params,
+                }
+            });
+            // Generic type <P> of `ParsedResponse<T, P>` can't be `None`
+            let parsed_response_params_type = response_params_type.unwrap_or(quote! { () });
             quote! {
                 #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
                 #[serde(transparent)]
@@ -101,20 +127,23 @@ fn generate_async_request_executor(
                     pub data: #output_type,
                     #[serde(skip)]
                     pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
+                    #response_pagination_params_fields
                 }
-                impl From<#response_type_ident> for crate::request::ParsedResponse<#output_type> {
+                impl From<#response_type_ident> for crate::request::ParsedResponse<#output_type, #parsed_response_params_type> {
                     fn from(value: #response_type_ident) -> Self {
                         Self {
                             data: value.data,
                             header_map: value.header_map,
+                            #from_concrete_response_impl_for_pagination_params
                         }
                     }
                 }
-                impl From<crate::request::ParsedResponse<#output_type>> for #response_type_ident {
-                    fn from(value: crate::request::ParsedResponse<#output_type>) -> Self {
+                impl From<crate::request::ParsedResponse<#output_type, #parsed_response_params_type>> for #response_type_ident {
+                    fn from(value: crate::request::ParsedResponse<#output_type, #parsed_response_params_type>) -> Self {
                         Self {
                             data: value.data,
                             header_map: value.header_map,
+                            #from_parsed_response_impl_for_pagination_params
                         }
                     }
                 }
@@ -301,7 +330,8 @@ impl ContextAndFilterHandler {
                 }
                 v
             }
-            crate::parse::RequestType::ContextualGet => {
+            crate::parse::RequestType::ContextualGet
+            | crate::parse::RequestType::ContextualPaged => {
                 let mut v = vec![];
                 WpContext::iter().for_each(|context| {
                     v.push(Self::NoFilterTakeContextAsFunctionName(context));

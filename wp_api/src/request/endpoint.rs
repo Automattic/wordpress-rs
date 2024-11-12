@@ -276,7 +276,7 @@ mod tests {
 
     fn wp_json_endpoint(base_url: &str) -> String {
         let mut url = base_url.to_string();
-        if !url.ends_with("/") {
+        if !url.ends_with('/') {
             url.push('/')
         }
         url.push_str(WP_JSON_PATH_SEGMENTS.join("/").as_str());

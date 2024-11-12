@@ -7,6 +7,7 @@ use url::Url;
 
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpError},
+    url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
     WpApiError, WpAuthentication,
 };
 
@@ -21,10 +22,29 @@ const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ParsedResponse<T> {
-    pub data: T,
+pub struct ParsedResponse<DataType, ParamsType> {
+    pub data: DataType,
     #[serde(skip)]
     pub header_map: Arc<WpNetworkHeaderMap>,
+    #[serde(skip)]
+    pub next_page_params: Option<ParamsType>,
+    #[serde(skip)]
+    pub prev_page_params: Option<ParamsType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PaginationHeaderKey {
+    Next,
+    Prev,
+}
+
+impl PaginationHeaderKey {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Next => "next",
+            Self::Prev => "prev",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -322,15 +342,29 @@ impl WpNetworkResponse {
         .collect()
     }
 
+    pub fn get_pagination_header<P: FromUrlQueryPairs>(
+        &self,
+        header_key: PaginationHeaderKey,
+    ) -> Option<P> {
+        self.get_link_header(header_key.as_str())
+            .first()
+            .and_then(|u| {
+                P::from_url_query_pairs(UrlQueryPairsMap::new(
+                    u.query_pairs().into_iter().collect(),
+                ))
+            })
+    }
+
     pub fn body_as_string(&self) -> String {
         request_or_response_body_as_string(&self.body)
     }
 
-    pub fn parse<T, D, E>(self) -> Result<T, E>
+    pub fn parse<ResponseType, DataType, ParamsType, E>(self) -> Result<ResponseType, E>
     where
-        T: DeserializeOwned,
-        T: From<ParsedResponse<D>>,
-        ParsedResponse<D>: From<T>,
+        ResponseType: DeserializeOwned,
+        ResponseType: From<ParsedResponse<DataType, ParamsType>>,
+        ParsedResponse<DataType, ParamsType>: From<ResponseType>,
+        ParamsType: FromUrlQueryPairs,
         E: ParsedRequestError,
     {
         if let Some(err) = E::try_parse(&self.body, self.status_code) {
@@ -340,9 +374,15 @@ impl WpNetworkResponse {
         serde_json::from_slice(&self.body)
             .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
             .map(|x| {
-                let mut p = ParsedResponse::<D>::from(x);
-                p.header_map = self.header_map;
-                T::from(p)
+                let mut parsed_response = ParsedResponse::<DataType, ParamsType>::from(x);
+                if ParamsType::supports_pagination() {
+                    parsed_response.next_page_params =
+                        self.get_pagination_header(PaginationHeaderKey::Next);
+                    parsed_response.prev_page_params =
+                        self.get_pagination_header(PaginationHeaderKey::Prev);
+                }
+                parsed_response.header_map = self.header_map;
+                ResponseType::from(parsed_response)
             })
     }
 

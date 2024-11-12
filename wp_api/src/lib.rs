@@ -4,6 +4,7 @@ pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
+use std::str::FromStr;
 use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
@@ -86,8 +87,36 @@ impl WpApiParamOrder {
     }
 }
 
+impl FromStr for WpApiParamOrder {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "asc" => Ok(Self::Asc),
+            "desc" => Ok(Self::Desc),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
+        }
+    }
+}
+
 trait SparseField {
     fn as_str(&self) -> &str;
+}
+
+trait OptionFromStr {
+    type Err;
+
+    fn option_from_str(s: &str) -> Result<Option<Self>, Self::Err>
+    where
+        Self: Sized;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
+pub enum EnumFromStrParsingError {
+    #[error("'{}' is not a valid variant for this enum", value)]
+    UnknownVariant { value: String },
 }
 
 #[macro_export]

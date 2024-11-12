@@ -3201,6 +3201,7 @@ dependencies = [
  "rstest_reuse",
  "serde",
  "serde_json",
+ "strum_macros",
  "thiserror",
  "uniffi",
  "url",

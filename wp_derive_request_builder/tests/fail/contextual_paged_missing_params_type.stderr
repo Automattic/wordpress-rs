@@ -1,0 +1,5 @@
+error: #[contextual_paged(params = ?)] is missing `params` type
+ --> tests/fail/contextual_paged_missing_params_type.rs:3:7
+  |
+3 |     #[contextual_paged(url = "/users", output = Vec<SparseUser>)]
+  |       ^^^^^^^^^^^^^^^^
