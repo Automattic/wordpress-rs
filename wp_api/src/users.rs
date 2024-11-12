@@ -238,7 +238,7 @@ impl AppendUrlQueryPairs for UserListParams {
 
 impl FromUrlQueryPairs for UserListParams {
     fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(UserListParams {
+        Some(Self {
             page: query_pairs.get(UserListParamsField::Page),
             per_page: query_pairs.get(UserListParamsField::PerPage),
             search: query_pairs.get(UserListParamsField::Search),

@@ -24,7 +24,7 @@ async fn create_post_err() {
 
 #[tokio::test]
 #[parallel]
-async fn create_post_err_cannot_create2() {
+async fn create_post_err_cannot_create() {
     api_client_as_subscriber()
         .posts()
         .create(&PostCreateParams {
@@ -36,7 +36,7 @@ async fn create_post_err_cannot_create2() {
 
 #[tokio::test]
 #[parallel]
-async fn create_post_err_cannot_create() {
+async fn create_post_err_cannot_create2() {
     api_client_as_subscriber()
         .posts()
         .create(&PostCreateParams {

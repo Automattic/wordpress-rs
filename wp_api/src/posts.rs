@@ -1,11 +1,17 @@
+use std::{num::ParseIntError, str::FromStr};
+
 use serde::{Deserialize, Serialize};
+use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
-    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    UserId, WpApiParamOrder,
+    url_query::{
+        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
+        UrlQueryPairsMap,
+    },
+    EnumFromStrParsingError, UserId, WpApiParamOrder,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -42,6 +48,28 @@ impl WpApiParamPostsOrderBy {
     }
 }
 
+impl FromStr for WpApiParamPostsOrderBy {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "author" => Ok(Self::Author),
+            "date" => Ok(Self::Date),
+            "id" => Ok(Self::Id),
+            "include" => Ok(Self::Include),
+            "include_slugs" => Ok(Self::IncludeSlugs),
+            "modified" => Ok(Self::Modified),
+            "parent" => Ok(Self::Parent),
+            "relevance" => Ok(Self::Relevance),
+            "slug" => Ok(Self::Slug),
+            "title" => Ok(Self::Title),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamPostsTaxRelation {
     And,
@@ -55,6 +83,20 @@ impl WpApiParamPostsTaxRelation {
         match self {
             Self::And => "AND",
             Self::Or => "OR",
+        }
+    }
+}
+
+impl FromStr for WpApiParamPostsTaxRelation {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "AND" => Ok(Self::And),
+            "OR" => Ok(Self::Or),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
         }
     }
 }
@@ -78,7 +120,22 @@ impl WpApiParamPostsSearchColumn {
     }
 }
 
-#[derive(Debug, Default, uniffi::Record)]
+impl FromStr for WpApiParamPostsSearchColumn {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "post_content" => Ok(Self::PostContent),
+            "post_excerpt" => Ok(Self::PostExcerpt),
+            "post_title" => Ok(Self::PostTitle),
+            value => Err(EnumFromStrParsingError::UnknownVariant {
+                value: value.to_string(),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct PostListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -159,32 +216,128 @@ pub struct PostListParams {
     pub sticky: Option<bool>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
+enum PostListParamsField {
+    #[strum(serialize = "page")]
+    Page,
+    #[strum(serialize = "per_page")]
+    PerPage,
+    #[strum(serialize = "search")]
+    Search,
+    #[strum(serialize = "after")]
+    After,
+    #[strum(serialize = "modified_after")]
+    ModifiedAfter,
+    #[strum(serialize = "author")]
+    Author,
+    #[strum(serialize = "author_exclude")]
+    AuthorExclude,
+    #[strum(serialize = "before")]
+    Before,
+    #[strum(serialize = "modified_before")]
+    ModifiedBefore,
+    #[strum(serialize = "exclude")]
+    Exclude,
+    #[strum(serialize = "include")]
+    Include,
+    #[strum(serialize = "offset")]
+    Offset,
+    #[strum(serialize = "order")]
+    Order,
+    #[strum(serialize = "orderby")]
+    Orderby,
+    #[strum(serialize = "search_columns")]
+    SearchColumns,
+    #[strum(serialize = "slug")]
+    Slug,
+    #[strum(serialize = "status")]
+    Status,
+    #[strum(serialize = "tax_relation")]
+    TaxRelation,
+    #[strum(serialize = "categories")]
+    Categories,
+    #[strum(serialize = "categories_exclude")]
+    CategoriesExclude,
+    #[strum(serialize = "tags")]
+    Tags,
+    #[strum(serialize = "tags_exclude")]
+    TagsExclude,
+    #[strum(serialize = "sticky")]
+    Sticky,
+}
+
 impl AppendUrlQueryPairs for PostListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair("page", self.page.as_ref())
-            .append_option_query_value_pair("per_page", self.per_page.as_ref())
-            .append_option_query_value_pair("search", self.search.as_ref())
-            .append_option_query_value_pair("after", self.after.as_ref())
-            .append_option_query_value_pair("modified_after", self.modified_after.as_ref())
-            .append_vec_query_value_pair("author", &self.author)
-            .append_vec_query_value_pair("author_exclude", &self.author_exclude)
-            .append_option_query_value_pair("before", self.before.as_ref())
-            .append_option_query_value_pair("modified_before", self.modified_before.as_ref())
-            .append_vec_query_value_pair("exclude", &self.exclude)
-            .append_vec_query_value_pair("include", &self.include)
-            .append_option_query_value_pair("offset", self.offset.as_ref())
-            .append_option_query_value_pair("order", self.order.as_ref())
-            .append_option_query_value_pair("orderby", self.orderby.as_ref())
-            .append_vec_query_value_pair("search_columns", &self.search_columns)
-            .append_vec_query_value_pair("slug", &self.slug)
-            .append_vec_query_value_pair("status", &self.status)
-            .append_option_query_value_pair("tax_relation", self.tax_relation.as_ref())
-            .append_vec_query_value_pair("categories", &self.categories)
-            .append_vec_query_value_pair("categories_exclude", &self.categories_exclude)
-            .append_vec_query_value_pair("tags", &self.tags)
-            .append_vec_query_value_pair("tags_exclude", &self.tags_exclude)
-            .append_option_query_value_pair("sticky", self.sticky.as_ref());
+            .append_option_query_value_pair(PostListParamsField::Page, self.page.as_ref())
+            .append_option_query_value_pair(PostListParamsField::PerPage, self.per_page.as_ref())
+            .append_option_query_value_pair(PostListParamsField::Search, self.search.as_ref())
+            .append_option_query_value_pair(PostListParamsField::After, self.after.as_ref())
+            .append_option_query_value_pair(
+                PostListParamsField::ModifiedAfter,
+                self.modified_after.as_ref(),
+            )
+            .append_vec_query_value_pair(PostListParamsField::Author, &self.author)
+            .append_vec_query_value_pair(PostListParamsField::AuthorExclude, &self.author_exclude)
+            .append_option_query_value_pair(PostListParamsField::Before, self.before.as_ref())
+            .append_option_query_value_pair(
+                PostListParamsField::ModifiedBefore,
+                self.modified_before.as_ref(),
+            )
+            .append_vec_query_value_pair(PostListParamsField::Exclude, &self.exclude)
+            .append_vec_query_value_pair(PostListParamsField::Include, &self.include)
+            .append_option_query_value_pair(PostListParamsField::Offset, self.offset.as_ref())
+            .append_option_query_value_pair(PostListParamsField::Order, self.order.as_ref())
+            .append_option_query_value_pair(PostListParamsField::Orderby, self.orderby.as_ref())
+            .append_vec_query_value_pair(PostListParamsField::SearchColumns, &self.search_columns)
+            .append_vec_query_value_pair(PostListParamsField::Slug, &self.slug)
+            .append_vec_query_value_pair(PostListParamsField::Status, &self.status)
+            .append_option_query_value_pair(
+                PostListParamsField::TaxRelation,
+                self.tax_relation.as_ref(),
+            )
+            .append_vec_query_value_pair(PostListParamsField::Categories, &self.categories)
+            .append_vec_query_value_pair(
+                PostListParamsField::CategoriesExclude,
+                &self.categories_exclude,
+            )
+            .append_vec_query_value_pair(PostListParamsField::Tags, &self.tags)
+            .append_vec_query_value_pair(PostListParamsField::TagsExclude, &self.tags_exclude)
+            .append_option_query_value_pair(PostListParamsField::Sticky, self.sticky.as_ref());
+    }
+}
+
+impl FromUrlQueryPairs for PostListParams {
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+        Some(Self {
+            page: query_pairs.get(PostListParamsField::Page),
+            per_page: query_pairs.get(PostListParamsField::PerPage),
+            search: query_pairs.get(PostListParamsField::Search),
+            after: query_pairs.get(PostListParamsField::After),
+            modified_after: query_pairs.get(PostListParamsField::ModifiedAfter),
+            author: query_pairs.get_csv(PostListParamsField::Author),
+            author_exclude: query_pairs.get_csv(PostListParamsField::AuthorExclude),
+            before: query_pairs.get(PostListParamsField::Before),
+            modified_before: query_pairs.get(PostListParamsField::ModifiedBefore),
+            exclude: query_pairs.get_csv(PostListParamsField::Exclude),
+            include: query_pairs.get_csv(PostListParamsField::Include),
+            offset: query_pairs.get(PostListParamsField::Offset),
+            order: query_pairs.get(PostListParamsField::Order),
+            orderby: query_pairs.get(PostListParamsField::Orderby),
+            search_columns: query_pairs.get_csv(PostListParamsField::SearchColumns),
+            slug: query_pairs.get_csv(PostListParamsField::Slug),
+            status: query_pairs.get_csv(PostListParamsField::Status),
+            tax_relation: query_pairs.get(PostListParamsField::TaxRelation),
+            categories: query_pairs.get_csv(PostListParamsField::Categories),
+            categories_exclude: query_pairs.get_csv(PostListParamsField::CategoriesExclude),
+            tags: query_pairs.get_csv(PostListParamsField::Tags),
+            tags_exclude: query_pairs.get_csv(PostListParamsField::TagsExclude),
+            sticky: query_pairs.get(PostListParamsField::Sticky),
+        })
+    }
+
+    fn supports_pagination() -> bool {
+        true
     }
 }
 
@@ -368,20 +521,52 @@ uniffi::custom_newtype!(PostId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostId(pub i32);
 
+impl FromStr for PostId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
 impl_as_query_value_for_new_type!(TagId);
 uniffi::custom_newtype!(TagId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TagId(pub i32);
+
+impl FromStr for TagId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
 
 impl_as_query_value_for_new_type!(CategoryId);
 uniffi::custom_newtype!(CategoryId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CategoryId(pub i32);
 
+impl FromStr for CategoryId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
 impl_as_query_value_for_new_type!(MediaId);
 uniffi::custom_newtype!(MediaId, i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MediaId(pub i32);
+
+impl FromStr for MediaId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
 
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -541,6 +726,21 @@ impl PostStatus {
     }
 }
 
+impl FromStr for PostStatus {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "draft" => Ok(Self::Draft),
+            "future" => Ok(Self::Future),
+            "pending" => Ok(Self::Pending),
+            "private" => Ok(Self::Private),
+            "publish" => Ok(Self::Publish),
+            value => Ok(Self::Custom(value.to_string())),
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
 )]
@@ -617,5 +817,92 @@ impl PostFormat {
             Self::Audio => "audio",
             Self::Custom(post_format) => post_format,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{generate, unit_test_common::assert_expected_and_from_query_pairs};
+    use rstest::*;
+
+    #[rstest]
+    #[case(PostListParams::default(), "")]
+    #[case(generate!(PostListParams, (page, Some(2))), "page=2")]
+    #[case(generate!(PostListParams, (per_page, Some(2))), "per_page=2")]
+    #[case(generate!(PostListParams, (search, Some("foo".to_string()))), "search=foo")]
+    #[case(generate!(PostListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
+    #[case(generate!(PostListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])), "exclude=1%2C2")]
+    #[case(generate!(PostListParams, (include, vec![PostId(1), PostId(2)])), "include=1%2C2")]
+    #[case(generate!(PostListParams, (offset, Some(2))), "offset=2")]
+    #[case(generate!(PostListParams, (order, Some(WpApiParamOrder::Asc))), "order=asc")]
+    #[case(generate!(PostListParams, (order, Some(WpApiParamOrder::Desc))), "order=desc")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), "orderby=author")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Date))), "orderby=date")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))), "orderby=id")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Include))), "orderby=include")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::IncludeSlugs))), "orderby=include_slugs")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Modified))), "orderby=modified")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Parent))), "orderby=parent")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Relevance))), "orderby=relevance")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Slug))), "orderby=slug")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Title))), "orderby=title")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent])), "search_columns=post_content")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostExcerpt])), "search_columns=post_excerpt")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_title")]
+    #[case(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt, WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_content%2Cpost_excerpt%2Cpost_title")]
+    #[case(generate!(PostListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), "slug=foo%2Cbar")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Draft])), "status=draft")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Future])), "status=future")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Pending])), "status=pending")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Private])), "status=private")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Publish])), "status=publish")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Custom("foo".to_string())])), "status=foo")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Future, PostStatus::Pending, PostStatus::Private, PostStatus::Publish, PostStatus::Custom("foo".to_string())])), "status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
+    #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))), "tax_relation=AND")]
+    #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::Or))), "tax_relation=OR")]
+    #[case(generate!(PostListParams, (categories, vec![CategoryId(1), CategoryId(2)])), "categories=1%2C2")]
+    #[case(generate!(PostListParams, (categories_exclude, vec![CategoryId(1), CategoryId(2)])), "categories_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (tags, vec![TagId(1), TagId(2)])), "tags=1%2C2")]
+    #[case(generate!(PostListParams, (tags_exclude, vec![TagId(1), TagId(2)])), "tags_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
+    #[case(PostListParams {
+        page: Some(11),
+        per_page: Some(22),
+        search: Some("s_q".to_string()),
+        after: Some("d_a".to_string()),
+        modified_after: Some("d_m_a".to_string()),
+        author: vec![UserId(111), UserId(112)],
+        author_exclude: vec![UserId(211), UserId(212)],
+        before: Some("d_b".to_string()),
+        modified_before: Some("d_m_b".to_string()),
+        exclude: vec![PostId(1111), PostId(1112)],
+        include: vec![PostId(2111), PostId(2112)],
+        offset: Some(11111),
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Slug),
+        search_columns: vec![
+            WpApiParamPostsSearchColumn::PostContent,
+            WpApiParamPostsSearchColumn::PostExcerpt,
+        ],
+        slug: vec!["sl_1".to_string(), "sl_2".to_string()],
+        status: vec![PostStatus::Draft, PostStatus::Future],
+        tax_relation: Some(WpApiParamPostsTaxRelation::Or),
+        categories: vec![CategoryId(333333), CategoryId(333334)],
+        categories_exclude: vec![CategoryId(444444), CategoryId(444445)],
+        tags: vec![TagId(555555), TagId(555556)],
+        tags_exclude: vec![TagId(666666), TagId(666667)],
+        sticky: Some(true),
+        },
+        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=draft%2Cfuture&tax_relation=OR&categories=333333%2C333334&categories_exclude=444444%2C444445&tags=555555%2C555556&tags_exclude=666666%2C666667&sticky=true"
+    )]
+    #[trace]
+    fn test_post_list_query_pairs(#[case] params: PostListParams, #[case] expected_query: &str) {
+        assert_expected_and_from_query_pairs(params, expected_query);
     }
 }
