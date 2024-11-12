@@ -5,10 +5,10 @@ use crate::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, UserId, WpApiParamOrder,
+    EnumFromStrParsingError, JsonValue, UserId, WpApiParamOrder,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::ParseIntError, str::FromStr};
+use std::{num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -421,8 +421,6 @@ pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub mime_type: Option<String>,
     #[WpContext(edit, embed, view)]
-    #[serde(skip_serializing)]
-    // TODO: Do we need serializing?
     pub media_details: Option<JsonValue>,
     #[serde(rename = "post")]
     #[WpContext(edit, view)]
@@ -431,7 +429,6 @@ pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub source_url: Option<String>,
     #[WpContext(edit)]
-    // TODO: What is the type for the array?
     pub missing_image_sizes: Option<Vec<String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
 }
@@ -450,77 +447,6 @@ pub struct SparseMediaCaption {
     pub raw: Option<String>,
     #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
-}
-
-#[derive(Debug, uniffi::Enum)]
-pub enum JsonValue {
-    Null,
-    Bool(bool),
-    Number(JsonNumber),
-    String(String),
-    Array(Vec<JsonValue>),
-    Object(HashMap<String, JsonValue>),
-}
-
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct JsonNumber {
-    n: JsonNumberType,
-}
-
-#[derive(Debug, Clone, Copy, uniffi::Enum)]
-enum JsonNumberType {
-    PosInt(u64),
-    /// Always less than zero.
-    NegInt(i64),
-    /// Always finite.
-    Float(f64),
-    // Doesn't exist in `serde_json::N` - used as a fallback
-    NotSupported,
-}
-
-impl From<serde_json::Number> for JsonNumber {
-    fn from(value: serde_json::Number) -> Self {
-        if value.is_u64() {
-            Self {
-                n: JsonNumberType::PosInt(value.as_u64().expect("already verified that it's u64")),
-            }
-        } else if value.is_i64() {
-            Self {
-                n: JsonNumberType::NegInt(value.as_i64().expect("already verified that it's i64")),
-            }
-        } else if value.is_f64() {
-            Self {
-                n: JsonNumberType::Float(value.as_f64().expect("already verified that it's f64")),
-            }
-        } else {
-            Self {
-                n: JsonNumberType::NotSupported,
-            }
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for JsonValue {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        serde_json::Value::deserialize(d).map(|v| v.into())
-    }
-}
-
-impl From<serde_json::Value> for JsonValue {
-    fn from(value: serde_json::Value) -> Self {
-        match value {
-            serde_json::Value::Null => Self::Null,
-            serde_json::Value::Bool(b) => Self::Bool(b),
-            serde_json::Value::Number(number) => Self::Number(JsonNumber::from(number)),
-            serde_json::Value::String(s) => Self::String(s),
-            serde_json::Value::Array(vec) => {
-                Self::Array(vec.into_iter().map(JsonValue::from).collect())
-            }
-            serde_json::Value::Object(map) => {
-                Self::Object(map.into_iter().map(|(k, v)| (k, v.into())).collect())
-            }
-        }
-    }
 }
 
 #[cfg(test)]

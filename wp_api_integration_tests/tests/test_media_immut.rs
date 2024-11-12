@@ -4,9 +4,10 @@ use serial_test::parallel;
 use wp_api::{
     generate,
     media::{
-        JsonValue, MediaListParams, SparseMediaFieldWithEditContext,
-        SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
+        MediaListParams, SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
+        SparseMediaFieldWithViewContext,
     },
+    JsonValue,
 };
 use wp_api_integration_tests::{api_client, AssertResponse};
 
@@ -29,7 +30,7 @@ async fn list_with_edit_context(#[case] params: MediaListParams) {
                 if w.is_some() {
                     let w = w.unwrap();
                     match w {
-                        JsonValue::Number(json_number) => {
+                        JsonValue::Int(json_number) => {
                             println!("width: {:#?}", json_number);
                         }
                         _ => panic!("Width should be a number"),
