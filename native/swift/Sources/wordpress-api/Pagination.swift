@@ -46,7 +46,6 @@ extension PaginationAwareExecutor {
 }
 
 // MARK: - Posts
-
 extension PostsRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithEditContext
