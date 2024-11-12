@@ -24,12 +24,21 @@ public protocol PaginationAwareExecutor {
     func paginatedWithEditContext(
         params: EditContextResponseType.ParamsType
     ) async throws -> [EditContextResponseType.DataType]
+
+    func paginatedWithViewContext(
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> [ViewContextResponseType.DataType]
+
+    func paginatedWithEmbedContext(
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> [EmbedContextResponseType.DataType]
 }
 
 extension PaginationAwareExecutor {
     /// Fetches all objects from all pages
     ///
-    /// This method waits until all objects have been downloaded then returns the results. This can have unexpected memory and time implications.
+    /// This method waits until all objects have been downloaded then returns the results. This can have
+    /// unexpected memory and time implications.
     public func paginatedWithEditContext(
         params: EditContextResponseType.ParamsType
     ) async throws -> [EditContextResponseType.DataType] {
@@ -38,6 +47,42 @@ extension PaginationAwareExecutor {
 
         while let nextPageParams = workingResponse.nextPageParams {
             workingResponse = try await self.listWithEditContext(params: nextPageParams)
+            allObjects.append(contentsOf: workingResponse.data)
+        }
+
+        return allObjects
+    }
+
+    /// Fetches all objects from all pages
+    ///
+    /// This method waits until all objects have been downloaded then returns the results. This can have
+    /// unexpected memory and time implications.
+    public func paginatedWithViewContext(
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> [ViewContextResponseType.DataType] {
+        var workingResponse = try await self.listWithViewContext(params: params)
+        var allObjects: [ViewContextResponseType.DataType] = workingResponse.data
+
+        while let nextPageParams = workingResponse.nextPageParams {
+            workingResponse = try await self.listWithViewContext(params: nextPageParams)
+            allObjects.append(contentsOf: workingResponse.data)
+        }
+
+        return allObjects
+    }
+
+    /// Fetches all objects from all pages
+    ///
+    /// This method waits until all objects have been downloaded then returns the results. This can have
+    /// unexpected memory and time implications.
+    public func paginatedWithEmbedContext(
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> [EmbedContextResponseType.DataType] {
+        var workingResponse = try await self.listWithEmbedContext(params: params)
+        var allObjects: [EmbedContextResponseType.DataType] = workingResponse.data
+
+        while let nextPageParams = workingResponse.nextPageParams {
+            workingResponse = try await self.listWithEmbedContext(params: nextPageParams)
             allObjects.append(contentsOf: workingResponse.data)
         }
 
