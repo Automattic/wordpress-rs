@@ -284,12 +284,15 @@ fn generate_integration_test_helper(
                         },
                         fields
                     );
-            });
+                });
+                // Only add a single field test case if the field is not a `#[WpContextualOption]`
+                // Otherwise, the server will return invalid JSON where it'll output an empty JSON
+                // array instead of an empty JSON object
+                let case_ident = format_ident!("single_field_{}", f_ident);
+                rs_test_cases.push(quote! {
+                    #[case::#case_ident(&[#sparse_field_type_ident::#variant_ident])]
+                });
             }
-            let case_ident = format_ident!("single_field_{}", f_ident);
-            rs_test_cases.push(quote! {
-                #[case::#case_ident(&[#sparse_field_type_ident::#variant_ident])]
-            });
         }
     }
     let test_cases_ident = format_ident!(
