@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use wp_api::{
-    posts::{CategoryId, MediaId, PostId, TagId},
+    media::MediaId,
+    posts::{CategoryId, PostId, TagId},
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },

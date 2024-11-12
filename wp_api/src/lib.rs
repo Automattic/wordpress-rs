@@ -16,6 +16,7 @@ mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
 pub mod login;
+pub mod media;
 pub mod plugins;
 pub mod post_types;
 pub mod posts;

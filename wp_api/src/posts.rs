@@ -7,6 +7,7 @@ use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_s
 
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    media::MediaId,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
@@ -555,19 +556,6 @@ impl FromStr for CategoryId {
     }
 }
 
-impl_as_query_value_for_new_type!(MediaId);
-uniffi::custom_newtype!(MediaId, i32);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MediaId(pub i32);
-
-impl FromStr for MediaId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -578,7 +566,7 @@ impl std::fmt::Display for PostId {
 pub struct SparsePost {
     #[WpContext(edit, embed, view)]
     pub id: Option<PostId>,
-    #[WpContext(edit, view)]
+    #[WpContext(edit, embed, view)]
     pub date: Option<String>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<String>,
