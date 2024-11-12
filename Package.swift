@@ -1,4 +1,4 @@
-// swift-tools-version:5.10
+// swift-tools-version: 6.0
 
 import Foundation
 import PackageDescription
@@ -48,6 +48,9 @@ var package = Package(
             path: "native/swift/Sources/wordpress-api-wrapper",
             exclude: [
                 "README.md"
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
             ]
         ),
         libwordpressFFI,
@@ -99,9 +102,11 @@ enum WordPressRSVersion {
 }
 
 // Add SwiftLint to the package so that we can see linting issues directly from Xcode.
+@MainActor
 func enableSwiftLint() throws {
 #if os(macOS)
-    let version = try String(contentsOf: URL(string:"./.swiftlint.yml", relativeTo: URL(filePath: #filePath))!)
+    let filePath = URL(string:"./.swiftlint.yml", relativeTo: URL(filePath: #filePath))!
+    let version = try String(contentsOf: filePath, encoding: .utf8)
         .split(separator: "\n")
         .first(where: { $0.starts(with: "swiftlint_version") })?
         .split(separator: ":")
