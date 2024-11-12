@@ -67,6 +67,13 @@ public typealias PostTypeDetailsWithEditContext = WordPressAPIInternal.PostTypeD
 public typealias PostTypeDetailsWithViewContext = WordPressAPIInternal.PostTypeDetailsWithViewContext
 public typealias PostTypeDetailsWithEmbedContext = WordPressAPIInternal.PostTypeDetailsWithEmbedContext
 
+// MARK: - Posts
+public typealias SparsePost = WordPressAPIInternal.SparsePost
+public typealias PostWithEditContext = WordPressAPIInternal.PostWithEditContext
+public typealias PostWithViewContext = WordPressAPIInternal.PostWithViewContext
+public typealias PostWithEmbedContext = WordPressAPIInternal.PostWithEmbedContext
+public typealias PostListParams = WordPressAPIInternal.PostListParams
+
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext

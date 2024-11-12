@@ -59,6 +59,10 @@ public struct WordPressAPI {
         self.requestBuilder.postTypes()
     }
 
+    public var posts: PostsRequestExecutor {
+        self.requestBuilder.posts()
+    }
+
     public var siteSettings: SiteSettingsRequestExecutor {
         self.requestBuilder.siteSettings()
     }
