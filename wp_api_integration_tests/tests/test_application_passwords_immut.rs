@@ -181,9 +181,6 @@ mod filter {
         #[values(FIRST_USER_ID, SECOND_USER_ID)] user_id: UserId,
         #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
     ) {
-        if should_skip_filter_with_edit_context_test(fields) {
-            return;
-        }
         api_client()
             .application_passwords()
             .filter_list_with_edit_context(&user_id, fields)
@@ -201,9 +198,6 @@ mod filter {
     async fn filter_retrieve_application_password_with_edit_context(
         #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
     ) {
-        if should_skip_filter_with_edit_context_test(fields) {
-            return;
-        }
         let p = api_client()
             .application_passwords()
             .filter_retrieve_with_edit_context(
@@ -226,9 +220,6 @@ mod filter {
     async fn filter_retrieve_current_application_password_with_edit_context(
         #[case] fields: &[SparseApplicationPasswordFieldWithEditContext],
     ) {
-        if should_skip_filter_with_edit_context_test(fields) {
-            return;
-        }
         let p = api_client()
             .application_passwords()
             .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
@@ -342,18 +333,5 @@ mod filter {
             .assert_response()
             .data;
         p.assert_that_instance_fields_nullability_match_provided_fields(fields);
-    }
-
-    fn should_skip_filter_with_edit_context_test(
-        fields: &[SparseApplicationPasswordFieldWithEditContext],
-    ) -> bool {
-        if fields.contains(&SparseApplicationPasswordFieldWithEditContext::Password) {
-            println!(
-            "Requesting password field returns invalid JSON as this field is only available after creating a new application token. Skipping this test..."
-        );
-            true
-        } else {
-            false
-        }
     }
 }
