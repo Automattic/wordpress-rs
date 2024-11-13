@@ -14,8 +14,7 @@ struct ExampleApp: App {
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Users", callback: {
-            try await WordPressAPI.globalInstance.users.listWithEditContext(params: .init())
-                .data
+            try await WordPressAPI.globalInstance.users.paginatedWithEditContext(params: UserListParams(perPage: 100))
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Plugins", callback: {
@@ -27,6 +26,10 @@ struct ExampleApp: App {
             try await WordPressAPI.globalInstance.postTypes.listWithViewContext().data.postTypes.map { _, value in
                 value.asListViewData
             }
+        }),
+        RootListData(name: "Posts", callback: {
+            try await WordPressAPI.globalInstance.posts.paginatedWithEditContext(params: PostListParams(perPage: 100))
+                .map { $0.asListViewData }
         }),
         RootListData(name: "Site Health Tests", callback: {
             let items: [any ListViewDataConvertable] = [
