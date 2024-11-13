@@ -146,7 +146,7 @@ extension PostWithEditContext: ListViewDataConvertable {
     public var id: String {
         self.slug
     }
-    
+
     var asListViewData: ListViewData {
         ListViewData(id: self.id, title: self.title.raw, subtitle: self.slug, fields: [:])
     }
