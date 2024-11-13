@@ -42,13 +42,19 @@ extension PaginationAwareExecutor {
     public func paginatedWithEditContext(
         params: EditContextResponseType.ParamsType
     ) async throws -> [EditContextResponseType.DataType] {
-        var workingResponse = try await self.listWithEditContext(params: params)
-        var allObjects: [EditContextResponseType.DataType] = workingResponse.data
+        var allObjects: [EditContextResponseType.DataType] = []
+        var mutableParams: EditContextResponseType.ParamsType = params
 
-        while let nextPageParams = workingResponse.nextPageParams {
-            workingResponse = try await self.listWithEditContext(params: nextPageParams)
-            allObjects.append(contentsOf: workingResponse.data)
-        }
+        repeat {
+            let response = try await self.listWithEditContext(params: mutableParams)
+            allObjects.append(contentsOf: response.data)
+
+            guard let newParams = response.nextPageParams else {
+                break
+            }
+
+            mutableParams = newParams
+        } while true
 
         return allObjects
     }
@@ -60,13 +66,19 @@ extension PaginationAwareExecutor {
     public func paginatedWithViewContext(
         params: ViewContextResponseType.ParamsType
     ) async throws -> [ViewContextResponseType.DataType] {
-        var workingResponse = try await self.listWithViewContext(params: params)
-        var allObjects: [ViewContextResponseType.DataType] = workingResponse.data
+        var allObjects: [ViewContextResponseType.DataType] = []
+        var mutableParams: ViewContextResponseType.ParamsType = params
 
-        while let nextPageParams = workingResponse.nextPageParams {
-            workingResponse = try await self.listWithViewContext(params: nextPageParams)
-            allObjects.append(contentsOf: workingResponse.data)
-        }
+        repeat {
+            let response = try await self.listWithViewContext(params: mutableParams)
+            allObjects.append(contentsOf: response.data)
+
+            guard let newParams = response.nextPageParams else {
+                break
+            }
+
+            mutableParams = newParams
+        } while true
 
         return allObjects
     }
@@ -78,13 +90,19 @@ extension PaginationAwareExecutor {
     public func paginatedWithEmbedContext(
         params: EmbedContextResponseType.ParamsType
     ) async throws -> [EmbedContextResponseType.DataType] {
-        var workingResponse = try await self.listWithEmbedContext(params: params)
-        var allObjects: [EmbedContextResponseType.DataType] = workingResponse.data
+        var allObjects: [EmbedContextResponseType.DataType] = []
+        var mutableParams: EmbedContextResponseType.ParamsType = params
 
-        while let nextPageParams = workingResponse.nextPageParams {
-            workingResponse = try await self.listWithEmbedContext(params: nextPageParams)
-            allObjects.append(contentsOf: workingResponse.data)
-        }
+        repeat {
+            let response = try await self.listWithEmbedContext(params: mutableParams)
+            allObjects.append(contentsOf: response.data)
+
+            guard let newParams = response.nextPageParams else {
+                break
+            }
+
+            mutableParams = newParams
+        } while true
 
         return allObjects
     }
