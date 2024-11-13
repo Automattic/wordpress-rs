@@ -6,7 +6,7 @@ struct ListView: View {
     var viewModel: ListViewModel
 
     var body: some View {
-        List(viewModel.listItems) { item in
+        List(viewModel.listItems.values.sorted(), id: \.id) { item in
             VStack(alignment: .leading) {
                 Text(item.title).font(.headline)
                 Text(item.subtitle).font(.footnote)
@@ -29,14 +29,15 @@ struct ListView: View {
                 }
             }
         )
-        .onAppear(perform: viewModel.startFetching)
-        .onDisappear(perform: viewModel.stopFetching)
+        .task {
+            await viewModel.task()
+        }
     }
 }
 
 #Preview {
 
-    let viewModel = ListViewModel(loginManager: LoginManager(), dataCallback: {
+    let viewModel = TaskListViewModel(dataCallback: {
         [
             ListViewData(id: "1234", title: "Item 1", subtitle: "Subtitle", fields: [:])
         ]

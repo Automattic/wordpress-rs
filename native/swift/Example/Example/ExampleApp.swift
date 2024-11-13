@@ -1,5 +1,7 @@
 import SwiftUI
 import WordPressAPI
+import WordPressAPICombine
+import Combine
 
 @main
 struct ExampleApp: App {
@@ -27,9 +29,23 @@ struct ExampleApp: App {
                 value.asListViewData
             }
         }),
-        RootListData(name: "Posts", callback: {
-            try await WordPressAPI.globalInstance.posts.paginatedWithEditContext(params: PostListParams(perPage: 100))
-                .map { $0.asListViewData }
+        RootListData(name: "Posts with Combine", stream: {
+            let stream = try WordPressAPI.globalInstance.posts.paginatedStream(params: PostListParams(perPage: 5))
+
+            return ListViewDataStream(
+                publisher: stream.getPublisher().map { $0.asListViewData() }.eraseToAnyPublisher(),
+                underlyingStream: stream
+            )
+        }),
+        RootListData(name: "Posts with AsyncSequence", sequence: {
+            do {
+                let sequence = try WordPressAPI.globalInstance
+                    .posts
+                    .paginatedSequenceWithEditContext(params: PostListParams(perPage: 5))
+                return ListViewSequence(underlyingSequence: sequence)
+            } catch {
+                abort()
+            }
         }),
         RootListData(name: "Site Health Tests", callback: {
             let items: [any ListViewDataConvertable] = [

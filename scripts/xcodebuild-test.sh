@@ -11,7 +11,7 @@ device_id=$(xcrun simctl list --json devices available | jq -re ".devices.\"com.
 export NSUnbufferedIO=YES
 
 xcodebuild \
-    -scheme WordPressAPI \
+    -scheme WordPressAPI-Package \
     -derivedDataPath DerivedData \
     -destination "id=${device_id}" \
     -skipPackagePluginValidation \

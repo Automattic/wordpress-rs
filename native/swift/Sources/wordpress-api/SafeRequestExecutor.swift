@@ -7,7 +7,7 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
-public protocol SafeRequestExecutor: RequestExecutor {
+public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 }
 
