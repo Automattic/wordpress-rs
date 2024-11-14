@@ -3,6 +3,9 @@ import WordPressAPI
 import WordPressAPICombine
 import Combine
 
+private let userListParams = UserListParams(perPage: 5)
+private let postListParams = PostListParams(perPage: 5)
+
 @main
 struct ExampleApp: App {
 
@@ -16,7 +19,7 @@ struct ExampleApp: App {
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Users", callback: {
-            try await WordPressAPI.globalInstance.users.paginatedWithEditContext(params: UserListParams(perPage: 100))
+            try await WordPressAPI.globalInstance.users.paginatedWithEditContext(params: userListParams)
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Plugins", callback: {
@@ -30,7 +33,7 @@ struct ExampleApp: App {
             }
         }),
         RootListData(name: "Posts with Combine", stream: {
-            let stream = try WordPressAPI.globalInstance.posts.paginatedStream(params: PostListParams(perPage: 5))
+            let stream = try WordPressAPI.globalInstance.posts.streamWithEditContext(params: postListParams)
 
             return ListViewDataStream(
                 publisher: stream.getPublisher().map { $0.asListViewData() }.eraseToAnyPublisher(),
@@ -39,9 +42,7 @@ struct ExampleApp: App {
         }),
         RootListData(name: "Posts with AsyncSequence", sequence: {
             do {
-                let sequence = try WordPressAPI.globalInstance
-                    .posts
-                    .paginatedSequenceWithEditContext(params: PostListParams(perPage: 5))
+                let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
                 return ListViewSequence(underlyingSequence: sequence)
             } catch {
                 abort()

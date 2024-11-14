@@ -35,15 +35,15 @@ public protocol PaginationAwareExecutor {
         params: EmbedContextResponseType.ParamsType
     ) async throws -> [EmbedContextResponseType.DataType]
 
-    func paginatedSequenceWithEditContext(
+    func sequenceWithEditContext(
         params: EditContextResponseType.ParamsType
     ) -> PaginationSequence<EditContextResponseType>
 
-    func paginatedSequenceWithViewContext(
+    func sequenceWithViewContext(
         params: ViewContextResponseType.ParamsType
     ) -> PaginationSequence<ViewContextResponseType>
 
-    func paginatedSequenceWithEmbedContext(
+    func sequenceWithEmbedContext(
         params: EmbedContextResponseType.ParamsType
     ) -> PaginationSequence<EmbedContextResponseType>
 }
@@ -121,7 +121,7 @@ extension PaginationAwareExecutor {
         return allObjects
     }
 
-    public func paginatedSequenceWithEditContext(
+    public func sequenceWithEditContext(
         params: EditContextResponseType.ParamsType
     ) -> PaginationSequence<EditContextResponseType> {
         PaginationSequence(params: params) { params in
@@ -129,7 +129,7 @@ extension PaginationAwareExecutor {
         }
     }
 
-    public func paginatedSequenceWithViewContext(
+    public func sequenceWithViewContext(
         params: ViewContextResponseType.ParamsType
     ) -> PaginationSequence<ViewContextResponseType> {
         PaginationSequence(params: params) { params in
@@ -137,7 +137,7 @@ extension PaginationAwareExecutor {
         }
     }
 
-    public func paginatedSequenceWithEmbedContext(
+    public func sequenceWithEmbedContext(
         params: EmbedContextResponseType.ParamsType
     ) -> PaginationSequence<EmbedContextResponseType> {
         PaginationSequence(params: params) { params in

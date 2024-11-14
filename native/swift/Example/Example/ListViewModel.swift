@@ -97,17 +97,17 @@ protocol ListViewModel {
     var cancellables: Set<AnyCancellable> = []
 
     private let streamProvider: StreamProvider
-    private var currentStream: ListViewDataStream?
 
     init(streamProvider: @escaping StreamProvider) {
         self.streamProvider = streamProvider
-        self.currentStream = nil
     }
 
     func task() async {
         self.error = nil
-        self.currentStream = try? self.streamProvider()
-        self.currentStream?.getPublisher()
+
+        guard var currentStream = try? self.streamProvider() else { return }
+
+        currentStream.getPublisher()
             .sink { completion in
                 switch completion {
                 case .finished:
@@ -126,7 +126,7 @@ protocol ListViewModel {
             }
         .store(in: &cancellables)
 
-        try? await self.currentStream?.fetch()
+        try? await currentStream.fetch()
     }
 }
 
@@ -146,13 +146,13 @@ struct MyError: LocalizedError {
     }
 }
 
-struct ListViewDataStream: WordPressAPICombine.Stream {
+struct ListViewDataStream {
     typealias ValueType = [ListViewData]
 
     let publisher: AnyPublisher<[ListViewData], Error>
-    let underlyingStream: any WordPressAPICombine.Stream
+    var underlyingStream: WordPressAPICombine.Fetchable
 
-    func fetch() async throws {
+    mutating func fetch() async throws {
         try await self.underlyingStream.fetch()
     }
 
