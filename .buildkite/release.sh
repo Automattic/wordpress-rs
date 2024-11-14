@@ -7,6 +7,9 @@ fi
 
 set -euo pipefail
 
+echo '--- :robot_face: Use bot for Git operations'
+source use-bot-for-git
+
 echo "--- :rust: Installing Rust"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
 
