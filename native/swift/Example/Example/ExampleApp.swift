@@ -1,5 +1,9 @@
 import SwiftUI
 import WordPressAPI
+import Combine
+
+private let userListParams = UserListParams(perPage: 5)
+private let postListParams = PostListParams(perPage: 5)
 
 @main
 struct ExampleApp: App {
@@ -13,9 +17,9 @@ struct ExampleApp: App {
                 .data
                 .map { $0.asListViewData }
         }),
-        RootListData(name: "Users", callback: {
-            try await WordPressAPI.globalInstance.users.paginatedWithEditContext(params: UserListParams(perPage: 100))
-                .map { $0.asListViewData }
+        RootListData(name: "Users", sequence: {
+            let sequence = try WordPressAPI.globalInstance.users.sequenceWithEditContext(params: userListParams)
+            return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Plugins", callback: {
             try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
@@ -27,9 +31,9 @@ struct ExampleApp: App {
                 value.asListViewData
             }
         }),
-        RootListData(name: "Posts", callback: {
-            try await WordPressAPI.globalInstance.posts.paginatedWithEditContext(params: PostListParams(perPage: 100))
-                .map { $0.asListViewData }
+        RootListData(name: "Posts", sequence: {
+            let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
+            return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Site Health Tests", callback: {
             let items: [any ListViewDataConvertable] = [

@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol PaginatableResponse {
+public protocol PaginatableResponse: Sendable {
     associatedtype ParamsType
     associatedtype DataType
 
@@ -8,6 +8,8 @@ public protocol PaginatableResponse {
     var prevPageParams: ParamsType? { get }
 
     var data: [DataType] { get }
+
+    init(data: [DataType], headerMap: WpNetworkHeaderMap, nextPageParams: ParamsType?, prevPageParams: ParamsType?)
 }
 
 public protocol PaginationAwareExecutor {
@@ -32,6 +34,18 @@ public protocol PaginationAwareExecutor {
     func paginatedWithEmbedContext(
         params: EmbedContextResponseType.ParamsType
     ) async throws -> [EmbedContextResponseType.DataType]
+
+    func sequenceWithEditContext(
+        params: EditContextResponseType.ParamsType
+    ) -> PaginationSequence<EditContextResponseType>
+
+    func sequenceWithViewContext(
+        params: ViewContextResponseType.ParamsType
+    ) -> PaginationSequence<ViewContextResponseType>
+
+    func sequenceWithEmbedContext(
+        params: EmbedContextResponseType.ParamsType
+    ) -> PaginationSequence<EmbedContextResponseType>
 }
 
 extension PaginationAwareExecutor {
@@ -106,20 +120,80 @@ extension PaginationAwareExecutor {
 
         return allObjects
     }
+
+    public func sequenceWithEditContext(
+        params: EditContextResponseType.ParamsType
+    ) -> PaginationSequence<EditContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithEditContext(params: params)
+        }
+    }
+
+    public func sequenceWithViewContext(
+        params: ViewContextResponseType.ParamsType
+    ) -> PaginationSequence<ViewContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithViewContext(params: params)
+        }
+    }
+
+    public func sequenceWithEmbedContext(
+        params: EmbedContextResponseType.ParamsType
+    ) -> PaginationSequence<EmbedContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithEmbedContext(params: params)
+        }
+    }
+}
+
+public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequence {
+    public typealias Transformer = (ResponseType.ParamsType) async throws -> ResponseType
+
+    private let params: ResponseType.ParamsType
+    private let transform: Transformer
+
+    init(params: ResponseType.ParamsType, transform: @escaping Transformer) {
+        self.params = params
+        self.transform = transform
+    }
+
+    public struct AsyncIterator: AsyncIteratorProtocol {
+        private var nextPageParams: ResponseType.ParamsType?
+        private let transform: Transformer
+
+        init(params: ResponseType.ParamsType, transform: @escaping Transformer) {
+            self.nextPageParams = params
+            self.transform = transform
+        }
+
+        public mutating func next() async throws -> [ResponseType.DataType]? {
+            guard let nextPageParams else {
+                return nil
+            }
+
+            let response = try await self.transform(nextPageParams)
+            self.nextPageParams = response.nextPageParams
+            return response.data
+        }
+    }
+
+    public func makeAsyncIterator() -> AsyncIterator {
+        AsyncIterator(params: params, transform: self.transform)
+    }
 }
 
 // MARK: - Posts
-extension PostsRequestListWithEditContextResponse: PaginatableResponse {
+extension PostsRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithEditContext
 }
 
-extension PostsRequestListWithViewContextResponse: PaginatableResponse {
+extension PostsRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithViewContext
 }
 
-extension PostsRequestListWithEmbedContextResponse: PaginatableResponse {
+extension PostsRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithEmbedContext
 }
@@ -131,17 +205,17 @@ extension PostsRequestExecutor: PaginationAwareExecutor {
 }
 
 // MARK: - Users
-extension UsersRequestListWithEditContextResponse: PaginatableResponse {
+extension UsersRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = UserListParams
     public typealias DataType = UserWithEditContext
 }
 
-extension UsersRequestListWithViewContextResponse: PaginatableResponse {
+extension UsersRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = UserListParams
     public typealias DataType = UserWithViewContext
 }
 
-extension UsersRequestListWithEmbedContextResponse: PaginatableResponse {
+extension UsersRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = UserListParams
     public typealias DataType = UserWithEmbedContext
 }

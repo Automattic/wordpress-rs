@@ -1,11 +1,16 @@
 import Foundation
 import WordPressAPI
+import WordPressAPIInternal
 
-struct ListViewData: Identifiable {
+struct ListViewData: Identifiable, Comparable, Hashable {
     let id: String
     let title: String
     let subtitle: String
     let fields: [String: String]
+
+    static func < (lhs: ListViewData, rhs: ListViewData) -> Bool {
+        lhs.title < rhs.title
+    }
 }
 
 protocol ListViewDataConvertable: Identifiable {
@@ -149,5 +154,17 @@ extension PostWithEditContext: ListViewDataConvertable {
 
     var asListViewData: ListViewData {
         ListViewData(id: self.id, title: self.title.raw, subtitle: self.slug, fields: [:])
+    }
+}
+
+extension [PostWithEditContext] {
+    func asListViewData() -> [ListViewData] {
+        self.map { $0.asListViewData }
+    }
+}
+
+extension [ListViewDataConvertable] {
+    func asListViewData() -> [ListViewData] {
+        self.map { $0.asListViewData }
     }
 }

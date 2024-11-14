@@ -13,6 +13,12 @@ extension WpNetworkHeaderMap {
     }
 }
 
+extension PaginatableResponse {
+    static var empty: Self {
+        Self(data: [], headerMap: .empty, nextPageParams: nil, prevPageParams: nil)
+    }
+}
+
 // These `Sendable` conformances are **NOT** safe – they're for the test suite only.
 //
 // Until or unless `WpNetworkRequest` and `WpNetworkRequest` become `uniffi::Record` (thus Structs)
