@@ -88,6 +88,18 @@ public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
 public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostsRequestListWithEmbedContextResponse
 
+// MARK: - Media
+public typealias SparseMedia = WordPressAPIInternal.SparseMedia
+public typealias MediaWithEditContext = WordPressAPIInternal.MediaWithEditContext
+public typealias MediaWithViewContext = WordPressAPIInternal.MediaWithViewContext
+public typealias MediaWithEmbedContext = WordPressAPIInternal.MediaWithEmbedContext
+public typealias MediaListParams = WordPressAPIInternal.MediaListParams
+public typealias MediaRequestExecutor = WordPressAPIInternal.MediaRequestExecutor
+
+public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.MediaRequestListWithEditContextResponse
+public typealias MediaRequestListWithViewContextResponse = WordPressAPIInternal.MediaRequestListWithViewContextResponse
+public typealias MediaRequestListWithEmbedContextResponse = WordPressAPIInternal.MediaRequestListWithEmbedContextResponse
+
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext

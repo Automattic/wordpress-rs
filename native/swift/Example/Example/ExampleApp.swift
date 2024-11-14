@@ -4,6 +4,7 @@ import Combine
 
 private let userListParams = UserListParams(perPage: 5)
 private let postListParams = PostListParams(perPage: 5)
+private let mediaListParams = MediaListParams(perPage: 5)
 
 @main
 struct ExampleApp: App {
@@ -33,6 +34,10 @@ struct ExampleApp: App {
         }),
         RootListData(name: "Posts", sequence: {
             let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
+            return ListViewSequence(underlyingSequence: sequence)
+        }),
+        RootListData(name: "Media", sequence: {
+            let sequence = try WordPressAPI.globalInstance.media.sequenceWithEditContext(params: mediaListParams)
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Site Health Tests", callback: {

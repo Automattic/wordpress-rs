@@ -63,6 +63,10 @@ public struct WordPressAPI {
         self.requestBuilder.posts()
     }
 
+    public var media: MediaRequestExecutor {
+        self.requestBuilder.media()
+    }
+
     public var siteSettings: SiteSettingsRequestExecutor {
         self.requestBuilder.siteSettings()
     }

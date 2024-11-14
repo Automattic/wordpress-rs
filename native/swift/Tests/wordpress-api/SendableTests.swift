@@ -4,6 +4,10 @@ import WordPressAPI
 struct SendableTests {
 
     private static let sendables: [Sendable] = [
+        MediaRequestListWithEditContextResponse.empty,
+        MediaRequestListWithViewContextResponse.empty,
+        MediaRequestListWithEmbedContextResponse.empty,
+
         PostsRequestListWithEditContextResponse.empty,
         PostsRequestListWithViewContextResponse.empty,
         PostsRequestListWithEmbedContextResponse.empty,
