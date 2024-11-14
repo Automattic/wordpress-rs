@@ -4,50 +4,100 @@ use serial_test::parallel;
 use wp_api::{
     generate,
     media::{
-        MediaListParams, SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
-        SparseMediaFieldWithViewContext,
+        MediaId, MediaListParams, MediaStatus, MediaTypeParam, SparseMediaFieldWithEditContext,
+        SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
     },
-    JsonValue,
+    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
+    WpApiParamOrder,
 };
-use wp_api_integration_tests::{api_client, AssertResponse};
+use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
 async fn list_with_edit_context(#[case] params: MediaListParams) {
-    let media_list = api_client()
+    api_client()
         .media()
         .list_with_edit_context(&params)
         .await
-        .assert_response()
-        .data;
-    // Temporary checks to see if JsonValue implementation is working
-    media_list.into_iter().for_each(|m| {
-        match m.media_details {
-            JsonValue::Object(hash_map) => {
-                //let w = hash_map.get("width").expect("All media in our test site seems to return a width, but this is probably not guaranteed.");
-                let w = hash_map.get("width");
-                if w.is_some() {
-                    let w = w.unwrap();
-                    match w {
-                        JsonValue::Int(json_number) => {
-                            println!("width: {:#?}", json_number);
-                        }
-                        _ => panic!("Width should be a number"),
-                    }
-                } else {
-                    println!("{:#?}", hash_map);
-                }
-            }
-            _ => panic!("Media details should be a JSON object"),
-        }
-    });
+        .assert_response();
+}
+
+#[tokio::test]
+#[apply(list_cases)]
+#[parallel]
+async fn list_with_embed_context(#[case] params: MediaListParams) {
+    api_client()
+        .media()
+        .list_with_embed_context(&params)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[apply(list_cases)]
+#[parallel]
+async fn list_with_view_context(#[case] params: MediaListParams) {
+    api_client()
+        .media()
+        .list_with_view_context(&params)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(MediaListParams { per_page: Some(1), ..Default::default() })]
+#[case(MediaListParams { per_page: Some(1), order: Some(WpApiParamOrder::Desc), ..Default::default() })]
+#[case(MediaListParams { per_page: Some(1), orderby: Some(WpApiParamPostsOrderBy::Modified), ..Default::default() })]
+async fn paginate_list_posts_with_edit_context(#[case] params: MediaListParams) {
+    let first_page_response = api_client()
+        .media()
+        .list_with_edit_context(&params)
+        .await
+        .assert_response();
+    assert!(!first_page_response.data.is_empty());
+    let next_page_params = first_page_response.next_page_params.unwrap();
+    let next_page_response = api_client()
+        .media()
+        .list_with_edit_context(&next_page_params)
+        .await
+        .assert_response();
+    assert!(!next_page_response.data.is_empty());
+    let prev_page_params = next_page_response.prev_page_params.unwrap();
+    let prev_page_response = api_client()
+        .media()
+        .list_with_edit_context(&prev_page_params)
+        .await
+        .assert_response();
+    assert!(!prev_page_response.data.is_empty());
 }
 
 #[template]
 #[rstest]
 #[case::default(MediaListParams::default())]
 #[case::page(generate!(MediaListParams, (page, Some(1))))]
+#[case::per_page(generate!(MediaListParams, (per_page, Some(3))))]
+#[case::search(generate!(MediaListParams, (search, Some("foo".to_string()))))]
+#[case::after(generate!(MediaListParams, (after, Some("2020-08-14 17:00:00.000".to_string()))))]
+#[case::modified_after(generate!(MediaListParams, (modified_after, Some("2024-01-14 17:00:00.000".to_string()))))]
+#[case::author(generate!(MediaListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
+#[case::author_exclude(generate!(MediaListParams, (author_exclude, vec![SECOND_USER_ID])))]
+#[case::before(generate!(MediaListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))))]
+#[case::modified_before(generate!(MediaListParams, (modified_before, Some("2024-01-14 17:00:00.000".to_string()))))]
+#[case::exclude(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])))]
+#[case::include(generate!(MediaListParams, (include, vec![MediaId(1)])))]
+#[case::offset(generate!(MediaListParams, (offset, Some(2))))]
+#[case::order(generate!(MediaListParams, (order, Some(WpApiParamOrder::Asc))))]
+#[case::orderby(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))))]
+#[case::parent(generate!(MediaListParams, (parent, vec![MediaId(1), MediaId(2)])))]
+#[case::parent_exclude(generate!(MediaListParams, (parent, vec![MediaId(1), MediaId(2)])))]
+#[case::search_columns(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt])))]
+#[case::slug(generate!(MediaListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
+#[case::status(generate!(MediaListParams, (status, vec![MediaStatus::Inherit, MediaStatus::Private, MediaStatus::Trash])))]
+#[case::media_type(generate!(MediaListParams, (media_type, Some(MediaTypeParam::Image))))]
+#[case::mime_type(generate!(MediaListParams, (mime_type, Some("image/jpeg".to_string()))))]
 pub fn list_cases(#[case] params: MediaListParams) {}
 
 mod filter {

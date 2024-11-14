@@ -1,6 +1,6 @@
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
-    posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
+    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
@@ -130,11 +130,8 @@ impl FromStr for MediaTypeParam {
 pub enum MediaStatus {
     #[default]
     Inherit,
-    Draft,
-    Future,
-    Pending,
     Private,
-    Publish,
+    Trash,
     #[serde(untagged)]
     Custom(String),
 }
@@ -145,11 +142,8 @@ impl MediaStatus {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Inherit => "inherit",
-            Self::Draft => "draft",
-            Self::Future => "future",
-            Self::Pending => "pending",
             Self::Private => "private",
-            Self::Publish => "publish",
+            Self::Trash => "trash",
             Self::Custom(status) => status,
         }
     }
@@ -161,11 +155,8 @@ impl FromStr for MediaStatus {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "inherit" => Ok(Self::Inherit),
-            "draft" => Ok(Self::Draft),
-            "future" => Ok(Self::Future),
-            "pending" => Ok(Self::Pending),
             "private" => Ok(Self::Private),
-            "publish" => Ok(Self::Publish),
+            "trash" => Ok(Self::Trash),
             value => Ok(Self::Custom(value.to_string())),
         }
     }
@@ -204,10 +195,10 @@ pub struct MediaListParams {
     pub modified_before: Option<String>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
-    pub exclude: Vec<PostId>,
+    pub exclude: Vec<MediaId>,
     /// Limit result set to specific IDs.
     #[uniffi(default = [])]
-    pub include: Vec<PostId>,
+    pub include: Vec<MediaId>,
     /// Offset the result set by a specific number of items.
     #[uniffi(default = None)]
     pub offset: Option<u32>,
@@ -223,10 +214,10 @@ pub struct MediaListParams {
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Limit result set to items with particular parent IDs.
     #[uniffi(default = [])]
-    pub parent: Vec<PostId>,
+    pub parent: Vec<MediaId>,
     /// Limit result set to all items except those of a particular parent ID.
     #[uniffi(default = [])]
-    pub parent_exclude: Vec<PostId>,
+    pub parent_exclude: Vec<MediaId>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
     pub search_columns: Vec<WpApiParamPostsSearchColumn>,
@@ -466,8 +457,8 @@ mod tests {
     #[case(generate!(MediaListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
     #[case(generate!(MediaListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
     #[case(generate!(MediaListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(MediaListParams, (exclude, vec![PostId(1), PostId(2)])), "exclude=1%2C2")]
-    #[case(generate!(MediaListParams, (include, vec![PostId(1), PostId(2)])), "include=1%2C2")]
+    #[case(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])), "exclude=1%2C2")]
+    #[case(generate!(MediaListParams, (include, vec![MediaId(1), MediaId(2)])), "include=1%2C2")]
     #[case(generate!(MediaListParams, (offset, Some(2))), "offset=2")]
     #[case(generate!(MediaListParams, (order, Some(WpApiParamOrder::Asc))), "order=asc")]
     #[case(generate!(MediaListParams, (order, Some(WpApiParamOrder::Desc))), "order=desc")]
@@ -481,21 +472,18 @@ mod tests {
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Relevance))), "orderby=relevance")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Slug))), "orderby=slug")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Title))), "orderby=title")]
-    #[case(generate!(MediaListParams, (parent, vec![PostId(44444), PostId(44445)])), "parent=44444%2C44445")]
-    #[case(generate!(MediaListParams, (parent_exclude, vec![PostId(55555), PostId(55556)])), "parent_exclude=55555%2C55556")]
+    #[case(generate!(MediaListParams, (parent, vec![MediaId(44444), MediaId(44445)])), "parent=44444%2C44445")]
+    #[case(generate!(MediaListParams, (parent_exclude, vec![MediaId(55555), MediaId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent])), "search_columns=post_content")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostExcerpt])), "search_columns=post_excerpt")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_title")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt, WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_content%2Cpost_excerpt%2Cpost_title")]
     #[case(generate!(MediaListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), "slug=foo%2Cbar")]
     #[case(generate!(MediaListParams, (status, vec![MediaStatus::Inherit])), "status=inherit")]
-    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Draft])), "status=draft")]
-    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Future])), "status=future")]
-    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Pending])), "status=pending")]
     #[case(generate!(MediaListParams, (status, vec![MediaStatus::Private])), "status=private")]
-    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Publish])), "status=publish")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Trash])), "status=trash")]
     #[case(generate!(MediaListParams, (status, vec![MediaStatus::Custom("foo".to_string())])), "status=foo")]
-    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Inherit, MediaStatus::Draft, MediaStatus::Future, MediaStatus::Pending, MediaStatus::Private, MediaStatus::Publish, MediaStatus::Custom("foo".to_string())])), "status=inherit%2Cdraft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Inherit, MediaStatus::Private, MediaStatus::Trash, MediaStatus::Custom("foo".to_string())])), "status=inherit%2Cprivate%2Ctrash%2Cfoo")]
     #[case(generate!(MediaListParams, (media_type, Some(MediaTypeParam::Image))), "media_type=image")]
     #[case(generate!(MediaListParams, (mime_type, Some("image/jpeg".to_string()))), "mime_type=image%2Fjpeg")]
     #[case(MediaListParams {
@@ -508,23 +496,23 @@ mod tests {
             author_exclude: vec![UserId(211), UserId(212)],
             before: Some("d_b".to_string()),
             modified_before: Some("d_m_b".to_string()),
-            exclude: vec![PostId(1111), PostId(1112)],
-            include: vec![PostId(2111), PostId(2112)],
+            exclude: vec![MediaId(1111), MediaId(1112)],
+            include: vec![MediaId(2111), MediaId(2112)],
             offset: Some(11111),
             order: Some(WpApiParamOrder::Desc),
             orderby: Some(WpApiParamPostsOrderBy::Slug),
-            parent: vec![PostId(44444), PostId(44445)],
-            parent_exclude: vec![PostId(55555), PostId(55556)],
+            parent: vec![MediaId(44444), MediaId(44445)],
+            parent_exclude: vec![MediaId(55555), MediaId(55556)],
             search_columns: vec![
                 WpApiParamPostsSearchColumn::PostContent,
                 WpApiParamPostsSearchColumn::PostExcerpt,
             ],
             slug: vec!["sl_1".to_string(), "sl_2".to_string()],
-            status: vec![MediaStatus::Draft, MediaStatus::Future],
+            status: vec![MediaStatus::Inherit, MediaStatus::Private, MediaStatus::Trash],
             media_type: Some(MediaTypeParam::Image),
             mime_type: Some("image/jpeg".to_string()),
         },
-        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=draft%2Cfuture&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
+        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
     )]
     #[trace]
     fn test_post_list_query_pairs(#[case] params: MediaListParams, #[case] expected_query: &str) {
