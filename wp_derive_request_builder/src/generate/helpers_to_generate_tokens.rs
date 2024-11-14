@@ -410,6 +410,13 @@ pub fn ident_response_type(
     )
 }
 
+pub fn ident_fn_parse_as_response_type(response_type_ident: &Ident) -> Ident {
+    format_ident!(
+        "parse_as_{}",
+        response_type_ident.to_string().to_case(Case::Snake)
+    )
+}
+
 pub fn response_params_type(
     params_type: Option<&ParamsType>,
     request_type: RequestType,
