@@ -10,7 +10,9 @@ use wp_api::{
     posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
     WpApiParamOrder,
 };
-use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api_integration_tests::{
+    api_client, AssertResponse, FIRST_USER_ID, MEDIA_ID_611, SECOND_USER_ID,
+};
 
 #[tokio::test]
 #[apply(list_cases)]
@@ -41,6 +43,36 @@ async fn list_with_view_context(#[case] params: MediaListParams) {
     api_client()
         .media()
         .list_with_view_context(&params)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .media()
+        .retrieve_with_edit_context(&MEDIA_ID_611)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context() {
+    api_client()
+        .media()
+        .retrieve_with_embed_context(&MEDIA_ID_611)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context() {
+    api_client()
+        .media()
+        .retrieve_with_view_context(&MEDIA_ID_611)
         .await
         .assert_response();
 }
@@ -132,6 +164,22 @@ mod filter {
             });
     }
 
+    #[apply(sparse_media_field_with_edit_context_test_cases)]
+    #[case(&[SparseMediaFieldWithEditContext::Id, SparseMediaFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_media_with_edit_context(
+        #[case] fields: &[SparseMediaFieldWithEditContext],
+    ) {
+        let media = api_client()
+            .media()
+            .filter_retrieve_with_edit_context(&MEDIA_ID_611, fields)
+            .await
+            .assert_response()
+            .data;
+        media.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
     #[apply(sparse_media_field_with_embed_context_test_cases)]
     #[case(&[SparseMediaFieldWithEmbedContext::Id, SparseMediaFieldWithEmbedContext::Author])]
     #[tokio::test]
@@ -157,6 +205,22 @@ mod filter {
             });
     }
 
+    #[apply(sparse_media_field_with_embed_context_test_cases)]
+    #[case(&[SparseMediaFieldWithEmbedContext::Id, SparseMediaFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_media_with_embed_context(
+        #[case] fields: &[SparseMediaFieldWithEmbedContext],
+    ) {
+        let media = api_client()
+            .media()
+            .filter_retrieve_with_embed_context(&MEDIA_ID_611, fields)
+            .await
+            .assert_response()
+            .data;
+        media.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
     #[apply(sparse_media_field_with_view_context_test_cases)]
     #[case(&[SparseMediaFieldWithViewContext::Id, SparseMediaFieldWithViewContext::Author])]
     #[tokio::test]
@@ -180,5 +244,21 @@ mod filter {
             .for_each(|media| {
                 media.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_media_field_with_view_context_test_cases)]
+    #[case(&[SparseMediaFieldWithViewContext::Id, SparseMediaFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_media_with_view_context(
+        #[case] fields: &[SparseMediaFieldWithViewContext],
+    ) {
+        let media = api_client()
+            .media()
+            .filter_retrieve_with_view_context(&MEDIA_ID_611, fields)
+            .await
+            .assert_response()
+            .data;
+        media.assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 }
