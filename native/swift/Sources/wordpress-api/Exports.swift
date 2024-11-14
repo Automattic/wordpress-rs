@@ -2,6 +2,7 @@
 //
 // We could export all of them using `@_exported import`, but that probably puts
 // us in a position where we need to make major releases due to Rust code changes.
+// swiftlint:disable line_length
 
 #if canImport(WordPressAPIInternal)
 
@@ -31,6 +32,10 @@ public typealias UserCreateParams = WordPressAPIInternal.UserCreateParams
 public typealias UserDeleteParams = WordPressAPIInternal.UserDeleteParams
 public typealias UserDeleteResponse = WordPressAPIInternal.UserDeleteResponse
 public typealias UsersRequestExecutor = WordPressAPIInternal.UsersRequestExecutor
+
+public typealias UsersRequestListWithEditContextResponse = WordPressAPIInternal.UsersRequestListWithEditContextResponse
+public typealias UsersRequestListWithViewContextResponse = WordPressAPIInternal.UsersRequestListWithViewContextResponse
+public typealias UsersRequestListWithEmbedContextResponse = WordPressAPIInternal.UsersRequestListWithEmbedContextResponse
 
 // MARK: - Plugins
 
@@ -73,11 +78,18 @@ public typealias PostWithEditContext = WordPressAPIInternal.PostWithEditContext
 public typealias PostWithViewContext = WordPressAPIInternal.PostWithViewContext
 public typealias PostWithEmbedContext = WordPressAPIInternal.PostWithEmbedContext
 public typealias PostListParams = WordPressAPIInternal.PostListParams
+public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
+
+public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.PostsRequestListWithEditContextResponse
+public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
+public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostsRequestListWithEmbedContextResponse
 
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext
 public typealias SiteSettingsWithViewContext = WordPressAPIInternal.SiteSettingsWithViewContext
 public typealias SiteSettingsWithEmbedContext = WordPressAPIInternal.SiteSettingsWithEmbedContext
+
+// swiftlint:enable line_length
 
 #endif

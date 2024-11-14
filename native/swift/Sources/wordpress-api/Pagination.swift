@@ -1,4 +1,4 @@
-import WordPressAPIInternal
+import Foundation
 
 public protocol PaginatableResponse {
     associatedtype ParamsType
