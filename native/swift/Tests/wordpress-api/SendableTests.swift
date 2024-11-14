@@ -7,10 +7,10 @@ struct SendableTests {
         PostsRequestListWithEditContextResponse.empty,
         PostsRequestListWithViewContextResponse.empty,
         PostsRequestListWithEmbedContextResponse.empty,
-        
+
         UsersRequestListWithEditContextResponse.empty,
         UsersRequestListWithViewContextResponse.empty,
-        UsersRequestListWithEmbedContextResponse.empty,
+        UsersRequestListWithEmbedContextResponse.empty
     ]
 
     /// This might seem like a weird test – why are we checking such a specific implementation detail?
