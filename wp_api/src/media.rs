@@ -1,0 +1,521 @@
+use crate::{
+    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
+    url_query::{
+        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
+        UrlQueryPairsMap,
+    },
+    EnumFromStrParsingError, JsonValue, UserId, WpApiParamOrder,
+};
+use serde::{Deserialize, Serialize};
+use std::{num::ParseIntError, str::FromStr};
+use strum_macros::IntoStaticStr;
+use wp_contextual::WpContextual;
+
+impl_as_query_value_for_new_type!(MediaId);
+uniffi::custom_newtype!(MediaId, i32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MediaId(pub i32);
+
+impl FromStr for MediaId {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+impl std::fmt::Display for MediaId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaType {
+    File,
+    Image,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+impl_as_query_value_from_as_str!(MediaType);
+
+impl MediaType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::File => "file",
+            Self::Image => "image",
+            Self::Custom(media_type) => media_type,
+        }
+    }
+}
+
+impl FromStr for MediaType {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "file" => Ok(Self::File),
+            "image" => Ok(Self::Image),
+            value => Ok(Self::Custom(value.to_string())),
+        }
+    }
+}
+
+// A separate param type is implemented for `MediaType` because the API will accept types such as
+// "audio" & "application" as a parameter, but it'll return "file" for the value of `media_type`
+// field for these media types.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaTypeParam {
+    Image,
+    Video,
+    Text,
+    Application,
+    Audio,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+impl_as_query_value_from_as_str!(MediaTypeParam);
+
+impl MediaTypeParam {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Image => "image",
+            Self::Video => "video",
+            Self::Text => "text",
+            Self::Application => "application",
+            Self::Audio => "audio",
+            Self::Custom(media_type) => media_type,
+        }
+    }
+}
+
+impl FromStr for MediaTypeParam {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "image" => Ok(Self::Image),
+            "video" => Ok(Self::Video),
+            "text" => Ok(Self::Text),
+            "application" => Ok(Self::Application),
+            "audio" => Ok(Self::Audio),
+            value => Ok(Self::Custom(value.to_string())),
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaStatus {
+    #[default]
+    Inherit,
+    Private,
+    Trash,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+impl_as_query_value_from_as_str!(MediaStatus);
+
+impl MediaStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Inherit => "inherit",
+            Self::Private => "private",
+            Self::Trash => "trash",
+            Self::Custom(status) => status,
+        }
+    }
+}
+
+impl FromStr for MediaStatus {
+    type Err = EnumFromStrParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "inherit" => Ok(Self::Inherit),
+            "private" => Ok(Self::Private),
+            "trash" => Ok(Self::Trash),
+            value => Ok(Self::Custom(value.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct MediaListParams {
+    /// Current page of the collection.
+    /// Default: `1`
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// Maximum number of items to be returned in result set.
+    /// Default: `10`
+    #[uniffi(default = None)]
+    pub per_page: Option<u32>,
+    /// Limit results to those matching a string.
+    #[uniffi(default = None)]
+    pub search: Option<String>,
+    /// Limit response to posts published after a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub after: Option<String>,
+    /// Limit response to posts modified after a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub modified_after: Option<String>,
+    /// Limit result set to posts assigned to specific authors.
+    #[uniffi(default = [])]
+    pub author: Vec<UserId>,
+    /// Ensure result set excludes posts assigned to specific authors.
+    #[uniffi(default = [])]
+    pub author_exclude: Vec<UserId>,
+    /// Limit response to posts published before a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub before: Option<String>,
+    /// Limit response to posts modified before a given ISO8601 compliant date.
+    #[uniffi(default = None)]
+    pub modified_before: Option<String>,
+    /// Ensure result set excludes specific IDs.
+    #[uniffi(default = [])]
+    pub exclude: Vec<MediaId>,
+    /// Limit result set to specific IDs.
+    #[uniffi(default = [])]
+    pub include: Vec<MediaId>,
+    /// Offset the result set by a specific number of items.
+    #[uniffi(default = None)]
+    pub offset: Option<u32>,
+    /// Order sort attribute ascending or descending.
+    /// Default: desc
+    /// One of: asc, desc
+    #[uniffi(default = None)]
+    pub order: Option<WpApiParamOrder>,
+    /// Sort collection by post attribute.
+    /// Default: date
+    /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title
+    #[uniffi(default = None)]
+    pub orderby: Option<WpApiParamPostsOrderBy>,
+    /// Limit result set to items with particular parent IDs.
+    #[uniffi(default = [])]
+    pub parent: Vec<crate::posts::PostId>,
+    /// Limit result set to all items except those of a particular parent ID.
+    #[uniffi(default = [])]
+    pub parent_exclude: Vec<crate::posts::PostId>,
+    /// Array of column names to be searched.
+    #[uniffi(default = [])]
+    pub search_columns: Vec<WpApiParamPostsSearchColumn>,
+    /// Limit result set to posts with one or more specific slugs.
+    #[uniffi(default = [])]
+    pub slug: Vec<String>,
+    /// Limit result set to posts assigned one or more statuses.
+    /// Default: inherit
+    #[uniffi(default = [])]
+    pub status: Vec<MediaStatus>,
+    /// Limit result set to attachments of a particular media type.
+    /// One of: image, video, text, application, audio
+    #[uniffi(default = None)]
+    pub media_type: Option<MediaTypeParam>,
+    /// Limit result set to attachments of a particular MIME type.
+    #[uniffi(default = None)]
+    pub mime_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
+enum MediaListParamsField {
+    #[strum(serialize = "page")]
+    Page,
+    #[strum(serialize = "per_page")]
+    PerPage,
+    #[strum(serialize = "search")]
+    Search,
+    #[strum(serialize = "after")]
+    After,
+    #[strum(serialize = "modified_after")]
+    ModifiedAfter,
+    #[strum(serialize = "author")]
+    Author,
+    #[strum(serialize = "author_exclude")]
+    AuthorExclude,
+    #[strum(serialize = "before")]
+    Before,
+    #[strum(serialize = "modified_before")]
+    ModifiedBefore,
+    #[strum(serialize = "exclude")]
+    Exclude,
+    #[strum(serialize = "include")]
+    Include,
+    #[strum(serialize = "offset")]
+    Offset,
+    #[strum(serialize = "order")]
+    Order,
+    #[strum(serialize = "orderby")]
+    Orderby,
+    #[strum(serialize = "parent")]
+    Parent,
+    #[strum(serialize = "parent_exclude")]
+    ParentExclude,
+    #[strum(serialize = "search_columns")]
+    SearchColumns,
+    #[strum(serialize = "slug")]
+    Slug,
+    #[strum(serialize = "status")]
+    Status,
+    #[strum(serialize = "media_type")]
+    MediaType,
+    #[strum(serialize = "mime_type")]
+    MimeType,
+}
+
+impl AppendUrlQueryPairs for MediaListParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut
+            .append_option_query_value_pair(MediaListParamsField::Page, self.page.as_ref())
+            .append_option_query_value_pair(MediaListParamsField::PerPage, self.per_page.as_ref())
+            .append_option_query_value_pair(MediaListParamsField::Search, self.search.as_ref())
+            .append_option_query_value_pair(MediaListParamsField::After, self.after.as_ref())
+            .append_option_query_value_pair(
+                MediaListParamsField::ModifiedAfter,
+                self.modified_after.as_ref(),
+            )
+            .append_vec_query_value_pair(MediaListParamsField::Author, &self.author)
+            .append_vec_query_value_pair(MediaListParamsField::AuthorExclude, &self.author_exclude)
+            .append_option_query_value_pair(MediaListParamsField::Before, self.before.as_ref())
+            .append_option_query_value_pair(
+                MediaListParamsField::ModifiedBefore,
+                self.modified_before.as_ref(),
+            )
+            .append_vec_query_value_pair(MediaListParamsField::Exclude, &self.exclude)
+            .append_vec_query_value_pair(MediaListParamsField::Include, &self.include)
+            .append_option_query_value_pair(MediaListParamsField::Offset, self.offset.as_ref())
+            .append_option_query_value_pair(MediaListParamsField::Order, self.order.as_ref())
+            .append_option_query_value_pair(MediaListParamsField::Orderby, self.orderby.as_ref())
+            .append_vec_query_value_pair(MediaListParamsField::Parent, self.parent.as_ref())
+            .append_vec_query_value_pair(MediaListParamsField::SearchColumns, &self.search_columns)
+            .append_vec_query_value_pair(MediaListParamsField::Slug, &self.slug)
+            .append_vec_query_value_pair(MediaListParamsField::Status, &self.status)
+            .append_vec_query_value_pair(
+                MediaListParamsField::ParentExclude,
+                self.parent_exclude.as_ref(),
+            )
+            .append_option_query_value_pair(
+                MediaListParamsField::MediaType,
+                self.media_type.as_ref(),
+            )
+            .append_option_query_value_pair(
+                MediaListParamsField::MimeType,
+                self.mime_type.as_ref(),
+            );
+    }
+}
+
+impl FromUrlQueryPairs for MediaListParams {
+    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+        Some(Self {
+            page: query_pairs.get(MediaListParamsField::Page),
+            per_page: query_pairs.get(MediaListParamsField::PerPage),
+            search: query_pairs.get(MediaListParamsField::Search),
+            after: query_pairs.get(MediaListParamsField::After),
+            modified_after: query_pairs.get(MediaListParamsField::ModifiedAfter),
+            author: query_pairs.get_csv(MediaListParamsField::Author),
+            author_exclude: query_pairs.get_csv(MediaListParamsField::AuthorExclude),
+            before: query_pairs.get(MediaListParamsField::Before),
+            modified_before: query_pairs.get(MediaListParamsField::ModifiedBefore),
+            exclude: query_pairs.get_csv(MediaListParamsField::Exclude),
+            include: query_pairs.get_csv(MediaListParamsField::Include),
+            offset: query_pairs.get(MediaListParamsField::Offset),
+            order: query_pairs.get(MediaListParamsField::Order),
+            orderby: query_pairs.get(MediaListParamsField::Orderby),
+            parent: query_pairs.get_csv(MediaListParamsField::Parent),
+            parent_exclude: query_pairs.get_csv(MediaListParamsField::ParentExclude),
+            search_columns: query_pairs.get_csv(MediaListParamsField::SearchColumns),
+            slug: query_pairs.get_csv(MediaListParamsField::Slug),
+            status: query_pairs.get_csv(MediaListParamsField::Status),
+            media_type: query_pairs.get(MediaListParamsField::MediaType),
+            mime_type: query_pairs.get(MediaListParamsField::MimeType),
+        })
+    }
+
+    fn supports_pagination() -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+pub struct SparseMedia {
+    #[WpContext(edit, embed, view)]
+    pub id: Option<MediaId>,
+    #[WpContext(edit, embed, view)]
+    pub date: Option<String>,
+    #[WpContext(edit, view)]
+    pub date_gmt: Option<String>,
+    #[WpContext(edit, view)]
+    #[WpContextualField]
+    pub guid: Option<crate::posts::SparsePostGuid>,
+    #[WpContext(edit, embed, view)]
+    pub link: Option<String>,
+    #[WpContext(edit, view)]
+    pub modified: Option<String>,
+    #[WpContext(edit, view)]
+    pub modified_gmt: Option<String>,
+    #[WpContext(edit, embed, view)]
+    pub slug: Option<String>,
+    #[WpContext(edit, view)]
+    pub status: Option<MediaStatus>,
+    #[serde(rename = "type")]
+    #[WpContext(edit, embed, view)]
+    pub post_type: Option<String>,
+    #[WpContext(edit)]
+    #[WpContextualOption]
+    pub password: Option<String>,
+    #[WpContext(edit)]
+    pub permalink_template: Option<String>,
+    #[WpContext(edit)]
+    pub generated_slug: Option<String>,
+    #[WpContext(edit, embed, view)]
+    #[WpContextualField]
+    pub title: Option<crate::posts::SparsePostTitle>,
+    #[WpContext(edit, embed, view)]
+    pub author: Option<crate::UserId>,
+    #[WpContext(edit, view)]
+    pub comment_status: Option<crate::posts::PostCommentStatus>,
+    #[WpContext(edit, view)]
+    pub ping_status: Option<crate::posts::PostPingStatus>,
+    #[WpContext(edit, view)]
+    pub template: Option<String>,
+    #[WpContext(edit, embed, view)]
+    pub alt_text: Option<String>,
+    #[WpContext(edit, embed, view)]
+    #[WpContextualField]
+    pub caption: Option<SparseMediaCaption>,
+    #[WpContext(edit, view)]
+    #[WpContextualField]
+    pub description: Option<SparseMediaDescription>,
+    #[WpContext(edit, embed, view)]
+    pub media_type: Option<MediaType>,
+    #[WpContext(edit, embed, view)]
+    pub mime_type: Option<String>,
+    #[WpContext(edit, embed, view)]
+    pub media_details: Option<JsonValue>,
+    #[serde(rename = "post")]
+    #[WpContext(edit, view)]
+    #[WpContextualOption]
+    pub post_id: Option<crate::posts::PostId>,
+    #[WpContext(edit, embed, view)]
+    pub source_url: Option<String>,
+    #[WpContext(edit)]
+    pub missing_image_sizes: Option<Vec<String>>,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+pub struct SparseMediaDescription {
+    #[WpContext(edit)]
+    pub raw: Option<String>,
+    #[WpContext(edit, view)]
+    pub rendered: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+pub struct SparseMediaCaption {
+    #[WpContext(edit)]
+    pub raw: Option<String>,
+    #[WpContext(edit, embed, view)]
+    pub rendered: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{generate, posts::PostId, unit_test_common::assert_expected_and_from_query_pairs};
+    use rstest::*;
+
+    #[rstest]
+    #[case(MediaListParams::default(), "")]
+    #[case(generate!(MediaListParams, (page, Some(2))), "page=2")]
+    #[case(generate!(MediaListParams, (per_page, Some(2))), "per_page=2")]
+    #[case(generate!(MediaListParams, (search, Some("foo".to_string()))), "search=foo")]
+    #[case(generate!(MediaListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
+    #[case(generate!(MediaListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
+    #[case(generate!(MediaListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])), "exclude=1%2C2")]
+    #[case(generate!(MediaListParams, (include, vec![MediaId(1), MediaId(2)])), "include=1%2C2")]
+    #[case(generate!(MediaListParams, (offset, Some(2))), "offset=2")]
+    #[case(generate!(MediaListParams, (order, Some(WpApiParamOrder::Asc))), "order=asc")]
+    #[case(generate!(MediaListParams, (order, Some(WpApiParamOrder::Desc))), "order=desc")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), "orderby=author")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Date))), "orderby=date")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))), "orderby=id")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Include))), "orderby=include")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::IncludeSlugs))), "orderby=include_slugs")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Modified))), "orderby=modified")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Parent))), "orderby=parent")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Relevance))), "orderby=relevance")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Slug))), "orderby=slug")]
+    #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Title))), "orderby=title")]
+    #[case(generate!(MediaListParams, (parent, vec![PostId(44444), PostId(44445)])), "parent=44444%2C44445")]
+    #[case(generate!(MediaListParams, (parent_exclude, vec![PostId(55555), PostId(55556)])), "parent_exclude=55555%2C55556")]
+    #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent])), "search_columns=post_content")]
+    #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostExcerpt])), "search_columns=post_excerpt")]
+    #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_title")]
+    #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt, WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_content%2Cpost_excerpt%2Cpost_title")]
+    #[case(generate!(MediaListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), "slug=foo%2Cbar")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Inherit])), "status=inherit")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Private])), "status=private")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Trash])), "status=trash")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Custom("foo".to_string())])), "status=foo")]
+    #[case(generate!(MediaListParams, (status, vec![MediaStatus::Inherit, MediaStatus::Private, MediaStatus::Trash, MediaStatus::Custom("foo".to_string())])), "status=inherit%2Cprivate%2Ctrash%2Cfoo")]
+    #[case(generate!(MediaListParams, (media_type, Some(MediaTypeParam::Image))), "media_type=image")]
+    #[case(generate!(MediaListParams, (mime_type, Some("image/jpeg".to_string()))), "mime_type=image%2Fjpeg")]
+    #[case(MediaListParams {
+            page: Some(11),
+            per_page: Some(22),
+            search: Some("s_q".to_string()),
+            after: Some("d_a".to_string()),
+            modified_after: Some("d_m_a".to_string()),
+            author: vec![UserId(111), UserId(112)],
+            author_exclude: vec![UserId(211), UserId(212)],
+            before: Some("d_b".to_string()),
+            modified_before: Some("d_m_b".to_string()),
+            exclude: vec![MediaId(1111), MediaId(1112)],
+            include: vec![MediaId(2111), MediaId(2112)],
+            offset: Some(11111),
+            order: Some(WpApiParamOrder::Desc),
+            orderby: Some(WpApiParamPostsOrderBy::Slug),
+            parent: vec![PostId(44444), PostId(44445)],
+            parent_exclude: vec![PostId(55555), PostId(55556)],
+            search_columns: vec![
+                WpApiParamPostsSearchColumn::PostContent,
+                WpApiParamPostsSearchColumn::PostExcerpt,
+            ],
+            slug: vec!["sl_1".to_string(), "sl_2".to_string()],
+            status: vec![MediaStatus::Inherit, MediaStatus::Private, MediaStatus::Trash],
+            media_type: Some(MediaTypeParam::Image),
+            mime_type: Some("image/jpeg".to_string()),
+        },
+        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
+    )]
+    #[trace]
+    fn test_post_list_query_pairs(#[case] params: MediaListParams, #[case] expected_query: &str) {
+        assert_expected_and_from_query_pairs(params, expected_query);
+    }
+}

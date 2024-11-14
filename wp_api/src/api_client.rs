@@ -3,6 +3,7 @@ use crate::request::{
         application_passwords_endpoint::{
             ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
         },
+        media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
         plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
         post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
         posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
@@ -39,6 +40,7 @@ impl UniffiWpApiRequestBuilder {
 #[derive(Debug)]
 pub struct WpApiRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
+    media: Arc<MediaRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
@@ -54,6 +56,7 @@ impl WpApiRequestBuilder {
             api_base_url,
             authentication;
             application_passwords,
+            media,
             plugins,
             post_types,
             posts,
@@ -86,6 +89,7 @@ impl UniffiWpApiClient {
 #[derive(Debug)]
 pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
+    media: Arc<MediaRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
@@ -107,6 +111,7 @@ impl WpApiClient {
             authentication,
             request_executor;
             application_passwords,
+            media,
             plugins,
             post_types,
             posts,
@@ -118,6 +123,7 @@ impl WpApiClient {
 }
 
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
+api_client_generate_endpoint_impl!(WpApi, media);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);

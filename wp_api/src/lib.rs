@@ -4,7 +4,8 @@ pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
-use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, str::FromStr};
 use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
@@ -16,6 +17,7 @@ mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
 pub mod login;
+pub mod media;
 pub mod plugins;
 pub mod post_types;
 pub mod posts;
@@ -117,6 +119,18 @@ trait OptionFromStr {
 pub enum EnumFromStrParsingError {
     #[error("'{}' is not a valid variant for this enum", value)]
     UnknownVariant { value: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum JsonValue {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    Array(Vec<JsonValue>),
+    Object(HashMap<String, JsonValue>),
 }
 
 #[macro_export]
