@@ -1,6 +1,5 @@
 import SwiftUI
 import WordPressAPI
-import WordPressAPICombine
 import Combine
 
 private let userListParams = UserListParams(perPage: 5)
@@ -31,14 +30,6 @@ struct ExampleApp: App {
             try await WordPressAPI.globalInstance.postTypes.listWithViewContext().data.postTypes.map { _, value in
                 value.asListViewData
             }
-        }),
-        RootListData(name: "Posts with Combine", stream: {
-            let stream = try WordPressAPI.globalInstance.posts.streamWithEditContext(params: postListParams)
-
-            return ListViewDataStream(
-                publisher: stream.getPublisher().map { $0.asListViewData() }.eraseToAnyPublisher(),
-                underlyingStream: stream
-            )
         }),
         RootListData(name: "Posts with AsyncSequence", sequence: {
             let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)

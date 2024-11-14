@@ -1,8 +1,6 @@
 import Foundation
 import SwiftUI
 import WordPressAPI
-import WordPressAPICombine
-import Combine
 
 @MainActor
 protocol ListViewModel {
@@ -84,52 +82,6 @@ protocol ListViewModel {
     }
 }
 
-@Observable class CombineListViewModel: ListViewModel {
-
-    public typealias StreamProvider = () throws -> ListViewDataStream
-
-    var listItems: [String: ListViewData] = [:]
-    var isLoading: Bool = false
-
-    var shouldPresentAlert: Bool = false
-
-    var error: MyError?
-    var cancellables: Set<AnyCancellable> = []
-
-    private let streamProvider: StreamProvider
-
-    init(streamProvider: @escaping StreamProvider) {
-        self.streamProvider = streamProvider
-    }
-
-    func task() async {
-        self.error = nil
-
-        guard var currentStream = try? self.streamProvider() else { return }
-
-        currentStream.getPublisher()
-            .sink { completion in
-                switch completion {
-                case .finished:
-                    self.isLoading = false
-
-                case .failure(let error):
-                    self.error = MyError(underlyingError: error)
-                    self.shouldPresentAlert = true
-                }
-            } receiveValue: { newValue in
-                withAnimation {
-                    for item in newValue {
-                        self.listItems[item.id] = item
-                    }
-                }
-            }
-        .store(in: &cancellables)
-
-        try? await currentStream.fetch()
-    }
-}
-
 struct MyError: LocalizedError {
     var underlyingError: Error
 
@@ -143,21 +95,6 @@ struct MyError: LocalizedError {
 
     var failureReason: String? {
         underlyingError.localizedDescription
-    }
-}
-
-struct ListViewDataStream {
-    typealias ValueType = [ListViewData]
-
-    let publisher: AnyPublisher<[ListViewData], Error>
-    var underlyingStream: WordPressAPICombine.Fetchable
-
-    mutating func fetch() async throws {
-        try await self.underlyingStream.fetch()
-    }
-
-    func getPublisher() -> AnyPublisher<[ListViewData], any Error> {
-        publisher
     }
 }
 

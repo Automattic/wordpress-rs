@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		242132C82CE69CE80021D8E8 /* WordPressAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 242132C72CE69CE80021D8E8 /* WordPressAPI */; };
 		242D648E2C3602C1007CA96C /* ListViewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D648D2C3602C1007CA96C /* ListViewData.swift */; };
 		242D64922C360687007CA96C /* RootListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64912C360687007CA96C /* RootListView.swift */; };
 		242D64942C3608C6007CA96C /* ListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64932C3608C6007CA96C /* ListView.swift */; };
@@ -19,7 +20,6 @@
 		24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C32E2BA8F96F00162AD1 /* LoginView.swift */; };
 		24A3C3362BAA874C00162AD1 /* LoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C3352BAA874C00162AD1 /* LoginManager.swift */; };
 		24E77D032CE44DD900F6998C /* WordPressAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 24E77D022CE44DD900F6998C /* WordPressAPI */; };
-		24E77D052CE44DD900F6998C /* WordPressAPI+Combine in Frameworks */ = {isa = PBXBuildFile; productRef = 24E77D042CE44DD900F6998C /* WordPressAPI+Combine */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,8 +42,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				24E77D052CE44DD900F6998C /* WordPressAPI+Combine in Frameworks */,
 				2479BF912B621CCA0014A01D /* WordPressAPI in Frameworks */,
+				242132C82CE69CE80021D8E8 /* WordPressAPI in Frameworks */,
 				24E77D032CE44DD900F6998C /* WordPressAPI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -128,7 +128,7 @@
 			packageProductDependencies = (
 				2479BF902B621CCA0014A01D /* WordPressAPI */,
 				24E77D022CE44DD900F6998C /* WordPressAPI */,
-				24E77D042CE44DD900F6998C /* WordPressAPI+Combine */,
+				242132C72CE69CE80021D8E8 /* WordPressAPI */,
 			);
 			productName = Example;
 			productReference = 2479BF7D2B621CB60014A01D /* Example.app */;
@@ -159,7 +159,7 @@
 			);
 			mainGroup = 2479BF742B621CB60014A01D;
 			packageReferences = (
-				24E77D012CE44DD900F6998C /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */,
+				242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */,
 			);
 			productRefGroup = 2479BF7E2B621CB60014A01D /* Products */;
 			projectDirPath = "";
@@ -415,13 +415,17 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		24E77D012CE44DD900F6998C /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */ = {
+		242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../../wordpress-rs";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		242132C72CE69CE80021D8E8 /* WordPressAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WordPressAPI;
+		};
 		2479BF902B621CCA0014A01D /* WordPressAPI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WordPressAPI;
@@ -429,10 +433,6 @@
 		24E77D022CE44DD900F6998C /* WordPressAPI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WordPressAPI;
-		};
-		24E77D042CE44DD900F6998C /* WordPressAPI+Combine */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = "WordPressAPI+Combine";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
