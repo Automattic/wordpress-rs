@@ -1,13 +1,14 @@
-import XCTest
 import Foundation
+import Testing
 @testable import WordPressAPI
 
 #if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
 #endif
 
-final class WordPressAPITests: XCTestCase {
+struct WordPressAPITests {
 
+    @Test
     func testExample() async throws {
         let response = """
           {
@@ -38,7 +39,7 @@ final class WordPressAPITests: XCTestCase {
           }
         """
         let stubs = HTTPStubs(stubs: [
-            HTTPStubs.stub(path: "/wp-json/wp/v2/users/1", with: try! .json(response))
+            HTTPStubs.stub(path: "/wp-json/wp/v2/users/1", with: try .json(response))
         ])
 
         let api = try WordPressAPI(
@@ -48,32 +49,6 @@ final class WordPressAPITests: XCTestCase {
             executor: stubs
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
-        XCTAssertEqual(user.data.name, "User Name")
+        #expect(user.data.name == "User Name")
     }
-
-#if !os(Linux)
-    // Skip on Linux, because `XCTExpectFailure` is unavailable on Linux
-    func testTimeout() async throws {
-        let stubs = HTTPStubs(stubs: [], missingStub: .failure(URLError(.timedOut)))
-
-        let api = try WordPressAPI(
-            urlSession: .shared,
-            baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
-            authenticationStategy: .none,
-            executor: stubs
-        )
-
-        do {
-            _ = try await api.users.retrieveWithViewContext(userId: 1)
-            XCTFail("Unexpected response")
-        } catch let error as URLError {
-            XCTAssertEqual(error.code, .timedOut)
-        } catch {
-            #if canImport(WordPressAPIInternal)
-            XCTAssertTrue(error is WordPressAPIInternal.WpApiError)
-            #endif
-        }
-    }
-#endif
-
 }

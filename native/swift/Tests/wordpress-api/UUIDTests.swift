@@ -1,12 +1,12 @@
 import Foundation
-import XCTest
+import Testing
 import WordPressAPI
 
-class WPUUIDTests: XCTestCase {
+struct WPUUIDTests {
 
+    @Test
     func testConvertToUUID() {
         let uuid = WpUuid().uuidString()
-        XCTAssertNotNil(UUID(uuidString: uuid), "WpUuid \(uuid) is not a Foundation.UUID")
+        #expect(UUID(uuidString: uuid) != nil, "WpUuid \(uuid) is not a Foundation.UUID")
     }
-
 }

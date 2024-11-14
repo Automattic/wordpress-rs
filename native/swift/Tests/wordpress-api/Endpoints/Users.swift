@@ -1,10 +1,10 @@
 import Foundation
-import XCTest
-
+import Testing
 @testable import WordPressAPI
 
-final class UsersTest: XCTestCase {
+struct UsersTests {
 
+    @Test
     func testRetrieveUser() async throws {
         let response = """
           {
@@ -45,7 +45,6 @@ final class UsersTest: XCTestCase {
             executor: stubs
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
-        XCTAssertEqual(user.data.name, "User Name")
+        #expect(user.data.name == "User Name")
     }
-
 }
