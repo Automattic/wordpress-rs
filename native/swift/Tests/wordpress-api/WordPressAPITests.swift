@@ -2,10 +2,6 @@ import Foundation
 import Testing
 @testable import WordPressAPI
 
-#if canImport(WordPressAPIInternal)
-import WordPressAPIInternal
-#endif
-
 struct WordPressAPITests {
 
     @Test

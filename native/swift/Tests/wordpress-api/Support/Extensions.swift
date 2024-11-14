@@ -1,7 +1,5 @@
 import Foundation
-import XCTest
-
-@testable import WordPressAPIInternal
+import WordPressAPI
 
 extension WpNetworkHeaderMap {
     static var empty: WpNetworkHeaderMap {
