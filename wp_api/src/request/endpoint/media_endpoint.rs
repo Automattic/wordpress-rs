@@ -1,8 +1,8 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
     media::{
-        MediaListParams, SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
-        SparseMediaFieldWithViewContext,
+        MediaId, MediaListParams, SparseMediaFieldWithEditContext,
+        SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
     },
     SparseField,
 };
@@ -12,6 +12,8 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum MediaRequest {
     #[contextual_paged(url = "/media", params = &MediaListParams, output = Vec<crate::media::SparseMedia>, filter_by = crate::media::SparseMediaField)]
     List,
+    #[contextual_get(url = "/media/<media_id>", output = crate::media::SparseMedia, filter_by = crate::media::SparseMediaField)]
+    Retrieve,
 }
 
 impl DerivedRequest for MediaRequest {
@@ -180,6 +182,58 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.filter_list_with_view_context(&params, fields),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn retrieve_media(endpoint: MediaRequestEndpoint) {
+        let media_id = MediaId(77);
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_edit_context(&media_id),
+            "/media/77?context=edit",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_embed_context(&media_id),
+            "/media/77?context=embed",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_view_context(&media_id),
+            "/media/77?context=view",
+        );
+    }
+
+    #[rstest]
+    fn filter_retrieve_media(endpoint: MediaRequestEndpoint) {
+        let media_id = MediaId(77);
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_edit_context(
+                &media_id,
+                &[
+                    SparseMediaFieldWithEditContext::Date,
+                    SparseMediaFieldWithEditContext::Guid,
+                ],
+            ),
+            "/media/77?context=edit&_fields=date%2Cguid",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_embed_context(
+                &media_id,
+                &[
+                    SparseMediaFieldWithEmbedContext::Link,
+                    SparseMediaFieldWithEmbedContext::PostType,
+                ],
+            ),
+            "/media/77?context=embed&_fields=link%2Ctype",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_view_context(
+                &media_id,
+                &[
+                    SparseMediaFieldWithViewContext::AltText,
+                    SparseMediaFieldWithViewContext::Template,
+                ],
+            ),
+            "/media/77?context=view&_fields=alt_text%2Ctemplate",
         );
     }
 
