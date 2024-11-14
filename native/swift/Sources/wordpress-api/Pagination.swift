@@ -152,7 +152,7 @@ public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequen
     private let params: ResponseType.ParamsType
     private let transform: Transformer
 
-    public init(params: ResponseType.ParamsType, transform: @escaping Transformer) {
+    init(params: ResponseType.ParamsType, transform: @escaping Transformer) {
         self.params = params
         self.transform = transform
     }
