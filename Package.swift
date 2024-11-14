@@ -26,10 +26,6 @@ var package = Package(
         .library(
             name: "WordPressAPI",
             targets: ["WordPressAPI"]
-        ),
-        .library(
-            name: "WordPressAPI+Combine",
-            targets: ["WordPressAPICombine"]
         )
     ],
     dependencies: [],
@@ -44,17 +40,6 @@ var package = Package(
                 .enableExperimentalFeature("StrictConcurrency"),
             ]
         ),
-        .target(
-            name: "WordPressAPICombine",
-            dependencies: [
-                .target(name: "WordPressAPI")
-            ],
-            path: "native/swift/Sources/wordpress-api-combine",
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency"),
-            ]
-        ),
-
         .target(
             name: "WordPressAPIInternal",
             dependencies: [
