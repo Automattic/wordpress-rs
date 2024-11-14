@@ -41,12 +41,8 @@ struct ExampleApp: App {
             )
         }),
         RootListData(name: "Posts with AsyncSequence", sequence: {
-            do {
-                let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
-                return ListViewSequence(underlyingSequence: sequence)
-            } catch {
-                abort()
-            }
+            let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
+            return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Site Health Tests", callback: {
             let items: [any ListViewDataConvertable] = [

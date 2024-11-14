@@ -20,7 +20,7 @@ protocol ListViewModel {
 @Observable class SequenceListViewModel: ListViewModel {
     var listItems: [String: ListViewData] = [String: ListViewData](minimumCapacity: 250)
 
-    typealias SequenceProvider = () -> ListViewSequence
+    typealias SequenceProvider = () throws -> ListViewSequence
 
     private let sequenceProvider: SequenceProvider
 
@@ -36,7 +36,7 @@ protocol ListViewModel {
 
     func task() async {
         do {
-            for try await page in self.sequenceProvider() {
+            for try await page in try self.sequenceProvider() {
                 for item in page {
                     self.listItems[item.id] = item
                 }
