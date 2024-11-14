@@ -12,15 +12,8 @@ class LoginTests: XCTestCase {
     // swiftlint:disable:next force_try
     let appId = { try! WpUuid.parse(input: "caa8b54a-eb5e-4134-8ae2-a3946a428ec7") }()
 
-    var stubs: HTTPStubs!
-
-    override func setUp() {
-        super.setUp()
-        stubs = HTTPStubs()
-        stubs.missingStub = .failure(URLError(.timedOut))
-    }
-
     func testInvalidUrl() async {
+        let stubs = HTTPStubs(stubs: [], missingStub: .failure(URLError(.timedOut)))
         let client = WordPressLoginClient(requestExecutor: stubs)
         do {
             let result = await client.login(
@@ -39,10 +32,13 @@ class LoginTests: XCTestCase {
     }
 
     func testNotWordPressSite() async throws {
-        try stubs.stub(
-            host: "example.com",
-            with: WpNetworkResponse(body: Data(), statusCode: 200, headerMap: .fromMap(hashMap: [:]))
-        )
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(
+                host: "example.com",
+                with: WpNetworkResponse(body: Data(), statusCode: 200, headerMap: .empty)
+            )
+        ])
+
         let client = WordPressLoginClient(requestExecutor: stubs)
         do {
             let result = await client.login(
@@ -71,22 +67,24 @@ class LoginTests: XCTestCase {
     }
 
     func testWpJsonError() async throws {
-        try stubs.stub(
-            url: "https://example.com/",
-            with: WpNetworkResponse(
-                body: Data(),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(
+                url: "https://example.com/",
+                with: WpNetworkResponse(
+                    body: Data(),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
+            ),
+            HTTPStubs.stub(
+                url: "https://example.com/wp-json/",
+                with: WpNetworkResponse(
+                    body: "not a json".data(using: .utf8)!,
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
             )
-        )
-        try stubs.stub(
-            url: "https://example.com/wp-json/",
-            with: WpNetworkResponse(
-                body: "not a json".data(using: .utf8)!,
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
-            )
-        )
+        ])
 
         let client = WordPressLoginClient(requestExecutor: stubs)
         do {
@@ -116,15 +114,6 @@ class LoginTests: XCTestCase {
     }
 
     func testMissingAuthenticationEndpoint() async throws {
-        try stubs.stub(
-            url: "https://example.com/",
-            with: WpNetworkResponse(
-                body: Data(),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
-            )
-        )
-
         let wpJsonResponse = try XCTUnwrap(
             Bundle.module.url(
                 forResource: "Responses/LoginTests-wp-json-missing-authentication-endpoint",
@@ -132,14 +121,24 @@ class LoginTests: XCTestCase {
             )
         )
 
-        try stubs.stub(
-            url: "https://example.com/wp-json/",
-            with: WpNetworkResponse(
-                body: Data(contentsOf: wpJsonResponse),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(
+                url: "https://example.com/",
+                with: WpNetworkResponse(
+                    body: Data(),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
+            ),
+            HTTPStubs.stub(
+                url: "https://example.com/wp-json/",
+                with: WpNetworkResponse(
+                    body: try Data(contentsOf: wpJsonResponse),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
             )
-        )
+        ])
 
         let client = WordPressLoginClient(requestExecutor: stubs)
         do {
@@ -159,15 +158,6 @@ class LoginTests: XCTestCase {
     }
 
     func testRejectedResult() async throws {
-        try stubs.stub(
-            url: "https://example.com/",
-            with: WpNetworkResponse(
-                body: Data(),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
-            )
-        )
-
         let wpJsonResponse = try XCTUnwrap(
             Bundle.module.url(
                 forResource: "Responses/LoginTests-wp-json",
@@ -175,14 +165,24 @@ class LoginTests: XCTestCase {
             )
         )
 
-        try stubs.stub(
-            url: "https://example.com/wp-json/",
-            with: WpNetworkResponse(
-                body: Data(contentsOf: wpJsonResponse),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(
+                url: "https://example.com/",
+                with: WpNetworkResponse(
+                    body: Data(),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
+            ),
+            HTTPStubs.stub(
+                url: "https://example.com/wp-json/",
+                with: WpNetworkResponse(
+                    body: try Data(contentsOf: wpJsonResponse),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
             )
-        )
+        ])
 
         let client = WordPressLoginClient(requestExecutor: stubs)
         let rejectedURL = try XCTUnwrap(URL(string: "x-wordpress-app://login-callback?success=false"))
@@ -203,15 +203,6 @@ class LoginTests: XCTestCase {
     }
 
     func testApprovedResult() async throws {
-        try stubs.stub(
-            url: "https://example.com/",
-            with: WpNetworkResponse(
-                body: Data(),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
-            )
-        )
-
         let wpJsonResponse = try XCTUnwrap(
             Bundle.module.url(
                 forResource: "Responses/LoginTests-wp-json",
@@ -219,14 +210,24 @@ class LoginTests: XCTestCase {
             )
         )
 
-        try stubs.stub(
-            url: "https://example.com/wp-json/",
-            with: WpNetworkResponse(
-                body: Data(contentsOf: wpJsonResponse),
-                statusCode: 200,
-                headerMap: .fromMap(hashMap: ["Link": #"<https://example.com/wp-json/>; rel="https://api.w.org/""#])
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(
+                url: "https://example.com/",
+                with: WpNetworkResponse(
+                    body: Data(),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
+            ),
+            HTTPStubs.stub(
+                url: "https://example.com/wp-json/",
+                with: WpNetworkResponse(
+                    body: try Data(contentsOf: wpJsonResponse),
+                    statusCode: 200,
+                    headerMap: .withLinkHeader(#"<https://example.com/wp-json/>; rel="https://api.w.org/""#)
+                )
             )
-        )
+        ])
 
         let client = WordPressLoginClient(requestExecutor: stubs)
         // swiftlint:disable:next line_length
@@ -243,7 +244,6 @@ class LoginTests: XCTestCase {
         XCTAssertEqual(success.userLogin, "admin")
         XCTAssertEqual(success.password, "123456")
     }
-
 }
 
 private class Authenticator: WordPressLoginClient.Authenticator {

@@ -37,8 +37,9 @@ final class WordPressAPITests: XCTestCase {
             }
           }
         """
-        let stubs = HTTPStubs()
-        try stubs.stub(path: "/wp-json/wp/v2/users/1", with: .json(response))
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(path: "/wp-json/wp/v2/users/1", with: try! .json(response))
+        ])
 
         let api = try WordPressAPI(
             urlSession: .shared,
@@ -53,8 +54,7 @@ final class WordPressAPITests: XCTestCase {
 #if !os(Linux)
     // Skip on Linux, because `XCTExpectFailure` is unavailable on Linux
     func testTimeout() async throws {
-        let stubs = HTTPStubs()
-        stubs.missingStub = .failure(URLError(.timedOut))
+        let stubs = HTTPStubs(stubs: [], missingStub: .failure(URLError(.timedOut)))
 
         let api = try WordPressAPI(
             urlSession: .shared,

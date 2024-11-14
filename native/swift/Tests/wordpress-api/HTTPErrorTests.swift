@@ -12,8 +12,7 @@ class HTTPErrorTests: XCTestCase {
 #if !os(Linux)
     // Skip on Linux, because `XCTExpectFailure` is unavailable on Linux
     func testTimeout() async throws {
-        let stubs = HTTPStubs()
-        stubs.missingStub = .failure(URLError(.timedOut))
+        let stubs = HTTPStubs(stubs: [], missingStub: .failure(URLError(.timedOut)))
 
         let api = try WordPressAPI(
             urlSession: .shared,
