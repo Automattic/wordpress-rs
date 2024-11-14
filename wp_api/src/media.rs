@@ -214,10 +214,10 @@ pub struct MediaListParams {
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Limit result set to items with particular parent IDs.
     #[uniffi(default = [])]
-    pub parent: Vec<MediaId>,
+    pub parent: Vec<crate::posts::PostId>,
     /// Limit result set to all items except those of a particular parent ID.
     #[uniffi(default = [])]
-    pub parent_exclude: Vec<MediaId>,
+    pub parent_exclude: Vec<crate::posts::PostId>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
     pub search_columns: Vec<WpApiParamPostsSearchColumn>,
@@ -443,7 +443,7 @@ pub struct SparseMediaCaption {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, unit_test_common::assert_expected_and_from_query_pairs};
+    use crate::{generate, posts::PostId, unit_test_common::assert_expected_and_from_query_pairs};
     use rstest::*;
 
     #[rstest]
@@ -472,8 +472,8 @@ mod tests {
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Relevance))), "orderby=relevance")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Slug))), "orderby=slug")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Title))), "orderby=title")]
-    #[case(generate!(MediaListParams, (parent, vec![MediaId(44444), MediaId(44445)])), "parent=44444%2C44445")]
-    #[case(generate!(MediaListParams, (parent_exclude, vec![MediaId(55555), MediaId(55556)])), "parent_exclude=55555%2C55556")]
+    #[case(generate!(MediaListParams, (parent, vec![PostId(44444), PostId(44445)])), "parent=44444%2C44445")]
+    #[case(generate!(MediaListParams, (parent_exclude, vec![PostId(55555), PostId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent])), "search_columns=post_content")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostExcerpt])), "search_columns=post_excerpt")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_title")]
@@ -501,8 +501,8 @@ mod tests {
             offset: Some(11111),
             order: Some(WpApiParamOrder::Desc),
             orderby: Some(WpApiParamPostsOrderBy::Slug),
-            parent: vec![MediaId(44444), MediaId(44445)],
-            parent_exclude: vec![MediaId(55555), MediaId(55556)],
+            parent: vec![PostId(44444), PostId(44445)],
+            parent_exclude: vec![PostId(55555), PostId(55556)],
             search_columns: vec![
                 WpApiParamPostsSearchColumn::PostContent,
                 WpApiParamPostsSearchColumn::PostExcerpt,

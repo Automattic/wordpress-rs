@@ -55,7 +55,7 @@ mod tests {
     use crate::{
         generate,
         media::{MediaId, MediaStatus, MediaTypeParam},
-        posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
+        posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
         request::endpoint::{
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
@@ -91,8 +91,8 @@ mod tests {
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Relevance))), "orderby=relevance")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Slug))), "orderby=slug")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Title))), "orderby=title")]
-    #[case(generate!(MediaListParams, (parent, vec![MediaId(44444), MediaId(44445)])), "parent=44444%2C44445")]
-    #[case(generate!(MediaListParams, (parent_exclude, vec![MediaId(55555), MediaId(55556)])), "parent_exclude=55555%2C55556")]
+    #[case(generate!(MediaListParams, (parent, vec![PostId(44444), PostId(44445)])), "parent=44444%2C44445")]
+    #[case(generate!(MediaListParams, (parent_exclude, vec![PostId(55555), PostId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent])), "search_columns=post_content")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostExcerpt])), "search_columns=post_excerpt")]
     #[case(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostTitle])), "search_columns=post_title")]
@@ -201,8 +201,8 @@ mod tests {
             offset: Some(11111),
             order: Some(WpApiParamOrder::Desc),
             orderby: Some(WpApiParamPostsOrderBy::Slug),
-            parent: vec![MediaId(44444), MediaId(44445)],
-            parent_exclude: vec![MediaId(55555), MediaId(55556)],
+            parent: vec![PostId(44444), PostId(44445)],
+            parent_exclude: vec![PostId(55555), PostId(55556)],
             search_columns: vec![
                 WpApiParamPostsSearchColumn::PostContent,
                 WpApiParamPostsSearchColumn::PostExcerpt,

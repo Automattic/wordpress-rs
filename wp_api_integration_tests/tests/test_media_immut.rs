@@ -7,7 +7,7 @@ use wp_api::{
         MediaId, MediaListParams, MediaStatus, MediaTypeParam, SparseMediaFieldWithEditContext,
         SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
     },
-    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
+    posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
     WpApiParamOrder,
 };
 use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
@@ -91,8 +91,8 @@ async fn paginate_list_posts_with_edit_context(#[case] params: MediaListParams) 
 #[case::offset(generate!(MediaListParams, (offset, Some(2))))]
 #[case::order(generate!(MediaListParams, (order, Some(WpApiParamOrder::Asc))))]
 #[case::orderby(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))))]
-#[case::parent(generate!(MediaListParams, (parent, vec![MediaId(1), MediaId(2)])))]
-#[case::parent_exclude(generate!(MediaListParams, (parent, vec![MediaId(1), MediaId(2)])))]
+#[case::parent(generate!(MediaListParams, (parent, vec![PostId(1), PostId(2)])))]
+#[case::parent_exclude(generate!(MediaListParams, (parent, vec![PostId(1), PostId(2)])))]
 #[case::search_columns(generate!(MediaListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt])))]
 #[case::slug(generate!(MediaListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
 #[case::status(generate!(MediaListParams, (status, vec![MediaStatus::Inherit, MediaStatus::Private, MediaStatus::Trash])))]
