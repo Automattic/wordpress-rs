@@ -8,6 +8,8 @@ public protocol PaginatableResponse: Sendable {
     var prevPageParams: ParamsType? { get }
 
     var data: [DataType] { get }
+
+    init(data: [DataType], headerMap: WpNetworkHeaderMap, nextPageParams: ParamsType?, prevPageParams: ParamsType?)
 }
 
 public protocol PaginationAwareExecutor {
