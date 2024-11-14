@@ -1,15 +1,17 @@
 import Foundation
 import WordPressAPI
 
-#if canImport(WordPressAPIInternal)
-import WordPressAPIInternal
-#endif
+final class HTTPStubs: SafeRequestExecutor {
 
-class HTTPStubs: SafeRequestExecutor {
+    typealias Stub = (condition: @Sendable (WpNetworkRequest) -> Bool, response: WpNetworkResponse)
 
-    var stubs: [(condition: (WpNetworkRequest) -> Bool, response: WpNetworkResponse)] = []
+    private let stubs: [Stub]
+    private let missingStub: Result<WpNetworkResponse, Error>?
 
-    var missingStub: Result<WpNetworkResponse, Error>?
+    init(stubs: [Stub] = [], missingStub: Result<WpNetworkResponse, Error>? = nil) {
+        self.stubs = stubs
+        self.missingStub = missingStub
+    }
 
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
@@ -28,32 +30,31 @@ class HTTPStubs: SafeRequestExecutor {
         }
     }
 
-    func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
+    private func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
         stubs.first { stub in stub.condition(request) }?
             .response
     }
 
-    func stub(url: String, with response: WpNetworkResponse) {
-        stubs.append((
+    static func stub(url: String, with response: WpNetworkResponse) -> Stub {
+        (
             condition: { URL(string: $0.url()) == URL(string: url) },
             response: response
-        ))
+        )
     }
 
-    func stub(host: String, with response: WpNetworkResponse) {
-        stubs.append((
+    static func stub(host: String, with response: WpNetworkResponse) -> Stub {
+        (
             condition: { URL(string: $0.url())?.host == host },
             response: response
-        ))
+        )
     }
 
-    func stub(path: String, with response: WpNetworkResponse) {
-        stubs.append((
+    static func stub(path: String, with response: WpNetworkResponse) -> Stub {
+        (
             condition: { URL(string: $0.url())?.path == path },
             response: response
-        ))
+        )
     }
-
 }
 
 extension WpNetworkResponse {

@@ -1,9 +1,13 @@
-import XCTest
+import Foundation
+import Testing
 import WordPressAPI
 
-final class FoundationExtensionsTests: XCTestCase {
+class FoundationExtensionsTests {
 
-    func testWordPressDateTimeParsing() throws {
-        XCTAssertNotNil(Date.fromWordPressDate("2024-07-04T01:49:37"))
+    @Test("The Foundation Extension can parse WordPress-formatted date strings", arguments: [
+        "2024-07-04T01:49:37"
+    ])
+    func testWordPressDateTimeParsing(_ string: String) throws {
+        #expect(Date.fromWordPressDate(string) != nil)
     }
 }

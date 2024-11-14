@@ -8,9 +8,7 @@ import FoundationNetworking
 #endif
 
 public protocol SafeRequestExecutor: RequestExecutor {
-
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
-
 }
 
 extension SafeRequestExecutor {
@@ -22,9 +20,7 @@ extension SafeRequestExecutor {
 
 }
 
-#if hasFeature(RetroactiveAttribute)
-extension URLSession: @retroactive RequestExecutor {}
-#endif
+extension URLSession: RequestExecutor {}
 
 extension URLSession: SafeRequestExecutor {
 
@@ -36,9 +32,8 @@ extension URLSession: SafeRequestExecutor {
             return .failure(.RequestExecutionFailed(statusCode: nil, reason: error.localizedDescription))
         }
 
-        // swiftlint:disable force_cast
+        // swiftlint:disable:next force_cast
         let urlResponse = response as! HTTPURLResponse
-        // swiftlint:enable force_cast
 
         let headerMap: WpNetworkHeaderMap
 

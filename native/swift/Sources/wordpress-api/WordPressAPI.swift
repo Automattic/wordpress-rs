@@ -68,11 +68,8 @@ public struct WordPressAPI {
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
-        try await withCheckedThrowingContinuation { continuation in
-            self.perform(request: request) { result in
-                continuation.resume(with: result)
-            }
-        }
+        let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
+        return try WpNetworkResponse.from(data: data, response: response)
     }
 
     package func perform(
