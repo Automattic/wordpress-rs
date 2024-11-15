@@ -36,6 +36,13 @@ struct ExampleApp: App {
             let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
             return ListViewSequence(underlyingSequence: sequence)
         }),
+        RootListData(name: "Posts with Combine", publisher: {
+            let publisher = try WordPressAPI.globalInstance.posts.publisherWithEditContext(params: postListParams).tryMap {
+                $0.data.map(\.asListViewData)
+            }.eraseToAnyPublisher()
+            
+            return ListViewDataStream(publisher: publisher)
+        }),
         RootListData(name: "Media", sequence: {
             let sequence = try WordPressAPI.globalInstance.media.sequenceWithEditContext(params: mediaListParams)
             return ListViewSequence(underlyingSequence: sequence)

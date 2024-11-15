@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		242132C82CE69CE80021D8E8 /* WordPressAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 242132C72CE69CE80021D8E8 /* WordPressAPI */; };
+		242132CB2CE7D0BE0021D8E8 /* Combine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242132C92CE7D0220021D8E8 /* Combine.swift */; };
 		242D648E2C3602C1007CA96C /* ListViewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D648D2C3602C1007CA96C /* ListViewData.swift */; };
 		242D64922C360687007CA96C /* RootListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64912C360687007CA96C /* RootListView.swift */; };
 		242D64942C3608C6007CA96C /* ListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242D64932C3608C6007CA96C /* ListView.swift */; };
@@ -23,6 +24,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		242132C92CE7D0220021D8E8 /* Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Combine.swift; sourceTree = "<group>"; };
 		242D648D2C3602C1007CA96C /* ListViewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListViewData.swift; sourceTree = "<group>"; };
 		242D64912C360687007CA96C /* RootListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootListView.swift; sourceTree = "<group>"; };
 		242D64932C3608C6007CA96C /* ListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListView.swift; sourceTree = "<group>"; };
@@ -90,6 +92,7 @@
 		2479BF7F2B621CB60014A01D /* Example */ = {
 			isa = PBXGroup;
 			children = (
+				242132C92CE7D0220021D8E8 /* Combine.swift */,
 				242D64972C363960007CA96C /* UI */,
 				242D64982C363996007CA96C /* Resources */,
 				2479BF802B621CB60014A01D /* ExampleApp.swift */,
@@ -187,6 +190,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				242132CB2CE7D0BE0021D8E8 /* Combine.swift in Sources */,
 				242D64922C360687007CA96C /* RootListView.swift in Sources */,
 				2479BF812B621CB60014A01D /* ExampleApp.swift in Sources */,
 				24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */,

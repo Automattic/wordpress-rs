@@ -14,7 +14,8 @@ public struct WordPressAPI {
     }
 
     private let urlSession: URLSession
-    package let requestBuilder: UniffiWpApiClient
+    package let internalClient: UniffiWpApiClient
+    package let requestBuilder: UniffiWpApiRequestBuilder
 
     public init(urlSession: URLSession, baseUrl: ParsedUrl, authenticationStategy: WpAuthentication) {
         self.init(
@@ -32,35 +33,40 @@ public struct WordPressAPI {
         executor: SafeRequestExecutor
     ) {
         self.urlSession = urlSession
-        self.requestBuilder = UniffiWpApiClient(
+        self.internalClient = UniffiWpApiClient(
             siteUrl: baseUrl,
             authentication: authenticationStategy,
             requestExecutor: executor
         )
+
+        self.requestBuilder = UniffiWpApiRequestBuilder(
+            siteUrl: baseUrl,
+            authentication: authenticationStategy
+        )
     }
 
     public var users: UsersRequestExecutor {
-        self.requestBuilder.users()
+        self.internalClient.users()
     }
 
     public var plugins: PluginsRequestExecutor {
-        self.requestBuilder.plugins()
+        self.internalClient.plugins()
     }
 
     public var applicationPasswords: ApplicationPasswordsRequestExecutor {
-        self.requestBuilder.applicationPasswords()
+        self.internalClient.applicationPasswords()
     }
 
     public var siteHealthTests: WpSiteHealthTestsRequestExecutor {
-        self.requestBuilder.wpSiteHealthTests()
+        self.internalClient.wpSiteHealthTests()
     }
 
     public var postTypes: PostTypesRequestExecutor {
-        self.requestBuilder.postTypes()
+        self.internalClient.postTypes()
     }
 
     public var posts: PostsRequestExecutor {
-        self.requestBuilder.posts()
+        self.internalClient.posts()
     }
 
     public var media: MediaRequestExecutor {
@@ -68,7 +74,7 @@ public struct WordPressAPI {
     }
 
     public var siteSettings: SiteSettingsRequestExecutor {
-        self.requestBuilder.siteSettings()
+        self.internalClient.siteSettings()
     }
 
     package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
