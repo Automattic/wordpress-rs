@@ -17,7 +17,7 @@ protocol ListViewDataConvertable: Identifiable {
     var asListViewData: ListViewData { get }
 }
 
-extension UserWithEditContext: ListViewDataConvertable {
+extension UserWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.email, fields: [
             "First Name": self.firstName,
@@ -27,7 +27,7 @@ extension UserWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension UserWithViewContext: ListViewDataConvertable {
+extension UserWithViewContext: @retroactive Identifiable, ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
             "Name": self.name
@@ -35,7 +35,7 @@ extension UserWithViewContext: ListViewDataConvertable {
     }
 }
 
-extension UserWithEmbedContext: ListViewDataConvertable {
+extension UserWithEmbedContext: @retroactive Identifiable, ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
             "Name": self.name
@@ -43,7 +43,7 @@ extension UserWithEmbedContext: ListViewDataConvertable {
     }
 }
 
-extension PluginWithEditContext: ListViewDataConvertable {
+extension PluginWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
     public var id: String {
         self.plugin.slug
     }
@@ -56,7 +56,7 @@ extension PluginWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
+extension ApplicationPasswordWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
     public var id: String {
         self.uuid.uuid
     }
@@ -76,7 +76,7 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension SiteHealthTest: ListViewDataConvertable {
+extension SiteHealthTest: @retroactive Identifiable, ListViewDataConvertable {
     public var id: String {
         self.label
     }
@@ -86,7 +86,7 @@ extension SiteHealthTest: ListViewDataConvertable {
     }
 }
 
-extension SiteHealthDirectorySizes: ListViewDataConvertable {
+extension SiteHealthDirectorySizes: @retroactive Identifiable, ListViewDataConvertable {
     public var id: String {
         [
             self.databaseSize.size,
@@ -117,7 +117,7 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
     }
 }
 
-extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
+extension PostTypeDetailsWithViewContext: @retroactive Identifiable, ListViewDataConvertable {
     public var id: String {
         self.slug
     }
@@ -147,7 +147,7 @@ extension SiteSettingsWithEditContext {
     }
 }
 
-extension PostWithEditContext: ListViewDataConvertable {
+extension PostWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
     public var id: String {
         self.slug
     }

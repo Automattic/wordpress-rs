@@ -1,0 +1,180 @@
+@preconcurrency import WordPressAPIInternal
+import Combine
+
+public final class MediaRequestPerformer {
+    typealias ExecutorType = MediaRequestExecutor
+    typealias RequestBuilderType = MediaRequestBuilder
+
+    internal let executor: MediaRequestExecutor
+    internal let builder: RequestBuilderType
+
+    init(executor: MediaRequestExecutor, builder: RequestBuilderType) {
+        self.executor = executor
+        self.builder = builder
+    }
+}
+
+public struct MediaCreateParams {}
+public struct MediaRequestCreateResponse {}
+
+extension MediaRequestPerformer: InternalRequestPerformer {}
+extension MediaRequestPerformer: PublisherAwarePerformer {}
+extension MediaRequestPerformer: CallbackAwarePerformer {}
+
+extension MediaRequestPerformer: RequestPerformer {
+    public typealias IdType = MediaId
+
+    public typealias SingleEditType = MediaWithEditContext
+    public typealias SingleEmbedType = MediaWithEmbedContext
+    public typealias SingleViewType = MediaWithViewContext
+
+    public typealias ListParamsType = MediaListParams
+    public typealias CreateParamsType = MediaCreateParams
+    public typealias UpdateParamsType = MediaUpdateParams
+
+    public typealias CreateResponseType = MediaRequestCreateResponse
+    public typealias UpdateResponseType = MediaRequestUpdateResponse
+    public typealias DeleteResponseType = MediaRequestDeleteResponse
+
+    public typealias EditContextListResponseType = MediaRequestListWithEditContextResponse
+    public typealias EmbedContextListResponseType = MediaRequestListWithEmbedContextResponse
+    public typealias ViewContextListResponseType = MediaRequestListWithViewContextResponse
+
+    public func buildCreateRequest(params: MediaCreateParams) -> WpNetworkRequest {
+        WpNetworkRequest(noPointer: .init())
+    }
+
+    public func buildUpdateRequest(id: MediaId, params: MediaUpdateParams) -> WpNetworkRequest {
+        builder.update(mediaId: id, params: params)
+    }
+
+    public func buildDeleteRequest(id: MediaId) -> WpNetworkRequest {
+        builder.delete(mediaId: id)
+    }
+
+    public func buildListWithEditRequest(params: MediaListParams) -> WpNetworkRequest {
+        builder.listWithEditContext(params: params)
+    }
+
+    public func buildListWithEmbedRequest(params: MediaListParams) -> WpNetworkRequest {
+        builder.listWithEmbedContext(params: params)
+    }
+
+    public func buildListWithViewRequest(params: MediaListParams) -> WpNetworkRequest {
+        builder.listWithViewContext(params: params)
+    }
+
+    public func parseListWithEditResponse(
+        response: WpNetworkResponse
+    ) throws -> MediaRequestListWithEditContextResponse {
+        try parseAsMediaRequestListWithEditContextResponse(response: response)
+    }
+
+    public func parseListWithEmbedResponse(
+        response: WpNetworkResponse
+    ) throws -> MediaRequestListWithEmbedContextResponse {
+        try parseAsMediaRequestListWithEmbedContextResponse(response: response)
+    }
+
+    public func parseListWithViewResponse(
+        response: WpNetworkResponse
+    ) throws -> MediaRequestListWithViewContextResponse {
+        try parseAsMediaRequestListWithViewContextResponse(response: response)
+    }
+}
+
+// MARK: - PostsRequestExecutorProtocol
+
+// Allows the performer to respond to everything the PostsRequestExecutor does
+extension MediaRequestPerformer: MediaRequestExecutorProtocol {
+    public func listWithViewContext(
+        params: WordPressAPIInternal.MediaListParams
+    ) async throws -> WordPressAPIInternal.MediaRequestListWithViewContextResponse {
+        try await self.executor.listWithViewContext(params: params)
+    }
+
+    public func listWithEmbedContext(
+        params: WordPressAPIInternal.MediaListParams
+    ) async throws -> WordPressAPIInternal.MediaRequestListWithEmbedContextResponse {
+        try await self.executor.listWithEmbedContext(params: params)
+    }
+
+    public func listWithEditContext(
+        params: WordPressAPIInternal.MediaListParams
+    ) async throws -> WordPressAPIInternal.MediaRequestListWithEditContextResponse {
+        try await self.executor.listWithEditContext(params: params)
+    }
+
+    public func delete(
+        mediaId: WordPressAPIInternal.MediaId
+    ) async throws -> WordPressAPIInternal.MediaRequestDeleteResponse {
+        try await self.executor.delete(mediaId: mediaId)
+    }
+
+    public func filterListWithEditContext(
+        params: WordPressAPIInternal.MediaListParams,
+        fields: [WordPressAPIInternal.SparseMediaFieldWithEditContext]
+    ) async throws -> WordPressAPIInternal.MediaRequestFilterListWithEditContextResponse {
+        try await self.executor.filterListWithEditContext(params: params, fields: fields)
+    }
+
+    public func filterListWithEmbedContext(
+        params: WordPressAPIInternal.MediaListParams,
+        fields: [WordPressAPIInternal.SparseMediaFieldWithEmbedContext]
+    ) async throws -> WordPressAPIInternal.MediaRequestFilterListWithEmbedContextResponse {
+        try await self.executor.filterListWithEmbedContext(params: params, fields: fields)
+    }
+
+    public func filterListWithViewContext(
+        params: WordPressAPIInternal.MediaListParams,
+        fields: [WordPressAPIInternal.SparseMediaFieldWithViewContext]
+    ) async throws -> WordPressAPIInternal.MediaRequestFilterListWithViewContextResponse {
+        try await self.executor.filterListWithViewContext(params: params, fields: fields)
+    }
+
+    public func filterRetrieveWithEditContext(
+        mediaId: WordPressAPIInternal.MediaId,
+        fields: [WordPressAPIInternal.SparseMediaFieldWithEditContext]
+    ) async throws -> WordPressAPIInternal.MediaRequestFilterRetrieveWithEditContextResponse {
+        try await self.executor.filterRetrieveWithEditContext(mediaId: mediaId, fields: fields)
+    }
+
+    public func filterRetrieveWithEmbedContext(
+        mediaId: WordPressAPIInternal.MediaId,
+        fields: [WordPressAPIInternal.SparseMediaFieldWithEmbedContext]
+    ) async throws -> WordPressAPIInternal.MediaRequestFilterRetrieveWithEmbedContextResponse {
+        try await self.executor.filterRetrieveWithEmbedContext(mediaId: mediaId, fields: fields)
+    }
+
+    public func filterRetrieveWithViewContext(
+        mediaId: WordPressAPIInternal.MediaId,
+        fields: [WordPressAPIInternal.SparseMediaFieldWithViewContext]
+    ) async throws -> WordPressAPIInternal.MediaRequestFilterRetrieveWithViewContextResponse {
+        try await self.executor.filterRetrieveWithViewContext(mediaId: mediaId, fields: fields)
+    }
+
+    public func retrieveWithEditContext(
+        mediaId: WordPressAPIInternal.MediaId
+    ) async throws -> WordPressAPIInternal.MediaRequestRetrieveWithEditContextResponse {
+        try await self.executor.retrieveWithEditContext(mediaId: mediaId)
+    }
+
+    public func retrieveWithEmbedContext(
+        mediaId: MediaId
+    ) async throws -> MediaRequestRetrieveWithEmbedContextResponse {
+        try await self.executor.retrieveWithEmbedContext(mediaId: mediaId)
+    }
+
+    public func retrieveWithViewContext(
+        mediaId: MediaId
+    ) async throws -> MediaRequestRetrieveWithViewContextResponse {
+        try await self.executor.retrieveWithViewContext(mediaId: mediaId)
+    }
+
+    public func update(
+        mediaId: MediaId,
+        params: MediaUpdateParams
+    ) async throws -> MediaRequestUpdateResponse {
+        try await self.executor.update(mediaId: mediaId, params: params)
+    }
+}

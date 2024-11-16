@@ -65,12 +65,18 @@ public struct WordPressAPI {
         self.internalClient.postTypes()
     }
 
-    public var posts: PostsRequestExecutor {
-        self.internalClient.posts()
+    public var posts: PostsRequestPerformer {
+        PostsRequestPerformer(
+            executor: self.internalClient.posts(),
+            builder: self.requestBuilder.posts()
+        )
     }
 
-    public var media: MediaRequestExecutor {
-        self.requestBuilder.media()
+    public var media: MediaRequestPerformer {
+        MediaRequestPerformer(
+            executor: internalClient.media(),
+            builder: requestBuilder.media()
+        )
     }
 
     public var siteSettings: SiteSettingsRequestExecutor {

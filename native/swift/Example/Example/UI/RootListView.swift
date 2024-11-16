@@ -40,16 +40,16 @@ struct RootListViewItem: View {
                 }
             }
 
-            case .publisher(let name, let streamProvider):
-                VStack(alignment: .leading, spacing: 4.0) {
-                    NavigationLink {
-                        ListView(
-                            viewModel: CombineListViewModel(streamProvider: streamProvider)
-                        )
-                    } label: {
-                        Text(name)
-                    }
+        case .publisher(let name, let streamProvider):
+            VStack(alignment: .leading, spacing: 4.0) {
+                NavigationLink {
+                    ListView(
+                        viewModel: CombineListViewModel(streamProvider: streamProvider)
+                    )
+                } label: {
+                    Text(name)
                 }
+            }
         }
     }
 }

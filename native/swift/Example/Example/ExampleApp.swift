@@ -37,10 +37,12 @@ struct ExampleApp: App {
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Posts with Combine", publisher: {
-            let publisher = try WordPressAPI.globalInstance.posts.publisherWithEditContext(params: postListParams).tryMap {
-                $0.data.map(\.asListViewData)
-            }.eraseToAnyPublisher()
-            
+            let publisher = try WordPressAPI.globalInstance
+                .posts
+                .publisherWithEditContext(params: postListParams)
+                .tryMap({ $0.data.map(\.asListViewData) })
+                .eraseToAnyPublisher()
+
             return ListViewDataStream(publisher: publisher)
         }),
         RootListData(name: "Media", sequence: {

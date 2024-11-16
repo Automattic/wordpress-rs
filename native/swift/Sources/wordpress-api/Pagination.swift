@@ -198,7 +198,7 @@ extension PostsRequestListWithEmbedContextResponse: PaginatableResponse, @unchec
     public typealias DataType = PostWithEmbedContext
 }
 
-extension PostsRequestExecutor: PaginationAwareExecutor {
+extension PostsRequestPerformer: PaginationAwareExecutor {
     public typealias EditContextResponseType = PostsRequestListWithEditContextResponse
     public typealias ViewContextResponseType = PostsRequestListWithViewContextResponse
     public typealias EmbedContextResponseType = PostsRequestListWithEmbedContextResponse
