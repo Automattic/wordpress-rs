@@ -1,6 +1,9 @@
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
-    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
+    posts::{
+        PostCommentStatus, PostId, PostPingStatus, PostStatus, WpApiParamPostsOrderBy,
+        WpApiParamPostsSearchColumn,
+    },
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
@@ -214,10 +217,10 @@ pub struct MediaListParams {
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Limit result set to items with particular parent IDs.
     #[uniffi(default = [])]
-    pub parent: Vec<crate::posts::PostId>,
+    pub parent: Vec<PostId>,
     /// Limit result set to all items except those of a particular parent ID.
     #[uniffi(default = [])]
-    pub parent_exclude: Vec<crate::posts::PostId>,
+    pub parent_exclude: Vec<PostId>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
     pub search_columns: Vec<WpApiParamPostsSearchColumn>,
@@ -357,6 +360,67 @@ impl FromUrlQueryPairs for MediaListParams {
     }
 }
 
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct MediaUpdateParams {
+    /// The date the post was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// The date the post was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<String>,
+    /// An alphanumeric identifier for the post unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    /// A named status for the post.
+    /// One of: publish, future, draft, pending, private
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<PostStatus>,
+    /// The title for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The ID for the author of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    /// Whether or not comments are open on the post.
+    /// One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_status: Option<PostCommentStatus>,
+    /// Whether or not the post can be pinged.
+    /// One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ping_status: Option<PostPingStatus>,
+    /// The theme file to use to display the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+    /// Alternative text to display when attachment is not displayed.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alt_text: Option<String>,
+    /// The attachment caption.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
+    /// The attachment description.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The ID for the associated post of the attachment.
+    #[serde(rename = "post")]
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_id: Option<PostId>,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
@@ -394,9 +458,9 @@ pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub author: Option<crate::UserId>,
     #[WpContext(edit, view)]
-    pub comment_status: Option<crate::posts::PostCommentStatus>,
+    pub comment_status: Option<PostCommentStatus>,
     #[WpContext(edit, view)]
-    pub ping_status: Option<crate::posts::PostPingStatus>,
+    pub ping_status: Option<PostPingStatus>,
     #[WpContext(edit, view)]
     pub template: Option<String>,
     #[WpContext(edit, embed, view)]
@@ -416,7 +480,7 @@ pub struct SparseMedia {
     #[serde(rename = "post")]
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub post_id: Option<crate::posts::PostId>,
+    pub post_id: Option<PostId>,
     #[WpContext(edit, embed, view)]
     pub source_url: Option<String>,
     #[WpContext(edit)]

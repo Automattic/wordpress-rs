@@ -1,0 +1,97 @@
+use macro_helper::generate_update_test;
+use serial_test::serial;
+use wp_api::{
+    media::MediaUpdateParams,
+    posts::{PostCommentStatus, PostPingStatus, PostStatus},
+};
+use wp_api_integration_tests::{
+    api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
+};
+
+generate_update_test!(update_date, date, "2024-09-09T12:00:00".to_string());
+
+generate_update_test!(update_date_gmt, date_gmt, "2024-09-09T12:00:00".to_string());
+
+generate_update_test!(update_slug, slug, "new_slug".to_string());
+
+generate_update_test!(update_status_to_draft, status, PostStatus::Draft);
+generate_update_test!(update_status_to_future, status, PostStatus::Future);
+generate_update_test!(update_status_to_pending, status, PostStatus::Pending);
+generate_update_test!(update_status_to_private, status, PostStatus::Private);
+generate_update_test!(update_status_to_publish, status, PostStatus::Publish);
+
+generate_update_test!(update_title, title, "new_title".to_string());
+
+generate_update_test!(
+    update_comment_status_to_open,
+    comment_status,
+    PostCommentStatus::Open
+);
+
+generate_update_test!(
+    update_comment_status_to_closed,
+    comment_status,
+    PostCommentStatus::Closed
+);
+
+generate_update_test!(
+    update_ping_status_to_open,
+    ping_status,
+    PostPingStatus::Open
+);
+
+generate_update_test!(
+    update_ping_status_to_closed,
+    ping_status,
+    PostPingStatus::Closed
+);
+
+// TODO: `POST_TEMPLATE_SINGLE_WITH_SIDEBAR` doesn't work for `/media`.
+//generate_update_test!(
+//    update_template,
+//    template,
+//    POST_TEMPLATE_SINGLE_WITH_SIDEBAR.to_string()
+//);
+
+generate_update_test!(update_alt_text, alt_text, "new_alt_text".to_string());
+
+generate_update_test!(update_caption, caption, "new_caption".to_string());
+
+generate_update_test!(
+    update_description,
+    description,
+    "new_description".to_string()
+);
+
+generate_update_test!(update_post_id, post_id, FIRST_POST_ID);
+
+async fn test_update_media(params: &MediaUpdateParams) {
+    api_client()
+        .media()
+        .update(&MEDIA_ID_611, params)
+        .await
+        .assert_response();
+    RestoreServer::db().await;
+}
+
+mod macro_helper {
+    macro_rules! generate_update_test {
+        ($ident:ident, $field:ident, $new_value:expr) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn $ident() {
+                    let updated_value = $new_value;
+                    test_update_media(
+                        &MediaUpdateParams {
+                            $field: Some(updated_value),
+                            ..Default::default()
+                        })
+                    .await;
+                }
+            }
+        };
+    }
+
+    pub(super) use generate_update_test;
+}
