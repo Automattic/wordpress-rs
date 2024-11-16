@@ -1,6 +1,6 @@
 import Foundation
 
-protocol CallbackAwarePerformer: RequestPerformer {
+public protocol CallbackAwarePerformer: RequestPerformer {
 
     // Generated implementation
     func listWithEditContext(
@@ -24,12 +24,72 @@ protocol CallbackAwarePerformer: RequestPerformer {
 
 extension CallbackAwarePerformer {
 
-    func perform(
+    public func listWithEditContext(
+        params: ListParamsType,
+        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void,
+        queue: DispatchQueue
+    ) {
+        perform(request: buildListWithEditRequest(params: params), callback: { result in
+            switch result {
+            case .success(let response):
+                do {
+                    let response = try parseListWithEditResponse(response: response)
+                    callback(.success(response))
+                } catch {
+                    callback(.failure(error))
+                }
+            case .failure(let error):
+                callback(.failure(error))
+            }
+        }, on: queue)
+    }
+
+    public func listWithEmbedContext(
+        params: ListParamsType,
+        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void,
+        queue: DispatchQueue
+    ) {
+        perform(request: buildListWithEmbedRequest(params: params), callback: { result in
+            switch result {
+            case .success(let response):
+                do {
+                    let response = try parseListWithEmbedResponse(response: response)
+                    callback(.success(response))
+                } catch {
+                    callback(.failure(error))
+                }
+            case .failure(let error):
+                callback(.failure(error))
+            }
+        }, on: queue)
+    }
+
+    public func listWithViewContext(
+        params: ListParamsType,
+        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void,
+        queue: DispatchQueue
+    ) {
+        perform(request: buildListWithViewRequest(params: params), callback: { result in
+            switch result {
+            case .success(let response):
+                do {
+                    let response = try parseListWithViewResponse(response: response)
+                    callback(.success(response))
+                } catch {
+                    callback(.failure(error))
+                }
+            case .failure(let error):
+                callback(.failure(error))
+            }
+        }, on: queue)
+    }
+
+    private func perform(
         request: WpNetworkRequest,
         callback: @escaping @Sendable (Result<WpNetworkResponse, Error>) -> Void,
         on queue: DispatchQueue = .global(qos: .background)
     ) {
-        URLSession.shared.dataTask(with: request.asURLRequest()) { data, response, error in
+        self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
             queue.async {
                 if let error {
                     callback(.failure(error))
@@ -51,63 +111,4 @@ extension CallbackAwarePerformer {
         }
     }
 
-    func listWithEditContext(
-        params: ListParamsType,
-        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
-    ) {
-        perform(request: buildListWithEditRequest(params: params), callback: { result in
-            switch result {
-            case .success(let response):
-                do {
-                    let response = try parseListWithEditResponse(response: response)
-                    callback(.success(response))
-                } catch {
-                    callback(.failure(error))
-                }
-            case .failure(let error):
-                callback(.failure(error))
-            }
-        }, on: queue)
-    }
-
-    func listWithEmbedContext(
-        params: ListParamsType,
-        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
-    ) {
-        perform(request: buildListWithEmbedRequest(params: params), callback: { result in
-            switch result {
-            case .success(let response):
-                do {
-                    let response = try parseListWithEmbedResponse(response: response)
-                    callback(.success(response))
-                } catch {
-                    callback(.failure(error))
-                }
-            case .failure(let error):
-                callback(.failure(error))
-            }
-        }, on: queue)
-    }
-
-    func listWithViewContext(
-        params: ListParamsType,
-        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
-    ) {
-        perform(request: buildListWithViewRequest(params: params), callback: { result in
-            switch result {
-            case .success(let response):
-                do {
-                    let response = try parseListWithViewResponse(response: response)
-                    callback(.success(response))
-                } catch {
-                    callback(.failure(error))
-                }
-            case .failure(let error):
-                callback(.failure(error))
-            }
-        }, on: queue)
-    }
 }

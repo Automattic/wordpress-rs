@@ -40,7 +40,7 @@ struct ExampleApp: App {
             let publisher = try WordPressAPI.globalInstance
                 .posts
                 .publisherWithEditContext(params: postListParams)
-                .tryMap({ $0.data.map(\.asListViewData) })
+                .tryMap({ $0.map(\.asListViewData) })
                 .eraseToAnyPublisher()
 
             return ListViewDataStream(publisher: publisher)

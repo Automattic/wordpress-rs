@@ -68,7 +68,8 @@ public struct WordPressAPI {
     public var posts: PostsRequestPerformer {
         PostsRequestPerformer(
             executor: self.internalClient.posts(),
-            builder: self.requestBuilder.posts()
+            builder: self.requestBuilder.posts(),
+            session: self.urlSession
         )
     }
 

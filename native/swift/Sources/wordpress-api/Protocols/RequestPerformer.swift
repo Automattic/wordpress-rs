@@ -27,6 +27,8 @@ public protocol RequestPerformer: Sendable {
     associatedtype EmbedContextListResponseType: PaginatableResponse
     associatedtype ViewContextListResponseType: PaginatableResponse
 
+    var urlSession: URLSession { get }
+
     // MARK: - Request Builders
     func buildCreateRequest(params: CreateParamsType) -> WpNetworkRequest
     func buildUpdateRequest(id: IdType, params: UpdateParamsType) -> WpNetworkRequest

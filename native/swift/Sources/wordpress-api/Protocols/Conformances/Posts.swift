@@ -1,20 +1,22 @@
-@preconcurrency import WordPressAPIInternal
+import Foundation
 import Combine
+@preconcurrency import WordPressAPIInternal
 
 public final class PostsRequestPerformer {
     typealias ExecutorType = PostsRequestExecutor
     typealias RequestBuilderType = PostsRequestBuilder
 
-    internal let executor: PostsRequestExecutor
-    internal let builder: RequestBuilderType
+    let executor: PostsRequestExecutor
+    let builder: RequestBuilderType
+    public let urlSession: URLSession
 
-    init(executor: PostsRequestExecutor, builder: RequestBuilderType) {
+    init(executor: PostsRequestExecutor, builder: RequestBuilderType, session: URLSession) {
         self.executor = executor
         self.builder = builder
+        self.urlSession = session
     }
 }
 
-extension PostsRequestPerformer: InternalRequestPerformer {}
 extension PostsRequestPerformer: PublisherAwarePerformer {}
 extension PostsRequestPerformer: CallbackAwarePerformer {}
 

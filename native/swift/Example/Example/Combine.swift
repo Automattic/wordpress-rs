@@ -37,14 +37,12 @@ import WordPressAPI
                         self.error = MyError(underlyingError: error)
                         self.shouldPresentAlert = true
                     }
-                } receiveValue: { newValue in
-                    withAnimation {
-                        for item in newValue {
-                            self.listItems[item.id] = item
-                        }
+                } receiveValue: { allItems in
+                    for item in allItems {
+                        self.listItems[item.id] = item
                     }
                 }
-            .store(in: &cancellables)
+                .store(in: &cancellables)
 
         } catch {
             self.error = MyError(underlyingError: error)
