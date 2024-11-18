@@ -74,6 +74,10 @@ wp plugin delete wordpress-importer
 # We need an `author` user for some of the integration tests
 wp user create test_author test_author@example.com --role=author
 
+# Switch to `twentytwentyfour` which supports post templates
+# This is used in `/posts` integration tests that updates the `template` field
+wp theme activate twentytwentyfour
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME

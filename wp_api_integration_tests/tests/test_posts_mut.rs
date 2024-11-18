@@ -9,7 +9,8 @@ use wp_api::posts::{
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, CATEGORY_ID_1, FIRST_POST_ID, MEDIA_ID_611, SECOND_USER_ID, TAG_ID_100,
+    AssertResponse, CATEGORY_ID_1, FIRST_POST_ID, MEDIA_ID_611, POST_TEMPLATE_SINGLE_WITH_SIDEBAR,
+    SECOND_USER_ID, TAG_ID_100,
 };
 use wp_cli::WpCliPost;
 
@@ -290,20 +291,14 @@ generate_update_test!(
     }
 );
 
-// TODO: This test started to intermittently fail without any changes in the codebase. The
-// intermittent failure was observed using the following command as well:
-//
-// ```
-// curl --user test@example.com:$(jq .admin_password test_credentials.json) -H "Content-Type: application/json" -d '{"template":"single-with-sidebar"}' http://localhost/wp-json/wp/v2/posts/1
-// ```
-//generate_update_test!(
-//    update_template,
-//    template,
-//    POST_TEMPLATE_SINGLE_WITH_SIDEBAR.to_string(),
-//    |updated_post, _| {
-//        assert_eq!(updated_post.template, POST_TEMPLATE_SINGLE_WITH_SIDEBAR);
-//    }
-//);
+generate_update_test!(
+    update_template,
+    template,
+    POST_TEMPLATE_SINGLE_WITH_SIDEBAR.to_string(),
+    |updated_post, _| {
+        assert_eq!(updated_post.template, POST_TEMPLATE_SINGLE_WITH_SIDEBAR);
+    }
+);
 
 generate_update_test!(
     update_meta_to_add_footnote,
