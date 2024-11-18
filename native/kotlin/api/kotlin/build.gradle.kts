@@ -95,6 +95,7 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
         "--bin",
         "wp_uniffi_bindgen",
         "generate",
+        "--no-format",
         "--library",
         nativeLibraryPath,
         "--out-dir",
