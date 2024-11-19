@@ -15,11 +15,22 @@ enum MediaRequest {
     List,
     #[contextual_get(url = "/media/<media_id>", output = crate::media::SparseMedia, filter_by = crate::media::SparseMediaField)]
     Retrieve,
+    #[delete(url = "/media/<media_id>", output = crate::media::MediaDeleteResponse)]
+    Delete,
     #[post(url = "/media/<media_id>", params = &MediaUpdateParams, output = MediaWithEditContext)]
     Update,
 }
 
 impl DerivedRequest for MediaRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            // The server always returns an error when `force=false`, so a separate `Trash` action
+            // is not implemented.
+            MediaRequest::Delete => vec![("force", true.to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -69,6 +80,11 @@ mod tests {
     };
     use rstest::*;
     use std::sync::Arc;
+
+    #[rstest]
+    fn delete_media(endpoint: MediaRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.delete(&MediaId(54)), "/media/54?force=true");
+    }
 
     #[rstest]
     #[case(MediaListParams::default(), "")]

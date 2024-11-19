@@ -421,6 +421,12 @@ pub struct MediaUpdateParams {
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct MediaDeleteResponse {
+    pub deleted: bool,
+    pub previous: MediaWithEditContext,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseMedia {
     #[WpContext(edit, embed, view)]

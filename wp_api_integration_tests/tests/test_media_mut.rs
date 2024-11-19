@@ -8,6 +8,21 @@ use wp_api_integration_tests::{
     api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
 };
 
+#[tokio::test]
+#[serial]
+async fn delete_media() {
+    // Delete the media using the API and ensure it's successful
+    let media_delete_response = api_client().media().delete(&MEDIA_ID_611).await;
+    assert!(
+        media_delete_response.is_ok(),
+        "{:#?}",
+        media_delete_response
+    );
+    assert!(media_delete_response.unwrap().data.deleted);
+
+    RestoreServer::db().await;
+}
+
 generate_update_test!(update_date, date, "2024-09-09T12:00:00".to_string());
 
 generate_update_test!(update_date_gmt, date_gmt, "2024-09-09T12:00:00".to_string());
