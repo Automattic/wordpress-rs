@@ -1,10 +1,13 @@
 use async_trait::async_trait;
+use http::{HeaderMap, HeaderValue};
+use reqwest::multipart::Part;
 use std::sync::Arc;
 use wp_api::{
     media::MediaId,
     posts::{CategoryId, PostId, TagId},
     request::{
-        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
+        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
     users::UserId,
     ParsedUrl, RequestExecutionError, WpApiClient, WpApiError, WpAuthentication, WpErrorCode,
@@ -159,6 +162,45 @@ impl AsyncWpNetworking {
         })
     }
 
+    pub async fn upload_media_request(
+        &self,
+        media_upload_request: Arc<MediaUploadRequest>,
+    ) -> Result<WpNetworkResponse, reqwest::Error> {
+        let request = self
+            .client
+            .request(
+                Self::request_method(media_upload_request.method()),
+                media_upload_request.url().0.as_str(),
+            )
+            .headers(media_upload_request.header_map().as_header_map());
+        let file_path = media_upload_request.file_path();
+        let mut file_header_map = HeaderMap::new();
+        file_header_map.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_str(&media_upload_request.file_content_type()).unwrap(),
+        );
+        let mut form = reqwest::multipart::Form::new().part(
+            "file",
+            Part::file(file_path)
+                .await
+                .unwrap()
+                .headers(file_header_map),
+        );
+        for (k, v) in media_upload_request.media_params() {
+            form = form.text(k, v)
+        }
+
+        let request = request.multipart(form);
+        let mut response = request.send().await?;
+
+        let header_map = std::mem::take(response.headers_mut());
+        Ok(WpNetworkResponse {
+            status_code: response.status().as_u16(),
+            body: response.bytes().await.unwrap().to_vec(),
+            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+        })
+    }
+
     fn request_method(method: RequestMethod) -> http::Method {
         match method {
             RequestMethod::GET => reqwest::Method::GET,
@@ -181,6 +223,18 @@ impl RequestExecutor for AsyncWpNetworking {
                 reason: err.to_string(),
             }
         })
+    }
+
+    async fn upload_media(
+        &self,
+        media_upload_request: Arc<MediaUploadRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.upload_media_request(media_upload_request)
+            .await
+            .map_err(|err| RequestExecutionError::RequestExecutionFailed {
+                status_code: err.status().map(|s| s.as_u16()),
+                reason: err.to_string(),
+            })
     }
 }
 
