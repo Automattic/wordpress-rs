@@ -2,110 +2,132 @@ import Foundation
 
 public protocol CallbackAwarePerformer: RequestPerformer {
 
+    func create(
+        params: CreateParamsType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<CreateResponseType, Error>) -> Void
+    )
+
+    func update(
+        id: IdType,
+        params: UpdateParamsType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<UpdateResponseType, Error>) -> Void
+    )
+
+    func publisherWithDelete(
+        id: IdType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<DeleteResponseType, Error>) -> Void
+    )
+
     // Generated implementation
     func listWithEditContext(
         params: ListParamsType,
-        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void
     )
 
     func listWithViewContext(
         params: ListParamsType,
-        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void
     )
 
     func listWithEmbedContext(
         params: ListParamsType,
-        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void
     )
 }
 
 extension CallbackAwarePerformer {
 
+    public func create(
+        params: CreateParamsType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<CreateResponseType, Error>) -> Void
+    ) {
+        perform(request: buildCreateRequest(params: params), on: queue, responseConverter: {
+            try parseCreateResponse(response: $0)
+        }, completion: callback)
+    }
+
+    public func update(
+        id: IdType,
+        params: UpdateParamsType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<UpdateResponseType, any Error>) -> Void
+    ) {
+        perform(request: buildUpdateRequest(id: id, params: params), on: queue, responseConverter: {
+            try parseUpdateResponse(response: $0)
+        }, completion: callback)
+    }
+
+    public func publisherWithDelete(
+        id: IdType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<DeleteResponseType, Error>) -> Void
+    ) {
+        perform(request: buildDeleteRequest(id: id), on: queue, responseConverter: {
+            try parseDeleteResponse(response: $0)
+        }, completion: callback)
+    }
+
     public func listWithEditContext(
         params: ListParamsType,
-        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void
     ) {
-        perform(request: buildListWithEditRequest(params: params), callback: { result in
-            switch result {
-            case .success(let response):
-                do {
-                    let response = try parseListWithEditResponse(response: response)
-                    callback(.success(response))
-                } catch {
-                    callback(.failure(error))
-                }
-            case .failure(let error):
-                callback(.failure(error))
-            }
-        }, on: queue)
+        perform(request: buildListWithEditRequest(params: params), on: queue, responseConverter: {
+            try parseListWithEditResponse(response: $0)
+        }, completion: callback)
     }
 
     public func listWithEmbedContext(
         params: ListParamsType,
-        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void
     ) {
-        perform(request: buildListWithEmbedRequest(params: params), callback: { result in
-            switch result {
-            case .success(let response):
-                do {
-                    let response = try parseListWithEmbedResponse(response: response)
-                    callback(.success(response))
-                } catch {
-                    callback(.failure(error))
-                }
-            case .failure(let error):
-                callback(.failure(error))
-            }
-        }, on: queue)
+        perform(request: buildListWithEmbedRequest(params: params), on: queue, responseConverter: {
+            try parseListWithEmbedResponse(response: $0)
+        }, completion: callback)
     }
 
     public func listWithViewContext(
         params: ListParamsType,
-        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void,
-        queue: DispatchQueue
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void
     ) {
-        perform(request: buildListWithViewRequest(params: params), callback: { result in
-            switch result {
-            case .success(let response):
-                do {
-                    let response = try parseListWithViewResponse(response: response)
-                    callback(.success(response))
-                } catch {
-                    callback(.failure(error))
-                }
-            case .failure(let error):
-                callback(.failure(error))
-            }
-        }, on: queue)
+        perform(request: buildListWithViewRequest(params: params), on: queue, responseConverter: {
+            try parseListWithViewResponse(response: $0)
+        }, completion: callback)
     }
 
-    private func perform(
+    private func perform<ResponseType>(
         request: WpNetworkRequest,
-        callback: @escaping @Sendable (Result<WpNetworkResponse, Error>) -> Void,
-        on queue: DispatchQueue = .global(qos: .background)
+        on queue: DispatchQueue = .global(qos: .background),
+        responseConverter: @escaping @Sendable (WpNetworkResponse) throws -> ResponseType,
+        completion: @escaping @Sendable (Result<ResponseType, Error>) -> Void
     ) {
         self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
             queue.async {
                 if let error {
-                    callback(.failure(error))
+                    completion(.failure(error))
                     return
                 }
 
                 guard let httpResponse = response as? HTTPURLResponse, let data else {
-                    callback(.failure(WordPressAPI.Errors.unableToParseResponse))
+                    completion(.failure(WordPressAPI.Errors.unableToParseResponse))
                     return
                 }
 
                 do {
-                    let response = try WpNetworkResponse.from(data: data, response: httpResponse)
-                    callback(.success(response))
+                    let rawResponse = try WpNetworkResponse.from(data: data, response: httpResponse)
+                    let parsedResponse = try responseConverter(rawResponse)
+                    completion(.success(parsedResponse))
                 } catch {
-                    callback(.failure(error))
+                    completion(.failure(error))
                 }
             }
         }
