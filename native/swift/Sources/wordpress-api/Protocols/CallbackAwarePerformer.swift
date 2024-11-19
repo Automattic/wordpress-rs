@@ -15,12 +15,6 @@ public protocol CallbackAwarePerformer: RequestPerformer {
         callback: @escaping @Sendable (Result<UpdateResponseType, Error>) -> Void
     )
 
-    func publisherWithDelete(
-        id: IdType,
-        queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<DeleteResponseType, Error>) -> Void
-    )
-
     // Generated implementation
     func listWithEditContext(
         params: ListParamsType,
@@ -38,6 +32,14 @@ public protocol CallbackAwarePerformer: RequestPerformer {
         params: ListParamsType,
         queue: DispatchQueue,
         callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void
+    )
+}
+
+public protocol CallbackAwareRequestPerformer: RequestPerformer, NoDeletionParams {
+    func delete(
+        id: IdType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<DeleteResponseType, Error>) -> Void
     )
 }
 
@@ -61,16 +63,6 @@ extension CallbackAwarePerformer {
     ) {
         perform(request: buildUpdateRequest(id: id, params: params), on: queue, responseConverter: {
             try parseUpdateResponse(response: $0)
-        }, completion: callback)
-    }
-
-    public func publisherWithDelete(
-        id: IdType,
-        queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<DeleteResponseType, Error>) -> Void
-    ) {
-        perform(request: buildDeleteRequest(id: id), on: queue, responseConverter: {
-            try parseDeleteResponse(response: $0)
         }, completion: callback)
     }
 
@@ -131,6 +123,18 @@ extension CallbackAwarePerformer {
                 }
             }
         }
+    }
+}
+
+extension CallbackAwarePerformer where Self: NoDeletionParams {
+    public func delete(
+        id: IdType,
+        queue: DispatchQueue,
+        callback: @escaping @Sendable (Result<DeleteResponseType, Error>) -> Void
+    ) {
+        perform(request: buildDeleteRequest(id: id), on: queue, responseConverter: {
+            try parseDeleteResponse(response: $0)
+        }, completion: callback)
     }
 
 }

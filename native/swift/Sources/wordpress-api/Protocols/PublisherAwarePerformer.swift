@@ -43,14 +43,6 @@ extension PublisherAwarePerformer {
         }.eraseToAnyPublisher()
     }
 
-    public func publisherWithDelete(
-        id: IdType
-    ) -> AnyPublisher<DeleteResponseType, any Error> {
-        perform(request: buildDeleteRequest(id: id)).tryMap {
-            try parseDeleteResponse(response: $0)
-        }.eraseToAnyPublisher()
-    }
-
     // swiftlint:disable force_cast
     public func publisherWithEditContext(
         params: EditContextListResponseType.ParamsType
@@ -110,5 +102,26 @@ extension PublisherAwarePerformer {
         self.urlSession
             .dataTaskPublisher(for: request.asURLRequest())
             .tryMap { try WpNetworkResponse.from(data: $0.data, response: $0.response) }
+    }
+}
+
+extension PublisherAwarePerformer where Self: NoDeletionParams {
+    public func publisherWithDelete(
+        id: IdType
+    ) -> AnyPublisher<DeleteResponseType, any Error> {
+        perform(request: buildDeleteRequest(id: id)).tryMap {
+            try parseDeleteResponse(response: $0)
+        }.eraseToAnyPublisher()
+    }
+}
+
+extension PublisherAwarePerformer where Self: HasDeletionParams {
+    public func publisherWithDelete(
+        id: IdType,
+        params: DeleteParamsType
+    ) -> AnyPublisher<DeleteResponseType, any Error> {
+        perform(request: buildDeleteRequest(id: id, params: params)).tryMap {
+            try parseDeleteResponse(response: $0)
+        }.eraseToAnyPublisher()
     }
 }

@@ -32,7 +32,6 @@ public protocol RequestPerformer: Sendable {
     // MARK: - Request Builders
     func buildCreateRequest(params: CreateParamsType) -> WpNetworkRequest
     func buildUpdateRequest(id: IdType, params: UpdateParamsType) -> WpNetworkRequest
-    func buildDeleteRequest(id: IdType) -> WpNetworkRequest
 
     func buildListWithEditRequest(params: ListParamsType) -> WpNetworkRequest
     func buildListWithEmbedRequest(params: ListParamsType) -> WpNetworkRequest
@@ -46,4 +45,15 @@ public protocol RequestPerformer: Sendable {
     func parseListWithEditResponse(response: WpNetworkResponse) throws -> EditContextListResponseType
     func parseListWithEmbedResponse(response: WpNetworkResponse) throws -> EmbedContextListResponseType
     func parseListWithViewResponse(response: WpNetworkResponse) throws -> ViewContextListResponseType
+}
+
+public protocol NoDeletionParams {
+    associatedtype IdType
+    func buildDeleteRequest(id: IdType) -> WpNetworkRequest
+}
+
+public protocol HasDeletionParams {
+    associatedtype IdType
+    associatedtype DeleteParamsType
+    func buildDeleteRequest(id: IdType, params: DeleteParamsType) -> WpNetworkRequest
 }

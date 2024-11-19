@@ -20,7 +20,7 @@ public final class PostsRequestPerformer {
 extension PostsRequestPerformer: PublisherAwarePerformer {}
 extension PostsRequestPerformer: CallbackAwarePerformer {}
 
-extension PostsRequestPerformer: RequestPerformer {
+extension PostsRequestPerformer: RequestPerformer, NoDeletionParams {
     public typealias IdType = PostId
 
     public typealias SingleEditType = PostWithEditContext
