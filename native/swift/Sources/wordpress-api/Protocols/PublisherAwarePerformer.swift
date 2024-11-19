@@ -2,12 +2,12 @@ import Foundation
 import WordPressAPIInternal
 import Combine
 
+@available(iOS 14.0, *)
 public protocol PublisherAwarePerformer: RequestPerformer {
 
-//    TODO
-//    func publisherWithCreate(params: CreateParamsType) -> AnyPublisher<CreateResponseType, Error>
-//    func publisherWithUpdate(id: IdType, params: UpdateParamsType) -> AnyPublisher<UpdateResponseType, Error>
-//    func publisherWithDelete(id: IdType) -> AnyPublisher<DeleteResponseType, Error>
+    func publisherWithCreate(params: CreateParamsType) -> AnyPublisher<CreateResponseType, Error>
+    func publisherWithUpdate(id: IdType, params: UpdateParamsType) -> AnyPublisher<UpdateResponseType, Error>
+    func publisherWithDelete(id: IdType) -> AnyPublisher<DeleteResponseType, Error>
 
     // Generated implementation
     func publisherWithEditContext(
@@ -23,7 +23,34 @@ public protocol PublisherAwarePerformer: RequestPerformer {
     ) -> AnyPublisher<[EmbedContextListResponseType.DataType], Error>
 }
 
+@available(iOS 14.0, *)
 extension PublisherAwarePerformer {
+
+    public func publisherWithCreate(
+        params: CreateParamsType
+    ) -> AnyPublisher<CreateResponseType, any Error> {
+        perform(request: buildCreateRequest(params: params)).tryMap {
+            try parseCreateResponse(response: $0)
+        }.eraseToAnyPublisher()
+    }
+
+    public func publisherWithUpdate(
+        id: IdType,
+        params: UpdateParamsType
+    ) -> AnyPublisher<UpdateResponseType, any Error> {
+        perform(request: buildUpdateRequest(id: id, params: params)).tryMap {
+            try parseUpdateResponse(response: $0)
+        }.eraseToAnyPublisher()
+    }
+
+    public func publisherWithDelete(
+        id: IdType
+    ) -> AnyPublisher<DeleteResponseType, any Error> {
+        perform(request: buildDeleteRequest(id: id)).tryMap {
+            try parseDeleteResponse(response: $0)
+        }.eraseToAnyPublisher()
+    }
+
     // swiftlint:disable force_cast
     public func publisherWithEditContext(
         params: EditContextListResponseType.ParamsType

@@ -63,6 +63,18 @@ extension PostsRequestPerformer: RequestPerformer {
         builder.listWithViewContext(params: params)
     }
 
+    public func parseCreateResponse(response: WpNetworkResponse) throws -> CreateResponseType {
+        try parseAsPostsRequestCreateResponse(response: response)
+    }
+
+    public func parseUpdateResponse(response: WpNetworkResponse) throws -> PostsRequestUpdateResponse {
+        try parseAsPostsRequestUpdateResponse(response: response)
+    }
+
+    public func parseDeleteResponse(response: WpNetworkResponse) throws -> PostsRequestDeleteResponse {
+        try parseAsPostsRequestDeleteResponse(response: response)
+    }
+
     public func parseListWithEditResponse(
         response: WpNetworkResponse
     ) throws -> PostsRequestListWithEditContextResponse {

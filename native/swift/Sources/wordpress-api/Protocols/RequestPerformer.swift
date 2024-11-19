@@ -39,6 +39,10 @@ public protocol RequestPerformer: Sendable {
     func buildListWithViewRequest(params: ListParamsType) -> WpNetworkRequest
 
     // MARK: - Response Parsers
+    func parseCreateResponse(response: WpNetworkResponse) throws -> CreateResponseType
+    func parseUpdateResponse(response: WpNetworkResponse) throws -> UpdateResponseType
+    func parseDeleteResponse(response: WpNetworkResponse) throws -> DeleteResponseType
+
     func parseListWithEditResponse(response: WpNetworkResponse) throws -> EditContextListResponseType
     func parseListWithEmbedResponse(response: WpNetworkResponse) throws -> EmbedContextListResponseType
     func parseListWithViewResponse(response: WpNetworkResponse) throws -> ViewContextListResponseType
