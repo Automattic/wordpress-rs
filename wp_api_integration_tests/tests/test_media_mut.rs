@@ -1,12 +1,27 @@
 use macro_helper::generate_update_test;
 use serial_test::serial;
 use wp_api::{
-    media::MediaUpdateParams,
+    media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
 use wp_api_integration_tests::{
     api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
 };
+
+#[tokio::test]
+#[serial]
+#[ignore]
+async fn create_media() {
+    api_client()
+        .media()
+        .create(&MediaCreateParams {
+            title: Some("foo".to_string()),
+            ..Default::default()
+        })
+        .await
+        .assert_response();
+    RestoreServer::db().await;
+}
 
 #[tokio::test]
 #[serial]

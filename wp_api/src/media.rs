@@ -427,6 +427,67 @@ pub struct MediaDeleteResponse {
     pub previous: MediaWithEditContext,
 }
 
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct MediaCreateParams {
+    /// The date the post was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// The date the post was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<String>,
+    /// An alphanumeric identifier for the post unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    /// A named status for the post.
+    /// One of: publish, future, draft, pending, private
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<PostStatus>,
+    /// The title for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The ID for the author of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    /// Whether or not comments are open on the post.
+    /// One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_status: Option<PostCommentStatus>,
+    /// Whether or not the post can be pinged.
+    /// One of: open, closed
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ping_status: Option<PostPingStatus>,
+    /// The theme file to use to display the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+    /// Alternative text to display when attachment is not displayed.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alt_text: Option<String>,
+    /// The attachment caption.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
+    /// The attachment description.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The ID for the associated post of the attachment.
+    #[serde(rename = "post")]
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_id: Option<PostId>,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseMedia {
     #[WpContext(edit, embed, view)]

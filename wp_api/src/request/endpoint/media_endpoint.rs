@@ -15,6 +15,8 @@ enum MediaRequest {
     List,
     #[contextual_get(url = "/media/<media_id>", output = crate::media::SparseMedia, filter_by = crate::media::SparseMediaField)]
     Retrieve,
+    #[post(url = "/media", params = &crate::media::MediaCreateParams, output = crate::media::MediaWithEditContext)]
+    Create,
     #[delete(url = "/media/<media_id>", output = crate::media::MediaDeleteResponse)]
     Delete,
     #[post(url = "/media/<media_id>", params = &MediaUpdateParams, output = MediaWithEditContext)]
@@ -80,6 +82,11 @@ mod tests {
     };
     use rstest::*;
     use std::sync::Arc;
+
+    #[rstest]
+    fn create_media(endpoint: MediaRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.create(), "/media");
+    }
 
     #[rstest]
     fn delete_media(endpoint: MediaRequestEndpoint) {
