@@ -39,6 +39,7 @@ testing {
             dependencies {
                 implementation(project())
 
+                implementation(libs.okhttp)
                 implementation(rootProject.libs.kotlin.test)
                 implementation(rootProject.libs.kotlinx.coroutines.test)
                 implementation(libs.kotlinx.serialization)

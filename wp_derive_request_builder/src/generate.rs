@@ -33,6 +33,7 @@ fn generate_async_request_executor(
     parsed_enum: &ParsedEnum,
     crate_config: &CrateConfig,
 ) -> TokenStream {
+    let crate_ident = &config.crate_ident;
     let static_api_base_url_type = &config.static_types.api_base_url;
     let static_wp_authentication_type = &config.static_types.wp_authentication;
     let static_request_executor_type = &crate_config.request_executor;
@@ -94,6 +95,7 @@ fn generate_async_request_executor(
                 &variant.variant_ident,
                 &context_and_filter_handler,
             );
+            let fn_parse_as_response_type_ident = ident_fn_parse_as_response_type(&response_type_ident);
             let response_params_type = response_params_type(variant.attr.params.as_ref(), variant.attr.request_type);
             let response_pagination_params_fields = response_params_type.as_ref().map(|p| {
                 quote! {
@@ -126,10 +128,10 @@ fn generate_async_request_executor(
                 pub struct #response_type_ident {
                     pub data: #output_type,
                     #[serde(skip)]
-                    pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
+                    pub header_map: std::sync::Arc<#crate_ident::request::WpNetworkHeaderMap>,
                     #response_pagination_params_fields
                 }
-                impl From<#response_type_ident> for crate::request::ParsedResponse<#output_type, #parsed_response_params_type> {
+                impl From<#response_type_ident> for #crate_ident::request::ParsedResponse<#output_type, #parsed_response_params_type> {
                     fn from(value: #response_type_ident) -> Self {
                         Self {
                             data: value.data,
@@ -138,14 +140,19 @@ fn generate_async_request_executor(
                         }
                     }
                 }
-                impl From<crate::request::ParsedResponse<#output_type, #parsed_response_params_type>> for #response_type_ident {
-                    fn from(value: crate::request::ParsedResponse<#output_type, #parsed_response_params_type>) -> Self {
+                impl From<#crate_ident::request::ParsedResponse<#output_type, #parsed_response_params_type>> for #response_type_ident {
+                    fn from(value: #crate_ident::request::ParsedResponse<#output_type, #parsed_response_params_type>) -> Self {
                         Self {
                             data: value.data,
                             header_map: value.header_map,
                             #from_parsed_response_impl_for_pagination_params
                         }
                     }
+                }
+
+                #[uniffi::export]
+                fn #fn_parse_as_response_type_ident(response: #crate_ident::request::WpNetworkResponse) -> Result<#response_type_ident, #error_type> {
+                    response.parse()
                 }
             }
         })
