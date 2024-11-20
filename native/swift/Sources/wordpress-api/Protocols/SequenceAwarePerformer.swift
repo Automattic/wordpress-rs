@@ -1,6 +1,6 @@
 import Foundation
 
-protocol SequenceAwarePerformer: RequestPerformer {
+public protocol SequenceAwarePerformer: RequestPerformer {
     // MARK: - Pagination
     func sequenceWithEditContext(
         params: ListWithEditContextResponseType.ParamsType

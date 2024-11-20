@@ -1,4 +1,5 @@
 import Foundation
+#if canImport(Combine)
 import Combine
 
 public protocol PublisherAwarePerformer: RequestPerformer {
@@ -121,3 +122,4 @@ extension PublisherAwarePerformer where Self: HasDeletionParams {
         }.eraseToAnyPublisher()
     }
 }
+#endif

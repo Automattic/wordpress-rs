@@ -1,6 +1,8 @@
 import Foundation
-import Combine
+
+#if canImport(WordPressAPIInternal)
 @preconcurrency import WordPressAPIInternal
+#endif
 
 public final class UsersRequestPerformer {
     typealias ExecutorType = UsersRequestExecutor
@@ -17,8 +19,14 @@ public final class UsersRequestPerformer {
     }
 }
 
-extension UsersRequestPerformer: PublisherAwarePerformer {}
 extension UsersRequestPerformer: CallbackAwarePerformer {}
+extension UsersRequestPerformer: PaginationAwarePerformer {}
+extension UsersRequestPerformer: SequenceAwarePerformer {}
+
+#if canImport(Combine)
+import Combine
+extension UsersRequestPerformer: PublisherAwarePerformer {}
+#endif
 
 extension UsersRequestPerformer: RequestPerformer, HasDeletionParams {
     public typealias IdType = UserId

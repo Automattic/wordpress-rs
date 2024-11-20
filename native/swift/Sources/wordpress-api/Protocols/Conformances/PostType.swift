@@ -1,6 +1,8 @@
 import Foundation
-import Combine
+
+#if canImport(WordPressAPIInternal)
 @preconcurrency import WordPressAPIInternal
+#endif
 
 public final class PostTypeRequestPerformer {
     typealias ExecutorType = PostTypesRequestExecutor

@@ -1,3 +1,4 @@
+import Foundation
 @preconcurrency import WordPressAPIInternal
 import Combine
 
@@ -5,23 +6,47 @@ public final class MediaRequestPerformer {
     typealias ExecutorType = MediaRequestExecutor
     typealias RequestBuilderType = MediaRequestBuilder
 
-    internal let executor: MediaRequestExecutor
-    internal let builder: RequestBuilderType
+    let executor: ExecutorType
+    let builder: RequestBuilderType
+    public let urlSession: URLSession
 
-    init(executor: MediaRequestExecutor, builder: RequestBuilderType) {
+    init(executor: ExecutorType, builder: RequestBuilderType, session: URLSession) {
         self.executor = executor
         self.builder = builder
-    }
-}
+        self.urlSession = session
+    }}
 
 public struct MediaCreateParams {}
 public struct MediaRequestCreateResponse {}
 
-extension MediaRequestPerformer: InternalRequestPerformer {}
 extension MediaRequestPerformer: PublisherAwarePerformer {}
 extension MediaRequestPerformer: CallbackAwarePerformer {}
 
 extension MediaRequestPerformer: RequestPerformer {
+    public func buildListWithEditRequest(params: MediaListParams) -> WpNetworkRequest {
+        builder.listWithEditContext(params: params)
+    }
+
+    public func buildListWithEmbedRequest(params: MediaListParams) -> WpNetworkRequest {
+        builder.listWithEmbedContext(params: params)
+    }
+
+    public func buildListWithViewRequest(params: MediaListParams) -> WpNetworkRequest {
+        builder.listWithViewContext(params: params)
+    }
+
+    public func parseCreateResponse(response: WpNetworkResponse) throws -> MediaRequestCreateResponse {
+        MediaRequestCreateResponse() // TODO
+    }
+
+    public func parseUpdateResponse(response: WpNetworkResponse) throws -> MediaRequestUpdateResponse {
+        try parseAsMediaRequestUpdateResponse(response: response)
+    }
+
+    public func parseDeleteResponse(response: WpNetworkResponse) throws -> MediaRequestDeleteResponse {
+        try parseAsMediaRequestDeleteResponse(response: response)
+    }
+
     public typealias IdType = MediaId
 
     public typealias SingleEditType = MediaWithEditContext
@@ -50,18 +75,6 @@ extension MediaRequestPerformer: RequestPerformer {
 
     public func buildDeleteRequest(id: MediaId) -> WpNetworkRequest {
         builder.delete(mediaId: id)
-    }
-
-    public func buildListWithEditRequest(params: MediaListParams) -> WpNetworkRequest {
-        builder.listWithEditContext(params: params)
-    }
-
-    public func buildListWithEmbedRequest(params: MediaListParams) -> WpNetworkRequest {
-        builder.listWithEmbedContext(params: params)
-    }
-
-    public func buildListWithViewRequest(params: MediaListParams) -> WpNetworkRequest {
-        builder.listWithViewContext(params: params)
     }
 
     public func parseListWithEditResponse(
@@ -178,3 +191,7 @@ extension MediaRequestPerformer: MediaRequestExecutorProtocol {
         try await self.executor.update(mediaId: mediaId, params: params)
     }
 }
+
+extension MediaRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {}
+extension MediaRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {}
+extension MediaRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {}

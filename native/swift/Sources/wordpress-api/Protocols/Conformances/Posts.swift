@@ -1,6 +1,8 @@
 import Foundation
-import Combine
+
+#if canImport(WordPressAPIInternal)
 @preconcurrency import WordPressAPIInternal
+#endif
 
 public final class PostsRequestPerformer {
     typealias ExecutorType = PostsRequestExecutor
@@ -93,8 +95,12 @@ extension PostsRequestPerformer: RequestPerformer, NoDeletionParams {
 
 extension PostsRequestPerformer: CallbackAwarePerformer {}
 extension PostsRequestPerformer: PaginationAwarePerformer {}
-extension PostsRequestPerformer: PublisherAwarePerformer {}
 extension PostsRequestPerformer: SequenceAwarePerformer {}
+
+#if canImport(Combine)
+import Combine
+extension PostsRequestPerformer: PublisherAwarePerformer {}
+#endif
 
 // MARK: - PostsRequestExecutorProtocol
 

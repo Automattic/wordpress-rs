@@ -45,8 +45,12 @@ public struct WordPressAPI {
         )
     }
 
-    public var users: UsersRequestExecutor {
-        self.internalClient.users()
+    public var users: UsersRequestPerformer {
+        UsersRequestPerformer(
+            executor: self.internalClient.users(),
+            builder: self.requestBuilder.users(),
+            session: self.urlSession
+        )
     }
 
     public var plugins: PluginsRequestExecutor {
@@ -75,8 +79,9 @@ public struct WordPressAPI {
 
     public var media: MediaRequestPerformer {
         MediaRequestPerformer(
-            executor: internalClient.media(),
-            builder: requestBuilder.media()
+            executor: self.internalClient.media(),
+            builder: self.requestBuilder.media(),
+            session: self.urlSession
         )
     }
 
