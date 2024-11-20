@@ -6,7 +6,7 @@ use syn::Ident;
 use super::{ContextAndFilterHandler, PartOf, WpContext};
 use crate::{
     parse::RequestType,
-    variant_attr::{ParamsType, UrlPart},
+    variant_attr::{ContentDispositionType, ParamsType, UrlPart},
 };
 
 const SPARSE_IDENT_PREFIX: &str = "Sparse";
@@ -371,9 +371,9 @@ pub fn fn_body_build_request_from_url(
                     self.inner.post(url, params)
                 }
             } else {
-                quote! {
-                    self.inner.post(url)
-                }
+                panic!(
+                    "During parsing we ensure that RequestType::Post always has a `params` type"
+                );
             }
         }
     }

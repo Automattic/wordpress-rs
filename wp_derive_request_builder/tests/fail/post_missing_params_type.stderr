@@ -1,0 +1,5 @@
+error: #[post(params = ?)] is missing `params` type
+ --> tests/fail/post_missing_params_type.rs:3:7
+  |
+3 |     #[post(url = "/users", output = Vec<SparseUser>)]
+  |       ^^^^

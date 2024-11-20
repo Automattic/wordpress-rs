@@ -18,12 +18,18 @@ pub struct ParamsType {
 }
 
 #[derive(Debug, Clone)]
+pub struct ContentDispositionType {
+    pub tokens: TokenStream,
+}
+
+#[derive(Debug, Clone)]
 pub struct ParsedVariantAttribute {
     pub request_type: RequestType,
     pub url_parts: Vec<UrlPart>,
     pub params: Option<ParamsType>,
     pub output: Vec<TokenTree>,
     pub filter_by: Option<FilterByType>,
+    pub content_disposition: Option<ContentDispositionType>,
 }
 
 impl ParsedVariantAttribute {
@@ -33,6 +39,7 @@ impl ParsedVariantAttribute {
         params: Option<Vec<TokenTree>>,
         output: Vec<TokenTree>,
         filter_by: Option<Vec<TokenTree>>,
+        content_disposition: Option<Vec<TokenTree>>,
     ) -> Result<Self, ItemVariantAttributeParseError> {
         let non_empty_token_tree_or_none =
             |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
@@ -48,8 +55,19 @@ impl ParsedVariantAttribute {
             tokens: TokenStream::from_iter(tokens),
         });
 
-        if request_type == RequestType::ContextualPaged && params_type.is_none() {
-            return Err(ItemVariantAttributeParseError::ContextualPagedRequiresParamsType);
+        // Check if params type is required
+        if params_type.is_none() {
+            match request_type {
+                RequestType::ContextualPaged => {
+                    return Err(ItemVariantAttributeParseError::ContextualPagedRequiresParamsType);
+                }
+                RequestType::Post => {
+                    return Err(ItemVariantAttributeParseError::PostRequiresParamsType);
+                }
+                RequestType::ContextualGet => (),
+                RequestType::Delete => (),
+                RequestType::Get => (),
+            }
         }
 
         Ok(Self {
@@ -59,6 +77,11 @@ impl ParsedVariantAttribute {
             output,
             filter_by: non_empty_token_tree_or_none(filter_by).map(|tokens| FilterByType {
                 tokens: TokenStream::from_iter(tokens),
+            }),
+            content_disposition: non_empty_token_tree_or_none(content_disposition).map(|tokens| {
+                ContentDispositionType {
+                    tokens: TokenStream::from_iter(tokens),
+                }
             }),
         })
     }
@@ -242,6 +265,7 @@ impl Parse for ParsedVariantAttribute {
         let mut params_tokens = None;
         let mut output_tokens = None;
         let mut filter_by_tokens = None;
+        let mut content_disposition_tokens = None;
 
         for (ident, tokens) in pair_vec.into_iter() {
             match ident.to_string().as_str() {
@@ -249,6 +273,7 @@ impl Parse for ParsedVariantAttribute {
                 "params" => params_tokens = Some(tokens),
                 "output" => output_tokens = Some(tokens),
                 "filter_by" => filter_by_tokens = Some(tokens),
+                "content_disposition" => content_disposition_tokens = Some(tokens),
                 _ => {
                     return Err(ItemVariantAttributeParseError::ExpectingKeyValuePairs
                         .into_syn_error(meta_list_span));
@@ -290,6 +315,7 @@ impl Parse for ParsedVariantAttribute {
             params_tokens,
             output,
             filter_by_tokens,
+            content_disposition_tokens,
         )
         .map_err(|e| e.into_syn_error(meta_list_span))
     }
@@ -299,6 +325,8 @@ impl Parse for ParsedVariantAttribute {
 enum ItemVariantAttributeParseError {
     #[error("#[contextual_paged(params = ?)] is missing `params` type")]
     ContextualPagedRequiresParamsType,
+    #[error("#[post(params = ?)] is missing `params` type")]
+    PostRequiresParamsType,
     #[error("Missing variant attribute")]
     MissingAttr,
     #[error("Only a single attribute is supported")]
