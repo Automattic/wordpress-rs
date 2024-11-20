@@ -357,6 +357,7 @@ pub fn fn_body_context_query_pairs(
 pub fn fn_body_build_request_from_url(
     params_type: Option<&ParamsType>,
     request_type: RequestType,
+    content_disposition_type: Option<&ContentDispositionType>,
 ) -> TokenStream {
     match request_type {
         RequestType::ContextualGet | RequestType::ContextualPaged | RequestType::Get => quote! {
@@ -367,8 +368,14 @@ pub fn fn_body_build_request_from_url(
         },
         RequestType::Post => {
             if params_type.is_some() {
-                quote! {
-                    self.inner.post(url, params)
+                if content_disposition_type.is_some() {
+                    quote! {
+                        self.inner.post(url, params, content_disposition)
+                    }
+                } else {
+                    quote! {
+                        self.inner.post(url, params)
+                    }
                 }
             } else {
                 panic!(
@@ -1039,33 +1046,55 @@ mod tests {
     }
 
     #[rstest]
-    #[case(None, RequestType::ContextualGet, "self . inner . get (url)")]
+    #[case(None, RequestType::ContextualGet, None, "self . inner . get (url)")]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
+        None,
         "self . inner . get (url)"
     )]
-    #[case(None, RequestType::Delete, "self . inner . delete (url)")]
+    #[case(None, RequestType::Delete, None, "self . inner . delete (url)")]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Delete,
+        None,
         "self . inner . delete (url)"
     )]
-    #[case(None, RequestType::Post, "self . inner . post (url)")]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Post,
+        None,
         "self . inner . post (url , params)"
+    )]
+    #[case(
+        referenced_params_type("UserListParams"),
+        RequestType::Post,
+        referenced_content_disposition_type("MediaContentDisposition"),
+        "self . inner . post (url , params , content_disposition)"
     )]
     fn test_fn_body_build_request_from_url(
         #[case] params: Option<ParamsType>,
         #[case] request_type: RequestType,
+        #[case] content_disposition_type: Option<ContentDispositionType>,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_build_request_from_url(params.as_ref(), request_type).to_string(),
+            fn_body_build_request_from_url(
+                params.as_ref(),
+                request_type,
+                content_disposition_type.as_ref()
+            )
+            .to_string(),
             expected_str
         );
+    }
+
+    #[test]
+    fn test_fn_body_build_request_from_url_panic() {
+        let result = std::panic::catch_unwind(|| {
+            fn_body_build_request_from_url(None, RequestType::Post, None)
+        });
+        assert!(result.is_err());
     }
 
     #[rstest]
@@ -1201,6 +1230,13 @@ mod tests {
     fn referenced_params_type(str: &str) -> Option<ParamsType> {
         let ident = format_ident!("{}", str);
         Some(ParamsType {
+            tokens: quote! { & #ident },
+        })
+    }
+
+    fn referenced_content_disposition_type(str: &str) -> Option<ContentDispositionType> {
+        let ident = format_ident!("{}", str);
+        Some(ContentDispositionType {
             tokens: quote! { & #ident },
         })
     }
