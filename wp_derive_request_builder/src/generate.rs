@@ -193,6 +193,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
+        let content_disposition_type = &variant.attr.content_disposition;
 
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
@@ -215,8 +216,11 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
-            let fn_body_build_request_from_url =
-                fn_body_build_request_from_url(params_type.as_ref(), variant.attr.request_type);
+            let fn_body_build_request_from_url = fn_body_build_request_from_url(
+                params_type.as_ref(),
+                variant.attr.request_type,
+                content_disposition_type.as_ref(),
+            );
             quote! {
                 pub #fn_signature -> #static_wp_network_request_type {
                     #url_from_endpoint

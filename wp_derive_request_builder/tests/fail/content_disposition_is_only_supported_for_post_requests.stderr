@@ -1,0 +1,5 @@
+error: `contextual_disposition` is only supported for `post` request type
+ --> tests/fail/content_disposition_is_only_supported_for_post_requests.rs:3:7
+  |
+3 |     #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>, content_disposition = FooContentDisposition)]
+  |       ^^^^^^^^^^^^^^

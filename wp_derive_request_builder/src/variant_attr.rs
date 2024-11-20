@@ -70,6 +70,22 @@ impl ParsedVariantAttribute {
             }
         }
 
+        let content_disposition_type =
+            non_empty_token_tree_or_none(content_disposition).map(|tokens| {
+                ContentDispositionType {
+                    tokens: TokenStream::from_iter(tokens),
+                }
+            });
+
+        if content_disposition_type.is_some() {
+            match request_type {
+                RequestType::Post => (),
+                _ => {
+                    return Err(ItemVariantAttributeParseError::ContentDispositionTypeIsOnlySupportedForPostRequests);
+                }
+            }
+        }
+
         Ok(Self {
             request_type,
             url_parts,
@@ -78,11 +94,7 @@ impl ParsedVariantAttribute {
             filter_by: non_empty_token_tree_or_none(filter_by).map(|tokens| FilterByType {
                 tokens: TokenStream::from_iter(tokens),
             }),
-            content_disposition: non_empty_token_tree_or_none(content_disposition).map(|tokens| {
-                ContentDispositionType {
-                    tokens: TokenStream::from_iter(tokens),
-                }
-            }),
+            content_disposition: content_disposition_type,
         })
     }
 
@@ -327,6 +339,8 @@ enum ItemVariantAttributeParseError {
     ContextualPagedRequiresParamsType,
     #[error("#[post(params = ?)] is missing `params` type")]
     PostRequiresParamsType,
+    #[error("`contextual_disposition` is only supported for `post` request type")]
+    ContentDispositionTypeIsOnlySupportedForPostRequests,
     #[error("Missing variant attribute")]
     MissingAttr,
     #[error("Only a single attribute is supported")]
