@@ -1,8 +1,9 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
     media::{
-        MediaId, MediaListParams, SparseMediaFieldWithEditContext,
-        SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
+        MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
+        SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
+        SparseMediaFieldWithViewContext,
     },
     SparseField,
 };
@@ -14,6 +15,8 @@ enum MediaRequest {
     List,
     #[contextual_get(url = "/media/<media_id>", output = crate::media::SparseMedia, filter_by = crate::media::SparseMediaField)]
     Retrieve,
+    #[post(url = "/media/<media_id>", params = &MediaUpdateParams, output = MediaWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for MediaRequest {
