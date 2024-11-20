@@ -16,9 +16,9 @@ use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 impl_as_query_value_for_new_type!(MediaId);
-uniffi::custom_newtype!(MediaId, i32);
+uniffi::custom_newtype!(MediaId, i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MediaId(pub i32);
+pub struct MediaId(pub i64);
 
 impl FromStr for MediaId {
     type Err = ParseIntError;

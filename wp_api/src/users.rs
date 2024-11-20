@@ -415,9 +415,9 @@ pub struct UserDeleteResponse {
 }
 
 impl_as_query_value_for_new_type!(UserId);
-uniffi::custom_newtype!(UserId, i32);
+uniffi::custom_newtype!(UserId, i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserId(pub i32);
+pub struct UserId(pub i64);
 
 impl FromStr for UserId {
     type Err = ParseIntError;

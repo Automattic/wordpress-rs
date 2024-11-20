@@ -53,7 +53,7 @@ async fn delete_user() {
         !Backend::users()
             .await
             .into_iter()
-            .any(|u| u.id == SECOND_USER_ID.0 as i64),
+            .any(|u| u.id == SECOND_USER_ID.0),
         "User wasn't deleted"
     );
 
@@ -81,7 +81,7 @@ async fn delete_current_user() {
         !Backend::users()
             .await
             .into_iter()
-            .any(|u| u.id == FIRST_USER_ID.0 as i64),
+            .any(|u| u.id == FIRST_USER_ID.0),
         "User wasn't deleted"
     );
 
@@ -221,7 +221,7 @@ async fn update_user_roles() {
     let updated_user = Backend::users()
         .await
         .into_iter()
-        .find(|u| u.id == SECOND_USER_ID.0 as i64)
+        .find(|u| u.id == SECOND_USER_ID.0)
         .expect("Failed to find the updated user");
     assert_eq!(updated_user.roles, new_role);
 

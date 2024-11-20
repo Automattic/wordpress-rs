@@ -518,9 +518,9 @@ pub struct PostUpdateParams {
 }
 
 impl_as_query_value_for_new_type!(PostId);
-uniffi::custom_newtype!(PostId, i32);
+uniffi::custom_newtype!(PostId, i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PostId(pub i32);
+pub struct PostId(pub i64);
 
 impl FromStr for PostId {
     type Err = ParseIntError;
@@ -531,9 +531,9 @@ impl FromStr for PostId {
 }
 
 impl_as_query_value_for_new_type!(TagId);
-uniffi::custom_newtype!(TagId, i32);
+uniffi::custom_newtype!(TagId, i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TagId(pub i32);
+pub struct TagId(pub i64);
 
 impl FromStr for TagId {
     type Err = ParseIntError;
@@ -544,9 +544,9 @@ impl FromStr for TagId {
 }
 
 impl_as_query_value_for_new_type!(CategoryId);
-uniffi::custom_newtype!(CategoryId, i32);
+uniffi::custom_newtype!(CategoryId, i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CategoryId(pub i32);
+pub struct CategoryId(pub i64);
 
 impl FromStr for CategoryId {
     type Err = ParseIntError;
