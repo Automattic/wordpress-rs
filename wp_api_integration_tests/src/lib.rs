@@ -24,10 +24,10 @@ pub struct TestCredentials {
     pub subscriber_password_uuid: &'static str,
     pub author_username: &'static str,
     pub author_password: &'static str,
-    pub password_protected_post_id: i32,
+    pub password_protected_post_id: i64,
     pub password_protected_post_password: &'static str,
     pub password_protected_post_title: &'static str,
-    pub trashed_post_id: i32,
+    pub trashed_post_id: i64,
 }
 
 pub mod backend;

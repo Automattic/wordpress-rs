@@ -29,7 +29,7 @@ pub struct WpCliUser {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WpCliUserMeta {
-    pub user_id: i32,
+    pub user_id: i64,
     pub meta_key: String,
     pub meta_value: String,
 }
