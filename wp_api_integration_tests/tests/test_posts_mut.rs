@@ -121,7 +121,7 @@ async fn delete_post() {
         !Backend::posts(None)
             .await
             .into_iter()
-            .any(|u| u.id == FIRST_POST_ID.0 as i64),
+            .any(|u| u.id == FIRST_POST_ID.0),
         "Post wasn't deleted"
     );
 
@@ -139,7 +139,7 @@ async fn trash_post() {
     let trashed_post = Backend::posts(Some("trash"))
         .await
         .into_iter()
-        .find(|u| u.id == FIRST_POST_ID.0 as i64);
+        .find(|u| u.id == FIRST_POST_ID.0);
     assert!(trashed_post.is_some(), "Can't find the trashed post");
     assert_eq!(
         trashed_post.unwrap().post_status,
@@ -216,7 +216,7 @@ generate_update_test!(
     SECOND_USER_ID,
     |updated_post, updated_post_from_wp_cli| {
         assert_eq!(updated_post.author, SECOND_USER_ID);
-        assert_eq!(updated_post_from_wp_cli.author, SECOND_USER_ID.0 as i64);
+        assert_eq!(updated_post_from_wp_cli.author, SECOND_USER_ID.0);
     }
 );
 
