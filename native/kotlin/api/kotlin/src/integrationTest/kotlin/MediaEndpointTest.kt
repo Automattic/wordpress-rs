@@ -8,7 +8,7 @@ import uniffi.wp_api.SparseMediaFieldWithEditContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertNotNull
 
-private const val MEDIA_ID_611 = 611
+private const val MEDIA_ID_611: Long = 611
 
 class MediaEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
