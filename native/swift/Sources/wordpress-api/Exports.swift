@@ -75,6 +75,7 @@ public typealias PostTypeWithEmbedContext = WordPressAPIInternal.PostTypeDetails
 public typealias PostTypeDetailsWithEditContext = WordPressAPIInternal.PostTypeDetailsWithEditContext
 public typealias PostTypeDetailsWithViewContext = WordPressAPIInternal.PostTypeDetailsWithViewContext
 public typealias PostTypeDetailsWithEmbedContext = WordPressAPIInternal.PostTypeDetailsWithEmbedContext
+public typealias PostTypesRequestExecutor = WordPressAPIInternal.PostTypesRequestExecutor
 
 // MARK: - Posts
 public typealias SparsePost = WordPressAPIInternal.SparsePost

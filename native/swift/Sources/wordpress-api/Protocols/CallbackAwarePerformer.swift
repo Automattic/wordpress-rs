@@ -15,23 +15,22 @@ public protocol CallbackAwarePerformer: RequestPerformer {
         callback: @escaping @Sendable (Result<UpdateResponseType, Error>) -> Void
     )
 
-    // Generated implementation
     func listWithEditContext(
         params: ListParamsType,
         queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void
+        callback: @escaping @Sendable (Result<ListWithEditContextResponseType, Error>) -> Void
     )
 
     func listWithViewContext(
         params: ListParamsType,
         queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void
+        callback: @escaping @Sendable (Result<ListWithViewContextResponseType, Error>) -> Void
     )
 
     func listWithEmbedContext(
         params: ListParamsType,
         queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void
+        callback: @escaping @Sendable (Result<ListWithEmbedContextResponseType, Error>) -> Void
     )
 }
 
@@ -69,7 +68,7 @@ extension CallbackAwarePerformer {
     public func listWithEditContext(
         params: ListParamsType,
         queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<EditContextListResponseType, Error>) -> Void
+        callback: @escaping @Sendable (Result<ListWithEditContextResponseType, any Error>) -> Void
     ) {
         perform(request: buildListWithEditRequest(params: params), on: queue, responseConverter: {
             try parseListWithEditResponse(response: $0)
@@ -79,7 +78,7 @@ extension CallbackAwarePerformer {
     public func listWithEmbedContext(
         params: ListParamsType,
         queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<EmbedContextListResponseType, Error>) -> Void
+        callback: @escaping @Sendable (Result<ListWithEmbedContextResponseType, Error>) -> Void
     ) {
         perform(request: buildListWithEmbedRequest(params: params), on: queue, responseConverter: {
             try parseListWithEmbedResponse(response: $0)
@@ -89,7 +88,7 @@ extension CallbackAwarePerformer {
     public func listWithViewContext(
         params: ListParamsType,
         queue: DispatchQueue,
-        callback: @escaping @Sendable (Result<ViewContextListResponseType, Error>) -> Void
+        callback: @escaping @Sendable (Result<ListWithViewContextResponseType, Error>) -> Void
     ) {
         perform(request: buildListWithViewRequest(params: params), on: queue, responseConverter: {
             try parseListWithViewResponse(response: $0)

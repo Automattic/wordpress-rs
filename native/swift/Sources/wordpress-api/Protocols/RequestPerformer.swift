@@ -1,13 +1,5 @@
 import Foundation
 
-protocol InternalRequestPerformer {
-    associatedtype ExecutorType
-    associatedtype RequestBuilderType
-
-    var executor: ExecutorType { get }
-    var builder: RequestBuilderType { get }
-}
-
 public protocol RequestPerformer: Sendable {
     associatedtype IdType
 
@@ -23,9 +15,9 @@ public protocol RequestPerformer: Sendable {
     associatedtype UpdateResponseType
     associatedtype DeleteResponseType
 
-    associatedtype EditContextListResponseType: PaginatableResponse
-    associatedtype EmbedContextListResponseType: PaginatableResponse
-    associatedtype ViewContextListResponseType: PaginatableResponse
+    associatedtype ListWithEditContextResponseType: PaginatableResponse
+    associatedtype ListWithEmbedContextResponseType: PaginatableResponse
+    associatedtype ListWithViewContextResponseType: PaginatableResponse
 
     var urlSession: URLSession { get }
 
@@ -41,10 +33,22 @@ public protocol RequestPerformer: Sendable {
     func parseCreateResponse(response: WpNetworkResponse) throws -> CreateResponseType
     func parseUpdateResponse(response: WpNetworkResponse) throws -> UpdateResponseType
     func parseDeleteResponse(response: WpNetworkResponse) throws -> DeleteResponseType
+    func parseListWithEditResponse(response: WpNetworkResponse) throws -> ListWithEditContextResponseType
+    func parseListWithEmbedResponse(response: WpNetworkResponse) throws -> ListWithEmbedContextResponseType
+    func parseListWithViewResponse(response: WpNetworkResponse) throws -> ListWithViewContextResponseType
 
-    func parseListWithEditResponse(response: WpNetworkResponse) throws -> EditContextListResponseType
-    func parseListWithEmbedResponse(response: WpNetworkResponse) throws -> EmbedContextListResponseType
-    func parseListWithViewResponse(response: WpNetworkResponse) throws -> ViewContextListResponseType
+    // MARK: – Known-to-exist List Methods
+    func listWithEditContext(
+        params: ListWithEditContextResponseType.ParamsType
+    ) async throws -> ListWithEditContextResponseType
+
+    func listWithEmbedContext(
+        params: ListWithEmbedContextResponseType.ParamsType
+    ) async throws -> ListWithEmbedContextResponseType
+
+    func listWithViewContext(
+        params: ListWithViewContextResponseType.ParamsType
+    ) async throws -> ListWithViewContextResponseType
 }
 
 public protocol NoDeletionParams {

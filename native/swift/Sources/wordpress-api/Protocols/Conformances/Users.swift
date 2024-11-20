@@ -17,6 +17,9 @@ public final class UsersRequestPerformer {
     }
 }
 
+extension UsersRequestPerformer: PublisherAwarePerformer {}
+extension UsersRequestPerformer: CallbackAwarePerformer {}
+
 extension UsersRequestPerformer: RequestPerformer, HasDeletionParams {
     public typealias IdType = UserId
 
@@ -217,4 +220,20 @@ extension UsersRequestPerformer: UsersRequestExecutorProtocol {
     public func updateMe(params: UserUpdateParams) async throws -> UsersRequestUpdateMeResponse {
         try await executor.updateMe(params: params)
     }
+}
+
+extension UsersRequestListWithEditContextResponse: @unchecked Sendable, PaginatableResponse {
+    public typealias DataType = UserWithEditContext
+    public typealias ParamsType = UserListParams
+}
+
+extension UsersRequestListWithEmbedContextResponse: @unchecked Sendable, PaginatableResponse {
+    public typealias DataType = UserWithEmbedContext
+    public typealias ParamsType = UserListParams
+
+}
+
+extension UsersRequestListWithViewContextResponse: @unchecked Sendable, PaginatableResponse {
+    public typealias DataType = UserWithViewContext
+    public typealias ParamsType = UserListParams
 }

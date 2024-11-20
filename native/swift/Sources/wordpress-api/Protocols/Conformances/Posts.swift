@@ -17,9 +17,6 @@ public final class PostsRequestPerformer {
     }
 }
 
-extension PostsRequestPerformer: PublisherAwarePerformer {}
-extension PostsRequestPerformer: CallbackAwarePerformer {}
-
 extension PostsRequestPerformer: RequestPerformer, NoDeletionParams {
     public typealias IdType = PostId
 
@@ -35,9 +32,9 @@ extension PostsRequestPerformer: RequestPerformer, NoDeletionParams {
     public typealias UpdateResponseType = PostsRequestUpdateResponse
     public typealias DeleteResponseType = PostsRequestDeleteResponse
 
-    public typealias EditContextListResponseType = PostsRequestListWithEditContextResponse
-    public typealias EmbedContextListResponseType = PostsRequestListWithEmbedContextResponse
-    public typealias ViewContextListResponseType = PostsRequestListWithViewContextResponse
+    public typealias ListWithEditContextResponseType = PostsRequestListWithEditContextResponse
+    public typealias ListWithViewContextResponseType = PostsRequestListWithViewContextResponse
+    public typealias ListWithEmbedContextResponseType = PostsRequestListWithEmbedContextResponse
 
     public func buildCreateRequest(params: PostCreateParams) -> WpNetworkRequest {
         builder.create(params: params)
@@ -93,6 +90,11 @@ extension PostsRequestPerformer: RequestPerformer, NoDeletionParams {
         try parseAsPostsRequestListWithViewContextResponse(response: response)
     }
 }
+
+extension PostsRequestPerformer: CallbackAwarePerformer {}
+extension PostsRequestPerformer: PaginationAwarePerformer {}
+extension PostsRequestPerformer: PublisherAwarePerformer {}
+extension PostsRequestPerformer: SequenceAwarePerformer {}
 
 // MARK: - PostsRequestExecutorProtocol
 
@@ -188,3 +190,7 @@ extension PostsRequestPerformer: PostsRequestExecutorProtocol {
         try await executor.trash(postId: postId)
     }
 }
+
+extension PostsRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {}
+extension PostsRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {}
+extension PostsRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {}

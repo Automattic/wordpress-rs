@@ -1,29 +1,25 @@
 import Foundation
-import WordPressAPIInternal
 import Combine
 
-@available(iOS 14.0, *)
 public protocol PublisherAwarePerformer: RequestPerformer {
 
     func publisherWithCreate(params: CreateParamsType) -> AnyPublisher<CreateResponseType, Error>
     func publisherWithUpdate(id: IdType, params: UpdateParamsType) -> AnyPublisher<UpdateResponseType, Error>
-    func publisherWithDelete(id: IdType) -> AnyPublisher<DeleteResponseType, Error>
 
     // Generated implementation
     func publisherWithEditContext(
-        params: ListParamsType
-    ) -> AnyPublisher<[EditContextListResponseType.DataType], Error>
-
-    func publisherWithViewContext(
-        params: ListParamsType
-    ) -> AnyPublisher<[ViewContextListResponseType.DataType], Error>
+        params: ListWithEditContextResponseType.ParamsType
+    ) -> AnyPublisher<[ListWithEditContextResponseType.DataType], Error>
 
     func publisherWithEmbedContext(
-        params: ListParamsType
-    ) -> AnyPublisher<[EmbedContextListResponseType.DataType], Error>
+        params: ListWithEmbedContextResponseType.ParamsType
+    ) -> AnyPublisher<[ListWithEmbedContextResponseType.DataType], Error>
+
+    func publisherWithViewContext(
+        params: ListWithViewContextResponseType.ParamsType
+    ) -> AnyPublisher<[ListWithViewContextResponseType.DataType], Error>
 }
 
-@available(iOS 14.0, *)
 extension PublisherAwarePerformer {
 
     public func publisherWithCreate(
@@ -45,8 +41,8 @@ extension PublisherAwarePerformer {
 
     // swiftlint:disable force_cast
     public func publisherWithEditContext(
-        params: EditContextListResponseType.ParamsType
-    ) -> AnyPublisher<[EditContextListResponseType.DataType], Error> {
+        params: ListWithEditContextResponseType.ParamsType
+    ) -> AnyPublisher<[ListWithEditContextResponseType.DataType], Error> {
         recursivePublisher(
             params: params,
             requestTransformer: { buildListWithEditRequest(params: $0 as! Self.ListParamsType) },
@@ -55,8 +51,8 @@ extension PublisherAwarePerformer {
     }
 
     public func publisherWithViewContext(
-        params: ViewContextListResponseType.ParamsType
-    ) -> AnyPublisher<[ViewContextListResponseType.DataType], Error> {
+        params: ListWithViewContextResponseType.ParamsType
+    ) -> AnyPublisher<[ListWithViewContextResponseType.DataType], Error> {
         recursivePublisher(
             params: params,
             requestTransformer: { buildListWithViewRequest(params: $0 as! Self.ListParamsType) },
@@ -65,8 +61,8 @@ extension PublisherAwarePerformer {
     }
 
     public func publisherWithEmbedContext(
-        params: EmbedContextListResponseType.ParamsType
-    ) -> AnyPublisher<[EmbedContextListResponseType.DataType], Error> {
+        params: ListWithEmbedContextResponseType.ParamsType
+    ) -> AnyPublisher<[ListWithEmbedContextResponseType.DataType], Error> {
         recursivePublisher(
             params: params,
             requestTransformer: { buildListWithEmbedRequest(params: $0 as! Self.ListParamsType) },
@@ -80,7 +76,7 @@ extension PublisherAwarePerformer {
         requestTransformer: @escaping (T.ParamsType) -> WpNetworkRequest,
         responseTransformer: @escaping (WpNetworkResponse) throws -> T
     ) -> AnyPublisher<[T.DataType], Error> {
-        let paramsPublisher = CurrentValueSubject<T.ParamsType, Never>(params)
+        let paramsPublisher = CurrentValueSubject<T.ParamsType, Error>(params)
 
         return paramsPublisher                                    // Following Combine chains can be tricky so:
             .flatMap { perform(request: requestTransformer($0)) } // 1. `dataTaskPublisher` replaces `paramsPublisher`
