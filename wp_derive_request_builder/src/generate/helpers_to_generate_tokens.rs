@@ -74,14 +74,16 @@ pub fn fn_signature(
     variant_ident: &Ident,
     url_parts: &[UrlPart],
     params_type: Option<&ParamsType>,
+    content_disposition_type: Option<&ContentDispositionType>,
     request_type: RequestType,
     context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
     let fn_name = fn_name(variant_ident, context_and_filter_handler);
     let url_params = fn_url_params(url_parts);
     let provided_param = fn_provided_param(part_of, params_type, request_type);
+    let content_disposition_param = fn_content_disposition_param(part_of, content_disposition_type);
     let fields_param = fn_fields_param(context_and_filter_handler);
-    quote! { fn #fn_name(&self, #url_params #provided_param #fields_param) }
+    quote! { fn #fn_name(&self, #url_params #provided_param #content_disposition_param #fields_param) }
 }
 
 pub fn fn_url_params(url_parts: &[UrlPart]) -> TokenStream {
@@ -117,6 +119,25 @@ pub fn fn_provided_param(
                 | RequestType::Get => tokens,
                 RequestType::Post => TokenStream::new(),
             },
+            PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
+        }
+    } else {
+        TokenStream::new()
+    }
+}
+
+pub fn fn_content_disposition_param(
+    part_of: PartOf,
+    content_disposition_type: Option<&ContentDispositionType>,
+) -> TokenStream {
+    if let Some(content_disposition_type) = content_disposition_type {
+        let tokens = {
+            let content_disposition_type_token_stream = &content_disposition_type.tokens;
+            quote! { content_disposition: #content_disposition_type_token_stream, }
+        };
+        match part_of {
+            // Endpoints don't need the content disposition type because it's not part of the url
+            PartOf::Endpoint => TokenStream::new(),
             PartOf::RequestBuilder | PartOf::RequestExecutor => tokens,
         }
     } else {
@@ -510,6 +531,34 @@ mod tests {
     }
 
     #[rstest]
+    #[case(PartOf::Endpoint, None, "")]
+    #[case(
+        PartOf::Endpoint,
+        referenced_content_disposition_type("FooContentDisposition"),
+        ""
+    )]
+    #[case(
+        PartOf::RequestBuilder,
+        referenced_content_disposition_type("FooContentDisposition"),
+        "content_disposition : & FooContentDisposition ,"
+    )]
+    #[case(
+        PartOf::RequestExecutor,
+        referenced_content_disposition_type("FooContentDisposition"),
+        "content_disposition : & FooContentDisposition ,"
+    )]
+    fn test_fn_content_disposition_param(
+        #[case] part_of: PartOf,
+        #[case] content_disposition_type: Option<ContentDispositionType>,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            fn_content_disposition_param(part_of, content_disposition_type.as_ref()).to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
     #[case("List", ContextAndFilterHandler::None, "list")]
     #[case(
         "List",
@@ -681,6 +730,7 @@ mod tests {
         format_ident!("Create"),
         url_static_users(),
         None,
+        None,
         RequestType::Post,
         ContextAndFilterHandler::None,
         "fn create (& self ,)")]
@@ -689,6 +739,7 @@ mod tests {
         format_ident!("Create"),
         url_static_users(),
         referenced_params_type("UserCreateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
         RequestType::Post,
         filter_no_context(),
         "fn filter_create (& self , fields : & [crate :: SparseUserField])")]
@@ -697,22 +748,25 @@ mod tests {
         format_ident!("Create"),
         url_static_users(),
         referenced_params_type("UserCreateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
         RequestType::Post,
         filter_no_context(),
-        "fn filter_create (& self , params : & UserCreateParams , fields : & [crate :: SparseUserField])")]
+        "fn filter_create (& self , params : & UserCreateParams , content_disposition : & UserContentDisposition , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestExecutor,
         format_ident!("Create"),
         url_static_users(),
         referenced_params_type("UserCreateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
         RequestType::Post,
         filter_no_context(),
-        "fn filter_create (& self , params : & UserCreateParams , fields : & [crate :: SparseUserField])")]
+        "fn filter_create (& self , params : & UserCreateParams , content_disposition : & UserContentDisposition , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::Endpoint,
         format_ident!("Delete"),
         url_users_with_user_id(),
         referenced_params_type("UserDeleteParams"),
+        None,
         RequestType::Delete,
         ContextAndFilterHandler::None,
         "fn delete (& self , user_id : & UserId , params : & UserDeleteParams ,)")]
@@ -721,6 +775,7 @@ mod tests {
         format_ident!("Delete"),
         url_users_with_user_id(),
         referenced_params_type("UserDeleteParams"),
+        None,
         RequestType::Delete,
         filter_no_context(),
         "fn filter_delete (& self , user_id : & UserId , params : & UserDeleteParams , fields : & [crate :: SparseUserField])")]
@@ -729,6 +784,7 @@ mod tests {
         format_ident!("DeleteMe"),
         url_static_users(),
         referenced_params_type("UserDeleteParams"),
+        None,
         RequestType::Delete,
         ContextAndFilterHandler::None,
         "fn delete_me (& self , params : & UserDeleteParams ,)")]
@@ -737,6 +793,7 @@ mod tests {
         format_ident!("List"),
         url_static_users(),
         referenced_params_type("UserListParams"),
+        None,
         RequestType::ContextualGet,
         filter_take_context_as_argument(),
         "fn filter_list_with_edit_context (& self , params : & UserListParams , fields : & [crate :: SparseUserFieldWithEditContext])")]
@@ -744,6 +801,7 @@ mod tests {
         PartOf::Endpoint,
         format_ident!("Retrieve"),
         url_users_with_user_id(),
+        None,
         None,
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
@@ -753,6 +811,7 @@ mod tests {
         format_ident!("Retrieve"),
         url_users_with_user_id(),
         None,
+        None,
         RequestType::ContextualGet,
         filter_take_context_as_argument(),
         "fn filter_retrieve_with_edit_context (& self , user_id : & UserId , fields : & [crate :: SparseUserFieldWithEditContext])")]
@@ -761,6 +820,7 @@ mod tests {
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
+        None,
         RequestType::Post,
         ContextAndFilterHandler::None,
         "fn update (& self , user_id : & UserId ,)")]
@@ -769,6 +829,7 @@ mod tests {
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
+        None,
         RequestType::Post,
         filter_no_context(),
         "fn filter_update (& self , user_id : & UserId , fields : & [crate :: SparseUserField])")]
@@ -777,14 +838,7 @@ mod tests {
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
-        RequestType::Post,
-        ContextAndFilterHandler::None,
-        "fn update (& self , user_id : & UserId , params : & UserUpdateParams ,)")]
-    #[case(
-        PartOf::RequestExecutor,
-        format_ident!("Update"),
-        url_users_with_user_id(),
-        referenced_params_type("UserUpdateParams"),
+        None,
         RequestType::Post,
         ContextAndFilterHandler::None,
         "fn update (& self , user_id : & UserId , params : & UserUpdateParams ,)")]
@@ -793,22 +847,52 @@ mod tests {
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
         RequestType::Post,
-        filter_no_context(),
-        "fn filter_update (& self , user_id : & UserId , params : & UserUpdateParams , fields : & [crate :: SparseUserField])")]
+        ContextAndFilterHandler::None,
+        "fn update (& self , user_id : & UserId , params : & UserUpdateParams , content_disposition : & UserContentDisposition ,)")]
     #[case(
         PartOf::RequestExecutor,
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
+        None,
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "fn update (& self , user_id : & UserId , params : & UserUpdateParams ,)")]
+    #[case(
+        PartOf::RequestExecutor,
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        referenced_params_type("UserUpdateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "fn update (& self , user_id : & UserId , params : & UserUpdateParams , content_disposition : & UserContentDisposition ,)")]
+    #[case(
+        PartOf::RequestBuilder,
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        referenced_params_type("UserUpdateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
         RequestType::Post,
         filter_no_context(),
-        "fn filter_update (& self , user_id : & UserId , params : & UserUpdateParams , fields : & [crate :: SparseUserField])")]
+        "fn filter_update (& self , user_id : & UserId , params : & UserUpdateParams , content_disposition : & UserContentDisposition , fields : & [crate :: SparseUserField])")]
+    #[case(
+        PartOf::RequestExecutor,
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        referenced_params_type("UserUpdateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
+        RequestType::Post,
+        filter_no_context(),
+        "fn filter_update (& self , user_id : & UserId , params : & UserUpdateParams , content_disposition : & UserContentDisposition , fields : & [crate :: SparseUserField])")]
     #[case(
         PartOf::RequestBuilder,
         format_ident!("List"),
         url_static_users(),
         referenced_params_type("UserListParams"),
+        None,
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         "fn list_with_edit_context (& self , params : & UserListParams ,)")]
@@ -817,6 +901,7 @@ mod tests {
         format_ident!("List"),
         url_static_users(),
         referenced_params_type("UserListParams"),
+        None,
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         "fn list_with_edit_context (& self , params : & UserListParams ,)")]
@@ -825,6 +910,7 @@ mod tests {
         #[case] variant_ident: Ident,
         #[case] url_parts: Vec<UrlPart>,
         #[case] params_type: Option<ParamsType>,
+        #[case] content_disposition_type: Option<ContentDispositionType>,
         #[case] request_type: RequestType,
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
@@ -835,6 +921,7 @@ mod tests {
                 &variant_ident,
                 &url_parts,
                 params_type.as_ref(),
+                content_disposition_type.as_ref(),
                 request_type,
                 &context_and_filter_handler,
             )

@@ -45,6 +45,7 @@ fn generate_async_request_executor(
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
+        let content_disposition_type = &variant.attr.content_disposition;
 
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
@@ -64,6 +65,7 @@ fn generate_async_request_executor(
                 &variant.variant_ident,
                 url_parts,
                 params_type.as_ref(),
+                content_disposition_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
@@ -213,6 +215,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 &variant.variant_ident,
                 url_parts,
                 params_type.as_ref(),
+                content_disposition_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
@@ -260,6 +263,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
     let functions = parsed_enum.variants.iter().map(|variant| {
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
+        let content_disposition_type = &variant.attr.content_disposition;
         let request_type = variant.attr.request_type;
         let url_from_api_base_url =
             fn_body_get_url_from_api_base_url(&parsed_enum.enum_ident, url_parts);
@@ -276,6 +280,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
                     &variant.variant_ident,
                     url_parts,
                     params_type.as_ref(),
+                    content_disposition_type.as_ref(),
                     request_type,
                     &context_and_filter_handler,
                 );
