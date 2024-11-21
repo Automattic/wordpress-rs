@@ -199,19 +199,22 @@ impl ParsedVariantAttribute {
     // #[derive(WpDerivedRequest)]
     // #[SparseField(crate::SparseUserField)]
     // enum UsersRequest {
-    //     #[contextual_get(url = "/users", params = &UserListParams, output = Vec<SparseUser>)]
+    //     #[contextual_get(url = "/users", params = &UserListParams, content_disposition =
+    //     &UserContentDisposition, output = Vec<SparseUser>)]
     //     List,
     // }
     // ```
     //
     // In the above example: (as pseudocode)
-    // * Input: `vec!["url = \"users\"", "params = &UserListParams", "output = Vec<SparseUser>"]`
-    // * Output: `vec![(url, "users"), (params, &UserListParams), (output, Vec<SparseUser>)]`
+    // * Input: `vec!["url = \"users\"", "params = &UserListParams", "content_disposition =
+    // &UserContentDisposition", "output = Vec<SparseUser>"]`
+    // * Output: `vec![(url, "users"), (params, &UserListParams),
+    // (content_disposition, &UserContentDisposition), (output, Vec<SparseUser>)]`
     //
     // How it works:
-    // * Since a specific set of keys is expected - "url", "params" or "output", it's certain that
-    // keys are `syn::Ident`s. Furthermore, the input is comma separated list, so it's certain that
-    // the first token is the key.
+    // * Since a specific set of keys is expected - "url", "params", "content_disposition" or
+    // "output", it's certain that keys are `syn::Ident`s. Furthermore, the input is comma
+    // separated list, so it's certain that the first token is the key.
     // * Since the first token is guaranteed to be a single `syn::Ident`, the second token is
     // guaranteed to be an `=` sign.
     // * The remaining tokens represent the "value". There needs to be at least one token.
@@ -233,7 +236,8 @@ impl ParsedVariantAttribute {
             .into_iter()
             .map(|tokens| {
                 let mut tokens_iter = tokens.into_iter();
-                // First token should be an Ident matching to "url", "params" or "output"
+                // First token should be an Ident matching to "url", "params",
+                // "content_disposition" or "output"
                 let first_token = tokens_iter.next();
                 let ident = if let Some(TokenTree::Ident(ident)) = first_token {
                     ident

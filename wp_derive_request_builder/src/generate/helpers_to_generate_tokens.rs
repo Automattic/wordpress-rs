@@ -239,6 +239,21 @@ fn fn_arg_provided_params(
     }
 }
 
+fn fn_arg_content_disposition(
+    part_of: PartOf,
+    content_disposition_type: Option<&ContentDispositionType>,
+) -> TokenStream {
+    if content_disposition_type.is_some() {
+        match part_of {
+            // Endpoints don't need the content disposition type because it's not part of the url
+            PartOf::Endpoint => TokenStream::new(),
+            PartOf::RequestBuilder | PartOf::RequestExecutor => quote! { content_disposition, },
+        }
+    } else {
+        TokenStream::new()
+    }
+}
+
 fn fn_arg_fields(context_and_filter_handler: &ContextAndFilterHandler) -> TokenStream {
     match context_and_filter_handler {
         ContextAndFilterHandler::None
@@ -391,7 +406,7 @@ pub fn fn_body_build_request_from_url(
             if params_type.is_some() {
                 if content_disposition_type.is_some() {
                     quote! {
-                        self.inner.post(url, params, content_disposition)
+                        self.inner.post_with_content_disposition(url, params, content_disposition)
                     }
                 } else {
                     quote! {
@@ -411,6 +426,7 @@ pub fn fn_body_get_request_from_request_builder(
     variant_ident: &Ident,
     url_parts: &[UrlPart],
     params_type: Option<&ParamsType>,
+    content_disposition_type: Option<&ContentDispositionType>,
     request_type: RequestType,
     context_and_filter_handler: &ContextAndFilterHandler,
 ) -> TokenStream {
@@ -418,10 +434,12 @@ pub fn fn_body_get_request_from_request_builder(
     let fn_arg_url_parts = fn_arg_url_parts(url_parts);
     let fn_arg_provided_params =
         fn_arg_provided_params(PartOf::RequestExecutor, params_type, request_type);
+    let fn_arg_content_disposition =
+        fn_arg_content_disposition(PartOf::RequestExecutor, content_disposition_type);
     let fn_arg_fields = fn_arg_fields(context_and_filter_handler);
 
     quote! {
-        let request = self.request_builder.#fn_name(#fn_arg_url_parts #fn_arg_provided_params #fn_arg_fields);
+        let request = self.request_builder.#fn_name(#fn_arg_url_parts #fn_arg_provided_params #fn_arg_content_disposition #fn_arg_fields);
     }
 }
 
@@ -667,6 +685,36 @@ mod tests {
     ) {
         assert_eq!(
             fn_arg_provided_params(part_of, params_type.as_ref(), request_type).to_string(),
+            expected_str
+        );
+    }
+
+    #[rstest]
+    #[case(PartOf::Endpoint, None, "")]
+    #[case(
+        PartOf::Endpoint,
+        referenced_content_disposition_type("FooContentDisposition"),
+        ""
+    )]
+    #[case(PartOf::RequestBuilder, None, "")]
+    #[case(
+        PartOf::RequestBuilder,
+        referenced_content_disposition_type("FooContentDisposition"),
+        "content_disposition ,"
+    )]
+    #[case(PartOf::RequestExecutor, None, "")]
+    #[case(
+        PartOf::RequestExecutor,
+        referenced_content_disposition_type("FooContentDisposition"),
+        "content_disposition ,"
+    )]
+    fn test_fn_arg_content_disposition(
+        #[case] part_of: PartOf,
+        #[case] content_disposition_type: Option<ContentDispositionType>,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(
+            fn_arg_content_disposition(part_of, content_disposition_type.as_ref()).to_string(),
             expected_str
         );
     }
@@ -1157,7 +1205,7 @@ mod tests {
         referenced_params_type("UserListParams"),
         RequestType::Post,
         referenced_content_disposition_type("MediaContentDisposition"),
-        "self . inner . post (url , params , content_disposition)"
+        "self . inner . post_with_content_disposition (url , params , content_disposition)"
     )]
     fn test_fn_body_build_request_from_url(
         #[case] params: Option<ParamsType>,
@@ -1189,6 +1237,7 @@ mod tests {
         format_ident!("Create"),
         url_static_users(),
         referenced_params_type("UserCreateParams"),
+        None,
         RequestType::Post,
         ContextAndFilterHandler::None,
         "let request = self . request_builder . create (params ,) ;")]
@@ -1196,13 +1245,31 @@ mod tests {
         format_ident!("Create"),
         url_static_users(),
         referenced_params_type("UserCreateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "let request = self . request_builder . create (params , content_disposition ,) ;")]
+    #[case(
+        format_ident!("Create"),
+        url_static_users(),
+        referenced_params_type("UserCreateParams"),
+        None,
         RequestType::Post,
         filter_no_context(),
         "let request = self . request_builder . filter_create (params , fields ,) ;")]
     #[case(
+        format_ident!("Create"),
+        url_static_users(),
+        referenced_params_type("UserCreateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
+        RequestType::Post,
+        filter_no_context(),
+        "let request = self . request_builder . filter_create (params , content_disposition , fields ,) ;")]
+    #[case(
         format_ident!("Delete"),
         url_users_with_user_id(),
         referenced_params_type("UserDeleteParams"),
+        None,
         RequestType::Delete,
         ContextAndFilterHandler::None,
         "let request = self . request_builder . delete (user_id , params ,) ;")]
@@ -1210,6 +1277,7 @@ mod tests {
         format_ident!("Delete"),
         url_users_with_user_id(),
         referenced_params_type("UserDeleteParams"),
+        None,
         RequestType::Delete,
         filter_no_context(),
         "let request = self . request_builder . filter_delete (user_id , params , fields ,) ;")]
@@ -1217,6 +1285,7 @@ mod tests {
         format_ident!("DeleteMe"),
         url_static_users(),
         referenced_params_type("UserDeleteParams"),
+        None,
         RequestType::Delete,
         ContextAndFilterHandler::None,
         "let request = self . request_builder . delete_me (params ,) ;")]
@@ -1224,6 +1293,7 @@ mod tests {
         format_ident!("List"),
         url_static_users(),
         referenced_params_type("UserListParams"),
+        None,
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Edit),
         "let request = self . request_builder . list_with_edit_context (params ,) ;")]
@@ -1231,12 +1301,14 @@ mod tests {
         format_ident!("List"),
         url_static_users(),
         referenced_params_type("UserListParams"),
+        None,
         RequestType::ContextualGet,
         filter_take_context_as_argument(),
         "let request = self . request_builder . filter_list_with_edit_context (params , fields ,) ;")]
     #[case(
         format_ident!("Retrieve"),
         url_users_with_user_id(),
+        None,
         None,
         RequestType::ContextualGet,
         ContextAndFilterHandler::NoFilterTakeContextAsFunctionName(WpContext::Embed),
@@ -1245,6 +1317,7 @@ mod tests {
         format_ident!("Retrieve"),
         url_users_with_user_id(),
         None,
+        None,
         RequestType::ContextualGet,
         filter_take_context_as_argument(),
         "let request = self . request_builder . filter_retrieve_with_edit_context (user_id , fields ,) ;")]
@@ -1252,6 +1325,7 @@ mod tests {
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
+        None,
         RequestType::Post,
         ContextAndFilterHandler::None,
         "let request = self . request_builder . update (user_id , params ,) ;")]
@@ -1259,13 +1333,31 @@ mod tests {
         format_ident!("Update"),
         url_users_with_user_id(),
         referenced_params_type("UserUpdateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
+        RequestType::Post,
+        ContextAndFilterHandler::None,
+        "let request = self . request_builder . update (user_id , params , content_disposition ,) ;")]
+    #[case(
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        referenced_params_type("UserUpdateParams"),
+        None,
         RequestType::Post,
         filter_no_context(),
         "let request = self . request_builder . filter_update (user_id , params , fields ,) ;")]
+    #[case(
+        format_ident!("Update"),
+        url_users_with_user_id(),
+        referenced_params_type("UserUpdateParams"),
+        referenced_content_disposition_type("UserContentDisposition"),
+        RequestType::Post,
+        filter_no_context(),
+        "let request = self . request_builder . filter_update (user_id , params , content_disposition , fields ,) ;")]
     fn test_fn_body_get_request_from_request_builder(
         #[case] variant_ident: Ident,
         #[case] url_parts: Vec<UrlPart>,
         #[case] params_type: Option<ParamsType>,
+        #[case] content_disposition_type: Option<ContentDispositionType>,
         #[case] request_type: RequestType,
         #[case] context_and_filter_handler: ContextAndFilterHandler,
         #[case] expected_str: &str,
@@ -1275,6 +1367,7 @@ mod tests {
                 &variant_ident,
                 &url_parts,
                 params_type.as_ref(),
+                content_disposition_type.as_ref(),
                 request_type,
                 &context_and_filter_handler
             )

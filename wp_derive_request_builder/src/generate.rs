@@ -57,6 +57,7 @@ fn generate_async_request_executor(
                 &variant.variant_ident,
                 url_parts,
                 params_type.as_ref(),
+                content_disposition_type.as_ref(),
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
