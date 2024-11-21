@@ -132,6 +132,7 @@ impl WpLoginClient {
             url: WpEndpointUrl(parsed_site_url.url()),
             header_map: WpNetworkHeaderMap::default().into(),
             body: None,
+            file_path: None,
         };
         self.request_executor
             .execute(api_root_request.into())
@@ -150,6 +151,7 @@ impl WpLoginClient {
                     url: WpEndpointUrl(api_root_url.url()),
                     header_map: WpNetworkHeaderMap::default().into(),
                     body: None,
+                    file_path: None,
                 }
                 .into(),
             )

@@ -136,19 +136,27 @@ pub enum JsonValue {
 
 #[derive(Debug, uniffi::Enum)]
 pub enum WpContentDisposition {
-    AttachmentFilename(String),
+    AttachmentFilepath(String),
 }
 
 pub trait AsContentDisposition {
-    fn header_value(self) -> Result<HeaderValue, InvalidHeaderValue>;
+    fn header_value(&self) -> Result<HeaderValue, InvalidHeaderValue>;
+
+    fn file_path(&self) -> String;
 }
 
 impl AsContentDisposition for WpContentDisposition {
-    fn header_value(self) -> Result<HeaderValue, InvalidHeaderValue> {
+    fn header_value(&self) -> Result<HeaderValue, InvalidHeaderValue> {
         match self {
-            WpContentDisposition::AttachmentFilename(f) => {
+            WpContentDisposition::AttachmentFilepath(f) => {
                 HeaderValue::from_str(format!("attachment;filename=\"{}\"", f).as_str())
             }
+        }
+    }
+
+    fn file_path(&self) -> String {
+        match self {
+            WpContentDisposition::AttachmentFilepath(f) => f.clone(),
         }
     }
 }

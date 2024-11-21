@@ -63,6 +63,7 @@ impl InnerRequestBuilder {
             url: url.into(),
             header_map: self.header_map().into(),
             body: None,
+            file_path: None,
         }
     }
 
@@ -75,6 +76,7 @@ impl InnerRequestBuilder {
             url: url.into(),
             header_map: self.header_map_for_post_request().into(),
             body: Self::post_body(json_body),
+            file_path: None,
         }
     }
 
@@ -82,7 +84,7 @@ impl InnerRequestBuilder {
         &self,
         url: ApiEndpointUrl,
         json_body: &T,
-        content_disposition: CD,
+        content_disposition: &CD,
     ) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
@@ -99,6 +101,7 @@ impl InnerRequestBuilder {
             url: url.into(),
             header_map: header_map.into(),
             body: Self::post_body(json_body),
+            file_path: Some(content_disposition.file_path()),
         }
     }
 
@@ -117,6 +120,7 @@ impl InnerRequestBuilder {
             url: url.into(),
             header_map: self.header_map().into(),
             body: None,
+            file_path: None,
         }
     }
 
@@ -181,6 +185,7 @@ pub struct WpNetworkRequest {
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
     pub(crate) body: Option<Arc<WpNetworkRequestBody>>,
+    pub(crate) file_path: Option<String>,
 }
 
 #[uniffi::export]
@@ -205,6 +210,10 @@ impl WpNetworkRequest {
         self.body
             .as_ref()
             .map(|b| request_or_response_body_as_string(&b.inner))
+    }
+
+    pub fn file_path(&self) -> Option<String> {
+        self.file_path.clone()
     }
 }
 

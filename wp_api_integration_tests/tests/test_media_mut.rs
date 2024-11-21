@@ -20,7 +20,7 @@ async fn create_media() {
                 title: Some("foo".to_string()),
                 ..Default::default()
             },
-            WpContentDisposition::AttachmentFilename("foo.jpg".to_string()),
+            &WpContentDisposition::AttachmentFilepath("foo.jpg".to_string()),
         )
         .await
         .assert_response();
