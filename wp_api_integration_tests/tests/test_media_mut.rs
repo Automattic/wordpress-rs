@@ -3,6 +3,7 @@ use serial_test::serial;
 use wp_api::{
     media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
+    WpContentDisposition,
 };
 use wp_api_integration_tests::{
     api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
@@ -14,10 +15,13 @@ use wp_api_integration_tests::{
 async fn create_media() {
     api_client()
         .media()
-        .create(&MediaCreateParams {
-            title: Some("foo".to_string()),
-            ..Default::default()
-        })
+        .create(
+            &MediaCreateParams {
+                title: Some("foo".to_string()),
+                ..Default::default()
+            },
+            WpContentDisposition::AttachmentFilename("foo.jpg".to_string()),
+        )
         .await
         .assert_response();
     RestoreServer::db().await;

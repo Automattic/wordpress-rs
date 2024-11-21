@@ -8,7 +8,7 @@ use url::Url;
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
-    WpApiError, WpAuthentication,
+    AsContentDisposition, WpApiError, WpAuthentication,
 };
 
 use self::endpoint::WpEndpointUrl;
@@ -74,10 +74,41 @@ impl InnerRequestBuilder {
             method: RequestMethod::POST,
             url: url.into(),
             header_map: self.header_map_for_post_request().into(),
-            body: serde_json::to_vec(json_body)
-                .ok()
-                .map(|b| Arc::new(WpNetworkRequestBody::new(b))),
+            body: Self::post_body(json_body),
         }
+    }
+
+    pub fn post_with_content_disposition<T, CD>(
+        &self,
+        url: ApiEndpointUrl,
+        json_body: &T,
+        content_disposition: CD,
+    ) -> WpNetworkRequest
+    where
+        T: ?Sized + Serialize,
+        CD: AsContentDisposition,
+    {
+        let mut header_map = self.header_map_for_post_request();
+        header_map.inner.insert(
+            http::header::CONTENT_DISPOSITION,
+            // TODO: What should be the behaviour when the header value can't be created?
+            content_disposition.header_value().unwrap(),
+        );
+        WpNetworkRequest {
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: header_map.into(),
+            body: Self::post_body(json_body),
+        }
+    }
+
+    fn post_body<T>(json_body: &T) -> Option<Arc<WpNetworkRequestBody>>
+    where
+        T: ?Sized + Serialize,
+    {
+        serde_json::to_vec(json_body)
+            .ok()
+            .map(|b| Arc::new(WpNetworkRequestBody::new(b)))
     }
 
     pub fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {

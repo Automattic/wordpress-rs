@@ -5,7 +5,7 @@ use crate::{
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
         SparseMediaFieldWithViewContext,
     },
-    SparseField,
+    SparseField, WpContentDisposition,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -15,7 +15,7 @@ enum MediaRequest {
     List,
     #[contextual_get(url = "/media/<media_id>", output = crate::media::SparseMedia, filter_by = crate::media::SparseMediaField)]
     Retrieve,
-    #[post(url = "/media", params = &crate::media::MediaCreateParams, output = crate::media::MediaWithEditContext)]
+    #[post(url = "/media", params = &crate::media::MediaCreateParams, output = crate::media::MediaWithEditContext, content_disposition = WpContentDisposition)]
     Create,
     #[delete(url = "/media/<media_id>", output = crate::media::MediaDeleteResponse)]
     Delete,

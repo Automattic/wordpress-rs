@@ -2,6 +2,7 @@
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
+use http::{header::InvalidHeaderValue, HeaderValue};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};
@@ -131,6 +132,25 @@ pub enum JsonValue {
     String(String),
     Array(Vec<JsonValue>),
     Object(HashMap<String, JsonValue>),
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum WpContentDisposition {
+    AttachmentFilename(String),
+}
+
+pub trait AsContentDisposition {
+    fn header_value(self) -> Result<HeaderValue, InvalidHeaderValue>;
+}
+
+impl AsContentDisposition for WpContentDisposition {
+    fn header_value(self) -> Result<HeaderValue, InvalidHeaderValue> {
+        match self {
+            WpContentDisposition::AttachmentFilename(f) => {
+                HeaderValue::from_str(format!("attachment;filename=\"{}\"", f).as_str())
+            }
+        }
+    }
 }
 
 #[macro_export]
