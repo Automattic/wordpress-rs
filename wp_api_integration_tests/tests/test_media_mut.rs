@@ -1,17 +1,98 @@
+use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use macro_helper::generate_update_test;
+use reqwest::multipart::Part;
 use serial_test::serial;
 use wp_api::{
     media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
-    WpContentDisposition,
+    AsContentDisposition, WpAuthentication, WpContentDisposition,
 };
 use wp_api_integration_tests::{
-    api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
+    api_client, backend::RestoreServer, AssertResponse, TestCredentials, FIRST_POST_ID,
+    MEDIA_ID_611,
 };
 
 #[tokio::test]
 #[serial]
 #[ignore]
+async fn upload_media() {
+    let authentication = WpAuthentication::from_username_and_password(
+        TestCredentials::instance().admin_username.to_string(),
+        TestCredentials::instance().admin_password.to_string(),
+    );
+    let client = reqwest::Client::new();
+    let mut request = client
+        .request(Method::POST, "http://localhost/wp-json/wp/v2/media/")
+        .headers(header_map(&authentication));
+    let mut jpeg_header_map = HeaderMap::new();
+    jpeg_header_map.insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_str("image/jpeg").unwrap(),
+    );
+    let mut json_body_header_map = HeaderMap::new();
+    json_body_header_map.insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_str("application/json").unwrap(),
+    );
+    let params = MediaCreateParams {
+        title: Some("foo".to_string()),
+        date: Some("2025-01-01T12:00:00".to_string()),
+        ..Default::default()
+    };
+    let json_body = serde_json::to_vec(&params).unwrap();
+    let form = reqwest::multipart::Form::new()
+        .part(
+            "file",
+            Part::file("../sample.jpeg")
+                .await
+                .unwrap()
+                .headers(jpeg_header_map),
+        )
+        //.part("title", Part::text("foooox"));
+        // Setting the json doesn't seem to work. Each part can be set separately as shown above
+        .part(
+            "metadata",
+            Part::bytes(json_body).headers(json_body_header_map),
+        );
+    request = request.multipart(form);
+
+    println!("{:#?}", request);
+    let response = request.send().await;
+
+    println!("{:#?}", response);
+    println!("{:#?}", response.unwrap().text().await);
+
+    RestoreServer::db().await;
+}
+
+fn header_map(authentication: &WpAuthentication) -> HeaderMap {
+    let mut header_map = HeaderMap::new();
+    // set by reqwest multipart
+    //header_map.insert(
+    //    http::header::CONTENT_TYPE,
+    //    HeaderValue::from_static("multipart/form-data"),
+    //);
+    header_map.insert(
+        http::header::ACCEPT,
+        HeaderValue::from_static("application/json"),
+    );
+    header_map.insert(
+        http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_str("attachment;filename=\"sample.jpeg\"").unwrap(),
+    );
+    match authentication {
+        WpAuthentication::None => (),
+        WpAuthentication::AuthorizationHeader { ref token } => {
+            let hv = HeaderValue::from_str(&format!("Basic {}", token)).unwrap();
+            header_map.insert(http::header::AUTHORIZATION, hv);
+        }
+    };
+    header_map
+}
+
+#[tokio::test]
+#[serial]
+//#[ignore]
 async fn create_media() {
     api_client()
         .media()
@@ -20,7 +101,7 @@ async fn create_media() {
                 title: Some("foo".to_string()),
                 ..Default::default()
             },
-            &WpContentDisposition::AttachmentFilepath("foo.jpg".to_string()),
+            &WpContentDisposition::AttachmentFilepath("../sample.jpeg".to_string()),
         )
         .await
         .assert_response();

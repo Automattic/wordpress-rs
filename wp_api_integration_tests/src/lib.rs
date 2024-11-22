@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use reqwest::multipart::Part;
 use std::sync::Arc;
 use wp_api::{
     media::MediaId,
@@ -149,6 +150,13 @@ impl AsyncWpNetworking {
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }
+        let request = if let Some(file_path) = wp_request.file_path() {
+            let form = reqwest::multipart::Form::new()
+                .part(file_path.clone(), Part::file(file_path).await.unwrap());
+            request.multipart(form)
+        } else {
+            request
+        };
         let mut response = request.send().await?;
 
         let header_map = std::mem::take(response.headers_mut());
