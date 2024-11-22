@@ -115,6 +115,7 @@ async fn delete_post() {
     // Delete the post using the API and ensure it's successful
     let post_delete_response = api_client().posts().delete(&FIRST_POST_ID).await;
     assert!(post_delete_response.is_ok(), "{:#?}", post_delete_response);
+    assert!(post_delete_response.unwrap().data.deleted);
 
     // Assert that the post was deleted
     assert!(
