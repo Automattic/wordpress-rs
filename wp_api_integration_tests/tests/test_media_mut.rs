@@ -1,11 +1,11 @@
-use http::{HeaderMap, HeaderName, HeaderValue, Method};
+use http::{HeaderMap, HeaderValue, Method};
 use macro_helper::generate_update_test;
 use reqwest::multipart::Part;
 use serial_test::serial;
 use wp_api::{
     media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
-    AsContentDisposition, WpAuthentication, WpContentDisposition,
+    WpAuthentication, WpContentDisposition,
 };
 use wp_api_integration_tests::{
     api_client, backend::RestoreServer, AssertResponse, TestCredentials, FIRST_POST_ID,
@@ -14,7 +14,7 @@ use wp_api_integration_tests::{
 
 #[tokio::test]
 #[serial]
-#[ignore]
+//#[ignore]
 async fn upload_media() {
     let authentication = WpAuthentication::from_username_and_password(
         TestCredentials::instance().admin_username.to_string(),
@@ -50,10 +50,7 @@ async fn upload_media() {
         )
         //.part("title", Part::text("foooox"));
         // Setting the json doesn't seem to work. Each part can be set separately as shown above
-        .part(
-            "metadata",
-            Part::bytes(json_body).headers(json_body_header_map),
-        );
+        .part("data", Part::bytes(json_body).headers(json_body_header_map));
     request = request.multipart(form);
 
     println!("{:#?}", request);
@@ -101,10 +98,29 @@ async fn create_media() {
                 title: Some("foo".to_string()),
                 ..Default::default()
             },
-            &WpContentDisposition::AttachmentFilepath("../sample.jpeg".to_string()),
+            &WpContentDisposition::AttachmentFilepath("foo.jpeg".to_string()),
         )
         .await
         .assert_response();
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore]
+async fn upload_media_from_client() {
+    let response = api_client()
+        .media()
+        .upload(
+            &MediaCreateParams {
+                title: Some("Testing upload_media_from_client".to_string()),
+                ..Default::default()
+            },
+            "../sample.jpeg".to_string(),
+            "image/jpeg".to_string(),
+        )
+        .await;
+    println!("{:#?}", response);
     RestoreServer::db().await;
 }
 

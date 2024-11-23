@@ -77,8 +77,19 @@ fun setupJniAndBindings() {
         into(jniLibsPath)
     }
 
+    tasks.register<Delete>("deleteTestResources") {
+        delete = setOf(generatedTestResourcesPath)
+    }
+
     tasks.register<Copy>("copyTestCredentials") {
+        dependsOn(tasks.named("deleteTestResources"))
         from("$cargoProjectRoot/test_credentials.json")
+        into(generatedTestResourcesPath)
+    }
+
+    tasks.register<Copy>("copyTestMedia") {
+        dependsOn(tasks.named("deleteTestResources"))
+        from("$cargoProjectRoot/test_media.jpg")
         into(generatedTestResourcesPath)
     }
 }

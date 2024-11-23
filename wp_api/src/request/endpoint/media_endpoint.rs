@@ -1,12 +1,16 @@
-use super::{AsNamespace, DerivedRequest, WpNamespace};
+use std::{collections::HashMap, sync::Arc};
+
+use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
     media::{
         MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
         SparseMediaFieldWithViewContext,
     },
+    request::{RequestMethod, WpNetworkHeaderMap, CONTENT_TYPE_MULTIPART},
     SparseField, WpContentDisposition,
 };
+use http::HeaderValue;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -64,6 +68,112 @@ impl SparseField for SparseMediaFieldWithViewContext {
             Self::PostType => "type",
             _ => self.as_field_name(),
         }
+    }
+}
+
+#[derive(uniffi::Object)]
+pub struct MediaUploadRequest {
+    pub(crate) method: RequestMethod,
+    pub(crate) url: WpEndpointUrl,
+    pub(crate) header_map: Arc<WpNetworkHeaderMap>,
+    pub(crate) file_path: String,
+    pub(crate) file_content_type: String,
+    pub(crate) media_params: HashMap<String, String>,
+}
+
+#[uniffi::export]
+impl MediaUploadRequest {
+    pub fn method(&self) -> RequestMethod {
+        self.method.clone()
+    }
+
+    pub fn url(&self) -> WpEndpointUrl {
+        self.url.clone()
+    }
+
+    pub fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+        self.header_map.clone()
+    }
+
+    pub fn file_path(&self) -> String {
+        self.file_path.clone()
+    }
+
+    pub fn file_content_type(&self) -> String {
+        self.file_content_type.clone()
+    }
+
+    pub fn media_params(&self) -> HashMap<String, String> {
+        self.media_params.clone()
+    }
+}
+
+impl std::fmt::Debug for MediaUploadRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = format!(
+            indoc::indoc! {"
+                MediaUploadRequest {{
+                    method: '{:?}',
+                    url: '{:?}',
+                    header_map: '{:?}',
+                    file_path: '{:?}'
+                    file_content_type: '{:?}'
+                    media_params: '{:?}'
+                }}
+                "},
+            self.method,
+            self.url,
+            self.header_map,
+            self.file_path,
+            self.file_content_type,
+            self.media_params
+        );
+        s.pop(); // Remove the new line at the end
+        write!(f, "{}", s)
+    }
+}
+
+#[uniffi::export]
+impl MediaRequestBuilder {
+    pub fn upload(
+        &self,
+        params: &crate::media::MediaCreateParams,
+        file_path: String,
+        file_content_type: String,
+    ) -> MediaUploadRequest {
+        let url = self.endpoint.create();
+        let mut header_map = self.inner.header_map();
+        header_map.inner.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
+        );
+        MediaUploadRequest {
+            method: RequestMethod::POST,
+            url: self.endpoint.create().into(),
+            header_map: header_map.into(),
+            file_path,
+            file_content_type,
+            // TODO: There should be a better way to do this, but it should be enough for testing
+            media_params: serde_json::from_str(&serde_json::to_string(&params).unwrap()).unwrap(),
+        }
+    }
+}
+
+#[uniffi::export]
+impl MediaRequestExecutor {
+    pub async fn upload(
+        &self,
+        params: &crate::media::MediaCreateParams,
+        file_path: String,
+        file_content_type: String,
+    ) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
+        let request = self
+            .request_builder
+            .upload(params, file_path, file_content_type);
+        self.request_executor
+            .upload_media(Arc::new(request))
+            .await?
+            .parse()
     }
 }
 
