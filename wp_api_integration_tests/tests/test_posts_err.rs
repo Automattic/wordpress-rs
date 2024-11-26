@@ -146,12 +146,7 @@ async fn trash_post_err_already_trashed() {
 async fn update_post_err_cannot_edit() {
     api_client_as_author()
         .posts()
-        .update(
-            &FIRST_POST_ID,
-            &PostUpdateParams {
-                ..Default::default()
-            },
-        )
+        .update(&FIRST_POST_ID, &PostUpdateParams::default())
         .await
         .assert_wp_error(WpErrorCode::CannotEdit);
 }

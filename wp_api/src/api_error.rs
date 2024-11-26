@@ -191,6 +191,10 @@ pub enum WpErrorCode {
     CannotAssignSticky,
     #[serde(rename = "rest_cannot_assign_term")]
     CannotAssignTerm,
+    #[serde(rename = "rest_cannot_edit_file_type")]
+    CannotEditFileType,
+    #[serde(rename = "rest_cannot_edit_image")]
+    CannotEditImage,
     #[serde(rename = "rest_cannot_edit_others")]
     CannotEditOthers,
     #[serde(rename = "rest_cannot_manage_application_passwords")]
@@ -201,12 +205,22 @@ pub enum WpErrorCode {
     CannotReadType,
     #[serde(rename = "rest_forbidden_status")]
     ForbiddenStatus,
+    #[serde(rename = "rest_image_not_edited")]
+    ImageNotEdited,
+    #[serde(rename = "rest_image_crop_failed")]
+    ImageCropFailed,
+    #[serde(rename = "rest_image_rotation_failed")]
+    ImageRotationFailed,
     #[serde(rename = "rest_invalid_featured_media")]
     InvalidFeaturedMedia,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
     #[serde(rename = "rest_user_cannot_delete_post")]
     UserCannotDeletePost, // See `rest_cannot_delete` instead
+    #[serde(rename = "rest_unknown_attachment")]
+    UnknownAttachment,
+    #[serde(rename = "rest_unknown_image_file_type")]
+    UnknownImageFileType,
     // ------------------------------------------------------------------------------------
     // Untested, because we believe these errors require multisite
     // ------------------------------------------------------------------------------------
