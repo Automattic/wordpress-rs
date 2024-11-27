@@ -157,7 +157,23 @@ extension PostWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension MediaWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
+    public var id: String {
+        self.slug
+    }
+
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id, title: self.title.raw, subtitle: String(describing: self.mediaDetails), fields: [:])
+    }
+}
+
 extension [PostWithEditContext] {
+    func asListViewData() -> [ListViewData] {
+        self.map { $0.asListViewData }
+    }
+}
+
+extension [MediaWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }
     }
