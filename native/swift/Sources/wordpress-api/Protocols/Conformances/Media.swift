@@ -26,6 +26,8 @@ public struct MediaCreateParams {}
 public struct MediaRequestCreateResponse {}
 
 extension MediaRequestPerformer: CallbackAwarePerformer {}
+extension MediaRequestPerformer: PaginationAwarePerformer {}
+extension MediaRequestPerformer: SequenceAwarePerformer {}
 
 #if canImport(Combine)
 extension MediaRequestPerformer: PublisherAwarePerformer {}
