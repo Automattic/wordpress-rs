@@ -11,7 +11,7 @@ use crate::{
     EnumFromStrParsingError, JsonValue, UserId, WpApiParamOrder,
 };
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -486,6 +486,37 @@ pub struct MediaCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_id: Option<PostId>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+}
+
+impl From<MediaCreateParams> for HashMap<String, String> {
+    fn from(params: MediaCreateParams) -> Self {
+        let mut map = HashMap::new();
+        let mut add = |k: &str, v: Option<String>| {
+            if let Some(v) = v {
+                map.insert(k.to_string(), v);
+            }
+        };
+        add("date", params.date);
+        add("date_gmt", params.date_gmt);
+        add("slug", params.slug);
+        add("status", params.status.map(|x| x.as_str().to_string()));
+        add("title", params.title);
+        add("author", params.author.map(|x| x.to_string()));
+        add(
+            "comment_status",
+            params.comment_status.map(|x| x.as_str().to_string()),
+        );
+        add(
+            "ping_status",
+            params.ping_status.map(|x| x.as_str().to_string()),
+        );
+        add("template", params.template);
+        add("alt_text", params.alt_text);
+        add("caption", params.caption);
+        add("description", params.description);
+        add("post", params.post_id.map(|x| x.to_string()));
+        map
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

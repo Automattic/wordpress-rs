@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
     media::{
-        MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
+        MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
         SparseMediaFieldWithViewContext,
     },
@@ -183,7 +183,7 @@ impl std::fmt::Debug for MediaUploadRequest {
 impl MediaRequestBuilder {
     pub fn create(
         &self,
-        params: &crate::media::MediaCreateParams,
+        params: MediaCreateParams,
         file_path: String,
         file_content_type: String,
     ) -> MediaUploadRequest {
@@ -199,8 +199,7 @@ impl MediaRequestBuilder {
             header_map: header_map.into(),
             file_path,
             file_content_type,
-            // TODO: There should be a better way to do this, but it should be enough for testing
-            media_params: serde_json::from_str(&serde_json::to_string(&params).unwrap()).unwrap(),
+            media_params: params.into(),
         }
     }
 }
@@ -209,7 +208,7 @@ impl MediaRequestBuilder {
 impl MediaRequestExecutor {
     pub async fn create(
         &self,
-        params: &crate::media::MediaCreateParams,
+        params: MediaCreateParams,
         file_path: String,
         file_content_type: String,
     ) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
