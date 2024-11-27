@@ -27,7 +27,7 @@ extension PostTypeRequestPerformer: PostTypesRequestExecutorProtocol {
     public func filterRetrieveWithEditContext(
         postType: PostType,
         fields: [SparsePostTypeDetailsFieldWithEditContext]
-    ) async throws -> WordPressAPIInternal.PostTypesRequestFilterRetrieveWithEditContextResponse {
+    ) async throws -> PostTypesRequestFilterRetrieveWithEditContextResponse {
         try await executor.filterRetrieveWithEditContext(postType: postType, fields: fields)
     }
 

@@ -111,8 +111,8 @@ extension PostsRequestPerformer: PublisherAwarePerformer {}
 extension PostsRequestPerformer: PostsRequestExecutorProtocol {
 
     public func create(
-        params: WordPressAPIInternal.PostCreateParams
-    ) async throws -> WordPressAPIInternal.PostsRequestCreateResponse {
+        params: PostCreateParams
+    ) async throws -> PostsRequestCreateResponse {
         try await self.executor.create(params: params)
     }
 
