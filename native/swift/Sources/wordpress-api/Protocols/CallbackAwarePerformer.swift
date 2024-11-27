@@ -108,13 +108,13 @@ extension CallbackAwarePerformer {
                     return
                 }
 
-                guard let httpResponse = response as? HTTPURLResponse, let data else {
+                guard let response, let data else {
                     completion(.failure(WordPressAPI.Errors.unableToParseResponse))
                     return
                 }
 
                 do {
-                    let rawResponse = try WpNetworkResponse.from(data: data, response: httpResponse)
+                    let rawResponse = try WpNetworkResponse.from(data: data, response: response)
                     let parsedResponse = try responseConverter(rawResponse)
                     completion(.success(parsedResponse))
                 } catch {
@@ -135,5 +135,4 @@ extension CallbackAwarePerformer where Self: NoDeletionParams {
             try parseDeleteResponse(response: $0)
         }, completion: callback)
     }
-
 }

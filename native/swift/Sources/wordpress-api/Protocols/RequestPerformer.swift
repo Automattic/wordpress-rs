@@ -1,5 +1,9 @@
 import Foundation
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public protocol RequestPerformer: Sendable {
     associatedtype IdType
 

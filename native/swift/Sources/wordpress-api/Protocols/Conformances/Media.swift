@@ -1,6 +1,9 @@
 import Foundation
 @preconcurrency import WordPressAPIInternal
-import Combine
+
+#if os(Linux)
+import FoundationNetworking
+#endif
 
 public final class MediaRequestPerformer {
     typealias ExecutorType = MediaRequestExecutor
@@ -19,8 +22,11 @@ public final class MediaRequestPerformer {
 public struct MediaCreateParams {}
 public struct MediaRequestCreateResponse {}
 
-extension MediaRequestPerformer: PublisherAwarePerformer {}
 extension MediaRequestPerformer: CallbackAwarePerformer {}
+
+#if canImport(Combine)
+extension MediaRequestPerformer: PublisherAwarePerformer {}
+#endif
 
 extension MediaRequestPerformer: RequestPerformer {
     public func buildListWithEditRequest(params: MediaListParams) -> WpNetworkRequest {

@@ -4,6 +4,10 @@ import Foundation
 @preconcurrency import WordPressAPIInternal
 #endif
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public final class PostTypeRequestPerformer {
     typealias ExecutorType = PostTypesRequestExecutor
     typealias RequestBuilderType = PostTypesRequestBuilder

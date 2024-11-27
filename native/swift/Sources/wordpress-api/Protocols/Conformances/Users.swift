@@ -4,6 +4,10 @@ import Foundation
 @preconcurrency import WordPressAPIInternal
 #endif
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 public final class UsersRequestPerformer {
     typealias ExecutorType = UsersRequestExecutor
     typealias RequestBuilderType = UsersRequestBuilder
@@ -24,7 +28,6 @@ extension UsersRequestPerformer: PaginationAwarePerformer {}
 extension UsersRequestPerformer: SequenceAwarePerformer {}
 
 #if canImport(Combine)
-import Combine
 extension UsersRequestPerformer: PublisherAwarePerformer {}
 #endif
 
