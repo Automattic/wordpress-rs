@@ -67,10 +67,10 @@ class MediaEndpointTest {
     }
 
     @Test
-    fun testUploadMediaRequest() = runTest {
+    fun testCreateMediaRequest() = runTest {
         val title = "Testing media upload from Kotlin"
         val response = client.request { requestBuilder ->
-            requestBuilder.media().upload(
+            requestBuilder.media().create(
                 params = MediaCreateParams(title = title),
                 "test_media.jpg",
                 "image/jpg"

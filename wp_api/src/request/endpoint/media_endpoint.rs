@@ -7,7 +7,10 @@ use crate::{
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
         SparseMediaFieldWithViewContext,
     },
-    request::{RequestMethod, WpNetworkHeaderMap, CONTENT_TYPE_MULTIPART},
+    request::{
+        ParsedResponse, RequestMethod, WpNetworkHeaderMap, WpNetworkResponse,
+        CONTENT_TYPE_MULTIPART,
+    },
     SparseField,
 };
 use http::HeaderValue;
@@ -19,8 +22,6 @@ enum MediaRequest {
     List,
     #[contextual_get(url = "/media/<media_id>", output = crate::media::SparseMedia, filter_by = crate::media::SparseMediaField)]
     Retrieve,
-    #[post(url = "/media", params = &crate::media::MediaCreateParams, output = crate::media::MediaWithEditContext)]
-    Create,
     #[delete(url = "/media/<media_id>", output = crate::media::MediaDeleteResponse)]
     Delete,
     #[post(url = "/media/<media_id>", params = &MediaUpdateParams, output = MediaWithEditContext)]
@@ -69,6 +70,51 @@ impl SparseField for SparseMediaFieldWithViewContext {
             _ => self.as_field_name(),
         }
     }
+}
+
+impl MediaRequestEndpoint {
+    pub fn create(&self) -> crate::request::endpoint::ApiEndpointUrl {
+        self.api_base_url
+            .by_extending_and_splitting_by_forward_slash([
+                MediaRequest::namespace().as_str(),
+                "media",
+            ])
+            .into()
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct MediaRequestCreateResponse {
+    pub data: crate::media::MediaWithEditContext,
+    #[serde(skip)]
+    pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
+}
+
+impl From<MediaRequestCreateResponse> for ParsedResponse<MediaWithEditContext, ()> {
+    fn from(value: MediaRequestCreateResponse) -> Self {
+        Self {
+            data: value.data,
+            header_map: value.header_map,
+            next_page_params: None,
+            prev_page_params: None,
+        }
+    }
+}
+impl From<ParsedResponse<MediaWithEditContext, ()>> for MediaRequestCreateResponse {
+    fn from(value: ParsedResponse<MediaWithEditContext, ()>) -> Self {
+        Self {
+            data: value.data,
+            header_map: value.header_map,
+        }
+    }
+}
+
+#[uniffi::export]
+fn parse_as_media_request_create_response(
+    response: WpNetworkResponse,
+) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
+    response.parse()
 }
 
 #[derive(uniffi::Object)]
@@ -135,7 +181,7 @@ impl std::fmt::Debug for MediaUploadRequest {
 
 #[uniffi::export]
 impl MediaRequestBuilder {
-    pub fn upload(
+    pub fn create(
         &self,
         params: &crate::media::MediaCreateParams,
         file_path: String,
@@ -161,7 +207,7 @@ impl MediaRequestBuilder {
 
 #[uniffi::export]
 impl MediaRequestExecutor {
-    pub async fn upload(
+    pub async fn create(
         &self,
         params: &crate::media::MediaCreateParams,
         file_path: String,
@@ -169,7 +215,7 @@ impl MediaRequestExecutor {
     ) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
         let request = self
             .request_builder
-            .upload(params, file_path, file_content_type);
+            .create(params, file_path, file_content_type);
         self.request_executor
             .upload_media(Arc::new(request))
             .await?

@@ -14,7 +14,7 @@ async fn upload_media() {
     let title = "Foo media";
     let created_media = api_client()
         .media()
-        .upload(
+        .create(
             &MediaCreateParams {
                 title: Some(title.to_string()),
                 ..Default::default()
