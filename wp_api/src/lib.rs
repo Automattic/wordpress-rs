@@ -1,7 +1,10 @@
 #![allow(dead_code, unused_variables)]
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
-pub use api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpError, WpErrorCode};
+pub use api_error::{
+    MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError, WpApiError,
+    WpError, WpErrorCode,
+};
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};

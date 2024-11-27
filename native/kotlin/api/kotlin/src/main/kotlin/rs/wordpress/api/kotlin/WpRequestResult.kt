@@ -20,6 +20,8 @@ sealed class WpRequestResult<T> {
         val reason: String,
     ) : WpRequestResult<T>()
 
+    class MediaFileNotFound<T> : WpRequestResult<T>()
+
     class SiteUrlParsingError<T>(
         val reason: String,
     ) : WpRequestResult<T>()

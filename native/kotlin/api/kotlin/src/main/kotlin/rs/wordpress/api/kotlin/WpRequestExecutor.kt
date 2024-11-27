@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.MediaUploadRequest
+import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -54,7 +55,11 @@ class WpRequestExecutor(
             }
             // TODO: This probably doesn't work with Android - and it looks wrong
             val file =
-                File(WpRequestExecutor::class.java.classLoader!!.getResource(mediaUploadRequest.filePath())!!.file)
+                WpRequestExecutor::class.java.classLoader?.getResource(mediaUploadRequest.filePath())?.file?.let {
+                    File(
+                        it
+                    )
+                } ?: throw MediaUploadRequestExecutionException.MediaFileNotFound()
             multipartBodyBuilder.addFormDataPart(
                 name = "file",
                 filename = file.name,

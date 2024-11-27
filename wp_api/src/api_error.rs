@@ -23,6 +23,8 @@ pub enum WpApiError {
         status_code: Option<u16>,
         reason: String,
     },
+    #[error("Media file not found")]
+    MediaFileNotFound,
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ResponseParsingError { reason: String, response: String },
     #[error("Error while parsing site url: {}", reason)]
@@ -320,6 +322,21 @@ pub enum RequestExecutionError {
     },
 }
 
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum MediaUploadRequestExecutionError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
+    #[error("Media file not found")]
+    MediaFileNotFound,
+}
+
 impl From<RequestExecutionError> for WpApiError {
     fn from(value: RequestExecutionError) -> Self {
         match value {
@@ -330,6 +347,21 @@ impl From<RequestExecutionError> for WpApiError {
                 status_code,
                 reason,
             },
+        }
+    }
+}
+
+impl From<MediaUploadRequestExecutionError> for WpApiError {
+    fn from(value: MediaUploadRequestExecutionError) -> Self {
+        match value {
+            MediaUploadRequestExecutionError::RequestExecutionFailed {
+                status_code,
+                reason,
+            } => Self::RequestExecutionFailed {
+                status_code,
+                reason,
+            },
+            MediaUploadRequestExecutionError::MediaFileNotFound => Self::MediaFileNotFound,
         }
     }
 }

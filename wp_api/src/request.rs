@@ -6,7 +6,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
 use crate::{
-    api_error::{ParsedRequestError, RequestExecutionError, WpError},
+    api_error::{
+        MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError, WpError,
+    },
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
     WpApiError, WpAuthentication,
 };
@@ -128,7 +130,7 @@ pub trait RequestExecutor: Send + Sync + Debug {
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError>;
+    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
 }
 
 #[derive(uniffi::Object)]
