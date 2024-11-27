@@ -34,20 +34,28 @@ struct MultipartRequestBody {
             data.append(boundaryData)
             data.append(contentsOf: lineBreak)
             data.append(part.httpHeadersData)
-            try fileHandle.write(contentsOf: data)
+            try write(data, to: fileHandle)
 
             for try await bodyData in part.readData() {
-                try fileHandle.write(contentsOf: bodyData)
+                try write(bodyData, to: fileHandle)
             }
 
-            try fileHandle.write(contentsOf: lineBreak)
+            try write(lineBreak, to: fileHandle)
         }
 
-        try fileHandle.write(contentsOf: boundaryMarker + boundaryData + boundaryMarker + lineBreak)
+        try write(boundaryMarker + boundaryData + boundaryMarker + lineBreak, to: fileHandle)
 
         try fileHandle.close()
 
         return filePath
+    }
+
+    func write(_ data: Data, to fileHandle: FileHandle) throws {
+        if #available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
+            try fileHandle.write(contentsOf: data)
+        } else {
+            fileHandle.write(data)
+        }
     }
 }
 
