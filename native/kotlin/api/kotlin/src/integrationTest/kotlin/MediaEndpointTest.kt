@@ -77,6 +77,6 @@ class MediaEndpointTest {
             )
         }.assertSuccessAndRetrieveData().data
         assertEquals(title, response.title.rendered)
-        // TODO: Restore server
+        restoreTestServer()
     }
 }
