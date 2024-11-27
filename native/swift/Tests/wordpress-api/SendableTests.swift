@@ -1,9 +1,12 @@
+import Foundation
 import Testing
 import WordPressAPI
 
 struct SendableTests {
 
     private static let sendables: [Sendable] = [
+        WordPressAPI(urlSession: URLSession(configuration: .ephemeral), baseUrl: try! ParsedUrl.parse(input: "https://example.com"), authenticationStategy: .none),
+
         MediaRequestListWithEditContextResponse.empty,
         MediaRequestListWithViewContextResponse.empty,
         MediaRequestListWithEmbedContextResponse.empty,

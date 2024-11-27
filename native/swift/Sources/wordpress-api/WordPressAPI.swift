@@ -1,13 +1,13 @@
 import Foundation
 #if canImport(WordPressAPIInternal)
-import WordPressAPIInternal
+@preconcurrency import WordPressAPIInternal
 #endif
 
 #if os(Linux)
 import FoundationNetworking
 #endif
 
-public struct WordPressAPI {
+public struct WordPressAPI: Sendable {
 
     enum Errors: Error {
         case unableToParseResponse
