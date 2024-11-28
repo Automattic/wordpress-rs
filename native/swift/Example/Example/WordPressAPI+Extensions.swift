@@ -2,6 +2,7 @@ import Foundation
 import WordPressAPI
 
 extension WordPressAPI {
+    @MainActor
     static var globalInstance: WordPressAPI {
         get throws {
             let loginManager = LoginManager()

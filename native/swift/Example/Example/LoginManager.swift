@@ -1,6 +1,7 @@
 import Foundation
 import WordPressAPI
 
+@MainActor
 class LoginManager: NSObject, ObservableObject {
 
     @Published
@@ -39,9 +40,7 @@ class LoginManager: NSObject, ObservableObject {
         setDefaultSiteUrl(to: newValue.siteUrl)
         try Keychain.store(username: newValue.userLogin, password: newValue.password, for: newValue.siteUrl)
 
-        await MainActor.run {
-            isLoggedIn = true
-        }
+        isLoggedIn = true
     }
 
     public func getLoginCredentials() throws -> WpAuthentication? {
