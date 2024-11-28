@@ -17,6 +17,7 @@ protocol ListViewDataConvertable: Identifiable {
     var asListViewData: ListViewData { get }
 }
 
+extension UserWithEditContext: @retroactive Identifiable {}
 extension UserWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.email, fields: [
@@ -27,6 +28,7 @@ extension UserWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension UserWithViewContext: @retroactive Identifiable {}
 extension UserWithViewContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
@@ -35,6 +37,7 @@ extension UserWithViewContext: ListViewDataConvertable {
     }
 }
 
+extension UserWithEmbedContext: @retroactive Identifiable {}
 extension UserWithEmbedContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
@@ -43,6 +46,7 @@ extension UserWithEmbedContext: ListViewDataConvertable {
     }
 }
 
+extension PluginWithEditContext: @retroactive Identifiable {}
 extension PluginWithEditContext: ListViewDataConvertable {
     public var id: String {
         self.plugin.slug
@@ -56,6 +60,7 @@ extension PluginWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension ApplicationPasswordWithEditContext: @retroactive Identifiable {}
 extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
     public var id: String {
         self.uuid.uuid
@@ -76,6 +81,7 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension WpSiteHealthTest: @retroactive Identifiable {}
 extension SiteHealthTest: ListViewDataConvertable {
     public var id: String {
         self.label
@@ -86,6 +92,7 @@ extension SiteHealthTest: ListViewDataConvertable {
     }
 }
 
+extension WpSiteHealthDirectorySizes: @retroactive Identifiable {}
 extension SiteHealthDirectorySizes: ListViewDataConvertable {
     public var id: String {
         [
@@ -117,6 +124,7 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
     }
 }
 
+extension PostTypeDetailsWithViewContext: @retroactive Identifiable {}
 extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
     public var id: String {
         self.slug
@@ -147,6 +155,7 @@ extension SiteSettingsWithEditContext {
     }
 }
 
+extension PostWithEditContext: @retroactive Identifiable {}
 extension PostWithEditContext: ListViewDataConvertable {
     public var id: String {
         self.slug
