@@ -5,7 +5,12 @@ import WordPressAPI
 struct SendableTests {
 
     private static let sendables: [Sendable] = [
-        WordPressAPI(urlSession: URLSession(configuration: .ephemeral), baseUrl: try! ParsedUrl.parse(input: "https://example.com"), authenticationStategy: .none),
+        WordPressAPI(
+            urlSession: URLSession(configuration: .ephemeral),
+            // swiftlint:disable:next force_try
+            baseUrl: try! ParsedUrl.parse(input: "https://example.com"),
+            authenticationStategy: .none
+        ),
 
         MediaRequestListWithEditContextResponse.empty,
         MediaRequestListWithViewContextResponse.empty,
