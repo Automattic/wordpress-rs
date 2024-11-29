@@ -20,8 +20,9 @@ class LoginTests {
                 site: "invalid url",
                 appName: "foo",
                 appId: appId,
-                authenticator: Authenticator()
-            ).get()
+                authenticator: MockAuthenticator
+                    .returning(.failure(.invalidSiteAddress(.UrlDiscoveryFailed(attempts: .init()))))
+            )
         }, throws: { error in
             guard let loginError = error as? WordPressLoginClient.Error, case .invalidSiteAddress = loginError else {
                 return false
@@ -42,15 +43,21 @@ class LoginTests {
 
         let client = WordPressLoginClient(requestExecutor: stubs)
 
-        await #expect(performing: {
+        await #expect(
+performing: {
             _ = try await client.login(
                 site: "https://example.com/blog",
                 appName: "foo",
                 appId: appId,
-                authenticator: Authenticator()
-            ).get()
-        }, throws: { error in
-            guard let loginError = error as? WordPressLoginClient.Error, case .invalidSiteAddress = loginError else {
+                authenticator: MockAuthenticator
+                    .returning(
+                        .failure(WordPressLoginClient.Error.invalidSiteAddress(.UrlDiscoveryFailed(attempts: .init())))
+                    )
+            )
+        },
+ throws: { error in
+            guard let loginError = error as? WordPressLoginClient.Error,
+ case .invalidSiteAddress = loginError else {
                 return false
             }
 
@@ -89,8 +96,9 @@ class LoginTests {
                 site: "https://example.com",
                 appName: "foo",
                 appId: appId,
-                authenticator: Authenticator()
-            ).get()
+                authenticator: MockAuthenticator
+                    .returning(.failure(WordPressLoginClient.Error.unknown(CocoaError(.fileReadInvalidFileName))))
+            )
         }, throws: { error in
             guard let loginError = error as? WordPressLoginClient.Error else {
                 return false
@@ -134,8 +142,8 @@ class LoginTests {
                 site: "https://example.com",
                 appName: "foo",
                 appId: appId,
-                authenticator: Authenticator()
-            ).get()
+                authenticator: MockAuthenticator.returning(.failure(.missingLoginUrl))
+            )
         }, throws: { error in
             error as? WordPressLoginClient.Error == .missingLoginUrl
         })
@@ -174,8 +182,8 @@ class LoginTests {
                 site: "https://example.com",
                 appName: "foo",
                 appId: appId,
-                authenticator: Authenticator().returning(.success(rejectedURL))
-            ).get()
+                authenticator: MockAuthenticator.returning(.success(rejectedURL))
+            )
         }, throws: { error in
             error as? WordPressLoginClient.Error == .authenticationError(.UnsuccessfulLogin)
         })
@@ -210,13 +218,12 @@ class LoginTests {
         // swiftlint:disable:next line_length
         let successfulURL = URL(string: "x-wordpress-app://login-callback?site_url=https%3A%2F%2Fexample.com&user_login=admin&password=123456")!
 
-        let result = await client.login(
+        let success = try await client.login(
             site: "https://example.com",
             appName: "foo",
             appId: appId,
-            authenticator: Authenticator().returning(.success(successfulURL))
+            authenticator: MockAuthenticator.returning(.success(successfulURL))
         )
-        let success = try result.get()
 
         #expect(success.siteUrl == "https://example.com")
         #expect(success.userLogin == "admin")
@@ -224,15 +231,22 @@ class LoginTests {
     }
 }
 
-private class Authenticator: WordPressLoginClient.Authenticator {
-    var result: Result<URL, WordPressLoginClient.Error>?
+private class MockAuthenticator: WordPressLoginClient.AuthenticatorProtocol {
+    var result: Result<URL, WordPressLoginClient.Error>
 
-    func returning(_ result: Result<URL, WordPressLoginClient.Error>) -> Self {
+    init(result: Result<URL, WordPressLoginClient.Error>) {
         self.result = result
-        return self
     }
 
-    func authenticate(url: URL, callbackURL: URL) async -> Result<URL, WordPressLoginClient.Error> {
-        result ?? .failure(.unknown(NSError(domain: "authenticator-test", code: 1)))
+    static func returning(_ result: Result<URL, WordPressLoginClient.Error>) -> MockAuthenticator {
+        MockAuthenticator(result: result)
+    }
+
+    func authenticate(url: URL, callbackURL: URL) async throws -> URL {
+        do {
+            return try result.get()
+        } catch {
+            throw error
+        }
     }
 }

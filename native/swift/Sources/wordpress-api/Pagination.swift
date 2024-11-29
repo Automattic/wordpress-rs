@@ -1,8 +1,12 @@
 import Foundation
 
+#if canImport(WordPressAPIInternal)
+import WordPressAPIInternal
+#endif
+
 public protocol PaginatableResponse: Sendable {
-    associatedtype ParamsType
-    associatedtype DataType
+    associatedtype ParamsType: Sendable
+    associatedtype DataType: Sendable
 
     var nextPageParams: ParamsType? { get }
     var prevPageParams: ParamsType? { get }
@@ -12,7 +16,7 @@ public protocol PaginatableResponse: Sendable {
     init(data: [DataType], headerMap: WpNetworkHeaderMap, nextPageParams: ParamsType?, prevPageParams: ParamsType?)
 }
 
-public protocol PaginationAwareExecutor {
+public protocol PaginationAwareExecutor: Sendable {
     associatedtype EditContextResponseType: PaginatableResponse
     associatedtype ViewContextResponseType: PaginatableResponse
     associatedtype EmbedContextResponseType: PaginatableResponse
@@ -146,8 +150,8 @@ extension PaginationAwareExecutor {
     }
 }
 
-public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequence {
-    public typealias Transformer = (ResponseType.ParamsType) async throws -> ResponseType
+public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequence, Sendable {
+    public typealias Transformer = @Sendable (ResponseType.ParamsType) async throws -> ResponseType
 
     private let params: ResponseType.ParamsType
     private let transform: Transformer
