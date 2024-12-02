@@ -3,7 +3,6 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -53,7 +52,6 @@ class WpRequestExecutor(
             mediaUploadRequest.mediaParams().forEach { (k, v) ->
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
-            // TODO: This probably doesn't work with Android - and it looks wrong
             val file =
                 WpRequestExecutor::class.java.classLoader?.getResource(mediaUploadRequest.filePath())?.file?.let {
                     File(
