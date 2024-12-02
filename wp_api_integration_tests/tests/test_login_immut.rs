@@ -7,6 +7,7 @@ use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
 const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
     "https://automatticwidgets.wpcomstaging.com/wp-admin/authorize-application.php";
+const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-application.php";
 
 #[rstest]
 #[case("http://localhost", LOCALHOST_AUTH_URL)]
@@ -35,6 +36,20 @@ const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
     AUTOMATTIC_WIDGETS_AUTH_URL
 )]
 #[case("automatticwidgets.wpcomstaging.com/ ", AUTOMATTIC_WIDGETS_AUTH_URL)]
+#[case("vanilla.wpmt.co", VANILLA_WP_SITE_URL)]
+#[case("http://vanilla.wpmt.co", VANILLA_WP_SITE_URL)]
+#[case(
+    "https://optional-https.wpmt.co",
+    "https://optional-https.wpmt.co/wp-admin/authorize-application.php"
+)]
+#[case(
+    "https://わぷー.wpmt.co",
+    "https://xn--39j4bws.wpmt.co/wp-admin/authorize-application.php"
+)]
+#[case(
+    "https://jetpack.wpmt.co",
+    "https://jetpack.wpmt.co/wp-admin/authorize-application.php"
+)]
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
