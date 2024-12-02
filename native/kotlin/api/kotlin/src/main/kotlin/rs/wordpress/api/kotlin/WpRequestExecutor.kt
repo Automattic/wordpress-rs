@@ -52,12 +52,13 @@ class WpRequestExecutor(
             mediaUploadRequest.mediaParams().forEach { (k, v) ->
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
+            val filePath = mediaUploadRequest.filePath()
             val file =
-                WpRequestExecutor::class.java.classLoader?.getResource(mediaUploadRequest.filePath())?.file?.let {
+                WpRequestExecutor::class.java.classLoader?.getResource(filePath)?.file?.let {
                     File(
                         it
                     )
-                } ?: throw MediaUploadRequestExecutionException.MediaFileNotFound()
+                } ?: throw MediaUploadRequestExecutionException.MediaFileNotFound(filePath)
             multipartBodyBuilder.addFormDataPart(
                 name = "file",
                 filename = file.name,

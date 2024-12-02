@@ -42,7 +42,9 @@ constructor(
                     statusCode = exception.statusCode,
                     reason = exception.reason
                 )
-                is WpApiException.MediaFileNotFound -> WpRequestResult.MediaFileNotFound()
+                is WpApiException.MediaFileNotFound -> WpRequestResult.MediaFileNotFound(
+                    filePath = exception.filePath
+                )
                 is WpApiException.ResponseParsingException -> WpRequestResult.ResponseParsingError(
                     reason = exception.reason,
                     response = exception.response,

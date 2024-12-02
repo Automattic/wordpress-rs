@@ -23,8 +23,8 @@ pub enum WpApiError {
         status_code: Option<u16>,
         reason: String,
     },
-    #[error("Media file not found")]
-    MediaFileNotFound,
+    #[error("Media file not found at file path: {}", file_path)]
+    MediaFileNotFound { file_path: String },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ResponseParsingError { reason: String, response: String },
     #[error("Error while parsing site url: {}", reason)]
@@ -333,8 +333,8 @@ pub enum MediaUploadRequestExecutionError {
         status_code: Option<u16>,
         reason: String,
     },
-    #[error("Media file not found")]
-    MediaFileNotFound,
+    #[error("Media file not found at file path: {}", file_path)]
+    MediaFileNotFound { file_path: String },
 }
 
 impl From<RequestExecutionError> for WpApiError {
@@ -361,7 +361,9 @@ impl From<MediaUploadRequestExecutionError> for WpApiError {
                 status_code,
                 reason,
             },
-            MediaUploadRequestExecutionError::MediaFileNotFound => Self::MediaFileNotFound,
+            MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {
+                Self::MediaFileNotFound { file_path }
+            }
         }
     }
 }
