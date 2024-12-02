@@ -34,6 +34,10 @@ steps:
           # Once we have integration tests running in CI, we can remove this separate step
           echo "--- :rust: Testing `#[derive(WpDerivedRequest)]` Parser"
           make test-rust-wp-derived-request-parser
+      - label: ":rust: Test wp_org_api"
+        command: |
+          echo "--- :rust: Testing"
+          make test-rust-wp-org-api
       - label: ":rust: Lint"
         command: |
           echo "--- :rust: Running Clippy"
