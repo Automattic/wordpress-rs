@@ -115,7 +115,7 @@ pub struct Icons {
 ///
 /// Here are a couple of examples:
 /// - The "requires" field is supposed to be the WordPress version string, but
-///   it can also be `fasle`.
+///   it can also be `false`.
 /// - The "contributors" field is supposed to be a map of contributor usernames
 ///   to their details, but it can also be `[]`.
 ///

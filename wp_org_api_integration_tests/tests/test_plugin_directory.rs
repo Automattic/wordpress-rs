@@ -1,7 +1,7 @@
-use wp_org_api::plugin_directory::*;
 use rstest::*;
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use wp_org_api::plugin_directory::*;
 
 #[fixture]
 fn plugins_dir() -> PathBuf {
@@ -27,10 +27,19 @@ fn plugin_info_files(plugins_dir: PathBuf) -> Vec<PathBuf> {
     files
 }
 
-fn parse_plugin(slug: &str) -> Result<PluginInformation, serde_json::Error> {
+fn parse_plugin(slug: &str) -> PluginInformation {
     let file = plugins_dir().join(format!("{}.json", slug));
     let content = std::fs::read_to_string(file).unwrap();
-    serde_json::from_str::<PluginInformation>(&content)
+    let result = serde_json::from_str::<PluginInformation>(&content);
+
+    assert!(
+        result.is_ok(),
+        "Failed to parse plugin {:?}: {:?}",
+        slug,
+        result.err()
+    );
+
+    result.unwrap()
 }
 
 #[rstest]
@@ -83,14 +92,7 @@ fn parse_plugin_info(plugin_info_files: Vec<PathBuf>) {
 #[case("superlinks", "")]
 fn test_property_author_profile(#[case] slug: &str, #[case] value: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert_eq!(result.unwrap().author_profile, value);
+    assert_eq!(result.author_profile, value);
 }
 
 #[rstest]
@@ -102,17 +104,10 @@ fn test_property_contributors_profile(
     #[case] profile: &str,
 ) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    let contributors = result.unwrap().contributors;
+    let contributors = result.contributors;
     assert_eq!(
-        contributors.get(username).map(|f| &f.profile),
-        Some(&profile.to_string())
+        contributors.get(username).map(|f| f.profile.as_str()),
+        Some(profile)
     );
 }
 
@@ -120,14 +115,7 @@ fn test_property_contributors_profile(
 #[case("superlinks")]
 fn test_property_no_contributors(#[case] slug: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(result.unwrap().contributors.is_empty());
+    assert!(result.contributors.is_empty());
 }
 
 #[rstest]
@@ -136,14 +124,7 @@ fn test_property_no_contributors(#[case] slug: &str) {
 #[case("superlinks", "2.5")]
 fn test_property_requires(#[case] slug: &str, #[case] value: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert_eq!(result.unwrap().requires, value);
+    assert_eq!(result.requires, value);
 }
 
 #[rstest]
@@ -151,14 +132,7 @@ fn test_property_requires(#[case] slug: &str, #[case] value: &str) {
 #[case("add-rss", "")]
 fn test_property_tested(#[case] slug: &str, #[case] value: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert_eq!(result.unwrap().tested, value);
+    assert_eq!(result.tested, value);
 }
 
 #[rstest]
@@ -166,14 +140,7 @@ fn test_property_tested(#[case] slug: &str, #[case] value: &str) {
 #[case("accessibility-toolbar", "7.4")]
 fn test_property_requires_php(#[case] slug: &str, #[case] value: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert_eq!(result.unwrap().requires_php, value);
+    assert_eq!(result.requires_php, value);
 }
 
 #[rstest]
@@ -181,27 +148,13 @@ fn test_property_requires_php(#[case] slug: &str, #[case] value: &str) {
 #[case("abc-pricing-table", "commercial")]
 fn test_property_business_model(#[case] slug: &str, #[case] value: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert_eq!(result.unwrap().business_model, value);
+    assert_eq!(result.business_model, value);
 }
 
 #[rstest]
 fn test_property_empty_upgrade_notice(#[values("1-click-close-store", "2em")] slug: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(result.unwrap().upgrade_notice.is_empty());
+    assert!(result.upgrade_notice.is_empty());
 }
 
 #[rstest]
@@ -209,66 +162,31 @@ fn test_property_nonempty_upgrade_notice(
     #[values("ab-wp-security", "absolute-addons")] slug: &str,
 ) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(!result.unwrap().upgrade_notice.is_empty());
+    assert!(!result.upgrade_notice.is_empty());
 }
 
 #[rstest]
 fn test_property_empty_tags(#[values("acf-rest", "add-rss")] slug: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(result.unwrap().tags.is_empty());
+    assert!(result.tags.is_empty());
 }
 
 #[rstest]
 fn test_property_nonempty_tags(#[values("appbanners", "seo-assistant")] slug: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(!result.unwrap().tags.is_empty());
+    assert!(!result.tags.is_empty());
 }
 
 #[rstest]
 fn test_property_empty_versions(#[values("mos-faqs", "adjustly-collapse")] slug: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(result.unwrap().versions.is_empty());
+    assert!(result.versions.is_empty());
 }
 
 #[rstest]
 fn test_property_nonempty_versions(#[values("abcsubmit", "acf-views")] slug: &str) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    assert!(!result.unwrap().versions.is_empty());
+    assert!(!result.versions.is_empty());
 }
 
 #[rstest]
@@ -289,15 +207,8 @@ fn test_property_nonempty_versions(#[values("abcsubmit", "acf-views")] slug: &st
 )]
 fn test_property_banners(#[case] slug: &str, #[case] low: String, #[case] high: String) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
     let expected = Banners { low, high };
-    let banners = result.unwrap().banners;
+    let banners = result.banners;
     assert_eq!(banners, expected);
 }
 
@@ -324,14 +235,7 @@ fn test_property_icons(
     #[case] default: Option<&str>,
 ) {
     let result = parse_plugin(slug);
-    assert!(
-        result.is_ok(),
-        "Failed to parse plugin {:?}: {:?}",
-        slug,
-        result.err()
-    );
-
-    let icons = result.unwrap().icons;
+    let icons = result.icons;
     assert!(icons.is_some());
 
     let icons = icons.unwrap();
