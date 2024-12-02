@@ -6,6 +6,7 @@ use wp_api::{
 };
 use wp_api_integration_tests::{
     api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
+    MEDIA_TEST_FILE_CONTENT_TYPE, MEDIA_TEST_FILE_PATH,
 };
 
 #[tokio::test]
@@ -19,8 +20,8 @@ async fn upload_media() {
                 title: Some(title.to_string()),
                 ..Default::default()
             },
-            "../test_media.jpg".to_string(),
-            "image/jpeg".to_string(),
+            MEDIA_TEST_FILE_PATH.to_string(),
+            MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
         )
         .await
         .assert_response();

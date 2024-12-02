@@ -1,13 +1,52 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use http::{HeaderMap, HeaderValue};
 use serial_test::parallel;
 use wp_api::{
-    media::{MediaId, MediaListParams, MediaUpdateParams},
+    media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
+    request::{
+        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, WpNetworkHeaderMap,
+        WpNetworkRequest, WpNetworkResponse,
+    },
     users::UserId,
+    MediaUploadRequestExecutionError, RequestExecutionError, WpApiClient, WpAuthentication,
     WpErrorCode,
 };
 use wp_api_integration_tests::{
-    api_client, api_client_as_author, api_client_as_subscriber, AssertWpError, MEDIA_ID_611,
+    api_client, api_client_as_author, api_client_as_subscriber, test_site_url, AssertWpError,
+    AsyncWpNetworking, TestCredentials, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
+    MEDIA_TEST_FILE_PATH,
 };
+
+#[tokio::test]
+#[parallel]
+async fn create_media_err_cannot_create() {
+    api_client_as_subscriber()
+        .media()
+        .create(
+            MediaCreateParams::default(),
+            MEDIA_TEST_FILE_PATH.to_string(),
+            MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
+        )
+        .await
+        .assert_wp_error(WpErrorCode::CannotCreate)
+}
+
+#[tokio::test]
+#[parallel]
+async fn create_media_err_upload_no_data() {
+    api_client_with_medir_err_networking(MediaErrNetworkingTestType::UploadNoData)
+        .media()
+        .create(
+            MediaCreateParams::default(),
+            MEDIA_TEST_FILE_PATH.to_string(),
+            MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
+        )
+        .await
+        .assert_wp_error(WpErrorCode::UploadNoData)
+}
 
 #[tokio::test]
 #[parallel]
@@ -128,4 +167,90 @@ async fn update_media_err_post_invalid_id() {
         .update(&MediaId(99999999), &MediaUpdateParams::default())
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId);
+}
+
+fn api_client_with_medir_err_networking(test_type: MediaErrNetworkingTestType) -> WpApiClient {
+    WpApiClient::new(
+        test_site_url(),
+        WpAuthentication::from_username_and_password(
+            TestCredentials::instance().admin_username.to_string(),
+            TestCredentials::instance().admin_password.to_string(),
+        ),
+        Arc::new(MediaErrNetworking::new(test_type)),
+    )
+}
+
+#[derive(Debug)]
+enum MediaErrNetworkingTestType {
+    UploadNoData,
+}
+
+#[derive(Debug)]
+struct MediaErrNetworking {
+    client: reqwest::Client,
+    test_type: MediaErrNetworkingTestType,
+}
+
+impl MediaErrNetworking {
+    fn new(test_type: MediaErrNetworkingTestType) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            test_type,
+        }
+    }
+}
+
+#[async_trait]
+impl RequestExecutor for MediaErrNetworking {
+    async fn execute(
+        &self,
+        _request: Arc<WpNetworkRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        Err(RequestExecutionError::RequestExecutionFailed {
+            status_code: None,
+            reason: "Execute function is not necessary for these tests".to_string(),
+        })
+    }
+
+    async fn upload_media(
+        &self,
+        media_upload_request: Arc<MediaUploadRequest>,
+    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+        let mut request = self
+            .client
+            .request(
+                AsyncWpNetworking::request_method(media_upload_request.method()),
+                media_upload_request.url().0.as_str(),
+            )
+            .headers(media_upload_request.header_map().as_header_map());
+        let mut file_header_map = HeaderMap::new();
+        file_header_map.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_str(&media_upload_request.file_content_type()).unwrap(),
+        );
+        let mut form = reqwest::multipart::Form::new();
+        match self.test_type {
+            MediaErrNetworkingTestType::UploadNoData => {
+                // don't add the file
+            }
+        }
+        for (k, v) in media_upload_request.media_params() {
+            form = form.text(k, v)
+        }
+        request = request.multipart(form);
+
+        let mut response = request.send().await.map_err(|err| {
+            MediaUploadRequestExecutionError::RequestExecutionFailed {
+                status_code: err.status().map(|s| s.as_u16()),
+                reason: err.to_string(),
+            }
+        })?;
+
+        let header_map = std::mem::take(response.headers_mut());
+        Ok(WpNetworkResponse {
+            status_code: response.status().as_u16(),
+            body: response.bytes().await.unwrap().to_vec(),
+            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+        })
+    }
 }
