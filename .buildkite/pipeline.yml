@@ -201,6 +201,11 @@ steps:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
 
+      - label: ":wordpress: :rust: WordPress.org API"
+        command: |
+          echo "--- :rust: Testing"
+          make test-rust-integration-wordpress-org-api
+
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
         command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:
