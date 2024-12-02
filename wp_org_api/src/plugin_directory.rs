@@ -145,7 +145,7 @@ where
             E: de::Error,
         {
             if !v {
-                return Ok(V::default());
+                Ok(V::default())
             } else {
                 Deserialize::deserialize(de::value::BoolDeserializer::new(v))
             }
@@ -155,7 +155,7 @@ where
         where
             E: de::Error,
         {
-            if v.len() == 0 {
+            if v.is_empty() {
                 Ok(V::default())
             } else {
                 Deserialize::deserialize(de::value::StrDeserializer::new(v))
@@ -166,7 +166,7 @@ where
         where
             E: de::Error,
         {
-            if v.len() == 0 {
+            if v.is_empty() {
                 Ok(V::default())
             } else {
                 Deserialize::deserialize(de::value::StringDeserializer::new(v))
@@ -238,9 +238,9 @@ mod tests {
             plugin_info_files
                 .iter()
                 .fold(HashMap::new(), |mut results, file| {
-                    let info = std::fs::read_to_string(&file).unwrap();
+                    let info = std::fs::read_to_string(file).unwrap();
                     let result = serde_json::from_str::<PluginInformation>(&info);
-                    results.insert(&file, result);
+                    results.insert(file, result);
                     results
                 });
 
