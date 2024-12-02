@@ -30,6 +30,10 @@ final class HTTPStubs: SafeRequestExecutor {
         }
     }
 
+    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+        try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
+    }
+
     private func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
         stubs.first { stub in stub.condition(request) }?
             .response

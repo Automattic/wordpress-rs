@@ -20,7 +20,11 @@ extension SafeRequestExecutor {
 
 }
 
-extension URLSession: RequestExecutor {}
+extension URLSession: RequestExecutor {
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+        try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
+    }
+}
 
 extension URLSession: SafeRequestExecutor {
 

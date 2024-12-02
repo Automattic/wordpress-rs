@@ -1,5 +1,7 @@
 package rs.wordpress.api.kotlin
 
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import uniffi.wp_api.UserId
 import uniffi.wp_api.WpErrorCode
 
@@ -25,4 +27,10 @@ fun <T> WpRequestResult<T>.assertSuccessAndRetrieveData(): T {
 fun <T> WpRequestResult<T>.wpErrorCode(): WpErrorCode {
     assert(this is WpRequestResult.WpError)
     return (this as WpRequestResult.WpError).errorCode
+}
+
+fun restoreTestServer() {
+    OkHttpClient().newCall(
+        Request.Builder().url("http://localhost:4000/restore?db=true&plugins=true").build()
+    ).execute()
 }

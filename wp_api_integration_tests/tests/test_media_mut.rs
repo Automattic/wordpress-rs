@@ -1,12 +1,32 @@
 use macro_helper::generate_update_test;
 use serial_test::serial;
 use wp_api::{
-    media::MediaUpdateParams,
+    media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
 use wp_api_integration_tests::{
     api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
 };
+
+#[tokio::test]
+#[serial]
+async fn upload_media() {
+    let title = "Foo media";
+    let created_media = api_client()
+        .media()
+        .create(
+            MediaCreateParams {
+                title: Some(title.to_string()),
+                ..Default::default()
+            },
+            "../test_media.jpg".to_string(),
+            "image/jpeg".to_string(),
+        )
+        .await
+        .assert_response();
+    assert_eq!(created_media.data.title.rendered.as_str(), title);
+    RestoreServer::db().await;
+}
 
 #[tokio::test]
 #[serial]
@@ -60,13 +80,6 @@ generate_update_test!(
     ping_status,
     PostPingStatus::Closed
 );
-
-// TODO: `POST_TEMPLATE_SINGLE_WITH_SIDEBAR` doesn't work for `/media`.
-//generate_update_test!(
-//    update_template,
-//    template,
-//    POST_TEMPLATE_SINGLE_WITH_SIDEBAR.to_string()
-//);
 
 generate_update_test!(update_alt_text, alt_text, "new_alt_text".to_string());
 

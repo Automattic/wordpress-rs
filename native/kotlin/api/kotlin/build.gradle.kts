@@ -115,13 +115,13 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
     inputs.dir("$cargoProjectRoot/$rustModuleName/")
 }
 
-
 tasks.named("compileKotlin").configure {
     dependsOn(generateUniFFIBindingsTask)
 }
 tasks.named("processIntegrationTestResources").configure {
     dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
     dependsOn(rootProject.tasks.named("copyTestCredentials"))
+    dependsOn(rootProject.tasks.named("copyTestMedia"))
 }
 
 project.afterEvaluate {

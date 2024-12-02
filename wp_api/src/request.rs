@@ -1,12 +1,14 @@
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
-use endpoint::ApiEndpointUrl;
+use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use url::Url;
 
 use crate::{
-    api_error::{ParsedRequestError, RequestExecutionError, WpError},
+    api_error::{
+        MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError, WpError,
+    },
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
     WpApiError, WpAuthentication,
 };
@@ -16,6 +18,7 @@ use self::endpoint::WpEndpointUrl;
 pub mod endpoint;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
+const CONTENT_TYPE_MULTIPART: &str = "multipart/form-data";
 const LINK_HEADER_KEY: &str = "Link";
 const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
 const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
@@ -123,6 +126,11 @@ pub trait RequestExecutor: Send + Sync + Debug {
         &self,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
+
+    async fn upload_media(
+        &self,
+        media_upload_request: Arc<MediaUploadRequest>,
+    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
 }
 
 #[derive(uniffi::Object)]

@@ -3,9 +3,11 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.MediaListParams
 import uniffi.wp_api.SparseMediaFieldWithEditContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 private const val MEDIA_ID_611: Long = 611
@@ -62,5 +64,19 @@ class MediaEndpointTest {
         }.assertSuccessAndRetrieveData().data
         assertNotNull(sparseMedia)
         assertNull(sparseMedia.slug)
+    }
+
+    @Test
+    fun testCreateMediaRequest() = runTest {
+        val title = "Testing media upload from Kotlin"
+        val response = client.request { requestBuilder ->
+            requestBuilder.media().create(
+                params = MediaCreateParams(title = title),
+                "test_media.jpg",
+                "image/jpg"
+            )
+        }.assertSuccessAndRetrieveData().data
+        assertEquals(title, response.title.rendered)
+        restoreTestServer()
     }
 }
