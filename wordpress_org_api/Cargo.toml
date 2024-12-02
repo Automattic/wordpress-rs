@@ -1,5 +1,5 @@
 [package]
-name = "wp_org_api"
+name = "wordpress_org_api"
 version = "0.1.0"
 edition = "2021"
 

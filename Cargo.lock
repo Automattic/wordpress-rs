@@ -3186,6 +3186,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "wordpress_org_api"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "wordpress_org_api_integration_tests"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "serde_json",
+ "wordpress_org_api",
+]
+
+[[package]]
 name = "wp_api"
 version = "0.1.0"
 dependencies = [
@@ -3286,24 +3304,6 @@ dependencies = [
  "trybuild",
  "uniffi",
  "url",
-]
-
-[[package]]
-name = "wp_org_api"
-version = "0.1.0"
-dependencies = [
- "rstest",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "wp_org_api_integration_tests"
-version = "0.1.0"
-dependencies = [
- "rstest",
- "serde_json",
- "wp_org_api",
 ]
 
 [[package]]

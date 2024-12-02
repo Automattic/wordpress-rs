@@ -1,7 +1,7 @@
 use rstest::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use wp_org_api::plugin_directory::*;
+use wordpress_org_api::plugin_directory::*;
 
 #[fixture]
 fn plugins_dir() -> PathBuf {
