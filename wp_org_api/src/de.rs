@@ -1,9 +1,15 @@
-use core::fmt;
-
 use serde::{
-    de::{self, MapAccess, SeqAccess, Visitor},
+    de::{self, IgnoredAny},
     Deserialize, Deserializer,
 };
+
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+enum AlternativeValues<T> {
+    Expected(T),
+    Bool(bool),
+    List(Vec<IgnoredAny>),
+}
 
 /// The plugin directory API may return different types of values for the same
 /// property.
@@ -21,72 +27,89 @@ where
     D: Deserializer<'de>,
     V: Deserialize<'de> + Default,
 {
-    struct DefaultValuesVisitor<V> {
-        _marker: std::marker::PhantomData<V>,
-    }
-
-    impl<'de, V> Visitor<'de> for DefaultValuesVisitor<V>
-    where
-        V: Deserialize<'de> + Default,
-    {
-        type Value = V;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a boolean false or any other value")
-        }
-
-        fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if !v {
+    AlternativeValues::<V>::deserialize(deserializer).and_then(|result| match result {
+        AlternativeValues::Expected(v) => Ok(v),
+        AlternativeValues::Bool(false) => Ok(V::default()),
+        AlternativeValues::Bool(true) => Err(de::Error::invalid_value(
+            de::Unexpected::Bool(true),
+            &"a boolean false",
+        )),
+        AlternativeValues::List(list) => {
+            if list.is_empty() {
                 Ok(V::default())
             } else {
-                Deserialize::deserialize(de::value::BoolDeserializer::new(v))
+                Err(de::Error::invalid_value(
+                    de::Unexpected::Seq,
+                    &"an empty list",
+                ))
             }
         }
-
-        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if v.is_empty() {
-                Ok(V::default())
-            } else {
-                Deserialize::deserialize(de::value::StrDeserializer::new(v))
-            }
-        }
-
-        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if v.is_empty() {
-                Ok(V::default())
-            } else {
-                Deserialize::deserialize(de::value::StringDeserializer::new(v))
-            }
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            if seq.next_element::<serde::de::IgnoredAny>()?.is_some() {
-                return Err(de::Error::invalid_type(de::Unexpected::Seq, &self));
-            }
-            Ok(V::default())
-        }
-
-        fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-        where
-            A: MapAccess<'de>,
-        {
-            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
-        }
-    }
-
-    deserializer.deserialize_any(DefaultValuesVisitor::<V> {
-        _marker: std::marker::PhantomData,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[derive(Deserialize, Debug, Eq, PartialEq)]
+    struct Payload {
+        #[serde(deserialize_with = "deserialize_default_values")]
+        string: String,
+        #[serde(deserialize_with = "deserialize_default_values")]
+        object: HashMap<String, String>,
+    }
+
+    #[test]
+    fn test_parsing_correct_types() {
+        let json = r#"{
+            "string": "string",
+            "object": {
+                "key": "value"
+            }
+        }"#;
+        let result = serde_json::from_str::<Payload>(json);
+        assert!(result.is_ok(), "Parsing failed: {:?}", result);
+
+        let payload = result.unwrap();
+
+        assert_eq!(payload.string.as_str(), "string");
+
+        assert_eq!(payload.object.len(), 1);
+        assert_eq!(payload.object["key"], "value");
+    }
+
+    #[test]
+    fn test_parsing_false() {
+        let json = r#"{"string": false, "object": false}"#;
+        let result = serde_json::from_str::<Payload>(json);
+        assert!(result.is_ok(), "Parsing failed: {:?}", result);
+
+        let payload = result.unwrap();
+        assert_eq!(payload.string, "".to_string());
+        assert_eq!(payload.object, HashMap::new());
+    }
+
+    #[test]
+    fn test_parsing_empty_list() {
+        let json = r#"{"string": "string", "object": []}"#;
+        let result = serde_json::from_str::<Payload>(json);
+        assert!(result.is_ok(), "Parsing failed: {:?}", result);
+
+        let payload = result.unwrap();
+        assert_eq!(payload.string, "string".to_string());
+        assert_eq!(payload.object, HashMap::new());
+    }
+
+    #[test]
+    fn test_parsing_nonempty_list() {
+        let json = r#"{"string": "string", "object": ["list"]}"#;
+        let result = serde_json::from_str::<Payload>(json);
+        assert!(
+            result.is_err(),
+            "Parsing 'object' should fail. Expected an error, got {:?}",
+            result
+        );
+    }
 }
