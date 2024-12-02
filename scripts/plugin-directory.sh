@@ -49,18 +49,23 @@ download_from_wp_org() {
 }
 
 S3_URI="s3://a8c-ci-cache/wordpress-rs-wordpress-org-plugin-directory.tar.gz"
+S3_LOCAL_CACHE="target/wordpress-org-plugin-directory.tar.gz"
 
 upload_to_s3() {
-    echo "Uploading $(ls -1 $OUTPUT_DIR | wc -l) plugins in $OUTPUT_DIR to S3..."
-    tar -czvf plugin-directory.tar.gz -C "$OUTPUT_DIR" .
-    aws s3 cp plugin-directory.tar.gz "$S3_URI"
+    echo "Uploading $(find "$OUTPUT_DIR" -type f | wc -l) plugins in $OUTPUT_DIR to S3..."
+    echo "Compressing ..."
+    tar -czf "$S3_LOCAL_CACHE" -C "$OUTPUT_DIR" .
+    aws s3 cp "$S3_LOCAL_CACHE" "$S3_URI"
+    rm "$S3_LOCAL_CACHE"
 }
 
 download_from_s3() {
     echo "Downloading plugin data from S3 cache..."
-    aws s3 cp "$S3_URI" plugin-directory.tar.gz
     rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
-    tar -xzvf plugin-directory.tar.gz -C "$OUTPUT_DIR"
+    aws s3 cp "$S3_URI" "$S3_LOCAL_CACHE"
+    echo "Unzip to $OUTPUT_DIR"
+    tar -xzf "$S3_LOCAL_CACHE" -C "$OUTPUT_DIR"
+    rm "$S3_LOCAL_CACHE"
 }
 
 ${1:-download_from_wp_org}
