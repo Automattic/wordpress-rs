@@ -191,6 +191,7 @@ test-swift-watchOS: xcframework
 	scripts/xcodebuild-test.sh watchOS-11-0
 
 test-rust-lib:
+	@test -d target/wordpress-org-plugin-directory || ./scripts/plugin-directory.sh download_from_s3
 	$(rust_docker_run) cargo test --lib -- --nocapture
 
 test-rust-doc:
@@ -198,10 +199,6 @@ test-rust-doc:
 
 test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
-
-test-rust-wp-org-api:
-	@test -d target/wordpress-org-plugin-directory || ./scripts/plugin-directory.sh download_from_s3
-	$(rust_docker_run) cargo test --package wp_org_api
 
 test-rust-integration:
 	@# Help: Run Rust integration tests in test server.
