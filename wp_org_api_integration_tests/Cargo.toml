@@ -1,0 +1,12 @@
+[package]
+name = "wp_org_api_integration_tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wp_org_api = { path = "../wp_org_api" }
+
+[dev-dependencies]
+rstest = { workspace = true }
+serde_json = { workspace = true }

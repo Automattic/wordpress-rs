@@ -1,1 +1,1 @@
-mod plugin_directory;
+pub mod plugin_directory;
