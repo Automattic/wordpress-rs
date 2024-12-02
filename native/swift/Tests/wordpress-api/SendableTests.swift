@@ -2,6 +2,10 @@ import Foundation
 import Testing
 import WordPressAPI
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 struct SendableTests {
 
     private static let sendables: [Sendable] = [
