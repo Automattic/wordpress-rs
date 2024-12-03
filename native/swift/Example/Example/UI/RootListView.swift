@@ -43,7 +43,7 @@ struct RootListViewItem: View {
     }
 }
 
-enum RootListData: Identifiable {
+enum RootListData: Identifiable, Sendable {
 
     case callback(String, TaskListViewModel.FetchDataTask)
     case sequence(String, SequenceListViewModel.SequenceProvider)

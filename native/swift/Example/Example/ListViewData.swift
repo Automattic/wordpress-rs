@@ -13,11 +13,10 @@ struct ListViewData: Identifiable, Comparable, Hashable {
     }
 }
 
-protocol ListViewDataConvertable: Identifiable {
+protocol ListViewDataConvertable {
     var asListViewData: ListViewData { get }
 }
 
-extension UserWithEditContext: @retroactive Identifiable {}
 extension UserWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.email, fields: [
@@ -28,7 +27,6 @@ extension UserWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension UserWithViewContext: @retroactive Identifiable {}
 extension UserWithViewContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
@@ -37,7 +35,6 @@ extension UserWithViewContext: ListViewDataConvertable {
     }
 }
 
-extension UserWithEmbedContext: @retroactive Identifiable {}
 extension UserWithEmbedContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
@@ -46,12 +43,7 @@ extension UserWithEmbedContext: ListViewDataConvertable {
     }
 }
 
-extension PluginWithEditContext: @retroactive Identifiable {}
 extension PluginWithEditContext: ListViewDataConvertable {
-    public var id: String {
-        self.plugin.slug
-    }
-
     var asListViewData: ListViewData {
         ListViewData(id: self.plugin.slug, title: self.name, subtitle: self.version, fields: [
             "Author": self.author,
@@ -60,12 +52,7 @@ extension PluginWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension ApplicationPasswordWithEditContext: @retroactive Identifiable {}
 extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
-    public var id: String {
-        self.uuid.uuid
-    }
-
     var creationDateString: String {
         guard let date = Date.fromWordPressDate(self.created) else {
             return self.created
@@ -81,18 +68,12 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension WpSiteHealthTest: @retroactive Identifiable {}
 extension SiteHealthTest: ListViewDataConvertable {
-    public var id: String {
-        self.label
-    }
-
     var asListViewData: ListViewData {
         ListViewData(id: self.label, title: self.label, subtitle: self.status, fields: [:])
     }
 }
 
-extension WpSiteHealthDirectorySizes: @retroactive Identifiable {}
 extension SiteHealthDirectorySizes: ListViewDataConvertable {
     public var id: String {
         [
@@ -124,14 +105,9 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
     }
 }
 
-extension PostTypeDetailsWithViewContext: @retroactive Identifiable {}
 extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
-    public var id: String {
-        self.slug
-    }
-
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: self.name, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [:])
     }
 }
 
@@ -155,24 +131,15 @@ extension SiteSettingsWithEditContext {
     }
 }
 
-extension PostWithEditContext: @retroactive Identifiable {}
 extension PostWithEditContext: ListViewDataConvertable {
-    public var id: String {
-        self.slug
-    }
-
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: self.title.raw, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.title.raw, subtitle: self.slug, fields: [:])
     }
 }
 
-extension MediaWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
-    public var id: String {
-        self.slug
-    }
-
+extension MediaWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: self.title.raw, subtitle: String(describing: self.mediaDetails), fields: [:])
+        ListViewData(id: self.slug, title: self.title.raw, subtitle: String(describing: self.mediaDetails), fields: [:])
     }
 }
 

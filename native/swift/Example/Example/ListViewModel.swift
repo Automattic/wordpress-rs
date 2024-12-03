@@ -18,7 +18,7 @@ protocol ListViewModel {
 @Observable class SequenceListViewModel: ListViewModel {
     var listItems: [String: ListViewData] = [String: ListViewData](minimumCapacity: 250)
 
-    typealias SequenceProvider = () throws -> ListViewSequence
+    typealias SequenceProvider = @Sendable () async throws -> ListViewSequence
 
     private let sequenceProvider: SequenceProvider
 
@@ -34,7 +34,7 @@ protocol ListViewModel {
 
     func task() async {
         do {
-            for try await page in try self.sequenceProvider() {
+            for try await page in try await self.sequenceProvider() {
                 for item in page {
                     self.listItems[item.id] = item
                 }
@@ -52,7 +52,7 @@ protocol ListViewModel {
 
 @Observable class TaskListViewModel: ListViewModel {
 
-    typealias FetchDataTask = () async throws -> [ListViewData]
+    typealias FetchDataTask = @Sendable () async throws -> [ListViewData]
 
     var listItems: [String: ListViewData] = [:]
     private var dataCallback: FetchDataTask
@@ -101,9 +101,9 @@ struct MyError: LocalizedError {
 struct ListViewSequence: AsyncSequence {
     typealias Element = [ListViewData]
 
-    private let underlyingSequence: any AsyncSequence
+    private let underlyingSequence: any (AsyncSequence & Sendable)
 
-    init(underlyingSequence: any AsyncSequence) {
+    init(underlyingSequence: any (AsyncSequence & Sendable)) {
         self.underlyingSequence = underlyingSequence
     }
 

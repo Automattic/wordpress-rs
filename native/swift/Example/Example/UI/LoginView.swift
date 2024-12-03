@@ -20,6 +20,8 @@ struct LoginView: View {
     @Environment(\.webAuthenticationSession)
     private var webAuthenticationSession
 
+    private let authenticationHelper = AuthenticationHelper()
+
     @EnvironmentObject
     var loginManager: LoginManager
 
@@ -66,9 +68,8 @@ struct LoginView: View {
                 let loginDetails = try await loginClient.login(
                     site: url,
                     appName: "WordPress SDK Example App",
-                    appId: nil,
-                    contextProvider: AuthenticationHelper()
-                ).get()
+                    appId: nil
+                )
                 debugPrint(loginDetails)
                 try await loginManager.setLoginCredentials(to: loginDetails)
             } catch let err {
@@ -84,19 +85,7 @@ struct LoginView: View {
 }
 
 class AuthenticationHelper: NSObject, ASWebAuthenticationPresentationContextProviding {
-    // swiftlint:disable force_cast
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        #if os(macOS)
-        ASPresentationAnchor(contentViewController: NSApp.windows.first!.contentViewController!)
-        #elseif os(iOS)
-        ASPresentationAnchor(windowScene: UIApplication.shared.connectedScenes.first as! UIWindowScene)
-        #endif
+        ASPresentationAnchor()
     }
-    // swiftlint:enable force_cast
 }
-
-// Stuff that should be Rust code
-
-// func findApiEndpoint(in bytes: Data) -> URL {
-//
-// }

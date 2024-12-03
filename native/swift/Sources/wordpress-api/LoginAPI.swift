@@ -10,81 +10,14 @@ import FoundationNetworking
 
 public final class WordPressLoginClient {
 
-    public protocol Authenticator {
-        func authenticate(url: URL, callbackURL: URL) async -> Result<URL, Error>
+    public protocol AuthenticatorProtocol {
+        func authenticate(url: URL, callbackURL: URL) async throws(WordPressLoginClientError) -> URL
     }
 
     private static let callbackURL = URL(string: "x-wordpress-app://login-callback")!
 
-    public enum Error: Swift.Error {
-        case invalidSiteAddress(UrlDiscoveryError)
-        case missingLoginUrl
-        case authenticationError(OAuthResponseUrlError)
-        case invalidApplicationPasswordCallback
-        case cancelled
-        case unknown(Swift.Error)
-
-        func isAutodiscoveryError() -> Bool {
-            guard case let .invalidSiteAddress(urlDiscoveryError) = self else {
-                return false
-            }
-
-            guard case .UrlDiscoveryFailed = urlDiscoveryError else {
-                return false
-            }
-
-            return true
-        }
-
-        var isFailedToFetchApiDetails: Bool {
-            guard
-                case let .invalidSiteAddress(urlDiscoveryError) = self,
-                case .UrlDiscoveryFailed(let attempts) = urlDiscoveryError
-            else {
-                return false
-            }
-
-            return attempts.values.contains { state in
-                return switch state {
-                case .failure(let error): urlDiscoverErrorIsFetchApiDetailsFailed(error)
-                default: false
-                }
-            }
-        }
-
-        var isFailedToFetchApiRoot: Bool {
-            guard
-                case let .invalidSiteAddress(urlDiscoveryError) = self,
-                case .UrlDiscoveryFailed(let attempts) = urlDiscoveryError
-            else {
-                return false
-            }
-
-            return attempts.values.contains { state in
-                if case let .failure(error) = state {
-                    return isFetchRootUrlFailedError(error)
-                }
-
-                return false
-            }
-        }
-
-        private func urlDiscoverErrorIsFetchApiDetailsFailed(_ error: UrlDiscoveryAttemptError) -> Bool {
-            return switch error {
-            case .fetchApiDetailsFailed: true
-            default: false
-            }
-        }
-
-        private func isFetchRootUrlFailedError(_ error: UrlDiscoveryAttemptError) -> Bool {
-            return switch error {
-            case .fetchApiRootUrlFailed: true
-            default: false
-            }
-        }
-    }
-
     private let requestExecutor: SafeRequestExecutor
+    private let client: UniffiWpLoginClient
 
     public convenience init(urlSession: URLSession) {
         self.init(requestExecutor: urlSession)
@@ -92,69 +25,65 @@ public final class WordPressLoginClient {
 
     init(requestExecutor: SafeRequestExecutor) {
         self.requestExecutor = requestExecutor
+        self.client = UniffiWpLoginClient(requestExecutor: requestExecutor)
     }
 
     public func login(
         site: String,
         appName: String,
         appId: WpUuid?,
-        authenticator: Authenticator
-    ) async -> Result<WpApiApplicationPasswordDetails, Error> {
-        let loginURL = await self.loginURL(forSite: site)
-        let authURL = loginURL
-            .map { loginURL in
-                createApplicationPasswordAuthenticationUrl(
-                    loginUrl: loginURL,
-                    appName: appName,
-                    appId: appId,
-                    successUrl: Self.callbackURL.absoluteString,
-                    rejectUrl: Self.callbackURL.absoluteString
-                )
-                .asURL()
-            }
+        authenticator: AuthenticatorProtocol
+    ) async throws -> WpApiApplicationPasswordDetails {
+        let loginURL = try await self.loginURL(forSite: site)
+        let authURL = createApplicationPasswordAuthenticationUrl(
+            loginUrl: loginURL,
+            appName: appName,
+            appId: appId,
+            successUrl: Self.callbackURL.absoluteString,
+            rejectUrl: Self.callbackURL.absoluteString
+        )
+        .asURL()
 
-        switch authURL {
-        case let .failure(error):
-            return .failure(error)
-        case let .success(authURL):
-            return await authenticator.authenticate(url: authURL, callbackURL: Self.callbackURL)
-                .flatMap(handleAuthenticationCallback(_:))
-        }
+        let urlWithToken = try await authenticator.authenticate(url: authURL, callbackURL: Self.callbackURL)
+        return try handleAuthenticationCallback(urlWithToken)
     }
 
-    private func loginURL(forSite proposedSiteUrl: String) async -> Result<ParsedUrl, Error> {
-        let result: UrlDiscoverySuccess
+    private func loginURL(forSite proposedSiteUrl: String) async throws(WordPressLoginClientError) -> ParsedUrl {
+
         do {
             let client = UniffiWpLoginClient(requestExecutor: self.requestExecutor)
-            result = try await client.apiDiscovery(siteUrl: proposedSiteUrl)
+            let discoveryResult = try await client.apiDiscovery(siteUrl: proposedSiteUrl)
+
+            // All sites should have some form of authentication we can use
+            guard
+                let passwordAuthenticationUrl = discoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl(),
+                let parsedLoginUrl = try? ParsedUrl.parse(input: passwordAuthenticationUrl)
+            else {
+                throw WordPressLoginClientError.missingLoginUrl
+            }
+
+            return parsedLoginUrl
+
         } catch let error as UrlDiscoveryError {
-            return .failure(.invalidSiteAddress(error))
+            throw WordPressLoginClientError.invalidSiteAddress(error)
         } catch {
-            return .failure(.unknown(error))
+            throw WordPressLoginClientError.unknown(error)
         }
-
-        // All sites should have some form of authentication we can use
-        guard let passwordAuthenticationUrl = result.apiDetails.findApplicationPasswordsAuthenticationUrl(),
-              let parsedLoginUrl = try? ParsedUrl.parse(input: passwordAuthenticationUrl) else {
-            return .failure(.missingLoginUrl)
-        }
-
-        return .success(parsedLoginUrl)
     }
 
     private func handleAuthenticationCallback(
         _ urlWithToken: URL
-    ) -> Result<WpApiApplicationPasswordDetails, Error> {
+    ) throws(WordPressLoginClientError) -> WpApiApplicationPasswordDetails {
         guard let parsed = try? ParsedUrl.from(url: urlWithToken) else {
-            return .failure(.invalidApplicationPasswordCallback)
+            throw .invalidApplicationPasswordCallback
         }
 
         do {
-            return try .success(extractLoginDetailsFromUrl(url: parsed))
+            return try extractLoginDetailsFromUrl(url: parsed)
         } catch let error as OAuthResponseUrlError {
-            return .failure(.authenticationError(error))
+            throw .authenticationError(error)
         } catch {
-            return .failure(.unknown(error))
+            throw .unknown(error)
         }
     }
 }
@@ -165,38 +94,42 @@ import AuthenticationServices
 
 extension WordPressLoginClient {
 
-    class AuthenticationServiceAuthenticator: Authenticator {
-        let contextProvider: ASWebAuthenticationPresentationContextProviding
-
-        init(contextProvider: ASWebAuthenticationPresentationContextProviding) {
-            self.contextProvider = contextProvider
+    class AuthenticationServiceAuthenticator: NSObject, AuthenticatorProtocol,
+                                                ASWebAuthenticationPresentationContextProviding {
+        func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+            ASPresentationAnchor()
         }
 
         @MainActor
-        func authenticate(url: URL, callbackURL: URL) async -> Result<URL, WordPressLoginClient.Error> {
-            await withCheckedContinuation { continuation in
-                let session = ASWebAuthenticationSession(
-                    url: url,
-                    callbackURLScheme: callbackURL.scheme!
-                ) { url, error in
-                    if let url {
-                        continuation.resume(returning: .success(url))
-                    } else if let error = error as? ASWebAuthenticationSessionError {
-                        switch error.code {
-                        case .canceledLogin:
-                            continuation.resume(returning: .failure(.cancelled))
-                        case .presentationContextInvalid, .presentationContextNotProvided:
-                            assertionFailure("An unexpected error received: \(error)")
-                            continuation.resume(returning: .failure(.cancelled))
-                        @unknown default:
-                            continuation.resume(returning: .failure(.cancelled))
+        func authenticate(url: URL, callbackURL: URL) async throws(WordPressLoginClientError) -> URL {
+            do {
+                return try await withCheckedThrowingContinuation { continuation in
+                    let session = ASWebAuthenticationSession(
+                        url: url,
+                        callbackURLScheme: callbackURL.scheme!
+                    ) { url, error in
+                        if let url {
+                            continuation.resume(returning: url)
+                        } else if let error = error as? ASWebAuthenticationSessionError {
+                            switch error.code {
+                            case .canceledLogin:
+                                continuation.resume(throwing: WordPressLoginClientError.cancelled)
+                            case .presentationContextInvalid, .presentationContextNotProvided:
+                                assertionFailure("An unexpected error received: \(error)")
+                                continuation.resume(throwing: WordPressLoginClientError.cancelled)
+                            @unknown default:
+                                continuation.resume(throwing: WordPressLoginClientError.cancelled)
+                            }
+                        } else {
+                            continuation.resume(throwing: WordPressLoginClientError.invalidApplicationPasswordCallback)
                         }
-                    } else {
-                        continuation.resume(returning: .failure(.invalidApplicationPasswordCallback))
                     }
+                    session.presentationContextProvider = self
+                    session.start()
                 }
-                session.presentationContextProvider = contextProvider
-                session.start()
+            } catch {
+                // swiftlint:disable:next force_cast
+                throw error as! WordPressLoginClientError
             }
         }
     }
@@ -204,17 +137,16 @@ extension WordPressLoginClient {
     public func login(
         site: String,
         appName: String,
-        appId: WpUuid?,
-        contextProvider: ASWebAuthenticationPresentationContextProviding
-    ) async -> Result<WpApiApplicationPasswordDetails, Error> {
-        await login(
+        appId: WpUuid?
+    ) async throws -> WpApiApplicationPasswordDetails {
+        let provider = await AuthenticationServiceAuthenticator()
+        return try await login(
             site: site,
             appName: appName,
             appId: appId,
-            authenticator: AuthenticationServiceAuthenticator(contextProvider: contextProvider)
+            authenticator: provider
         )
     }
-
 }
 
 #endif
