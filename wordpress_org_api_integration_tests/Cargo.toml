@@ -8,5 +8,9 @@ publish = false
 wordpress_org_api = { path = "../wordpress_org_api" }
 
 [dev-dependencies]
+reqwest = { workspace = true, features = [ "json" ] }
 rstest = { workspace = true }
+rstest_reuse = { workspace = true }
+serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = [ "full" ] }

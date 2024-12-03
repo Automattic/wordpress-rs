@@ -15,6 +15,7 @@ pub struct PluginInformation {
     #[serde(deserialize_with = "deserialize_default_values")]
     pub author_profile: String,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub contributors: HashMap<String, ContributorDetails>,
     #[serde(deserialize_with = "deserialize_default_values")]
     pub requires: String,
@@ -26,6 +27,7 @@ pub struct PluginInformation {
     pub rating: u32,
     pub ratings: Ratings,
     pub num_ratings: u32,
+    #[serde(default)]
     pub support_url: String,
     pub support_threads: u32,
     pub support_threads_resolved: u32,
@@ -33,23 +35,32 @@ pub struct PluginInformation {
     pub last_updated: String,
     pub added: String,
     pub homepage: String,
+    #[serde(default)]
     pub sections: HashMap<String, String>,
     pub download_link: String,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub upgrade_notice: HashMap<String, String>,
+    #[serde(default)]
     pub screenshots: Screenshots,
     #[serde(deserialize_with = "deserialize_default_values")]
     pub tags: HashMap<String, String>,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub versions: HashMap<String, String>,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub business_model: String,
+    #[serde(default)]
     pub repository_url: String,
+    #[serde(default)]
     pub commercial_support_url: String,
     pub donate_link: String,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub banners: Banners,
     pub icons: Option<Icons>,
+    #[serde(default)]
     pub preview_link: String,
 }
 
@@ -82,6 +93,12 @@ pub enum Screenshots {
     List(Vec<Screenshot>),
 }
 
+impl Default for Screenshots {
+    fn default() -> Self {
+        Screenshots::List(vec![])
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Screenshot {
     pub src: String,
@@ -104,4 +121,17 @@ pub struct Icons {
     pub high: Option<String>,
     pub svg: Option<String>,
     pub default: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct QueryPluginResponse {
+    pub info: QueryPluginResponseInfo,
+    pub plugins: Vec<PluginInformation>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct QueryPluginResponseInfo {
+    pub page: i64,
+    pub pages: i64,
+    pub results: i64,
 }

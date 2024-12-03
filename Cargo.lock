@@ -3198,8 +3198,12 @@ dependencies = [
 name = "wordpress_org_api_integration_tests"
 version = "0.1.0"
 dependencies = [
+ "reqwest",
  "rstest",
+ "rstest_reuse",
+ "serde",
  "serde_json",
+ "tokio",
  "wordpress_org_api",
 ]
 

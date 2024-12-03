@@ -1,0 +1,14 @@
+steps:
+  - label: ":wordpress: :rust: WordPress.org API"
+    command: |
+      echo "--- :wordpress: Preparing"
+      ./wordpress_org_api_integration_tests/replace-test-parameters.sh
+      echo "--- :rust: Testing"
+      make test-rust-integration-wordpress-org-api
+
+notify:
+  - slack:
+      channels:
+        - "#wordpress-rs"
+      message: "wordpress-org-api-integration-tests failed."
+    if: build.state == "failed"
