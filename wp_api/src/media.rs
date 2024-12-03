@@ -677,7 +677,7 @@ mod tests {
         "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
     )]
     #[trace]
-    fn test_post_list_query_pairs(#[case] params: MediaListParams, #[case] expected_query: &str) {
+    fn test_media_list_query_pairs(#[case] params: MediaListParams, #[case] expected_query: &str) {
         assert_expected_and_from_query_pairs(params, expected_query);
     }
 }

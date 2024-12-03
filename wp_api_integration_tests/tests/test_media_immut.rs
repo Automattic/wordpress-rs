@@ -83,7 +83,7 @@ async fn retrieve_with_view_context() {
 #[case(MediaListParams { per_page: Some(1), ..Default::default() })]
 #[case(MediaListParams { per_page: Some(1), order: Some(WpApiParamOrder::Desc), ..Default::default() })]
 #[case(MediaListParams { per_page: Some(1), orderby: Some(WpApiParamPostsOrderBy::Modified), ..Default::default() })]
-async fn paginate_list_posts_with_edit_context(#[case] params: MediaListParams) {
+async fn paginate_list_media_with_edit_context(#[case] params: MediaListParams) {
     let first_page_response = api_client()
         .media()
         .list_with_edit_context(&params)

@@ -19,6 +19,7 @@ mod parsed_url; // re-exported relevant types
 mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
+pub mod comments;
 pub mod login;
 pub mod media;
 pub mod plugins;
