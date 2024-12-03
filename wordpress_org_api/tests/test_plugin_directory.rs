@@ -1,3 +1,5 @@
+use futures::{StreamExt, TryFutureExt};
+use reqwest::Request;
 use rstest::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -243,4 +245,66 @@ fn test_property_icons(
     assert_eq!(icons.high.as_deref(), high);
     assert_eq!(icons.svg.as_deref(), svg);
     assert_eq!(icons.default.as_deref(), default);
+}
+
+#[tokio::test]
+async fn test_fetch_plugin_info() {
+    let page_size = 200;
+    let url = format!(
+        "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}",
+        page_size
+    );
+    let response = reqwest::get(&url).await.unwrap();
+    let json = response.json::<serde_json::Value>().await.unwrap();
+    let total_pages = json["info"]["pages"]
+        .as_u64()
+        .unwrap();
+
+    let urls = (1..=total_pages)
+        .map(|page| {
+            format!(
+                "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}&request[page]={}",
+                page_size, page
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let results: Vec<_> = futures::future::join_all(urls.iter().map(|url| async move {
+        let result = reqwest::get(url).await;
+        result.and_then(|r| Ok(async { r.json::<serde_json::Value>().await }));
+     })).collect().await;
+
+    // async fn fetch(url: &str) -> Result<reqwest::Response, reqwest::Error> {
+    //     reqwest::get(url).await?;
+    // }
+
+    // let mut tasks = futures::stream::FuturesUnordered::new();
+    // for url in urls {
+    //     tasks.push(fetch(&url));
+    // }
+
+    // let results: Vec<_> = futures::stream::iter(tasks).collect();
+
+    //     .map(|result| result.unwrap())
+    //     .try_for_each(|json| async {
+    //         let plugins = json["plugins"]
+    //             .as_object()
+    //             .unwrap()
+    //             .iter()
+    //             .map(|(slug, info)| {
+    //                 let file = plugins_dir().join(format!("{}.json", slug));
+    //                 let content = serde_json::to_string_pretty(info).unwrap();
+    //                 std::fs::write(file, content).unwrap();
+    //             })
+    //             .collect::<Vec<_>>();
+
+    //         Ok(plugins)
+    //     })
+    //     .await
+    //     .unwrap();
+
+    // let mut results = vec![];
+    // while let Some(result) = tasks.next().await {
+    //     results.push(result.unwrap());
+    // }
 }
