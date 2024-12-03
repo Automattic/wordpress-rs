@@ -3195,15 +3195,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wordpress_org_api_integration_tests"
-version = "0.1.0"
-dependencies = [
- "rstest",
- "serde_json",
- "wordpress_org_api",
-]
-
-[[package]]
 name = "wp_api"
 version = "0.1.0"
 dependencies = [

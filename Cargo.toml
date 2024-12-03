@@ -9,7 +9,6 @@ members = [
   "wp_serde_helper",
   "wp_uniffi_bindgen",
   "wordpress_org_api",
-  "wordpress_org_api_integration_tests",
   "xcframework",
 ]
 resolver = "2"
