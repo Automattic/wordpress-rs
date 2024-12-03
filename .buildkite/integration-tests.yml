@@ -5,6 +5,8 @@ steps:
       ./wordpress_org_api_integration_tests/replace-test-parameters.sh
       echo "--- :rust: Testing"
       make test-rust-integration-wordpress-org-api
+    agents:
+      queue: tumblr-metal
 
 notify:
   - slack:
