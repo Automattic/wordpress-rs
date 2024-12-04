@@ -121,7 +121,11 @@ mod tests {
             let parsed = serde_json::from_str::<PluginInformation>(json_string);
             let raw_json = serde_json::from_str(json_string);
             assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
-            assert!(raw_json.is_ok(), "Failed to parse JSON: {:?}", raw_json.err());
+            assert!(
+                raw_json.is_ok(),
+                "Failed to parse JSON: {:?}",
+                raw_json.err()
+            );
 
             Self {
                 parsed: parsed.unwrap(),
@@ -158,8 +162,14 @@ mod tests {
         plugin_with_variant_types: Plugin,
         plugin_with_expected_types: Plugin,
     ) {
-        assert_eq!(plugin_with_variant_types.raw_json["contributors"].as_array(), Some(vec![]).as_ref());
-        assert_eq!(plugin_with_variant_types.parsed.contributors, HashMap::new());
+        assert_eq!(
+            plugin_with_variant_types.raw_json["contributors"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(
+            plugin_with_variant_types.parsed.contributors,
+            HashMap::new()
+        );
 
         assert!(plugin_with_expected_types.raw_json["contributors"].is_object());
         assert!(!plugin_with_expected_types.parsed.contributors.is_empty());
@@ -206,8 +216,14 @@ mod tests {
         plugin_with_variant_types: Plugin,
         plugin_with_expected_types: Plugin,
     ) {
-        assert_eq!(plugin_with_variant_types.raw_json["upgrade_notice"].as_array(), Some(vec![]).as_ref());
-        assert_eq!(plugin_with_variant_types.parsed.upgrade_notice, HashMap::new());
+        assert_eq!(
+            plugin_with_variant_types.raw_json["upgrade_notice"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(
+            plugin_with_variant_types.parsed.upgrade_notice,
+            HashMap::new()
+        );
 
         assert!(plugin_with_expected_types.raw_json["upgrade_notice"].is_object());
         assert!(!plugin_with_expected_types.parsed.upgrade_notice.is_empty());
@@ -218,7 +234,10 @@ mod tests {
         plugin_with_variant_types: Plugin,
         plugin_with_expected_types: Plugin,
     ) {
-        assert_eq!(plugin_with_variant_types.raw_json["tags"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(
+            plugin_with_variant_types.raw_json["tags"].as_array(),
+            Some(vec![]).as_ref()
+        );
         assert_eq!(plugin_with_variant_types.parsed.tags, HashMap::new());
 
         assert!(plugin_with_expected_types.raw_json["tags"].is_object());
@@ -230,7 +249,10 @@ mod tests {
         plugin_with_variant_types: Plugin,
         plugin_with_expected_types: Plugin,
     ) {
-        assert_eq!(plugin_with_variant_types.raw_json["versions"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(
+            plugin_with_variant_types.raw_json["versions"].as_array(),
+            Some(vec![]).as_ref()
+        );
         assert_eq!(plugin_with_variant_types.parsed.versions, HashMap::new());
 
         assert!(plugin_with_expected_types.raw_json["versions"].is_object());
@@ -254,7 +276,10 @@ mod tests {
         plugin_with_variant_types: Plugin,
         plugin_with_expected_types: Plugin,
     ) {
-        assert_eq!(plugin_with_variant_types.raw_json["banners"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(
+            plugin_with_variant_types.raw_json["banners"].as_array(),
+            Some(vec![]).as_ref()
+        );
         assert_eq!(plugin_with_variant_types.parsed.banners, Banners::default());
 
         assert!(plugin_with_expected_types.raw_json["banners"].is_object());
