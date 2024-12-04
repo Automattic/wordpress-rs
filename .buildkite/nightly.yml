@@ -1,0 +1,13 @@
+steps:
+  - label: ":wordpress: :rust: WordPress.org API"
+    command: |
+      echo "--- :rust: Testing"
+      make test-rust-integration-wordpress-org-api
+    env:
+      TEST_ALL_PLUGINS: true
+
+notify:
+  - slack:
+      channels:
+        - "#wordpress-rs"
+      message: "Nightly build."
