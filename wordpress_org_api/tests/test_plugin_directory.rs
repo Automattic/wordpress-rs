@@ -1,3 +1,8 @@
+use std::{
+    env,
+    io::{self, Write},
+};
+
 use serde::Deserialize;
 use wordpress_org_api::plugin_directory::*;
 
@@ -49,8 +54,6 @@ async fn test_parsing_full_plugin_directory() {
     let mut query_plugins_failures = Vec::new();
     let mut all_slugs: Vec<String> = Vec::new();
     for page in 1..=total_pages {
-        println!("Processing page {}...", page);
-
         let url = format!(
             "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}&request[page]={}",
             page_size, page
@@ -58,26 +61,32 @@ async fn test_parsing_full_plugin_directory() {
         let slugs = query_plugins_slugs(&url).await;
         match slugs {
             Ok(slugs) => {
+                print!(".");
                 all_slugs.extend(slugs);
             }
             Err(e) => {
-                println!("Failed to fetch page: {:?}", url);
+                print!("F({})", &url);
                 query_plugins_failures.push((url, e));
             }
         }
+        _ = io::stdout().flush();
     }
+    println!();
 
     println!("Fetching and parsing {} plugins...", all_slugs.len());
 
     let mut plugin_information_failures = Vec::new();
     for slug in all_slugs {
-        println!("Fetching plugin information for: {}", slug);
         let info = plugin_information(&slug).await;
         if let Err(e) = info {
-            println!("Failed to fetch plugin information: {:?}", slug);
+            print!("F({})", slug);
             plugin_information_failures.push((slug.to_string(), e));
+        } else {
+            print!(".");
         }
+        _ = io::stdout().flush();
     }
+    println!();
 
     println!("{} query plugins failures:", query_plugins_failures.len());
     for (url, e) in query_plugins_failures {
