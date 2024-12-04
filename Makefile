@@ -204,7 +204,6 @@ test-rust-integration:
 	docker exec -i wordpress /bin/bash < ./scripts/run-rust-integration-tests.sh
 
 test-rust-integration-wordpress-org-api:
-	@test -d target/wordpress-org-plugin-directory || ./scripts/plugin-directory.sh download_from_s3
 	$(rust_docker_run) cargo test --package wordpress_org_api -- --nocapture
 
 test-kotlin-integration:
