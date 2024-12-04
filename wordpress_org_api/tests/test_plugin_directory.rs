@@ -40,16 +40,23 @@ async fn plugin_information(slug: &str) -> Result<PluginInformation, reqwest::Er
 
 #[tokio::test]
 async fn test_parsing_full_plugin_directory() {
-    println!("Checking how many pages to fetch...");
-    let page_size = 200;
-    let url = format!(
-        "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}",
-        page_size
-    );
-    let response = reqwest::get(&url).await.unwrap();
-    let json = response.json::<serde_json::Value>().await.unwrap();
-    let total_pages = json["info"]["pages"].as_u64().unwrap();
-    println!("Total pages: {}", total_pages);
+    let page_size: u64;
+    let total_pages: u64;
+    if env::var("TEST_ALL_PLUGINS").is_ok() {
+        println!("Checking how many pages to fetch...");
+        page_size = 200;
+        let url = format!(
+            "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}",
+            page_size
+        );
+        let response = reqwest::get(&url).await.unwrap();
+        let json = response.json::<serde_json::Value>().await.unwrap();
+        total_pages = json["info"]["pages"].as_u64().unwrap();
+    } else {
+        println!("Only a small amount of plugins will be fetched.");
+        page_size = 10;
+        total_pages = 2;
+    }
 
     let mut query_plugins_failures = Vec::new();
     let mut all_slugs: Vec<String> = Vec::new();
