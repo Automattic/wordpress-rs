@@ -160,6 +160,17 @@ pub struct WpNetworkRequest {
     pub(crate) body: Option<Arc<WpNetworkRequestBody>>,
 }
 
+impl WpNetworkRequest {
+    pub fn get(url: WpEndpointUrl) -> Self {
+        Self {
+            method: RequestMethod::GET,
+            url,
+            header_map: Arc::new(WpNetworkHeaderMap::default()),
+            body: None,
+        }
+    }
+}
+
 #[uniffi::export]
 impl WpNetworkRequest {
     pub fn method(&self) -> RequestMethod {
