@@ -105,3 +105,85 @@ pub struct Icons {
     pub svg: Option<String>,
     pub default: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    const JSON_STRING: &str = include_str!("../tests/plugin-with-different-types-of-values.json");
+
+    #[fixture]
+    fn plugin_info() -> PluginInformation {
+        let result = serde_json::from_str::<PluginInformation>(JSON_STRING);
+        assert!(result.is_ok());
+        result.unwrap()
+    }
+
+    #[fixture]
+    fn raw_json() -> serde_json::Value {
+        let result = serde_json::from_str(JSON_STRING);
+        assert!(result.is_ok());
+        result.unwrap()
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_author_profile(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["author_profile"], false);
+        assert_eq!(plugin_info.author_profile, "");
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_contributors(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["contributors"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(plugin_info.contributors, HashMap::new());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_requires(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["requires"], false);
+        assert_eq!(plugin_info.requires, "");
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_tested(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["tested"], false);
+        assert_eq!(plugin_info.tested, "");
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_requires_php(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["requires_php"], false);
+        assert_eq!(plugin_info.requires_php, "");
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_upgrade_notice(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["upgrade_notice"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(plugin_info.upgrade_notice, HashMap::new());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_tags(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["tags"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(plugin_info.tags, HashMap::new());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_versions(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["versions"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(plugin_info.versions, HashMap::new());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_business_model(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["business_model"], false);
+        assert_eq!(plugin_info.business_model, "");
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_banners(plugin_info: PluginInformation, raw_json: serde_json::Value) {
+        assert_eq!(raw_json["banners"].as_array(), Some(vec![]).as_ref());
+        assert_eq!(plugin_info.banners, Banners::default());
+    }
+}
