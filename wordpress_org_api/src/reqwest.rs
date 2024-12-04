@@ -3,9 +3,10 @@ use std::sync::Arc;
 use reqwest::Client as ReqwestClient;
 use wp_api::{
     request::{
-        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
+        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
-    RequestExecutionError,
+    MediaUploadRequestExecutionError, RequestExecutionError,
 };
 
 #[derive(Debug)]
@@ -56,6 +57,13 @@ impl RequestExecutor for ReqwestExecutor {
             body: response.bytes().await.unwrap().to_vec(),
             header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
         })
+    }
+
+    async fn upload_media(
+        &self,
+        _: Arc<MediaUploadRequest>,
+    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+        unimplemented!("upload_media is not implemented for sending requests to api.wordpress.org")
     }
 }
 
