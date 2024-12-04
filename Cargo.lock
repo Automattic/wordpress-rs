@@ -3205,11 +3205,18 @@ dependencies = [
 name = "wordpress_org_api"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "http 1.1.0",
  "reqwest",
  "rstest",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
+ "uniffi",
+ "url",
+ "wordpress_org_api",
+ "wp_api",
 ]
 
 [[package]]

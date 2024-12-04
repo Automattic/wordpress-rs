@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::Deserialize;
-use wordpress_org_api::plugin_directory::*;
+use wordpress_org_api::Client;
 
 async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
     #[derive(Deserialize, Debug)]
@@ -24,18 +24,6 @@ async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
         .iter()
         .map(|p| Ok(p.slug.clone()))
         .collect()
-}
-
-async fn plugin_information(slug: &str) -> Result<PluginInformation, reqwest::Error> {
-    let url = format!(
-        "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]={}&fields=icons",
-        slug
-    );
-    reqwest::get(&url)
-        .await?
-        .json::<PluginInformation>()
-        .await
-        .map_err(Into::into)
 }
 
 #[tokio::test]
@@ -81,10 +69,11 @@ async fn test_parsing_full_plugin_directory() {
     println!();
 
     println!("Fetching and parsing {} plugins...", all_slugs.len());
+    let client: Client = reqwest::Client::builder().build().unwrap().into();
 
     let mut plugin_information_failures = Vec::new();
     for slug in all_slugs {
-        let info = plugin_information(&slug).await;
+        let info = client.plugin_information(&slug).await;
         if let Err(e) = info {
             print!("F({})", slug);
             plugin_information_failures.push((slug.to_string(), e));
