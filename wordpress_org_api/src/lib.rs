@@ -8,4 +8,4 @@ pub use client::*;
 #[cfg(feature = "reqwest")]
 pub mod reqwest;
 
-pub type Result<T> = std::result::Result<T, self::Error>;
+pub type Result<T> = std::result::Result<T, self::WordPressOrgApiClientError>;

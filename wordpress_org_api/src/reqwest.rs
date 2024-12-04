@@ -67,10 +67,10 @@ impl RequestExecutor for ReqwestExecutor {
     }
 }
 
-impl From<reqwest::Client> for crate::Client {
-    fn from(client: ReqwestClient) -> crate::Client {
+impl From<reqwest::Client> for crate::WordPressOrgApiClient {
+    fn from(client: ReqwestClient) -> crate::WordPressOrgApiClient {
         let executor = ReqwestExecutor { client };
-        crate::Client {
+        crate::WordPressOrgApiClient {
             request_executor: Arc::new(executor),
         }
     }

@@ -9,12 +9,12 @@ use wp_api::{
 use crate::plugin_directory::PluginInformation;
 
 #[derive(Debug, uniffi::Object)]
-pub struct Client {
+pub struct WordPressOrgApiClient {
     pub(crate) request_executor: Arc<dyn RequestExecutor>,
 }
 
 #[uniffi::export]
-impl Client {
+impl WordPressOrgApiClient {
     #[uniffi::constructor]
     pub fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
         Self { request_executor }
@@ -32,7 +32,7 @@ impl Client {
     }
 }
 
-impl Client {
+impl WordPressOrgApiClient {
     fn plugin_info_api_url() -> Url {
         Url::parse("https://api.wordpress.org/plugins/info/1.2/").expect("The URL is valid")
     }
@@ -43,12 +43,12 @@ impl Client {
     {
         match response.status_code {
             200 => {
-                serde_json::from_slice(&response.body).map_err(|e| Error::ResponseParsingError {
+                serde_json::from_slice(&response.body).map_err(|e| WordPressOrgApiClientError::ResponseParsingError {
                     reason: format!("Failed to parse response body as JSON: {}", e),
                     response: String::from_utf8_lossy(&response.body).to_string(),
                 })
             }
-            _ => Err(Error::UnexpectedStatusCodeError {
+            _ => Err(WordPressOrgApiClientError::UnexpectedStatusCodeError {
                 status_code: response.status_code,
                 response: String::from_utf8_lossy(&response.body).to_string(),
             }),
@@ -57,7 +57,7 @@ impl Client {
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum Error {
+pub enum WordPressOrgApiClientError {
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
         status_code,
@@ -77,13 +77,13 @@ pub enum Error {
     UnexpectedStatusCodeError { status_code: u16, response: String },
 }
 
-impl From<RequestExecutionError> for Error {
+impl From<RequestExecutionError> for WordPressOrgApiClientError {
     fn from(e: RequestExecutionError) -> Self {
         match e {
             RequestExecutionError::RequestExecutionFailed {
                 status_code,
                 reason,
-            } => Error::RequestExecutionFailed {
+            } => WordPressOrgApiClientError::RequestExecutionFailed {
                 status_code,
                 reason,
             },

@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::Deserialize;
-use wordpress_org_api::Client;
+use wordpress_org_api::WordPressOrgApiClient;
 
 async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
     #[derive(Deserialize, Debug)]
@@ -69,7 +69,7 @@ async fn test_parsing_full_plugin_directory() {
     println!();
 
     println!("Fetching and parsing {} plugins...", all_slugs.len());
-    let client: Client = reqwest::Client::builder().build().unwrap().into();
+    let client: WordPressOrgApiClient = reqwest::Client::builder().build().unwrap().into();
 
     let mut plugin_information_failures = Vec::new();
     for slug in all_slugs {
