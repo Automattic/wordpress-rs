@@ -9,6 +9,35 @@ use super::WpApiDetails;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
+#[uniffi::export]
+fn new_api_discovery(site_url: String) -> NewUrlDiscoveryResult {
+    todo!()
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct NewUrlDiscoveryResult {
+    pub user_input_attempt: NewUrlDiscoveryAttemptResult,
+    pub other_successful_attempts: Vec<NewUrlDiscoveryAttemptResult>,
+    pub other_failed_attempts: Vec<NewUrlDiscoveryAttemptResult>,
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct NewUrlDiscoveryAttemptResult {
+    pub is_network_error: bool,
+    pub is_successful: bool,
+    pub is_the_site_url_same_as_the_user_input: bool,
+    pub is_failed_to_parse_site_url: bool,
+    pub is_failed_to_parsed_api_root: bool,
+    pub is_failed_to_parsed_api_details: bool,
+    pub has_found_api_root_url: bool,
+    pub input_url: String,
+    pub parsed_site_url: Option<Arc<ParsedUrl>>,
+    pub api_root_url: Option<Arc<ParsedUrl>>,
+    pub api_details: Option<Arc<WpApiDetails>>,
+    // TODO: Not sure about the type for this
+    pub errors: u32,
+}
+
 pub fn construct_attempts(input_site_url: String) -> Vec<String> {
     let mut attempts = vec![input_site_url.clone()];
     if !input_site_url.starts_with("http") {
