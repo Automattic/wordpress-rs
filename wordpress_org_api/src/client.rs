@@ -42,12 +42,12 @@ impl WordPressOrgApiClient {
         T: DeserializeOwned,
     {
         match response.status_code {
-            200 => {
-                serde_json::from_slice(&response.body).map_err(|e| WordPressOrgApiClientError::ResponseParsingError {
+            200 => serde_json::from_slice(&response.body).map_err(|e| {
+                WordPressOrgApiClientError::ResponseParsingError {
                     reason: format!("Failed to parse response body as JSON: {}", e),
                     response: String::from_utf8_lossy(&response.body).to_string(),
-                })
-            }
+                }
+            }),
             _ => Err(WordPressOrgApiClientError::UnexpectedStatusCodeError {
                 status_code: response.status_code,
                 response: String::from_utf8_lossy(&response.body).to_string(),
