@@ -1,0 +1,5 @@
+[bindings.swift]
+ffi_module_name = "libwordpressFFI"
+ffi_module_filename = "wordpress_org_api_uniffi"
+generate_module_map = false
+generate_immutable_records = true

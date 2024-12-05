@@ -39,7 +39,8 @@ impl CreateXCFramework {
 
         XCFramework::new(&self.targets, &self.profile)?.create(&temp_dir)?;
 
-        Ok(())
+        std::fs::remove_dir_all(&temp_dir)
+            .with_context(|| format!("Failed to remove temporary dir: {:?}", temp_dir))
     }
 }
 
@@ -157,29 +158,23 @@ impl XCFramework {
             let path = dir_entry.expect("Invalid Path").path();
             if path.is_dir() {
                 let headers_dir = temp_dir.join(&path).join("Headers");
-                let header_path = headers_dir.join("libwordpressFFI.h");
-                let module_path = headers_dir.join("module.modulemap");
+                let non_lib_files: Vec<PathBuf> = std::fs::read_dir(&headers_dir)?
+                    .flat_map(|f| f.ok())
+                    .filter_map(|f|
+                        if f.path().ends_with(".a") {
+                            None
+                        } else {
+                            Some(f.path())
+                        }
+                    )
+                    .collect();
 
-                let new_headers_dir = temp_dir.join(&path).join("Headers").join("libwordpressFFI");
-
+                let new_headers_dir = headers_dir.join("libwordpressFFI");
                 recreate_directory(&new_headers_dir)?;
 
-                let new_header_path = new_headers_dir.join("libwordpressFFI.h");
-                let new_module_path = new_headers_dir.join("module.modulemap");
-
-                println!(
-                    "Moving: {} -> {}",
-                    header_path.display(),
-                    new_header_path.display()
-                );
-                println!(
-                    "Moving: {} -> {}",
-                    module_path.display(),
-                    new_module_path.display()
-                );
-
-                std::fs::rename(header_path, new_header_path)?;
-                std::fs::rename(module_path, new_module_path)?;
+                for file in non_lib_files {
+                    std::fs::rename(&file, new_headers_dir.join(file.file_name().unwrap()))?;
+                }
             }
         }
 
@@ -214,15 +209,15 @@ impl Slice {
     fn create(&self, temp_dir: &Path) -> Result<PathBuf> {
         let libs = self.built_libraries();
 
-        // If there are more static libraries (a.k.a cargo packages), we'll
-        // need to bundle them together into one static library.
-        // At the moment, we only have one libwp_api, so we can just copy it.
-        assert!(
-            libs.len() == 1,
-            "Expected exactly one library for each slice"
-        );
+        let lib = temp_dir.join("temp.a");
+        Command::new("xcrun")
+            .arg("libtool")
+            .arg("-static")
+            .arg("-o")
+            .arg(&lib)
+            .args(libs)
+            .successful_output()?;
 
-        let lib = &libs[0];
         if !lib.exists() {
             anyhow::bail!("Library not found: {}", lib.display())
         }
@@ -231,7 +226,7 @@ impl Slice {
         recreate_directory(&dir)?;
 
         let dest = dir.join(LIBRARY_FILENAME);
-        std::fs::copy(lib, &dest)
+        std::fs::copy(&lib, &dest)
             .with_context(|| format!("Failed to copy {} to {}", lib.display(), dest.display()))?;
 
         Ok(dest)
@@ -245,7 +240,10 @@ impl Slice {
             target_dir.push(&self.profile);
         }
 
-        vec![target_dir.join("libwp_api.a")]
+        vec![
+            target_dir.join("libwp_api.a"),
+            target_dir.join("libwordpress_org_api.a"),
+        ]
     }
 }
 

@@ -32,12 +32,8 @@ clean:
 	git clean -ffXd
 
 bindings:
-	rm -rf target/swift-bindings
-	cargo build --release
-
-	#wp_api
-	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
-	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
+	@scripts/swift-bindings.sh
+	cp target/swift-bindings/*.swift native/swift/Sources/wordpress-api-wrapper/
 
 .PHONY: docs # Rebuild docs each time we run this command
 docs:
@@ -115,7 +111,7 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 
 # Build the library for a specific target
 _build-apple-%: xcframework-headers
-	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
+	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --package wordpress_org_api --profile $(CARGO_PROFILE)
 
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
