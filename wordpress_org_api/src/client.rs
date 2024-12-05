@@ -1,22 +1,69 @@
 use serde::de::DeserializeOwned;
+use std::fmt::Debug;
 use std::sync::Arc;
 use url::Url;
-use wp_api::{
-    request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
-    RequestExecutionError,
-};
+use wp_api::request::{endpoint::WpEndpointUrl, WpNetworkRequest, WpNetworkResponse};
 
 use crate::plugin_directory::PluginInformation;
 
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait WordPressOrgApiRequestExecutor: Send + Sync + Debug {
+    async fn execute(
+        &self,
+        request: Arc<WpNetworkRequest>,
+    ) -> Result<WordPressOrgApiNetworkResponse, WordPressOrgApiRequestExecutionError>;
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum WordPressOrgApiRequestExecutionError {
+    #[error(
+        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        status_code,
+        reason
+    )]
+    RequestExecutionFailed {
+        status_code: Option<u16>,
+        reason: String,
+    },
+}
+
+#[derive(Debug, Default, uniffi::Object)]
+pub struct DummyObject;
+
+#[uniffi::export]
+impl DummyObject {
+    #[uniffi::constructor]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct WordPressOrgApiNetworkResponse {
+    pub inner: WpNetworkResponse,
+    // Putting a uniffi reference type here to prevent uniffi-rs from generating
+    // a `Equtable` and `Hashable` implementation in the Swift binding file.
+    // They wouldn't be able to compile, because `WpNetworkResponse` doesn't implement
+    // `Equtable` and `Hashable`.
+    dummy: Arc<DummyObject>,
+}
+
+impl From<WpNetworkResponse> for WordPressOrgApiNetworkResponse {
+    fn from(inner: WpNetworkResponse) -> Self {
+        Self { inner, dummy: DummyObject.into() }
+    }
+}
+
 #[derive(Debug, uniffi::Object)]
 pub struct WordPressOrgApiClient {
-    pub(crate) request_executor: Arc<dyn RequestExecutor>,
+    pub(crate) request_executor: Arc<dyn WordPressOrgApiRequestExecutor>,
 }
 
 #[uniffi::export]
 impl WordPressOrgApiClient {
     #[uniffi::constructor]
-    pub fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
+    pub fn new(request_executor: Arc<dyn WordPressOrgApiRequestExecutor>) -> Self {
         Self { request_executor }
     }
 
@@ -28,7 +75,7 @@ impl WordPressOrgApiClient {
             .append_pair("slug", slug);
         let request = WpNetworkRequest::get(WpEndpointUrl(url.to_string()));
         let response = self.request_executor.execute(Arc::new(request)).await?;
-        Self::parse(response)
+        Self::parse(response.inner)
     }
 }
 
@@ -77,10 +124,10 @@ pub enum WordPressOrgApiClientError {
     UnexpectedStatusCodeError { status_code: u16, response: String },
 }
 
-impl From<RequestExecutionError> for WordPressOrgApiClientError {
-    fn from(e: RequestExecutionError) -> Self {
+impl From<WordPressOrgApiRequestExecutionError> for WordPressOrgApiClientError {
+    fn from(e: WordPressOrgApiRequestExecutionError) -> Self {
         match e {
-            RequestExecutionError::RequestExecutionFailed {
+            WordPressOrgApiRequestExecutionError::RequestExecutionFailed {
                 status_code,
                 reason,
             } => WordPressOrgApiClientError::RequestExecutionFailed {

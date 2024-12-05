@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
 use reqwest::Client as ReqwestClient;
-use wp_api::{
-    request::{
-        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-    },
-    MediaUploadRequestExecutionError, RequestExecutionError,
+use wp_api::request::{RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse};
+
+use crate::{
+    WordPressOrgApiNetworkResponse, WordPressOrgApiRequestExecutionError,
+    WordPressOrgApiRequestExecutor,
 };
 
 #[derive(Debug)]
@@ -27,11 +26,11 @@ impl ReqwestExecutor {
 }
 
 #[async_trait::async_trait]
-impl RequestExecutor for ReqwestExecutor {
+impl WordPressOrgApiRequestExecutor for ReqwestExecutor {
     async fn execute(
         &self,
         wp_request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+    ) -> Result<WordPressOrgApiNetworkResponse, WordPressOrgApiRequestExecutionError> {
         let mut request = self
             .client
             .request(
@@ -42,28 +41,20 @@ impl RequestExecutor for ReqwestExecutor {
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }
-        let mut response =
-            request
-                .send()
-                .await
-                .map_err(|err| RequestExecutionError::RequestExecutionFailed {
-                    status_code: err.status().map(|s| s.as_u16()),
-                    reason: err.to_string(),
-                })?;
+        let mut response = request.send().await.map_err(|err| {
+            WordPressOrgApiRequestExecutionError::RequestExecutionFailed {
+                status_code: err.status().map(|s| s.as_u16()),
+                reason: err.to_string(),
+            }
+        })?;
 
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
             header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
-        })
-    }
-
-    async fn upload_media(
-        &self,
-        _: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        unimplemented!("upload_media is not implemented for sending requests to api.wordpress.org")
+        }
+        .into())
     }
 }
 
