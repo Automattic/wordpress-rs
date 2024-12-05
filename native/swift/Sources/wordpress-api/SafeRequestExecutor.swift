@@ -7,7 +7,7 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
-public protocol SafeRequestExecutor: RequestExecutor, Sendable {
+public protocol SafeRequestExecutor: RequestExecutor, WordPressOrgApiRequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 }
 
@@ -15,6 +15,21 @@ extension SafeRequestExecutor {
 
     public func execute(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let result = await execute(request)
+        return try result.get()
+    }
+
+    public func execute(request: WpNetworkRequest) async throws -> WordPressOrgApiNetworkResponse {
+        let result = await execute(request)
+            .map { WordPressOrgApiNetworkResponse(inner: $0, dummy: .init()) }
+            .mapError { error in
+                switch error {
+                case let .RequestExecutionFailed(statusCode, reason):
+                    return WordPressOrgApiRequestExecutionError.RequestExecutionFailed(
+                        statusCode: statusCode,
+                        reason: reason
+                    )
+                }
+            }
         return try result.get()
     }
 
