@@ -1,9 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{
-    request::{WpNetworkHeaderMap, WpNetworkResponse},
-    ParseUrlError, ParsedUrl, RequestExecutionError,
-};
+use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
 
 use super::WpApiDetails;
 
@@ -113,103 +110,6 @@ pub enum UrlDiscoveryError {
     UrlDiscoveryFailed {
         attempts: HashMap<String, UrlDiscoveryState>,
     },
-}
-
-#[derive(Debug)]
-pub(super) struct StateInitial {
-    pub site_url: String,
-}
-
-impl StateInitial {
-    pub fn new(site_url: &str) -> Self {
-        Self {
-            site_url: site_url.to_string(),
-        }
-    }
-
-    pub fn parse(self) -> Result<StateParsedUrl, ParseUrlError> {
-        ParsedUrl::parse(self.site_url.as_str()).map(StateParsedUrl::new)
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct StateParsedUrl {
-    pub site_url: ParsedUrl,
-}
-
-impl StateParsedUrl {
-    fn new(site_url: ParsedUrl) -> Self {
-        Self { site_url }
-    }
-
-    pub fn parse_api_root_response(
-        self,
-        response: WpNetworkResponse,
-    ) -> Result<StateFetchedApiRootUrl, FetchApiRootUrlError> {
-        match response
-            .get_link_header(API_ROOT_LINK_HEADER)
-            .into_iter()
-            .nth(0)
-        {
-            Some(url) => Ok(StateFetchedApiRootUrl {
-                site_url: self.site_url,
-                api_root_url: ParsedUrl::new(url),
-            }),
-            None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
-                header_map: response.header_map,
-                status_code: response.status_code,
-            }),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct StateFetchedApiRootUrl {
-    pub site_url: ParsedUrl,
-    pub api_root_url: ParsedUrl,
-}
-
-impl StateFetchedApiRootUrl {
-    pub fn parse_api_details_response(
-        self,
-        response: WpNetworkResponse,
-    ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
-        match serde_json::from_slice::<WpApiDetails>(&response.body) {
-            Ok(api_details) => Ok(UrlDiscoveryAttemptSuccess {
-                site_url: Arc::new(self.site_url),
-                api_details: Arc::new(api_details),
-                api_root_url: Arc::new(self.api_root_url),
-            }),
-            Err(err) => {
-                let e = FetchApiDetailsError::ApiDetailsCouldntBeParsed {
-                    reason: err.to_string(),
-                    response: response.body_as_string(),
-                };
-                Err(UrlDiscoveryAttemptError::FetchApiDetailsFailed {
-                    site_url: Arc::new(self.site_url),
-                    api_root_url: Arc::new(self.api_root_url),
-                    error: e,
-                })
-            }
-        }
-    }
-}
-
-impl From<StateFetchedApiDetails> for UrlDiscoveryAttemptSuccess {
-    fn from(state: StateFetchedApiDetails) -> Self {
-        UrlDiscoveryAttemptSuccess {
-            site_url: Arc::new(state.site_url),
-            api_details: Arc::new(state.api_details),
-            api_root_url: Arc::new(state.api_root_url),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct StateFetchedApiDetails {
-    pub site_url: ParsedUrl,
-    pub api_details: WpApiDetails,
-    pub api_root_url: ParsedUrl,
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
