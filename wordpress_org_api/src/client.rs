@@ -90,5 +90,3 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
         }
     }
 }
-
-uniffi::setup_scaffolding!();

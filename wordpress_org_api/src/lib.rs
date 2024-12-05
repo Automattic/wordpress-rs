@@ -9,3 +9,5 @@ pub use client::*;
 pub mod reqwest;
 
 pub type Result<T> = std::result::Result<T, self::WordPressOrgApiClientError>;
+
+uniffi::setup_scaffolding!();
