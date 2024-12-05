@@ -8,8 +8,9 @@ use crate::request::{
 use crate::ParsedUrl;
 
 use super::url_discovery::{
-    self, FetchApiDetailsError, FetchApiRootUrlError, StateInitial, UrlDiscoveryAttemptError,
-    UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState, UrlDiscoverySuccess,
+    self, AutoDiscoveryAttempt, FetchApiDetailsError, FetchApiRootUrlError, StateInitial,
+    UrlDiscoveryAttemptError, UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState,
+    UrlDiscoverySuccess,
 };
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
@@ -89,8 +90,9 @@ impl WpLoginClient {
 
     async fn attempt_api_discovery(
         &self,
-        site_url: &str,
+        attempt: &AutoDiscoveryAttempt,
     ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
+        let site_url = attempt.site_url.as_str();
         let initial_state = StateInitial::new(site_url);
         let parsed_url_state =
             initial_state

@@ -9,18 +9,52 @@ use super::WpApiDetails;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
-pub fn construct_attempts(input_site_url: String) -> Vec<String> {
-    let mut attempts = vec![input_site_url.clone()];
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct AutoDiscoveryAttempt {
+    pub(crate) site_url: String,
+    pub(crate) attempt_type: AutoDiscoveryAttemptType,
+}
+
+impl AutoDiscoveryAttempt {
+    fn new(site_url: impl Into<String>, attempt_type: AutoDiscoveryAttemptType) -> Self {
+        Self {
+            site_url: site_url.into(),
+            attempt_type,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum AutoDiscoveryAttemptType {
+    Original,
+    AutoHttps,
+    AutoDotPhpExtensionForWpAdmin,
+}
+
+pub fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
+    let mut attempts = vec![AutoDiscoveryAttempt::new(
+        input_site_url.clone(),
+        AutoDiscoveryAttemptType::Original,
+    )];
     if !input_site_url.starts_with("http") {
-        attempts.push(format!("https://{}", input_site_url))
+        attempts.push(AutoDiscoveryAttempt::new(
+            format!("https://{}", input_site_url),
+            AutoDiscoveryAttemptType::AutoHttps,
+        ))
     }
     if input_site_url.ends_with("wp-admin") {
-        attempts.push(format!("{}.php", input_site_url))
+        attempts.push(AutoDiscoveryAttempt::new(
+            format!("{}.php", input_site_url),
+            AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+        ))
     } else if input_site_url.ends_with("wp-admin/") {
         let mut s = input_site_url.clone();
         s.pop()
             .expect("Already verified that there is at least one char");
-        attempts.push(format!("{}.php", s));
+        attempts.push(AutoDiscoveryAttempt::new(
+            format!("{}.php", s),
+            AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+        ))
     }
     attempts
 }
@@ -249,25 +283,25 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case("localhost", vec!["localhost", "https://localhost"])]
-    #[case("http://localhost", vec!["http://localhost"])]
-    #[case("http://localhost/wp-json", vec!["http://localhost/wp-json"])]
-    #[case("http://localhost/wp-admin.php", vec!["http://localhost/wp-admin.php"])]
-    #[case("http://localhost/wp-admin", vec!["http://localhost/wp-admin", "http://localhost/wp-admin.php"])]
-    #[case("http://localhost/wp-admin/", vec!["http://localhost/wp-admin/", "http://localhost/wp-admin.php"])]
-    #[case("orchestremetropolitain.com/wp-json", vec!["orchestremetropolitain.com/wp-json", "https://orchestremetropolitain.com/wp-json"])]
-    #[case("https://orchestremetropolitain.com", vec!["https://orchestremetropolitain.com"])]
+    #[case("localhost", vec![AutoDiscoveryAttempt::new("localhost", AutoDiscoveryAttemptType::Original), AutoDiscoveryAttempt::new("https://localhost", AutoDiscoveryAttemptType::AutoHttps)])]
+    #[case("http://localhost", vec![AutoDiscoveryAttempt::new("http://localhost", AutoDiscoveryAttemptType::Original)])]
+    #[case("http://localhost/wp-json", vec![AutoDiscoveryAttempt::new("http://localhost/wp-json", AutoDiscoveryAttemptType::Original)])]
+    #[case("http://localhost/wp-admin.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::Original)])]
+    #[case("http://localhost/wp-admin", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin", AutoDiscoveryAttemptType::Original), AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin)])]
+    #[case("http://localhost/wp-admin/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin/", AutoDiscoveryAttemptType::Original), AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin)])]
+    #[case("orchestremetropolitain.com/wp-json", vec![AutoDiscoveryAttempt::new("orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::Original), AutoDiscoveryAttempt::new("https://orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::AutoHttps)])]
+    #[case("https://orchestremetropolitain.com", vec![AutoDiscoveryAttempt::new("https://orchestremetropolitain.com", AutoDiscoveryAttemptType::Original)])]
     #[case(
         "https://orchestremetropolitain.com/fr/",
-        vec!["https://orchestremetropolitain.com/fr/"]
+        vec![AutoDiscoveryAttempt::new("https://orchestremetropolitain.com/fr/", AutoDiscoveryAttemptType::Original)]
     )]
     #[case(
         "https://orchestremetropolitain.com/wp-json",
-        vec!["https://orchestremetropolitain.com/wp-json"]
+        vec![AutoDiscoveryAttempt::new("https://orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::Original)]
     )]
     fn test_construct_attempts(
         #[case] input_site_url: &str,
-        #[case] mut expected_attempts: Vec<&str>,
+        #[case] mut expected_attempts: Vec<AutoDiscoveryAttempt>,
     ) {
         let mut found_attempts = construct_attempts(input_site_url.to_string());
         found_attempts.sort();
