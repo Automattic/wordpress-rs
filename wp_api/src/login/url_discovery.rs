@@ -1,34 +1,122 @@
-use std::{collections::HashMap, sync::Arc};
-
-use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
-
 use super::WpApiDetails;
+use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
+use std::{collections::HashMap, sync::Arc};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct AutoDiscoveryAttempt {
-    pub(crate) site_url: String,
+    pub(crate) attempt_site_url: String,
     pub(crate) attempt_type: AutoDiscoveryAttemptType,
 }
 
 impl AutoDiscoveryAttempt {
-    fn new(site_url: impl Into<String>, attempt_type: AutoDiscoveryAttemptType) -> Self {
+    fn new(attempt_site_url: impl Into<String>, attempt_type: AutoDiscoveryAttemptType) -> Self {
         Self {
-            site_url: site_url.into(),
+            attempt_site_url: attempt_site_url.into(),
             attempt_type,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum AutoDiscoveryAttemptType {
+#[derive(Debug, uniffi::Record)]
+pub struct AutoDiscoveryUniffiResult {
+    pub attempts: HashMap<AutoDiscoveryAttemptType, Arc<AutoDiscoveryAttemptResult>>,
+}
+
+impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
+    fn from(value: AutoDiscoveryResult) -> Self {
+        Self {
+            attempts: value
+                .attempts
+                .into_iter()
+                .map(|(k, v)| (k, Arc::new(v)))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct AutoDiscoveryResult {
+    pub attempts: HashMap<AutoDiscoveryAttemptType, AutoDiscoveryAttemptResult>,
+}
+
+impl AutoDiscoveryResult {
+    pub fn find_successful(self) -> Option<AutoDiscoveryAttemptResult> {
+        self.attempts
+            .into_iter()
+            .find(|(attempt_type, result)| result.result.is_ok())
+            .map(|(attempt_type, result)| result)
+    }
+}
+
+#[derive(Debug, uniffi::Object)]
+pub struct AutoDiscoveryAttemptResult {
+    pub attempt_type: AutoDiscoveryAttemptType,
+    pub attempt_site_url: String,
+    pub result: Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
+}
+
+#[derive(Debug)]
+pub struct AutoDiscoveryAttemptSuccess {
+    pub parsed_site_url: ParsedUrl,
+    pub api_root_url: ParsedUrl,
+    pub api_details: WpApiDetails,
+}
+
+#[derive(Debug)]
+pub enum AutoDiscoveryAttemptFailure {
+    ParseSiteUrl {
+        error: ParseUrlError,
+    },
+    FetchApiRootUrl {
+        parsed_site_url: ParsedUrl,
+        error: RequestExecutionError,
+    },
+    ParseApiRootUrl {
+        parsed_site_url: ParsedUrl,
+        error: ParseApiRootUrlError,
+    },
+    FetchApiDetails {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+        error: RequestExecutionError,
+    },
+    ParseApiDetails {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+        error: serde_json::Error,
+    },
+}
+
+impl AutoDiscoveryAttemptFailure {
+    pub fn into_attempt_result(
+        self,
+        attempt_type: AutoDiscoveryAttemptType,
+        attempt_site_url: String,
+    ) -> AutoDiscoveryAttemptResult {
+        AutoDiscoveryAttemptResult {
+            attempt_type,
+            attempt_site_url,
+            result: Err(self),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, uniffi::Enum)]
+pub enum AutoDiscoveryAttemptType {
     Original,
     AutoHttps,
     AutoDotPhpExtensionForWpAdmin,
 }
 
-pub fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
+impl AutoDiscoveryAttemptType {
+    fn is_the_site_url_same_as_the_user_input(&self) -> bool {
+        matches!(self, AutoDiscoveryAttemptType::Original)
+    }
+}
+
+pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
     let mut attempts = vec![AutoDiscoveryAttempt::new(
         input_site_url.clone(),
         AutoDiscoveryAttemptType::Original,
@@ -56,73 +144,8 @@ pub fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
     attempts
 }
 
-#[derive(Debug, uniffi::Enum)]
-pub enum UrlDiscoveryState {
-    Success(UrlDiscoveryAttemptSuccess),
-    Failure(UrlDiscoveryAttemptError),
-}
-
-#[derive(Debug, uniffi::Record)]
-pub struct UrlDiscoveryAttemptSuccess {
-    pub site_url: Arc<ParsedUrl>,
-    pub api_details: Arc<WpApiDetails>,
-    pub api_root_url: Arc<ParsedUrl>,
-}
-
-#[derive(Debug, uniffi::Enum)]
-pub enum UrlDiscoveryAttemptError {
-    FailedToParseSiteUrl {
-        site_url: String,
-        error: ParseUrlError,
-    },
-    FetchApiRootUrlFailed {
-        site_url: Arc<ParsedUrl>,
-        error: FetchApiRootUrlError,
-    },
-    FetchApiDetailsFailed {
-        site_url: Arc<ParsedUrl>,
-        api_root_url: Arc<ParsedUrl>,
-        error: FetchApiDetailsError,
-    },
-}
-
-impl UrlDiscoveryAttemptError {
-    pub fn site_url(&self) -> String {
-        match self {
-            UrlDiscoveryAttemptError::FailedToParseSiteUrl { site_url, .. } => site_url.clone(),
-            UrlDiscoveryAttemptError::FetchApiRootUrlFailed { site_url, .. } => site_url.url(),
-            UrlDiscoveryAttemptError::FetchApiDetailsFailed { site_url, .. } => site_url.url(),
-        }
-    }
-}
-
-#[derive(Debug, uniffi::Record)]
-pub struct UrlDiscoverySuccess {
-    pub site_url: Arc<ParsedUrl>,
-    pub api_details: Arc<WpApiDetails>,
-    pub api_root_url: Arc<ParsedUrl>,
-    pub attempts: HashMap<String, UrlDiscoveryState>,
-}
-
 #[derive(Debug, thiserror::Error, uniffi::Error)]
-pub enum UrlDiscoveryError {
-    #[error("Url discovery failed: {:?}", attempts)]
-    UrlDiscoveryFailed {
-        attempts: HashMap<String, UrlDiscoveryState>,
-    },
-}
-
-#[derive(Debug, thiserror::Error, uniffi::Error)]
-pub enum FetchApiRootUrlError {
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'\nResponse: '{}'",
-        status_code,
-        reason
-    )]
-    RequestExecutionFailed {
-        status_code: Option<u16>,
-        reason: String,
-    },
+pub enum ParseApiRootUrlError {
     #[error(
         "Api root link header not found!\nStatus Code: '{:#?}'\nHeader Map: '{:#?}'",
         status_code,
@@ -132,20 +155,6 @@ pub enum FetchApiRootUrlError {
         header_map: Arc<WpNetworkHeaderMap>,
         status_code: u16,
     },
-}
-
-impl From<RequestExecutionError> for FetchApiRootUrlError {
-    fn from(value: RequestExecutionError) -> Self {
-        match value {
-            RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                reason,
-            } => Self::RequestExecutionFailed {
-                status_code,
-                reason,
-            },
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -161,20 +170,6 @@ pub enum FetchApiDetailsError {
     },
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
-}
-
-impl From<RequestExecutionError> for FetchApiDetailsError {
-    fn from(value: RequestExecutionError) -> Self {
-        match value {
-            RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                reason,
-            } => Self::RequestExecutionFailed {
-                status_code,
-                reason,
-            },
-        }
-    }
 }
 
 #[cfg(test)]

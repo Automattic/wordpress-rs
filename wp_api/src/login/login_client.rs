@@ -1,18 +1,17 @@
 use std::str;
 use std::sync::Arc;
 
+use super::url_discovery::{
+    self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
+    AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
+    ParseApiRootUrlError,
+};
+use super::WpApiDetails;
 use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{
     RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
 };
-use crate::ParsedUrl;
-
-use super::url_discovery::{
-    self, AutoDiscoveryAttempt, FetchApiDetailsError, FetchApiRootUrlError,
-    UrlDiscoveryAttemptError, UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState,
-    UrlDiscoverySuccess,
-};
-use super::WpApiDetails;
+use crate::{ParsedUrl, RequestExecutionError};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -30,11 +29,8 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn api_discovery(
-        &self,
-        site_url: String,
-    ) -> Result<UrlDiscoverySuccess, UrlDiscoveryError> {
-        self.inner.api_discovery(site_url).await
+    async fn api_discovery(&self, site_url: String) -> AutoDiscoveryUniffiResult {
+        self.inner.api_discovery(site_url).await.into()
     }
 }
 
@@ -48,83 +44,84 @@ impl WpLoginClient {
         Self { request_executor }
     }
 
-    pub async fn api_discovery(
-        &self,
-        site_url: String,
-    ) -> Result<UrlDiscoverySuccess, UrlDiscoveryError> {
+    pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
         let attempts = futures::future::join_all(
             url_discovery::construct_attempts(site_url)
-                .iter()
-                .map(|s| async { self.attempt_api_discovery(s).await }),
+                .into_iter()
+                .map(|attempt| async { self.attempt_api_discovery(attempt).await }),
         )
         .await;
-        let successful_attempt = attempts.iter().find_map(|a| {
-            if let Ok(s) = a {
-                Some((
-                    Arc::clone(&s.site_url),
-                    Arc::clone(&s.api_details),
-                    Arc::clone(&s.api_root_url),
-                ))
-            } else {
-                None
-            }
-        });
-
-        let attempts = attempts
-            .into_iter()
-            .map(|a| match a {
-                Ok(s) => (s.site_url.url(), UrlDiscoveryState::Success(s)),
-                Err(e) => (e.site_url(), UrlDiscoveryState::Failure(e)),
-            })
-            .collect();
-        if let Some(s) = successful_attempt {
-            Ok(UrlDiscoverySuccess {
-                site_url: s.0,
-                api_details: s.1,
-                api_root_url: s.2,
-                attempts,
-            })
-        } else {
-            Err(UrlDiscoveryError::UrlDiscoveryFailed { attempts })
+        AutoDiscoveryResult {
+            attempts: attempts.into_iter().map(|r| (r.attempt_type, r)).collect(),
         }
     }
 
     async fn attempt_api_discovery(
         &self,
-        attempt: &AutoDiscoveryAttempt,
-    ) -> Result<UrlDiscoveryAttemptSuccess, UrlDiscoveryAttemptError> {
-        let site_url = attempt.site_url.as_str();
-        let parsed_site_url: Arc<ParsedUrl> = self.parse_attempt_url(site_url)?.into();
-        let api_root_url: Arc<ParsedUrl> = self
-            .fetch_api_root_url(&parsed_site_url)
-            .await
-            .and_then(|r| self.parse_api_root_response(&parsed_site_url, r))
-            .map_err(|e| UrlDiscoveryAttemptError::FetchApiRootUrlFailed {
-                site_url: Arc::clone(&parsed_site_url),
-                error: e,
-            })?
-            .into();
-        let api_details: Arc<WpApiDetails> = self
-            .fetch_wp_api_details(Arc::clone(&api_root_url))
-            .await
-            .and_then(|api_details_response| self.parse_api_details_response(api_details_response))
-            .map_err(|err| UrlDiscoveryAttemptError::FetchApiDetailsFailed {
-                site_url: Arc::clone(&parsed_site_url),
-                api_root_url: Arc::clone(&api_root_url),
-                error: err,
-            })?
-            .into();
-        Ok(UrlDiscoveryAttemptSuccess {
-            site_url: Arc::clone(&parsed_site_url),
-            api_root_url: Arc::clone(&api_root_url),
-            api_details: Arc::clone(&api_details),
-        })
+        attempt: AutoDiscoveryAttempt,
+    ) -> AutoDiscoveryAttemptResult {
+        let result = self
+            .inner_attempt_api_discovery(attempt.attempt_site_url.as_str())
+            .await;
+        AutoDiscoveryAttemptResult {
+            attempt_type: attempt.attempt_type,
+            attempt_site_url: attempt.attempt_site_url,
+            result,
+        }
     }
 
-    fn parse_attempt_url(&self, site_url: &str) -> Result<ParsedUrl, UrlDiscoveryAttemptError> {
-        ParsedUrl::parse(site_url).map_err(|e| UrlDiscoveryAttemptError::FailedToParseSiteUrl {
-            site_url: site_url.to_string(),
-            error: e,
+    async fn inner_attempt_api_discovery(
+        &self,
+        attempt_site_url: &str,
+    ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
+        let parsed_site_url = ParsedUrl::parse(attempt_site_url)
+            .map_err(|error| AutoDiscoveryAttemptFailure::ParseSiteUrl { error })?;
+        let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
+            Ok(r) => r,
+            Err(error) => {
+                return Err(AutoDiscoveryAttemptFailure::FetchApiRootUrl {
+                    parsed_site_url,
+                    error,
+                })
+            }
+        };
+        let api_root_url =
+            match self.parse_api_root_response(&parsed_site_url, fetch_api_root_url_response) {
+                Ok(api_root_url) => api_root_url,
+                Err(error) => {
+                    return Err(AutoDiscoveryAttemptFailure::ParseApiRootUrl {
+                        parsed_site_url,
+                        error,
+                    })
+                }
+            };
+
+        let fetch_api_details_response = match self.fetch_wp_api_details(&api_root_url).await {
+            Ok(r) => r,
+            Err(error) => {
+                return Err(AutoDiscoveryAttemptFailure::FetchApiDetails {
+                    parsed_site_url,
+                    api_root_url,
+                    error,
+                })
+            }
+        };
+        let api_details: WpApiDetails =
+            match serde_json::from_slice::<WpApiDetails>(&fetch_api_details_response.body) {
+                Ok(api_details) => api_details,
+                Err(error) => {
+                    return Err(AutoDiscoveryAttemptFailure::ParseApiDetails {
+                        parsed_site_url,
+                        api_root_url,
+                        error,
+                    })
+                }
+            };
+
+        Ok(AutoDiscoveryAttemptSuccess {
+            parsed_site_url,
+            api_root_url,
+            api_details,
         })
     }
 
@@ -132,30 +129,18 @@ impl WpLoginClient {
         &self,
         site_url: &ParsedUrl,
         response: WpNetworkResponse,
-    ) -> Result<ParsedUrl, FetchApiRootUrlError> {
+    ) -> Result<ParsedUrl, ParseApiRootUrlError> {
         match response
             .get_link_header(API_ROOT_LINK_HEADER)
             .into_iter()
             .nth(0)
         {
             Some(url) => Ok(ParsedUrl::new(url)),
-            None => Err(FetchApiRootUrlError::ApiRootLinkHeaderNotFound {
+            None => Err(ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
                 header_map: response.header_map,
                 status_code: response.status_code,
             }),
         }
-    }
-
-    fn parse_api_details_response(
-        &self,
-        response: WpNetworkResponse,
-    ) -> Result<WpApiDetails, FetchApiDetailsError> {
-        serde_json::from_slice::<WpApiDetails>(&response.body).map_err(|err| {
-            FetchApiDetailsError::ApiDetailsCouldntBeParsed {
-                reason: err.to_string(),
-                response: response.body_as_string(),
-            }
-        })
     }
 
     // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing
@@ -163,23 +148,20 @@ impl WpLoginClient {
     async fn fetch_api_root_url(
         &self,
         parsed_site_url: &ParsedUrl,
-    ) -> Result<WpNetworkResponse, FetchApiRootUrlError> {
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let api_root_request = WpNetworkRequest {
             method: RequestMethod::HEAD,
             url: WpEndpointUrl(parsed_site_url.url()),
             header_map: WpNetworkHeaderMap::default().into(),
             body: None,
         };
-        self.request_executor
-            .execute(api_root_request.into())
-            .await
-            .map_err(FetchApiRootUrlError::from)
+        self.request_executor.execute(api_root_request.into()).await
     }
 
     async fn fetch_wp_api_details(
         &self,
-        api_root_url: Arc<ParsedUrl>,
-    ) -> Result<WpNetworkResponse, FetchApiDetailsError> {
+        api_root_url: &ParsedUrl,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.request_executor
             .execute(
                 WpNetworkRequest {
@@ -191,6 +173,5 @@ impl WpLoginClient {
                 .into(),
             )
             .await
-            .map_err(FetchApiDetailsError::from)
     }
 }
