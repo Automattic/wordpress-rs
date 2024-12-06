@@ -4,16 +4,13 @@ use std::str;
 use std::sync::Arc;
 use wp_serde_helper::deserialize_i64_or_string;
 
-pub use login_client::WpLoginClient;
-pub use url_discovery::{UrlDiscoveryError, UrlDiscoveryState, UrlDiscoverySuccess};
-
 use crate::ParsedUrl;
 use crate::WpUuid;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
-mod login_client;
-mod url_discovery;
+pub mod login_client;
+pub mod url_discovery;
 
 #[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {

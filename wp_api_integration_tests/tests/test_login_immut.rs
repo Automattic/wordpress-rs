@@ -1,8 +1,8 @@
 use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
-use wp_api::login::WpLoginClient;
-use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
+use wp_api::login::login_client::WpLoginClient;
+use wp_api_integration_tests::AsyncWpNetworking;
 
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
 const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
@@ -54,12 +54,15 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
-    let url_discovery = client
-        .api_discovery(site_url.to_string())
-        .await
-        .assert_response();
+    let result = client.api_discovery(site_url.to_string()).await;
+    let failure_message = format!("Auto discovery failed: {:#?}", result);
+    let successful_attempt = result.find_successful();
+    assert!(successful_attempt.is_some(), "{}", failure_message);
     assert_eq!(
-        url_discovery
+        successful_attempt
+            .unwrap()
+            .result
+            .unwrap()
             .api_details
             .find_application_passwords_authentication_url(),
         Some(expected_auth_url.to_string())
