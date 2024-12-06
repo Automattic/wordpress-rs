@@ -44,7 +44,7 @@ pub fn extract_login_details_from_url(
     })
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Object)]
 pub struct WpApiDetails {
     pub name: String,
     pub description: String,
@@ -67,12 +67,12 @@ impl WpApiDetails {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct WpRestApiAuthenticationScheme {
     pub endpoints: WpRestApiAuthenticationEndpoint,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct WpRestApiAuthenticationEndpoint {
     pub authorization: String,
 }

@@ -2,7 +2,7 @@ use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
 use wp_api::login::login_client::WpLoginClient;
-use wp_api::login::url_discovery::{AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptType};
+use wp_api::login::url_discovery::AutoDiscoveryAttemptType;
 use wp_api_integration_tests::AsyncWpNetworking;
 
 #[rstest]
@@ -18,12 +18,9 @@ async fn test_login_flow_err_parse_api_details(#[case] site_url: &str) {
         .unwrap()
         .result
         .unwrap_err();
-    println!();
-    assert!(
-        matches!(
-            original_attempt_error,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. }
-        ),
+    assert_eq!(
+        original_attempt_error.has_failed_to_parse_api_details(),
+        Some(true),
         "{:#?}",
         original_attempt_error
     );

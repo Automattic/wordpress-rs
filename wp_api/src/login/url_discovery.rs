@@ -57,6 +57,77 @@ pub struct AutoDiscoveryAttemptResult {
     pub result: Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
 }
 
+#[uniffi::export]
+impl AutoDiscoveryAttemptResult {
+    fn attempt_site_url(&self) -> String {
+        self.attempt_site_url.clone()
+    }
+
+    fn error_message(&self) -> Option<String> {
+        match &self.result {
+            Ok(_) => None,
+            Err(error) => Some(error.error_message()),
+        }
+    }
+
+    fn is_successful(&self) -> bool {
+        self.result.is_ok()
+    }
+
+    fn is_network_error(&self) -> bool {
+        match &self.result {
+            Ok(_) => false,
+            Err(error) => error.is_network_error(),
+        }
+    }
+
+    fn is_original_attempt(&self) -> bool {
+        matches!(self.attempt_type, AutoDiscoveryAttemptType::Original)
+    }
+
+    fn has_failed_to_parse_site_url(&self) -> bool {
+        match &self.result {
+            Ok(success) => false,
+            Err(error) => error.parsed_site_url().is_none(),
+        }
+    }
+
+    fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
+        match &self.result {
+            Ok(success) => Some(false),
+            Err(error) => error.has_failed_to_parse_api_root_url(),
+        }
+    }
+
+    fn has_failed_to_parse_api_details(&self) -> Option<bool> {
+        match &self.result {
+            Ok(success) => Some(false),
+            Err(error) => error.has_failed_to_parse_api_details(),
+        }
+    }
+
+    fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
+        match &self.result {
+            Ok(success) => Some(Arc::new(success.parsed_site_url.clone())),
+            Err(error) => error.parsed_site_url().map(|p| Arc::new(p.clone())),
+        }
+    }
+
+    fn api_root_url(&self) -> Option<Arc<ParsedUrl>> {
+        match &self.result {
+            Ok(success) => Some(Arc::new(success.api_root_url.clone())),
+            Err(error) => error.api_root_url().map(|p| Arc::new(p.clone())),
+        }
+    }
+
+    fn api_details(&self) -> Option<Arc<WpApiDetails>> {
+        match &self.result {
+            Ok(success) => Some(Arc::new(success.api_details.clone())),
+            Err(_) => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct AutoDiscoveryAttemptSuccess {
     pub parsed_site_url: ParsedUrl,
@@ -99,6 +170,88 @@ impl AutoDiscoveryAttemptFailure {
             attempt_type,
             attempt_site_url,
             result: Err(self),
+        }
+    }
+
+    pub fn error_message(&self) -> String {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => error.to_string(),
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl { error, .. } => error.to_string(),
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl { error, .. } => error.to_string(),
+            AutoDiscoveryAttemptFailure::FetchApiDetails { error, .. } => error.to_string(),
+            AutoDiscoveryAttemptFailure::ParseApiDetails { error, .. } => {
+                format!("Failed to parse api details: {:#?}", error)
+            }
+        }
+    }
+
+    pub fn is_network_error(&self) -> bool {
+        match self {
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => true,
+            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => true,
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => false,
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => false,
+            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => false,
+        }
+    }
+
+    pub fn parsed_site_url(&self) -> Option<&ParsedUrl> {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl {
+                parsed_site_url, ..
+            } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl {
+                parsed_site_url, ..
+            } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::FetchApiDetails {
+                parsed_site_url, ..
+            } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::ParseApiDetails {
+                parsed_site_url, ..
+            } => Some(parsed_site_url),
+        }
+    }
+
+    // If it failed while parsing the site url or fetching the api root url, we never tried to
+    // parse it, so we return `None`
+    //
+    // If we fail to parse with `AutoDiscoveryAttemptFailure::ParseApiRootUrl`, we return
+    // `Some(true)`, because that's exactly when the failure happened.
+    //
+    // If an error occurs after parsing the api root url, we return `Some(false)`.
+    pub fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => Some(true),
+            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(false),
+        }
+    }
+
+    pub fn api_root_url(&self) -> Option<&ParsedUrl> {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
+            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
+        }
+    }
+
+    // If it failed while parsing the site url, fetching the api root url, parsing the api root url
+    // or fetching the api details, we never tried to parse it, so we return `None`.
+    //
+    // If we fail to parse with `AutoDiscoveryAttemptFailure::ParseApiDetails`, we return
+    // `Some(true)`, because that's exactly when the failure happened.
+    pub fn has_failed_to_parse_api_details(&self) -> Option<bool> {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(true),
         }
     }
 }
