@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const XCFRAMEWORK_OUTPUT_PATH: &str = "target/libwordpressFFI.xcframework";
-const SWIFT_BINDINGS_HEADER_DIR: &str = "target/swift-bindings/headers";
 const LIBRARY_FILENAME: &str = "libwordpress.a";
 
 fn main() -> Result<()> {
@@ -50,7 +49,6 @@ impl CreateXCFramework {
 // work together to make it easier to create a xcframework.
 struct XCFramework {
     libraries: Vec<LibraryGroup>,
-    headers: PathBuf,
 }
 
 // Represent a group of static libraries that are built for the same platform.
@@ -67,11 +65,6 @@ struct Slice {
 
 impl XCFramework {
     fn new(targets: &Vec<String>, profile: &str) -> Result<Self> {
-        let headers = PathBuf::from(SWIFT_BINDINGS_HEADER_DIR);
-        if !headers.exists() {
-            anyhow::bail!("Headers not found: {}", headers.display())
-        }
-
         let mut groups = HashMap::<LibraryGroupId, LibraryGroup>::new();
         for target in targets {
             let id = LibraryGroupId::from_target(target)?;
@@ -91,15 +84,13 @@ impl XCFramework {
 
         Ok(Self {
             libraries: groups.into_values().collect(),
-            headers,
         })
     }
 
     fn create(&self, temp_dir: &Path) -> Result<PathBuf> {
         self.preview();
 
-        let libraries = self.combine_libraries(temp_dir)?;
-        let temp_dest = self.create_xcframework(&libraries, temp_dir)?;
+        let temp_dest = self.create_xcframework(temp_dir)?;
         self.patch_xcframework(&temp_dest)?;
 
         let dest = PathBuf::from(XCFRAMEWORK_OUTPUT_PATH);
@@ -120,23 +111,27 @@ impl XCFramework {
         }
     }
 
-    fn combine_libraries(&self, temp_dir: &Path) -> Result<Vec<PathBuf>> {
-        self.libraries
-            .iter()
-            .map(|lib| lib.create(temp_dir))
-            .collect()
-    }
-
-    fn create_xcframework(&self, libraries: &[PathBuf], temp_dir: &Path) -> Result<PathBuf> {
+    fn create_xcframework(&self, temp_dir: &Path) -> Result<PathBuf> {
         let temp_dest = temp_dir.join("libwordpressFFI.xcframework");
         std::fs::remove_dir_all(&temp_dest).ok();
 
-        let library_args = libraries.iter().flat_map(|lib| {
+        let library_args: Result<Vec<(PathBuf, PathBuf)>> = self
+            .libraries
+            .iter()
+            .map(|library| {
+                let lib = library.create(temp_dir)?;
+                let header = library.headers_dir()?;
+                Ok((lib, header))
+            })
+            .collect();
+        let library_args = library_args?;
+
+        let library_args = library_args.iter().flat_map(|(lib, headers)| {
             [
                 "-library".as_ref(),
                 lib.as_os_str(),
                 "-headers".as_ref(),
-                self.headers.as_os_str(),
+                headers.as_os_str(),
             ]
         });
         Command::new("xcodebuild")
@@ -157,29 +152,23 @@ impl XCFramework {
             let path = dir_entry.expect("Invalid Path").path();
             if path.is_dir() {
                 let headers_dir = temp_dir.join(&path).join("Headers");
-                let header_path = headers_dir.join("libwordpressFFI.h");
-                let module_path = headers_dir.join("module.modulemap");
+                let non_lib_files: Vec<PathBuf> = std::fs::read_dir(&headers_dir)?
+                    .flat_map(|f| f.ok())
+                    .filter_map(|f| {
+                        if f.path().ends_with(".a") {
+                            None
+                        } else {
+                            Some(f.path())
+                        }
+                    })
+                    .collect();
 
-                let new_headers_dir = temp_dir.join(&path).join("Headers").join("libwordpressFFI");
-
+                let new_headers_dir = headers_dir.join("libwordpressFFI");
                 recreate_directory(&new_headers_dir)?;
 
-                let new_header_path = new_headers_dir.join("libwordpressFFI.h");
-                let new_module_path = new_headers_dir.join("module.modulemap");
-
-                println!(
-                    "Moving: {} -> {}",
-                    header_path.display(),
-                    new_header_path.display()
-                );
-                println!(
-                    "Moving: {} -> {}",
-                    module_path.display(),
-                    new_module_path.display()
-                );
-
-                std::fs::rename(header_path, new_header_path)?;
-                std::fs::rename(module_path, new_module_path)?;
+                for file in non_lib_files {
+                    std::fs::rename(&file, new_headers_dir.join(file.file_name().unwrap()))?;
+                }
             }
         }
 
@@ -207,6 +196,18 @@ impl LibraryGroup {
             .successful_output()?;
 
         Ok(dest)
+    }
+
+    fn headers_dir(&self) -> Result<PathBuf> {
+        let slice = self
+            .slices
+            .first()
+            .with_context(|| "No slices in library group")?;
+        let path = slice.built_product_dir().join("swift-bindings/headers");
+        if !path.exists() {
+            anyhow::bail!("Headers not found: {}", path.display())
+        }
+        Ok(path)
     }
 }
 
@@ -237,7 +238,8 @@ impl Slice {
         Ok(dest)
     }
 
-    fn built_libraries(&self) -> Vec<PathBuf> {
+    /// Returns the directory where the built static libraries are located.
+    fn built_product_dir(&self) -> PathBuf {
         let mut target_dir: PathBuf = ["target", &self.target].iter().collect();
         if self.profile == "dev" {
             target_dir.push("debug");
@@ -245,7 +247,11 @@ impl Slice {
             target_dir.push(&self.profile);
         }
 
-        vec![target_dir.join("libwp_api.a")]
+        target_dir
+    }
+
+    fn built_libraries(&self) -> Vec<PathBuf> {
+        vec![self.built_product_dir().join("libwp_api.a")]
     }
 }
 

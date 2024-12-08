@@ -19,25 +19,9 @@ swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 rust_nightly_toolchain := nightly-2024-04-30
 
-uname := $(shell uname | tr A-Z a-z)
-ifeq ($(uname), linux)
-	dylib_ext := so
-endif
-ifeq ($(uname), darwin)
-	dylib_ext := dylib
-endif
-
 clean:
 	@# Help: Remove untracked files from the project via Git.
 	git clean -ffXd
-
-bindings:
-	rm -rf target/swift-bindings
-	cargo build --release
-
-	#wp_api
-	cargo run --release --bin wp_uniffi_bindgen generate --library ./target/release/libwp_api.$(dylib_ext) --out-dir ./target/swift-bindings --language swift
-	cp target/swift-bindings/wp_api.swift native/swift/Sources/wordpress-api-wrapper/wp_api.swift
 
 .PHONY: docs # Rebuild docs each time we run this command
 docs:
@@ -77,14 +61,6 @@ release-on-ci:
 	@echo "Swift package will be released by https://buildkite.com/automattic/wordpress-rs/builds/$$(jq -r '.number' .build/buildkite_release_job_response.json)"
 	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
 
-# An XCFramework relies on the .h file and the modulemap to interact with the precompiled binary
-xcframework-headers: bindings
-	rm -rvf target/swift-bindings/headers
-	mkdir -p target/swift-bindings/headers
-
-	cp target/swift-bindings/*.h target/swift-bindings/headers
-	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/headers/module.modulemap
-
 apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
 apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
@@ -97,8 +73,10 @@ apple-platform-targets := \
 
 ifeq ($(BUILDKITE), true)
 CARGO_PROFILE ?= release
+CARGO_PROFILE_DIRNAME := release
 else
 CARGO_PROFILE ?= dev
+CARGO_PROFILE_DIRNAME := debug
 endif
 
 cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'profile.$(CARGO_PROFILE).panic="abort"'
@@ -114,8 +92,9 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 	CARGO_OPTS = +$(rust_nightly_toolchain) -Z build-std=panic_abort,std
 
 # Build the library for a specific target
-_build-apple-%: xcframework-headers
+_build-apple-%:
 	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
+	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libwp_api.a
 
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
@@ -153,11 +132,12 @@ xcframework-package-checksum:
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
 
-swift-linux-library: bindings
-	mkdir -p target/swift-bindings/libwordpressFFI-linux
-	cp target/swift-bindings/*.h target/swift-bindings/libwordpressFFI-linux/
-	cp target/swift-bindings/libwordpressFFI.modulemap target/swift-bindings/libwordpressFFI-linux/module.modulemap
-	cp target/release/libwp_api.a target/swift-bindings/libwordpressFFI-linux/
+swift-linux-library:
+	cargo build --release --package wp_api
+	./scripts/swift-bindings.sh target/release/libwp_api.a
+	mkdir -p target/release/libwordpressFFI-linux
+	cp target/release/swift-bindings/Headers/* target/release/libwordpressFFI-linux/
+	cp target/release/libwp_api.a target/release/libwordpressFFI-linux/
 
 swift-example-app: swift-example-app-mac swift-example-app-ios
 
@@ -174,7 +154,7 @@ test-swift-linux: docker-image-swift
 	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
-	swift test -Xlinker -Ltarget/swift-bindings/libwordpressFFI-linux -Xlinker -lwp_api
+	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_api
 
 test-swift-darwin: xcframework
 	swift test
@@ -255,10 +235,6 @@ fmt-rust:
 
 fmt-check-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt --all -- --check"
-
-build-in-docker:
-	$(call bindings)
-	$(docker_build_and_run)
 
 setup-rust:
 	@# Help: Install the necessary Rust toolchains on your development computer (for macOS).
