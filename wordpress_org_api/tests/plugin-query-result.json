@@ -1,0 +1,70 @@
+{
+  "info": { "page": 1, "pages": 27333, "results": 54665 },
+  "plugins": [
+    {
+      "name": "Plugin 1",
+      "slug": "plugin-1",
+      "version": "3.2",
+      "author": "<a href=\"https://author.com/\">Author</a>",
+      "author_profile": "https://profiles.wordpress.org/author/",
+      "requires": "6.3",
+      "tested": "6.7.1",
+      "requires_php": "7.4",
+      "requires_plugins": [],
+      "rating": 92,
+      "ratings": { "5": 5, "4": 4, "3": 3, "2": 2, "1": 1 },
+      "num_ratings": 15,
+      "support_threads": 2,
+      "support_threads_resolved": 9,
+      "active_installs": 100,
+      "downloaded": 514,
+      "last_updated": "2023-11-30 3:00pm GMT",
+      "added": "2023-05-30",
+      "homepage": "https://author.com/plugin-1",
+      "short_description": "A short desc",
+      "description": "A long description",
+      "download_link": "https://downloads.wordpress.org/plugin/1.zip",
+      "tags": {
+        "editor": "editor",
+        "page-builder": "page builder"
+      },
+      "donate_link": "",
+      "icons": {
+        "1x": "https://ps.w.org/plugin/assets/icon-128x128.gif",
+        "2x": "https://ps.w.org/plugin/assets/icon-256x256.gif"
+      }
+    },
+    {
+      "name": "Plugin 2",
+      "slug": "plugin-2",
+      "version": "6.0.1",
+      "author": "<a href=\"https://author.com/\">Author</a>",
+      "author_profile": "https://profiles.wordpress.org/author/",
+      "requires": "6.3",
+      "tested": "6.7.1",
+      "requires_php": "7.4",
+      "requires_plugins": [],
+      "rating": 92,
+      "ratings": { "5": 5, "4": 4, "3": 3, "2": 2, "1": 1 },
+      "num_ratings": 15,
+      "support_threads": 2,
+      "support_threads_resolved": 9,
+      "active_installs": 100,
+      "downloaded": 54,
+      "last_updated": "2022-11-30 3:00pm GMT",
+      "added": "2022-05-30",
+      "homepage": "https://author.com/plugin-2",
+      "short_description": "short",
+      "description": "long",
+      "download_link": "https://downloads.wordpress.org/plugin/2.zip",
+      "tags": {
+        "validation": "validation"
+      },
+      "donate_link": "https://author.com/donate/",
+      "icons": {
+        "1x": "https://ps.w.org/plugin-2/assets/icon.svg",
+        "svg": "https://ps.w.org/plugin-2/assets/icon.svg"
+      }
+    }
+  ]
+}

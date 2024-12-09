@@ -3,22 +3,12 @@ use std::{
     io::{self, Write},
 };
 
-use serde::Deserialize;
 use wordpress_org_api::plugin_directory::*;
 
 async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
-    #[derive(Deserialize, Debug)]
-    struct Response {
-        plugins: Vec<Plugin>,
-    }
-    #[derive(Deserialize, Debug)]
-    struct Plugin {
-        slug: String,
-    }
-
     reqwest::get(url)
         .await?
-        .json::<Response>()
+        .json::<QueryPluginResponse>()
         .await?
         .plugins
         .iter()
@@ -50,8 +40,8 @@ async fn test_parsing_full_plugin_directory() {
             page_size
         );
         let response = reqwest::get(&url).await.unwrap();
-        let json = response.json::<serde_json::Value>().await.unwrap();
-        total_pages = json["info"]["pages"].as_u64().unwrap();
+        let response = response.json::<QueryPluginResponse>().await.unwrap();
+        total_pages = response.info.pages;
     } else {
         println!("Only a small amount of plugins will be fetched.");
         page_size = 10;
