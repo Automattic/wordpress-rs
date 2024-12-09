@@ -14,7 +14,7 @@ async fn test_login_flow_err_parse_api_details(#[case] site_url: &str) {
     let mut result = client.api_discovery(site_url.to_string()).await;
     let original_attempt_error = result
         .attempts
-        .remove(&AutoDiscoveryAttemptType::Original)
+        .remove(&AutoDiscoveryAttemptType::UserInput)
         .unwrap()
         .result
         .unwrap_err();
