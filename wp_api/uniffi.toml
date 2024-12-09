@@ -8,3 +8,4 @@ generate_immutable_records = true
 ffi_module_name = "libwordpressFFI"
 ffi_module_filename = "libwordpressFFI"
 generate_immutable_records = true
+experimental_sendable_value_types = true

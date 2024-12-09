@@ -28,8 +28,8 @@ extension WpNetworkRequest: @unchecked Sendable {}
 extension WpNetworkResponse: @unchecked Sendable {}
 
 // This is only for testing – it's not production-ready
-extension WordPressLoginClient.Error: Equatable {
-    public static func == (lhs: WordPressLoginClient.Error, rhs: WordPressLoginClient.Error) -> Bool {
+extension WordPressLoginClientError: Equatable {
+    public static func == (lhs: WordPressLoginClientError, rhs: WordPressLoginClientError) -> Bool {
         lhs.localizedDescription == rhs.localizedDescription
     }
 }

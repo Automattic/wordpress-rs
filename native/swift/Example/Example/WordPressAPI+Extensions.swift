@@ -2,18 +2,26 @@ import Foundation
 import WordPressAPI
 
 extension WordPressAPI {
+
     static var globalInstance: WordPressAPI {
-        get throws {
-            let loginManager = LoginManager()
+        get async throws {
+            let loginManager = await LoginManager()
 
-            let parsedUrl = try ParsedUrl.parse(input: loginManager.getDefaultSiteUrl()!)
+            guard let defaultSiteUrl = await loginManager.getDefaultSiteUrl() else {
+                throw CocoaError(.validationMissingMandatoryProperty)
+            }
 
-            return try WordPressAPI(
+            let parsedUrl = try ParsedUrl.parse(input: defaultSiteUrl)
+
+            guard let loginCredentials = try await loginManager.getLoginCredentials() else {
+                throw CocoaError(.xpcConnectionInvalid)
+            }
+
+            return WordPressAPI(
                urlSession: .shared,
                baseUrl: parsedUrl,
-               authenticationStategy: loginManager.getLoginCredentials()!
+               authenticationStategy: loginCredentials
            )
         }
     }
-
 }

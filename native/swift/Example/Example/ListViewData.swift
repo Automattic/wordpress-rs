@@ -13,7 +13,7 @@ struct ListViewData: Identifiable, Comparable, Hashable {
     }
 }
 
-protocol ListViewDataConvertable: Identifiable {
+protocol ListViewDataConvertable {
     var asListViewData: ListViewData { get }
 }
 
@@ -44,10 +44,6 @@ extension UserWithEmbedContext: ListViewDataConvertable {
 }
 
 extension PluginWithEditContext: ListViewDataConvertable {
-    public var id: String {
-        self.plugin.slug
-    }
-
     var asListViewData: ListViewData {
         ListViewData(id: self.plugin.slug, title: self.name, subtitle: self.version, fields: [
             "Author": self.author,
@@ -57,10 +53,6 @@ extension PluginWithEditContext: ListViewDataConvertable {
 }
 
 extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
-    public var id: String {
-        self.uuid.uuid
-    }
-
     var creationDateString: String {
         guard let date = Date.fromWordPressDate(self.created) else {
             return self.created
@@ -77,10 +69,6 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
 }
 
 extension SiteHealthTest: ListViewDataConvertable {
-    public var id: String {
-        self.label
-    }
-
     var asListViewData: ListViewData {
         ListViewData(id: self.label, title: self.label, subtitle: self.status, fields: [:])
     }
@@ -118,12 +106,8 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
 }
 
 extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
-    public var id: String {
-        self.slug
-    }
-
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: self.name, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [:])
     }
 }
 
@@ -148,22 +132,14 @@ extension SiteSettingsWithEditContext {
 }
 
 extension PostWithEditContext: ListViewDataConvertable {
-    public var id: String {
-        self.slug
-    }
-
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: self.title.raw, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.title.raw, subtitle: self.slug, fields: [:])
     }
 }
 
-extension MediaWithEditContext: @retroactive Identifiable, ListViewDataConvertable {
-    public var id: String {
-        self.slug
-    }
-
+extension MediaWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.id, title: self.title.raw, subtitle: String(describing: self.mediaDetails), fields: [:])
+        ListViewData(id: self.slug, title: self.title.raw, subtitle: String(describing: self.mediaDetails), fields: [:])
     }
 }
 

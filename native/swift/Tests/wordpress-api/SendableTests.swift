@@ -1,5 +1,10 @@
+import Foundation
 import Testing
 import WordPressAPI
+
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 struct SendableTests {
 

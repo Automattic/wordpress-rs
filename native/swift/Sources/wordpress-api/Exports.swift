@@ -36,6 +36,7 @@ public typealias UserCreateParams = WordPressAPIInternal.UserCreateParams
 public typealias UserDeleteParams = WordPressAPIInternal.UserDeleteParams
 public typealias UserDeleteResponse = WordPressAPIInternal.UserDeleteResponse
 public typealias UsersRequestExecutor = WordPressAPIInternal.UsersRequestExecutor
+extension UsersRequestExecutor: @unchecked Sendable {}
 
 public typealias UsersRequestListWithEditContextResponse = WordPressAPIInternal.UsersRequestListWithEditContextResponse
 public typealias UsersRequestListWithViewContextResponse = WordPressAPIInternal.UsersRequestListWithViewContextResponse
@@ -54,6 +55,7 @@ public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
 public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
+extension PluginsRequestExecutor: @unchecked Sendable {}
 
 // MARK: – Application Passwords
 
@@ -61,6 +63,8 @@ public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicat
 public typealias ApplicationPasswordWithEditContext = WordPressAPIInternal.ApplicationPasswordWithEditContext
 public typealias ApplicationPasswordWithViewContext = WordPressAPIInternal.ApplicationPasswordWithViewContext
 public typealias ApplicationPasswordWithEmbedContext = WordPressAPIInternal.ApplicationPasswordWithEmbedContext
+public typealias ApplicationPasswordsRequestExecutor = WordPressAPIInternal.ApplicationPasswordsRequestExecutor
+extension ApplicationPasswordsRequestExecutor: @unchecked Sendable {}
 
 // MARK: - Site Health Checks
 public typealias SiteHealthTest = WordPressAPIInternal.WpSiteHealthTest
@@ -75,6 +79,8 @@ public typealias PostTypeWithEmbedContext = WordPressAPIInternal.PostTypeDetails
 public typealias PostTypeDetailsWithEditContext = WordPressAPIInternal.PostTypeDetailsWithEditContext
 public typealias PostTypeDetailsWithViewContext = WordPressAPIInternal.PostTypeDetailsWithViewContext
 public typealias PostTypeDetailsWithEmbedContext = WordPressAPIInternal.PostTypeDetailsWithEmbedContext
+public typealias PostTypesRequestExecutor = WordPressAPIInternal.PostTypesRequestExecutor
+extension PostTypesRequestExecutor: @unchecked Sendable {}
 
 // MARK: - Posts
 public typealias SparsePost = WordPressAPIInternal.SparsePost
@@ -83,6 +89,7 @@ public typealias PostWithViewContext = WordPressAPIInternal.PostWithViewContext
 public typealias PostWithEmbedContext = WordPressAPIInternal.PostWithEmbedContext
 public typealias PostListParams = WordPressAPIInternal.PostListParams
 public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
+extension PostsRequestExecutor: @unchecked Sendable {}
 
 public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.PostsRequestListWithEditContextResponse
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
@@ -96,6 +103,7 @@ public typealias MediaWithViewContext = WordPressAPIInternal.MediaWithViewContex
 public typealias MediaWithEmbedContext = WordPressAPIInternal.MediaWithEmbedContext
 public typealias MediaListParams = WordPressAPIInternal.MediaListParams
 public typealias MediaRequestExecutor = WordPressAPIInternal.MediaRequestExecutor
+extension MediaRequestExecutor: @unchecked Sendable {}
 
 public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.MediaRequestListWithEditContextResponse
 public typealias MediaRequestListWithViewContextResponse = WordPressAPIInternal.MediaRequestListWithViewContextResponse
@@ -107,6 +115,13 @@ public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettings
 public typealias SiteSettingsWithViewContext = WordPressAPIInternal.SiteSettingsWithViewContext
 public typealias SiteSettingsWithEmbedContext = WordPressAPIInternal.SiteSettingsWithEmbedContext
 
+// MARK: – Site Settings
+public typealias SiteSettingsRequestExecutor = WordPressAPIInternal.SiteSettingsRequestExecutor
+extension SiteSettingsRequestExecutor: @unchecked Sendable {}
+
+// MARK: – Site Health Tests
+public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteHealthTestsRequestExecutor
+extension WpSiteHealthTestsRequestExecutor: @unchecked Sendable {}
 // swiftlint:enable line_length
 
 #endif

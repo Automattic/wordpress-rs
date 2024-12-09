@@ -19,7 +19,7 @@ struct ExampleApp: App {
                 .map { $0.asListViewData }
         }),
         RootListData(name: "Users", sequence: {
-            let sequence = try WordPressAPI.globalInstance.users.sequenceWithEditContext(params: userListParams)
+            let sequence = try await WordPressAPI.globalInstance.users.sequenceWithEditContext(params: userListParams)
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Plugins", callback: {
@@ -33,11 +33,11 @@ struct ExampleApp: App {
             }
         }),
         RootListData(name: "Posts", sequence: {
-            let sequence = try WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
+            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(params: postListParams)
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Media", sequence: {
-            let sequence = try WordPressAPI.globalInstance.media.sequenceWithEditContext(params: mediaListParams)
+            let sequence = try await WordPressAPI.globalInstance.media.sequenceWithEditContext(params: mediaListParams)
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Site Health Tests", callback: {
