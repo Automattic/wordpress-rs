@@ -8,7 +8,7 @@ let libwordpressFFIVersion: WordPressRSVersion = .local
 #if os(Linux)
 let libwordpressFFI: Target = .systemLibrary(
         name: "libwordpressFFI",
-        path: "target/swift-bindings/libwordpressFFI-linux/"
+        path: "target/release/libwordpressFFI-linux/"
     )
 #elseif os(macOS)
 let libwordpressFFI: Target = libwordpressFFIVersion.target
