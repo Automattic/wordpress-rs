@@ -25,7 +25,7 @@ impl ParsedUrl {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error)]
 pub enum ParseUrlError {
     #[error("Error while parsing url: {}", reason)]
     Generic { reason: String },

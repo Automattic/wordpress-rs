@@ -55,14 +55,18 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
     let result = client.api_discovery(site_url.to_string()).await;
-    let failure_message = format!("Auto discovery failed: {:#?}", result);
-    let successful_attempt = result.find_successful();
-    assert!(successful_attempt.is_some(), "{}", failure_message);
+    assert!(
+        result.is_successful(),
+        "Auto discovery failed: {:#?}",
+        result
+    );
     assert_eq!(
-        successful_attempt
-            .unwrap()
+        result
+            .find_successful()
+            .expect("Already verified that auto discovery is successful")
             .result
-            .unwrap()
+            .clone()
+            .expect("Already verified that auto discovery is successful")
             .api_details
             .find_application_passwords_authentication_url(),
         Some(expected_auth_url.to_string())

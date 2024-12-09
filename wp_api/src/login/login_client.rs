@@ -113,7 +113,7 @@ impl WpLoginClient {
                     return Err(AutoDiscoveryAttemptFailure::ParseApiDetails {
                         parsed_site_url,
                         api_root_url,
-                        error,
+                        parsing_error_message: error.to_string(),
                     })
                 }
             };
