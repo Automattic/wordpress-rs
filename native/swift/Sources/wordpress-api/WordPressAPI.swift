@@ -7,7 +7,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-public struct WordPressAPI: Sendable {
+public actor WordPressAPI {
 
     enum Errors: Error {
         case unableToParseResponse
