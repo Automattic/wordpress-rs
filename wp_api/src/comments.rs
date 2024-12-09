@@ -434,10 +434,12 @@ mod tests {
     #[case(generate!(CommentListParams, (page, Some(2))), "page=2")]
     #[case(generate!(CommentListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(CommentListParams, (search, Some("foo".to_string()))), "search=foo")]
+    #[case(generate!(CommentListParams, (search, Some("foo + bar".to_string()))), "search=foo+%2B+bar")]
     #[case(generate!(CommentListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
     #[case(generate!(CommentListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(CommentListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
     #[case(generate!(CommentListParams, (author_email, Some("foo".to_string()))), "author_email=foo")]
+    #[case(generate!(CommentListParams, (author_email, Some("foo+bar@example.com".to_string()))), "author_email=foo%2Bbar%40example.com")]
     #[case(generate!(CommentListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
     #[case(generate!(CommentListParams, (exclude, vec![CommentId(1), CommentId(2)])), "exclude=1%2C2")]
     #[case(generate!(CommentListParams, (include, vec![CommentId(1), CommentId(2)])), "include=1%2C2")]
@@ -471,7 +473,7 @@ mod tests {
             after: Some("d_a".to_string()),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
-            author_email: Some("a_email".to_string()),
+            author_email: Some("a_email@example.com".to_string()),
             before: Some("d_b".to_string()),
             exclude: vec![CommentId(1111), CommentId(1112)],
             include: vec![CommentId(2111), CommentId(2112)],
@@ -485,7 +487,7 @@ mod tests {
             comment_type: Some(CommentType::Pingback),
             password: Some("p_q".to_string()),
         },
-        "page=11&per_page=22&search=s_q&after=d_a&author=111%2C112&author_exclude=211%2C212&author_email=a_email&before=d_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q"
+        "page=11&per_page=22&search=s_q&after=d_a&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&before=d_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q"
     )]
     #[trace]
     fn test_comment_list_query_pairs(
