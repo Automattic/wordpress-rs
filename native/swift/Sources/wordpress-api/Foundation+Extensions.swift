@@ -17,3 +17,13 @@ public extension Date {
         wordpressDateFormatter.date(from: string)
     }
 }
+
+public extension URL {
+    var schemeAndHost: String? {
+        guard let scheme = self.scheme, let host = self.host else {
+            return nil
+        }
+
+        return scheme.uppercased() + "" + "://" + host
+    }
+}

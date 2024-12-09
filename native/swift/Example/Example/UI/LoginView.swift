@@ -9,13 +9,13 @@ struct LoginView: View {
     private var url: String = ""
 
     @State
-    private var isLoggingIn: Bool = false
+    private var isLoading: Bool = false
 
     @State
     private var loginError: String?
 
     @State
-    private var loginTask: Task<Void, Error>?
+    private var currentTask: Task<Void, Error>?
 
     @Environment(\.webAuthenticationSession)
     private var webAuthenticationSession
@@ -43,14 +43,14 @@ struct LoginView: View {
             #endif
 
             HStack {
-                if isLoggingIn {
+                if isLoading {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .controlSize(.small)
                         .padding()
                 } else {
-                    Button(action: self.startLogin, label: {
-                        Text("Sign In")
+                    Button(action: self.startAutodiscovery, label: {
+                        Text("Next")
                     })
                 }
             }
@@ -58,28 +58,44 @@ struct LoginView: View {
         .padding()
     }
 
-    func startLogin() {
-        self.loginError = nil
-        self.isLoggingIn = true
+    func startAutodiscovery() {
+        self.currentTask = Task {
+            self.isLoading = true
 
-        self.loginTask = Task {
             do {
-                let loginClient = WordPressLoginClient(urlSession: .shared)
-                let loginDetails = try await loginClient.login(
-                    site: url,
-                    appName: "WordPress SDK Example App",
-                    appId: nil
-                )
+                let loginClient = WordPressLoginClient(requestExecutor: URLSession.shared)
+                let loginDetails = await loginClient.autodiscoveryResult(forSite: url)
+                
                 debugPrint(loginDetails)
-                try await loginManager.setLoginCredentials(to: loginDetails)
-            } catch let err {
-                handleLoginError(err)
             }
+
+            self.isLoading = false
         }
     }
 
+    func startLogin() {
+        self.loginError = nil
+        self.isLoading = true
+
+//        self.currentTask = Task {
+//            do {
+////                let loginClient = WordPressLoginClient(requestExecutor: URLSession.shared)
+////                let loginDetails = try await loginClient.login(
+////                    site: url,
+////                    appName: "WordPress SDK Example App",
+////                    appId: nil,
+////                    contextProvider: AuthenticationHelper()
+////                ).get()
+////                debugPrint(loginDetails)
+////                try await loginManager.setLoginCredentials(to: loginDetails)
+//            } catch let err {
+//                handleLoginError(err)
+//            }
+//        }
+    }
+
     private func handleLoginError(_ error: Error) {
-        self.isLoggingIn = false
+        self.isLoading = false
         self.loginError = error.localizedDescription
     }
 }
@@ -88,4 +104,6 @@ class AuthenticationHelper: NSObject, ASWebAuthenticationPresentationContextProv
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         ASPresentationAnchor()
     }
+
+//    LoginView().environmentObject(LoginManager())
 }

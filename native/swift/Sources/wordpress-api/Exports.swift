@@ -20,9 +20,7 @@ public typealias WpNetworkHeaderMap = WordPressAPIInternal.WpNetworkHeaderMap
 
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
-public typealias UrlDiscoveryError = WordPressAPIInternal.UrlDiscoveryError
-public typealias UrlDiscoverySuccess = WordPressAPIInternal.UrlDiscoverySuccess
-public typealias UrlDiscoveryAttemptError = WordPressAPIInternal.UrlDiscoveryAttemptError
+public typealias AutoDiscoveryResult = WordPressAPIInternal.AutoDiscoveryUniffiResult
 
 // MARK: - Users
 
@@ -123,5 +121,7 @@ extension SiteSettingsRequestExecutor: @unchecked Sendable {}
 public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteHealthTestsRequestExecutor
 extension WpSiteHealthTestsRequestExecutor: @unchecked Sendable {}
 // swiftlint:enable line_length
+
+extension AutoDiscoveryResult: @unchecked Sendable {}
 
 #endif
