@@ -168,6 +168,8 @@ pub enum WpErrorCode {
     TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]
     Unauthorized,
+    #[serde(rename = "rest_upload_no_data")]
+    UploadNoData,
     #[serde(rename = "rest_user_cannot_delete")]
     UserCannotDelete,
     #[serde(rename = "rest_user_cannot_view")]
@@ -217,6 +219,26 @@ pub enum WpErrorCode {
     InvalidFeaturedMedia,
     #[serde(rename = "rest_no_authenticated_app_password")]
     NoAuthenticatedAppPassword,
+    #[serde(rename = "rest_no_featured_media")]
+    NoFeaturedMedia,
+    #[serde(rename = "rest_upload_file_error")]
+    UploadFileError,
+    #[serde(rename = "rest_upload_file_too_big")]
+    UploadFileTooBig,
+    #[serde(rename = "rest_upload_hash_mismatch")]
+    UploadHashMismatch,
+    #[serde(rename = "rest_upload_invalid_disposition")]
+    UploadInvalidDisposition,
+    #[serde(rename = "rest_upload_limited_space")]
+    UploadLimitedSpace,
+    #[serde(rename = "rest_upload_no_content_disposition")]
+    UploadNoContentDisposition,
+    #[serde(rename = "rest_upload_no_content_type")]
+    UploadNoContentType,
+    #[serde(rename = "rest_upload_sideload_error")]
+    UploadSideloadError,
+    #[serde(rename = "rest_upload_user_quota_exceeded")]
+    UploadUserQuotaExceeded,
     #[serde(rename = "rest_user_cannot_delete_post")]
     UserCannotDeletePost, // See `rest_cannot_delete` instead
     #[serde(rename = "rest_unknown_attachment")]

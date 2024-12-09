@@ -47,6 +47,8 @@ pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 pub const FIRST_POST_ID: PostId = PostId(1);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
+pub const MEDIA_TEST_FILE_PATH: &str = "../test_media.jpg";
+pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
 pub const CATEGORY_ID_1: CategoryId = CategoryId(1);
 pub const TAG_ID_100: TagId = TagId(100);
 pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
@@ -202,7 +204,7 @@ impl AsyncWpNetworking {
         })
     }
 
-    fn request_method(method: RequestMethod) -> http::Method {
+    pub fn request_method(method: RequestMethod) -> http::Method {
         match method {
             RequestMethod::GET => reqwest::Method::GET,
             RequestMethod::POST => reqwest::Method::POST,
