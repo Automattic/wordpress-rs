@@ -185,6 +185,7 @@ mod tests {
         assert_eq!(plugin_with_variant_types.parsed.author_profile, "");
 
         assert!(plugin_with_expected_types.raw_json["author_profile"].is_string());
+        assert!(!plugin_with_expected_types.parsed.author_profile.is_empty());
     }
 
     #[rstest]
