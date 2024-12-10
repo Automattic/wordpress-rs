@@ -60,6 +60,7 @@ pub struct PluginInformation {
     #[serde(default)]
     pub banners: Banners,
     pub icons: Option<Icons>,
+    #[serde(default)]
     pub preview_link: String,
 }
 
