@@ -314,6 +314,7 @@ mod tests {
         assert!(plugin_with_expected_types.raw_json["banners"].is_object());
     }
 
+    #[test]
     fn test_plugin_query_result() {
         let json_string = include_str!("../tests/plugin-query-result.json");
         let parsed = serde_json::from_str::<QueryPluginResponse>(json_string);
