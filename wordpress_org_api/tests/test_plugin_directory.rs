@@ -86,7 +86,7 @@ async fn test_parsing_full_plugin_directory() {
     println!();
 
     println!("{} query plugins failures:", query_plugins_failures.len());
-    for (url, e) in query_plugins_failures {
+    for (url, e) in &query_plugins_failures {
         println!("  - {:?} : {:?}", url, e);
     }
 
@@ -94,7 +94,10 @@ async fn test_parsing_full_plugin_directory() {
         "{} plugin information failures:",
         plugin_information_failures.len()
     );
-    for (slug, e) in plugin_information_failures {
+    for (slug, e) in &plugin_information_failures {
         println!("  - {:?} : {:?}", slug, e);
     }
+
+    assert!(query_plugins_failures.is_empty());
+    assert!(plugin_information_failures.is_empty())
 }
