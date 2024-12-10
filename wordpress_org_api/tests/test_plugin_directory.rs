@@ -11,8 +11,8 @@ async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
         .json::<QueryPluginResponse>()
         .await?
         .plugins
-        .iter()
-        .map(|p| Ok(p.slug.clone()))
+        .into_iter()
+        .map(|p| Ok(p.slug))
         .collect()
 }
 
