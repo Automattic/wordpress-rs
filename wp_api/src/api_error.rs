@@ -25,7 +25,11 @@ pub enum WpApiError {
     },
     #[error("Media file not found at file path: {}", file_path)]
     MediaFileNotFound { file_path: String },
-    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
+    #[error(
+        "Error while parsing. \nReason: {}\nResponse: {}",
+        reason,
+        maybe_json_response(response)
+    )]
     ResponseParsingError { reason: String, response: String },
     #[error("Error while parsing site url: {}", reason)]
     SiteUrlParsingError { reason: String },
@@ -48,6 +52,13 @@ pub enum WpApiError {
         status_code: u16,
         response: String,
     },
+}
+
+// Pretty print the response as JSON if it can be parsed as such, return as is otherwise
+fn maybe_json_response(response: &String) -> String {
+    serde_json::from_str::<serde_json::Value>(response.as_str())
+        .and_then(|value| serde_json::to_string_pretty(&value))
+        .unwrap_or(response.to_string())
 }
 
 impl ParsedRequestError for WpApiError {
