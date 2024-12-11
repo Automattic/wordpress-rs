@@ -15,6 +15,7 @@ pub struct PluginInformation {
     #[serde(deserialize_with = "deserialize_default_values")]
     pub author_profile: String,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub contributors: HashMap<String, ContributorDetails>,
     #[serde(deserialize_with = "deserialize_default_values")]
     pub requires: String,
@@ -26,6 +27,7 @@ pub struct PluginInformation {
     pub rating: u32,
     pub ratings: Ratings,
     pub num_ratings: u32,
+    #[serde(default)]
     pub support_url: String,
     pub support_threads: u32,
     pub support_threads_resolved: u32,
@@ -33,23 +35,32 @@ pub struct PluginInformation {
     pub last_updated: String,
     pub added: String,
     pub homepage: String,
+    #[serde(default)]
     pub sections: HashMap<String, String>,
     pub download_link: String,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub upgrade_notice: HashMap<String, String>,
+    #[serde(default)]
     pub screenshots: Screenshots,
     #[serde(deserialize_with = "deserialize_default_values")]
     pub tags: HashMap<String, String>,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub versions: HashMap<String, String>,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub business_model: String,
+    #[serde(default)]
     pub repository_url: String,
+    #[serde(default)]
     pub commercial_support_url: String,
     pub donate_link: String,
     #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(default)]
     pub banners: Banners,
     pub icons: Option<Icons>,
+    #[serde(default)]
     pub preview_link: String,
 }
 
@@ -82,6 +93,12 @@ pub enum Screenshots {
     List(Vec<Screenshot>),
 }
 
+impl Default for Screenshots {
+    fn default() -> Self {
+        Screenshots::List(vec![])
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Screenshot {
     pub src: String,
@@ -104,4 +121,205 @@ pub struct Icons {
     pub high: Option<String>,
     pub svg: Option<String>,
     pub default: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct QueryPluginResponse {
+    pub info: QueryPluginResponseInfo,
+    pub plugins: Vec<PluginInformation>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct QueryPluginResponseInfo {
+    pub page: u64,
+    pub pages: u64,
+    pub results: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    struct Plugin {
+        parsed: PluginInformation,
+        raw_json: serde_json::Value,
+    }
+
+    impl Plugin {
+        fn parse(json_string: &str) -> Self {
+            let parsed = serde_json::from_str::<PluginInformation>(json_string);
+            let raw_json = serde_json::from_str(json_string);
+            assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+            assert!(
+                raw_json.is_ok(),
+                "Failed to parse JSON: {:?}",
+                raw_json.err()
+            );
+
+            Self {
+                parsed: parsed.unwrap(),
+                raw_json: raw_json.unwrap(),
+            }
+        }
+    }
+
+    #[fixture]
+    fn plugin_with_variant_types() -> Plugin {
+        let json_string = include_str!("../tests/plugin-with-different-types-of-values.json");
+        Plugin::parse(json_string)
+    }
+
+    #[fixture]
+    fn plugin_with_expected_types() -> Plugin {
+        let json_string = include_str!("../tests/plugin-with-expected-types.json");
+        Plugin::parse(json_string)
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_author_profile(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(plugin_with_variant_types.raw_json["author_profile"], false);
+        assert_eq!(plugin_with_variant_types.parsed.author_profile, "");
+
+        assert!(plugin_with_expected_types.raw_json["author_profile"].is_string());
+        assert!(!plugin_with_expected_types.parsed.author_profile.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_contributors(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(
+            plugin_with_variant_types.raw_json["contributors"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(
+            plugin_with_variant_types.parsed.contributors,
+            HashMap::new()
+        );
+
+        assert!(plugin_with_expected_types.raw_json["contributors"].is_object());
+        assert!(!plugin_with_expected_types.parsed.contributors.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_requires(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(plugin_with_variant_types.raw_json["requires"], false);
+        assert_eq!(plugin_with_variant_types.parsed.requires, "");
+
+        assert!(plugin_with_expected_types.raw_json["requires"].is_string());
+        assert!(!plugin_with_expected_types.parsed.requires.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_tested(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(plugin_with_variant_types.raw_json["tested"], false);
+        assert_eq!(plugin_with_variant_types.parsed.tested, "");
+
+        assert!(plugin_with_expected_types.raw_json["tested"].is_string());
+        assert!(!plugin_with_expected_types.parsed.tested.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_requires_php(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(plugin_with_variant_types.raw_json["requires_php"], false);
+        assert_eq!(plugin_with_variant_types.parsed.requires_php, "");
+
+        assert!(plugin_with_expected_types.raw_json["requires_php"].is_string());
+        assert!(!plugin_with_expected_types.parsed.requires_php.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_upgrade_notice(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(
+            plugin_with_variant_types.raw_json["upgrade_notice"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(
+            plugin_with_variant_types.parsed.upgrade_notice,
+            HashMap::new()
+        );
+
+        assert!(plugin_with_expected_types.raw_json["upgrade_notice"].is_object());
+        assert!(!plugin_with_expected_types.parsed.upgrade_notice.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_tags(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(
+            plugin_with_variant_types.raw_json["tags"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(plugin_with_variant_types.parsed.tags, HashMap::new());
+
+        assert!(plugin_with_expected_types.raw_json["tags"].is_object());
+        assert!(!plugin_with_expected_types.parsed.tags.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_versions(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(
+            plugin_with_variant_types.raw_json["versions"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(plugin_with_variant_types.parsed.versions, HashMap::new());
+
+        assert!(plugin_with_expected_types.raw_json["versions"].is_object());
+        assert!(!plugin_with_expected_types.parsed.versions.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_business_model(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(plugin_with_variant_types.raw_json["business_model"], false);
+        assert_eq!(plugin_with_variant_types.parsed.business_model, "");
+
+        assert!(plugin_with_expected_types.raw_json["business_model"].is_string());
+        assert!(!plugin_with_expected_types.parsed.business_model.is_empty());
+    }
+
+    #[rstest]
+    fn test_plugin_with_different_types_of_banners(
+        plugin_with_variant_types: Plugin,
+        plugin_with_expected_types: Plugin,
+    ) {
+        assert_eq!(
+            plugin_with_variant_types.raw_json["banners"].as_array(),
+            Some(vec![]).as_ref()
+        );
+        assert_eq!(plugin_with_variant_types.parsed.banners, Banners::default());
+
+        assert!(plugin_with_expected_types.raw_json["banners"].is_object());
+    }
+
+    #[test]
+    fn test_plugin_query_result() {
+        let json_string = include_str!("../tests/plugin-query-result.json");
+        let parsed = serde_json::from_str::<QueryPluginResponse>(json_string);
+        assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+    }
 }

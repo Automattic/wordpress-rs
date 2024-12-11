@@ -7,7 +7,7 @@ docker_container_repo_dir=/app
 rust_docker_container := public.ecr.aws/docker/library/rust:1.80
 
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
-rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e CARGO_HOME=/app/.cargo $(rust_docker_container)
+rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e TEST_ALL_PLUGINS -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
 
 swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
@@ -184,8 +184,7 @@ test-rust-integration:
 	docker exec -i wordpress /bin/bash < ./scripts/run-rust-integration-tests.sh
 
 test-rust-integration-wordpress-org-api:
-	@test -d target/wordpress-org-plugin-directory || ./scripts/plugin-directory.sh download_from_s3
-	$(rust_docker_run) cargo test --package wordpress_org_api
+	$(rust_docker_run) cargo test --package wordpress_org_api -- --nocapture
 
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
