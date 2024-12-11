@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::de::deserialize_default_values;
+use super::de::deserialize_default_values;
 
 #[derive(Deserialize, Debug)]
 pub struct PluginInformation {
@@ -166,13 +166,15 @@ mod tests {
 
     #[fixture]
     fn plugin_with_variant_types() -> Plugin {
-        let json_string = include_str!("../tests/plugin-with-different-types-of-values.json");
+        let json_string =
+            include_str!("../../tests/plugin-directory/plugin-with-different-types-of-values.json");
         Plugin::parse(json_string)
     }
 
     #[fixture]
     fn plugin_with_expected_types() -> Plugin {
-        let json_string = include_str!("../tests/plugin-with-expected-types.json");
+        let json_string =
+            include_str!("../../tests/plugin-directory/plugin-with-expected-types.json");
         Plugin::parse(json_string)
     }
 
@@ -318,7 +320,7 @@ mod tests {
 
     #[test]
     fn test_plugin_query_result() {
-        let json_string = include_str!("../tests/plugin-query-result.json");
+        let json_string = include_str!("../../tests/plugin-directory/plugin-query-result.json");
         let parsed = serde_json::from_str::<QueryPluginResponse>(json_string);
         assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
     }

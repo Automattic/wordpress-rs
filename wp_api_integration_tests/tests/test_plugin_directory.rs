@@ -3,7 +3,7 @@ use std::{
     io::{self, Write},
 };
 
-use wordpress_org_api::plugin_directory::*;
+use wp_api::wordpress_org::plugin_directory::*;
 
 async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
     reqwest::get(url)
