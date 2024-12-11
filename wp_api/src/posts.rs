@@ -530,6 +530,12 @@ impl FromStr for PostId {
     }
 }
 
+impl std::fmt::Display for PostId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl_as_query_value_for_new_type!(TagId);
 uniffi::custom_newtype!(TagId, i64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -553,12 +559,6 @@ impl FromStr for CategoryId {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for PostId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 

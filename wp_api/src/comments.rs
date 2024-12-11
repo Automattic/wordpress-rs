@@ -74,6 +74,12 @@ impl FromStr for CommentId {
     }
 }
 
+impl std::fmt::Display for CommentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(
     Debug,
     Default,
@@ -301,6 +307,19 @@ impl FromUrlQueryPairs for CommentListParams {
 
     fn supports_pagination() -> bool {
         true
+    }
+}
+
+#[derive(Debug, Default, uniffi::Record)]
+pub struct CommentRetrieveParams {
+    /// The password for the parent post of the comment (if the post is password protected).
+    #[uniffi(default = None)]
+    pub password: Option<String>,
+}
+
+impl AppendUrlQueryPairs for CommentRetrieveParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_option_query_value_pair("password", self.password.as_ref());
     }
 }
 
