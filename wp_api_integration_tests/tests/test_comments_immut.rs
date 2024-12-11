@@ -7,6 +7,7 @@ use wp_api::comments::{
     WpApiParamCommentsOrderBy,
 };
 use wp_api::posts::PostId;
+use wp_api::users::UserAvatarSize;
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
     api_client, AssertResponse, FIRST_USER_EMAIL, FIRST_USER_ID, SECOND_USER_ID,
@@ -72,6 +73,38 @@ async fn paginate_list_comments_with_edit_context(#[case] params: CommentListPar
         .await
         .assert_response();
     assert!(!prev_page_response.data.is_empty());
+}
+
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(true, CommentListParams { comment_type: Some(CommentType::Comment), ..Default::default() })]
+#[case(false, CommentListParams { comment_type: Some(CommentType::Pingback), ..Default::default() })]
+#[case(false, CommentListParams { comment_type: Some(CommentType::Trackback), ..Default::default() })]
+#[ignore]
+async fn list_comments_with_edit_context_parse_author_avatar_urls(
+    #[case] size_24_included: bool,
+    #[case] params: CommentListParams,
+) {
+    api_client()
+        .comments()
+        .list_with_view_context(&params)
+        .await
+        .assert_response()
+        .data
+        .into_iter()
+        .for_each(|mut c| {
+            assert_eq!(
+                size_24_included,
+                c.author_avatar_urls
+                    .remove(&UserAvatarSize::Size24)
+                    .unwrap()
+                    .0
+                    .is_some(),
+                "{:#?}",
+                c.author_avatar_urls
+            )
+        });
 }
 
 #[template]

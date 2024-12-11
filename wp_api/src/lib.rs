@@ -137,6 +137,27 @@ pub enum JsonValue {
     Object(HashMap<String, JsonValue>),
 }
 
+uniffi::custom_newtype!(WpResponseString, Option<String>);
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(from = "BoolOrString")]
+pub struct WpResponseString(pub Option<String>);
+
+impl From<BoolOrString> for WpResponseString {
+    fn from(value: BoolOrString) -> Self {
+        match value {
+            BoolOrString::Bool(_) => Self(None),
+            BoolOrString::String(s) => Self(Some(s)),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum BoolOrString {
+    Bool(bool),
+    String(String),
+}
+
 #[macro_export]
 macro_rules! generate {
     ($type_name:ident) => {
