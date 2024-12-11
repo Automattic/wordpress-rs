@@ -252,7 +252,7 @@ mod filter {
     #[case(&[SparseCommentFieldWithEditContext::Id, SparseCommentFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
-    async fn filter_comment_with_edit_context(
+    async fn filter_comments_with_edit_context(
         #[case] fields: &[SparseCommentFieldWithEditContext],
         #[values(
             CommentListParams::default(),
@@ -273,11 +273,31 @@ mod filter {
             });
     }
 
+    #[apply(sparse_comment_field_with_edit_context_test_cases)]
+    #[case(&[SparseCommentFieldWithEditContext::Id, SparseCommentFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_comments_with_edit_context(
+        #[case] fields: &[SparseCommentFieldWithEditContext],
+    ) {
+        let comment = api_client()
+            .comments()
+            .filter_retrieve_with_edit_context(
+                &FIRST_COMMENT_ID,
+                &CommentRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data;
+        comment.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
     #[apply(sparse_comment_field_with_embed_context_test_cases)]
     #[case(&[SparseCommentFieldWithEmbedContext::Id, SparseCommentFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
-    async fn filter_comment_with_embed_context(
+    async fn filter_comments_with_embed_context(
         #[case] fields: &[SparseCommentFieldWithEmbedContext],
         #[values(
             CommentListParams::default(),
@@ -298,11 +318,31 @@ mod filter {
             });
     }
 
+    #[apply(sparse_comment_field_with_embed_context_test_cases)]
+    #[case(&[SparseCommentFieldWithEmbedContext::Id, SparseCommentFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_comments_with_embed_context(
+        #[case] fields: &[SparseCommentFieldWithEmbedContext],
+    ) {
+        let comment = api_client()
+            .comments()
+            .filter_retrieve_with_embed_context(
+                &FIRST_COMMENT_ID,
+                &CommentRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data;
+        comment.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
     #[apply(sparse_comment_field_with_view_context_test_cases)]
     #[case(&[SparseCommentFieldWithViewContext::Id, SparseCommentFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
-    async fn filter_comment_with_view_context(
+    async fn filter_comments_with_view_context(
         #[case] fields: &[SparseCommentFieldWithViewContext],
         #[values(
             CommentListParams::default(),
@@ -321,5 +361,25 @@ mod filter {
             .for_each(|comment| {
                 comment.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_comment_field_with_view_context_test_cases)]
+    #[case(&[SparseCommentFieldWithViewContext::Id, SparseCommentFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_comments_with_view_context(
+        #[case] fields: &[SparseCommentFieldWithViewContext],
+    ) {
+        let comment = api_client()
+            .comments()
+            .filter_retrieve_with_view_context(
+                &FIRST_COMMENT_ID,
+                &CommentRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data;
+        comment.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }
