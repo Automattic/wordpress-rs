@@ -5,7 +5,7 @@ use std::sync::Arc;
 use wp_serde_helper::deserialize_i64_or_string;
 
 pub use login_client::WpLoginClient;
-pub use url_discovery::{UrlDiscoveryState, UrlDiscoverySuccess};
+pub use url_discovery::{UrlDiscoveryError, UrlDiscoveryState, UrlDiscoverySuccess};
 
 use crate::ParsedUrl;
 use crate::WpUuid;
