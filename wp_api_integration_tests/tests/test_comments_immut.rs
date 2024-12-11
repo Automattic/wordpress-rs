@@ -2,15 +2,16 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::comments::{
-    CommentId, CommentListParams, CommentStatus, CommentType, SparseCommentFieldWithEditContext,
-    SparseCommentFieldWithEmbedContext, SparseCommentFieldWithViewContext,
-    WpApiParamCommentsOrderBy,
+    CommentId, CommentListParams, CommentRetrieveParams, CommentStatus, CommentType,
+    SparseCommentFieldWithEditContext, SparseCommentFieldWithEmbedContext,
+    SparseCommentFieldWithViewContext, WpApiParamCommentsOrderBy,
 };
 use wp_api::posts::PostId;
 use wp_api::users::UserAvatarSize;
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, FIRST_USER_EMAIL, FIRST_USER_ID, SECOND_USER_ID,
+    api_client, AssertResponse, TestCredentials, FIRST_COMMENT_ID, FIRST_USER_EMAIL, FIRST_USER_ID,
+    SECOND_USER_ID,
 };
 
 #[tokio::test]
@@ -44,6 +45,111 @@ async fn list_with_view_context(#[case] params: CommentListParams) {
         .list_with_view_context(&params)
         .await
         .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .comments()
+        .retrieve_with_edit_context(&FIRST_COMMENT_ID, &CommentRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context(#[case] params: CommentRetrieveParams) {
+    api_client()
+        .comments()
+        .retrieve_with_embed_context(&FIRST_COMMENT_ID, &CommentRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context(#[case] params: CommentRetrieveParams) {
+    api_client()
+        .comments()
+        .retrieve_with_view_context(&FIRST_COMMENT_ID, &CommentRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_edit_context() {
+    let test_credentials = TestCredentials::instance();
+    let comment = api_client()
+        .comments()
+        .retrieve_with_edit_context(
+            &CommentId(test_credentials.password_protected_comment_id),
+            &CommentRetrieveParams {
+                password: Some(
+                    test_credentials
+                        .password_protected_post_password
+                        .to_string(),
+                ),
+            },
+        )
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(
+        comment.author_name,
+        test_credentials.password_protected_comment_author
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_embed_context() {
+    let test_credentials = TestCredentials::instance();
+    let comment = api_client()
+        .comments()
+        .retrieve_with_embed_context(
+            &CommentId(test_credentials.password_protected_comment_id),
+            &CommentRetrieveParams {
+                password: Some(
+                    test_credentials
+                        .password_protected_post_password
+                        .to_string(),
+                ),
+            },
+        )
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(
+        comment.author_name,
+        test_credentials.password_protected_comment_author
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_password_protected_with_view_context() {
+    let test_credentials = TestCredentials::instance();
+    let comment = api_client()
+        .comments()
+        .retrieve_with_view_context(
+            &CommentId(test_credentials.password_protected_comment_id),
+            &CommentRetrieveParams {
+                password: Some(
+                    test_credentials
+                        .password_protected_post_password
+                        .to_string(),
+                ),
+            },
+        )
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(
+        comment.author_name,
+        test_credentials.password_protected_comment_author
+    );
 }
 
 #[tokio::test]

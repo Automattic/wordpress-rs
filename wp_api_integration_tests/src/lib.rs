@@ -3,6 +3,7 @@ use http::{HeaderMap, HeaderValue};
 use reqwest::multipart::Part;
 use std::sync::Arc;
 use wp_api::{
+    comments::CommentId,
     media::MediaId,
     posts::{CategoryId, PostId, TagId},
     request::{
@@ -31,6 +32,8 @@ pub struct TestCredentials {
     pub password_protected_post_id: i64,
     pub password_protected_post_password: &'static str,
     pub password_protected_post_title: &'static str,
+    pub password_protected_comment_id: i64,
+    pub password_protected_comment_author: &'static str,
     pub trashed_post_id: i64,
 }
 
@@ -45,6 +48,7 @@ pub const SECOND_USER_SLUG: &str = "themedemos";
 pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
+pub const FIRST_COMMENT_ID: CommentId = CommentId(1);
 pub const FIRST_POST_ID: PostId = PostId(1);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test_media.jpg";
