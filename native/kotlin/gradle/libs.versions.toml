@@ -22,7 +22,7 @@ okHttp = "4.12.0"
 navigation = "2.8.4"
 navigationCompose = "2.8.0-alpha10"
 publish-to-s3-plugin = "0.10.0"
-rust-android-plugin = "0.9.4"
+rust-android-plugin = "0.9.5"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
