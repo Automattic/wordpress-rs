@@ -81,7 +81,6 @@ async fn paginate_list_comments_with_edit_context(#[case] params: CommentListPar
 #[case(true, CommentListParams { comment_type: Some(CommentType::Comment), ..Default::default() })]
 #[case(false, CommentListParams { comment_type: Some(CommentType::Pingback), ..Default::default() })]
 #[case(false, CommentListParams { comment_type: Some(CommentType::Trackback), ..Default::default() })]
-#[ignore]
 async fn list_comments_with_edit_context_parse_author_avatar_urls(
     #[case] size_24_included: bool,
     #[case] params: CommentListParams,
