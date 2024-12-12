@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use wp_serde_helper::deserialize_i64_or_string;
 
-use crate::run_wp_cli_command;
+use crate::{run_wp_cli_command, AsWpCliArguments};
 
 const COMMENT_FIELDS_ARG: &str = "--fields=comment_ID,comment_post_ID,comment_author,comment_author_email,comment_author_url,comment_author_IP,comment_date,comment_date_gmt,comment_content,comment_karma,comment_approved,comment_agent,comment_type,comment_parent,user_id";
 
@@ -11,21 +13,13 @@ pub struct WpCliCommentListArguments {
     pub comment_status: Option<String>,
 }
 
-impl WpCliCommentListArguments {
+impl AsWpCliArguments for WpCliCommentListArguments {
     fn as_wp_cli_arguments(&self) -> Option<String> {
-        let mut s = String::new();
-        Self::add_field_arg(&mut s, "status", self.comment_status.as_ref());
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
+        let mut map = HashMap::new();
+        if let Some(comment_status) = &self.comment_status {
+            map.insert("status", comment_status);
         }
-    }
-
-    fn add_field_arg(args: &mut String, field_name: &str, field: Option<&String>) {
-        if let Some(f) = field {
-            args.push_str(format!("--{}={}", field_name, f).as_str());
-        }
+        map.as_wp_cli_arguments()
     }
 }
 
