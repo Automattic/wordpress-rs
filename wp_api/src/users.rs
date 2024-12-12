@@ -11,7 +11,7 @@ use crate::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, OptionFromStr, WpApiParamOrder,
+    EnumFromStrParsingError, OptionFromStr, WpApiParamOrder, WpResponseString,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -129,6 +129,21 @@ impl Display for WpApiParamUsersHasPublishedPosts {
             },
         )
     }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum UserAvatarSize {
+    #[serde(rename = "24")]
+    Size24,
+    #[serde(rename = "48")]
+    Size48,
+    #[serde(rename = "96")]
+    Size96,
+    #[serde(untagged)]
+    Custom(String),
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -471,7 +486,7 @@ pub struct SparseUser {
     // According to our tests, `avatar_urls` is not available for all site types. It's marked with
     // `#[WpContextual]` which will make it an `Option` in the generated contextual types.
     #[WpContextualOption]
-    pub avatar_urls: Option<HashMap<String, String>>,
+    pub avatar_urls: Option<HashMap<UserAvatarSize, WpResponseString>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/57
 }
 

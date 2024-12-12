@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
@@ -11,7 +11,7 @@ use crate::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, UserId, WpApiParamOrder,
+    EnumFromStrParsingError, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -339,7 +339,7 @@ pub struct SparseComment {
     #[WpContext(edit, embed, view)]
     pub comment_type: Option<CommentType>,
     #[WpContext(edit, embed, view)]
-    pub author_avatar_urls: Option<CommentAuthorAvatarUrls>,
+    pub author_avatar_urls: Option<HashMap<UserAvatarSize, WpResponseString>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
 }
 
@@ -349,16 +349,6 @@ pub struct SparseCommentContent {
     pub raw: Option<String>,
     #[WpContext(edit, view, embed)]
     pub rendered: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct CommentAuthorAvatarUrls {
-    #[serde(rename = "24")]
-    pub size_24: CommentAuthorAvatarUrlSize,
-    #[serde(rename = "48")]
-    pub size_48: CommentAuthorAvatarUrlSize,
-    #[serde(rename = "96")]
-    pub size_96: CommentAuthorAvatarUrlSize,
 }
 
 #[derive(
