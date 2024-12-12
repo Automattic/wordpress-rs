@@ -139,14 +139,41 @@ pub enum JsonValue {
 
 uniffi::custom_newtype!(WpResponseString, Option<String>);
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(from = "BoolOrString")]
+#[serde(try_from = "BoolOrString")]
 pub struct WpResponseString(pub Option<String>);
 
-impl From<BoolOrString> for WpResponseString {
-    fn from(value: BoolOrString) -> Self {
+// In some cases, WordPress API may return a different type for a field than expected. One example,
+// is when a `false` boolean value is returned when a `String` is expected.
+//
+// We handle these issues by deserializing them into some expected combinations, such as
+// `BoolOrString` and then map them into a new type that wraps the original type. For example,
+// `WpResponseString` is a new type for `Option<String>`, that uses `BoolOrString` to deserialize.
+//
+// During this conversion, there may be some values that are not clear how they should be mapped.
+// For example, when we are expecting a `String` field, if we get a `false` value, we can assume
+// that it's `null`, but there isn't a clear conversion for the `true` value, so we return an
+// error.
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum WpApiNewtypeParsingError {
+    #[error("Expecting a `String` value for this field, but received the boolean `true` instead")]
+    BooleanTrueIsReturnedWhenStringIsExpected,
+}
+
+impl TryFrom<BoolOrString> for WpResponseString {
+    type Error = WpApiNewtypeParsingError;
+
+    fn try_from(value: BoolOrString) -> Result<Self, Self::Error> {
         match value {
-            BoolOrString::Bool(_) => Self(None),
-            BoolOrString::String(s) => Self(Some(s)),
+            BoolOrString::Bool(b) => {
+                // When we are expecting a `String`, we can assume `false` means `null`, but there
+                // isn't a clear conversion for `true`, so we return an error.
+                if b {
+                    Err(WpApiNewtypeParsingError::BooleanTrueIsReturnedWhenStringIsExpected)
+                } else {
+                    Ok(Self(None))
+                }
+            }
+            BoolOrString::String(s) => Ok(Self(Some(s))),
         }
     }
 }
