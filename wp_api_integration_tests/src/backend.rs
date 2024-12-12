@@ -27,12 +27,20 @@ impl Backend {
             BACKEND_PATH_COMMENT, comment_id
         ))
         .await
-        .expect("Failed to parse fetched post from wp_cli")
+        .expect("Failed to parse fetched comment from wp_cli")
     }
-    pub async fn comments() -> Vec<WpCliComment> {
-        Self::get(BACKEND_PATH_COMMENTS)
+    pub async fn comments(comment_status: Option<&str>) -> Vec<WpCliComment> {
+        let url = if let Some(comment_status) = comment_status {
+            format!(
+                "{}?comment_status={}",
+                BACKEND_PATH_COMMENTS, comment_status
+            )
+        } else {
+            BACKEND_PATH_COMMENTS.to_string()
+        };
+        Self::get(url)
             .await
-            .expect("Failed to parse fetched users from wp_cli")
+            .expect("Failed to parse fetched comments from wp_cli")
     }
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await

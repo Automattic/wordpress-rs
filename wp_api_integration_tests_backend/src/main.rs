@@ -6,7 +6,8 @@ use std::fs::metadata;
 use std::io;
 use std::path::Path;
 use wp_cli::{
-    WpCliComment, WpCliPost, WpCliPostListArguments, WpCliSiteSettings, WpCliUser, WpCliUserMeta,
+    WpCliComment, WpCliCommentListArguments, WpCliPost, WpCliPostListArguments, WpCliSiteSettings,
+    WpCliUser, WpCliUserMeta,
 };
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
@@ -24,9 +25,9 @@ fn wp_cli_comment(comment_id: i64) -> Result<Json<WpCliComment>, Error> {
         .map_err(|e| Error::AsString(e.to_string()))
 }
 
-#[get("/comments")]
-fn wp_cli_comments() -> Result<Json<Vec<WpCliComment>>, Error> {
-    WpCliComment::list()
+#[get("/comments?<comment_status>")]
+fn wp_cli_comments(comment_status: Option<String>) -> Result<Json<Vec<WpCliComment>>, Error> {
+    WpCliComment::list(Some(WpCliCommentListArguments { comment_status }))
         .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
