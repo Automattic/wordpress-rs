@@ -8,7 +8,6 @@ members = [
   "wp_derive_request_builder",
   "wp_serde_helper",
   "wp_uniffi_bindgen",
-  "wordpress_org_api",
   "xcframework",
 ]
 resolver = "2"

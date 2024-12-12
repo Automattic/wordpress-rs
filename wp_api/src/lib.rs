@@ -29,6 +29,7 @@ pub mod request;
 pub mod site_settings;
 pub mod url_query;
 pub mod users;
+pub mod wordpress_org;
 pub mod wp_site_health_tests;
 
 #[cfg(test)]
