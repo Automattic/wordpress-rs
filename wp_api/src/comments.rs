@@ -323,7 +323,7 @@ impl AppendUrlQueryPairs for CommentRetrieveParams {
     }
 }
 
-#[derive(Debug, uniffi::Record)]
+#[derive(Debug, Default, uniffi::Record)]
 pub struct CommentDeleteParams {
     /// The password for the parent post of the comment (if the post is password protected).
     #[uniffi(default = None)]
