@@ -38,7 +38,7 @@ class MediaEndpointTest {
 
     @Test
     fun testFilterMediaListRequest() = runTest {
-        val postList = client.request { requestBuilder ->
+        val mediaList = client.request { requestBuilder ->
             requestBuilder.media().filterListWithEditContext(
                 params = MediaListParams(),
                 fields = listOf(
@@ -47,8 +47,8 @@ class MediaEndpointTest {
                 )
             )
         }.assertSuccessAndRetrieveData().data
-        assert(postList.isNotEmpty())
-        assertNull(postList.first().slug)
+        assert(mediaList.isNotEmpty())
+        assertNull(mediaList.first().slug)
     }
 
     @Test
