@@ -6,7 +6,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use super::de::deserialize_default_values;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Record)]
 pub struct PluginInformation {
     pub name: String,
     pub slug: String,
@@ -64,14 +64,14 @@ pub struct PluginInformation {
     pub preview_link: String,
 }
 
-#[derive(Deserialize, Debug, Eq, PartialEq)]
+#[derive(Deserialize, Debug, Eq, PartialEq, uniffi::Record)]
 pub struct ContributorDetails {
     pub profile: String,
     pub avatar: String,
     pub display_name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Record)]
 pub struct Ratings {
     #[serde(rename = "5")]
     pub five_star: u32,
@@ -86,7 +86,7 @@ pub struct Ratings {
 }
 
 /// https://developer.wordpress.org/plugins/wordpress-org/plugin-assets/#screenshots
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Enum)]
 #[serde(untagged)]
 pub enum Screenshots {
     Named(HashMap<String, Screenshot>),
@@ -99,13 +99,13 @@ impl Default for Screenshots {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Record)]
 pub struct Screenshot {
     pub src: String,
     pub caption: String,
 }
 
-#[derive(Deserialize, Debug, Eq, PartialEq, Default)]
+#[derive(Deserialize, Debug, Eq, PartialEq, Default, uniffi::Record)]
 pub struct Banners {
     #[serde(deserialize_with = "deserialize_default_values")]
     pub low: String,
@@ -113,7 +113,7 @@ pub struct Banners {
     pub high: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Record)]
 pub struct Icons {
     #[serde(rename = "1x")]
     pub low: Option<String>,
@@ -123,13 +123,13 @@ pub struct Icons {
     pub default: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Record)]
 pub struct QueryPluginResponse {
     pub info: QueryPluginResponseInfo,
     pub plugins: Vec<PluginInformation>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, uniffi::Record)]
 pub struct QueryPluginResponseInfo {
     pub page: u64,
     pub pages: u64,
