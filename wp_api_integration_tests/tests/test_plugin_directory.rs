@@ -6,7 +6,7 @@ use std::{
 
 use wp_api::{
     request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
-    wordpress_org::client::WordPressOrgApiClient,
+    wordpress_org::client::{WordPressOrgApiClient, WordPressOrgApiPluginDirectoryCategory},
     RequestExecutionError,
 };
 
@@ -89,7 +89,7 @@ async fn test_parsing_full_plugin_directory() {
     if env::var("TEST_ALL_PLUGINS").is_ok() {
         println!("Checking how many pages to fetch...");
         page_size = 200;
-        let response = client.list_plugins(1, 200).await.unwrap();
+        let response = client.browse_plugins(None, 1, page_size).await.unwrap();
         total_pages = response.info.pages;
     } else {
         println!("Only a small amount of plugins will be fetched.");
@@ -101,7 +101,7 @@ async fn test_parsing_full_plugin_directory() {
     let mut all_slugs: Vec<String> = Vec::new();
     for page in 1..=total_pages {
         let slugs: Result<Vec<_>, _> = client
-            .list_plugins(page, page_size)
+            .browse_plugins(None, page, page_size)
             .await
             .map(|r| r.plugins.into_iter().map(|p| p.slug).collect());
         match slugs {
@@ -148,4 +148,35 @@ async fn test_parsing_full_plugin_directory() {
 
     assert!(query_plugins_failures.is_empty());
     assert!(plugin_information_failures.is_empty())
+}
+
+#[tokio::test]
+#[rstest::rstest]
+#[case(WordPressOrgApiPluginDirectoryCategory::New)]
+#[case(WordPressOrgApiPluginDirectoryCategory::Popular)]
+#[case(WordPressOrgApiPluginDirectoryCategory::Updated)]
+#[case(WordPressOrgApiPluginDirectoryCategory::TopRated)]
+async fn test_browse_plugins(#[case] category: WordPressOrgApiPluginDirectoryCategory) {
+    let client = wordpress_org_api_client();
+    let response = client.browse_plugins(Some(category), 1, 30).await;
+    assert!(response.is_ok());
+    assert!(!response.unwrap().plugins.is_empty());
+}
+
+#[tokio::test]
+async fn test_search_plugins() {
+    let client = wordpress_org_api_client();
+    let response = client
+        .search_plugins("jetpack-social".to_string(), 1, 30)
+        .await;
+    assert!(response.is_ok());
+
+    let slugs = response
+        .unwrap()
+        .plugins
+        .into_iter()
+        .map(|plugin| plugin.slug)
+        .collect::<Vec<_>>();
+    println!("{:?}", slugs);
+    assert!(slugs.contains(&"jetpack-social".to_string()));
 }

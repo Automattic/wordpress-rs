@@ -33,12 +33,55 @@ impl WordPressOrgApiClient {
         Self::parse(response)
     }
 
-    pub async fn list_plugins(&self, page: u64, page_size: u64) -> Result<QueryPluginResponse> {
+    pub async fn browse_plugins(
+        &self,
+        category: Option<WordPressOrgApiPluginDirectoryCategory>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<QueryPluginResponse> {
+        self.query_plugins(page, page_size, |url| match category {
+            Some(category) => {
+                let mut url = url;
+                url.query_pairs_mut()
+                    .append_pair("browse", category.as_str());
+                url
+            }
+            None => url,
+        })
+        .await
+    }
+
+    pub async fn search_plugins(
+        &self,
+        search: String,
+        page: u64,
+        page_size: u64,
+    ) -> Result<QueryPluginResponse> {
+        self.query_plugins(page, page_size, |url| {
+            let mut url = url;
+            url.query_pairs_mut().append_pair("search", &search);
+            url
+        })
+        .await
+    }
+}
+
+impl WordPressOrgApiClient {
+    async fn query_plugins<F>(
+        &self,
+        page: u64,
+        page_size: u64,
+        url_builder: F,
+    ) -> Result<QueryPluginResponse>
+    where
+        F: FnOnce(Url) -> Url,
+    {
         let mut url = Self::plugin_info_api_url();
         url.query_pairs_mut()
             .append_pair("action", "query_plugins")
-            .append_pair("request[page]", &page.to_string())
-            .append_pair("request[per_page]", &page_size.to_string());
+            .append_pair("page", &page.to_string())
+            .append_pair("per_page", &page_size.to_string());
+        let url = url_builder(url);
         let request = WpNetworkRequest::get(WpEndpointUrl(url.to_string()));
         let response = self.request_executor.execute(Arc::new(request)).await?;
         Self::parse(response)
@@ -65,6 +108,25 @@ impl WordPressOrgApiClient {
                 status_code: response.status_code,
                 response: String::from_utf8_lossy(&response.body).to_string(),
             }),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum WordPressOrgApiPluginDirectoryCategory {
+    New,
+    Popular,
+    Updated,
+    TopRated,
+}
+
+impl WordPressOrgApiPluginDirectoryCategory {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            WordPressOrgApiPluginDirectoryCategory::New => "new",
+            WordPressOrgApiPluginDirectoryCategory::Popular => "popular",
+            WordPressOrgApiPluginDirectoryCategory::Updated => "updated",
+            WordPressOrgApiPluginDirectoryCategory::TopRated => "top-rated",
         }
     }
 }
@@ -101,5 +163,87 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
                 reason,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use futures::lock::Mutex;
+
+    use super::*;
+    use crate::{
+        request::{endpoint::media_endpoint::MediaUploadRequest, RequestExecutor},
+        MediaUploadRequestExecutionError,
+    };
+    use std::sync::Arc;
+
+    #[derive(Debug)]
+    struct MockRequestExecutor {
+        requests: Mutex<Vec<Arc<WpNetworkRequest>>>,
+    }
+
+    impl MockRequestExecutor {
+        fn new() -> Self {
+            Self {
+                requests: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl RequestExecutor for MockRequestExecutor {
+        async fn execute(
+            &self,
+            _wp_request: Arc<WpNetworkRequest>,
+        ) -> std::result::Result<WpNetworkResponse, RequestExecutionError> {
+            self.requests.lock().await.push(_wp_request);
+
+            Err(RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                reason: "Mocked request executor".to_string(),
+            })
+        }
+
+        async fn upload_media(
+            &self,
+            media_upload_request: Arc<MediaUploadRequest>,
+        ) -> std::result::Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+            unimplemented!(
+                "upload_media is not implemented for sending requests to api.wordpress.org"
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn test_plugin_info_requests_include_icons() {
+        let request_executor = Arc::new(MockRequestExecutor::new());
+        let client = WordPressOrgApiClient::new(request_executor.clone());
+        let _ = client.plugin_information("akismet").await;
+
+        let requests = request_executor.requests.lock().await;
+        assert!(requests.len() == 1);
+
+        let request = &requests[0];
+        assert!(request.url.0.contains("fields=icons"));
+    }
+
+    #[tokio::test]
+    async fn test_search_does_not_include_pagination() {
+        let request_executor = Arc::new(MockRequestExecutor::new());
+        let client = WordPressOrgApiClient::new(request_executor.clone());
+        let _ = client.search_plugins("akismet".to_string(), 3, 24).await;
+
+        let requests = request_executor.requests.lock().await;
+        assert!(requests.len() == 1);
+
+        let request = &requests[0];
+
+        // The 'request[x]' parameters do not work for the search endpoint.
+        // The 'page' and 'per_page' parameters do.
+        assert!(!request.url.0.contains("request[page]"));
+        assert!(!request.url.0.contains("request[per_page]"));
+        assert!(request.url.0.contains("page=3"));
+        assert!(request.url.0.contains("per_page=24"));
     }
 }

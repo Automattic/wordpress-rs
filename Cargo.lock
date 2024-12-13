@@ -3319,6 +3319,7 @@ dependencies = [
  "serde_json",
  "strum_macros",
  "thiserror",
+ "tokio",
  "uniffi",
  "url",
  "uuid",
