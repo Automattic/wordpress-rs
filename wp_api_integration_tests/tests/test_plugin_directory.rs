@@ -1,46 +1,95 @@
 use std::{
     env,
     io::{self, Write},
+    sync::Arc,
 };
 
-use wp_api::wordpress_org::plugin_directory::*;
+use wp_api::{
+    request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
+    wordpress_org::client::WordPressOrgApiClient,
+    RequestExecutionError,
+};
 
-async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
-    reqwest::get(url)
-        .await?
-        .json::<QueryPluginResponse>()
-        .await?
-        .plugins
-        .into_iter()
-        .map(|p| Ok(p.slug))
-        .collect()
+use reqwest::Client as ReqwestClient;
+use wp_api::{
+    request::{endpoint::media_endpoint::MediaUploadRequest, RequestMethod, WpNetworkHeaderMap},
+    MediaUploadRequestExecutionError,
+};
+
+#[derive(Debug)]
+pub struct ReqwestExecutor {
+    client: ReqwestClient,
 }
 
-async fn plugin_information(slug: &str) -> Result<PluginInformation, reqwest::Error> {
-    let url = format!(
-        "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]={}&fields=icons",
-        slug
-    );
-    reqwest::get(&url)
-        .await?
-        .json::<PluginInformation>()
-        .await
-        .map_err(Into::into)
+impl ReqwestExecutor {
+    fn request_method(method: RequestMethod) -> http::Method {
+        match method {
+            RequestMethod::GET => reqwest::Method::GET,
+            RequestMethod::POST => reqwest::Method::POST,
+            RequestMethod::PUT => reqwest::Method::PUT,
+            RequestMethod::DELETE => reqwest::Method::DELETE,
+            RequestMethod::HEAD => reqwest::Method::HEAD,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl RequestExecutor for ReqwestExecutor {
+    async fn execute(
+        &self,
+        wp_request: Arc<WpNetworkRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let mut request = self
+            .client
+            .request(
+                Self::request_method(wp_request.method()),
+                wp_request.url().0.as_str(),
+            )
+            .headers(wp_request.header_map().as_header_map());
+        if let Some(body) = wp_request.body() {
+            request = request.body(body.contents());
+        }
+        let mut response =
+            request
+                .send()
+                .await
+                .map_err(|err| RequestExecutionError::RequestExecutionFailed {
+                    status_code: err.status().map(|s| s.as_u16()),
+                    reason: err.to_string(),
+                })?;
+
+        let header_map = std::mem::take(response.headers_mut());
+        Ok(WpNetworkResponse {
+            status_code: response.status().as_u16(),
+            body: response.bytes().await.unwrap().to_vec(),
+            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+        })
+    }
+
+    async fn upload_media(
+        &self,
+        _: Arc<MediaUploadRequest>,
+    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+        unimplemented!("upload_media is not implemented for sending requests to api.wordpress.org")
+    }
+}
+
+fn wordpress_org_api_client() -> WordPressOrgApiClient {
+    let client = ReqwestClient::new();
+    let executor = ReqwestExecutor { client };
+    WordPressOrgApiClient::new(Arc::new(executor))
 }
 
 #[tokio::test]
 async fn test_parsing_full_plugin_directory() {
+    let client = wordpress_org_api_client();
+
     let page_size: u64;
     let total_pages: u64;
     if env::var("TEST_ALL_PLUGINS").is_ok() {
         println!("Checking how many pages to fetch...");
         page_size = 200;
-        let url = format!(
-            "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}",
-            page_size
-        );
-        let response = reqwest::get(&url).await.unwrap();
-        let response = response.json::<QueryPluginResponse>().await.unwrap();
+        let response = client.list_plugins(1, 200).await.unwrap();
         total_pages = response.info.pages;
     } else {
         println!("Only a small amount of plugins will be fetched.");
@@ -51,19 +100,18 @@ async fn test_parsing_full_plugin_directory() {
     let mut query_plugins_failures = Vec::new();
     let mut all_slugs: Vec<String> = Vec::new();
     for page in 1..=total_pages {
-        let url = format!(
-            "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}&request[page]={}",
-            page_size, page
-        );
-        let slugs = query_plugins_slugs(&url).await;
+        let slugs: Result<Vec<_>, _> = client
+            .list_plugins(page, page_size)
+            .await
+            .map(|r| r.plugins.into_iter().map(|p| p.slug).collect());
         match slugs {
             Ok(slugs) => {
                 print!(".");
                 all_slugs.extend(slugs);
             }
             Err(e) => {
-                print!("F({})", &url);
-                query_plugins_failures.push((url, e));
+                print!("F({})", page);
+                query_plugins_failures.push((page, e));
             }
         }
         _ = io::stdout().flush();
@@ -74,7 +122,7 @@ async fn test_parsing_full_plugin_directory() {
 
     let mut plugin_information_failures = Vec::new();
     for slug in all_slugs {
-        let info = plugin_information(&slug).await;
+        let info = client.plugin_information(&slug).await;
         if let Err(e) = info {
             print!("F({})", slug);
             plugin_information_failures.push((slug.to_string(), e));
@@ -86,8 +134,8 @@ async fn test_parsing_full_plugin_directory() {
     println!();
 
     println!("{} query plugins failures:", query_plugins_failures.len());
-    for (url, e) in &query_plugins_failures {
-        println!("  - {:?} : {:?}", url, e);
+    for (page, e) in &query_plugins_failures {
+        println!("  - Page {:?}, page size {:?} : {:?}", page, page_size, e);
     }
 
     println!(
