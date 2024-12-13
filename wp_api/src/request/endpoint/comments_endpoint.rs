@@ -12,6 +12,8 @@ enum CommentsRequest {
     List,
     #[contextual_get(url = "/comments/<comment_id>", params = &crate::comments::CommentRetrieveParams, output = crate::comments::SparseComment, filter_by = crate::comments::SparseCommentField)]
     Retrieve,
+    #[post(url = "/comments", params = &crate::comments::CommentCreateParams, output = crate::comments::CommentWithEditContext)]
+    Create,
     #[delete(url = "/comments/<comment_id>", params = &crate::comments::CommentDeleteParams, output = crate::comments::CommentDeleteResponse)]
     Delete,
     #[delete(url = "/comments/<comment_id>", params = &crate::comments::CommentDeleteParams, output = crate::comments::CommentWithEditContext)]
@@ -275,6 +277,11 @@ mod tests {
             ),
             expected_path,
         );
+    }
+
+    #[rstest]
+    fn create_comment(endpoint: CommentsRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.create(), "/comments");
     }
 
     #[rstest]

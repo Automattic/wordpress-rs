@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.CommentCreateParams
 import uniffi.wp_api.CommentDeleteParams
 import uniffi.wp_api.CommentListParams
 import uniffi.wp_api.CommentRetrieveParams
@@ -66,6 +67,17 @@ class CommentsEndpointTest {
         }.assertSuccessAndRetrieveData().data
         assertNotNull(sparseComment)
         Assertions.assertNull(sparseComment.id)
+    }
+
+    @Test
+    fun createCommentRequest() = runTest {
+        val createdComment = client.request { requestBuilder ->
+            requestBuilder.comments()
+                .create(CommentCreateParams(post = 1, content = "foo", status = CommentStatus.Hold))
+        }.assertSuccessAndRetrieveData().data
+        assertEquals("foo", createdComment.content.raw)
+        assertEquals(CommentStatus.Hold, createdComment.status)
+        restoreTestServer()
     }
 
     @Test

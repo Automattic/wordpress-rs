@@ -348,6 +348,93 @@ pub struct CommentDeleteResponse {
     pub previous: CommentWithEditContext,
 }
 
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct CommentCreateParams {
+    /// The ID of the associated post object.
+    pub post: PostId,
+    /// The ID of the user object, if author was a user.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    /// Email address for the comment author.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_email: Option<String>,
+    /// IP address for the comment author.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_ip: Option<String>,
+    /// Display name for the comment author.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_name: Option<String>,
+    /// URL for the comment author.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_url: Option<String>,
+    /// User agent for the comment author.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_user_agent: Option<String>,
+    /// The content for the comment.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// The date the comment was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// The date the comment was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<String>,
+    /// The ID for the parent of the comment.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<CommentId>,
+    /// State of the comment.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<CommentStatus>,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
+}
+
+impl CommentCreateParams {
+    pub fn new(post: PostId, content: String) -> Self {
+        Self {
+            post,
+            author: None,
+            author_email: None,
+            author_ip: None,
+            author_name: None,
+            author_url: None,
+            author_user_agent: None,
+            content: Some(content),
+            date: None,
+            date_gmt: None,
+            parent: None,
+            status: None,
+        }
+    }
+
+    pub fn with_status(post: PostId, content: String, status: CommentStatus) -> Self {
+        Self {
+            post,
+            author: None,
+            author_email: None,
+            author_ip: None,
+            author_name: None,
+            author_url: None,
+            author_user_agent: None,
+            content: Some(content),
+            date: None,
+            date_gmt: None,
+            parent: None,
+            status: Some(status),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseComment {
     #[WpContext(edit, embed, view)]
