@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.CommentDeleteParams
 import uniffi.wp_api.CommentListParams
 import uniffi.wp_api.CommentRetrieveParams
+import uniffi.wp_api.CommentStatus
 import uniffi.wp_api.SparseCommentFieldWithEditContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
@@ -81,7 +82,7 @@ class CommentsEndpointTest {
         val trashedComment = client.request { requestBuilder ->
             requestBuilder.comments().trash(commentId = 1, CommentDeleteParams())
         }.assertSuccessAndRetrieveData().data
-        assertEquals("trash", trashedComment.status)
+        assertEquals(CommentStatus.Trash, trashedComment.status)
         restoreTestServer()
     }
 }

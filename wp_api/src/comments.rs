@@ -378,7 +378,7 @@ pub struct SparseComment {
     #[WpContext(edit, view)]
     pub post: Option<PostId>,
     #[WpContext(edit, view)]
-    pub status: Option<String>,
+    pub status: Option<CommentStatus>,
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]
     pub comment_type: Option<CommentType>,
