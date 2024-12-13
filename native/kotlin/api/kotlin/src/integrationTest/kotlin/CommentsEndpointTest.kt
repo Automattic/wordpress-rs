@@ -3,10 +3,12 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.CommentDeleteParams
 import uniffi.wp_api.CommentListParams
 import uniffi.wp_api.CommentRetrieveParams
 import uniffi.wp_api.SparseCommentFieldWithEditContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -63,5 +65,23 @@ class CommentsEndpointTest {
         }.assertSuccessAndRetrieveData().data
         assertNotNull(sparseComment)
         Assertions.assertNull(sparseComment.id)
+    }
+
+    @Test
+    fun deleteCommentRequest() = runTest {
+        val deletedComment = client.request { requestBuilder ->
+            requestBuilder.comments().delete(commentId = 1, CommentDeleteParams())
+        }.assertSuccessAndRetrieveData().data
+        assert(deletedComment.deleted)
+        restoreTestServer()
+    }
+
+    @Test
+    fun trashCommentRequest() = runTest {
+        val trashedComment = client.request { requestBuilder ->
+            requestBuilder.comments().trash(commentId = 1, CommentDeleteParams())
+        }.assertSuccessAndRetrieveData().data
+        assertEquals("trash", trashedComment.status)
+        restoreTestServer()
     }
 }

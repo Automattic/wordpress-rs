@@ -20,7 +20,9 @@ fun <T> WpRequestResult<T>.assertSuccess() {
 }
 
 fun <T> WpRequestResult<T>.assertSuccessAndRetrieveData(): T {
-    assert(this is WpRequestResult.WpRequestSuccess)
+    assert(this is WpRequestResult.WpRequestSuccess) {
+        "Request wasn't successful: $this"
+    }
     return (this as WpRequestResult.WpRequestSuccess).data
 }
 
