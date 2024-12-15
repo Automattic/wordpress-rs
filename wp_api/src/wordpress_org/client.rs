@@ -27,13 +27,13 @@ impl WordPressOrgApiClient {
         self.execute(self.plugin_information_request(slug)).await
     }
 
-    pub async fn browse_plugins(
+    pub fn browse_plugins_request(
         &self,
         category: Option<WordPressOrgApiPluginDirectoryCategory>,
         page: u64,
         page_size: u64,
-    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
-        let request = self.query_plugins_request(page, page_size, |url| match category {
+    ) -> WpNetworkRequest {
+        self.query_plugins_request(page, page_size, |url| match category {
             Some(category) => {
                 let mut url = url;
                 url.query_pairs_mut()
@@ -41,8 +41,30 @@ impl WordPressOrgApiClient {
                 url
             }
             None => url,
-        });
+        })
+    }
+
+    pub async fn browse_plugins(
+        &self,
+        category: Option<WordPressOrgApiPluginDirectoryCategory>,
+        page: u64,
+        page_size: u64,
+    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
+        let request = self.browse_plugins_request(category, page, page_size);
         self.execute(request).await
+    }
+
+    pub fn search_plugins_request(
+        &self,
+        search: String,
+        page: u64,
+        page_size: u64,
+    ) -> WpNetworkRequest {
+        self.query_plugins_request(page, page_size, |url| {
+            let mut url = url;
+            url.query_pairs_mut().append_pair("search", &search);
+            url
+        })
     }
 
     pub async fn search_plugins(
@@ -51,11 +73,7 @@ impl WordPressOrgApiClient {
         page: u64,
         page_size: u64,
     ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
-        let request = self.query_plugins_request(page, page_size, |url| {
-            let mut url = url;
-            url.query_pairs_mut().append_pair("search", &search);
-            url
-        });
+        let request = self.search_plugins_request(search, page, page_size);
         self.execute(request).await
     }
 }
@@ -178,8 +196,6 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
 #[cfg(test)]
 mod tests {
 
-    use futures::lock::Mutex;
-
     use super::*;
     use crate::{
         request::{endpoint::media_endpoint::MediaUploadRequest, RequestExecutor},
@@ -188,17 +204,7 @@ mod tests {
     use std::sync::Arc;
 
     #[derive(Debug)]
-    struct MockRequestExecutor {
-        requests: Mutex<Vec<Arc<WpNetworkRequest>>>,
-    }
-
-    impl MockRequestExecutor {
-        fn new() -> Self {
-            Self {
-                requests: Mutex::new(Vec::new()),
-            }
-        }
-    }
+    struct MockRequestExecutor;
 
     #[async_trait::async_trait]
     impl RequestExecutor for MockRequestExecutor {
@@ -206,8 +212,6 @@ mod tests {
             &self,
             _wp_request: Arc<WpNetworkRequest>,
         ) -> std::result::Result<WpNetworkResponse, RequestExecutionError> {
-            self.requests.lock().await.push(_wp_request);
-
             Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: None,
                 reason: "Mocked request executor".to_string(),
@@ -224,29 +228,19 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_plugin_info_requests_include_icons() {
-        let request_executor = Arc::new(MockRequestExecutor::new());
+    #[test]
+    fn test_plugin_info_requests_include_icons() {
+        let request_executor = Arc::new(MockRequestExecutor {});
         let client = WordPressOrgApiClient::new(request_executor.clone());
-        let _ = client.plugin_information("akismet").await;
-
-        let requests = request_executor.requests.lock().await;
-        assert!(requests.len() == 1);
-
-        let request = &requests[0];
+        let request = client.plugin_information_request("akismet");
         assert!(request.url.0.contains("fields=icons"));
     }
 
-    #[tokio::test]
-    async fn test_search_does_not_include_pagination() {
-        let request_executor = Arc::new(MockRequestExecutor::new());
+    #[test]
+    fn test_search_does_not_include_pagination() {
+        let request_executor = Arc::new(MockRequestExecutor {});
         let client = WordPressOrgApiClient::new(request_executor.clone());
-        let _ = client.search_plugins("akismet".to_string(), 3, 24).await;
-
-        let requests = request_executor.requests.lock().await;
-        assert!(requests.len() == 1);
-
-        let request = &requests[0];
+        let request = client.search_plugins_request("akismet".to_string(), 3, 24);
 
         // The 'request[x]' parameters do not work for the search endpoint.
         // The 'page' and 'per_page' parameters do.
