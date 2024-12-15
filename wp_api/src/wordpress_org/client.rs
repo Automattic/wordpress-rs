@@ -3,12 +3,10 @@ use crate::{
     RequestExecutionError,
 };
 use serde::de::DeserializeOwned;
-use std::sync::Arc;
+use std::{result::Result, sync::Arc};
 use url::Url;
 
 use super::plugin_directory::{PluginInformation, QueryPluginResponse};
-
-pub type Result<T> = std::result::Result<T, self::WordPressOrgApiClientError>;
 
 #[derive(Debug, uniffi::Object)]
 pub struct WordPressOrgApiClient {
@@ -22,7 +20,10 @@ impl WordPressOrgApiClient {
         Self { request_executor }
     }
 
-    pub async fn plugin_information(&self, slug: &str) -> Result<PluginInformation> {
+    pub async fn plugin_information(
+        &self,
+        slug: &str,
+    ) -> Result<PluginInformation, WordPressOrgApiClientError> {
         let mut url = Self::plugin_info_api_url();
         url.query_pairs_mut()
             .append_pair("action", "plugin_information")
@@ -38,7 +39,7 @@ impl WordPressOrgApiClient {
         category: Option<WordPressOrgApiPluginDirectoryCategory>,
         page: u64,
         page_size: u64,
-    ) -> Result<QueryPluginResponse> {
+    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
         self.query_plugins(page, page_size, |url| match category {
             Some(category) => {
                 let mut url = url;
@@ -56,7 +57,7 @@ impl WordPressOrgApiClient {
         search: String,
         page: u64,
         page_size: u64,
-    ) -> Result<QueryPluginResponse> {
+    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
         self.query_plugins(page, page_size, |url| {
             let mut url = url;
             url.query_pairs_mut().append_pair("search", &search);
@@ -72,7 +73,7 @@ impl WordPressOrgApiClient {
         page: u64,
         page_size: u64,
         url_builder: F,
-    ) -> Result<QueryPluginResponse>
+    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError>
     where
         F: FnOnce(Url) -> Url,
     {
@@ -93,7 +94,7 @@ impl WordPressOrgApiClient {
         Url::parse("https://api.wordpress.org/plugins/info/1.2/").expect("The URL is valid")
     }
 
-    fn parse<T>(response: WpNetworkResponse) -> Result<T>
+    fn parse<T>(response: WpNetworkResponse) -> Result<T, WordPressOrgApiClientError>
     where
         T: DeserializeOwned,
     {
