@@ -90,12 +90,12 @@ pub struct Ratings {
 #[serde(untagged)]
 pub enum Screenshots {
     Named(HashMap<String, Screenshot>),
-    List(Vec<Screenshot>),
+    Unnamed(Vec<Screenshot>),
 }
 
 impl Default for Screenshots {
     fn default() -> Self {
-        Screenshots::List(vec![])
+        Screenshots::Unnamed(vec![])
     }
 }
 
