@@ -24,14 +24,7 @@ impl WordPressOrgApiClient {
         &self,
         slug: &str,
     ) -> Result<PluginInformation, WordPressOrgApiClientError> {
-        let mut url = Self::plugin_info_api_url();
-        url.query_pairs_mut()
-            .append_pair("action", "plugin_information")
-            .append_pair("fields", "icons")
-            .append_pair("slug", slug);
-        let request = WpNetworkRequest::get(WpEndpointUrl(url.to_string()));
-        let response = self.request_executor.execute(Arc::new(request)).await?;
-        Self::parse(response)
+        self.execute(self.plugin_information_request(slug)).await
     }
 
     pub async fn browse_plugins(
@@ -40,7 +33,7 @@ impl WordPressOrgApiClient {
         page: u64,
         page_size: u64,
     ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
-        self.query_plugins(page, page_size, |url| match category {
+        let request = self.query_plugins_request(page, page_size, |url| match category {
             Some(category) => {
                 let mut url = url;
                 url.query_pairs_mut()
@@ -48,8 +41,8 @@ impl WordPressOrgApiClient {
                 url
             }
             None => url,
-        })
-        .await
+        });
+        self.execute(request).await
     }
 
     pub async fn search_plugins(
@@ -58,22 +51,31 @@ impl WordPressOrgApiClient {
         page: u64,
         page_size: u64,
     ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
-        self.query_plugins(page, page_size, |url| {
+        let request = self.query_plugins_request(page, page_size, |url| {
             let mut url = url;
             url.query_pairs_mut().append_pair("search", &search);
             url
-        })
-        .await
+        });
+        self.execute(request).await
     }
 }
 
 impl WordPressOrgApiClient {
-    async fn query_plugins<F>(
+    fn plugin_information_request(&self, slug: &str) -> WpNetworkRequest {
+        let mut url = Self::plugin_info_api_url();
+        url.query_pairs_mut()
+            .append_pair("action", "plugin_information")
+            .append_pair("fields", "icons")
+            .append_pair("slug", slug);
+        WpNetworkRequest::get(WpEndpointUrl(url.to_string()))
+    }
+
+    fn query_plugins_request<F>(
         &self,
         page: u64,
         page_size: u64,
         url_builder: F,
-    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError>
+    ) -> WpNetworkRequest
     where
         F: FnOnce(Url) -> Url,
     {
@@ -83,7 +85,13 @@ impl WordPressOrgApiClient {
             .append_pair("page", &page.to_string())
             .append_pair("per_page", &page_size.to_string());
         let url = url_builder(url);
-        let request = WpNetworkRequest::get(WpEndpointUrl(url.to_string()));
+        WpNetworkRequest::get(WpEndpointUrl(url.to_string()))
+    }
+
+    async fn execute<T>(&self, request: WpNetworkRequest) -> Result<T, WordPressOrgApiClientError>
+    where
+        T: DeserializeOwned,
+    {
         let response = self.request_executor.execute(Arc::new(request)).await?;
         Self::parse(response)
     }
