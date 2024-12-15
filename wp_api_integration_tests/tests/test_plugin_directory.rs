@@ -157,10 +157,12 @@ async fn test_parsing_full_plugin_directory() {
 #[case(WordPressOrgApiPluginDirectoryCategory::Updated)]
 #[case(WordPressOrgApiPluginDirectoryCategory::TopRated)]
 async fn test_browse_plugins(#[case] category: WordPressOrgApiPluginDirectoryCategory) {
-    let client = wordpress_org_api_client();
-    let response = client.browse_plugins(Some(category), 1, 30).await;
-    assert!(response.is_ok());
-    assert!(!response.unwrap().plugins.is_empty());
+    use wp_api_integration_tests::AssertResponse;
+    let response = wordpress_org_api_client()
+        .browse_plugins(Some(category), 1, 30)
+        .await
+        .assert_response();
+    assert!(!response.plugins.is_empty());
 }
 
 #[tokio::test]
