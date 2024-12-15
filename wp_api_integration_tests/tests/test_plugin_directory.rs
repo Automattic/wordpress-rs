@@ -167,18 +167,15 @@ async fn test_browse_plugins(#[case] category: WordPressOrgApiPluginDirectoryCat
 
 #[tokio::test]
 async fn test_search_plugins() {
-    let client = wordpress_org_api_client();
-    let response = client
+    use wp_api_integration_tests::AssertResponse;
+    let plugins = wordpress_org_api_client()
         .search_plugins("jetpack-social".to_string(), 1, 30)
-        .await;
-    assert!(response.is_ok());
-
-    let slugs = response
-        .unwrap()
-        .plugins
-        .into_iter()
-        .map(|plugin| plugin.slug)
-        .collect::<Vec<_>>();
-    println!("{:?}", slugs);
-    assert!(slugs.contains(&"jetpack-social".to_string()));
+        .await
+        .assert_response()
+        .plugins;
+    assert!(
+        plugins.iter().any(|p| p.slug == "jetpack-social"),
+        "Plugins search result doesn't contain 'jetpack-social': {:#?}",
+        plugins
+    );
 }
