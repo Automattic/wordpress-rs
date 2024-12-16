@@ -29,7 +29,7 @@ class PostsEndpointTest {
     @Test
     fun testRetrievePostRequest() = runTest {
         val post = client.request { requestBuilder ->
-            requestBuilder.posts().retrieveWithEditContext(1, PostRetrieveParams(null))
+            requestBuilder.posts().retrieveWithEditContext(1, PostRetrieveParams())
         }.assertSuccessAndRetrieveData().data
         assertNotNull(post)
     }
@@ -54,7 +54,7 @@ class PostsEndpointTest {
         val sparsePost = client.request { requestBuilder ->
             requestBuilder.posts().filterRetrieveWithEditContext(
                 postId = 1,
-                params = PostRetrieveParams(null),
+                params = PostRetrieveParams(),
                 fields = listOf(
                     SparsePostFieldWithEditContext.TITLE,
                     SparsePostFieldWithEditContext.CONTENT

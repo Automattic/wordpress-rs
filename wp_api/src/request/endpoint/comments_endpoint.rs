@@ -1,6 +1,6 @@
 use crate::comments::{
-    CommentListParams, SparseCommentFieldWithEditContext, SparseCommentFieldWithEmbedContext,
-    SparseCommentFieldWithViewContext,
+    CommentId, CommentListParams, SparseCommentFieldWithEditContext,
+    SparseCommentFieldWithEmbedContext, SparseCommentFieldWithViewContext,
 };
 use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
@@ -10,6 +10,8 @@ use super::{AsNamespace, DerivedRequest, WpNamespace};
 enum CommentsRequest {
     #[contextual_paged(url = "/comments", params = &CommentListParams, output = Vec<crate::comments::SparseComment>, filter_by = crate::comments::SparseCommentField)]
     List,
+    #[contextual_get(url = "/comments/<comment_id>", params = &crate::comments::CommentRetrieveParams, output = crate::comments::SparseComment, filter_by = crate::comments::SparseCommentField)]
+    Retrieve,
 }
 
 impl DerivedRequest for CommentsRequest {
@@ -49,7 +51,9 @@ impl SparseField for SparseCommentFieldWithViewContext {
 mod tests {
     use super::*;
     use crate::{
-        comments::{CommentId, CommentStatus, CommentType, WpApiParamCommentsOrderBy},
+        comments::{
+            CommentId, CommentRetrieveParams, CommentStatus, CommentType, WpApiParamCommentsOrderBy,
+        },
         generate,
         posts::PostId,
         request::endpoint::{
@@ -200,6 +204,64 @@ mod tests {
             comment_type: Some(CommentType::Pingback),
             password: Some("p_q".to_string()),
         }
+    }
+
+    #[rstest]
+    #[case(None, "")]
+    #[case(Some("foo"), "password=foo")]
+    fn retrieve_comment(
+        endpoint: CommentsRequestEndpoint,
+        #[case] password: Option<&str>,
+        #[case] expected_additional_params: &str,
+    ) {
+        let comment_id = CommentId(54);
+        let expected_path = |context: &str| {
+            if expected_additional_params.is_empty() {
+                format!("/comments/54?context={}", context)
+            } else {
+                format!(
+                    "/comments/54?context={}&{}",
+                    context, expected_additional_params
+                )
+            }
+        };
+        let params = CommentRetrieveParams {
+            password: password.map(|p| p.to_string()),
+        };
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_edit_context(&comment_id, &params),
+            &expected_path("edit"),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_embed_context(&comment_id, &params),
+            &expected_path("embed"),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_view_context(&comment_id, &params),
+            &expected_path("view"),
+        );
+    }
+
+    #[rstest]
+    #[case(None, &[], "/comments/54?context=view&_fields=")]
+    #[case(Some("foo"), &[SparseCommentFieldWithViewContext::Author], "/comments/54?context=view&password=foo&_fields=author")]
+    #[case(Some("foo"), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments/54?context=view&password=foo&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT))]
+    fn filter_retrieve_comment_with_view_context(
+        endpoint: CommentsRequestEndpoint,
+        #[case] password: Option<&str>,
+        #[case] fields: &[SparseCommentFieldWithViewContext],
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_view_context(
+                &CommentId(54),
+                &CommentRetrieveParams {
+                    password: password.map(|p| p.to_string()),
+                },
+                fields,
+            ),
+            expected_path,
+        );
     }
 
     const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT: &str = "_fields=id%2Cauthor%2Cauthor_email%2Cauthor_ip%2Cauthor_name%2Cauthor_url%2Cauthor_user_agent%2Ccontent%2Cdate%2Cdate_gmt%2Clink%2Cparent%2Cpost%2Cstatus%2Ctype%2Cauthor_avatar_urls";
