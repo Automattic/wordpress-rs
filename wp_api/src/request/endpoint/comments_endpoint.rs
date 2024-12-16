@@ -12,9 +12,21 @@ enum CommentsRequest {
     List,
     #[contextual_get(url = "/comments/<comment_id>", params = &crate::comments::CommentRetrieveParams, output = crate::comments::SparseComment, filter_by = crate::comments::SparseCommentField)]
     Retrieve,
+    #[delete(url = "/comments/<comment_id>", params = &crate::comments::CommentDeleteParams, output = crate::comments::CommentDeleteResponse)]
+    Delete,
+    #[delete(url = "/comments/<comment_id>", params = &crate::comments::CommentDeleteParams, output = crate::comments::CommentWithEditContext)]
+    Trash,
 }
 
 impl DerivedRequest for CommentsRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            CommentsRequest::Delete => vec![("force", true.to_string())],
+            CommentsRequest::Trash => vec![("force", false.to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -52,7 +64,8 @@ mod tests {
     use super::*;
     use crate::{
         comments::{
-            CommentId, CommentRetrieveParams, CommentStatus, CommentType, WpApiParamCommentsOrderBy,
+            CommentDeleteParams, CommentId, CommentRetrieveParams, CommentStatus, CommentType,
+            WpApiParamCommentsOrderBy,
         },
         generate,
         posts::PostId,
@@ -260,6 +273,34 @@ mod tests {
                 },
                 fields,
             ),
+            expected_path,
+        );
+    }
+
+    #[rstest]
+    #[case(None, "/comments/54?force=true")]
+    #[case(Some("foo".to_string()), "/comments/54?password=foo&force=true")]
+    fn delete_comment(
+        endpoint: CommentsRequestEndpoint,
+        #[case] password: Option<String>,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.delete(&CommentId(54), &CommentDeleteParams::new(password)),
+            expected_path,
+        );
+    }
+
+    #[rstest]
+    #[case(None, "/comments/54?force=false")]
+    #[case(Some("foo".to_string()), "/comments/54?password=foo&force=false")]
+    fn trash_comment(
+        endpoint: CommentsRequestEndpoint,
+        #[case] password: Option<String>,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.trash(&CommentId(54), &CommentDeleteParams::new(password)),
             expected_path,
         );
     }

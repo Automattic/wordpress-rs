@@ -1,9 +1,11 @@
-use std::{ffi::OsStr, process::Command};
+use std::{collections::HashMap, ffi::OsStr, process::Command};
 
+mod wp_cli_comments;
 mod wp_cli_posts;
 mod wp_cli_settings;
 mod wp_cli_users;
 
+pub use wp_cli_comments::*;
 pub use wp_cli_posts::*;
 pub use wp_cli_settings::*;
 pub use wp_cli_users::*;
@@ -27,4 +29,22 @@ where
         .args(args);
     println!("Running wp_cli command: {:#?}", c);
     c.output().expect("Failed to run wp-cli command")
+}
+
+pub(crate) trait AsWpCliArguments {
+    fn as_wp_cli_arguments(&self) -> Option<String>;
+}
+
+impl AsWpCliArguments for HashMap<&'static str, &String> {
+    fn as_wp_cli_arguments(&self) -> Option<String> {
+        let mut s = String::new();
+        self.iter().for_each(|(k, v)| {
+            s.push_str(format!("--{}={}", k, v).as_str());
+        });
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    }
 }

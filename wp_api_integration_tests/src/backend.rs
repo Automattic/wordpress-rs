@@ -1,9 +1,11 @@
 use serde::{de::DeserializeOwned, Serialize};
-use wp_api::{posts::PostId, users::UserId};
-use wp_cli::{WpCliPost, WpCliSiteSettings, WpCliUser, WpCliUserMeta};
+use wp_api::{comments::CommentId, posts::PostId, users::UserId};
+use wp_cli::{WpCliComment, WpCliPost, WpCliSiteSettings, WpCliUser, WpCliUserMeta};
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
 const BACKEND_PATH_RESTORE: &str = "/restore";
+const BACKEND_PATH_COMMENT: &str = "/wp-cli/comment";
+const BACKEND_PATH_COMMENTS: &str = "/wp-cli/comments";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
 const BACKEND_PATH_POST: &str = "/wp-cli/post";
 const BACKEND_PATH_POSTS: &str = "/wp-cli/posts";
@@ -18,6 +20,27 @@ impl Backend {
     async fn get<T: DeserializeOwned>(path: impl AsRef<str>) -> Result<T, reqwest::Error> {
         let url = format!("{}{}", BACKEND_ADDRESS, path.as_ref());
         reqwest::get(url).await?.json().await
+    }
+    pub async fn comment(comment_id: &CommentId) -> WpCliComment {
+        Self::get(format!(
+            "{}?comment_id={}",
+            BACKEND_PATH_COMMENT, comment_id
+        ))
+        .await
+        .expect("Failed to parse fetched comment from wp_cli")
+    }
+    pub async fn comments(comment_status: Option<&str>) -> Vec<WpCliComment> {
+        let url = if let Some(comment_status) = comment_status {
+            format!(
+                "{}?comment_status={}",
+                BACKEND_PATH_COMMENTS, comment_status
+            )
+        } else {
+            BACKEND_PATH_COMMENTS.to_string()
+        };
+        Self::get(url)
+            .await
+            .expect("Failed to parse fetched comments from wp_cli")
     }
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await

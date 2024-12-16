@@ -323,6 +323,31 @@ impl AppendUrlQueryPairs for CommentRetrieveParams {
     }
 }
 
+#[derive(Debug, Default, uniffi::Record)]
+pub struct CommentDeleteParams {
+    /// The password for the parent post of the comment (if the post is password protected).
+    #[uniffi(default = None)]
+    pub password: Option<String>,
+}
+
+impl CommentDeleteParams {
+    pub fn new(password: Option<String>) -> Self {
+        Self { password }
+    }
+}
+
+impl AppendUrlQueryPairs for CommentDeleteParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_option_query_value_pair("password", self.password.as_ref());
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct CommentDeleteResponse {
+    pub deleted: bool,
+    pub previous: CommentWithEditContext,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseComment {
     #[WpContext(edit, embed, view)]
@@ -353,7 +378,7 @@ pub struct SparseComment {
     #[WpContext(edit, view)]
     pub post: Option<PostId>,
     #[WpContext(edit, view)]
-    pub status: Option<String>,
+    pub status: Option<CommentStatus>,
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]
     pub comment_type: Option<CommentType>,

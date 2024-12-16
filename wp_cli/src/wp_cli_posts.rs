@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use wp_serde_helper::deserialize_i64_or_string;
 
-use crate::run_wp_cli_command;
+use crate::{run_wp_cli_command, AsWpCliArguments};
 
 const POST_FIELDS_ARG: &str = "--fields=ID,post_name,post_title,post_date,post_status,post_author,post_date_gmt,post_content,post_excerpt,comment_status,ping_status,post_password,post_modified,post_modified_gmt,guid,post_type";
 
@@ -11,21 +13,13 @@ pub struct WpCliPostListArguments {
     pub post_status: Option<String>,
 }
 
-impl WpCliPostListArguments {
+impl AsWpCliArguments for WpCliPostListArguments {
     fn as_wp_cli_arguments(&self) -> Option<String> {
-        let mut s = String::new();
-        Self::add_field_arg(&mut s, "post_status", self.post_status.as_ref());
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
+        let mut map = HashMap::new();
+        if let Some(post_status) = &self.post_status {
+            map.insert("post_status", post_status);
         }
-    }
-
-    fn add_field_arg(args: &mut String, field_name: &str, field: Option<&String>) {
-        if let Some(f) = field {
-            args.push_str(format!("--{}={}", field_name, f).as_str());
-        }
+        map.as_wp_cli_arguments()
     }
 }
 
