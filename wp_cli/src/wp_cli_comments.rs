@@ -29,21 +29,33 @@ pub struct WpCliComment {
     #[serde(deserialize_with = "deserialize_i64_or_string")]
     pub comment_id: i64,
     #[serde(rename = "comment_post_ID")]
-    pub comment_post_id: String,
-    pub comment_author: String,
-    pub comment_author_email: String,
-    pub comment_author_url: String,
+    #[serde(deserialize_with = "deserialize_i64_or_string")]
+    pub post: i64,
+    #[serde(rename = "user_id")]
+    #[serde(deserialize_with = "deserialize_i64_or_string")]
+    pub author: i64,
+    #[serde(rename = "comment_author")]
+    pub author_name: String,
+    #[serde(rename = "comment_author_email")]
+    pub author_email: String,
+    #[serde(rename = "comment_author_url")]
+    pub author_url: String,
     #[serde(rename = "comment_author_IP")]
-    pub comment_author_ip: String,
-    pub comment_date: String,
-    pub comment_date_gmt: String,
-    pub comment_content: String,
+    pub author_ip: String,
+    #[serde(rename = "comment_agent")]
+    pub author_user_agent: String,
+    #[serde(rename = "comment_content")]
+    pub content: String,
+    #[serde(rename = "comment_date")]
+    pub date: String,
+    #[serde(rename = "comment_date_gmt")]
+    pub date_gmt: String,
+    #[serde(rename = "comment_parent")]
+    #[serde(deserialize_with = "deserialize_i64_or_string")]
+    pub parent: i64,
     pub comment_karma: String,
     pub comment_approved: String,
-    pub comment_agent: String,
     pub comment_type: String,
-    pub comment_parent: String,
-    pub user_id: String,
 }
 
 impl WpCliComment {

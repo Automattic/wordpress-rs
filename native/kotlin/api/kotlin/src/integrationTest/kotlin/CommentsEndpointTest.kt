@@ -8,6 +8,7 @@ import uniffi.wp_api.CommentDeleteParams
 import uniffi.wp_api.CommentListParams
 import uniffi.wp_api.CommentRetrieveParams
 import uniffi.wp_api.CommentStatus
+import uniffi.wp_api.CommentUpdateParams
 import uniffi.wp_api.SparseCommentFieldWithEditContext
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
@@ -95,6 +96,16 @@ class CommentsEndpointTest {
             requestBuilder.comments().trash(commentId = 1, CommentDeleteParams())
         }.assertSuccessAndRetrieveData().data
         assertEquals(CommentStatus.Trash, trashedComment.status)
+        restoreTestServer()
+    }
+
+    @Test
+    fun updateCommentRequest() = runTest {
+        val updatedComment = client.request { requestBuilder ->
+            requestBuilder.comments()
+                .update(commentId = 1, CommentUpdateParams(content = "foo"))
+        }.assertSuccessAndRetrieveData().data
+        assertEquals("foo", updatedComment.content.raw)
         restoreTestServer()
     }
 }
