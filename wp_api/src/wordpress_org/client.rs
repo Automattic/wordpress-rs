@@ -24,16 +24,37 @@ impl WordPressOrgApiClient {
         &self,
         slug: &str,
     ) -> Result<PluginInformation, WordPressOrgApiClientError> {
-        self.execute(self.plugin_information_request(slug)).await
+        self.execute(Self::plugin_information_request(slug)).await
     }
 
-    pub fn browse_plugins_request(
+    pub async fn browse_plugins(
         &self,
         category: Option<WordPressOrgApiPluginDirectoryCategory>,
         page: u64,
         page_size: u64,
+    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
+        let request = Self::browse_plugins_request(category, page, page_size);
+        self.execute(request).await
+    }
+
+    pub async fn search_plugins(
+        &self,
+        search: String,
+        page: u64,
+        page_size: u64,
+    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
+        let request = Self::search_plugins_request(search, page, page_size);
+        self.execute(request).await
+    }
+}
+
+impl WordPressOrgApiClient {
+    pub fn browse_plugins_request(
+        category: Option<WordPressOrgApiPluginDirectoryCategory>,
+        page: u64,
+        page_size: u64,
     ) -> WpNetworkRequest {
-        self.query_plugins_request(page, page_size, |url| match category {
+        Self::query_plugins_request(page, page_size, |url| match category {
             Some(category) => {
                 let mut url = url;
                 url.query_pairs_mut()
@@ -44,42 +65,15 @@ impl WordPressOrgApiClient {
         })
     }
 
-    pub async fn browse_plugins(
-        &self,
-        category: Option<WordPressOrgApiPluginDirectoryCategory>,
-        page: u64,
-        page_size: u64,
-    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
-        let request = self.browse_plugins_request(category, page, page_size);
-        self.execute(request).await
-    }
-
-    pub fn search_plugins_request(
-        &self,
-        search: String,
-        page: u64,
-        page_size: u64,
-    ) -> WpNetworkRequest {
-        self.query_plugins_request(page, page_size, |url| {
+    pub fn search_plugins_request(search: String, page: u64, page_size: u64) -> WpNetworkRequest {
+        Self::query_plugins_request(page, page_size, |url| {
             let mut url = url;
             url.query_pairs_mut().append_pair("search", &search);
             url
         })
     }
 
-    pub async fn search_plugins(
-        &self,
-        search: String,
-        page: u64,
-        page_size: u64,
-    ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
-        let request = self.search_plugins_request(search, page, page_size);
-        self.execute(request).await
-    }
-}
-
-impl WordPressOrgApiClient {
-    fn plugin_information_request(&self, slug: &str) -> WpNetworkRequest {
+    fn plugin_information_request(slug: &str) -> WpNetworkRequest {
         let mut url = Self::plugin_info_api_url();
         url.query_pairs_mut()
             .append_pair("action", "plugin_information")
@@ -88,12 +82,7 @@ impl WordPressOrgApiClient {
         WpNetworkRequest::get(WpEndpointUrl(url.to_string()))
     }
 
-    fn query_plugins_request<F>(
-        &self,
-        page: u64,
-        page_size: u64,
-        url_builder: F,
-    ) -> WpNetworkRequest
+    fn query_plugins_request<F>(page: u64, page_size: u64, url_builder: F) -> WpNetworkRequest
     where
         F: FnOnce(Url) -> Url,
     {
@@ -106,18 +95,16 @@ impl WordPressOrgApiClient {
         WpNetworkRequest::get(WpEndpointUrl(url.to_string()))
     }
 
+    fn plugin_info_api_url() -> Url {
+        Url::parse("https://api.wordpress.org/plugins/info/1.2/").expect("The URL is valid")
+    }
+
     async fn execute<T>(&self, request: WpNetworkRequest) -> Result<T, WordPressOrgApiClientError>
     where
         T: DeserializeOwned,
     {
         let response = self.request_executor.execute(Arc::new(request)).await?;
         Self::parse(response)
-    }
-}
-
-impl WordPressOrgApiClient {
-    fn plugin_info_api_url() -> Url {
-        Url::parse("https://api.wordpress.org/plugins/info/1.2/").expect("The URL is valid")
     }
 
     fn parse<T>(response: WpNetworkResponse) -> Result<T, WordPressOrgApiClientError>
@@ -195,52 +182,17 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    use crate::{
-        request::{endpoint::media_endpoint::MediaUploadRequest, RequestExecutor},
-        MediaUploadRequestExecutionError,
-    };
-    use std::sync::Arc;
-
-    #[derive(Debug)]
-    struct MockRequestExecutor;
-
-    #[async_trait::async_trait]
-    impl RequestExecutor for MockRequestExecutor {
-        async fn execute(
-            &self,
-            _wp_request: Arc<WpNetworkRequest>,
-        ) -> std::result::Result<WpNetworkResponse, RequestExecutionError> {
-            Err(RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
-                reason: "Mocked request executor".to_string(),
-            })
-        }
-
-        async fn upload_media(
-            &self,
-            media_upload_request: Arc<MediaUploadRequest>,
-        ) -> std::result::Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-            unimplemented!(
-                "upload_media is not implemented for sending requests to api.wordpress.org"
-            )
-        }
-    }
 
     #[test]
     fn test_plugin_info_requests_include_icons() {
-        let request_executor = Arc::new(MockRequestExecutor {});
-        let client = WordPressOrgApiClient::new(request_executor.clone());
-        let request = client.plugin_information_request("akismet");
+        let request = WordPressOrgApiClient::plugin_information_request("akismet");
         assert!(request.url.0.contains("fields=icons"));
     }
 
     #[test]
     fn test_search_does_not_include_pagination() {
-        let request_executor = Arc::new(MockRequestExecutor {});
-        let client = WordPressOrgApiClient::new(request_executor.clone());
-        let request = client.search_plugins_request("akismet".to_string(), 3, 24);
+        let request = WordPressOrgApiClient::search_plugins_request("akismet".to_string(), 3, 24);
 
         // The 'request[x]' parameters do not work for the search endpoint.
         // The 'page' and 'per_page' parameters do.
