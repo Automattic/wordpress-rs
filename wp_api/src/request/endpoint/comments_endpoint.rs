@@ -1,5 +1,5 @@
 use crate::comments::{
-    CommentId, CommentListParams, SparseCommentFieldWithEditContext,
+    CommentId, CommentListParams, CommentUpdateParams, SparseCommentFieldWithEditContext,
     SparseCommentFieldWithEmbedContext, SparseCommentFieldWithViewContext,
 };
 use crate::SparseField;
@@ -18,6 +18,8 @@ enum CommentsRequest {
     Delete,
     #[delete(url = "/comments/<comment_id>", params = &crate::comments::CommentDeleteParams, output = crate::comments::CommentWithEditContext)]
     Trash,
+    #[post(url = "/comments/<comment_id>", params = &CommentUpdateParams, output = crate::comments::CommentWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for CommentsRequest {
