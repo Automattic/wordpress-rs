@@ -61,58 +61,22 @@ release-on-ci:
 	@echo "Swift package will be released by https://buildkite.com/automattic/wordpress-rs/builds/$$(jq -r '.number' .build/buildkite_release_job_response.json)"
 	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
 
-apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
-apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
-apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
-apple-platform-targets-watchos := arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
-apple-platform-targets := \
-	$(apple-platform-targets-macos) \
-	$(apple-platform-targets-ios) \
-	$(apple-platform-targets-tvos) \
-	$(apple-platform-targets-watchos)
-
 ifeq ($(BUILDKITE), true)
 CARGO_PROFILE ?= release
-CARGO_PROFILE_DIRNAME := release
 else
 CARGO_PROFILE ?= dev
-CARGO_PROFILE_DIRNAME := debug
 endif
 
-cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'profile.$(CARGO_PROFILE).panic="abort"'
-
-# Set deployment targets for each platform
-_build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
-_build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
-_build-apple-%-tvos _build-apple-%-tvos-sim: export TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos)
-_build-apple-%-watchos _build-apple-%-watchos-sim: export WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos)
-
-# Use nightly toolchain for tvOS and watchOS
-_build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-%-watchos-sim: \
-	CARGO_OPTS = +$(rust_nightly_toolchain) -Z build-std=panic_abort,std
-
-# Build the library for a specific target
-_build-apple-%:
-	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
-	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libwp_api.a
-
-# Build the library for one single platform, including real device and simulator.
-build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
-build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-ios))
-build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
-build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
-
 # Creating xcframework for one single platform, including real device and simulator.
-xcframework-only-macos: $(build-apple-platform-macos)
-xcframework-only-ios: $(build-apple-platform-ios)
-xcframework-only-tvos: $(build-apple-platform-tvos)
-xcframework-only-watchos: $(build-apple-platform-watchos)
-xcframework-only-%:
-	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+xcframework-only-macos:
+	cargo run -q --bin swift_helper_cli build --package wp_api --profile $(CARGO_PROFILE) --ffi-module-name libwordpressFFI --only-macos
+
+xcframework-only-ios:
+	cargo run -q --bin swift_helper_cli build --package wp_api --profile $(CARGO_PROFILE) --ffi-module-name libwordpressFFI --only-ios
 
 # Creating xcframework for all platforms.
-xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
-	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
+xcframework-all:
+	cargo run -q --bin swift_helper_cli build --package wp_api --profile $(CARGO_PROFILE) --ffi-module-name libwordpressFFI
 
 ifeq ($(SKIP_PACKAGE_WP_API),true)
 xcframework:
@@ -123,11 +87,13 @@ endif
 
 xcframework-package: xcframework-all
 	rm -rf libwordpressFFI.xcframework.zip
-	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ libwordpressFFI.xcframework.zip
+	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI/libwordpressFFI.xcframework/ libwordpressFFI.xcframework.zip
 
 xcframework-package-checksum:
 	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
 
+generate-swift-package-manifest:
+	cargo run -q --bin swift_helper_cli generate-package --package wp_api --ffi-module-name libwordpressFFI --project-name wordpress-rs --package-name-map wp_api:WordpressAPI
 
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .

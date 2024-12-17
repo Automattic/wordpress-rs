@@ -66,7 +66,7 @@ steps:
 
           echo "--- :swift: Building xcframework"
           make xcframework
-          zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
+          zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI/libwordpressFFI.xcframework
         artifact_paths:
           - target/libwordpressFFI.xcframework.zip
           - native/swift/Sources/wordpress-api-wrapper/wp_api.swift

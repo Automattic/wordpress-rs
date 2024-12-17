@@ -6,6 +6,9 @@ set -euo pipefail
 
 export SKIP_PACKAGE_WP_API=true
 
+echo "--- :swift: Generating Package.swift"
+make generate-swift-package-manifest
+
 function run_tests() {
     local platform; platform=$1
     echo "--- :swift: Testing on $platform simulator"

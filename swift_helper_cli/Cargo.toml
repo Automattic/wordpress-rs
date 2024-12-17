@@ -1,0 +1,8 @@
+[package]
+name = "swift_helper_cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uniffi-swift-helper = { workspace = true }
+anyhow = { version = "1.0" }
