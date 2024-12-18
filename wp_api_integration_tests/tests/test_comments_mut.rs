@@ -1,8 +1,8 @@
 use macro_helper::generate_update_test;
 use serial_test::serial;
 use wp_api::comments::{
-    CommentCreateParams, CommentDeleteParams, CommentStatus, CommentUpdateParams,
-    CommentWithEditContext,
+    CommentCreateParams, CommentCreateParamsBuilder, CommentDeleteParams, CommentStatus,
+    CommentUpdateParams, CommentWithEditContext,
 };
 use wp_api_integration_tests::{
     api_client,
@@ -29,7 +29,9 @@ async fn create_comment_with_just_content() {
 #[serial]
 async fn create_comment_with_content_and_status() {
     test_create_comment(
-        &CommentCreateParams::with_status(FIRST_POST_ID, "foo".to_string(), CommentStatus::Hold),
+        &CommentCreateParamsBuilder::new(FIRST_POST_ID, "foo".to_string())
+            .status(Some(CommentStatus::Hold))
+            .build(),
         |created_comment, comment_from_wp_cli| {
             assert_eq!(created_comment.content.raw, "foo");
             assert_eq!(created_comment.status, CommentStatus::Hold);

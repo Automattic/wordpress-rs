@@ -143,16 +143,52 @@ pub enum WpErrorCode {
     CannotManagePlugins,
     #[serde(rename = "rest_cannot_read_application_password")]
     CannotReadApplicationPassword,
+    #[serde(rename = "rest_cannot_read")]
+    CannotRead,
+    #[serde(rename = "rest_cannot_read_post")]
+    CannotReadPost,
     #[serde(rename = "rest_cannot_view")]
     CannotView,
     #[serde(rename = "rest_cannot_view_plugin")]
     CannotViewPlugin,
     #[serde(rename = "rest_cannot_view_plugins")]
     CannotViewPlugins,
+    #[serde(rename = "comment_author_column_length")]
+    CommentAuthorColumnLength,
+    #[serde(rename = "rest_comment_author_data_required")]
+    CommentAuthorDataRequired,
+    #[serde(rename = "comment_author_email_column_length")]
+    CommentAuthorEmailColumnLength,
+    #[serde(rename = "rest_comment_author_invalid")]
+    CommentAuthorInvalid,
+    #[serde(rename = "comment_author_url_column_length")]
+    CommentAuthorUrlColumnLength,
+    #[serde(rename = "rest_comment_closed")]
+    CommentClosed,
+    #[serde(rename = "comment_content_column_length")]
+    ContentColumnLength,
+    #[serde(rename = "rest_comment_content_invalid")]
+    CommentContentInvalid,
+    #[serde(rename = "rest_comment_draft_post")]
+    CommentDraftPost,
+    #[serde(rename = "rest_comment_invalid_author")]
+    CommentInvalidAuthor,
+    #[serde(rename = "rest_comment_invalid_author_ip")]
+    CommentInvalidAuthorIp,
+    #[serde(rename = "rest_comment_invalid_id")]
+    CommentInvalidId,
+    #[serde(rename = "rest_comment_invalid_post_id")]
+    CommentInvalidPostId,
+    #[serde(rename = "rest_comment_invalid_status")]
+    CommentInvalidStatus,
+    #[serde(rename = "rest_comment_trash_post")]
+    CommentTrashPost,
     #[serde(rename = "empty_content")]
     EmptyContent,
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
+    #[serde(rename = "rest_forbidden_param")]
+    ForbiddenParam,
     #[serde(rename = "rest_forbidden_orderby")]
     ForbiddenOrderBy,
     #[serde(rename = "rest_forbidden_who")]
@@ -218,6 +254,16 @@ pub enum WpErrorCode {
     CannotPublish,
     #[serde(rename = "rest_cannot_read_type")]
     CannotReadType,
+    #[serde(rename = "comment_duplicate")]
+    CommentDuplicate,
+    #[serde(rename = "rest_comment_failed_create")]
+    CommentFailedCreate,
+    #[serde(rename = "rest_comment_failed_edit")]
+    CommentFailedEdit,
+    #[serde(rename = "comment_flood")]
+    CommentFlood,
+    #[serde(rename = "rest_comment_login_required")]
+    CommentLoginRequired,
     #[serde(rename = "rest_forbidden_status")]
     ForbiddenStatus,
     #[serde(rename = "rest_image_not_edited")]
@@ -273,11 +319,17 @@ pub enum WpErrorCode {
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_activate_plugin")]
     CannotActivatePlugin,
+    // If the create comment request includes an id.
+    #[serde(rename = "rest_comment_exists")]
+    CommentExists,
     /// If a plugin is tried to be deactivated without the `deactivate_plugin` permission.
     /// However, in a default setup a prior check of `deactivate_plugin` will fail
     /// resulting in `CannotManagePlugins` error instead.
     #[serde(rename = "rest_cannot_deactivate_plugin")]
     CannotDeactivatePlugin,
+    // If a `comment_type` parameter is passed while creating / editing a comment.
+    #[serde(rename = "rest_invalid_comment_type")]
+    InvalidCommentType,
     // If the create post request includes an id.
     #[serde(rename = "rest_post_exists")]
     PostExists,
