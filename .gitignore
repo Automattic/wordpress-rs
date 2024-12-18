@@ -32,6 +32,7 @@ DerivedData
 fastlane/report.xml
 libwordPressFFI.xcframework*
 /Package.swift
+/Package.resolved
 
 # Auto-generated Swift Files
 native/swift/Sources/wordpress-api-wrapper/*.swift
