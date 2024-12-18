@@ -69,14 +69,14 @@ endif
 
 # Creating xcframework for one single platform, including real device and simulator.
 xcframework-only-macos:
-	cargo run -q --bin swift_helper_cli build --package wp_api --profile $(CARGO_PROFILE) --ffi-module-name libwordpressFFI --only-macos
+	cargo run -q --bin swift_helper_cli build --profile $(CARGO_PROFILE) --only-macos
 
 xcframework-only-ios:
-	cargo run -q --bin swift_helper_cli build --package wp_api --profile $(CARGO_PROFILE) --ffi-module-name libwordpressFFI --only-ios
+	cargo run -q --bin swift_helper_cli build --profile $(CARGO_PROFILE) --only-ios
 
 # Creating xcframework for all platforms.
 xcframework-all:
-	cargo run -q --bin swift_helper_cli build --package wp_api --profile $(CARGO_PROFILE) --ffi-module-name libwordpressFFI
+	cargo run -q --bin swift_helper_cli build --profile $(CARGO_PROFILE)
 
 ifeq ($(SKIP_PACKAGE_WP_API),true)
 xcframework:
@@ -93,17 +93,13 @@ xcframework-package-checksum:
 	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
 
 generate-swift-package-manifest:
-	cargo run -q --bin swift_helper_cli generate-package --package wp_api --ffi-module-name libwordpressFFI --project-name wordpress-rs --package-name-map wp_api:WordpressAPI
+	cargo run -q --bin swift_helper_cli generate-package --project-name wordpress-rs
 
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
 
 swift-linux-library:
-	cargo build --release --package wp_api
-	./scripts/swift-bindings.sh target/release/libwp_api.a
-	mkdir -p target/release/libwordpressFFI-linux
-	cp target/release/swift-bindings/Headers/* target/release/libwordpressFFI-linux/
-	cp target/release/libwp_api.a target/release/libwordpressFFI-linux/
+	cargo run -q --bin swift_helper_cli build --profile $(CARGO_PROFILE)
 
 swift-example-app: swift-example-app-mac swift-example-app-ios
 
@@ -119,8 +115,8 @@ test-swift:
 test-swift-linux: docker-image-swift
 	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
 
-test-swift-linux-in-docker: swift-linux-library
-	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_api
+test-swift-linux-in-docker: swift-linux-library generate-swift-package-manifest
+	swift test -Xlinker -Ltarget/libwordpressFFI/linux -Xlinker -lwordpressFFI
 
 test-swift-darwin: xcframework
 	swift test

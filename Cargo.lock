@@ -2899,7 +2899,7 @@ dependencies = [
 [[package]]
 name = "uniffi-swift-helper"
 version = "0.1.0"
-source = "git+https://github.com/automattic/uniffi-swift-helper.git?branch=real-stuff#d48ae27a66727a8fcc526e3325c2a35a8ca9eeda"
+source = "git+https://github.com/automattic/uniffi-swift-helper.git?branch=real-stuff#dea8a44077fab77d4f2857f98adb1fb92e8cda12"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.19.1",
@@ -2907,7 +2907,7 @@ dependencies = [
  "pathdiff",
  "rinja",
  "serde_json",
- "tempfile",
+ "toml 0.8.15",
  "uniffi",
  "uniffi_bindgen",
 ]
