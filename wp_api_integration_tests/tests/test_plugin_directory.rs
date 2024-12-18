@@ -1,46 +1,29 @@
 use std::{
     env,
     io::{self, Write},
+    sync::Arc,
 };
 
-use wp_api::wordpress_org::plugin_directory::*;
+use wp_api::wordpress_org::client::{
+    WordPressOrgApiClient, WordPressOrgApiPluginDirectoryCategory,
+};
 
-async fn query_plugins_slugs(url: &str) -> Result<Vec<String>, reqwest::Error> {
-    reqwest::get(url)
-        .await?
-        .json::<QueryPluginResponse>()
-        .await?
-        .plugins
-        .into_iter()
-        .map(|p| Ok(p.slug))
-        .collect()
-}
+use wp_api_integration_tests::AsyncWpNetworking;
 
-async fn plugin_information(slug: &str) -> Result<PluginInformation, reqwest::Error> {
-    let url = format!(
-        "https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]={}&fields=icons",
-        slug
-    );
-    reqwest::get(&url)
-        .await?
-        .json::<PluginInformation>()
-        .await
-        .map_err(Into::into)
+fn wordpress_org_api_client() -> WordPressOrgApiClient {
+    WordPressOrgApiClient::new(Arc::new(AsyncWpNetworking::default()))
 }
 
 #[tokio::test]
 async fn test_parsing_full_plugin_directory() {
+    let client = wordpress_org_api_client();
+
     let page_size: u64;
     let total_pages: u64;
     if env::var("TEST_ALL_PLUGINS").is_ok() {
         println!("Checking how many pages to fetch...");
         page_size = 200;
-        let url = format!(
-            "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}",
-            page_size
-        );
-        let response = reqwest::get(&url).await.unwrap();
-        let response = response.json::<QueryPluginResponse>().await.unwrap();
+        let response = client.browse_plugins(None, 1, page_size).await.unwrap();
         total_pages = response.info.pages;
     } else {
         println!("Only a small amount of plugins will be fetched.");
@@ -51,19 +34,18 @@ async fn test_parsing_full_plugin_directory() {
     let mut query_plugins_failures = Vec::new();
     let mut all_slugs: Vec<String> = Vec::new();
     for page in 1..=total_pages {
-        let url = format!(
-            "https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request[per_page]={}&request[page]={}",
-            page_size, page
-        );
-        let slugs = query_plugins_slugs(&url).await;
+        let slugs: Result<Vec<_>, _> = client
+            .browse_plugins(None, page, page_size)
+            .await
+            .map(|r| r.plugins.into_iter().map(|p| p.slug).collect());
         match slugs {
             Ok(slugs) => {
                 print!(".");
                 all_slugs.extend(slugs);
             }
             Err(e) => {
-                print!("F({})", &url);
-                query_plugins_failures.push((url, e));
+                print!("F({})", page);
+                query_plugins_failures.push((page, e));
             }
         }
         _ = io::stdout().flush();
@@ -74,7 +56,7 @@ async fn test_parsing_full_plugin_directory() {
 
     let mut plugin_information_failures = Vec::new();
     for slug in all_slugs {
-        let info = plugin_information(&slug).await;
+        let info = client.plugin_information(&slug).await;
         if let Err(e) = info {
             print!("F({})", slug);
             plugin_information_failures.push((slug.to_string(), e));
@@ -86,8 +68,8 @@ async fn test_parsing_full_plugin_directory() {
     println!();
 
     println!("{} query plugins failures:", query_plugins_failures.len());
-    for (url, e) in &query_plugins_failures {
-        println!("  - {:?} : {:?}", url, e);
+    for (page, e) in &query_plugins_failures {
+        println!("  - Page {:?}, page size {:?} : {:?}", page, page_size, e);
     }
 
     println!(
@@ -100,4 +82,34 @@ async fn test_parsing_full_plugin_directory() {
 
     assert!(query_plugins_failures.is_empty());
     assert!(plugin_information_failures.is_empty())
+}
+
+#[tokio::test]
+#[rstest::rstest]
+#[case(WordPressOrgApiPluginDirectoryCategory::New)]
+#[case(WordPressOrgApiPluginDirectoryCategory::Popular)]
+#[case(WordPressOrgApiPluginDirectoryCategory::Updated)]
+#[case(WordPressOrgApiPluginDirectoryCategory::TopRated)]
+async fn test_browse_plugins(#[case] category: WordPressOrgApiPluginDirectoryCategory) {
+    use wp_api_integration_tests::AssertResponse;
+    let response = wordpress_org_api_client()
+        .browse_plugins(Some(category), 1, 30)
+        .await
+        .assert_response();
+    assert!(!response.plugins.is_empty());
+}
+
+#[tokio::test]
+async fn test_search_plugins() {
+    use wp_api_integration_tests::AssertResponse;
+    let plugins = wordpress_org_api_client()
+        .search_plugins("jetpack-social".to_string(), 1, 30)
+        .await
+        .assert_response()
+        .plugins;
+    assert!(
+        plugins.iter().any(|p| p.slug == "jetpack-social"),
+        "Plugins search result doesn't contain 'jetpack-social': {:#?}",
+        plugins
+    );
 }

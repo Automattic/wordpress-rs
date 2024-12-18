@@ -185,6 +185,17 @@ impl WpNetworkRequest {
     }
 }
 
+impl WpNetworkRequest {
+    pub fn get(url: WpEndpointUrl) -> Self {
+        Self {
+            method: RequestMethod::GET,
+            url,
+            header_map: Arc::new(WpNetworkHeaderMap::default()),
+            body: None,
+        }
+    }
+}
+
 impl Debug for WpNetworkRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = format!(
