@@ -3,6 +3,8 @@ steps:
     command: |
       echo "--- :rust: Testing"
       make test-rust-integration-wordpress-org-api
+    agents:
+      queue: tumblr-metal
     env:
       TEST_ALL_PLUGINS: true
 
