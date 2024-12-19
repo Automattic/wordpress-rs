@@ -416,22 +416,70 @@ impl CommentCreateParams {
             status: None,
         }
     }
+}
 
-    pub fn with_status(post: PostId, content: String, status: CommentStatus) -> Self {
+#[derive(Debug)]
+pub struct CommentCreateParamsBuilder {
+    params: CommentCreateParams,
+}
+
+impl CommentCreateParamsBuilder {
+    pub fn new(post: PostId, content: String) -> Self {
         Self {
-            post,
-            author: None,
-            author_email: None,
-            author_ip: None,
-            author_name: None,
-            author_url: None,
-            author_user_agent: None,
-            content: Some(content),
-            date: None,
-            date_gmt: None,
-            parent: None,
-            status: Some(status),
+            params: CommentCreateParams::new(post, content),
         }
+    }
+
+    pub fn author(mut self, author: Option<UserId>) -> Self {
+        self.params.author = author;
+        self
+    }
+
+    pub fn author_email(mut self, author_email: Option<String>) -> Self {
+        self.params.author_email = author_email;
+        self
+    }
+
+    pub fn author_ip(mut self, author_ip: Option<String>) -> Self {
+        self.params.author_ip = author_ip;
+        self
+    }
+
+    pub fn author_name(mut self, author_name: Option<String>) -> Self {
+        self.params.author_name = author_name;
+        self
+    }
+    pub fn author_url(mut self, author_url: Option<String>) -> Self {
+        self.params.author_url = author_url;
+        self
+    }
+
+    pub fn author_user_agent(mut self, author_user_agent: Option<String>) -> Self {
+        self.params.author_user_agent = author_user_agent;
+        self
+    }
+    pub fn date(mut self, date: Option<String>) -> Self {
+        self.params.date = date;
+        self
+    }
+
+    pub fn date_gmt(mut self, date_gmt: Option<String>) -> Self {
+        self.params.date_gmt = date_gmt;
+        self
+    }
+
+    pub fn parent(mut self, parent: Option<CommentId>) -> Self {
+        self.params.parent = parent;
+        self
+    }
+
+    pub fn status(mut self, status: Option<CommentStatus>) -> Self {
+        self.params.status = status;
+        self
+    }
+
+    pub fn build(self) -> CommentCreateParams {
+        self.params
     }
 }
 

@@ -45,13 +45,17 @@ pub const FIRST_USER_EMAIL: &str = "test@example.com";
 pub const SECOND_USER_ID: UserId = UserId(2);
 pub const SECOND_USER_EMAIL: &str = "themeshaperwp+demos@gmail.com";
 pub const SECOND_USER_SLUG: &str = "themedemos";
+pub const USER_ID_INVALID: UserId = UserId(99999999);
 pub const HELLO_DOLLY_PLUGIN_SLUG: &str = "hello-dolly/hello";
 pub const CLASSIC_EDITOR_PLUGIN_SLUG: &str = "classic-editor/classic-editor";
 pub const WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS: &str = "classic-widgets";
 pub const FIRST_COMMENT_ID: CommentId = CommentId(1);
 pub const SECOND_COMMENT_ID: CommentId = CommentId(2);
+pub const COMMENT_ID_INVALID: CommentId = CommentId(99999999);
 pub const FIRST_POST_ID: PostId = PostId(1);
 pub const POST_ID_555: PostId = PostId(555);
+pub const POST_ID_DRAFT: PostId = PostId(1164);
+pub const POST_ID_INVALID: PostId = PostId(99999999);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test_media.jpg";
 pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
@@ -128,7 +132,7 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
                 expected_error_code, error_code, response
             );
         } else {
-            panic!("Unexpected wp_error '{:?}'", err);
+            panic!("Unexpected wp_error '{}'", err);
         }
     }
 }
