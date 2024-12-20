@@ -13,10 +13,10 @@ name = "wp_api"
 [dependencies]
 async-trait = { workspace = true }
 base64 = { workspace = true }
+chrono = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
 indoc = { workspace = true }
-url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
@@ -25,6 +25,7 @@ serde_json = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
+url = { workspace = true }
 uuid = { workspace = true, features = [ "v4" ] }
 wp_contextual = { path = "../wp_contextual" }
 wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }

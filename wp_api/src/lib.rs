@@ -20,6 +20,7 @@ mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
 pub mod comments;
+pub mod date;
 pub mod login;
 pub mod media;
 pub mod plugins;

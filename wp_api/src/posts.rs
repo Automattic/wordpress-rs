@@ -6,6 +6,7 @@ use wp_contextual::WpContextual;
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 use crate::{
+    date::WpDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     media::MediaId,
     url_query::{
@@ -370,7 +371,7 @@ pub struct PostCreateParams {
     // The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpDateTime>,
     // An alphanumeric identifier for the post unique to its type.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -448,7 +449,7 @@ pub struct PostUpdateParams {
     // The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpDateTime>,
     // An alphanumeric identifier for the post unique to its type.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -569,7 +570,7 @@ pub struct SparsePost {
     #[WpContext(edit, embed, view)]
     pub date: Option<String>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpDateTime>,
     #[WpContext(edit, view)]
     #[WpContextualField]
     pub guid: Option<SparsePostGuid>,

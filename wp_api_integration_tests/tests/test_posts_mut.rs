@@ -164,9 +164,9 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    "2024-09-09T12:00:00".to_string(),
+    "2024-09-09T12:00:00".parse().expect("Can't fail"),
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.date_gmt, "2024-09-09T12:00:00");
+        assert_eq!(updated_post.date_gmt.to_string(), "2024-09-09T12:00:00");
         assert_eq!(updated_post_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }
 );
