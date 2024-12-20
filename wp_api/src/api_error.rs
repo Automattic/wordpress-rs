@@ -211,6 +211,8 @@ pub enum WpErrorCode {
     PostInvalidId,
     #[serde(rename = "rest_post_invalid_page_number")]
     PostInvalidPageNumber,
+    #[serde(rename = "rest_taxonomy_invalid")]
+    TaxonomyInvalid,
     #[serde(rename = "rest_type_invalid")]
     TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]

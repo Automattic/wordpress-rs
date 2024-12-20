@@ -8,7 +8,6 @@ use wp_api::post_types::{
 
 use wp_api_integration_tests::{api_client, AssertResponse};
 
-#[rstest]
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_edit_context() {
@@ -28,7 +27,6 @@ async fn list_post_types_with_edit_context() {
     );
 }
 
-#[rstest]
 #[tokio::test]
 #[parallel]
 async fn list_post_types_with_embed_context() {
