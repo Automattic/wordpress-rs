@@ -90,6 +90,9 @@ public typealias PostWithEmbedContext = WordPressAPIInternal.PostWithEmbedContex
 public typealias PostListParams = WordPressAPIInternal.PostListParams
 public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
 extension PostsRequestExecutor: @unchecked Sendable {}
+extension PostWithEditContext: @unchecked Sendable {}
+extension PostWithViewContext: @unchecked Sendable {}
+extension PostWithEmbedContext: @unchecked Sendable {}
 
 public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.PostsRequestListWithEditContextResponse
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
