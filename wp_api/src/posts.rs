@@ -8,6 +8,7 @@ use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_s
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     media::MediaId,
+    tags::TagId,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
@@ -533,19 +534,6 @@ impl FromStr for PostId {
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl_as_query_value_for_new_type!(TagId);
-uniffi::custom_newtype!(TagId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TagId(pub i64);
-
-impl FromStr for TagId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
     }
 }
 
