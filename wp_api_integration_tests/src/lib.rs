@@ -5,11 +5,12 @@ use std::sync::Arc;
 use wp_api::{
     comments::CommentId,
     media::MediaId,
-    posts::{CategoryId, PostId, TagId},
+    posts::{CategoryId, PostId},
     request::{
         endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
         WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
+    tags::TagId,
     users::UserId,
     MediaUploadRequestExecutionError, ParsedUrl, RequestExecutionError, WpApiClient, WpApiError,
     WpAuthentication, WpErrorCode,

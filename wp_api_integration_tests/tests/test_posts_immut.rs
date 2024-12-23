@@ -4,9 +4,10 @@ use serial_test::parallel;
 use wp_api::posts::{
     CategoryId, PostId, PostListParams, PostRetrieveParams, PostStatus,
     SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
-    SparsePostFieldWithViewContext, TagId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
+    SparsePostFieldWithViewContext, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
     WpApiParamPostsTaxRelation,
 };
+use wp_api::tags::TagId;
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
     api_client, AssertResponse, TestCredentials, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID,

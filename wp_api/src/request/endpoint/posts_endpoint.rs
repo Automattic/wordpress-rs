@@ -73,13 +73,14 @@ mod tests {
     use crate::{
         generate,
         posts::{
-            CategoryId, PostRetrieveParams, PostStatus, TagId, WpApiParamPostsOrderBy,
+            CategoryId, PostRetrieveParams, PostStatus, WpApiParamPostsOrderBy,
             WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
         },
         request::endpoint::{
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
+        tags::TagId,
         UserId, WpApiParamOrder,
     };
     use rstest::*;
