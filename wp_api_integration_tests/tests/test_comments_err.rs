@@ -161,7 +161,8 @@ async fn create_err_comment_invalid_author_ip() {
         .comments()
         .create(
             &CommentCreateParamsBuilder::new(FIRST_POST_ID, "foo".to_string())
-                .author_ip(Some("127.0.0.1".to_string()))
+                // A different IP from the one making the request
+                .author_ip(Some("8.8.8.8".to_string()))
                 .build(),
         )
         .await
