@@ -62,4 +62,13 @@ class TagsEndpointTest {
         }.assertSuccessAndRetrieveData().data
         assertNull(tag.description)
     }
+
+    @Test
+    fun deleteTagRequest() = runTest {
+        val deletedTag = client.request { requestBuilder ->
+            requestBuilder.tags().delete(tagId = TAG_ID_100)
+        }.assertSuccessAndRetrieveData().data
+        assert(deletedTag.deleted)
+        restoreTestServer()
+    }
 }

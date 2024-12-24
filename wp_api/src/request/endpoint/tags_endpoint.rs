@@ -14,9 +14,20 @@ enum TagsRequest {
     List,
     #[contextual_get(url = "/tags/<tag_id>", output = crate::tags::SparseTag, filter_by = crate::tags::SparseTagField)]
     Retrieve,
+    #[delete(url = "/tags/<tag_id>", output = crate::tags::TagDeleteResponse)]
+    Delete,
 }
 
 impl DerivedRequest for TagsRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            // The server always returns an error when `force=false`, so a separate `Trash` action
+            // is not implemented.
+            Self::Delete => vec![("force", true.to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
     }

@@ -3,11 +3,13 @@ use std::{collections::HashMap, ffi::OsStr, process::Command};
 mod wp_cli_comments;
 mod wp_cli_posts;
 mod wp_cli_settings;
+mod wp_cli_tags;
 mod wp_cli_users;
 
 pub use wp_cli_comments::*;
 pub use wp_cli_posts::*;
 pub use wp_cli_settings::*;
+pub use wp_cli_tags::*;
 pub use wp_cli_users::*;
 
 const BACKUP_PATH: &str = "/var/www/html/wp-content/dump.sql";
