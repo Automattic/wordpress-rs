@@ -1,6 +1,6 @@
 use serde::{de::DeserializeOwned, Serialize};
-use wp_api::{comments::CommentId, posts::PostId, users::UserId};
-use wp_cli::{WpCliComment, WpCliPost, WpCliSiteSettings, WpCliUser, WpCliUserMeta};
+use wp_api::{comments::CommentId, posts::PostId, tags::TagId, users::UserId};
+use wp_cli::{WpCliComment, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta};
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
 const BACKEND_PATH_RESTORE: &str = "/restore";
@@ -9,6 +9,8 @@ const BACKEND_PATH_COMMENTS: &str = "/wp-cli/comments";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
 const BACKEND_PATH_POST: &str = "/wp-cli/post";
 const BACKEND_PATH_POSTS: &str = "/wp-cli/posts";
+const BACKEND_PATH_TAG: &str = "/wp-cli/tag";
+const BACKEND_PATH_TAGS: &str = "/wp-cli/tags";
 const BACKEND_PATH_USER: &str = "/wp-cli/user";
 const BACKEND_PATH_USERS: &str = "/wp-cli/users";
 const BACKEND_PATH_USER_META: &str = "/wp-cli/user-meta";
@@ -59,6 +61,16 @@ impl Backend {
         Self::get(url)
             .await
             .expect("Failed to parse fetched posts from wp_cli")
+    }
+    pub async fn tag(tag_id: &TagId) -> WpCliTag {
+        Self::get(format!("{}?tag_id={}", BACKEND_PATH_TAG, tag_id))
+            .await
+            .expect("Failed to parse fetched tag from wp_cli")
+    }
+    pub async fn tags() -> Vec<WpCliTag> {
+        Self::get(BACKEND_PATH_TAGS)
+            .await
+            .expect("Failed to parse fetched tags from wp_cli")
     }
     pub async fn user(user_id: &UserId) -> WpCliUser {
         Self::get(format!("{}?user_id={}", BACKEND_PATH_USER, user_id))
