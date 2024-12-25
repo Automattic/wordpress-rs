@@ -3,8 +3,10 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseTagFieldWithEditContext
+import uniffi.wp_api.TagCreateParams
 import uniffi.wp_api.TagListParams
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -61,6 +63,17 @@ class TagsEndpointTest {
             )
         }.assertSuccessAndRetrieveData().data
         assertNull(tag.description)
+    }
+
+    @Test
+    fun createTagRequest() = runTest {
+        val createdTag = client.request { requestBuilder ->
+            requestBuilder.tags()
+                .create(TagCreateParams(name = "foo", description = "bar"))
+        }.assertSuccessAndRetrieveData().data
+        assertEquals(createdTag.name, "foo")
+        assertEquals(createdTag.description, "bar")
+        restoreTestServer()
     }
 
     @Test
