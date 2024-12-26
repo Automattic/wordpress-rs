@@ -147,6 +147,8 @@ pub enum WpErrorCode {
     CannotRead,
     #[serde(rename = "rest_cannot_read_post")]
     CannotReadPost,
+    #[serde(rename = "rest_cannot_update")]
+    CannotUpdate,
     #[serde(rename = "rest_cannot_view")]
     CannotView,
     #[serde(rename = "rest_cannot_view_plugin")]
@@ -213,6 +215,8 @@ pub enum WpErrorCode {
     PostInvalidPageNumber,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
+    #[serde(rename = "rest_term_invalid")]
+    TermInvalid,
     #[serde(rename = "rest_type_invalid")]
     TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]
