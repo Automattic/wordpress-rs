@@ -18,6 +18,8 @@ enum TagsRequest {
     Create,
     #[delete(url = "/tags/<tag_id>", output = crate::tags::TagDeleteResponse)]
     Delete,
+    #[post(url = "/tags/<tag_id>", params = &crate::tags::TagUpdateParams, output = crate::tags::TagWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for TagsRequest {
