@@ -1,5 +1,6 @@
+use macro_helper::generate_update_test;
 use serial_test::serial;
-use wp_api::tags::{TagCreateParams, TagWithEditContext};
+use wp_api::tags::{TagCreateParams, TagUpdateParams, TagWithEditContext};
 use wp_api_integration_tests::backend::{Backend, RestoreServer};
 use wp_api_integration_tests::{api_client, AssertResponse, TAG_ID_100};
 use wp_cli::WpCliTag;
@@ -97,6 +98,36 @@ async fn delete_tag() {
     RestoreServer::db().await;
 }
 
+generate_update_test!(
+    update_description,
+    description,
+    "new_description".to_string(),
+    |updated_tag, updated_tag_from_wp_cli| {
+        assert_eq!(updated_tag.description, "new_description");
+        assert_eq!(updated_tag_from_wp_cli.description, "new_description");
+    }
+);
+
+generate_update_test!(
+    update_name,
+    name,
+    "new_name".to_string(),
+    |updated_tag, updated_tag_from_wp_cli| {
+        assert_eq!(updated_tag.name, "new_name");
+        assert_eq!(updated_tag_from_wp_cli.name, "new_name");
+    }
+);
+
+generate_update_test!(
+    update_slug,
+    slug,
+    "new_slug".to_string(),
+    |updated_tag, updated_tag_from_wp_cli| {
+        assert_eq!(updated_tag.slug, "new_slug");
+        assert_eq!(updated_tag_from_wp_cli.slug, "new_slug");
+    }
+);
+
 async fn test_create_tag<F>(params: &TagCreateParams, assert: F)
 where
     F: Fn(TagWithEditContext, WpCliTag),
@@ -110,4 +141,41 @@ where
     let created_tag_from_wp_cli = Backend::tag(&created_tag.id).await;
     assert(created_tag, created_tag_from_wp_cli);
     RestoreServer::db().await;
+}
+
+async fn test_update_tag<F>(params: &TagUpdateParams, assert: F)
+where
+    F: Fn(TagWithEditContext, WpCliTag),
+{
+    let updated_tag = api_client()
+        .tags()
+        .update(&TAG_ID_100, params)
+        .await
+        .assert_response()
+        .data;
+    let updated_tag_from_wp_cli = Backend::tag(&TAG_ID_100).await;
+    assert(updated_tag, updated_tag_from_wp_cli);
+    RestoreServer::db().await;
+}
+
+mod macro_helper {
+    macro_rules! generate_update_test {
+        ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn $ident() {
+                    let updated_value = $new_value;
+                    test_update_tag(
+                        &TagUpdateParams {
+                            $field: Some(updated_value),
+                            ..Default::default()
+                        }, $assertion)
+                    .await;
+                }
+            }
+        };
+    }
+
+    pub(super) use generate_update_test;
 }
