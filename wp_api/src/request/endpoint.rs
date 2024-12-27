@@ -3,6 +3,7 @@ use url::Url;
 use crate::SparseField;
 
 pub mod application_passwords_endpoint;
+pub mod categories_endpoint;
 pub mod comments_endpoint;
 pub mod media_endpoint;
 pub mod plugins_endpoint;

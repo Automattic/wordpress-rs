@@ -339,6 +339,10 @@ pub enum WpErrorCode {
     // If the create post request includes an id.
     #[serde(rename = "rest_post_exists")]
     PostExists,
+    // If a create/update request to a non-hierarchical endpoint, such as `/tags`, include
+    // `parent` argument
+    #[serde(rename = "rest_taxonomy_not_hierarchical")]
+    TaxonomyNotHierarchical,
     // If `force=true` is missing from delete user request.
     // If trash is not supported for the post type: https://github.com/WordPress/WordPress/blob/6.6.2/wp-includes/rest-api/endpoints/class-wp-rest-posts-controller.php#L1011-L1029
     #[serde(rename = "rest_trash_not_supported")]
