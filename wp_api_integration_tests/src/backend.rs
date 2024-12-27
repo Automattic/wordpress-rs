@@ -1,9 +1,15 @@
 use serde::{de::DeserializeOwned, Serialize};
-use wp_api::{comments::CommentId, posts::PostId, tags::TagId, users::UserId};
-use wp_cli::{WpCliComment, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta};
+use wp_api::{
+    categories::CategoryId, comments::CommentId, posts::PostId, tags::TagId, users::UserId,
+};
+use wp_cli::{
+    WpCliCategory, WpCliComment, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta,
+};
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
 const BACKEND_PATH_RESTORE: &str = "/restore";
+const BACKEND_PATH_CATEGORY: &str = "/wp-cli/category";
+const BACKEND_PATH_CATEGORIES: &str = "/wp-cli/categories";
 const BACKEND_PATH_COMMENT: &str = "/wp-cli/comment";
 const BACKEND_PATH_COMMENTS: &str = "/wp-cli/comments";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
@@ -22,6 +28,19 @@ impl Backend {
     async fn get<T: DeserializeOwned>(path: impl AsRef<str>) -> Result<T, reqwest::Error> {
         let url = format!("{}{}", BACKEND_ADDRESS, path.as_ref());
         reqwest::get(url).await?.json().await
+    }
+    pub async fn category(category_id: &CategoryId) -> WpCliCategory {
+        Self::get(format!(
+            "{}?category_id={}",
+            BACKEND_PATH_CATEGORY, category_id
+        ))
+        .await
+        .expect("Failed to parse fetched category from wp_cli")
+    }
+    pub async fn categories() -> Vec<WpCliCategory> {
+        Self::get(BACKEND_PATH_CATEGORIES)
+            .await
+            .expect("Failed to parse fetched categories from wp_cli")
     }
     pub async fn comment(comment_id: &CommentId) -> WpCliComment {
         Self::get(format!(

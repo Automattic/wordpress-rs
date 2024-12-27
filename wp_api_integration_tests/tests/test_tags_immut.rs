@@ -99,7 +99,7 @@ mod filter {
     #[case(&[SparseTagFieldWithEditContext::Name, SparseTagFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_tags_with_edit_context(
+    async fn filter_list_with_edit_context(
         #[case] fields: &[SparseTagFieldWithEditContext],
         #[values(
             TagListParams::default(),
@@ -124,9 +124,7 @@ mod filter {
     #[case(&[SparseTagFieldWithEditContext::Name, SparseTagFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_retrieve_posts_with_edit_context(
-        #[case] fields: &[SparseTagFieldWithEditContext],
-    ) {
+    async fn filter_retrieve_with_edit_context(#[case] fields: &[SparseTagFieldWithEditContext]) {
         let tag = api_client()
             .tags()
             .filter_retrieve_with_edit_context(&TAG_ID_100, fields)
@@ -140,7 +138,7 @@ mod filter {
     #[case(&[SparseTagFieldWithEmbedContext::Name, SparseTagFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_tags_with_embed_context(
+    async fn filter_list_with_embed_context(
         #[case] fields: &[SparseTagFieldWithEmbedContext],
         #[values(
             TagListParams::default(),
@@ -165,9 +163,7 @@ mod filter {
     #[case(&[SparseTagFieldWithEmbedContext::Name, SparseTagFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_retrieve_posts_with_embed_context(
-        #[case] fields: &[SparseTagFieldWithEmbedContext],
-    ) {
+    async fn filter_retrieve_with_embed_context(#[case] fields: &[SparseTagFieldWithEmbedContext]) {
         let tag = api_client()
             .tags()
             .filter_retrieve_with_embed_context(&TAG_ID_100, fields)
@@ -181,7 +177,7 @@ mod filter {
     #[case(&[SparseTagFieldWithViewContext::Name, SparseTagFieldWithViewContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_tags_with_view_context(
+    async fn filter_list_with_view_context(
         #[case] fields: &[SparseTagFieldWithViewContext],
         #[values(
             TagListParams::default(),
@@ -206,9 +202,7 @@ mod filter {
     #[case(&[SparseTagFieldWithViewContext::Name, SparseTagFieldWithViewContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_retrieve_posts_with_view_context(
-        #[case] fields: &[SparseTagFieldWithViewContext],
-    ) {
+    async fn filter_retrieve_with_view_context(#[case] fields: &[SparseTagFieldWithViewContext]) {
         let tag = api_client()
             .tags()
             .filter_retrieve_with_view_context(&TAG_ID_100, fields)

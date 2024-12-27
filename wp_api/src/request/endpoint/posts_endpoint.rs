@@ -71,10 +71,11 @@ impl SparseField for SparsePostFieldWithViewContext {
 mod tests {
     use super::*;
     use crate::{
+        categories::CategoryId,
         generate,
         posts::{
-            CategoryId, PostRetrieveParams, PostStatus, WpApiParamPostsOrderBy,
-            WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+            PostRetrieveParams, PostStatus, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
+            WpApiParamPostsTaxRelation,
         },
         request::endpoint::{
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},

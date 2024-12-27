@@ -1,11 +1,11 @@
 use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
+use wp_api::categories::CategoryId;
 use wp_api::posts::{
-    CategoryId, PostId, PostListParams, PostRetrieveParams, PostStatus,
-    SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
-    SparsePostFieldWithViewContext, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
-    WpApiParamPostsTaxRelation,
+    PostId, PostListParams, PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
+    SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
+    WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
 };
 use wp_api::tags::TagId;
 use wp_api::{generate, WpApiParamOrder};

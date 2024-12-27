@@ -6,6 +6,7 @@ use wp_contextual::WpContextual;
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 use crate::{
+    categories::CategoryId,
     impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
     media::MediaId,
     tags::TagId,
@@ -534,19 +535,6 @@ impl FromStr for PostId {
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl_as_query_value_for_new_type!(CategoryId);
-uniffi::custom_newtype!(CategoryId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CategoryId(pub i64);
-
-impl FromStr for CategoryId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
     }
 }
 
