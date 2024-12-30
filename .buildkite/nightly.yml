@@ -11,3 +11,4 @@ notify:
       channels:
         - "#wordpress-rs"
       message: "Nightly build."
+    if: build.state == "failed"
