@@ -30,6 +30,7 @@ pub mod request;
 pub mod site_settings;
 pub mod tags;
 pub mod taxonomies;
+pub mod themes;
 pub mod url_query;
 pub mod users;
 pub mod wordpress_org;
@@ -187,6 +188,13 @@ impl TryFrom<BoolOrString> for WpResponseString {
 pub enum BoolOrString {
     Bool(bool),
     String(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum BoolOrVecString {
+    Bool(bool),
+    VecString(Vec<String>),
 }
 
 #[macro_export]

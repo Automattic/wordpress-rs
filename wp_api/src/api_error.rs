@@ -151,10 +151,14 @@ pub enum WpErrorCode {
     CannotUpdate,
     #[serde(rename = "rest_cannot_view")]
     CannotView,
+    #[serde(rename = "rest_cannot_view_active_theme")]
+    CannotViewActiveTheme,
     #[serde(rename = "rest_cannot_view_plugin")]
     CannotViewPlugin,
     #[serde(rename = "rest_cannot_view_plugins")]
     CannotViewPlugins,
+    #[serde(rename = "rest_cannot_view_themes")]
+    CannotViewThemes,
     #[serde(rename = "comment_author_column_length")]
     CommentAuthorColumnLength,
     #[serde(rename = "rest_comment_author_data_required")]
@@ -217,6 +221,8 @@ pub enum WpErrorCode {
     TaxonomyInvalid,
     #[serde(rename = "rest_term_invalid")]
     TermInvalid,
+    #[serde(rename = "rest_theme_not_found")]
+    ThemeNotFound,
     #[serde(rename = "rest_type_invalid")]
     TypeInvalid,
     #[serde(rename = "rest_not_logged_in")]
