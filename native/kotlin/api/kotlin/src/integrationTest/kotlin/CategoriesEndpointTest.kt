@@ -2,7 +2,6 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import uniffi.wp_api.PostListParams
 import uniffi.wp_api.SparseCategoryFieldWithEditContext
 import uniffi.wp_api.CategoryCreateParams
 import uniffi.wp_api.CategoryListParams
@@ -48,7 +47,7 @@ class CategoriesEndpointTest {
     }
 
     @Test
-    fun testRetrieveMediaRequest() = runTest {
+    fun testRetrieveCategoryRequest() = runTest {
         val category = client.request { requestBuilder ->
             requestBuilder.categories().retrieveWithEditContext(CATEGORY_ID_59)
         }.assertSuccessAndRetrieveData().data

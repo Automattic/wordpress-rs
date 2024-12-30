@@ -12,6 +12,7 @@ pub mod posts_endpoint;
 pub mod site_settings_endpoint;
 pub mod tags_endpoint;
 pub mod taxonomies_endpoint;
+pub mod themes_endpoint;
 pub mod users_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
