@@ -9,6 +9,7 @@ use crate::request::{
         plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
         post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
         posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
+        search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
         site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
         tags_endpoint::{TagsRequestBuilder, TagsRequestExecutor},
         taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
@@ -51,6 +52,7 @@ pub struct WpApiRequestBuilder {
     plugins: Arc<PluginsRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
+    search: Arc<SearchRequestBuilder>,
     site_settings: Arc<SiteSettingsRequestBuilder>,
     tags: Arc<TagsRequestBuilder>,
     taxonomies: Arc<TaxonomiesRequestBuilder>,
@@ -72,6 +74,7 @@ impl WpApiRequestBuilder {
             plugins,
             post_types,
             posts,
+            search,
             site_settings,
             tags,
             taxonomies,
@@ -110,6 +113,7 @@ pub struct WpApiClient {
     plugins: Arc<PluginsRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
+    search: Arc<SearchRequestExecutor>,
     site_settings: Arc<SiteSettingsRequestExecutor>,
     tags: Arc<TagsRequestExecutor>,
     taxonomies: Arc<TaxonomiesRequestExecutor>,
@@ -137,6 +141,7 @@ impl WpApiClient {
             plugins,
             post_types,
             posts,
+            search,
             site_settings,
             tags,
             taxonomies,
@@ -154,6 +159,7 @@ api_client_generate_endpoint_impl!(WpApi, media);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);
+api_client_generate_endpoint_impl!(WpApi, search);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
 api_client_generate_endpoint_impl!(WpApi, tags);
 api_client_generate_endpoint_impl!(WpApi, taxonomies);

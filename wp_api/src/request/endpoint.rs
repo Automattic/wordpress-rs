@@ -9,6 +9,7 @@ pub mod media_endpoint;
 pub mod plugins_endpoint;
 pub mod post_types_endpoint;
 pub mod posts_endpoint;
+pub mod search_endpoint;
 pub mod site_settings_endpoint;
 pub mod tags_endpoint;
 pub mod taxonomies_endpoint;
