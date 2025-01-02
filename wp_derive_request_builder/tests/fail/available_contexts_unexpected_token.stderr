@@ -1,0 +1,5 @@
+error: `available_contexts` contains unexpected tokens. It should be a comma separated string: "edit,embed,view"
+ --> tests/fail/available_contexts_unexpected_token.rs:4:5
+  |
+4 |     List,
+  |     ^^^^
