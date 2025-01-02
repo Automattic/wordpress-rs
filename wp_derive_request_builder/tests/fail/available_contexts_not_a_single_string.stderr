@@ -1,0 +1,5 @@
+error: `available_contexts` should be a single comma separated string: "edit,embed,view"
+ --> tests/fail/available_contexts_not_a_single_string.rs:4:5
+  |
+4 |     List,
+  |     ^^^^

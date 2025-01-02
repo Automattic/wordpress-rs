@@ -5,8 +5,6 @@ use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::FoundCrate;
 use quote::{format_ident, quote};
 use serde::{de::Error, Deserialize, Deserializer};
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 use syn::Ident;
 
 use crate::{
@@ -49,6 +47,7 @@ fn generate_async_request_executor(
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
             variant.attr.filter_by.clone(),
+            &variant.attr.available_contexts,
         )
         .into_iter()
         .map(|context_and_filter_handler| {
@@ -86,6 +85,7 @@ fn generate_async_request_executor(
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
             variant.attr.filter_by.clone(),
+            &variant.attr.available_contexts
         )
         .into_iter()
         .map(|context_and_filter_handler| {
@@ -197,6 +197,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
         ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
             variant.attr.filter_by.clone(),
+            &variant.attr.available_contexts,
         )
         .into_iter()
         .map(|context_and_filter_handler| {
@@ -264,33 +265,37 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
         let additional_query_pairs =
             fn_body_additional_query_pairs(&parsed_enum.enum_ident, &variant.variant_ident);
 
-        ContextAndFilterHandler::from_request_type(request_type, variant.attr.filter_by.clone())
-            .into_iter()
-            .map(|context_and_filter_handler| {
-                let fn_signature = fn_signature(
-                    PartOf::Endpoint,
-                    &variant.variant_ident,
-                    url_parts,
-                    params_type.as_ref(),
-                    request_type,
-                    &context_and_filter_handler,
-                );
-                let context_query_pair =
-                    fn_body_context_query_pairs(&config.crate_ident, &context_and_filter_handler);
-                let fields_query_pairs =
-                    fn_body_fields_query_pairs(&config.crate_ident, &context_and_filter_handler);
-                quote! {
-                    pub #fn_signature -> #static_api_endpoint_url_type {
-                        #url_from_api_base_url
-                        #context_query_pair
-                        #query_pairs
-                        #additional_query_pairs
-                        #fields_query_pairs
-                        url.into()
-                    }
+        ContextAndFilterHandler::from_request_type(
+            request_type,
+            variant.attr.filter_by.clone(),
+            &variant.attr.available_contexts,
+        )
+        .into_iter()
+        .map(|context_and_filter_handler| {
+            let fn_signature = fn_signature(
+                PartOf::Endpoint,
+                &variant.variant_ident,
+                url_parts,
+                params_type.as_ref(),
+                request_type,
+                &context_and_filter_handler,
+            );
+            let context_query_pair =
+                fn_body_context_query_pairs(&config.crate_ident, &context_and_filter_handler);
+            let fields_query_pairs =
+                fn_body_fields_query_pairs(&config.crate_ident, &context_and_filter_handler);
+            quote! {
+                pub #fn_signature -> #static_api_endpoint_url_type {
+                    #url_from_api_base_url
+                    #context_query_pair
+                    #query_pairs
+                    #additional_query_pairs
+                    #fields_query_pairs
+                    url.into()
                 }
-            })
-            .collect::<TokenStream>()
+            }
+        })
+        .collect::<TokenStream>()
     });
 
     quote! {
@@ -328,6 +333,7 @@ impl ContextAndFilterHandler {
     fn from_request_type(
         request_type: RequestType,
         filter_by_type: Option<FilterByType>,
+        available_contexts: &[WpContext],
     ) -> Vec<Self> {
         match request_type {
             crate::parse::RequestType::Get => {
@@ -340,11 +346,11 @@ impl ContextAndFilterHandler {
             crate::parse::RequestType::ContextualGet
             | crate::parse::RequestType::ContextualPaged => {
                 let mut v = vec![];
-                WpContext::iter().for_each(|context| {
-                    v.push(Self::NoFilterTakeContextAsFunctionName(context));
+                available_contexts.iter().for_each(|context| {
+                    v.push(Self::NoFilterTakeContextAsFunctionName(*context));
                     if let Some(ref filter_by_type) = filter_by_type {
                         v.push(Self::FilterTakeContextAsFunctionName(
-                            context,
+                            *context,
                             filter_by_type.clone(),
                         ));
                     }
@@ -358,11 +364,17 @@ impl ContextAndFilterHandler {
     }
 }
 
-#[derive(Debug, Clone, Copy, EnumIter)]
+#[derive(Debug, Clone, Copy)]
 pub enum WpContext {
     Edit,
     Embed,
     View,
+}
+
+impl WpContext {
+    pub fn all() -> Vec<Self> {
+        vec![Self::Edit, Self::Embed, Self::View]
+    }
 }
 
 impl Display for WpContext {
