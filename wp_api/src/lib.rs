@@ -27,6 +27,7 @@ pub mod plugins;
 pub mod post_types;
 pub mod posts;
 pub mod request;
+pub mod search_results;
 pub mod site_settings;
 pub mod tags;
 pub mod taxonomies;
@@ -183,18 +184,25 @@ impl TryFrom<BoolOrString> for WpResponseString {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
 #[serde(untagged)]
 pub enum BoolOrString {
     Bool(bool),
     String(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
 #[serde(untagged)]
 pub enum BoolOrVecString {
     Bool(bool),
     VecString(Vec<String>),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
+#[serde(untagged)]
+pub enum IntegerOrString {
+    Integer(i64),
+    String(String),
 }
 
 #[macro_export]
