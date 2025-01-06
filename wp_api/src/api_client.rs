@@ -13,6 +13,7 @@ use crate::request::{
         site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
         tags_endpoint::{TagsRequestBuilder, TagsRequestExecutor},
         taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
+        templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
         themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         wp_site_health_tests_endpoint::{
@@ -56,6 +57,7 @@ pub struct WpApiRequestBuilder {
     site_settings: Arc<SiteSettingsRequestBuilder>,
     tags: Arc<TagsRequestBuilder>,
     taxonomies: Arc<TaxonomiesRequestBuilder>,
+    templates: Arc<TemplatesRequestBuilder>,
     themes: Arc<ThemesRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
@@ -78,6 +80,7 @@ impl WpApiRequestBuilder {
             site_settings,
             tags,
             taxonomies,
+            templates,
             themes,
             users,
             wp_site_health_tests
@@ -117,6 +120,7 @@ pub struct WpApiClient {
     site_settings: Arc<SiteSettingsRequestExecutor>,
     tags: Arc<TagsRequestExecutor>,
     taxonomies: Arc<TaxonomiesRequestExecutor>,
+    templates: Arc<TemplatesRequestExecutor>,
     themes: Arc<ThemesRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
@@ -145,6 +149,7 @@ impl WpApiClient {
             site_settings,
             tags,
             taxonomies,
+            templates,
             themes,
             users,
             wp_site_health_tests
@@ -163,6 +168,7 @@ api_client_generate_endpoint_impl!(WpApi, search);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
 api_client_generate_endpoint_impl!(WpApi, tags);
 api_client_generate_endpoint_impl!(WpApi, taxonomies);
+api_client_generate_endpoint_impl!(WpApi, templates);
 api_client_generate_endpoint_impl!(WpApi, themes);
 api_client_generate_endpoint_impl!(WpApi, users);
 api_client_generate_endpoint_impl!(WpApi, wp_site_health_tests);
