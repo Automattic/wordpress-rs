@@ -31,6 +31,7 @@ pub mod search_results;
 pub mod site_settings;
 pub mod tags;
 pub mod taxonomies;
+pub mod templates;
 pub mod themes;
 pub mod url_query;
 pub mod users;
