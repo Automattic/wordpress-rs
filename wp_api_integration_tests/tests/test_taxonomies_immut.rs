@@ -26,7 +26,7 @@ async fn list_taxonomies_with_edit_context(
         response
             .taxonomy_types
             .get(&expected_taxonomy_type)
-            .expect(format!("Expected to find taxonomy type: {}", expected_taxonomy_type).as_str())
+            .unwrap_or_else(|| panic!("Expected to find taxonomy type: {}", expected_taxonomy_type))
             .name,
         expected_taxonomy_type_name
     );
@@ -50,7 +50,7 @@ async fn list_taxonomies_with_embed_context(
         response
             .taxonomy_types
             .get(&expected_taxonomy_type)
-            .expect(format!("Expected to find taxonomy type: {}", expected_taxonomy_type).as_str())
+            .unwrap_or_else(|| panic!("Expected to find taxonomy type: {}", expected_taxonomy_type))
             .name,
         expected_taxonomy_type_name
     );
@@ -74,7 +74,7 @@ async fn list_taxonomies_with_view_context(
         response
             .taxonomy_types
             .get(&expected_taxonomy_type)
-            .expect(format!("Expected to find taxonomy type: {}", expected_taxonomy_type).as_str())
+            .unwrap_or_else(|| panic!("Expected to find taxonomy type: {}", expected_taxonomy_type))
             .name,
         expected_taxonomy_type_name
     );
