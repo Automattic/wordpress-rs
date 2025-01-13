@@ -11,7 +11,11 @@ use wp_api_integration_tests::{api_client, AssertResponse};
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_taxonomies_with_edit_context(#[case] params: TaxonomyListParams) {
+async fn list_taxonomies_with_edit_context(
+    #[case] params: TaxonomyListParams,
+    #[case] expected_taxonomy_type: TaxonomyType,
+    #[case] expected_taxonomy_type_name: String,
+) {
     let response = api_client()
         .taxonomies()
         .list_with_edit_context(&params)
@@ -21,17 +25,21 @@ async fn list_taxonomies_with_edit_context(#[case] params: TaxonomyListParams) {
     assert_eq!(
         response
             .taxonomy_types
-            .get(&TaxonomyType::Category)
-            .expect("Our local WordPress test site has `category` taxonomy type")
+            .get(&expected_taxonomy_type)
+            .expect(format!("Expected to find taxonomy type: {}", expected_taxonomy_type).as_str())
             .name,
-        "Categories"
+        expected_taxonomy_type_name
     );
 }
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_taxonomies_with_embed_context(#[case] params: TaxonomyListParams) {
+async fn list_taxonomies_with_embed_context(
+    #[case] params: TaxonomyListParams,
+    #[case] expected_taxonomy_type: TaxonomyType,
+    #[case] expected_taxonomy_type_name: String,
+) {
     let response = api_client()
         .taxonomies()
         .list_with_embed_context(&params)
@@ -41,17 +49,21 @@ async fn list_taxonomies_with_embed_context(#[case] params: TaxonomyListParams) 
     assert_eq!(
         response
             .taxonomy_types
-            .get(&TaxonomyType::Category)
-            .expect("Our local WordPress test site has `category` taxonomy type")
+            .get(&expected_taxonomy_type)
+            .expect(format!("Expected to find taxonomy type: {}", expected_taxonomy_type).as_str())
             .name,
-        "Categories"
+        expected_taxonomy_type_name
     );
 }
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_taxonomies_with_view_context(#[case] params: TaxonomyListParams) {
+async fn list_taxonomies_with_view_context(
+    #[case] params: TaxonomyListParams,
+    #[case] expected_taxonomy_type: TaxonomyType,
+    #[case] expected_taxonomy_type_name: String,
+) {
     let response = api_client()
         .taxonomies()
         .list_with_view_context(&params)
@@ -61,10 +73,10 @@ async fn list_taxonomies_with_view_context(#[case] params: TaxonomyListParams) {
     assert_eq!(
         response
             .taxonomy_types
-            .get(&TaxonomyType::Category)
-            .expect("Our local WordPress test site has `category` taxonomy type")
+            .get(&expected_taxonomy_type)
+            .expect(format!("Expected to find taxonomy type: {}", expected_taxonomy_type).as_str())
             .name,
-        "Categories"
+        expected_taxonomy_type_name
     );
 }
 
@@ -103,22 +115,16 @@ async fn retrieve_taxonomies_with_view_context(#[case] taxonomy_type: TaxonomyTy
 
 #[template]
 #[rstest]
-#[case::default(TaxonomyListParams::default())]
-#[case::post(TaxonomyListParams { post_type: Some(PostType::Post) })]
-// TODO: These post types return:
-// ```
-// {"code":"rest_cannot_view","message":"Sorry, you are not allowed to manage terms in this taxonomy.","data":{"status":403}}
-// ```
-//#[case::page(TaxonomyListParams { post_type: Some(PostType::Page) })]
-//#[case::attachment(TaxonomyListParams { post_type: Some(PostType::Attachment) })]
-//#[case::nav_menu_item(TaxonomyListParams { post_type: Some(PostType::NavMenuItem) })]
-//#[case::wp_block(TaxonomyListParams { post_type: Some(PostType::WpBlock) })]
-//#[case::wp_template(TaxonomyListParams { post_type: Some(PostType::WpTemplate) })]
-//#[case::wp_template_part(TaxonomyListParams { post_type: Some(PostType::WpTemplatePart) })]
-//#[case::wp_navigation(TaxonomyListParams { post_type: Some(PostType::WpNavigation) })]
-//#[case::wp_font_family(TaxonomyListParams { post_type: Some(PostType::WpFontFamily) })]
-//#[case::wp_font_face(TaxonomyListParams { post_type: Some(PostType::WpFontFace) })]
-pub fn list_cases(#[case] params: TaxonomyListParams) {}
+#[case::default(TaxonomyListParams::default(), TaxonomyType::Category, "Categories")]
+#[case::post(TaxonomyListParams { post_type: Some(PostType::Post) }, TaxonomyType::Category, "Categories")]
+#[case::nav_menu_item(TaxonomyListParams { post_type: Some(PostType::NavMenuItem) }, TaxonomyType::NavMenu, "Navigation Menus")]
+#[case::wp_block(TaxonomyListParams { post_type: Some(PostType::WpBlock) }, TaxonomyType::WpPatternCategory, "Pattern Categories")]
+pub fn list_cases(
+    #[case] params: TaxonomyListParams,
+    #[case] expected_taxonomy_type: TaxonomyType,
+    #[case] expected_taxonomy_type_name: String,
+) {
+}
 
 #[template]
 #[rstest]
