@@ -57,9 +57,7 @@ impl FromStr for PostType {
             "wp_navigation" => Ok(Self::WpNavigation),
             "wp_font_family" => Ok(Self::WpFontFamily),
             "wp_font_face" => Ok(Self::WpFontFace),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
+            value => Ok(Self::Custom(value.to_string())),
         }
     }
 }
