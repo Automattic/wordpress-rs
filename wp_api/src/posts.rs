@@ -1,4 +1,4 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::{convert::Infallible, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
@@ -715,7 +715,7 @@ impl PostStatus {
 }
 
 impl FromStr for PostStatus {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {

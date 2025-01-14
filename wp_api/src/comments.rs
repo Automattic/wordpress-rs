@@ -1,4 +1,4 @@
-use std::{collections::HashMap, num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, convert::Infallible, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
@@ -117,7 +117,7 @@ impl CommentType {
 }
 
 impl FromStr for CommentType {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -632,7 +632,7 @@ impl CommentStatus {
 }
 
 impl FromStr for CommentStatus {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {

@@ -1,7 +1,8 @@
+use std::convert::Infallible;
 use std::{collections::HashMap, fmt::Display, str::FromStr};
 
+use crate::impl_as_query_value_from_as_str;
 use crate::url_query::AsQueryValue;
-use crate::{impl_as_query_value_from_as_str, EnumFromStrParsingError};
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
@@ -43,7 +44,7 @@ impl PostType {
 }
 
 impl FromStr for PostType {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {

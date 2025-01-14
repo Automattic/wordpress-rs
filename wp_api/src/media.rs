@@ -8,10 +8,10 @@ use crate::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, JsonValue, UserId, WpApiParamOrder,
+    JsonValue, UserId, WpApiParamOrder,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, convert::Infallible, num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -58,7 +58,7 @@ impl MediaType {
 }
 
 impl FromStr for MediaType {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -102,7 +102,7 @@ impl MediaTypeParam {
 }
 
 impl FromStr for MediaTypeParam {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -153,7 +153,7 @@ impl MediaStatus {
 }
 
 impl FromStr for MediaStatus {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
