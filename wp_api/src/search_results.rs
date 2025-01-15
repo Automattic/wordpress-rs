@@ -1,12 +1,11 @@
 use crate::{
-    impl_as_query_value_from_as_str,
+    impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    AsQueryValue, EnumFromStrParsingError, IntegerOrString,
+    AsQueryValue, IntegerOrString,
 };
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -22,88 +21,54 @@ use wp_contextual::WpContextual;
     Serialize,
     Deserialize,
     uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 pub enum SearchResultType {
     #[default]
     #[serde(rename = "post")]
+    #[strum(serialize = "post")]
     Post,
     #[serde(rename = "term")]
+    #[strum(serialize = "term")]
     Term,
     #[serde(rename = "post-format")]
+    #[strum(serialize = "post-format")]
     PostFormat,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(SearchResultType);
-
-impl SearchResultType {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Post => "post",
-            Self::Term => "term",
-            Self::PostFormat => "post-format",
-            Self::Custom(result_type) => result_type,
-        }
-    }
-}
-
-impl FromStr for SearchResultType {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "post" => Ok(Self::Post),
-            "term" => Ok(Self::Term),
-            "post-format" => Ok(Self::PostFormat),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(SearchResultType);
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum SearchResultSubtype {
-    #[serde(rename = "post")]
     Post,
-    #[serde(rename = "page")]
     Page,
-    #[serde(rename = "category")]
     Category,
-    #[serde(rename = "post_tag")]
     PostTag,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(SearchResultSubtype);
-
-impl SearchResultSubtype {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Post => "post",
-            Self::Page => "page",
-            Self::Category => "category",
-            Self::PostTag => "post_tag",
-            Self::Custom(result_type) => result_type,
-        }
-    }
-}
-
-impl FromStr for SearchResultSubtype {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "post" => Ok(Self::Post),
-            "page" => Ok(Self::Page),
-            "category" => Ok(Self::Category),
-            "post_tag" => Ok(Self::PostTag),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(SearchResultSubtype);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct SearchListParams {

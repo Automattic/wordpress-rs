@@ -1,49 +1,40 @@
 use crate::{
-    impl_as_query_value_from_as_str,
+    impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    AsQueryValue, BoolOrVecString, EnumFromStrParsingError,
+    AsQueryValue, BoolOrVecString,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display, str::FromStr};
+use std::{collections::HashMap, fmt::Display};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum ThemeStatus {
     Active,
     Inactive,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(ThemeStatus);
-
-impl ThemeStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Active => "active",
-            Self::Inactive => "inactive",
-            Self::Custom(status) => status,
-        }
-    }
-}
-
-impl FromStr for ThemeStatus {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "active" => Ok(Self::Active),
-            "inactive" => Ok(Self::Inactive),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(ThemeStatus);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct ThemeListParams {

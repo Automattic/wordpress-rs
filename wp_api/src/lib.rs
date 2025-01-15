@@ -8,7 +8,7 @@ pub use api_error::{
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
@@ -81,37 +81,25 @@ fn wp_authentication_from_username_and_password(
     WpAuthentication::from_username_and_password(username, password)
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamOrder {
     #[default]
     Asc,
     Desc,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamOrder);
-
-impl WpApiParamOrder {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Asc => "asc",
-            Self::Desc => "desc",
-        }
-    }
-}
-
-impl FromStr for WpApiParamOrder {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "asc" => Ok(Self::Asc),
-            "desc" => Ok(Self::Desc),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamOrder);
 
 trait SparseField {
     fn as_str(&self) -> &str;
@@ -218,3 +206,31 @@ macro_rules! generate {
 }
 
 uniffi::setup_scaffolding!();
+
+#[cfg(test)]
+mod lib_tests {
+    use super::*;
+    use rstest::*;
+    use url::Url;
+    use url_query::QueryPairsExtension;
+
+    #[rstest]
+    #[case(WpApiParamOrder::Asc, "asc")]
+    #[case(WpApiParamOrder::Desc, "desc")]
+    fn test_order_url_query(#[case] orderby: WpApiParamOrder, #[case] expected: &str) {
+        let mut url = Url::parse("https://example.com").unwrap();
+        url.query_pairs_mut()
+            .append_query_value_pair("orderby", &orderby);
+        assert_eq!(
+            url.query().map(|x| x.to_string()),
+            Some(format!("orderby={}", expected))
+        );
+    }
+
+    #[rstest]
+    #[case(WpApiParamOrder::Asc)]
+    #[case(WpApiParamOrder::Desc)]
+    fn test_orderby_string_conversion(#[case] orderby: WpApiParamOrder) {
+        assert_eq!(orderby, orderby.to_string().parse().unwrap(),);
+    }
+}

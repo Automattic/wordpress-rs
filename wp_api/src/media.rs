@@ -1,5 +1,5 @@
 use crate::{
-    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::{
         PostCommentStatus, PostId, PostPingStatus, PostStatus, WpApiParamPostsOrderBy,
         WpApiParamPostsSearchColumn,
@@ -11,7 +11,7 @@ use crate::{
     JsonValue, UserId, WpApiParamOrder,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::Infallible, num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -35,47 +35,50 @@ impl std::fmt::Display for MediaId {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum MediaType {
     File,
     Image,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(MediaType);
-
-impl MediaType {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::File => "file",
-            Self::Image => "image",
-            Self::Custom(media_type) => media_type,
-        }
-    }
-}
-
-impl FromStr for MediaType {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "file" => Ok(Self::File),
-            "image" => Ok(Self::Image),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(MediaType);
 
 // A separate param type is implemented for `MediaType` because the API will accept types such as
 // "audio" & "application" as a parameter, but it'll return "file" for the value of `media_type`
 // field for these media types.
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum MediaTypeParam {
     Image,
     Video,
@@ -83,38 +86,11 @@ pub enum MediaTypeParam {
     Application,
     Audio,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(MediaTypeParam);
-
-impl MediaTypeParam {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Image => "image",
-            Self::Video => "video",
-            Self::Text => "text",
-            Self::Application => "application",
-            Self::Audio => "audio",
-            Self::Custom(media_type) => media_type,
-        }
-    }
-}
-
-impl FromStr for MediaTypeParam {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "image" => Ok(Self::Image),
-            "video" => Ok(Self::Video),
-            "text" => Ok(Self::Text),
-            "application" => Ok(Self::Application),
-            "audio" => Ok(Self::Audio),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(MediaTypeParam);
 
 #[derive(
     Debug,
@@ -128,42 +104,22 @@ impl FromStr for MediaTypeParam {
     Serialize,
     Deserialize,
     uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum MediaStatus {
     #[default]
     Inherit,
     Private,
     Trash,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(MediaStatus);
-
-impl MediaStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Inherit => "inherit",
-            Self::Private => "private",
-            Self::Trash => "trash",
-            Self::Custom(status) => status,
-        }
-    }
-}
-
-impl FromStr for MediaStatus {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "inherit" => Ok(Self::Inherit),
-            "private" => Ok(Self::Private),
-            "trash" => Ok(Self::Trash),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(MediaStatus);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct MediaListParams {
@@ -499,17 +455,14 @@ impl From<MediaCreateParams> for HashMap<String, String> {
         add("date", params.date);
         add("date_gmt", params.date_gmt);
         add("slug", params.slug);
-        add("status", params.status.map(|x| x.as_str().to_string()));
+        add("status", params.status.map(|x| x.to_string()));
         add("title", params.title);
         add("author", params.author.map(|x| x.to_string()));
         add(
             "comment_status",
-            params.comment_status.map(|x| x.as_str().to_string()),
+            params.comment_status.map(|x| x.to_string()),
         );
-        add(
-            "ping_status",
-            params.ping_status.map(|x| x.as_str().to_string()),
-        );
+        add("ping_status", params.ping_status.map(|x| x.to_string()));
         add("template", params.template);
         add("alt_text", params.alt_text);
         add("caption", params.caption);

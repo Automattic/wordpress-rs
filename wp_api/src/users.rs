@@ -7,8 +7,7 @@ use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 use crate::{
-    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
-    impl_as_query_value_from_to_string,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
@@ -16,7 +15,18 @@ use crate::{
     EnumFromStrParsingError, OptionFromStr, WpApiParamOrder, WpResponseString,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamUsersOrderBy {
     Id,
     Include,
@@ -29,42 +39,7 @@ pub enum WpApiParamUsersOrderBy {
     Url,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamUsersOrderBy);
-
-impl WpApiParamUsersOrderBy {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Id => "id",
-            Self::Include => "include",
-            Self::Name => "name",
-            Self::RegisteredDate => "registered_date",
-            Self::Slug => "slug",
-            Self::IncludeSlugs => "include_slugs",
-            Self::Email => "email",
-            Self::Url => "url",
-        }
-    }
-}
-
-impl FromStr for WpApiParamUsersOrderBy {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "id" => Ok(Self::Id),
-            "include" => Ok(Self::Include),
-            "name" => Ok(Self::Name),
-            "registered_date" => Ok(Self::RegisteredDate),
-            "slug" => Ok(Self::Slug),
-            "include_slugs" => Ok(Self::IncludeSlugs),
-            "email" => Ok(Self::Email),
-            "url" => Ok(Self::Url),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamUsersOrderBy);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpApiParamUsersWho {

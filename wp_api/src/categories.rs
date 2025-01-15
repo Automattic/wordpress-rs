@@ -5,14 +5,14 @@ use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 use crate::{
-    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::PostId,
     taxonomies::TaxonomyType,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, WpApiParamOrder,
+    WpApiParamOrder,
 };
 
 impl_as_query_value_for_new_type!(CategoryId);
@@ -34,7 +34,18 @@ impl std::fmt::Display for CategoryId {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamCategoriesOrderBy {
     Id,
     Include,
@@ -47,42 +58,7 @@ pub enum WpApiParamCategoriesOrderBy {
     Count,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamCategoriesOrderBy);
-
-impl WpApiParamCategoriesOrderBy {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Id => "id",
-            Self::Include => "include",
-            Self::Name => "name",
-            Self::Slug => "slug",
-            Self::IncludeSlugs => "include_slugs",
-            Self::TermGroup => "term_group",
-            Self::Description => "description",
-            Self::Count => "count",
-        }
-    }
-}
-
-impl FromStr for WpApiParamCategoriesOrderBy {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "id" => Ok(Self::Id),
-            "include" => Ok(Self::Include),
-            "name" => Ok(Self::Name),
-            "slug" => Ok(Self::Slug),
-            "include_slugs" => Ok(Self::IncludeSlugs),
-            "term_group" => Ok(Self::TermGroup),
-            "description" => Ok(Self::Description),
-            "count" => Ok(Self::Count),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamCategoriesOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct CategoryListParams {
@@ -270,4 +246,46 @@ pub struct SparseCategory {
     #[WpContext(edit, view)]
     pub parent: Option<CategoryId>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/470
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+    use url::Url;
+
+    #[rstest]
+    #[case(WpApiParamCategoriesOrderBy::Id, "id")]
+    #[case(WpApiParamCategoriesOrderBy::Include, "include")]
+    #[case(WpApiParamCategoriesOrderBy::Name, "name")]
+    #[case(WpApiParamCategoriesOrderBy::Slug, "slug")]
+    #[case(WpApiParamCategoriesOrderBy::IncludeSlugs, "include_slugs")]
+    #[case(WpApiParamCategoriesOrderBy::TermGroup, "term_group")]
+    #[case(WpApiParamCategoriesOrderBy::Description, "description")]
+    #[case(WpApiParamCategoriesOrderBy::Count, "count")]
+    fn test_orderby_url_query(
+        #[case] orderby: WpApiParamCategoriesOrderBy,
+        #[case] expected: &str,
+    ) {
+        let mut url = Url::parse("https://example.com").unwrap();
+        url.query_pairs_mut()
+            .append_query_value_pair("orderby", &orderby);
+        assert_eq!(
+            url.query().map(|x| x.to_string()),
+            Some(format!("orderby={}", expected))
+        );
+    }
+
+    #[rstest]
+    #[case(WpApiParamCategoriesOrderBy::Id)]
+    #[case(WpApiParamCategoriesOrderBy::Include)]
+    #[case(WpApiParamCategoriesOrderBy::Name)]
+    #[case(WpApiParamCategoriesOrderBy::Slug)]
+    #[case(WpApiParamCategoriesOrderBy::IncludeSlugs)]
+    #[case(WpApiParamCategoriesOrderBy::TermGroup)]
+    #[case(WpApiParamCategoriesOrderBy::Description)]
+    #[case(WpApiParamCategoriesOrderBy::Count)]
+    fn test_orderby_string_conversion(#[case] orderby: WpApiParamCategoriesOrderBy) {
+        assert_eq!(orderby, orderby.to_string().parse().unwrap(),);
+    }
 }
