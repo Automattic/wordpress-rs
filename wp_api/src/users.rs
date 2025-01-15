@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fmt::Display, num::ParseIntError, str::FromStr};
+use std::{
+    collections::HashMap, convert::Infallible, fmt::Display, num::ParseIntError, str::FromStr,
+};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
@@ -102,7 +104,7 @@ pub enum WpApiParamUsersHasPublishedPosts {
 }
 
 impl FromStr for WpApiParamUsersHasPublishedPosts {
-    type Err = EnumFromStrParsingError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {

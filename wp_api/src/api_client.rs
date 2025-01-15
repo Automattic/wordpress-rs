@@ -9,6 +9,7 @@ use crate::request::{
         post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
         posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
         site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
+        taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
         users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
         wp_site_health_tests_endpoint::{
             WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
@@ -47,6 +48,7 @@ pub struct WpApiRequestBuilder {
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
     site_settings: Arc<SiteSettingsRequestBuilder>,
+    taxonomies: Arc<TaxonomiesRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
 }
@@ -63,6 +65,7 @@ impl WpApiRequestBuilder {
             plugins,
             post_types,
             posts,
+            taxonomies,
             users,
             site_settings,
             wp_site_health_tests
@@ -98,6 +101,7 @@ pub struct WpApiClient {
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
     site_settings: Arc<SiteSettingsRequestExecutor>,
+    taxonomies: Arc<TaxonomiesRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
 }
@@ -121,6 +125,7 @@ impl WpApiClient {
             post_types,
             posts,
             site_settings,
+            taxonomies,
             users,
             wp_site_health_tests
         )
@@ -134,6 +139,7 @@ api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
+api_client_generate_endpoint_impl!(WpApi, taxonomies);
 api_client_generate_endpoint_impl!(WpApi, users);
 api_client_generate_endpoint_impl!(WpApi, wp_site_health_tests);
 
