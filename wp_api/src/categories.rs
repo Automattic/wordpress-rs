@@ -286,6 +286,6 @@ mod tests {
     #[case(WpApiParamCategoriesOrderBy::Description)]
     #[case(WpApiParamCategoriesOrderBy::Count)]
     fn test_orderby_string_conversion(#[case] orderby: WpApiParamCategoriesOrderBy) {
-        assert_eq!(orderby, orderby.to_string().parse().unwrap(),);
+        assert_eq!(orderby, orderby.to_string().parse().unwrap());
     }
 }

@@ -231,6 +231,6 @@ mod lib_tests {
     #[case(WpApiParamOrder::Asc)]
     #[case(WpApiParamOrder::Desc)]
     fn test_orderby_string_conversion(#[case] orderby: WpApiParamOrder) {
-        assert_eq!(orderby, orderby.to_string().parse().unwrap(),);
+        assert_eq!(orderby, orderby.to_string().parse().unwrap());
     }
 }
