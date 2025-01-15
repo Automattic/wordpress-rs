@@ -1,6 +1,6 @@
 use serde::{
     de::{self, DeserializeOwned, Unexpected},
-    ser, Deserializer, Serialize, Serializer,
+    ser, Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::{fmt, marker::PhantomData};
 
@@ -82,6 +82,47 @@ where
     D: Deserializer<'de>,
 {
     deserializer.deserialize_any(DeserializeI64OrStringVisitor)
+}
+
+pub struct DeserializeEmptyVecOrT<T>(pub PhantomData<T>);
+
+impl<'de, T> de::Visitor<'de> for DeserializeEmptyVecOrT<T>
+where
+    T: Deserialize<'de> + Default,
+{
+    type Value = T;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("empty Vec or T")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        if seq.next_element::<T>()?.is_none() {
+            // It's an empty vec
+            Ok(Self::Value::default())
+        } else {
+            // not an empty vec
+            todo!()
+        }
+    }
+
+    //fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    //where
+    //    A: de::MapAccess<'de>,
+    //{
+    //    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+    //}
+}
+
+pub fn deserialize_empty_vec_or_t<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Deserialize<'de> + Default,
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeEmptyVecOrT::<T>(PhantomData))
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ use crate::{
     },
     EnumFromStrParsingError, UserId,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::IgnoredAny, Deserialize, Serialize};
 use std::str::FromStr;
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
@@ -199,14 +199,68 @@ pub struct SparseTemplate {
     pub original_source: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum SparseTemplateContentWrapper {
+    String(String),
+    Object(SparseTemplateContent),
+}
+
+//#[derive(Debug, Default, Deserialize, Serialize, uniffi::Record, WpContextual)]
+//pub struct SparseTemplateContent {
+//    #[WpContext(edit)]
+//    pub raw: Option<String>,
+//    #[WpContext(edit, view)]
+//    pub rendered: Option<String>,
+//    #[WpContext(edit, view)]
+//    pub protected: Option<bool>,
+//    #[WpContext(edit)]
+//    pub block_version: Option<u32>,
+//}
+
+#[derive(Debug, Default, Deserialize, Serialize, uniffi::Record)]
+#[serde(try_from = "EmptyVecOrT<SparseTemplateContentInternal>")]
 pub struct SparseTemplateContent {
-    #[WpContext(edit)]
     pub raw: Option<String>,
-    #[WpContext(edit, view)]
     pub rendered: Option<String>,
-    #[WpContext(edit, view)]
     pub protected: Option<bool>,
-    #[WpContext(edit)]
     pub block_version: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SparseTemplateContentInternal {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
+    pub protected: Option<bool>,
+    pub block_version: Option<u32>,
+}
+
+impl From<SparseTemplateContentInternal> for SparseTemplateContent {
+    fn from(value: SparseTemplateContentInternal) -> Self {
+        Self {
+            raw: value.raw,
+            rendered: value.rendered,
+            protected: value.protected,
+            block_version: value.block_version,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum EmptyVecOrT<T> {
+    Vec(Vec<IgnoredAny>),
+    Object(T),
+}
+
+impl TryFrom<EmptyVecOrT<SparseTemplateContentInternal>> for SparseTemplateContent {
+    type Error = serde_json::Error;
+
+    fn try_from(value: EmptyVecOrT<SparseTemplateContentInternal>) -> Result<Self, Self::Error> {
+        match value {
+            // TODO: Return error if not empty
+            EmptyVecOrT::Vec(vec) => Ok(Self::default()),
+            EmptyVecOrT::Object(internal) => Ok(Self::from(internal)),
+        }
+    }
 }
