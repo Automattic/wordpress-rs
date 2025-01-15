@@ -1,4 +1,6 @@
 #![allow(dead_code, unused_variables)]
+#![feature(test)]
+extern crate test;
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{

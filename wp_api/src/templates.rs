@@ -249,8 +249,8 @@ impl From<SparseTemplateContentInternal> for SparseTemplateContent {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum EmptyVecOrT<T> {
-    Vec(Vec<IgnoredAny>),
     Object(T),
+    Vec(Vec<IgnoredAny>),
 }
 
 impl TryFrom<EmptyVecOrT<SparseTemplateContentInternal>> for SparseTemplateContent {
@@ -262,5 +262,44 @@ impl TryFrom<EmptyVecOrT<SparseTemplateContentInternal>> for SparseTemplateConte
             EmptyVecOrT::Vec(vec) => Ok(Self::default()),
             EmptyVecOrT::Object(internal) => Ok(Self::from(internal)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::de::DeserializeOwned;
+    use test::Bencher;
+
+    #[bench]
+    fn bench_parse_directly(b: &mut Bencher) {
+        let json = &json();
+        b.iter(|| parse::<SparseTemplateContentInternal>(json));
+    }
+
+    #[bench]
+    fn bench_parse_to_empty_vec_or_t(b: &mut Bencher) {
+        let json = &json();
+        b.iter(|| parse::<EmptyVecOrT<SparseTemplateContentInternal>>(json));
+    }
+
+    #[bench]
+    fn bench_parse_using_extra_enum_and_internal_type(b: &mut Bencher) {
+        let json = &json();
+        b.iter(|| parse::<SparseTemplateContent>(json));
+    }
+
+    fn json() -> String {
+        let s = SparseTemplateContent {
+            raw: Some("Lorem ipsum odor amet, consectetuer adipiscing elit. Hendrerit integer potenti sit penatibus egestas auctor auctor. Rhoncus fusce auctor venenatis ante ex vitae euismod tempus. Dictumst enim sagittis tellus sapien semper. Neque neque hac per bibendum mattis platea feugiat. Hendrerit penatibus eros euismod ex lectus fringilla volutpat iaculis at. Senectus mollis senectus pretium habitasse; cubilia etiam vulputate.".to_string()),
+            rendered: None,
+            protected: None,
+            block_version: None,
+        };
+        serde_json::to_string(&s).unwrap()
+    }
+
+    fn parse<T: DeserializeOwned>(s: &str) -> T {
+        serde_json::from_str(s).unwrap()
     }
 }
