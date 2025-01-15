@@ -239,7 +239,7 @@ impl<'de> Deserialize<'de> for SparseTemplateContent {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct SparseTemplateContentInternal {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -283,15 +283,16 @@ mod tests {
     use serde::de::DeserializeOwned;
     use test::Bencher;
 
-    #[bench]
-    fn bench_parse_directly(b: &mut Bencher) {
-        let json = &json();
-        b.iter(|| parse::<Vec<SparseTemplateContentInternal>>(json));
-    }
+    //#[bench]
+    //fn bench_parse_directly(b: &mut Bencher) {
+    //    let json = &json();
+    //    b.iter(|| parse::<Vec<SparseTemplateContentInternal>>(json));
+    //}
 
     #[bench]
     fn bench_parse_to_empty_vec_or_t(b: &mut Bencher) {
         let json = &json();
+        //println!("{}", json);
         b.iter(|| parse::<Vec<EmptyVecOrT<SparseTemplateContentInternal>>>(json));
     }
 
@@ -301,12 +302,26 @@ mod tests {
         b.iter(|| parse::<Vec<SparseTemplateContent>>(json));
     }
 
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum JsonHelper<T> {
+        Object(T),
+        Vec(Vec<()>),
+    }
+
     fn json() -> String {
-        let s: Vec<SparseTemplateContent> = (1..1000).into_iter().map(|_| SparseTemplateContent {
-            raw: Some("Lorem ipsum odor amet, consectetuer adipiscing elit. Hendrerit integer potenti sit penatibus egestas auctor auctor. Rhoncus fusce auctor venenatis ante ex vitae euismod tempus. Dictumst enim sagittis tellus sapien semper. Neque neque hac per bibendum mattis platea feugiat. Hendrerit penatibus eros euismod ex lectus fringilla volutpat iaculis at. Senectus mollis senectus pretium habitasse; cubilia etiam vulputate.".to_string()),
-            rendered: None,
-            protected: None,
-            block_version: None,
+        let s: Vec<JsonHelper<SparseTemplateContent>> = (1..=1000000).into_iter().map(|i| {
+            if i % 2 == 0 {
+                JsonHelper::Vec(Vec::new())
+            } else {
+            let s = SparseTemplateContent {
+                raw: Some("Lorem ipsum odor amet, consectetuer adipiscing elit. Hendrerit integer potenti sit penatibus egestas auctor auctor. Rhoncus fusce auctor venenatis ante ex vitae euismod tempus. Dictumst enim sagittis tellus sapien semper. Neque neque hac per bibendum mattis platea feugiat. Hendrerit penatibus eros euismod ex lectus fringilla volutpat iaculis at. Senectus mollis senectus pretium habitasse; cubilia etiam vulputate.".to_string()),
+                rendered: None,
+                protected: None,
+                block_version: None,
+            };
+            JsonHelper::Object(s)
+            }
         }).collect();
         serde_json::to_string(&s).unwrap()
     }
