@@ -12,6 +12,7 @@ use serde::{de::IgnoredAny, Deserialize, Serialize};
 use std::str::FromStr;
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_serde_helper::DeserializeEmptyVecOrT;
 
 #[derive(
     Debug,
@@ -218,8 +219,8 @@ pub enum SparseTemplateContentWrapper {
 //    pub block_version: Option<u32>,
 //}
 
-#[derive(Debug, Default, Deserialize, Serialize, uniffi::Record)]
-#[serde(try_from = "EmptyVecOrT<SparseTemplateContentInternal>")]
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+//#[serde(try_from = "EmptyVecOrT<SparseTemplateContentInternal>")]
 pub struct SparseTemplateContent {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -227,7 +228,18 @@ pub struct SparseTemplateContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+impl<'de> Deserialize<'de> for SparseTemplateContent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer
+            .deserialize_any(DeserializeEmptyVecOrT::<SparseTemplateContentInternal>::new())
+            .map(|internal| Self::from(internal))
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
 struct SparseTemplateContentInternal {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -284,13 +296,13 @@ mod tests {
     }
 
     #[bench]
-    fn bench_parse_using_extra_enum_and_internal_type(b: &mut Bencher) {
+    fn bench_parse_using_visitor(b: &mut Bencher) {
         let json = &json();
         b.iter(|| parse::<Vec<SparseTemplateContent>>(json));
     }
 
     fn json() -> String {
-        let s: Vec<SparseTemplateContent> = (1..1000000).into_iter().map(|_| SparseTemplateContent {
+        let s: Vec<SparseTemplateContent> = (1..1000).into_iter().map(|_| SparseTemplateContent {
             raw: Some("Lorem ipsum odor amet, consectetuer adipiscing elit. Hendrerit integer potenti sit penatibus egestas auctor auctor. Rhoncus fusce auctor venenatis ante ex vitae euismod tempus. Dictumst enim sagittis tellus sapien semper. Neque neque hac per bibendum mattis platea feugiat. Hendrerit penatibus eros euismod ex lectus fringilla volutpat iaculis at. Senectus mollis senectus pretium habitasse; cubilia etiam vulputate.".to_string()),
             rendered: None,
             protected: None,

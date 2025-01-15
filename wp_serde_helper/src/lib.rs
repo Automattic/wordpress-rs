@@ -86,6 +86,12 @@ where
 
 pub struct DeserializeEmptyVecOrT<T>(pub PhantomData<T>);
 
+impl<T> DeserializeEmptyVecOrT<T> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
 impl<'de, T> de::Visitor<'de> for DeserializeEmptyVecOrT<T>
 where
     T: Deserialize<'de> + Default,
@@ -109,12 +115,12 @@ where
         }
     }
 
-    //fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-    //where
-    //    A: de::MapAccess<'de>,
-    //{
-    //    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
-    //}
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::MapAccess<'de>,
+    {
+        Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+    }
 }
 
 pub fn deserialize_empty_vec_or_t<'de, T, D>(deserializer: D) -> Result<T, D::Error>
