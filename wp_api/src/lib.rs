@@ -27,6 +27,7 @@ pub mod post_types;
 pub mod posts;
 pub mod request;
 pub mod site_settings;
+pub mod tags;
 pub mod taxonomies;
 pub mod url_query;
 pub mod users;
