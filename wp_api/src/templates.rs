@@ -274,28 +274,28 @@ mod tests {
     #[bench]
     fn bench_parse_directly(b: &mut Bencher) {
         let json = &json();
-        b.iter(|| parse::<SparseTemplateContentInternal>(json));
+        b.iter(|| parse::<Vec<SparseTemplateContentInternal>>(json));
     }
 
     #[bench]
     fn bench_parse_to_empty_vec_or_t(b: &mut Bencher) {
         let json = &json();
-        b.iter(|| parse::<EmptyVecOrT<SparseTemplateContentInternal>>(json));
+        b.iter(|| parse::<Vec<EmptyVecOrT<SparseTemplateContentInternal>>>(json));
     }
 
     #[bench]
     fn bench_parse_using_extra_enum_and_internal_type(b: &mut Bencher) {
         let json = &json();
-        b.iter(|| parse::<SparseTemplateContent>(json));
+        b.iter(|| parse::<Vec<SparseTemplateContent>>(json));
     }
 
     fn json() -> String {
-        let s = SparseTemplateContent {
+        let s: Vec<SparseTemplateContent> = (1..1000000).into_iter().map(|_| SparseTemplateContent {
             raw: Some("Lorem ipsum odor amet, consectetuer adipiscing elit. Hendrerit integer potenti sit penatibus egestas auctor auctor. Rhoncus fusce auctor venenatis ante ex vitae euismod tempus. Dictumst enim sagittis tellus sapien semper. Neque neque hac per bibendum mattis platea feugiat. Hendrerit penatibus eros euismod ex lectus fringilla volutpat iaculis at. Senectus mollis senectus pretium habitasse; cubilia etiam vulputate.".to_string()),
             rendered: None,
             protected: None,
             block_version: None,
-        };
+        }).collect();
         serde_json::to_string(&s).unwrap()
     }
 
