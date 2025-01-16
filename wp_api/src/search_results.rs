@@ -171,3 +171,19 @@ pub struct SparseSearchResult {
     #[WpContextualOption]
     pub object_subtype: Option<SearchResultSubtype>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case(SearchResultType::Post)]
+    #[case(SearchResultType::Term)]
+    #[case(SearchResultType::PostFormat)]
+    #[case(SearchResultType::Custom("foo_bar".to_string()))]
+    #[case(SearchResultType::Custom("foo-bar".to_string()))]
+    fn test_search_result_type_string_conversion(#[case] value: SearchResultType) {
+        assert_eq!(value, value.to_string().parse().unwrap());
+    }
+}
