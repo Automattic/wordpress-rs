@@ -353,9 +353,27 @@ pub enum ParseApiRootUrlError {
         header_map
     )]
     ApiRootLinkHeaderNotFound {
+        site_url: Arc<ParsedUrl>,
         header_map: Arc<WpNetworkHeaderMap>,
         status_code: u16,
     },
+}
+
+impl WpLocalizedError for ParseApiRootUrlError {
+    fn localized_error_message(&self, lang_id: String) -> Option<String> {
+        let message = match self {
+            ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                site_url,
+                header_map,
+                status_code,
+            } => localized_message_with_args(
+                &lang_id,
+                "parse_api_root_url_error_api_root_link_header_not_found",
+                &HashMap::from([("site_url", site_url.url().into())]),
+            ),
+        };
+        Some(message)
+    }
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -380,46 +398,42 @@ pub trait WpLocalizedError: Send + Sync {
 
 impl WpLocalizedError for AutoDiscoveryAttemptFailure {
     fn localized_error_message(&self, lang_id: String) -> Option<String> {
-        let message = match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => {
-                localized_message(&lang_id, "auto_discovery_attempt_failure_parse_site_url")
-            }
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => Some(localized_message(
+                &lang_id,
+                "auto_discovery_attempt_failure_parse_site_url",
+            )),
             AutoDiscoveryAttemptFailure::FetchApiRootUrl {
                 parsed_site_url,
                 error,
-            } => localized_message_with_args(
+            } => Some(localized_message_with_args(
                 &lang_id,
                 "auto_discovery_attempt_failure_fetch_api_root_url",
                 &HashMap::from([("site_url", parsed_site_url.url().into())]),
-            ),
+            )),
             AutoDiscoveryAttemptFailure::ParseApiRootUrl {
                 parsed_site_url,
                 error,
-            } => localized_message_with_args(
-                &lang_id,
-                "auto_discovery_attempt_failure_parse_api_root_url",
-                &HashMap::from([("site_url", parsed_site_url.url().into())]),
-            ),
+            } => error.localized_error_message(lang_id),
             AutoDiscoveryAttemptFailure::FetchApiDetails {
                 parsed_site_url,
                 api_root_url,
                 error,
-            } => localized_message_with_args(
+            } => Some(localized_message_with_args(
                 &lang_id,
                 "auto_discovery_attempt_failure_fetch_api_details",
                 &HashMap::from([("api_url", api_root_url.url().into())]),
-            ),
+            )),
             AutoDiscoveryAttemptFailure::ParseApiDetails {
                 parsed_site_url,
                 api_root_url,
                 parsing_error_message,
-            } => localized_message_with_args(
+            } => Some(localized_message_with_args(
                 &lang_id,
                 "auto_discovery_attempt_failure_parse_api_details",
                 &HashMap::from([("api_url", api_root_url.url().into())]),
-            ),
-        };
-        Some(message)
+            )),
+        }
     }
 }
 
