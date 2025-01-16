@@ -208,7 +208,7 @@ macro_rules! generate {
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
-mod lib_tests {
+mod tests {
     use super::*;
     use rstest::*;
     use url::Url;
