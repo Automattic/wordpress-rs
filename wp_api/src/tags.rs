@@ -198,6 +198,21 @@ pub struct TagDeleteResponse {
     pub previous: TagWithEditContext,
 }
 
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct TagCreateParams {
+    /// HTML title for the term.
+    pub name: String,
+    /// HTML description of the term.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// An alphanumeric identifier for the term unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/463
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseTag {
     #[WpContext(edit, embed, view)]

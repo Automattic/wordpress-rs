@@ -14,6 +14,8 @@ enum TagsRequest {
     List,
     #[contextual_get(url = "/tags/<tag_id>", output = crate::tags::SparseTag, filter_by = crate::tags::SparseTagField)]
     Retrieve,
+    #[post(url = "/tags", params = &crate::tags::TagCreateParams, output = crate::tags::TagWithEditContext)]
+    Create,
     #[delete(url = "/tags/<tag_id>", output = crate::tags::TagDeleteResponse)]
     Delete,
 }
