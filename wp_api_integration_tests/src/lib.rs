@@ -3,9 +3,10 @@ use http::{HeaderMap, HeaderValue};
 use reqwest::multipart::Part;
 use std::sync::Arc;
 use wp_api::{
+    categories::CategoryId,
     comments::CommentId,
     media::MediaId,
-    posts::{CategoryId, PostId},
+    posts::PostId,
     request::{
         endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
         WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
@@ -60,7 +61,9 @@ pub const POST_ID_INVALID: PostId = PostId(99999999);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test_media.jpg";
 pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
-pub const CATEGORY_ID_1: CategoryId = CategoryId(1);
+pub const CATEGORY_ID_48: CategoryId = CategoryId(48);
+pub const CATEGORY_ID_59: CategoryId = CategoryId(59);
+pub const CATEGORY_ID_INVALID: CategoryId = CategoryId(99999999);
 pub const TAG_ID_100: TagId = TagId(100);
 pub const TAG_ID_INVALID: TagId = TagId(99999999);
 pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";

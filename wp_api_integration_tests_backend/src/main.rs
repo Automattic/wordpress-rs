@@ -6,8 +6,8 @@ use std::fs::metadata;
 use std::io;
 use std::path::Path;
 use wp_cli::{
-    WpCliComment, WpCliCommentListArguments, WpCliPost, WpCliPostListArguments, WpCliSiteSettings,
-    WpCliTag, WpCliUser, WpCliUserMeta,
+    WpCliCategory, WpCliComment, WpCliCommentListArguments, WpCliPost, WpCliPostListArguments,
+    WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta,
 };
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
@@ -16,6 +16,20 @@ pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
 enum Error {
     #[response(status = 500)]
     AsString(String),
+}
+
+#[get("/category?<category_id>")]
+fn wp_cli_category(category_id: i64) -> Result<Json<WpCliCategory>, Error> {
+    WpCliCategory::get(category_id)
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/categories")]
+fn wp_cli_categories() -> Result<Json<Vec<WpCliCategory>>, Error> {
+    WpCliCategory::list()
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
 }
 
 #[get("/comment?<comment_id>")]
@@ -109,6 +123,8 @@ async fn restore_wp_server(db: bool, plugins: bool) -> Result<Status, Error> {
 fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![restore_wp_server])
+        .mount("/wp-cli/", routes![wp_cli_category])
+        .mount("/wp-cli/", routes![wp_cli_categories])
         .mount("/wp-cli/", routes![wp_cli_comment])
         .mount("/wp-cli/", routes![wp_cli_comments])
         .mount("/wp-cli/", routes![wp_cli_site_settings])

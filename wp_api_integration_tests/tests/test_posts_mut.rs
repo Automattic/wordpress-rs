@@ -9,7 +9,7 @@ use wp_api::posts::{
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, CATEGORY_ID_1, FIRST_POST_ID, MEDIA_ID_611, POST_TEMPLATE_SINGLE_WITH_SIDEBAR,
+    AssertResponse, CATEGORY_ID_59, FIRST_POST_ID, MEDIA_ID_611, POST_TEMPLATE_SINGLE_WITH_SIDEBAR,
     SECOND_USER_ID, TAG_ID_100,
 };
 use wp_cli::WpCliPost;
@@ -350,7 +350,7 @@ async fn update_sticky_to_false() {
 #[tokio::test]
 #[serial]
 async fn update_categories() {
-    let updated_value = vec![CATEGORY_ID_1];
+    let updated_value = vec![CATEGORY_ID_59];
     test_update_post(
         &PostUpdateParams {
             categories: updated_value.clone(),
