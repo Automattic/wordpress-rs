@@ -5,7 +5,7 @@ use syn::{
     Attribute, Ident, MetaList,
 };
 
-use crate::parse::RequestType;
+use crate::{generate::WpContext, parse::RequestType};
 
 #[derive(Debug, Clone)]
 pub struct FilterByType {
@@ -24,6 +24,7 @@ pub struct ParsedVariantAttribute {
     pub params: Option<ParamsType>,
     pub output: Vec<TokenTree>,
     pub filter_by: Option<FilterByType>,
+    pub available_contexts: Vec<WpContext>,
 }
 
 impl ParsedVariantAttribute {
@@ -33,6 +34,7 @@ impl ParsedVariantAttribute {
         params: Option<Vec<TokenTree>>,
         output: Vec<TokenTree>,
         filter_by: Option<Vec<TokenTree>>,
+        available_contexts: Vec<WpContext>,
     ) -> Result<Self, ItemVariantAttributeParseError> {
         let non_empty_token_tree_or_none =
             |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
@@ -60,6 +62,7 @@ impl ParsedVariantAttribute {
             filter_by: non_empty_token_tree_or_none(filter_by).map(|tokens| FilterByType {
                 tokens: TokenStream::from_iter(tokens),
             }),
+            available_contexts,
         })
     }
 
@@ -228,6 +231,65 @@ impl ParsedVariantAttribute {
             })
             .collect()
     }
+
+    fn available_contexts(
+        available_contexts_tokens: Option<&Vec<TokenTree>>,
+        error_span: Span,
+    ) -> syn::Result<Vec<WpContext>> {
+        if let Some(available_contexts_tokens) = available_contexts_tokens {
+            if available_contexts_tokens.len() != 1 {
+                return Err(
+                    ItemVariantAttributeParseError::AvailableContextsShouldBeASingleString
+                        .into_syn_error(error_span),
+                );
+            }
+            let first_token = available_contexts_tokens
+                .first()
+                .expect("Already verified that there is only one url token");
+
+            let mut contexts = vec![];
+            match first_token {
+                TokenTree::Literal(literal) => {
+                    let mut available_contexts_as_string = literal.to_string();
+                    if available_contexts_as_string.starts_with('"')
+                        && available_contexts_as_string.ends_with('"')
+                    {
+                        available_contexts_as_string.pop();
+                        available_contexts_as_string.remove(0);
+                    } else {
+                        return Err(
+                            ItemVariantAttributeParseError::AvailableContextShouldBeLiteral
+                                .into_syn_error(error_span),
+                        );
+                    }
+                    for possible_context in available_contexts_as_string.split(',') {
+                        match possible_context.to_lowercase().as_str() {
+                            "edit" => contexts.push(WpContext::Edit),
+                            "embed" => contexts.push(WpContext::Embed),
+                            "view" => contexts.push(WpContext::View),
+                            _ => {
+                                return Err(
+                    ItemVariantAttributeParseError::AvailableContextsUnexpectedContext{ unexpected_context: possible_context.to_string()}
+                        .into_syn_error(error_span)
+                );
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    return Err(
+                        ItemVariantAttributeParseError::AvailableContextsUnexpectedTokens
+                            .into_syn_error(error_span),
+                    )
+                }
+            }
+            Ok(contexts)
+        } else {
+            // `available_contexts` is an optional parameter and if not provided, we assume all
+            // contexts are available.
+            Ok(WpContext::all())
+        }
+    }
 }
 
 impl Parse for ParsedVariantAttribute {
@@ -242,6 +304,7 @@ impl Parse for ParsedVariantAttribute {
         let mut params_tokens = None;
         let mut output_tokens = None;
         let mut filter_by_tokens = None;
+        let mut available_contexts_tokens = None;
 
         for (ident, tokens) in pair_vec.into_iter() {
             match ident.to_string().as_str() {
@@ -249,6 +312,7 @@ impl Parse for ParsedVariantAttribute {
                 "params" => params_tokens = Some(tokens),
                 "output" => output_tokens = Some(tokens),
                 "filter_by" => filter_by_tokens = Some(tokens),
+                "available_contexts" => available_contexts_tokens = Some(tokens),
                 _ => {
                     return Err(ItemVariantAttributeParseError::ExpectingKeyValuePairs
                         .into_syn_error(meta_list_span));
@@ -283,6 +347,10 @@ impl Parse for ParsedVariantAttribute {
         })?;
 
         let url_parts = UrlPart::split(url_str.to_string(), &meta_list_span)?;
+        let available_contexts = ParsedVariantAttribute::available_contexts(
+            available_contexts_tokens.as_ref(),
+            input.span(),
+        )?;
 
         ParsedVariantAttribute::new(
             request_type,
@@ -290,6 +358,7 @@ impl Parse for ParsedVariantAttribute {
             params_tokens,
             output,
             filter_by_tokens,
+            available_contexts,
         )
         .map_err(|e| e.into_syn_error(meta_list_span))
     }
@@ -315,6 +384,17 @@ enum ItemVariantAttributeParseError {
     UrlShouldBeLiteral,
     #[error("Missing (output = crate::Foo)")]
     MissingOutput,
+    #[error("`available_contexts` contains unexpected tokens. It should be a comma separated string: \"edit,embed,view\"")]
+    AvailableContextsUnexpectedTokens,
+    #[error("`available_contexts` should be a single comma separated string: \"edit,embed,view\"")]
+    AvailableContextsShouldBeASingleString,
+    #[error(
+        "`available_contexts` contains unexpected context: '{}'",
+        unexpected_context
+    )]
+    AvailableContextsUnexpectedContext { unexpected_context: String },
+    #[error("`available_contexts` should be set as a String: (available_contexts = \"edit,embed,view\")")]
+    AvailableContextShouldBeLiteral,
     #[error("Only 'contextual_get', 'contextual_paged', 'get', 'post' & 'delete' are supported")]
     UnsupportedRequestType,
 }

@@ -290,6 +290,12 @@ pub enum WpErrorCode {
     NoAuthenticatedAppPassword,
     #[serde(rename = "rest_no_featured_media")]
     NoFeaturedMedia,
+    #[serde(rename = "rest_search_handler_error")]
+    SearchHandlerError,
+    #[serde(rename = "rest_search_invalid_page_number")]
+    SearchInvalidPageNumber,
+    #[serde(rename = "rest_search_invalid_type")]
+    SearchInvalidType,
     #[serde(rename = "rest_upload_file_error")]
     UploadFileError,
     #[serde(rename = "rest_upload_file_too_big")]

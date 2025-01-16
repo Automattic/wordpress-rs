@@ -1,0 +1,5 @@
+error: `available_contexts` contains unexpected context: 'foo'
+ --> tests/fail/available_contexts_unexpected_context.rs:4:5
+  |
+4 |     List,
+  |     ^^^^
