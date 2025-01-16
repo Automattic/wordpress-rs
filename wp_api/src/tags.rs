@@ -192,6 +192,12 @@ impl FromUrlQueryPairs for TagListParams {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct TagDeleteResponse {
+    pub deleted: bool,
+    pub previous: TagWithEditContext,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseTag {
     #[WpContext(edit, embed, view)]

@@ -7,7 +7,7 @@ use std::io;
 use std::path::Path;
 use wp_cli::{
     WpCliComment, WpCliCommentListArguments, WpCliPost, WpCliPostListArguments, WpCliSiteSettings,
-    WpCliUser, WpCliUserMeta,
+    WpCliTag, WpCliUser, WpCliUserMeta,
 };
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
@@ -49,6 +49,20 @@ fn wp_cli_post(post_id: i64) -> Result<Json<WpCliPost>, Error> {
 #[get("/posts?<post_status>")]
 fn wp_cli_posts(post_status: Option<String>) -> Result<Json<Vec<WpCliPost>>, Error> {
     WpCliPost::list(Some(WpCliPostListArguments { post_status }))
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/tag?<tag_id>")]
+fn wp_cli_tag(tag_id: i64) -> Result<Json<WpCliTag>, Error> {
+    WpCliTag::get(tag_id)
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/tags")]
+fn wp_cli_tags() -> Result<Json<Vec<WpCliTag>>, Error> {
+    WpCliTag::list()
         .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
@@ -100,6 +114,8 @@ fn rocket() -> _ {
         .mount("/wp-cli/", routes![wp_cli_site_settings])
         .mount("/wp-cli/", routes![wp_cli_post])
         .mount("/wp-cli/", routes![wp_cli_posts])
+        .mount("/wp-cli/", routes![wp_cli_tag])
+        .mount("/wp-cli/", routes![wp_cli_tags])
         .mount("/wp-cli/", routes![wp_cli_user])
         .mount("/wp-cli/", routes![wp_cli_users])
         .mount("/wp-cli/", routes![wp_cli_user_meta])
