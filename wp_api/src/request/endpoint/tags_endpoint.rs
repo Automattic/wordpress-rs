@@ -2,7 +2,7 @@ use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
     tags::{
         SparseTagFieldWithEditContext, SparseTagFieldWithEmbedContext,
-        SparseTagFieldWithViewContext, TagListParams,
+        SparseTagFieldWithViewContext, TagId, TagListParams,
     },
     SparseField,
 };
@@ -12,6 +12,8 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum TagsRequest {
     #[contextual_paged(url = "/tags", params = &TagListParams, output = Vec<crate::tags::SparseTag>, filter_by = crate::tags::SparseTagField)]
     List,
+    #[contextual_get(url = "/tags/<tag_id>", output = crate::tags::SparseTag, filter_by = crate::tags::SparseTagField)]
+    Retrieve,
 }
 
 impl DerivedRequest for TagsRequest {

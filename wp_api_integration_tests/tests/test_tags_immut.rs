@@ -41,6 +41,36 @@ async fn list_with_view_context(#[case] params: TagListParams) {
         .assert_response();
 }
 
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .tags()
+        .retrieve_with_edit_context(&TAG_ID_100)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context() {
+    api_client()
+        .tags()
+        .retrieve_with_embed_context(&TAG_ID_100)
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context() {
+    api_client()
+        .tags()
+        .retrieve_with_view_context(&TAG_ID_100)
+        .await
+        .assert_response();
+}
+
 #[template]
 #[rstest]
 #[case::default(TagListParams::default())]
@@ -90,6 +120,22 @@ mod filter {
             });
     }
 
+    #[apply(sparse_tag_field_with_edit_context_test_cases)]
+    #[case(&[SparseTagFieldWithEditContext::Name, SparseTagFieldWithEditContext::Slug])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_posts_with_edit_context(
+        #[case] fields: &[SparseTagFieldWithEditContext],
+    ) {
+        let tag = api_client()
+            .tags()
+            .filter_retrieve_with_edit_context(&TAG_ID_100, fields)
+            .await
+            .assert_response()
+            .data;
+        tag.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
     #[apply(sparse_tag_field_with_embed_context_test_cases)]
     #[case(&[SparseTagFieldWithEmbedContext::Name, SparseTagFieldWithEmbedContext::Slug])]
     #[tokio::test]
@@ -115,6 +161,22 @@ mod filter {
             });
     }
 
+    #[apply(sparse_tag_field_with_embed_context_test_cases)]
+    #[case(&[SparseTagFieldWithEmbedContext::Name, SparseTagFieldWithEmbedContext::Slug])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_posts_with_embed_context(
+        #[case] fields: &[SparseTagFieldWithEmbedContext],
+    ) {
+        let tag = api_client()
+            .tags()
+            .filter_retrieve_with_embed_context(&TAG_ID_100, fields)
+            .await
+            .assert_response()
+            .data;
+        tag.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
     #[apply(sparse_tag_field_with_view_context_test_cases)]
     #[case(&[SparseTagFieldWithViewContext::Name, SparseTagFieldWithViewContext::Slug])]
     #[tokio::test]
@@ -138,5 +200,21 @@ mod filter {
             .for_each(|tag| {
                 tag.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_tag_field_with_view_context_test_cases)]
+    #[case(&[SparseTagFieldWithViewContext::Name, SparseTagFieldWithViewContext::Slug])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_posts_with_view_context(
+        #[case] fields: &[SparseTagFieldWithViewContext],
+    ) {
+        let tag = api_client()
+            .tags()
+            .filter_retrieve_with_view_context(&TAG_ID_100, fields)
+            .await
+            .assert_response()
+            .data;
+        tag.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }
