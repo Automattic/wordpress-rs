@@ -2,10 +2,12 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.PostListParams
 import uniffi.wp_api.SparseTagFieldWithEditContext
 import uniffi.wp_api.TagCreateParams
 import uniffi.wp_api.TagListParams
 import uniffi.wp_api.TagUpdateParams
+import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -103,5 +105,14 @@ class TagsEndpointTest {
         assertEquals("new_description", updatedTag.description)
         assertEquals("new_slug", updatedTag.slug)
         restoreTestServer()
+    }
+
+    @Test
+    fun testErrorTermInvalid() = runTest {
+        val result =
+            client.request { requestBuilder ->
+                requestBuilder.tags().retrieveWithEditContext(9999999)
+            }
+        assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
     }
 }
