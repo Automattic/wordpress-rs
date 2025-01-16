@@ -199,3 +199,10 @@ macro_rules! generate {
 }
 
 uniffi::setup_scaffolding!();
+
+fluent_templates::static_loader! {
+    static LOCALES = {
+        locales: "./localization",
+        fallback_language: "en-US"
+    };
+}
