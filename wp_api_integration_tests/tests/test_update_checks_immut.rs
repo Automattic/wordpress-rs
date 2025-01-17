@@ -1,0 +1,29 @@
+use std::sync::Arc;
+
+use serial_test::parallel;
+use wp_api::wordpress_org::client::WordPressOrgApiClient;
+use wp_api_integration_tests::{api_client, test_site_url, AsyncWpNetworking, TestCredentials};
+
+#[tokio::test]
+#[parallel]
+async fn plugins_update_check() {
+    let rest_client = api_client();
+    let plugins = rest_client
+        .plugins()
+        .list_with_view_context(&Default::default())
+        .await;
+    let plugins = plugins.unwrap().data;
+    assert!(!plugins.is_empty());
+
+    let wp_org_client = WordPressOrgApiClient::new(Arc::new(AsyncWpNetworking::default()));
+    let result = wp_org_client
+        .check_plugin_updates(
+            TestCredentials::instance()
+                .wordpress_core_version
+                .to_string(),
+            test_site_url(),
+            plugins,
+        )
+        .await;
+    assert!(result.is_ok());
+}

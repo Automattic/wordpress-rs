@@ -139,7 +139,7 @@ pub struct WpNetworkRequestBody {
 }
 
 impl WpNetworkRequestBody {
-    fn new(body: Vec<u8>) -> Self {
+    pub fn new(body: Vec<u8>) -> Self {
         Self { inner: body }
     }
 }
@@ -457,7 +457,7 @@ impl Debug for WpNetworkResponse {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Enum)]
+#[derive(Debug, PartialEq, Eq, Clone, uniffi::Enum)]
 pub enum RequestMethod {
     GET,
     POST,
