@@ -1,20 +1,31 @@
-use std::{collections::HashMap, convert::Infallible, num::ParseIntError, str::FromStr};
+use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 use crate::{
-    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
+    UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamCommentsOrderBy {
     Date,
     #[default]
@@ -26,40 +37,7 @@ pub enum WpApiParamCommentsOrderBy {
     Type,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamCommentsOrderBy);
-
-impl WpApiParamCommentsOrderBy {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Date => "date",
-            Self::DateGmt => "date_gmt",
-            Self::Id => "id",
-            Self::Include => "include",
-            Self::Post => "post",
-            Self::Parent => "parent",
-            Self::Type => "type",
-        }
-    }
-}
-
-impl FromStr for WpApiParamCommentsOrderBy {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "date" => Ok(Self::Date),
-            "date_gmt" => Ok(Self::DateGmt),
-            "id" => Ok(Self::Id),
-            "include" => Ok(Self::Include),
-            "post" => Ok(Self::Post),
-            "parent" => Ok(Self::Parent),
-            "type" => Ok(Self::Type),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamCommentsOrderBy);
 
 impl_as_query_value_for_new_type!(CommentId);
 uniffi::custom_newtype!(CommentId, i64);
@@ -92,42 +70,22 @@ impl std::fmt::Display for CommentId {
     Serialize,
     Deserialize,
     uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum CommentType {
     #[default]
     Comment,
     Pingback,
     Trackback,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(CommentType);
-
-impl CommentType {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Comment => "comment",
-            Self::Pingback => "pingback",
-            Self::Trackback => "trackback",
-            Self::Custom(comment_type) => comment_type,
-        }
-    }
-}
-
-impl FromStr for CommentType {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "comment" => Ok(Self::Comment),
-            "pingback" => Ok(Self::Pingback),
-            "trackback" => Ok(Self::Trackback),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(CommentType);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct CommentListParams {
@@ -605,8 +563,11 @@ pub enum CommentAuthorAvatarUrlSize {
     Serialize,
     Deserialize,
     uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum CommentStatus {
     Hold,
     #[default]
@@ -614,36 +575,11 @@ pub enum CommentStatus {
     Spam,
     Trash,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(CommentStatus);
-
-impl CommentStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Hold => "hold",
-            Self::Approve => "approve",
-            Self::Spam => "spam",
-            Self::Trash => "trash",
-            Self::Custom(status) => status,
-        }
-    }
-}
-
-impl FromStr for CommentStatus {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "hold" => Ok(Self::Hold),
-            "approve" => Ok(Self::Approve),
-            "spam" => Ok(Self::Spam),
-            "trash" => Ok(Self::Trash),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(CommentStatus);
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,4 @@
-use std::{convert::Infallible, num::ParseIntError, str::FromStr};
+use std::{num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
@@ -7,17 +7,28 @@ use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_s
 
 use crate::{
     categories::CategoryId,
-    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     media::MediaId,
     tags::TagId,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, UserId, WpApiParamOrder,
+    UserId, WpApiParamOrder,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamPostsOrderBy {
     Author,
     #[default]
@@ -32,111 +43,31 @@ pub enum WpApiParamPostsOrderBy {
     Title,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamPostsOrderBy);
+impl_as_query_value_from_to_string!(WpApiParamPostsOrderBy);
 
-impl WpApiParamPostsOrderBy {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Author => "author",
-            Self::Date => "date",
-            Self::Id => "id",
-            Self::Include => "include",
-            Self::IncludeSlugs => "include_slugs",
-            Self::Modified => "modified",
-            Self::Parent => "parent",
-            Self::Relevance => "relevance",
-            Self::Slug => "slug",
-            Self::Title => "title",
-        }
-    }
-}
-
-impl FromStr for WpApiParamPostsOrderBy {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "author" => Ok(Self::Author),
-            "date" => Ok(Self::Date),
-            "id" => Ok(Self::Id),
-            "include" => Ok(Self::Include),
-            "include_slugs" => Ok(Self::IncludeSlugs),
-            "modified" => Ok(Self::Modified),
-            "parent" => Ok(Self::Parent),
-            "relevance" => Ok(Self::Relevance),
-            "slug" => Ok(Self::Slug),
-            "title" => Ok(Self::Title),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum, strum_macros::EnumString, strum_macros::Display,
+)]
 pub enum WpApiParamPostsTaxRelation {
+    #[strum(serialize = "AND")]
     And,
+    #[strum(serialize = "OR")]
     Or,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamPostsTaxRelation);
+impl_as_query_value_from_to_string!(WpApiParamPostsTaxRelation);
 
-impl WpApiParamPostsTaxRelation {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::And => "AND",
-            Self::Or => "OR",
-        }
-    }
-}
-
-impl FromStr for WpApiParamPostsTaxRelation {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "AND" => Ok(Self::And),
-            "OR" => Ok(Self::Or),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum, strum_macros::EnumString, strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamPostsSearchColumn {
     PostContent,
     PostExcerpt,
     PostTitle,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamPostsSearchColumn);
-
-impl WpApiParamPostsSearchColumn {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostContent => "post_content",
-            Self::PostExcerpt => "post_excerpt",
-            Self::PostTitle => "post_title",
-        }
-    }
-}
-
-impl FromStr for WpApiParamPostsSearchColumn {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "post_content" => Ok(Self::PostContent),
-            "post_excerpt" => Ok(Self::PostExcerpt),
-            "post_title" => Ok(Self::PostTitle),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamPostsSearchColumn);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct PostListParams {
@@ -662,8 +593,11 @@ pub struct PostFootnote {
     Serialize,
     Deserialize,
     uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum PostStatus {
     Draft,
     Future,
@@ -672,85 +606,76 @@ pub enum PostStatus {
     #[default]
     Publish,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(PostStatus);
-
-impl PostStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Draft => "draft",
-            Self::Future => "future",
-            Self::Pending => "pending",
-            Self::Private => "private",
-            Self::Publish => "publish",
-            Self::Custom(status) => status,
-        }
-    }
-}
-
-impl FromStr for PostStatus {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "draft" => Ok(Self::Draft),
-            "future" => Ok(Self::Future),
-            "pending" => Ok(Self::Pending),
-            "private" => Ok(Self::Private),
-            "publish" => Ok(Self::Publish),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(PostStatus);
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum PostCommentStatus {
     Open,
     Closed,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl PostCommentStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Open => "open",
-            Self::Closed => "closed",
-            Self::Custom(comment_status) => comment_status,
-        }
-    }
-}
-
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum PostPingStatus {
     Open,
     Closed,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl PostPingStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Open => "open",
-            Self::Closed => "closed",
-            Self::Custom(ping_status) => ping_status,
-        }
-    }
-}
-
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum PostFormat {
     Standard,
     Aside,
@@ -763,6 +688,7 @@ pub enum PostFormat {
     Video,
     Audio,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
@@ -827,6 +753,9 @@ mod tests {
     #[case(generate!(PostListParams, (status, vec![PostStatus::Private])), "status=private")]
     #[case(generate!(PostListParams, (status, vec![PostStatus::Publish])), "status=publish")]
     #[case(generate!(PostListParams, (status, vec![PostStatus::Custom("foo".to_string())])), "status=foo")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Custom("foo-bar".to_string())])), "status=foo-bar")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Custom("foo_bar".to_string())])), "status=foo_bar")]
+    #[case(generate!(PostListParams, (status, vec![PostStatus::Custom("FooBar".to_string())])), "status=FooBar")]
     #[case(generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Future, PostStatus::Pending, PostStatus::Private, PostStatus::Publish, PostStatus::Custom("foo".to_string())])), "status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))), "tax_relation=AND")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::Or))), "tax_relation=OR")]

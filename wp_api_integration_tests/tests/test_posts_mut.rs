@@ -248,7 +248,7 @@ generate_update_test!(
         assert_eq!(updated_post.comment_status, PostCommentStatus::Open);
         assert_eq!(
             updated_post_from_wp_cli.comment_status,
-            PostCommentStatus::Open.as_str()
+            PostCommentStatus::Open.to_string()
         );
     }
 );
@@ -261,7 +261,7 @@ generate_update_test!(
         assert_eq!(updated_post.comment_status, PostCommentStatus::Closed);
         assert_eq!(
             updated_post_from_wp_cli.comment_status,
-            PostCommentStatus::Closed.as_str()
+            PostCommentStatus::Closed.to_string()
         );
     }
 );
@@ -274,7 +274,7 @@ generate_update_test!(
         assert_eq!(updated_post.ping_status, PostPingStatus::Open);
         assert_eq!(
             updated_post_from_wp_cli.ping_status,
-            PostPingStatus::Open.as_str()
+            PostPingStatus::Open.to_string()
         );
     }
 );
@@ -287,7 +287,7 @@ generate_update_test!(
         assert_eq!(updated_post.ping_status, PostPingStatus::Closed);
         assert_eq!(
             updated_post_from_wp_cli.ping_status,
-            PostPingStatus::Closed.as_str()
+            PostPingStatus::Closed.to_string()
         );
     }
 );
@@ -393,7 +393,7 @@ async fn update_status_to_future() {
             assert_eq!(updated_post.status, PostStatus::Future);
             assert_eq!(
                 updated_post_from_wp_cli.post_status,
-                PostStatus::Future.as_str()
+                PostStatus::Future.to_string()
             );
         },
     )
@@ -481,7 +481,7 @@ mod macro_helper {
                             assert_eq!(updated_post.status, PostStatus::$status);
                             assert_eq!(
                                 updated_post_from_wp_cli.post_status,
-                                PostStatus::$status.as_str()
+                                PostStatus::$status.to_string()
                             );
                         }
                     ).await;

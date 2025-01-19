@@ -1,15 +1,26 @@
-use std::convert::Infallible;
-use std::{collections::HashMap, fmt::Display, str::FromStr};
+use std::collections::HashMap;
 
-use crate::impl_as_query_value_from_as_str;
+use crate::impl_as_query_value_from_to_string;
 use crate::url_query::AsQueryValue;
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum PostType {
     Post,
     Page,
@@ -22,54 +33,11 @@ pub enum PostType {
     WpFontFamily,
     WpFontFace,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl PostType {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Post => "post",
-            Self::Page => "page",
-            Self::Attachment => "attachment",
-            Self::NavMenuItem => "nav_menu_item",
-            Self::WpBlock => "wp_block",
-            Self::WpTemplate => "wp_template",
-            Self::WpTemplatePart => "wp_template_part",
-            Self::WpNavigation => "wp_navigation",
-            Self::WpFontFamily => "wp_font_family",
-            Self::WpFontFace => "wp_font_face",
-            Self::Custom(name) => name.as_str(),
-        }
-    }
-}
-
-impl FromStr for PostType {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "post" => Ok(Self::Post),
-            "page" => Ok(Self::Page),
-            "attachment" => Ok(Self::Attachment),
-            "nav_menu_item" => Ok(Self::NavMenuItem),
-            "wp_block" => Ok(Self::WpBlock),
-            "wp_template" => Ok(Self::WpTemplate),
-            "wp_template_part" => Ok(Self::WpTemplatePart),
-            "wp_navigation" => Ok(Self::WpNavigation),
-            "wp_font_family" => Ok(Self::WpFontFamily),
-            "wp_font_face" => Ok(Self::WpFontFace),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
-
-impl Display for PostType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl_as_query_value_from_as_str!(PostType);
+impl_as_query_value_from_to_string!(PostType);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 #[serde(transparent)]
