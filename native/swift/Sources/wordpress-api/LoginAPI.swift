@@ -33,7 +33,7 @@ public final class WordPressLoginClient {
         appName: String,
         appId: WpUuid?,
         authenticator: AuthenticatorProtocol
-    ) async throws -> WpApiApplicationPasswordDetails {
+    ) async throws(WordPressLoginClientError) -> WpApiApplicationPasswordDetails {
         let loginURL = try await self.loginURL(forSite: site)
         let authURL = createApplicationPasswordAuthenticationUrl(
             loginUrl: loginURL,
@@ -138,7 +138,7 @@ extension WordPressLoginClient {
         site: String,
         appName: String,
         appId: WpUuid?
-    ) async throws -> WpApiApplicationPasswordDetails {
+    ) async throws(WordPressLoginClientError) -> WpApiApplicationPasswordDetails {
         let provider = await AuthenticationServiceAuthenticator()
         return try await login(
             site: site,
