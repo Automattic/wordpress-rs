@@ -289,7 +289,7 @@ impl WpNetworkHeaderMap {
 #[uniffi::export]
 impl WpNetworkHeaderMap {
     #[uniffi::constructor]
-    fn from_multi_map(
+    pub fn from_multi_map(
         hash_map: HashMap<String, Vec<String>>,
     ) -> Result<Self, WpNetworkHeaderMapError> {
         let inner = hash_map
