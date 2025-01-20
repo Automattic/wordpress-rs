@@ -29,7 +29,7 @@ class WpRequestExecutor(
                 request.method().toString(),
                 request.body()?.contents()?.toRequestBody()
             )
-            request.headerMap().toMap().forEach { (key, values) ->
+            request.headerMap().toMultiMap().forEach { (key, values) ->
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
@@ -68,7 +68,7 @@ class WpRequestExecutor(
                 method = mediaUploadRequest.method().toString(),
                 body = multipartBodyBuilder.build()
             )
-            mediaUploadRequest.headerMap().toMap().forEach { (key, values) ->
+            mediaUploadRequest.headerMap().toMultiMap().forEach { (key, values) ->
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
