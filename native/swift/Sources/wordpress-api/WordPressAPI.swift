@@ -121,7 +121,7 @@ public actor WordPressAPI {
 
 public extension WpNetworkHeaderMap {
     func toFlatMap() -> [String: String] {
-        self.toMap().mapValues { $0.joined(separator: ",") }
+        self.toMultiMap().mapValues { $0.joined(separator: ",") }
     }
 }
 
@@ -138,7 +138,7 @@ public extension WpNetworkRequest {
     #if DEBUG
     func debugPrint() {
         print("\(method().rawValue) \(self.url())")
-        for (name, value) in self.headerMap().toMap() {
+        for (name, value) in self.headerMap().toMultiMap() {
             print("\(name): \(value)")
         }
 
