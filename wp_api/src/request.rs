@@ -314,7 +314,7 @@ impl WpNetworkHeaderMap {
         Ok(Self { inner })
     }
 
-    fn to_map(&self) -> HashMap<String, Vec<String>> {
+    pub fn to_multi_map(&self) -> HashMap<String, Vec<String>> {
         let mut header_hashmap = HashMap::new();
         self.inner.iter().for_each(|(k, v)| {
             let v = String::from_utf8_lossy(v.as_bytes()).into_owned();

@@ -13,7 +13,7 @@ public protocol PaginatableResponse: Sendable {
 
     var data: [DataType] { get }
 
-    init(data: [DataType], headerMap: WpNetworkHeaderMap, nextPageParams: ParamsType?, prevPageParams: ParamsType?)
+    init(data: [DataType], headerMap: [String: [String]], nextPageParams: ParamsType?, prevPageParams: ParamsType?)
 }
 
 public protocol PaginationAwareExecutor: Sendable {
@@ -187,17 +187,17 @@ public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequen
 }
 
 // MARK: - Posts
-extension PostsRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
+extension PostsRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithEditContext
 }
 
-extension PostsRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
+extension PostsRequestListWithViewContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithViewContext
 }
 
-extension PostsRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
+extension PostsRequestListWithEmbedContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
     public typealias DataType = PostWithEmbedContext
 }
@@ -209,17 +209,17 @@ extension PostsRequestExecutor: PaginationAwareExecutor {
 }
 
 // MARK: - Media
-extension MediaRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
+extension MediaRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = MediaListParams
     public typealias DataType = MediaWithEditContext
 }
 
-extension MediaRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
+extension MediaRequestListWithViewContextResponse: PaginatableResponse {
     public typealias ParamsType = MediaListParams
     public typealias DataType = MediaWithViewContext
 }
 
-extension MediaRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
+extension MediaRequestListWithEmbedContextResponse: PaginatableResponse {
     public typealias ParamsType = MediaListParams
     public typealias DataType = MediaWithEmbedContext
 }
@@ -231,17 +231,17 @@ extension MediaRequestExecutor: PaginationAwareExecutor {
 }
 
 // MARK: - Users
-extension UsersRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
+extension UsersRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = UserListParams
     public typealias DataType = UserWithEditContext
 }
 
-extension UsersRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
+extension UsersRequestListWithViewContextResponse: PaginatableResponse {
     public typealias ParamsType = UserListParams
     public typealias DataType = UserWithViewContext
 }
 
-extension UsersRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
+extension UsersRequestListWithEmbedContextResponse: PaginatableResponse {
     public typealias ParamsType = UserListParams
     public typealias DataType = UserWithEmbedContext
 }
