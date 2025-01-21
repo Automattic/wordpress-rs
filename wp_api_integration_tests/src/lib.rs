@@ -169,7 +169,7 @@ impl AsyncWpNetworking {
                 Self::request_method(wp_request.method()),
                 wp_request.url().0.as_str(),
             )
-            .headers(wp_request.header_map().as_header_map());
+            .headers(wp_request.header_map().to_header_map());
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }
@@ -193,7 +193,7 @@ impl AsyncWpNetworking {
                 Self::request_method(media_upload_request.method()),
                 media_upload_request.url().0.as_str(),
             )
-            .headers(media_upload_request.header_map().as_header_map());
+            .headers(media_upload_request.header_map().to_header_map());
         let file_path = media_upload_request.file_path();
         let mut file_header_map = HeaderMap::new();
         file_header_map.insert(
