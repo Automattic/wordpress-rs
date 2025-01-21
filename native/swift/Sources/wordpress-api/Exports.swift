@@ -26,6 +26,7 @@ public typealias UrlDiscoveryAttemptError = WordPressAPIInternal.UrlDiscoveryAtt
 
 // MARK: - Users
 
+public typealias UserId = WordPressAPIInternal.UserId
 public typealias SparseUser = WordPressAPIInternal.SparseUser
 public typealias UserWithViewContext = WordPressAPIInternal.UserWithViewContext
 public typealias UserWithEditContext = WordPressAPIInternal.UserWithEditContext
