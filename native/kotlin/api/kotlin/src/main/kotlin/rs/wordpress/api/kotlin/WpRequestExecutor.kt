@@ -12,7 +12,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestExecutor
-import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import java.io.File
@@ -29,7 +28,7 @@ class WpRequestExecutor(
                 request.method().toString(),
                 request.body()?.contents()?.toRequestBody()
             )
-            request.headerMap().toMultiMap().forEach { (key, values) ->
+            request.headerMap().forEach { (key, values) ->
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
@@ -39,7 +38,7 @@ class WpRequestExecutor(
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
-                    headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
+                    headerMap = response.headers.toMultimap()
                 )
             }
         }
@@ -68,7 +67,7 @@ class WpRequestExecutor(
                 method = mediaUploadRequest.method().toString(),
                 body = multipartBodyBuilder.build()
             )
-            mediaUploadRequest.headerMap().toMultiMap().forEach { (key, values) ->
+            mediaUploadRequest.headerMap().forEach { (key, values) ->
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
@@ -78,7 +77,7 @@ class WpRequestExecutor(
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
-                    headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
+                    headerMap = response.headers.toMultimap()
                 )
             }
         }

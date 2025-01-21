@@ -195,7 +195,7 @@ pub enum FetchApiRootUrlError {
         header_map
     )]
     ApiRootLinkHeaderNotFound {
-        header_map: Arc<WpNetworkHeaderMap>,
+        header_map: WpNetworkHeaderMap,
         status_code: u16,
     },
 }

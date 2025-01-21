@@ -7,7 +7,6 @@ use wp_api::posts::{
     SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
     WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
 };
-use wp_api::request::WpNetworkHeaderMap;
 use wp_api::tags::TagId;
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
@@ -22,9 +21,8 @@ async fn list_with_edit_context_number_of_pages() {
         .list_with_edit_context(&PostListParams::default())
         .await
         .assert_response();
-    let header_map = WpNetworkHeaderMap::from_multi_map(p.header_map).unwrap();
-    assert_eq!(header_map.wp_total(), Some(57));
-    assert_eq!(header_map.wp_total_pages(), Some(6));
+    assert_eq!(p.header_map.wp_total(), Some(57));
+    assert_eq!(p.header_map.wp_total_pages(), Some(6));
 }
 
 #[tokio::test]

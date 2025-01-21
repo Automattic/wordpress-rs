@@ -1,16 +1,15 @@
-use std::str;
-use std::sync::Arc;
-
-use crate::request::endpoint::WpEndpointUrl;
-use crate::request::{
-    RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-};
-use crate::ParsedUrl;
-
 use super::url_discovery::{
     self, FetchApiDetailsError, FetchApiRootUrlError, StateInitial, UrlDiscoveryAttemptError,
     UrlDiscoveryAttemptSuccess, UrlDiscoveryError, UrlDiscoveryState, UrlDiscoverySuccess,
 };
+use crate::{
+    request::{
+        endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
+        WpNetworkRequest, WpNetworkResponse,
+    },
+    ParsedUrl,
+};
+use std::{str, sync::Arc};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -130,7 +129,7 @@ impl WpLoginClient {
         let api_root_request = WpNetworkRequest {
             method: RequestMethod::HEAD,
             url: WpEndpointUrl(parsed_site_url.url()),
-            header_map: WpNetworkHeaderMap::default().into(),
+            header_map: WpNetworkHeaderMap::default(),
             body: None,
         };
         self.request_executor
@@ -148,7 +147,7 @@ impl WpLoginClient {
                 WpNetworkRequest {
                     method: RequestMethod::GET,
                     url: WpEndpointUrl(api_root_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
+                    header_map: WpNetworkHeaderMap::default(),
                     body: None,
                 }
                 .into(),

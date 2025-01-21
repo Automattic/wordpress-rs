@@ -9,7 +9,7 @@ use wp_api::{
     posts::PostId,
     request::{
         endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        WpNetworkRequest, WpNetworkResponse,
     },
     tags::TagId,
     users::UserId,
@@ -167,19 +167,19 @@ impl AsyncWpNetworking {
             .client
             .request(
                 Self::request_method(wp_request.method()),
-                wp_request.url().0.as_str(),
+                wp_request.url.0.as_str(),
             )
-            .headers(wp_request.header_map().as_header_map());
+            .headers(wp_request.header_map.to_http_header_map().expect("WpNetworkRequest's header map should cleanly convert from HashMap<String, Vec<String>> to http::HeaderMap"));
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }
         let mut response = request.send().await?;
 
-        let header_map = std::mem::take(response.headers_mut());
+        let response_header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            header_map: response_header_map.into(),
         })
     }
 
@@ -191,14 +191,14 @@ impl AsyncWpNetworking {
             .client
             .request(
                 Self::request_method(media_upload_request.method()),
-                media_upload_request.url().0.as_str(),
+                media_upload_request.url.0.as_str(),
             )
-            .headers(media_upload_request.header_map().as_header_map());
-        let file_path = media_upload_request.file_path();
+            .headers(media_upload_request.header_map.to_http_header_map().expect("WpNetworkRequest's header map should cleanly convert from HashMap<String, Vec<String>> to http::HeaderMap"));
+        let file_path = &media_upload_request.file_path;
         let mut file_header_map = HeaderMap::new();
         file_header_map.insert(
             http::header::CONTENT_TYPE,
-            HeaderValue::from_str(&media_upload_request.file_content_type()).unwrap(),
+            HeaderValue::from_str(&media_upload_request.file_content_type).unwrap(),
         );
         let mut form = reqwest::multipart::Form::new().part(
             "file",
@@ -207,18 +207,18 @@ impl AsyncWpNetworking {
                 .unwrap()
                 .headers(file_header_map),
         );
-        for (k, v) in media_upload_request.media_params() {
-            form = form.text(k, v)
+        for (k, v) in &media_upload_request.media_params {
+            form = form.text(k.clone(), v.clone())
         }
 
         let request = request.multipart(form);
         let mut response = request.send().await?;
 
-        let header_map = std::mem::take(response.headers_mut());
+        let response_header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            header_map: response_header_map.into(),
         })
     }
 

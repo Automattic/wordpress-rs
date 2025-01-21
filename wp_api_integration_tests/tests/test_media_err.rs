@@ -7,8 +7,8 @@ use wp_api::{
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     request::{
-        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, WpNetworkHeaderMap,
-        WpNetworkRequest, WpNetworkResponse,
+        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, WpNetworkRequest,
+        WpNetworkResponse,
     },
     users::UserId,
     MediaUploadRequestExecutionError, RequestExecutionError, WpApiClient, WpAuthentication,
@@ -220,13 +220,13 @@ impl RequestExecutor for MediaErrNetworking {
             .client
             .request(
                 AsyncWpNetworking::request_method(media_upload_request.method()),
-                media_upload_request.url().0.as_str(),
+                media_upload_request.url.0.as_str(),
             )
-            .headers(media_upload_request.header_map().as_header_map());
+            .headers(media_upload_request.header_map.to_http_header_map().expect("WpNetworkRequest's header map should cleanly convert from HashMap<String, Vec<String>> to http::HeaderMap"));
         let mut file_header_map = HeaderMap::new();
         file_header_map.insert(
             http::header::CONTENT_TYPE,
-            HeaderValue::from_str(&media_upload_request.file_content_type()).unwrap(),
+            HeaderValue::from_str(&media_upload_request.file_content_type).unwrap(),
         );
         let mut form = reqwest::multipart::Form::new();
         match self.test_type {
@@ -234,8 +234,8 @@ impl RequestExecutor for MediaErrNetworking {
                 // don't add the file
             }
         }
-        for (k, v) in media_upload_request.media_params() {
-            form = form.text(k, v)
+        for (k, v) in &media_upload_request.media_params {
+            form = form.text(k.clone(), v.clone())
         }
         request = request.multipart(form);
 
@@ -250,7 +250,7 @@ impl RequestExecutor for MediaErrNetworking {
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            header_map: header_map.into(),
         })
     }
 }

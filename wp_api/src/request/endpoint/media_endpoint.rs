@@ -13,7 +13,6 @@ use crate::{
     },
     SparseField,
 };
-use http::HeaderValue;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -88,7 +87,7 @@ impl MediaRequestEndpoint {
 pub struct MediaRequestCreateResponse {
     pub data: crate::media::MediaWithEditContext,
     #[serde(skip)]
-    pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
+    pub header_map: WpNetworkHeaderMap,
 }
 
 impl From<MediaRequestCreateResponse> for ParsedResponse<MediaWithEditContext, ()> {
@@ -120,11 +119,11 @@ fn parse_as_media_request_create_response(
 #[derive(uniffi::Object)]
 pub struct MediaUploadRequest {
     pub(crate) method: RequestMethod,
-    pub(crate) url: WpEndpointUrl,
-    pub(crate) header_map: Arc<WpNetworkHeaderMap>,
-    pub(crate) file_path: String,
-    pub(crate) file_content_type: String,
-    pub(crate) media_params: HashMap<String, String>,
+    pub url: WpEndpointUrl,
+    pub header_map: WpNetworkHeaderMap,
+    pub file_path: String,
+    pub file_content_type: String,
+    pub media_params: HashMap<String, String>,
 }
 
 #[uniffi::export]
@@ -133,23 +132,23 @@ impl MediaUploadRequest {
         self.method.clone()
     }
 
-    pub fn url(&self) -> WpEndpointUrl {
+    fn url(&self) -> WpEndpointUrl {
         self.url.clone()
     }
 
-    pub fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+    fn header_map(&self) -> WpNetworkHeaderMap {
         self.header_map.clone()
     }
 
-    pub fn file_path(&self) -> String {
+    fn file_path(&self) -> String {
         self.file_path.clone()
     }
 
-    pub fn file_content_type(&self) -> String {
+    fn file_content_type(&self) -> String {
         self.file_content_type.clone()
     }
 
-    pub fn media_params(&self) -> HashMap<String, String> {
+    fn media_params(&self) -> HashMap<String, String> {
         self.media_params.clone()
     }
 }
@@ -189,14 +188,14 @@ impl MediaRequestBuilder {
     ) -> MediaUploadRequest {
         let url = self.endpoint.create();
         let mut header_map = self.inner.header_map();
-        header_map.inner.insert(
-            http::header::CONTENT_TYPE,
-            HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
+        header_map.0.insert(
+            http::header::CONTENT_TYPE.to_string(),
+            vec![CONTENT_TYPE_MULTIPART.to_string()],
         );
         MediaUploadRequest {
             method: RequestMethod::POST,
             url: self.endpoint.create().into(),
-            header_map: header_map.into(),
+            header_map,
             file_path,
             file_content_type,
             media_params: params.into(),
