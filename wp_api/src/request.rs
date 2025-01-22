@@ -24,6 +24,21 @@ const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
 const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
 #[derive(Debug, uniffi::Record)]
+// This can be used to replace `Arc<WpNetworkHeaderMap>`.
+struct AnotherWpNetworkHeaderMap {
+    inner: OpaqueRustObject,
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_get_network_header_map() -> AnotherWpNetworkHeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert("X-WP-Total", HeaderValue::from_static("10"));
+    AnotherWpNetworkHeaderMap {
+        inner: headers.into(),
+    }
+}
+
+#[derive(Debug, uniffi::Record)]
 pub struct OpaqueRustObject {
     type_id: OpaqueRustObjectIdentifier,
     raw: Vec<u8>,
@@ -362,8 +377,17 @@ impl Debug for WpNetworkRequest {
 pub struct WpNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
+    // TODO: Change this to `OpaqueRustObject`
     pub header_map: Arc<WpNetworkHeaderMap>,
 }
+
+/* TODO: Implement this
+impl WpNetworkResponse {
+    pub fn header_map(&self) -> Result<HeaderMap, ...> {
+        self.header_map.try_into()
+    }
+}
+ */
 
 #[derive(Debug, Default, Clone, uniffi::Object)]
 pub struct WpNetworkHeaderMap {

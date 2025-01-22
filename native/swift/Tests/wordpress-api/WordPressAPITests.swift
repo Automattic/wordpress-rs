@@ -68,6 +68,17 @@ struct ConversionTest {
     }
 
     @Test
+    func useAnotherHeaderMap() throws {
+        let headerMap = wpApiRustObjectGetNetworkHeaderMap()
+        #expect(headerMap is Sendable)
+
+        let headers = try UniffiHeaderMap(opaque: headerMap.inner)
+        #expect(headers.headerValue(key: "X-WP-Total") == "10")
+        #expect(headers.headerValue(key: "x-wp-total") == "10")
+        #expect(headers.headerValue(key: "X-wp-TotAl") == "10")
+    }
+
+    @Test
     func useRustObjectAnotherType() throws {
         let opaque = wpApiRustObjectGetAnotherRandomType()
         let foo = try UniffiAnotherRandomType(opaque: opaque)
