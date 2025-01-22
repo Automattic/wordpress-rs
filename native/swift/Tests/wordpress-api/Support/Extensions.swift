@@ -15,7 +15,7 @@ extension WpNetworkHeaderMap {
 
 extension PaginatableResponse {
     static var empty: Self {
-        Self(data: [], headerMap: .empty, nextPageParams: nil, prevPageParams: nil)
+        Self(data: [], headerMap: [:], nextPageParams: nil, prevPageParams: nil)
     }
 }
 
