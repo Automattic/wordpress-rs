@@ -118,6 +118,12 @@ impl From<&str> for PluginWpOrgDirectorySlug {
     }
 }
 
+impl PluginWpOrgDirectorySlug {
+    pub fn as_str(&self) -> &str {
+        self.slug.as_str()
+    }
+}
+
 #[derive(
     Debug,
     Clone,
