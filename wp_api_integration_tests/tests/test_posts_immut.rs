@@ -362,3 +362,16 @@ mod filter {
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }
+
+#[tokio::test]
+#[parallel]
+async fn test_wp_total_header() {
+    let p = api_client()
+        .posts()
+        .list_with_edit_context(&PostListParams::default())
+        .await
+        .assert_response();
+    assert_eq!(p.header_map.header_value_as_u32("X-WP-Total"), Some(57));
+    assert_eq!(p.header_map.header_value_as_u32("x-wp-total"), Some(57));
+    assert_eq!(p.header_map.header_value_as_u32("X-WP-TOTAL"), Some(57));
+}

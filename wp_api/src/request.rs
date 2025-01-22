@@ -517,6 +517,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn header_value_as_u32_case_insensitive() {
+        let hash_map = [("X-WP-Total".to_string(), vec!["17".to_string()])].into();
+        let headers = WpNetworkHeaderMap(hash_map);
+        assert_eq!(headers.header_value_as_u32("x-wp-total"), Some(17));
+        assert_eq!(headers.header_value_as_u32("X-WP-TOTAL"), Some(17));
+    }
+
     fn assert_header_map_values(header_map: &WpNetworkHeaderMap, key: &str, values: Vec<&str>) {
         assert_eq!(
             header_map
