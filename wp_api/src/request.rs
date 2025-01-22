@@ -178,6 +178,43 @@ fn wp_api_rust_object_get_another_random_type() -> OpaqueRustObject {
     .into()
 }
 
+fn get_test_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+    headers.insert("User-Agent", HeaderValue::from_static("wp-api-rs"));
+    headers.insert("X-Extra", "Extra".repeat(30).parse().unwrap());
+    headers
+}
+
+fn use_test_headers(headers: HeaderMap) -> u64 {
+    headers.len() as u64
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_get_large_opaque() -> OpaqueRustObject {
+    get_test_headers().into()
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_get_large_value() -> HashMap<String, String> {
+    get_test_headers()
+        .iter()
+        .map(|(k, v)| (k.as_str().to_owned(), v.to_str().unwrap().to_owned()))
+        .collect()
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_use_large_opaque(opaque: OpaqueRustObject) -> u64 {
+    let headers: HeaderMap = opaque.try_into().unwrap();
+    use_test_headers(headers)
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_use_large_value(map: HashMap<String, String>) -> u64 {
+    let headers = TryInto::<HeaderMap>::try_into(&map).unwrap();
+    use_test_headers(headers)
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ParsedResponse<DataType, ParamsType> {

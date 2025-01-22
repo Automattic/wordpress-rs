@@ -95,3 +95,52 @@ struct ConversionTest {
         })
     }
 }
+
+import XCTest
+
+class BenchmarkTest: XCTestCase {
+
+    let iterations = 1_000
+
+    func testSwiftToRustBaseline() {
+        let value = wpApiRustObjectGetLargeValue()
+        self.measure(metrics: [XCTClockMetric()]) {
+            for _ in 1...iterations {
+                let result = wpApiRustObjectUseLargeValue(map: value)
+                XCTAssertEqual(result, 3)
+            }
+        }
+    }
+
+    func testSwiftToRust() {
+        let value = wpApiRustObjectGetLargeOpaque()
+
+        self.measure(metrics: [XCTClockMetric()]) {
+            for _ in 1...iterations {
+                let result = wpApiRustObjectUseLargeOpaque(opaque: value)
+                XCTAssertEqual(result, 3)
+            }
+        }
+    }
+
+    func testRoundTripBaseline() {
+        self.measure(metrics: [XCTClockMetric()]) {
+            for _ in 1...iterations {
+                let value = wpApiRustObjectGetLargeValue()
+                let result = wpApiRustObjectUseLargeValue(map: value)
+                XCTAssertEqual(result, 3)
+            }
+        }
+    }
+
+    func testRoundTrip() {
+        self.measure(metrics: [XCTClockMetric()]) {
+            for _ in 1...iterations {
+                let value = wpApiRustObjectGetLargeOpaque()
+                let result = wpApiRustObjectUseLargeOpaque(opaque: value)
+                XCTAssertEqual(result, 3)
+            }
+        }
+    }
+
+}
