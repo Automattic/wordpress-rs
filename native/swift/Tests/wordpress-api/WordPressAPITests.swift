@@ -48,3 +48,35 @@ struct WordPressAPITests {
         #expect(user.data.name == "User Name")
     }
 }
+
+#if canImport(WordPressAPIInternal)
+import WordPressAPIInternal
+#endif
+
+struct ConversionTest {
+
+    @Test
+    func useRustObjectHeaderMap() throws {
+        let opaque = wpApiRustObjectGetHeaderMap()
+        let headers = try UniffiHeaderMap(opaque: opaque)
+        #expect(headers.headerValue(key: "Content-Type") == "application/json")
+        #expect(headers.headerValue(key: "User-Agent") == "wp-api-rs")
+    }
+
+    @Test
+    func useRustObjectAnotherType() throws {
+        let opaque = wpApiRustObjectGetAnotherRandomType()
+        let foo = try UniffiAnotherRandomType(opaque: opaque)
+        #expect(foo.value() == "Hello from Rust!")
+    }
+
+    @Test
+    func useRustObjectMismatch() {
+        let opaque = wpApiRustObjectGetAnotherRandomType()
+        #expect(performing: {
+            try UniffiHeaderMap(opaque: opaque)
+        }, throws: { error in
+            error as? OpaqueRustObjectConversionError == .TypeMismatch(expected: .headerMap)
+        })
+    }
+}

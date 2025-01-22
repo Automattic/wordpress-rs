@@ -23,6 +23,146 @@ const LINK_HEADER_KEY: &str = "Link";
 const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
 const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
+#[derive(Debug, uniffi::Record)]
+pub struct OpaqueRustObject {
+    type_id: OpaqueRustObjectIdentifier,
+    raw: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum OpaqueRustObjectIdentifier {
+    HeaderMap,
+    AnotherRandomType,
+}
+
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum OpaqueRustObjectConversionError {
+    #[error("Expected type {expected:?}")]
+    TypeMismatch {
+        expected: OpaqueRustObjectIdentifier,
+    },
+    #[error("Failed to deserialize object: {reason}")]
+    Deserialization { reason: String },
+}
+
+impl From<HeaderMap> for OpaqueRustObject {
+    fn from(headers: HeaderMap) -> Self {
+        let hash_map: HashMap<String, String> = headers
+            .iter()
+            .map(|(k, v)| (k.as_str().to_owned(), v.to_str().unwrap().to_owned()))
+            .collect();
+
+        Self {
+            type_id: OpaqueRustObjectIdentifier::HeaderMap,
+            raw: serde_json::to_vec(&hash_map).unwrap(),
+        }
+    }
+}
+
+impl TryFrom<OpaqueRustObject> for HeaderMap {
+    type Error = OpaqueRustObjectConversionError;
+
+    fn try_from(value: OpaqueRustObject) -> Result<Self, Self::Error> {
+        if value.type_id != OpaqueRustObjectIdentifier::HeaderMap {
+            return Err(OpaqueRustObjectConversionError::TypeMismatch {
+                expected: OpaqueRustObjectIdentifier::HeaderMap,
+            });
+        }
+
+        match serde_json::from_slice::<HashMap<String, String>>(&value.raw) {
+            Ok(hash_map) => TryInto::<HeaderMap>::try_into(&hash_map).map_err(|err| {
+                OpaqueRustObjectConversionError::Deserialization {
+                    reason: err.to_string(),
+                }
+            }),
+            Err(err) => Err(OpaqueRustObjectConversionError::Deserialization {
+                reason: err.to_string(),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, uniffi::Object)]
+struct UniffiHeaderMap {
+    inner: HeaderMap,
+}
+
+#[uniffi::export]
+impl UniffiHeaderMap {
+    #[uniffi::constructor]
+    fn new(opaque: OpaqueRustObject) -> Result<Self, OpaqueRustObjectConversionError> {
+        opaque.try_into().map(|inner| Self { inner })
+    }
+
+    fn header_value(&self, key: String) -> Option<String> {
+        self.inner.get(key).map(|v| v.to_str().unwrap().to_owned())
+    }
+}
+
+#[derive(Debug)]
+struct AnotherRandomType {
+    value: String,
+}
+
+impl From<AnotherRandomType> for OpaqueRustObject {
+    fn from(obj: AnotherRandomType) -> Self {
+        Self {
+            type_id: OpaqueRustObjectIdentifier::AnotherRandomType,
+            raw: obj.value.into_bytes(),
+        }
+    }
+}
+impl TryFrom<OpaqueRustObject> for AnotherRandomType {
+    type Error = OpaqueRustObjectConversionError;
+
+    fn try_from(value: OpaqueRustObject) -> Result<Self, Self::Error> {
+        if value.type_id != OpaqueRustObjectIdentifier::AnotherRandomType {
+            return Err(OpaqueRustObjectConversionError::TypeMismatch {
+                expected: OpaqueRustObjectIdentifier::AnotherRandomType,
+            });
+        }
+
+        String::from_utf8(value.raw)
+            .map(|value| AnotherRandomType { value })
+            .map_err(|err| OpaqueRustObjectConversionError::Deserialization {
+                reason: err.to_string(),
+            })
+    }
+}
+
+#[derive(Debug, uniffi::Object)]
+struct UniffiAnotherRandomType {
+    inner: AnotherRandomType,
+}
+
+#[uniffi::export]
+impl UniffiAnotherRandomType {
+    #[uniffi::constructor]
+    fn new(opaque: OpaqueRustObject) -> Result<Self, OpaqueRustObjectConversionError> {
+        opaque.try_into().map(|inner| Self { inner })
+    }
+
+    fn value(&self) -> String {
+        self.inner.value.clone()
+    }
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_get_header_map() -> OpaqueRustObject {
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+    headers.insert("User-Agent", HeaderValue::from_static("wp-api-rs"));
+    headers.into()
+}
+
+#[uniffi::export]
+fn wp_api_rust_object_get_another_random_type() -> OpaqueRustObject {
+    AnotherRandomType {
+        value: "Hello from Rust!".to_string(),
+    }
+    .into()
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ParsedResponse<DataType, ParamsType> {
