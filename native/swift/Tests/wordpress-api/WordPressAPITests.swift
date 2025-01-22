@@ -60,7 +60,11 @@ struct ConversionTest {
         let opaque = wpApiRustObjectGetHeaderMap()
         let headers = try UniffiHeaderMap(opaque: opaque)
         #expect(headers.headerValue(key: "Content-Type") == "application/json")
+        #expect(headers.headerValue(key: "content-type") == "application/json")
+        #expect(headers.headerValue(key: "ConTenT-Type") == "application/json")
         #expect(headers.headerValue(key: "User-Agent") == "wp-api-rs")
+        #expect(headers.headerValue(key: "user-agent") == "wp-api-rs")
+        #expect(headers.headerValue(key: "uSEr-aGENt") == "wp-api-rs")
     }
 
     @Test
