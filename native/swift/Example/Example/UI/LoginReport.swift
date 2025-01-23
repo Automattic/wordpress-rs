@@ -5,21 +5,38 @@ import AuthenticationServices
 import WordPressAPIInternal
 
 struct AutoDiscoveryStepView: View {
-    let label: String
+    let step: AutoDiscoveryStep
 
     let successIcon = "checkmark.circle"
-    let failureIcon = "exclamationmark.circle"
-
-    let isSuccess: Bool
+    let warningIcon = "exclamationmark.circle"
+    let errorIcon   = "xmark.circle"
 
     var body: some View {
         VStack(alignment: .leading) {
             HStack(alignment: .firstTextBaseline) {
-                Image(systemName: isSuccess ? successIcon : failureIcon)
-                    .font(.title)
-                Text(label).font(.title)
+                if step.wasSuccessful {
+                    Image(systemName: successIcon)
+                        .font(.title)
+                        .foregroundStyle(.green)
+                } else if step.isRequired {
+                    Image(systemName: errorIcon)
+                        .font(.title)
+                        .foregroundStyle(.red)
+                } else {
+                    Image(systemName: warningIcon)
+                        .font(.title)
+                        .foregroundStyle(.yellow)
+                }
+
+                Text(step.name).font(.title)
+
                 Spacer()
             }
+
+            if let errorMessage = step.errorMessage {
+                Text(errorMessage)
+            }
+
         }.padding(.horizontal)
     }
 }
@@ -53,15 +70,18 @@ struct AutodiscoveryReportView: View {
 struct AutodiscoveryResultView: View {
     let attempt: AutoDiscoveryAttemptResult
 
+    let locale = Locale.autoupdatingCurrent
+
     var body: some View {
         if let url = attempt.domainWithSubdomain {
             Text(url)
         }
 
-        AutoDiscoveryStepView(label: "Site Connection", isSuccess: attempt.couldConnectToUrl)
-        AutoDiscoveryStepView(label: "Can connect using HTTPS", isSuccess: attempt.couldUseHttps)
-        AutoDiscoveryStepView(label: "Supports JSON ", isSuccess: attempt.foundApiRoot)
-        AutoDiscoveryStepView(label: "Found authentication URL ", isSuccess: attempt.foundAuthenticationUrl)
+        let steps = attempt.constructSteps(langId: locale.identifier)
+
+        ForEach(steps) { step in
+            AutoDiscoveryStepView(step: step)
+        }
     }
 }
 
@@ -76,7 +96,7 @@ struct AutodiscoveryResultView: View {
         var body: some View {
             AutodiscoveryReportView(report: report)
                 .task {               
-                    let result = await loginApi.autodiscoveryResult(forSite: "http://optional-https.wpmt.co")
+                    let result = await loginApi.autodiscoveryResult(forSite: "http://jalib923knblakis9ba92q3nbaslkes.nope")
                     self.report = result
                 }
         }

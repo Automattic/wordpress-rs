@@ -65,8 +65,18 @@ struct LoginView: View {
             do {
                 let loginClient = WordPressLoginClient(requestExecutor: URLSession.shared)
                 let loginDetails = await loginClient.autodiscoveryResult(forSite: url)
-                
+
                 debugPrint(loginDetails)
+
+                let localeId = Locale.preferredLanguages.first ?? "en-US"
+                self.loginError = [
+                        loginDetails.userInputAttempt.errorMessage(localeId: localeId),
+                        loginDetails.autoHttpsAttempt?.errorMessage(localeId: localeId),
+                        loginDetails.autoDotPhpExtensionForWpAdminAttempt?.errorMessage(localeId: localeId)
+                    ]
+                    .compactMap { $0 }
+                    .map { "- \($0)"}
+                    .joined(separator: "\n")
             }
 
             self.isLoading = false

@@ -2,6 +2,14 @@ use super::WpApiDetails;
 use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
 use std::{collections::HashMap, sync::Arc};
 
+use crate::LOCALES;
+
+use fluent_bundle::FluentValue;
+use fluent_langneg::convert_vec_str_to_langids_lossy;
+use fluent_langneg::negotiate_languages;
+use fluent_langneg::NegotiationStrategy;
+use fluent_templates::Loader;
+
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -17,6 +25,14 @@ impl AutoDiscoveryAttempt {
             attempt_type,
         }
     }
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct AutoDiscoveryStep {
+    pub name: String,
+    pub is_required: bool,
+    pub was_successful: bool,
+    pub error_message: Option<String>
 }
 
 #[derive(Debug, uniffi::Record)]
@@ -96,14 +112,60 @@ pub struct AutoDiscoveryAttemptResult {
 
 #[uniffi::export]
 impl AutoDiscoveryAttemptResult {
+
+    fn construct_steps(&self, lang_id: String) -> Vec<AutoDiscoveryStep> {
+        vec![
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_connect"),
+                was_successful: true,
+                is_required: true,
+                error_message: None // TODO: We should be able to populate this
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_https"),
+                was_successful: !self.has_failed_to_connect_with_https(),
+                is_required: false,
+                error_message: None // TODO: We should be able to populate this
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_is_wordpress"),
+                is_required: true,
+                was_successful: true, // TODO: Write some evaluation for this
+                error_message: None // TODO: We should be able to populate this
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_json"),
+                is_required: true,
+                was_successful: !self.has_failed_to_parse_api_details(),
+                error_message: Some(localized_message_with_args(
+                    &lang_id,
+                    "parse_api_root_url_error_api_root_link_header_not_found",
+                    &HashMap::from([("site_url", self.attempt_site_url().into())]),
+                ))
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_find_auth_url"),
+                is_required: true,
+                was_successful: !self.has_failed_to_parse_authentication_url(),
+                error_message: Some(localized_message_with_args(
+                    &lang_id,
+                    "auto_discovery_attempt_failure_parse_api_details",
+                    &HashMap::from([("api_url", self.attempt_site_url().into())]),
+                ))
+            }
+        ]
+    }
+
     fn attempt_site_url(&self) -> String {
         self.attempt_site_url.clone()
     }
 
-    fn error_message(&self) -> Option<String> {
+    fn error_message(&self, locale_id: String) -> Option<String> {
         match &self.result {
             Ok(_) => None,
-            Err(error) => Some(error.error_message()),
+            Err(error) => {
+                error.localized_error_message(locale_id)
+            },
         }
     }
 
@@ -129,18 +191,16 @@ impl AutoDiscoveryAttemptResult {
         }
     }
 
-    fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
-        match &self.result {
-            Ok(success) => Some(false),
-            Err(error) => error.has_failed_to_parse_api_root_url(),
-        }
+    fn has_failed_to_connect_with_https(&self) -> bool {
+        !self.attempt_site_url().starts_with("https://") // TODO: Can we do better here?
     }
 
-    fn has_failed_to_parse_api_details(&self) -> Option<bool> {
-        match &self.result {
-            Ok(success) => Some(false),
-            Err(error) => error.has_failed_to_parse_api_details(),
-        }
+    fn has_failed_to_parse_api_root_url(&self) -> bool {
+        false // TODO
+    }
+
+    fn has_failed_to_parse_api_details(&self) -> bool {
+        false // TODO
     }
 
     fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
@@ -162,6 +222,14 @@ impl AutoDiscoveryAttemptResult {
             Ok(success) => Some(Arc::new(success.api_details.clone())),
             Err(_) => None,
         }
+    }
+
+    fn has_failed_to_parse_authentication_url(&self) -> bool {
+        if let Some(details) = self.api_details() {
+            return details.find_application_passwords_authentication_url().is_some();
+        }
+
+        false
     }
 }
 
@@ -345,9 +413,27 @@ pub enum ParseApiRootUrlError {
         header_map
     )]
     ApiRootLinkHeaderNotFound {
+        site_url: Arc<ParsedUrl>,
         header_map: Arc<WpNetworkHeaderMap>,
         status_code: u16,
     },
+}
+
+impl WpLocalizedError for ParseApiRootUrlError {
+    fn localized_error_message(&self, lang_id: String) -> Option<String> {
+        let message = match self {
+            ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                site_url,
+                header_map,
+                status_code,
+            } => localized_message_with_args(
+                &lang_id,
+                "parse_api_root_url_error_api_root_link_header_not_found",
+                &HashMap::from([("site_url", site_url.url().into())]),
+            ),
+        };
+        Some(message)
+    }
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -363,6 +449,88 @@ pub enum FetchApiDetailsError {
     },
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
+}
+
+#[uniffi::export(with_foreign)]
+pub trait WpLocalizedError: Send + Sync {
+    fn localized_error_message(&self, locale_id: String) -> Option<String>;
+}
+
+impl WpLocalizedError for AutoDiscoveryAttemptFailure {
+    fn localized_error_message(&self, lang_id: String) -> Option<String> {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => Some(localized_message(
+                &lang_id,
+                "auto_discovery_attempt_failure_parse_site_url",
+            )),
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl {
+                parsed_site_url,
+                error,
+            } => Some(localized_message_with_args(
+                &lang_id,
+                "auto_discovery_attempt_failure_fetch_api_root_url",
+                &HashMap::from([("site_url", parsed_site_url.url().into())]),
+            )),
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl {
+                parsed_site_url,
+                error,
+            } => error.localized_error_message(lang_id),
+            AutoDiscoveryAttemptFailure::FetchApiDetails {
+                parsed_site_url,
+                api_root_url,
+                error,
+            } => Some(localized_message_with_args(
+                &lang_id,
+                "auto_discovery_attempt_failure_fetch_api_details",
+                &HashMap::from([("api_url", api_root_url.url().into())]),
+            )),
+            AutoDiscoveryAttemptFailure::ParseApiDetails {
+                parsed_site_url,
+                api_root_url,
+                parsing_error_message,
+            } => Some(localized_message_with_args(
+                &lang_id,
+                "auto_discovery_attempt_failure_parse_api_details",
+                &HashMap::from([("api_url", api_root_url.url().into())]),
+            )),
+        }
+    }
+}
+
+fn locale_language_id(lang_id: &str) -> unic_langid::LanguageIdentifier {
+    // Look up the translated message for `message_key` in `lang_id`.
+    let requested = convert_vec_str_to_langids_lossy([lang_id]);
+    let default: icu_locid::LanguageIdentifier = icu_locid::langid!("en-US");
+    let available: Vec<icu_locid::LanguageIdentifier> = LOCALES
+        .locales()
+        .filter_map(|f| f.to_string().parse().ok())
+        .collect();
+
+    let supported = negotiate_languages(
+        &requested,
+        &available,
+        Some(&default),
+        NegotiationStrategy::Filtering,
+    );
+
+    supported
+        .first()
+        .unwrap_or(&&default)
+        .to_string()
+        .parse()
+        .unwrap_or(unic_langid::langid!("en-US"))
+}
+
+pub fn localized_message(lang_id: &str, message_key: &str) -> String {
+    LOCALES.lookup(&locale_language_id(lang_id), message_key)
+}
+
+pub fn localized_message_with_args<T: AsRef<str>>(
+    lang_id: &str,
+    message_key: &str,
+    args: &HashMap<T, FluentValue>,
+) -> String {
+    LOCALES.lookup_with_args(&locale_language_id(lang_id), message_key, args)
 }
 
 #[cfg(test)]

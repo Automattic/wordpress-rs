@@ -21,6 +21,7 @@ public typealias WpNetworkHeaderMap = WordPressAPIInternal.WpNetworkHeaderMap
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias AutoDiscoveryResult = WordPressAPIInternal.AutoDiscoveryUniffiResult
+public typealias AutoDiscoveryStep = WordPressAPIInternal.AutoDiscoveryStep
 
 // MARK: - Users
 
