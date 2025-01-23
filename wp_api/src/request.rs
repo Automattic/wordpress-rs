@@ -62,14 +62,13 @@ pub enum OpaqueRustObjectConversionError {
 
 impl From<HeaderMap> for OpaqueRustObject {
     fn from(headers: HeaderMap) -> Self {
-        let hash_map: HashMap<String, String> = headers
+        let hash_map: HashMap<&str, &[u8]> = headers
             .iter()
-            .map(|(k, v)| (k.as_str().to_owned(), v.to_str().unwrap().to_owned()))
+            .map(|(k, v)| (k.as_str(), v.as_bytes()))
             .collect();
-
         Self {
             type_id: OpaqueRustObjectIdentifier::HeaderMap,
-            raw: serde_json::to_vec(&hash_map).unwrap(),
+            raw: bincode::serialize(&hash_map).unwrap(),
         }
     }
 }
@@ -84,16 +83,20 @@ impl TryFrom<OpaqueRustObject> for HeaderMap {
             });
         }
 
-        match serde_json::from_slice::<HashMap<String, String>>(&value.raw) {
-            Ok(hash_map) => TryInto::<HeaderMap>::try_into(&hash_map).map_err(|err| {
-                OpaqueRustObjectConversionError::Deserialization {
-                    reason: err.to_string(),
-                }
-            }),
-            Err(err) => Err(OpaqueRustObjectConversionError::Deserialization {
+        bincode::deserialize::<HashMap<&str, &[u8]>>(&value.raw)
+            .map(|m| {
+                m.iter()
+                    .map(|(k, v)| {
+                        (
+                            HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                            HeaderValue::from_bytes(v).unwrap(),
+                        )
+                    })
+                    .collect()
+            })
+            .map_err(|err| OpaqueRustObjectConversionError::Deserialization {
                 reason: err.to_string(),
-            }),
-        }
+            })
     }
 }
 

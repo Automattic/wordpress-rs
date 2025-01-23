@@ -102,6 +102,22 @@ class BenchmarkTest: XCTestCase {
 
     let iterations = 1_000
 
+    func testRustToSwiftBaseline() {
+        self.measure(metrics: [XCTClockMetric()]) {
+            for _ in 1...iterations {
+                let _ = wpApiRustObjectGetLargeValue()
+            }
+        }
+    }
+
+    func testRustToSwift() {
+        self.measure(metrics: [XCTClockMetric()]) {
+            for _ in 1...iterations {
+                let _ = wpApiRustObjectGetLargeOpaque()
+            }
+        }
+    }
+
     func testSwiftToRustBaseline() {
         let value = wpApiRustObjectGetLargeValue()
         self.measure(metrics: [XCTClockMetric()]) {
