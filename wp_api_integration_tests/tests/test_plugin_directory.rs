@@ -56,7 +56,7 @@ async fn test_parsing_full_plugin_directory() {
 
     let mut plugin_information_failures = Vec::new();
     for slug in all_slugs {
-        let info = client.plugin_information(&slug).await;
+        let info = client.plugin_information(&slug.as_str().into()).await;
         if let Err(e) = info {
             print!("F({})", slug);
             plugin_information_failures.push((slug.to_string(), e));

@@ -125,4 +125,8 @@ public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteH
 extension WpSiteHealthTestsRequestExecutor: @unchecked Sendable {}
 // swiftlint:enable line_length
 
+// MARK: - WordPress.org
+public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
+extension WordPressOrgApiClient: @unchecked Sendable {}
+
 #endif
