@@ -28,6 +28,14 @@ impl AutoDiscoveryAttempt {
 }
 
 #[derive(Debug, uniffi::Record)]
+pub struct AutoDiscoveryStep {
+    pub name: String,
+    pub is_required: bool,
+    pub was_successful: bool,
+    pub error_message: Option<String>
+}
+
+#[derive(Debug, uniffi::Record)]
 pub struct AutoDiscoveryUniffiResult {
     pub user_input_attempt: Arc<AutoDiscoveryAttemptResult>,
     pub successful_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
@@ -104,6 +112,50 @@ pub struct AutoDiscoveryAttemptResult {
 
 #[uniffi::export]
 impl AutoDiscoveryAttemptResult {
+
+    fn construct_steps(&self, lang_id: String) -> Vec<AutoDiscoveryStep> {
+        vec![
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_connect"),
+                was_successful: true,
+                is_required: true,
+                error_message: None // TODO: We should be able to populate this
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_https"),
+                was_successful: !self.has_failed_to_connect_with_https(),
+                is_required: false,
+                error_message: None // TODO: We should be able to populate this
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_is_wordpress"),
+                is_required: true,
+                was_successful: true, // TODO: Write some evaluation for this
+                error_message: None // TODO: We should be able to populate this
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_json"),
+                is_required: true,
+                was_successful: !self.has_failed_to_parse_api_details(),
+                error_message: Some(localized_message_with_args(
+                    &lang_id,
+                    "parse_api_root_url_error_api_root_link_header_not_found",
+                    &HashMap::from([("site_url", self.attempt_site_url().into())]),
+                ))
+            },
+            AutoDiscoveryStep {
+                name: localized_message(&lang_id, "auto_discovery_step_find_auth_url"),
+                is_required: true,
+                was_successful: !self.has_failed_to_parse_authentication_url(),
+                error_message: Some(localized_message_with_args(
+                    &lang_id,
+                    "auto_discovery_attempt_failure_parse_api_details",
+                    &HashMap::from([("api_url", self.attempt_site_url().into())]),
+                ))
+            }
+        ]
+    }
+
     fn attempt_site_url(&self) -> String {
         self.attempt_site_url.clone()
     }
@@ -111,7 +163,9 @@ impl AutoDiscoveryAttemptResult {
     fn error_message(&self, locale_id: String) -> Option<String> {
         match &self.result {
             Ok(_) => None,
-            Err(error) => error.localized_error_message(locale_id),
+            Err(error) => {
+                error.localized_error_message(locale_id)
+            },
         }
     }
 
@@ -137,18 +191,16 @@ impl AutoDiscoveryAttemptResult {
         }
     }
 
-    fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
-        match &self.result {
-            Ok(success) => Some(false),
-            Err(error) => error.has_failed_to_parse_api_root_url(),
-        }
+    fn has_failed_to_connect_with_https(&self) -> bool {
+        !self.attempt_site_url().starts_with("https://") // TODO: Can we do better here?
     }
 
-    fn has_failed_to_parse_api_details(&self) -> Option<bool> {
-        match &self.result {
-            Ok(success) => Some(false),
-            Err(error) => error.has_failed_to_parse_api_details(),
-        }
+    fn has_failed_to_parse_api_root_url(&self) -> bool {
+        false // TODO
+    }
+
+    fn has_failed_to_parse_api_details(&self) -> bool {
+        false // TODO
     }
 
     fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
@@ -170,6 +222,14 @@ impl AutoDiscoveryAttemptResult {
             Ok(success) => Some(Arc::new(success.api_details.clone())),
             Err(_) => None,
         }
+    }
+
+    fn has_failed_to_parse_authentication_url(&self) -> bool {
+        if let Some(details) = self.api_details() {
+            return details.find_application_passwords_authentication_url().is_some();
+        }
+
+        false
     }
 }
 

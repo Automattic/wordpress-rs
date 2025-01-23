@@ -27,3 +27,7 @@ public extension URL {
         return scheme.uppercased() + "" + "://" + host
     }
 }
+
+extension AutoDiscoveryStep: Identifiable {
+    public var id: String { self.name }
+}

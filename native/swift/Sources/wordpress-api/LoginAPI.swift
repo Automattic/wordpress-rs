@@ -98,24 +98,40 @@ public actor WordPressLoginClient {
 
 public extension AutoDiscoveryAttemptResult {
 
-    public var couldConnectToUrl: Bool {
+    var couldConnectToUrl: Bool {
         // no good way to find this in isolation
         true
     }
 
-    public var couldUseHttps: Bool {
+    func getConnectionErrorMessage(for locale: Locale) -> String? {
+        self.errorMessage(localeId: locale.identifier)
+    }
+
+    var couldUseHttps: Bool {
         self.apiRootUrl()?.asURL().scheme == "https"
     }
 
-    public var foundApiRoot: Bool {
+    func getHttpsErrorMessage(for locale: Locale) -> String? {
+        self.errorMessage(localeId: locale.identifier)
+    }
+
+    var foundApiRoot: Bool {
         self.apiRootUrl() != nil
     }
 
-    public var foundAuthenticationUrl: Bool {
+    func getApiRootErrorMessage(for locale: Locale) -> String? {
+        self.errorMessage(localeId: locale.identifier)
+    }
+
+    var foundAuthenticationUrl: Bool {
         self.apiDetails()?.findApplicationPasswordsAuthenticationUrl() != nil
     }
 
-    public var authenticationUrl: URL? {
+    func getAuthenticationUrlErrorMessage(for locale: Locale) -> String? {
+        self.errorMessage(localeId: locale.identifier)
+    }
+
+    var authenticationUrl: URL? {
         guard
             let string = apiDetails()?.findApplicationPasswordsAuthenticationUrl(),
             let url = URL(string: string)
@@ -126,7 +142,7 @@ public extension AutoDiscoveryAttemptResult {
         return url
     }
 
-    public var domainWithSubdomain: String? {
+    var domainWithSubdomain: String? {
         guard let scheme = apiRootUrl()?.asURL().scheme, let host = apiRootUrl()?.asURL().host else {
             return nil
         }
