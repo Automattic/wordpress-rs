@@ -22,6 +22,7 @@ parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = [ "derive" ] }
+serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }

@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_bytes::Bytes;
 use url::Url;
 
 use crate::{
@@ -62,13 +63,13 @@ pub enum OpaqueRustObjectConversionError {
 
 impl From<HeaderMap> for OpaqueRustObject {
     fn from(headers: HeaderMap) -> Self {
-        let hash_map: HashMap<&str, &[u8]> = headers
+        let encoded: Vec<(&Bytes, &Bytes)> = headers
             .iter()
-            .map(|(k, v)| (k.as_str(), v.as_bytes()))
+            .map(|(k, v)| (Bytes::new(k.as_str().as_bytes()), Bytes::new(v.as_bytes())))
             .collect();
         Self {
             type_id: OpaqueRustObjectIdentifier::HeaderMap,
-            raw: bincode::serialize(&hash_map).unwrap(),
+            raw: bincode::serialize(&encoded).unwrap(),
         }
     }
 }
@@ -83,12 +84,12 @@ impl TryFrom<OpaqueRustObject> for HeaderMap {
             });
         }
 
-        bincode::deserialize::<HashMap<&str, &[u8]>>(&value.raw)
+        bincode::deserialize::<Vec<(&Bytes, &Bytes)>>(&value.raw)
             .map(|m| {
                 m.iter()
                     .map(|(k, v)| {
                         (
-                            HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                            HeaderName::from_bytes(k).unwrap(),
                             HeaderValue::from_bytes(v).unwrap(),
                         )
                     })

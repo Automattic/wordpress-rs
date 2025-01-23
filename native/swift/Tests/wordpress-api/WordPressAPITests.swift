@@ -120,10 +120,10 @@ class BenchmarkTest: XCTestCase {
 
     func testSwiftToRustBaseline() {
         let value = wpApiRustObjectGetLargeValue()
+
         self.measure(metrics: [XCTClockMetric()]) {
             for _ in 1...iterations {
-                let result = wpApiRustObjectUseLargeValue(map: value)
-                XCTAssertEqual(result, 3)
+                let _ = wpApiRustObjectUseLargeValue(map: value)
             }
         }
     }
@@ -133,8 +133,7 @@ class BenchmarkTest: XCTestCase {
 
         self.measure(metrics: [XCTClockMetric()]) {
             for _ in 1...iterations {
-                let result = wpApiRustObjectUseLargeOpaque(opaque: value)
-                XCTAssertEqual(result, 3)
+                let _ = wpApiRustObjectUseLargeOpaque(opaque: value)
             }
         }
     }
@@ -143,8 +142,7 @@ class BenchmarkTest: XCTestCase {
         self.measure(metrics: [XCTClockMetric()]) {
             for _ in 1...iterations {
                 let value = wpApiRustObjectGetLargeValue()
-                let result = wpApiRustObjectUseLargeValue(map: value)
-                XCTAssertEqual(result, 3)
+                let _ = wpApiRustObjectUseLargeValue(map: value)
             }
         }
     }
@@ -153,9 +151,22 @@ class BenchmarkTest: XCTestCase {
         self.measure(metrics: [XCTClockMetric()]) {
             for _ in 1...iterations {
                 let value = wpApiRustObjectGetLargeOpaque()
-                let result = wpApiRustObjectUseLargeOpaque(opaque: value)
-                XCTAssertEqual(result, 3)
+                let _ = wpApiRustObjectUseLargeOpaque(opaque: value)
             }
+        }
+    }
+
+    func testCorrectness() {
+        do {
+            let value = wpApiRustObjectGetLargeOpaque()
+            let result = wpApiRustObjectUseLargeOpaque(opaque: value)
+            XCTAssertEqual(result, 3)
+        }
+
+        do {
+            let value = wpApiRustObjectGetLargeValue()
+            let result = wpApiRustObjectUseLargeValue(map: value)
+            XCTAssertEqual(result, 3)
         }
     }
 
