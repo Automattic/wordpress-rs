@@ -6,7 +6,13 @@ import uniffi.wp_api.SparseUserFieldWithEditContext
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpHeaderName
+import uniffi.wp_api.WpNetworkHeaderMap
+import uniffi.wp_api.WpNetworkHeaderMapCaseInsensitive
+import uniffi.wp_api.constructWpHeaderName
+import uniffi.wp_api.testHeaderMap
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import uniffi.wp_api.wpHeaderNameToString
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -106,5 +112,14 @@ class UsersEndpointTest {
             requestBuilder.users().listWithEditContext(nextPageResponse.prevPageParams!!)
         }.assertSuccessAndRetrieveData()
         assert(prevPageResponse.data.isNotEmpty())
+    }
+
+    @Test
+    fun headerNameCaseInsensitive() = runTest {
+        assertEquals("foo", wpHeaderNameToString(constructWpHeaderName("Foo")))
+        assertEquals("foo", wpHeaderNameToString(constructWpHeaderName("fOO")))
+        val h = testHeaderMap()
+        assertEquals(listOf("17"), h[constructWpHeaderName("x-wp-total")])
+        assertEquals(listOf("17"), h[constructWpHeaderName("X-WP-Total")])
     }
 }
