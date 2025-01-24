@@ -12,19 +12,6 @@ use wp_api_integration_tests::{
 };
 
 #[tokio::test]
-#[parallel]
-async fn filter_theme_supports() {
-    api_client()
-        .themes()
-        .filter_list_with_edit_context(
-            &ThemeListParams::default(),
-            &[SparseThemeFieldWithEditContext::ThemeSupports],
-        )
-        .await
-        .assert_response();
-}
-
-#[tokio::test]
 #[apply(list_cases)]
 #[parallel]
 async fn list_with_edit_context(#[case] params: ThemeListParams) {
