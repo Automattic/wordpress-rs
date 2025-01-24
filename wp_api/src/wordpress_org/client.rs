@@ -1,12 +1,14 @@
 use crate::{
     request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
-    PluginWpOrgDirectorySlug, RequestExecutionError,
+    wordpress_org::update_check::UpdateCheckRequest,
+    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
 use serde::de::DeserializeOwned;
 use std::{result::Result, sync::Arc};
 use url::Url;
 
 use super::plugin_directory::{PluginInformation, QueryPluginResponse};
+use super::update_check::UpdateCheckResponse;
 
 #[derive(Debug, uniffi::Object)]
 pub struct WordPressOrgApiClient {
@@ -45,6 +47,21 @@ impl WordPressOrgApiClient {
     ) -> Result<QueryPluginResponse, WordPressOrgApiClientError> {
         let request = Self::search_plugins_request(search, page, page_size);
         self.execute(request).await
+    }
+
+    pub async fn check_plugin_updates(
+        &self,
+        wordpress_core_version: String,
+        site_url: Arc<ParsedUrl>,
+        plugins: Vec<PluginWithViewContext>,
+    ) -> Result<UpdateCheckResponse, WordPressOrgApiClientError> {
+        let site_url = Arc::unwrap_or_clone(site_url);
+        match UpdateCheckRequest::new(wordpress_core_version, site_url, plugins).try_into() {
+            Ok(request) => self.execute(request).await,
+            Err(e) => Err(WordPressOrgApiClientError::RequestEncodingError {
+                reason: e.to_string(),
+            }),
+        }
     }
 }
 
@@ -147,6 +164,8 @@ impl WordPressOrgApiPluginDirectoryCategory {
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WordPressOrgApiClientError {
+    #[error("Failed to encode request. Reason: {}", reason)]
+    RequestEncodingError { reason: String },
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
         status_code,

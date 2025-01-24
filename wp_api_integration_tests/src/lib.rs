@@ -37,6 +37,7 @@ pub struct TestCredentials {
     pub password_protected_comment_id: i64,
     pub password_protected_comment_author: &'static str,
     pub trashed_post_id: i64,
+    pub wordpress_core_version: &'static str,
 }
 
 pub mod backend;
