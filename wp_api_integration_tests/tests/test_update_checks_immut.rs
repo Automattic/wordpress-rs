@@ -18,7 +18,7 @@ async fn plugins_update_check() {
     assert!(!plugins.is_empty());
 
     let wp_org_client = WordPressOrgApiClient::new(Arc::new(AsyncWpNetworking::default()));
-    let result = wp_org_client
+    wp_org_client
         .check_plugin_updates(
             TestCredentials::instance()
                 .wordpress_core_version
