@@ -62,6 +62,9 @@ public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
 public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
+extension PluginsRequestListWithViewContextResponse: @unchecked Sendable {}
+extension PluginsRequestListWithEditContextResponse: @unchecked Sendable {}
+extension PluginsRequestListWithEmbedContextResponse: @unchecked Sendable {}
 extension PluginsRequestExecutor: @unchecked Sendable {}
 
 // MARK: – Application Passwords
