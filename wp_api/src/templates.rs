@@ -171,12 +171,10 @@ pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
     pub origin: Option<String>,
-    // TODO: Object or String or it's `[]`
     #[WpContext(edit, embed, view)]
     pub content: Option<SparseTemplateContentWrapper>,
-    //// TODO: Object or String
-    //#[WpContext(edit, embed, view)]
-    //pub title: Option<String>,
+    #[WpContext(edit, embed, view)]
+    pub title: Option<SparseTemplateTitleWrapper>,
     #[WpContext(edit, embed, view)]
     pub description: Option<String>,
     #[WpContext(edit, embed, view)]
@@ -192,7 +190,6 @@ pub struct SparseTemplate {
     pub modified: Option<bool>,
     #[WpContext(edit, view, embed)]
     pub is_custom: Option<bool>,
-    // TODO: `author_text` & `original_source` fields are missing from documentation
     #[WpContext(edit, view, embed)]
     pub author_text: Option<String>,
     #[WpContext(edit, view, embed)]
@@ -212,4 +209,17 @@ pub struct SparseTemplateContent {
     pub rendered: Option<String>,
     pub protected: Option<bool>,
     pub block_version: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum SparseTemplateTitleWrapper {
+    Object(SparseTemplateTitle),
+    String(String),
+}
+
+#[derive(Debug, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+pub struct SparseTemplateTitle {
+    pub raw: Option<String>,
+    pub rendered: Option<String>,
 }
