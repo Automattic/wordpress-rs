@@ -43,6 +43,12 @@ public typealias UsersRequestListWithEditContextResponse = WordPressAPIInternal.
 public typealias UsersRequestListWithViewContextResponse = WordPressAPIInternal.UsersRequestListWithViewContextResponse
 public typealias UsersRequestListWithEmbedContextResponse = WordPressAPIInternal.UsersRequestListWithEmbedContextResponse
 
+extension UsersRequestUpdateResponse: @unchecked Sendable {}
+extension UsersRequestDeleteResponse: @unchecked Sendable {}
+extension UsersRequestRetrieveMeWithViewContextResponse: @unchecked Sendable {}
+extension UsersRequestRetrieveMeWithEditContextResponse: @unchecked Sendable {}
+extension UsersRequestRetrieveMeWithEmbedContextResponse: @unchecked Sendable {}
+
 // MARK: - Plugins
 
 public typealias SparsePlugin = WordPressAPIInternal.SparsePlugin
@@ -56,6 +62,9 @@ public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
 public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
+extension PluginsRequestListWithViewContextResponse: @unchecked Sendable {}
+extension PluginsRequestListWithEditContextResponse: @unchecked Sendable {}
+extension PluginsRequestListWithEmbedContextResponse: @unchecked Sendable {}
 extension PluginsRequestExecutor: @unchecked Sendable {}
 
 // MARK: – Application Passwords
