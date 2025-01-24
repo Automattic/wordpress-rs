@@ -222,7 +222,7 @@ impl RequestExecutor for MediaErrNetworking {
                 AsyncWpNetworking::request_method(media_upload_request.method()),
                 media_upload_request.url().0.as_str(),
             )
-            .headers(media_upload_request.header_map().as_header_map());
+            .headers(media_upload_request.header_map().to_header_map());
         let mut file_header_map = HeaderMap::new();
         file_header_map.insert(
             http::header::CONTENT_TYPE,

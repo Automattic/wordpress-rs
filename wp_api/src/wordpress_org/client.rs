@@ -1,7 +1,7 @@
 use crate::{
     request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
     wordpress_org::update_check::UpdateCheckRequest,
-    ParsedUrl, PluginWithViewContext, RequestExecutionError,
+    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
 use serde::de::DeserializeOwned;
 use std::{result::Result, sync::Arc};
@@ -24,7 +24,7 @@ impl WordPressOrgApiClient {
 
     pub async fn plugin_information(
         &self,
-        slug: &str,
+        slug: &PluginWpOrgDirectorySlug,
     ) -> Result<PluginInformation, WordPressOrgApiClientError> {
         self.execute(Self::plugin_information_request(slug)).await
     }
@@ -90,12 +90,12 @@ impl WordPressOrgApiClient {
         })
     }
 
-    fn plugin_information_request(slug: &str) -> WpNetworkRequest {
+    fn plugin_information_request(slug: &PluginWpOrgDirectorySlug) -> WpNetworkRequest {
         let mut url = Self::plugin_info_api_url();
         url.query_pairs_mut()
             .append_pair("action", "plugin_information")
             .append_pair("fields", "icons")
-            .append_pair("slug", slug);
+            .append_pair("slug", slug.as_str());
         WpNetworkRequest::get(WpEndpointUrl(url.to_string()))
     }
 
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_plugin_info_requests_include_icons() {
-        let request = WordPressOrgApiClient::plugin_information_request("akismet");
+        let request = WordPressOrgApiClient::plugin_information_request(&("akismet".into()));
         assert!(request.url.0.contains("fields=icons"));
     }
 

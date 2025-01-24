@@ -1,12 +1,11 @@
-use std::{fmt::Display, str::FromStr};
+use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
 use crate::{
-    impl_as_query_value_from_as_str,
+    impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    EnumFromStrParsingError,
 };
 
 #[derive(Debug, Default, uniffi::Record)]
@@ -121,42 +120,37 @@ impl From<&str> for PluginWpOrgDirectorySlug {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, uniffi::Enum)]
+impl PluginWpOrgDirectorySlug {
+    pub fn as_str(&self) -> &str {
+        self.slug.as_str()
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Deserialize,
+    Serialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
 pub enum PluginStatus {
     #[serde(rename = "active")]
+    #[strum(serialize = "active")]
     Active,
     #[serde(rename = "inactive")]
+    #[strum(serialize = "inactive")]
     Inactive,
     #[serde(rename = "network-active")]
+    #[strum(serialize = "network-active")]
     NetworkActive,
 }
 
-impl_as_query_value_from_as_str!(PluginStatus);
-
-impl PluginStatus {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Active => "active",
-            Self::Inactive => "inactive",
-            Self::NetworkActive => "network-active",
-        }
-    }
-}
-
-impl FromStr for PluginStatus {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "active" => Ok(Self::Active),
-            "inactive" => Ok(Self::Inactive),
-            "network-active" => Ok(Self::NetworkActive),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(PluginStatus);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PluginDescription {

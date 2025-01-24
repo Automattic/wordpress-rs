@@ -5,14 +5,14 @@ use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
 use crate::{
-    impl_as_query_value_for_new_type, impl_as_query_value_from_as_str,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::PostId,
     taxonomies::TaxonomyType,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, WpApiParamOrder,
+    WpApiParamOrder,
 };
 
 impl_as_query_value_for_new_type!(TagId);
@@ -34,7 +34,18 @@ impl std::fmt::Display for TagId {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum WpApiParamTagsOrderBy {
     Id,
     Include,
@@ -47,42 +58,7 @@ pub enum WpApiParamTagsOrderBy {
     Count,
 }
 
-impl_as_query_value_from_as_str!(WpApiParamTagsOrderBy);
-
-impl WpApiParamTagsOrderBy {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::Id => "id",
-            Self::Include => "include",
-            Self::Name => "name",
-            Self::Slug => "slug",
-            Self::IncludeSlugs => "include_slugs",
-            Self::TermGroup => "term_group",
-            Self::Description => "description",
-            Self::Count => "count",
-        }
-    }
-}
-
-impl FromStr for WpApiParamTagsOrderBy {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "id" => Ok(Self::Id),
-            "include" => Ok(Self::Include),
-            "name" => Ok(Self::Name),
-            "slug" => Ok(Self::Slug),
-            "include_slugs" => Ok(Self::IncludeSlugs),
-            "term_group" => Ok(Self::TermGroup),
-            "description" => Ok(Self::Description),
-            "count" => Ok(Self::Count),
-            value => Err(EnumFromStrParsingError::UnknownVariant {
-                value: value.to_string(),
-            }),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WpApiParamTagsOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct TagListParams {

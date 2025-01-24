@@ -281,7 +281,7 @@ impl WpNetworkHeaderMap {
             .collect()
     }
 
-    pub fn as_header_map(&self) -> HeaderMap {
+    pub fn to_header_map(&self) -> HeaderMap {
         self.inner.clone()
     }
 }

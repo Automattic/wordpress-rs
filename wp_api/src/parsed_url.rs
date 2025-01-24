@@ -96,7 +96,7 @@ mod tests {
     #[case("http://example.com")]
     fn parse_url_success(#[case] input: &str) {
         let parsed_url = ParsedUrl::parse(input).unwrap();
-        assert_eq!(parsed_url.url(), "http://example.com/",);
+        assert_eq!(parsed_url.url(), "http://example.com/");
         assert_eq!(parsed_url, Url::parse("http://example.com").unwrap().into());
     }
 

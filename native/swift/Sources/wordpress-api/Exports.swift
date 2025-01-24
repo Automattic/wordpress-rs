@@ -26,6 +26,7 @@ public typealias UrlDiscoveryAttemptError = WordPressAPIInternal.UrlDiscoveryAtt
 
 // MARK: - Users
 
+public typealias UserId = WordPressAPIInternal.UserId
 public typealias SparseUser = WordPressAPIInternal.SparseUser
 public typealias UserWithViewContext = WordPressAPIInternal.UserWithViewContext
 public typealias UserWithEditContext = WordPressAPIInternal.UserWithEditContext
@@ -123,5 +124,9 @@ extension SiteSettingsRequestExecutor: @unchecked Sendable {}
 public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteHealthTestsRequestExecutor
 extension WpSiteHealthTestsRequestExecutor: @unchecked Sendable {}
 // swiftlint:enable line_length
+
+// MARK: - WordPress.org
+public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
+extension WordPressOrgApiClient: @unchecked Sendable {}
 
 #endif
