@@ -3324,6 +3324,7 @@ dependencies = [
  "url",
  "uuid",
  "wp_contextual",
+ "wp_derive",
  "wp_derive_request_builder",
  "wp_serde_helper",
 ]
@@ -3383,6 +3384,22 @@ dependencies = [
  "thiserror",
  "trybuild",
  "uniffi",
+]
+
+[[package]]
+name = "wp_derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "rstest",
+ "serde",
+ "serde_json",
+ "syn",
+ "thiserror",
+ "trybuild",
+ "wp_serde_helper",
 ]
 
 [[package]]

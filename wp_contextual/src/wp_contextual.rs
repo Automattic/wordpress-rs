@@ -20,11 +20,16 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let parsed_fields = parse_fields(fields)?;
 
     let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
-        let generate_type = |ident, generated_fields: &Vec<GeneratedContextualField>| {
+        let generate_type = |is_sparse, ident, generated_fields: &Vec<GeneratedContextualField>| {
             if !generated_fields.is_empty() {
+                let deserialize_derive = if is_sparse {
+                    quote! { wp_derive::WpDeserialize }
+                } else {
+                    quote! { serde::Deserialize }
+                };
                 let fields_to_add = generated_fields.iter().map(|f| &f.field);
                 quote! {
-                    #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
+                    #[derive(Debug, serde::Serialize, #deserialize_derive, uniffi::Record)]
                     pub struct #ident {
                         #(#fields_to_add,)*
                     }
@@ -60,10 +65,10 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
             &ident_name_for_context(original_ident_name.as_str(), current_context),
             original_ident.span(),
         );
-        let non_sparse_type = generate_type(&non_sparse_ident, &non_sparse_type_fields);
+        let non_sparse_type = generate_type(false, &non_sparse_ident, &non_sparse_type_fields);
         let sparse_field_type =
             generate_sparse_field_type(&sparse_field_ident, &sparse_type_fields);
-        let sparse_type = generate_type(&sparse_ident, &sparse_type_fields);
+        let sparse_type = generate_type(true, &sparse_ident, &sparse_type_fields);
         let integration_test_helpers =
             generate_integration_test_helper(sparse_ident, sparse_field_ident, &sparse_type_fields);
         Ok(TokenStream::from_iter([
