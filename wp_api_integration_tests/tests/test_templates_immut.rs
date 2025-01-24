@@ -4,8 +4,9 @@ use serial_test::parallel;
 use wp_api::generate;
 use wp_api::post_types::PostType;
 use wp_api::templates::{
-    SparseTemplateFieldWithEditContext, SparseTemplateFieldWithEmbedContext,
-    SparseTemplateFieldWithViewContext, TemplateArea, TemplateListParams,
+    SparseTemplateContentWrapper, SparseTemplateFieldWithEditContext,
+    SparseTemplateFieldWithEmbedContext, SparseTemplateFieldWithViewContext, TemplateArea,
+    TemplateListParams,
 };
 use wp_api_integration_tests::{
     api_client, AssertResponse, FIRST_POST_ID, POST_ID_555, POST_ID_DRAFT,
@@ -15,33 +16,54 @@ use wp_api_integration_tests::{
 #[apply(list_cases)]
 #[parallel]
 async fn list_with_edit_context(#[case] params: TemplateListParams) {
-    api_client()
+    let templates = api_client()
         .templates()
         .list_with_edit_context(&params)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
+    let found = templates
+        .iter()
+        .find(|t| matches!(t.content, SparseTemplateContentWrapper::String(_)));
+    if found.is_some() {
+        panic!("found one: {:#?}", found);
+    }
 }
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
 async fn list_with_embed_context(#[case] params: TemplateListParams) {
-    api_client()
+    let templates = api_client()
         .templates()
         .list_with_embed_context(&params)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
+    let found = templates
+        .iter()
+        .find(|t| matches!(t.content, SparseTemplateContentWrapper::String(_)));
+    if found.is_some() {
+        panic!("found one: {:#?}", found);
+    }
 }
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
 async fn list_with_view_context(#[case] params: TemplateListParams) {
-    api_client()
+    let templates = api_client()
         .templates()
         .list_with_view_context(&params)
         .await
-        .assert_response();
+        .assert_response()
+        .data;
+    let found = templates
+        .iter()
+        .find(|t| matches!(t.content, SparseTemplateContentWrapper::String(_)));
+    if found.is_some() {
+        panic!("found one: {:#?}", found);
+    }
 }
 
 #[template]
