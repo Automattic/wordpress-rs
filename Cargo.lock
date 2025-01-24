@@ -3384,6 +3384,8 @@ dependencies = [
  "thiserror",
  "trybuild",
  "uniffi",
+ "wp_derive",
+ "wp_serde_helper",
 ]
 
 [[package]]

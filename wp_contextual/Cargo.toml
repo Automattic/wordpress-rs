@@ -22,3 +22,5 @@ uniffi = { workspace = true }
 
 [dev-dependencies]
 trybuild = { workspace = true, features = ["diff"] }
+wp_derive = { path = "../wp_derive" }
+wp_serde_helper = { path = "../wp_serde_helper" }
