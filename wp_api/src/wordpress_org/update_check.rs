@@ -270,7 +270,7 @@ mod tests {
         let body = request.unwrap().body.unwrap().contents();
         let body_string = String::from_utf8(body).unwrap();
         let body_map = body_string
-            .split("&")
+            .split('&')
             .flat_map(|x| url::form_urlencoded::parse(x.as_bytes()))
             .collect::<HashMap<_, _>>();
         assert!(body_map.contains_key("plugins"));
