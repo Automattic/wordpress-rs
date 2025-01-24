@@ -155,7 +155,7 @@ impl FromUrlQueryPairs for TemplateListParams {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+#[derive(Debug, Serialize, Deserialize, WpContextual)]
 pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
     pub id: Option<String>,
@@ -173,7 +173,7 @@ pub struct SparseTemplate {
     pub origin: Option<String>,
     // TODO: Object or String or it's `[]`
     #[WpContext(edit, embed, view)]
-    pub content: Option<SparseTemplateContent>,
+    pub content: Option<SparseTemplateContentWrapper>,
     //// TODO: Object or String
     //#[WpContext(edit, embed, view)]
     //pub title: Option<String>,
@@ -199,14 +199,17 @@ pub struct SparseTemplate {
     pub original_source: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum SparseTemplateContentWrapper {
+    Object(SparseTemplateContent),
+    String(String),
+}
+
+#[derive(Debug, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
 pub struct SparseTemplateContent {
-    #[WpContext(edit)]
     pub raw: Option<String>,
-    #[WpContext(edit, view)]
     pub rendered: Option<String>,
-    #[WpContext(edit, view)]
     pub protected: Option<bool>,
-    #[WpContext(edit)]
     pub block_version: Option<u32>,
 }
