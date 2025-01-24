@@ -1,8 +1,5 @@
 import Foundation
-
-#if canImport(WordPressAPIInternal)
 import WordPressAPIInternal
-#endif
 
 extension ParsedUrl {
 

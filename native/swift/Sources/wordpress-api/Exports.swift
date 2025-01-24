@@ -4,8 +4,6 @@
 // us in a position where we need to make major releases due to Rust code changes.
 // swiftlint:disable line_length
 
-#if canImport(WordPressAPIInternal)
-
 import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
@@ -137,5 +135,3 @@ extension WpSiteHealthTestsRequestExecutor: @unchecked Sendable {}
 // MARK: - WordPress.org
 public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
 extension WordPressOrgApiClient: @unchecked Sendable {}
-
-#endif
