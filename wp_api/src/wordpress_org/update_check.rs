@@ -197,7 +197,7 @@ mod tests {
         );
         let request: Result<WpNetworkRequest, _> = request.try_into();
         let request = request.unwrap();
-        let headers = request.header_map.as_header_map();
+        let headers = request.header_map.to_header_map();
         assert!(headers.contains_key("User-Agent"));
 
         let user_agent = headers.get("User-Agent").unwrap().to_str().unwrap();
