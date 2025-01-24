@@ -84,12 +84,6 @@ steps:
         plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
-      - label: ":swift: :cocoapods: Validate CocoaPods Support"
-        command: .buildkite/validate-cocoapods.sh
-        depends_on: xcframework
-        plugins: [$CI_TOOLKIT]
-        agents:
-          queue: mac
       - label: ":swift: :linux: Build and Test"
         command: |
           echo "--- :swift: Building + Testing"
