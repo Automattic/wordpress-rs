@@ -26,6 +26,6 @@ async fn plugins_update_check() {
             test_site_url(),
             plugins,
         )
-        .await;
-    assert!(result.is_ok());
+        .await
+        .assert_response();
 }
