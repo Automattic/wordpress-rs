@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import WordPressAPI
 
-#if canImport(FoundationNetworking)
+#if os(Linux)
 import FoundationNetworking
 #endif
 

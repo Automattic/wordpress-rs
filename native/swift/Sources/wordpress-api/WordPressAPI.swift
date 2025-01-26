@@ -1,7 +1,5 @@
 import Foundation
-#if canImport(WordPressAPIInternal)
 @preconcurrency import WordPressAPIInternal
-#endif
 
 #if os(Linux)
 import FoundationNetworking
