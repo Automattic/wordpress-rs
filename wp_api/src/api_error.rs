@@ -416,7 +416,7 @@ pub enum WpErrorCode {
     CustomError(String),
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
@@ -429,7 +429,7 @@ pub enum RequestExecutionError {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum MediaUploadRequestExecutionError {
     #[error(
         "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
