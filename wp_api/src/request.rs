@@ -252,8 +252,8 @@ impl WpNetworkHeaderMap {
 
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
-        header_name: String,
-        header_value: String,
+        header_name: &str,
+        header_value: &str,
     ) -> Vec<Result<(HeaderName, HeaderValue), WpNetworkHeaderMapError>> {
         header_value
             .split(',')
@@ -274,7 +274,7 @@ impl WpNetworkHeaderMap {
                     }
                 } else {
                     Err(WpNetworkHeaderMapError::InvalidHeaderName {
-                        header_name: header_name.clone(),
+                        header_name: header_name.to_string(),
                     })
                 }
             })
@@ -293,10 +293,10 @@ impl WpNetworkHeaderMap {
         hash_map: HashMap<String, Vec<String>>,
     ) -> Result<Self, WpNetworkHeaderMapError> {
         let inner = hash_map
-            .into_iter()
+            .iter()
             .flat_map(|(header_name, values)| {
-                values.into_iter().flat_map(move |header_value| {
-                    Self::build_header_name_value(header_name.clone(), header_value)
+                values.iter().flat_map(|header_value| {
+                    Self::build_header_name_value(header_name, header_value)
                 })
             })
             .collect::<Result<HeaderMap, WpNetworkHeaderMapError>>()?;
@@ -306,7 +306,7 @@ impl WpNetworkHeaderMap {
     #[uniffi::constructor]
     fn from_map(hash_map: HashMap<String, String>) -> Result<Self, WpNetworkHeaderMapError> {
         let inner = hash_map
-            .into_iter()
+            .iter()
             .flat_map(|(header_name, header_value)| {
                 Self::build_header_name_value(header_name, header_value)
             })
