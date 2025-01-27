@@ -293,10 +293,10 @@ impl WpNetworkHeaderMap {
         hash_map: HashMap<String, Vec<String>>,
     ) -> Result<Self, WpNetworkHeaderMapError> {
         let inner = hash_map
-            .into_iter()
+            .iter()
             .flat_map(|(header_name, values)| {
-                values.into_iter().flat_map(move |header_value| {
-                    Self::build_header_name_value(&header_name, &header_value)
+                values.iter().flat_map(move |header_value| {
+                    Self::build_header_name_value(header_name, header_value)
                 })
             })
             .collect::<Result<HeaderMap, WpNetworkHeaderMapError>>()?;
@@ -306,9 +306,9 @@ impl WpNetworkHeaderMap {
     #[uniffi::constructor]
     fn from_map(hash_map: HashMap<String, String>) -> Result<Self, WpNetworkHeaderMapError> {
         let inner = hash_map
-            .into_iter()
+            .iter()
             .flat_map(|(header_name, header_value)| {
-                Self::build_header_name_value(&header_name, &header_value)
+                Self::build_header_name_value(header_name, header_value)
             })
             .collect::<Result<HeaderMap, WpNetworkHeaderMapError>>()?;
         Ok(Self { inner })
