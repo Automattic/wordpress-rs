@@ -295,7 +295,7 @@ impl WpNetworkHeaderMap {
         let inner = hash_map
             .iter()
             .flat_map(|(header_name, values)| {
-                values.iter().flat_map(move |header_value| {
+                values.iter().flat_map(|header_value| {
                     Self::build_header_name_value(header_name, header_value)
                 })
             })
