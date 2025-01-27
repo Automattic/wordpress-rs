@@ -1,15 +1,14 @@
 use crate::{
-    impl_as_query_value_from_as_str,
+    impl_as_query_value_from_to_string,
     post_types::PostType,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
         UrlQueryPairsMap,
     },
-    EnumFromStrParsingError, UserId,
+    UserId,
 };
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -25,8 +24,11 @@ use wp_contextual::WpContextual;
     Serialize,
     Deserialize,
     uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum TemplateStatus {
     Draft,
     Future,
@@ -35,76 +37,38 @@ pub enum TemplateStatus {
     #[default]
     Publish,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(TemplateStatus);
-
-impl TemplateStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Draft => "draft",
-            Self::Future => "future",
-            Self::Pending => "pending",
-            Self::Private => "private",
-            Self::Publish => "publish",
-            Self::Custom(status) => status,
-        }
-    }
-}
-
-impl FromStr for TemplateStatus {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "draft" => Ok(Self::Draft),
-            "future" => Ok(Self::Future),
-            "pending" => Ok(Self::Pending),
-            "private" => Ok(Self::Private),
-            "publish" => Ok(Self::Publish),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(TemplateStatus);
 
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum TemplateArea {
     Header,
     Footer,
     Uncategorized,
     #[serde(untagged)]
+    #[strum(default)]
     Custom(String),
 }
 
-impl_as_query_value_from_as_str!(TemplateArea);
-
-impl TemplateArea {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Header => "header",
-            Self::Footer => "footer",
-            Self::Uncategorized => "uncategorized",
-            Self::Custom(area) => area,
-        }
-    }
-}
-
-impl FromStr for TemplateArea {
-    type Err = EnumFromStrParsingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "header" => Ok(Self::Header),
-            "footer" => Ok(Self::Footer),
-            "uncategorized" => Ok(Self::Uncategorized),
-            value => Ok(Self::Custom(value.to_string())),
-        }
-    }
-}
+impl_as_query_value_from_to_string!(TemplateArea);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct TemplateListParams {
