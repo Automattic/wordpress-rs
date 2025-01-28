@@ -22,7 +22,6 @@ echo "--- :rubygems: Setting up Gems"
 install_gems
 
 echo "--- :rust: Building XCFramework"
-make bindings
 make xcframework-package
 make xcframework-package-checksum
 
