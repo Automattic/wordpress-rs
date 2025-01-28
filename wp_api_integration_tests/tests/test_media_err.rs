@@ -11,8 +11,8 @@ use wp_api::{
         WpNetworkRequest, WpNetworkResponse,
     },
     users::UserId,
-    MediaUploadRequestExecutionError, RequestExecutionError, WpApiClient, WpAuthentication,
-    WpErrorCode,
+    MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
+    WpApiClient, WpAuthentication, WpErrorCode,
 };
 use wp_api_integration_tests::{
     api_client, api_client_as_author, api_client_as_subscriber, test_site_url, AssertWpError,
@@ -208,7 +208,9 @@ impl RequestExecutor for MediaErrNetworking {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         Err(RequestExecutionError::RequestExecutionFailed {
             status_code: None,
-            reason: "Execute function is not necessary for these tests".to_string(),
+            reason: RequestExecutionErrorReason::GenericError {
+                error_message: "Execute function is not necessary for these tests".to_string(),
+            },
         })
     }
 
@@ -242,7 +244,9 @@ impl RequestExecutor for MediaErrNetworking {
         let mut response = request.send().await.map_err(|err| {
             MediaUploadRequestExecutionError::RequestExecutionFailed {
                 status_code: err.status().map(|s| s.as_u16()),
-                reason: err.to_string(),
+                reason: RequestExecutionErrorReason::GenericError {
+                    error_message: err.to_string(),
+                },
             }
         })?;
 

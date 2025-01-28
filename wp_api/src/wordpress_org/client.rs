@@ -1,4 +1,5 @@
 use crate::{
+    api_error::RequestExecutionErrorReason,
     request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
     wordpress_org::update_check::UpdateCheckRequest,
     ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
@@ -167,13 +168,13 @@ pub enum WordPressOrgApiClientError {
     #[error("Failed to encode request. Reason: {}", reason)]
     RequestEncodingError { reason: String },
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
         status_code,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ResponseParsingError { reason: String, response: String },

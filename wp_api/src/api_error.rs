@@ -15,13 +15,13 @@ pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]
     InvalidHttpStatusCode { status_code: u16 },
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
         status_code,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
     MediaFileNotFound { file_path: String },
@@ -419,26 +419,38 @@ pub enum WpErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
         status_code,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        reason: RequestExecutionErrorReason,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum RequestExecutionErrorReason {
+    SslError {
+        domain: String,
+        trust_chain: Option<Vec<String>>,
+        error_message: String,
+    },
+    GenericError {
+        error_message: String,
     },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum MediaUploadRequestExecutionError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
         status_code,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
     MediaFileNotFound { file_path: String },
