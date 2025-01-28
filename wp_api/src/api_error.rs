@@ -15,12 +15,14 @@ pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]
     InvalidHttpStatusCode { status_code: u16 },
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
+        redirects: Option<Vec<String>>,
         reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
@@ -419,12 +421,14 @@ pub enum WpErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
+        redirects: Option<Vec<String>>,
         reason: RequestExecutionErrorReason,
     },
 }
@@ -444,12 +448,14 @@ pub enum RequestExecutionErrorReason {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum MediaUploadRequestExecutionError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nReason: '{:#?}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
+        redirects: Option<Vec<String>>,
         reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
@@ -461,9 +467,11 @@ impl From<RequestExecutionError> for WpApiError {
         match value {
             RequestExecutionError::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             } => Self::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             },
         }
@@ -475,9 +483,11 @@ impl From<MediaUploadRequestExecutionError> for WpApiError {
         match value {
             MediaUploadRequestExecutionError::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             } => Self::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             },
             MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {

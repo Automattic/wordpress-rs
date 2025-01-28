@@ -208,6 +208,7 @@ impl RequestExecutor for MediaErrNetworking {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         Err(RequestExecutionError::RequestExecutionFailed {
             status_code: None,
+            redirects: None,
             reason: RequestExecutionErrorReason::GenericError {
                 error_message: "Execute function is not necessary for these tests".to_string(),
             },
@@ -244,6 +245,7 @@ impl RequestExecutor for MediaErrNetworking {
         let mut response = request.send().await.map_err(|err| {
             MediaUploadRequestExecutionError::RequestExecutionFailed {
                 status_code: err.status().map(|s| s.as_u16()),
+                redirects: None,
                 reason: RequestExecutionErrorReason::GenericError {
                     error_message: err.to_string(),
                 },

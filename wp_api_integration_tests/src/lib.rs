@@ -245,6 +245,7 @@ impl RequestExecutor for AsyncWpNetworking {
         self.async_request(request).await.map_err(|err| {
             RequestExecutionError::RequestExecutionFailed {
                 status_code: err.status().map(|s| s.as_u16()),
+                redirects: None,
                 reason: RequestExecutionErrorReason::GenericError {
                     error_message: err.to_string(),
                 },
@@ -261,6 +262,7 @@ impl RequestExecutor for AsyncWpNetworking {
             .map_err(
                 |err| MediaUploadRequestExecutionError::RequestExecutionFailed {
                     status_code: err.status().map(|s| s.as_u16()),
+                    redirects: None,
                     reason: RequestExecutionErrorReason::GenericError {
                         error_message: err.to_string(),
                     },
