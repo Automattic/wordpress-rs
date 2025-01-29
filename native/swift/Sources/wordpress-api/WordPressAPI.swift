@@ -68,41 +68,6 @@ public actor WordPressAPI {
         self.requestBuilder.siteSettings()
     }
 
-//    package func perform(request: WpNetworkRequest) async throws -> WpNetworkResponse {
-//        let (data, response) = try await self.urlSession.data(for: request.asURLRequest())
-//        return try WpNetworkResponse.from(data: data, response: response)
-//    }
-//
-//    package func perform(
-//        request: WpNetworkRequest,
-//        callback: @escaping @Sendable (Result<WpNetworkResponse, Error>) -> Void
-//    ) {
-//        let task = self.urlSession.dataTask(with: request.asURLRequest()) { data, response, error in
-//            if let error {
-//                callback(.failure(error))
-//                return
-//            }
-//
-//            // If the task is cancelled, we can save time/CPU/battery by skipping the parsing step
-//            if Task.isCancelled {
-//                return
-//            }
-//
-//            guard let data = data, let response = response else {
-//                callback(.failure(Errors.unableToParseResponse))
-//                return
-//            }
-//
-//            do {
-//                let response = try WpNetworkResponse.from(data: data, response: response)
-//                callback(.success(response))
-//            } catch {
-//                callback(.failure(error))
-//            }
-//        }
-//        task.resume()
-//    }
-
     public struct Helpers {
         public static func extractLoginDetails(from url: URL) throws -> WpApiApplicationPasswordDetails? {
             let parsedUrl = try ParsedUrl.from(url: url)
