@@ -2,7 +2,8 @@ use super::{
     url_discovery::{
         self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, ParseApiRootUrlError,
+        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
+        IsWordPressSiteResult, IsWordPressSiteUniffiResult, ParseApiRootUrlError,
     },
     WpApiDetails,
 };
@@ -35,6 +36,13 @@ impl UniffiWpLoginClient {
     async fn api_discovery(&self, site_url: String) -> AutoDiscoveryUniffiResult {
         self.inner.api_discovery(site_url).await.into()
     }
+
+    async fn is_wordpress_site_discovery(&self, site_url: String) -> IsWordPressSiteUniffiResult {
+        self.inner
+            .is_wordpress_site_discovery(site_url)
+            .await
+            .into()
+    }
 }
 
 #[derive(Debug)]
@@ -55,6 +63,18 @@ impl WpLoginClient {
         )
         .await;
         AutoDiscoveryResult {
+            attempts: attempts.into_iter().map(|r| (r.attempt_type, r)).collect(),
+        }
+    }
+
+    pub async fn is_wordpress_site_discovery(&self, site_url: String) -> IsWordPressSiteResult {
+        let attempts = futures::future::join_all(
+            url_discovery::construct_attempts(site_url)
+                .into_iter()
+                .map(|attempt| async { self.attempt_is_wordpress_site(attempt).await }),
+        )
+        .await;
+        IsWordPressSiteResult {
             attempts: attempts.into_iter().map(|r| (r.attempt_type, r)).collect(),
         }
     }
@@ -108,6 +128,19 @@ impl WpLoginClient {
             api_root_url: api_root_url_success.api_root_url,
             api_details,
         })
+    }
+
+    async fn attempt_is_wordpress_site(
+        &self,
+        attempt: AutoDiscoveryAttempt,
+    ) -> IsWordPressSiteAttemptResult {
+        let api_link_header_result = self
+            .find_api_root_url(attempt.attempt_site_url.as_str())
+            .await;
+        IsWordPressSiteAttemptResult {
+            attempt_type: attempt.attempt_type,
+            api_link_header_result,
+        }
     }
 
     async fn find_api_root_url(
