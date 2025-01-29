@@ -1,17 +1,20 @@
-use std::str;
-use std::sync::Arc;
-
-use super::url_discovery::{
-    self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
-    AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-    ParseApiRootUrlError,
+use super::{
+    url_discovery::{
+        self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
+        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
+        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
+        ParseApiRootUrlError,
+    },
+    WpApiDetails,
 };
-use super::WpApiDetails;
-use crate::request::endpoint::WpEndpointUrl;
-use crate::request::{
-    RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+use crate::{
+    request::{
+        endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
+        WpNetworkRequest, WpNetworkResponse,
+    },
+    ParsedUrl, RequestExecutionError,
 };
-use crate::{ParsedUrl, RequestExecutionError};
+use std::{str, sync::Arc};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -74,34 +77,16 @@ impl WpLoginClient {
         &self,
         attempt_site_url: &str,
     ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
-        let parsed_site_url = ParsedUrl::parse(attempt_site_url)
-            .map_err(|error| AutoDiscoveryAttemptFailure::ParseSiteUrl { error })?;
-        let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
-            Ok(r) => r,
-            Err(error) => {
-                return Err(AutoDiscoveryAttemptFailure::FetchApiRootUrl {
-                    parsed_site_url,
-                    error,
-                })
-            }
-        };
-        let api_root_url =
-            match self.parse_api_root_response(&parsed_site_url, fetch_api_root_url_response) {
-                Ok(api_root_url) => api_root_url,
-                Err(error) => {
-                    return Err(AutoDiscoveryAttemptFailure::ParseApiRootUrl {
-                        parsed_site_url,
-                        error,
-                    })
-                }
-            };
-
-        let fetch_api_details_response = match self.fetch_wp_api_details(&api_root_url).await {
+        let api_root_url_success = self.find_api_root_url(attempt_site_url).await?;
+        let fetch_api_details_response = match self
+            .fetch_wp_api_details(&api_root_url_success.api_root_url)
+            .await
+        {
             Ok(r) => r,
             Err(error) => {
                 return Err(AutoDiscoveryAttemptFailure::FetchApiDetails {
-                    parsed_site_url,
-                    api_root_url,
+                    parsed_site_url: api_root_url_success.parsed_site_url,
+                    api_root_url: api_root_url_success.api_root_url,
                     error,
                 })
             }
@@ -111,17 +96,48 @@ impl WpLoginClient {
                 Ok(api_details) => api_details,
                 Err(error) => {
                     return Err(AutoDiscoveryAttemptFailure::ParseApiDetails {
-                        parsed_site_url,
-                        api_root_url,
+                        parsed_site_url: api_root_url_success.parsed_site_url,
+                        api_root_url: api_root_url_success.api_root_url,
                         parsing_error_message: error.to_string(),
                     })
                 }
             };
 
         Ok(AutoDiscoveryAttemptSuccess {
+            parsed_site_url: api_root_url_success.parsed_site_url,
+            api_root_url: api_root_url_success.api_root_url,
+            api_details,
+        })
+    }
+
+    async fn find_api_root_url(
+        &self,
+        attempt_site_url: &str,
+    ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
+        let parsed_site_url = ParsedUrl::parse(attempt_site_url)
+            .map_err(|error| FindApiRootLinkHeaderFailure::ParseSiteUrl { error })?;
+        let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
+            Ok(r) => r,
+            Err(error) => {
+                return Err(FindApiRootLinkHeaderFailure::FetchApiRootUrl {
+                    parsed_site_url,
+                    error,
+                })
+            }
+        };
+        let api_root_url =
+            match self.parse_api_root_response(&parsed_site_url, fetch_api_root_url_response) {
+                Ok(api_root_url) => api_root_url,
+                Err(error) => {
+                    return Err(FindApiRootLinkHeaderFailure::ParseApiRootUrl {
+                        parsed_site_url,
+                        error,
+                    })
+                }
+            };
+        Ok(FindApiRootLinkHeaderSuccess {
             parsed_site_url,
             api_root_url,
-            api_details,
         })
     }
 
