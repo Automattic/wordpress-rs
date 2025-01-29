@@ -2,8 +2,7 @@ use super::{
     url_discovery::{
         self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
-        ParseApiRootUrlError,
+        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, ParseApiRootUrlError,
     },
     WpApiDetails,
 };
