@@ -25,6 +25,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
         self.session = urlSession
     }
 
+    // swiftlint:disable function_body_length
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
 
         let (data, response): (Data, URLResponse)
@@ -41,8 +42,6 @@ final class WpRequestExecutor: SafeRequestExecutor {
             do {
                 headerMap = try WpNetworkHeaderMap.fromMap(hashMap: httpResponse.httpHeaders)
 
-                debugPrint(redirectTracker.redirects(for: request.requestId()))
-
                 return .success(
                     WpNetworkResponse(
                         body: data,
@@ -51,9 +50,22 @@ final class WpRequestExecutor: SafeRequestExecutor {
                     )
                 )
             } catch is WpNetworkHeaderMapError {
-                return .failure(.RequestExecutionFailed(statusCode: nil, reason: "Invalid header"))
+                let error = RequestExecutionError.RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: redirectTracker.redirects(for: request.requestId()),
+                    reason: RequestExecutionErrorReason.genericError(errorMessage: "Invalid Headers")
+                )
+
+                return .failure(error)
+
             } catch {
-                return .failure(.RequestExecutionFailed(statusCode: nil, reason: "Unknown error: \(error)"))
+                return .failure(
+                    .RequestExecutionFailed(
+                        statusCode: nil,
+                        redirects: redirectTracker.redirects(for: request.requestId()),
+                        reason: .genericError(errorMessage: "Unknown error: \(error)")
+                    )
+                )
             }
         } catch {
            if (try? errorIsHttpsError(error)) == true {
@@ -61,12 +73,27 @@ final class WpRequestExecutor: SafeRequestExecutor {
                    abort()
                }
 
-               return .failure(.RequestExecutionFailed(statusCode: nil, reason: httpsErrorDetails.description))
+               let domain = httpsErrorDetails.first?.commonName ?? "Unknown Domain"
+
+               return .failure(.RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: nil,
+                    reason: .sslError(
+                        domain: domain,
+                        trustChain: nil,
+                        errorMessage: error.localizedDescription
+                    )
+                ))
            }
 
-           return .failure(.RequestExecutionFailed(statusCode: nil, reason: error.localizedDescription))
+            return .failure(.RequestExecutionFailed(
+                statusCode: nil,
+                redirects: nil,
+                reason: .genericError(errorMessage: error.localizedDescription)
+            ))
        }
     }
+    // swiftlint:enable function_body_length
 
     func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
         try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
@@ -146,15 +173,10 @@ final class WpRequestExecutor: SafeRequestExecutor {
 
 final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
-    struct Redirect {
-        var source: URL
-        var destination: URL
-    }
-
     private let lock = NSLock()
-    private var redirects: [String: [Redirect]] = [:]
+    private var redirects: [String: [WpRedirect]] = [:]
 
-    func redirects(for taskID: String) -> [Redirect]? {
+    func redirects(for taskID: String) -> [WpRedirect]? {
         lock.withLock {
             redirects[taskID]
         }
@@ -183,12 +205,12 @@ final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendab
 
         lock.withLock {
             if redirects[requestID] == nil {
-                redirects[requestID] = [Redirect]()
+                redirects[requestID] = [WpRedirect]()
             }
 
-            redirects[requestID]?.append(Redirect(
-                source: source,
-                destination: destination
+            redirects[requestID]?.append(WpRedirect(
+                source: source.absoluteString,
+                destination: destination.absoluteString
             ))
         }
 

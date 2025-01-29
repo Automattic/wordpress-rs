@@ -23,10 +23,14 @@ final class HTTPStubs: SafeRequestExecutor {
             return .success(response)
         case .failure:
             // TODO: Translate error into the Rust type
-            return .failure(.RequestExecutionFailed(statusCode: nil, reason: ""))
+            return .failure(
+                .RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .genericError(errorMessage: ""))
+            )
         default:
             // TODO: Translate error into the Rust type
-            return .failure(.RequestExecutionFailed(statusCode: nil, reason: ""))
+            return .failure(
+                .RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .genericError(errorMessage: ""))
+            )
         }
     }
 
