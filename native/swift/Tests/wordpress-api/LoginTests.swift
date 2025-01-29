@@ -102,6 +102,35 @@ class LoginTests {
         })
     }
 
+    final class SessionDelegate: NSObject, URLSessionDelegate {
+        func urlSession(
+            _ session: URLSession,
+            didReceive challenge: URLAuthenticationChallenge,
+            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void)
+        {
+
+            
+
+            completionHandler(.useCredential, nil)
+//            let trust: SecTrust = challenge.protectionSpace.serverTrust!
+//            let credential = URLCredential(trust: trust)
+//            completionHandler(.useCredential, credential)
+        }
+    }
+
+    @Test
+    func testInvalidHTTPs() async throws {
+        let session = URLSession(configuration: .default, delegate: SessionDelegate(), delegateQueue: nil)
+        let client = WordPressLoginClient(urlSession: session)
+        try await client.login(site: "https://wordpress-1315525-4803651.cloudwaysapps.com", appName: "Test", appId: nil)
+    }
+
+    @Test func testRedirects() async throws {
+        let session = URLSession(configuration: .default)
+        let client = WordPressLoginClient(urlSession: session)
+        #expect(try await client.loginURL(forSite: "http://vanilla.wpmt.co") != nil)
+    }
+
     func testMissingAuthenticationEndpoint() async throws {
         let filePath = Bundle.module.url(
             forResource: "Responses/LoginTests-wp-json-missing-authentication-endpoint",

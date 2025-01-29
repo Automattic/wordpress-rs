@@ -17,7 +17,7 @@ public final class WordPressLoginClient {
     private let client: UniffiWpLoginClient
 
     public convenience init(urlSession: URLSession) {
-        self.init(requestExecutor: urlSession)
+        self.init(requestExecutor: WpRequestExecutor(urlSession: urlSession))
     }
 
     init(requestExecutor: SafeRequestExecutor) {
@@ -31,6 +31,7 @@ public final class WordPressLoginClient {
         appId: WpUuid?,
         authenticator: AuthenticatorProtocol
     ) async throws(WordPressLoginClientError) -> WpApiApplicationPasswordDetails {
+        debugPrint("HERE")
         let loginURL = try await self.loginURL(forSite: site)
         let authURL = createApplicationPasswordAuthenticationUrl(
             loginUrl: loginURL,
@@ -45,7 +46,7 @@ public final class WordPressLoginClient {
         return try handleAuthenticationCallback(urlWithToken)
     }
 
-    private func loginURL(forSite proposedSiteUrl: String) async throws(WordPressLoginClientError) -> ParsedUrl {
+    public func loginURL(forSite proposedSiteUrl: String) async throws(WordPressLoginClientError) -> ParsedUrl {
 
         do {
             let client = UniffiWpLoginClient(requestExecutor: self.requestExecutor)
