@@ -20,6 +20,24 @@ impl AutoDiscoveryAttempt {
 }
 
 #[derive(Debug, uniffi::Record)]
+pub struct IsWordPressSiteUniffiResult {
+    pub user_input_attempt: Arc<IsWordPressSiteAttemptResult>,
+}
+
+impl From<IsWordPressSiteResult> for IsWordPressSiteUniffiResult {
+    fn from(value: IsWordPressSiteResult) -> Self {
+        let get_attempt_result = |attempt_type| {
+            value
+                .get_attempt(&attempt_type)
+                .map(|a| Arc::new(a.clone()))
+        };
+        Self {
+            user_input_attempt: Arc::new(value.user_input_attempt().clone()),
+        }
+    }
+}
+
+#[derive(Debug, uniffi::Record)]
 pub struct AutoDiscoveryUniffiResult {
     pub user_input_attempt: Arc<AutoDiscoveryAttemptResult>,
     pub successful_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
@@ -44,6 +62,25 @@ impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
             ),
             is_successful: value.is_successful(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct IsWordPressSiteResult {
+    pub attempts: HashMap<AutoDiscoveryAttemptType, IsWordPressSiteAttemptResult>,
+}
+
+impl IsWordPressSiteResult {
+    pub fn user_input_attempt(&self) -> &IsWordPressSiteAttemptResult {
+        self.get_attempt(&AutoDiscoveryAttemptType::UserInput)
+            .expect("User input url is always attempted")
+    }
+
+    pub fn get_attempt(
+        &self,
+        attempt_type: &AutoDiscoveryAttemptType,
+    ) -> Option<&IsWordPressSiteAttemptResult> {
+        self.attempts.get(attempt_type)
     }
 }
 
@@ -163,6 +200,12 @@ impl AutoDiscoveryAttemptResult {
             Err(_) => None,
         }
     }
+}
+
+#[derive(Debug, Clone, uniffi::Object)]
+pub struct IsWordPressSiteAttemptResult {
+    pub attempt_type: AutoDiscoveryAttemptType,
+    pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
 }
 
 #[derive(Debug, Clone)]
