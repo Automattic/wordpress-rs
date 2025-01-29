@@ -1,6 +1,6 @@
 use crate::{
     api_error::RequestExecutionErrorReason,
-    request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
+    request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect},
     wordpress_org::update_check::UpdateCheckRequest,
     ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
@@ -175,7 +175,7 @@ pub enum WordPressOrgApiClientError {
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        redirects: Option<Vec<String>>,
+        redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]

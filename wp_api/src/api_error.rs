@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::request::request_or_response_body_as_string;
+use crate::request::WpRedirect;
 
 pub trait ParsedRequestError
 where
@@ -22,7 +23,7 @@ pub enum WpApiError {
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        redirects: Option<Vec<String>>,
+        redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
@@ -428,7 +429,7 @@ pub enum RequestExecutionError {
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        redirects: Option<Vec<String>>,
+        redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
 }
@@ -455,7 +456,7 @@ pub enum MediaUploadRequestExecutionError {
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        redirects: Option<Vec<String>>,
+        redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
