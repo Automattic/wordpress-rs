@@ -166,6 +166,27 @@ impl AutoDiscoveryAttemptResult {
 }
 
 #[derive(Debug, Clone)]
+pub struct FindApiRootLinkHeaderSuccess {
+    pub parsed_site_url: ParsedUrl,
+    pub api_root_url: ParsedUrl,
+}
+
+#[derive(Debug, Clone)]
+pub enum FindApiRootLinkHeaderFailure {
+    ParseSiteUrl {
+        error: ParseUrlError,
+    },
+    FetchApiRootUrl {
+        parsed_site_url: ParsedUrl,
+        error: RequestExecutionError,
+    },
+    ParseApiRootUrl {
+        parsed_site_url: ParsedUrl,
+        error: ParseApiRootUrlError,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub struct AutoDiscoveryAttemptSuccess {
     pub parsed_site_url: ParsedUrl,
     pub api_root_url: ParsedUrl,
@@ -292,6 +313,28 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
             AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => None,
             AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(true),
+        }
+    }
+}
+
+impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
+    fn from(value: FindApiRootLinkHeaderFailure) -> Self {
+        match value {
+            FindApiRootLinkHeaderFailure::ParseSiteUrl { error } => Self::ParseSiteUrl { error },
+            FindApiRootLinkHeaderFailure::FetchApiRootUrl {
+                parsed_site_url,
+                error,
+            } => Self::FetchApiRootUrl {
+                parsed_site_url,
+                error,
+            },
+            FindApiRootLinkHeaderFailure::ParseApiRootUrl {
+                parsed_site_url,
+                error,
+            } => Self::ParseApiRootUrl {
+                parsed_site_url,
+                error,
+            },
         }
     }
 }
