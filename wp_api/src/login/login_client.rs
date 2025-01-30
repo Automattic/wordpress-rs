@@ -2,17 +2,19 @@ use super::{
     url_discovery::{
         self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
-        IsWordPressSiteResult, IsWordPressSiteUniffiResult, ParseApiRootUrlError,
+        FetchWpJsonFailure, FetchWpJsonSuccess, FindApiRootLinkHeaderFailure,
+        FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult, IsWordPressSiteResult,
+        IsWordPressSiteUniffiResult, ParseApiRootUrlError,
     },
     WpApiDetails,
 };
 use crate::{
+    login::url_discovery::RootWpJson,
     request::{
         endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse,
     },
-    ParsedUrl, RequestExecutionError,
+    ParseUrlError, ParsedUrl, RequestExecutionError,
 };
 use std::{str, sync::Arc};
 
@@ -133,12 +135,13 @@ impl WpLoginClient {
         &self,
         attempt: AutoDiscoveryAttempt,
     ) -> IsWordPressSiteAttemptResult {
-        let api_link_header_result = self
-            .find_api_root_url(attempt.attempt_site_url.as_str())
-            .await;
+        let attempt_site_url = attempt.attempt_site_url.as_str();
+        let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
+        let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
         IsWordPressSiteAttemptResult {
             attempt_type: attempt.attempt_type,
             api_link_header_result,
+            fetch_wp_json_result,
         }
     }
 
@@ -221,5 +224,51 @@ impl WpLoginClient {
                 .into(),
             )
             .await
+    }
+
+    async fn fetch_wp_json(
+        &self,
+        attempt_site_url: &str,
+    ) -> Result<FetchWpJsonSuccess, FetchWpJsonFailure> {
+        let wp_json_url = {
+            let mut wp_json_url = ParsedUrl::parse(attempt_site_url)
+                .map_err(|error| FetchWpJsonFailure::ParseSiteUrl { error })?;
+            wp_json_url
+                .inner
+                .path_segments_mut()
+                .map_err(|_| FetchWpJsonFailure::ParseSiteUrl {
+                    error: ParseUrlError::RelativeUrlWithCannotBeABaseBase,
+                })?
+                .push("wp-json");
+            wp_json_url
+        };
+        let fetch_wp_json_response = match self
+            .request_executor
+            .execute(
+                WpNetworkRequest {
+                    method: RequestMethod::GET,
+                    url: WpEndpointUrl(wp_json_url.url()),
+                    header_map: WpNetworkHeaderMap::default().into(),
+                    body: None,
+                }
+                .into(),
+            )
+            .await
+        {
+            Ok(r) => r,
+            Err(error) => {
+                return Err(FetchWpJsonFailure::FetchWpJson { wp_json_url, error });
+            }
+        };
+
+        let root_wp_json = match serde_json::from_slice::<RootWpJson>(&fetch_wp_json_response.body)
+        {
+            Ok(r) => r,
+            Err(error) => return Err(FetchWpJsonFailure::ParseWpJson { wp_json_url }),
+        };
+        Ok(FetchWpJsonSuccess {
+            wp_json_url,
+            root_wp_json,
+        })
     }
 }
