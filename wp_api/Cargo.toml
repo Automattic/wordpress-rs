@@ -31,6 +31,7 @@ wp_contextual = { path = "../wp_contextual" }
 wp_derive = { path = "../wp_derive" }
 wp_derive_request_builder = { path = "../wp_derive_request_builder", features = [ "generate_request_builder" ] }
 wp_serde_helper = { path = "../wp_serde_helper" }
+x509-cert = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

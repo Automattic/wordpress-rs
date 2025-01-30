@@ -167,7 +167,6 @@ pub struct WpNetworkRequest {
 
 #[uniffi::export]
 impl WpNetworkRequest {
-
     pub fn request_id(&self) -> String {
         self.uuid.clone()
     }
@@ -481,17 +480,19 @@ pub fn request_or_response_body_as_string(body: &[u8]) -> String {
     String::from_utf8_lossy(body).to_string()
 }
 
-
 #[derive(Clone, Debug, Eq, PartialEq, uniffi::Record)]
 pub struct WpRedirect {
     pub source: String,
-    pub destination: String
+    pub destination: String,
 }
 
 impl WpRedirect {
     #[uniffi::constructor]
     fn new(source: String, destination: String) -> Self {
-        WpRedirect { source: source, destination: destination }
+        WpRedirect {
+            source,
+            destination,
+        }
     }
 }
 

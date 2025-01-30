@@ -28,15 +28,12 @@ var package = Package(
             targets: ["WordPressAPI"]
         )
     ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-certificates.git", .upToNextMajor(from: "1.0.0"))
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "WordPressAPI",
             dependencies: [
-                .target(name: "WordPressAPIInternal"),
-                .product(name: "X509", package: "swift-certificates"),
+                .target(name: "WordPressAPIInternal")
             ],
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [

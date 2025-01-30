@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 use crate::request::request_or_response_body_as_string;
 use crate::request::WpRedirect;
+use crate::ssl::SSLCertificateInfo;
 
 pub trait ParsedRequestError
 where
@@ -436,10 +437,19 @@ pub enum RequestExecutionError {
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum RequestExecutionErrorReason {
-    SslError {
-        domain: String,
-        trust_chain: Option<Vec<String>>,
-        error_message: String,
+    // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
+    InvalidSslError {
+        // The SSL certificate for the site we're trying to contact
+        site_certificate: Option<SSLCertificateInfo>,
+
+        // Any other certificates in the trust chain
+        certificate_chain: Vec<SSLCertificateInfo>,
+
+        // The error message provided by the HTTP stack
+        error_message: Option<String>,
+
+        // Any suggested action provided by the HTTP stack
+        suggested_action: Option<String>,
     },
     GenericError {
         error_message: String,

@@ -1,6 +1,5 @@
 import Foundation
 import WordPressAPIInternal
-import X509
 
 #if os(Linux)
 import FoundationNetworking
@@ -69,21 +68,24 @@ final class WpRequestExecutor: SafeRequestExecutor {
             }
         } catch {
            if (try? errorIsHttpsError(error)) == true {
-               guard let httpsErrorDetails = try? getHttpsErrorCertificateDetails(error) else {
-                   abort()
+               guard var peerCertificateChain = try? getPeerCertificateChain(error) else {
+                   abort() // TODO
                }
 
-               let domain = httpsErrorDetails.first?.commonName ?? "Unknown Domain"
+               let siteCertificate = peerCertificateChain.remove(at: 0)
 
-               return .failure(.RequestExecutionFailed(
+               return .failure(
+                .RequestExecutionFailed(
                     statusCode: nil,
-                    redirects: nil,
-                    reason: .sslError(
-                        domain: domain,
-                        trustChain: nil,
-                        errorMessage: error.localizedDescription
+                    redirects: redirectTracker.redirects(for: request.requestId()),
+                    reason: RequestExecutionErrorReason.invalidSslError(
+                            siteCertificate: siteCertificate,
+                            certificateChain: peerCertificateChain,
+                            errorMessage: nil,
+                            suggestedAction: nil
+                        )
                     )
-                ))
+                )
            }
 
             return .failure(.RequestExecutionFailed(
@@ -111,52 +113,16 @@ final class WpRequestExecutor: SafeRequestExecutor {
         ].contains(nserror.code)
     }
 
-    private func getHttpsErrorCertificateDetails(_ error: Error) throws -> [SSLCertificateInfo] {
+    private func getPeerCertificateChain(_ error: Error) throws -> [SSLCertificateInfo] {
         let nserror = error as NSError
         let info = nserror.userInfo
 
         return try parseCertificateChain(info["NSErrorPeerCertificateChainKey"] as! NSArray)
-            .compactMap(self.parseCertificateItem)
+            .compactMap { parseCertificate(data: $0) }
     }
 
-    func parseCertificateItem(_ certificate: Certificate) throws -> SSLCertificateInfo? {
-        let validDomainNames = try? certificate
-            .extensions
-            .subjectAlternativeNames?
-            .compactMap { generalName -> String? in
-                switch generalName {
-                case .dnsName(let domain): return domain
-                default: return nil
-                }
-            }
-
-        return SSLCertificateInfo(
-            commonName: certificate.subject.asSSLCertificateSubject.commonName ?? "no common name found",
-            validDomainNames: validDomainNames ?? [],
-            issuer: certificate.issuer.asSSLCertificateSubject
-        )
-    }
-
-    struct SSLCertificateInfo {
-        // The domain this certificate was issued for
-        let commonName: String
-
-        // The list of valid domain names from the SAN field of the certificate – many certificates are valid for
-        // multiple domain names
-        let validDomainNames: [String]
-
-        // The chain of trust back to the root cert
-        let issuer: SSLCertificateSubject
-    }
-
-    struct SSLCertificateSubject {
-        let region: String?
-        let organization: String?
-        let commonName: String?
-    }
-
-    private func parseCertificateChain(_ chain: NSArray) throws -> [Certificate] {
-        try chain.compactMap { cert in
+    private func parseCertificateChain(_ chain: NSArray) throws -> [Data] {
+        chain.compactMap { cert in
 
             // CFGetTypeID validates the type in a way the type system can't
             let typeCert = cert as! SecCertificate
@@ -164,8 +130,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
                 return nil
             }
 
-            let certData = SecCertificateCopyData(cert as! SecCertificate) as Data
-            return try Certificate(derEncoded: [UInt8](certData))
+            return SecCertificateCopyData(cert as! SecCertificate) as Data
         }
     }
     // swiftlint:enable force_cast
@@ -221,29 +186,5 @@ final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendab
 extension URLRequest {
     var requestId: String? {
         allHTTPHeaderFields?["X-REQUEST-ID"]
-    }
-}
-
-extension DistinguishedName {
-    fileprivate var asSSLCertificateSubject: WpRequestExecutor.SSLCertificateSubject {
-
-        if self.count == 1 {
-            return WpRequestExecutor
-                .SSLCertificateSubject(
-                    region: nil,
-                    organization: nil,
-                    commonName: self.first?.first?.value.description
-                )
-        }
-
-        if self.count == 3 {
-            return WpRequestExecutor.SSLCertificateSubject(
-                region: self[0].first?.value.description,
-                organization: self[1].first?.value.description,
-                commonName: self[2].first?.value.description
-            )
-        }
-
-        abort()
     }
 }

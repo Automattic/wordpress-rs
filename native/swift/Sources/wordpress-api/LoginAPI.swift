@@ -31,7 +31,6 @@ public final class WordPressLoginClient {
         appId: WpUuid?,
         authenticator: AuthenticatorProtocol
     ) async throws -> WpApiApplicationPasswordDetails {
-        debugPrint("HERE")
         let loginURL = try await self.loginURL(forSite: site)
         let authURL = createApplicationPasswordAuthenticationUrl(
             loginUrl: loginURL,
@@ -53,7 +52,7 @@ public final class WordPressLoginClient {
             let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
             guard let apiDetails = discoveryResult.successfulAttempt?.apiDetails() else {
-                debugPrint(discoveryResult.userInputAttempt.errorMessage())
+                debugPrint("Error: \(discoveryResult.userInputAttempt.errorMessage())")
                 throw CocoaError(.fileReadUnknown) // TODO: Throw a better error here
             }
 
