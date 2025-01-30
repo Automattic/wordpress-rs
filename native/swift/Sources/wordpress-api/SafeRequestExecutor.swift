@@ -124,6 +124,9 @@ final class WpRequestExecutor: SafeRequestExecutor {
     private func parseCertificateChain(_ chain: NSArray) throws -> [Data] {
         chain.compactMap { cert in
 
+            #if os(Linux)
+            return nil
+            #else
             // CFGetTypeID validates the type in a way the type system can't
             let typeCert = cert as! SecCertificate
             guard CFGetTypeID(typeCert) == SecCertificateGetTypeID() else {
@@ -131,6 +134,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
             }
 
             return SecCertificateCopyData(cert as! SecCertificate) as Data
+            #endif
         }
     }
     // swiftlint:enable force_cast

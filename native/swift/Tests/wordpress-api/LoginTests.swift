@@ -3,6 +3,10 @@ import Testing
 
 @testable import WordPressAPI
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 @Suite("Login")
 class LoginTests {
 
