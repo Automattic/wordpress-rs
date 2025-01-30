@@ -10,13 +10,16 @@ use x509_cert::Certificate;
 // If this returns `None`, we weren't able to parse the certificate
 #[uniffi::export]
 pub fn parse_certificate(data: &[u8]) -> Option<SSLCertificateInfo> {
-    let certificate = Certificate::from_der(data).unwrap();
+    let Ok(certificate) = Certificate::from_der(data) else { return None };
+
+    let Some(subject_common_name) = get_common_name(certificate.tbs_certificate().subject()) else { return None };
+    let Some(issuer_common_name) = get_common_name(certificate.tbs_certificate().issuer()) else { return None };
 
     Some(SSLCertificateInfo {
-        common_name: get_common_name(certificate.tbs_certificate().subject()).unwrap(),
+        common_name: subject_common_name,
         alternative_names: get_alternative_names(certificate.tbs_certificate()),
         issuer: SSLCertificateIssuer {
-            common_name: get_common_name(certificate.tbs_certificate().issuer()).unwrap(),
+            common_name: issuer_common_name,
             organization: get_organization(certificate.tbs_certificate().issuer()),
             country: get_country(certificate.tbs_certificate().issuer()),
         },
@@ -53,7 +56,8 @@ pub fn get_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
         .into_iter()
         .map(|name| match name {
             DnsName(string) => string.to_string(),
-            _ => todo!(),
+            // TODO: I thought I read that LetsEncrypt would be offering certificates for IP addresses, if so we might need to support that GeneralName variant
+            _ => todo!(), // TODO: Do we need to do anything here?
         })
         .collect()
 }
