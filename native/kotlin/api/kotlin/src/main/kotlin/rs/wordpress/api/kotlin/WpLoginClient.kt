@@ -23,4 +23,7 @@ class WpLoginClient(
             Result.failure(e)
         }
     }
+
+    suspend fun parseHtmlH1(html: String): List<String> =
+        internalClient.scrapeHtmlH1(html)
 }

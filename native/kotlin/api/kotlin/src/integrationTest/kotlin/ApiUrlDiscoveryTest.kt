@@ -16,4 +16,11 @@ class ApiUrlDiscoveryTest {
             urlDiscovery.apiDetails.findApplicationPasswordsAuthenticationUrl()
         )
     }
+
+    @Test
+    fun testParseHtml() = runTest {
+        assertEquals(
+            listOf("Hello, ", "world!"), loginClient.parseHtmlH1("<h1>Hello, <i>world!</i></h1>")
+        )
+    }
 }

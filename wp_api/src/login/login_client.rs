@@ -1,6 +1,8 @@
 use std::str;
 use std::sync::Arc;
 
+use scraper::{Html, Selector};
+
 use crate::request::endpoint::WpEndpointUrl;
 use crate::request::{
     RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
@@ -33,6 +35,13 @@ impl UniffiWpLoginClient {
         site_url: String,
     ) -> Result<UrlDiscoverySuccess, UrlDiscoveryError> {
         self.inner.api_discovery(site_url).await
+    }
+
+    async fn scrape_html_h1(&self, html: &str) -> Vec<String> {
+        let fragment = Html::parse_fragment(html);
+        let selector = Selector::parse("h1").unwrap();
+        let h1 = fragment.select(&selector).next().unwrap();
+        h1.text().map(|s| s.to_string()).collect::<Vec<_>>()
     }
 }
 
