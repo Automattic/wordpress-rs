@@ -33,3 +33,11 @@ extension WpNetworkResponse: @unchecked Sendable {}
 //        lhs.localizedDescription == rhs.localizedDescription
 //    }
 //}
+
+func isLinux() -> Bool {
+    #if os(Linux)
+    return true
+    #else
+    return false
+    #endif
+}
