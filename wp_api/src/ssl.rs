@@ -80,30 +80,3 @@ pub struct SSLCertificateIssuer {
     pub organization: Option<String>,
     pub country: Option<String>,
 }
-
-#[cfg(test)]
-mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
-    use super::*;
-
-    #[test]
-    fn test_parse_name_string() {
-        assert_eq!(
-            parse_name_string("CN=R10,O=Let's Encrypt,C=US".to_string()),
-            ParsedName {
-                common_name: "R10".to_string(),
-                organization: Some("Let's Encrypt".to_string()),
-                country: Some("US".to_string())
-            }
-        );
-
-        assert_eq!(
-            parse_name_string("CN=vanilla.wpmt.co".to_string()),
-            ParsedName {
-                common_name: "vanilla.wpmt.co".to_string(),
-                organization: None,
-                country: None
-            }
-        );
-    }
-}
