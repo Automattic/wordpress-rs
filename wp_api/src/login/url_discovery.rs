@@ -1,5 +1,6 @@
 use super::WpApiDetails;
 use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
+use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
@@ -206,12 +207,24 @@ impl AutoDiscoveryAttemptResult {
 pub struct IsWordPressSiteAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
+    pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FindApiRootLinkHeaderSuccess {
     pub parsed_site_url: ParsedUrl,
     pub api_root_url: ParsedUrl,
+}
+
+#[derive(Debug, Clone)]
+pub struct FetchWpJsonSuccess {
+    pub wp_json_url: ParsedUrl,
+    pub root_wp_json: RootWpJson,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RootWpJson {
+    pub namespaces: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -226,6 +239,20 @@ pub enum FindApiRootLinkHeaderFailure {
     ParseApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: ParseApiRootUrlError,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum FetchWpJsonFailure {
+    ParseSiteUrl {
+        error: ParseUrlError,
+    },
+    FetchWpJson {
+        wp_json_url: ParsedUrl,
+        error: RequestExecutionError,
+    },
+    ParseWpJson {
+        wp_json_url: ParsedUrl,
     },
 }
 
