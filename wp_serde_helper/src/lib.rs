@@ -18,7 +18,7 @@ where
 // Use `PhantomData` to avoid "unused generic `T` error"
 struct StringOfJsonArrayVisitor<T>(PhantomData<T>);
 
-impl<'de, T: DeserializeOwned> de::Visitor<'de> for StringOfJsonArrayVisitor<T> {
+impl<T: DeserializeOwned> de::Visitor<'_> for StringOfJsonArrayVisitor<T> {
     type Value = Vec<T>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -47,7 +47,7 @@ where
 
 struct DeserializeI64OrStringVisitor;
 
-impl<'de> de::Visitor<'de> for DeserializeI64OrStringVisitor {
+impl de::Visitor<'_> for DeserializeI64OrStringVisitor {
     type Value = i64;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
