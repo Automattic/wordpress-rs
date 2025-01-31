@@ -4,7 +4,7 @@ use super::{
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
         FetchWpJsonFailure, FetchWpJsonSuccess, FindApiRootLinkHeaderFailure,
         FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult, IsWordPressSiteResult,
-        IsWordPressSiteUniffiResult, ParseApiRootUrlError,
+        IsWordPressSiteUniffiResult, ParseApiRootUrlError, ParseHtmlFailure,
     },
     WpApiDetails,
 };
@@ -16,9 +16,17 @@ use crate::{
     },
     ParseUrlError, ParsedUrl, RequestExecutionError,
 };
+use scraper::{Html, Selector};
 use std::{str, sync::Arc};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
+const META_TAG_GENERATOR: &str = "generator";
+const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
+const SELECTOR_META: &str = "meta";
+const HTML_ATTR_NAME: &str = "name";
+const HTML_ATTR_CONTENT: &str = "content";
+const REFERENCE_WP_CONTENT: &str = "wp-content";
+const REFERENCE_WP_INCLUDES: &str = "wp-includes";
 
 #[derive(Debug, uniffi::Object)]
 struct UniffiWpLoginClient {
@@ -138,10 +146,22 @@ impl WpLoginClient {
         let attempt_site_url = attempt.attempt_site_url.as_str();
         let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
         let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
+        let (page_has_generator_meta_tag_result, page_mentions_wp_content_result) =
+            match self.fetch_site(attempt_site_url).await {
+                Ok(r) => {
+                    let html = Html::parse_document(&r.body_as_string());
+                    let has_generator_tag = helpers::html_has_generator_tag(&html);
+                    let has_wp_references = helpers::html_has_wp_references(&html);
+                    (Ok(has_generator_tag), Ok(has_wp_references))
+                }
+                Err(e) => (Err(e.clone()), Err(e)),
+            };
         IsWordPressSiteAttemptResult {
             attempt_type: attempt.attempt_type,
             api_link_header_result,
             fetch_wp_json_result,
+            page_has_generator_meta_tag_result,
+            page_has_wp_references: page_mentions_wp_content_result,
         }
     }
 
@@ -270,5 +290,62 @@ impl WpLoginClient {
             wp_json_url,
             root_wp_json,
         })
+    }
+
+    async fn parse_page_for_generator_meta_tag_and_mention_of_wp_content(
+        &self,
+        attempt_site_url: &str,
+    ) -> (
+        Result<bool, ParseHtmlFailure>,
+        Result<bool, ParseHtmlFailure>,
+    ) {
+        let response = match self.fetch_site(attempt_site_url).await {
+            Ok(r) => r,
+            Err(e) => return (Err(e.clone()), Err(e)),
+        };
+        let html = Html::parse_document(&response.body_as_string());
+        let has_generator_tag = helpers::html_has_generator_tag(&html);
+        (Ok(has_generator_tag), Ok(false))
+    }
+
+    async fn fetch_site(
+        &self,
+        attempt_site_url: &str,
+    ) -> Result<WpNetworkResponse, ParseHtmlFailure> {
+        let site_url = ParsedUrl::parse(attempt_site_url)
+            .map_err(|error| ParseHtmlFailure::ParseSiteUrl { error })?;
+        self.request_executor
+            .execute(
+                WpNetworkRequest {
+                    method: RequestMethod::GET,
+                    url: WpEndpointUrl(site_url.url()),
+                    header_map: WpNetworkHeaderMap::default().into(),
+                    body: None,
+                }
+                .into(),
+            )
+            .await
+            .map_err(|error| ParseHtmlFailure::FetchSite { error })
+    }
+}
+
+mod helpers {
+    use super::*;
+
+    pub(super) fn html_has_generator_tag(html: &Html) -> bool {
+        html.select(&Selector::parse(SELECTOR_META).expect("'meta' is a valid selector"))
+            .any(|e| {
+                e.value().attr(HTML_ATTR_NAME) == Some(META_TAG_GENERATOR)
+                    && e.value()
+                        .attr(HTML_ATTR_CONTENT)
+                        .unwrap_or_default()
+                        .contains(META_TAG_GENERATOR_CONTENT_INCLUDES)
+            })
+    }
+
+    // TODO: If we are not going to use parsed Html, we should pass the response body reference
+    // instead
+    pub(super) fn html_has_wp_references(html: &Html) -> bool {
+        html.html().contains(REFERENCE_WP_CONTENT) || html.html().contains(REFERENCE_WP_INCLUDES)
     }
 }
