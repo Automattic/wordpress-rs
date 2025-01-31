@@ -35,10 +35,12 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
     alternative_names
         .0
         .into_iter()
-        .map(|name| match name {
-            DnsName(string) => string.to_string(),
-            // TODO: I thought I read that LetsEncrypt would be offering certificates for IP addresses, if so we might need to support that GeneralName variant
-            _ => todo!(), // TODO: Do we need to do anything here?
+        .flat_map(|name| match name {
+            DnsName(string) => Some(string.to_string()),
+            // Future Thing: I thought I read that LetsEncrypt would be
+            // offering certificates for IP addresses, if so we might need to
+            // support that GeneralName variant at some point?
+            _ => None,
         })
         .collect()
 }
