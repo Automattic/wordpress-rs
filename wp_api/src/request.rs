@@ -487,7 +487,6 @@ pub struct WpRedirect {
 }
 
 impl WpRedirect {
-    #[uniffi::constructor]
     fn new(source: String, destination: String) -> Self {
         WpRedirect {
             source,
