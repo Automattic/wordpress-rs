@@ -1,6 +1,8 @@
 package rs.wordpress.api.kotlin
 
+import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpRedirect
 
 sealed class WpRequestResult<T> {
     data class WpRequestSuccess<T>(val data: T) : WpRequestResult<T>()
@@ -17,7 +19,8 @@ sealed class WpRequestResult<T> {
 
     data class RequestExecutionFailed<T>(
         val statusCode: UShort?,
-        val reason: String,
+        val redirects: List<WpRedirect>?,
+        val reason: RequestExecutionErrorReason,
     ) : WpRequestResult<T>()
 
     data class MediaFileNotFound<T>(
