@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use url::form_urlencoded::byte_serialize as url_encode;
+use uuid::Uuid;
 
 use crate::request::{RequestMethod, WpNetworkRequest, WpNetworkRequestBody};
 use crate::{ParsedUrl, PluginSlug, PluginStatus, PluginWithViewContext, PluginWpOrgDirectorySlug};
@@ -91,6 +92,7 @@ impl TryFrom<UpdateCheckRequest> for WpNetworkRequest {
         let body = request.url_encoded_body()?;
 
         Ok(WpNetworkRequest {
+            uuid: Uuid::new_v4().into(),
             method: RequestMethod::POST,
             url: crate::request::endpoint::WpEndpointUrl(
                 "https://api.wordpress.org/plugins/update-check/1.1/".to_string(),

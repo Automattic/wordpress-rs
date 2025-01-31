@@ -9,7 +9,6 @@ class HTTPErrorTests {
         let stubs = HTTPStubs(stubs: [], missingStub: .failure(URLError(.timedOut)))
 
         let api = try WordPressAPI(
-            urlSession: .shared,
             baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
             authenticationStategy: .none,
             executor: stubs

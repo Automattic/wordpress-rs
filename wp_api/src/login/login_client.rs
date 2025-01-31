@@ -14,6 +14,7 @@ use crate::{
     ParsedUrl, RequestExecutionError,
 };
 use std::{str, sync::Arc};
+use uuid::Uuid;
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -165,6 +166,7 @@ impl WpLoginClient {
         parsed_site_url: &ParsedUrl,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let api_root_request = WpNetworkRequest {
+            uuid: Uuid::new_v4().into(),
             method: RequestMethod::HEAD,
             url: WpEndpointUrl(parsed_site_url.url()),
             header_map: WpNetworkHeaderMap::default().into(),
@@ -180,6 +182,7 @@ impl WpLoginClient {
         self.request_executor
             .execute(
                 WpNetworkRequest {
+                    uuid: Uuid::new_v4().into(),
                     method: RequestMethod::GET,
                     url: WpEndpointUrl(api_root_url.url()),
                     header_map: WpNetworkHeaderMap::default().into(),
