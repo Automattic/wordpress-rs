@@ -80,6 +80,7 @@ async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str
 // TODO: Remove ignore and do a relevant assertion
 #[rstest]
 #[case("http://localhost")]
+#[case("https://github.com/Automattic/wordpress-rs/blob/is-wordpress-site-incorrect/foo.md")]
 #[tokio::test]
 #[ignore]
 #[parallel]
