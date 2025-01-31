@@ -20,6 +20,7 @@ class LoginTests {
         await #expect(performing: {
             _ = try await client.loginURL(forSite: "invalid url")
         }, throws: { error in
+            debugPrint(error)
             return true
         })
     }
@@ -31,6 +32,7 @@ class LoginTests {
         await #expect(performing: {
             let parsedUrl = try await client.loginURL(forSite: "https://example.com/blog")
         }, throws: { error in
+            debugPrint(error)
             return true
         })
     }
@@ -49,8 +51,8 @@ class LoginTests {
         func urlSession(
             _ session: URLSession,
             didReceive challenge: URLAuthenticationChallenge,
-            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void)
-        {
+            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        ) {
             guard allowedDomains.contains(challenge.protectionSpace.host),
                   let trust = challenge.protectionSpace.serverTrust else {
                 completionHandler(.useCredential, nil)
@@ -69,6 +71,7 @@ class LoginTests {
         await #expect(performing: {
             _ = try await client.loginURL(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
         }, throws: { error in
+            debugPrint(error)
             true // TODO: It'd be nice to get more details about this error
         })
     }
