@@ -88,9 +88,10 @@ async fn test_is_wordpress_site(#[case] site_url: &str) {
     let result = client
         .is_wordpress_site_discovery(site_url.to_string())
         .await;
-    let fetch_wp_json_result = &result
+    let original_attempt_result = result
         .get_attempt(&AutoDiscoveryAttemptType::UserInput)
-        .unwrap()
-        .fetch_wp_json_result;
-    dbg!(fetch_wp_json_result);
+        .unwrap();
+    dbg!(&original_attempt_result.fetch_wp_json_result);
+    dbg!(&original_attempt_result.page_has_generator_meta_tag_result);
+    dbg!(&original_attempt_result.page_has_wp_references);
 }

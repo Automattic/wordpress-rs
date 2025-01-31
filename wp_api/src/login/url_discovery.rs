@@ -208,6 +208,8 @@ pub struct IsWordPressSiteAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
+    pub page_has_generator_meta_tag_result: Result<bool, ParseHtmlFailure>,
+    pub page_has_wp_references: Result<bool, ParseHtmlFailure>,
 }
 
 #[derive(Debug, Clone)]
@@ -254,6 +256,12 @@ pub enum FetchWpJsonFailure {
     ParseWpJson {
         wp_json_url: ParsedUrl,
     },
+}
+
+#[derive(Debug, Clone)]
+pub enum ParseHtmlFailure {
+    ParseSiteUrl { error: ParseUrlError },
+    FetchSite { error: RequestExecutionError },
 }
 
 #[derive(Debug, Clone)]
