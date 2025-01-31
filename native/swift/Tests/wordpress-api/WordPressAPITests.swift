@@ -39,7 +39,6 @@ struct WordPressAPITests {
         ])
 
         let api = try WordPressAPI(
-            urlSession: .shared,
             baseUrl: ParsedUrl.parse(input: "https://wordpress.org"),
             authenticationStategy: .none,
             executor: stubs

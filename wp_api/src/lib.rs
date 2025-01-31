@@ -16,6 +16,7 @@ pub use uuid::{WpUuid, WpUuidParseError};
 mod api_client; // re-exported relevant types
 mod api_error; // re-exported relevant types
 mod parsed_url; // re-exported relevant types
+mod ssl; // re-exported relevant types
 mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
