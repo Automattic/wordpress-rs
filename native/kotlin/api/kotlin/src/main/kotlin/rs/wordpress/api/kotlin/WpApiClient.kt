@@ -40,6 +40,7 @@ constructor(
                 )
                 is WpApiException.RequestExecutionFailed -> WpRequestResult.RequestExecutionFailed(
                     statusCode = exception.statusCode,
+                    redirects = exception.redirects,
                     reason = exception.reason
                 )
                 is WpApiException.MediaFileNotFound -> WpRequestResult.MediaFileNotFound(
