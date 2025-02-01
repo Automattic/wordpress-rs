@@ -1,6 +1,8 @@
 use crate::{
     api_error::RequestExecutionErrorReason,
-    request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect},
+    request::{
+        endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect,
+    },
     wordpress_org::update_check::UpdateCheckRequest,
     ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };

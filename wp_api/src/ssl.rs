@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use x509_cert::{
     der::Decode,
     ext::pkix::{name::GeneralName::DnsName, SubjectAltName},
@@ -9,19 +10,22 @@ use x509_cert::{
 //
 // If this returns `None`, we weren't able to parse the certificate
 #[uniffi::export]
-pub fn parse_certificate(data: &[u8]) -> Option<SSLCertificateInfo> {
+pub fn parse_certificate(data: &[u8]) -> Option<Arc<SSLCertificateInfo>> {
     let certificate = Certificate::from_der(data).ok()?;
     let certificate = certificate.tbs_certificate();
 
-    Some(SSLCertificateInfo {
-        common_name: extract_data_as_string(certificate.subject().common_name())?,
-        alternative_names: extract_alternative_names(certificate),
-        issuer: SSLCertificateIssuer {
-            common_name: extract_data_as_string(certificate.issuer().common_name())?,
-            organization: extract_data_as_string(certificate.issuer().organization()),
-            country: extract_data_as_string(certificate.issuer().country()),
-        },
-    })
+    Some(
+        SSLCertificateInfo {
+            common_name: extract_data_as_string(certificate.subject().common_name())?,
+            alternative_names: extract_alternative_names(certificate),
+            issuer: SSLCertificateIssuer {
+                common_name: extract_data_as_string(certificate.issuer().common_name())?,
+                organization: extract_data_as_string(certificate.issuer().organization()),
+                country: extract_data_as_string(certificate.issuer().country()),
+            },
+        }
+        .into(),
+    )
 }
 
 fn extract_data_as_string(data: x509_cert::der::Result<Option<impl AsRef<str>>>) -> Option<String> {
@@ -45,7 +49,7 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Object)]
 pub struct SSLCertificateInfo {
     /// The domain this certificate is valid for (or the signer's name, if this is an intermediate or root certificate)
     pub common_name: String,
@@ -53,6 +57,21 @@ pub struct SSLCertificateInfo {
     pub alternative_names: Vec<String>,
     /// Information about whomever signed this certificate
     pub issuer: SSLCertificateIssuer,
+}
+
+#[uniffi::export]
+impl SSLCertificateInfo {
+    fn common_name(&self) -> String {
+        self.common_name.clone()
+    }
+
+    fn alternative_names(&self) -> Vec<String> {
+        self.alternative_names.clone()
+    }
+
+    fn issuer(&self) -> SSLCertificateIssuer {
+        self.issuer.clone()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]

@@ -1,8 +1,9 @@
+use crate::{
+    request::{request_or_response_body_as_string, WpRedirect},
+    ssl::SSLCertificateInfo,
+};
 use serde::Deserialize;
-
-use crate::request::request_or_response_body_as_string;
-use crate::request::WpRedirect;
-use crate::ssl::SSLCertificateInfo;
+use std::sync::Arc;
 
 pub trait ParsedRequestError
 where
@@ -440,10 +441,10 @@ pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
     InvalidSslError {
         // The SSL certificate for the site we're trying to contact
-        site_certificate: Option<SSLCertificateInfo>,
+        site_certificate: Option<Arc<SSLCertificateInfo>>,
 
         // Any other certificates in the trust chain
-        certificate_chain: Vec<SSLCertificateInfo>,
+        certificate_chain: Vec<Arc<SSLCertificateInfo>>,
 
         // The error message provided by the HTTP stack
         error_message: Option<String>,
