@@ -50,6 +50,10 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
     "https://jetpack.wpmt.co",
     "https://jetpack.wpmt.co/wp-admin/authorize-application.php"
 )]
+#[case(
+    "https://aggressive-caching.wpmt.co",
+    "https://jetpack.wpmt.co/wp-admin/authorize-application.php"
+)] // Returns gzip responses, may not always include Link header
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
