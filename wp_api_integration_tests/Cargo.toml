@@ -27,3 +27,4 @@ paste = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
 serial_test = { workspace = true }
+tokio-stream = { workspace = true }

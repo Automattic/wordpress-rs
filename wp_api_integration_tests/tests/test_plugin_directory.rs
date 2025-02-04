@@ -1,14 +1,15 @@
-use std::{
-    env,
-    io::{self, Write},
-    sync::Arc,
+use futures::{FutureExt, StreamExt};
+use std::{env, sync::Arc};
+use wp_api::wordpress_org::{
+    client::{
+        WordPressOrgApiClient, WordPressOrgApiClientError, WordPressOrgApiPluginDirectoryCategory,
+    },
+    plugin_directory::PluginInformation,
 };
-
-use wp_api::wordpress_org::client::{
-    WordPressOrgApiClient, WordPressOrgApiPluginDirectoryCategory,
-};
-
 use wp_api_integration_tests::AsyncWpNetworking;
+
+const FETCH_PLUGIN_INFORMATION_RETRY_COUNT: usize = 5;
+const TOKIO_STREAM_SIZE: usize = 100;
 
 fn wordpress_org_api_client() -> WordPressOrgApiClient {
     WordPressOrgApiClient::new(Arc::new(AsyncWpNetworking::default()))
@@ -18,6 +19,15 @@ fn wordpress_org_api_client() -> WordPressOrgApiClient {
 async fn test_parsing_full_plugin_directory() {
     let client = wordpress_org_api_client();
 
+    let (all_slugs, all_slugs_were_fetched_successfully) = query_all_plugin_slugs(&client).await;
+    let all_plugin_infos_were_fetched_and_parsed_successfully =
+        fetch_plugin_information_for_all_slugs(&client, all_slugs).await;
+
+    assert!(all_slugs_were_fetched_successfully);
+    assert!(all_plugin_infos_were_fetched_and_parsed_successfully);
+}
+
+async fn query_all_plugin_slugs(client: &WordPressOrgApiClient) -> (Vec<String>, bool) {
     let page_size: u64;
     let total_pages: u64;
     if env::var("TEST_ALL_PLUGINS").is_ok() {
@@ -31,57 +41,98 @@ async fn test_parsing_full_plugin_directory() {
         total_pages = 2;
     }
 
+    println!("Pages to fetch: {total_pages}");
+
+    let results = futures::future::join_all((1..=total_pages).map(|page| {
+        client
+            .browse_plugins(None, page, page_size)
+            .map(move |r| (page, r))
+    }))
+    .await;
+
     let mut query_plugins_failures = Vec::new();
     let mut all_slugs: Vec<String> = Vec::new();
-    for page in 1..=total_pages {
-        let slugs: Result<Vec<_>, _> = client
-            .browse_plugins(None, page, page_size)
-            .await
-            .map(|r| r.plugins.into_iter().map(|p| p.slug).collect());
-        match slugs {
-            Ok(slugs) => {
-                print!(".");
-                all_slugs.extend(slugs);
-            }
-            Err(e) => {
-                print!("F({})", page);
-                query_plugins_failures.push((page, e));
-            }
-        }
-        _ = io::stdout().flush();
-    }
-    println!();
 
-    println!("Fetching and parsing {} plugins...", all_slugs.len());
+    for (page, query_plugins_response) in results {
+        match query_plugins_response {
+            Ok(r) => all_slugs.extend(r.plugins.into_iter().map(|p| p.slug)),
+            Err(e) => query_plugins_failures.push((page, e)),
+        }
+    }
+
+    if !query_plugins_failures.is_empty() {
+        println!(
+            "Number of failures while querying plugin slugs: {}",
+            query_plugins_failures.len()
+        );
+        for (page, e) in &query_plugins_failures {
+            println!("  - Page {:?}, page size {:?} : {:?}", page, page_size, e);
+        }
+    } else {
+        println!("Successfully fetched {total_pages} query plugins pages!");
+    }
+
+    (all_slugs, query_plugins_failures.is_empty())
+}
+
+async fn fetch_plugin_information_for_all_slugs(
+    client: &WordPressOrgApiClient,
+    all_slugs: Vec<String>,
+) -> bool {
+    let number_of_plugins = all_slugs.len();
+    println!("Fetching and parsing {number_of_plugins} plugins...");
+
+    let mut plugin_info_stream = tokio_stream::iter(all_slugs)
+        .map(|slug| fetch_plugin_information(client, slug, FETCH_PLUGIN_INFORMATION_RETRY_COUNT))
+        .buffer_unordered(TOKIO_STREAM_SIZE);
 
     let mut plugin_information_failures = Vec::new();
-    for slug in all_slugs {
-        let info = client.plugin_information(&slug.as_str().into()).await;
-        if let Err(e) = info {
-            print!("F({})", slug);
-            plugin_information_failures.push((slug.to_string(), e));
-        } else {
-            print!(".");
+    while let Some((slug, info_result)) = plugin_info_stream.next().await {
+        if let Err(e) = info_result {
+            plugin_information_failures.push((slug, e));
         }
-        _ = io::stdout().flush();
-    }
-    println!();
-
-    println!("{} query plugins failures:", query_plugins_failures.len());
-    for (page, e) in &query_plugins_failures {
-        println!("  - Page {:?}, page size {:?} : {:?}", page, page_size, e);
     }
 
-    println!(
-        "{} plugin information failures:",
-        plugin_information_failures.len()
-    );
-    for (slug, e) in &plugin_information_failures {
-        println!("  - {:?} : {:?}", slug, e);
+    if !plugin_information_failures.is_empty() {
+        println!(
+            "{} plugin information failures:",
+            plugin_information_failures.len()
+        );
+        for (slug, e) in &plugin_information_failures {
+            println!("  - {:?} : {:?}", slug, e);
+        }
+    } else {
+        println!("Successfully fetched and parsed {number_of_plugins} plugins!");
     }
 
-    assert!(query_plugins_failures.is_empty());
-    assert!(plugin_information_failures.is_empty())
+    plugin_information_failures.is_empty()
+}
+
+async fn fetch_plugin_information(
+    client: &WordPressOrgApiClient,
+    slug: String,
+    remaining_retry_count: usize,
+) -> (
+    String,
+    Result<PluginInformation, WordPressOrgApiClientError>,
+) {
+    let result = client.plugin_information(&slug.as_str().into()).await;
+    if remaining_retry_count == 0 {
+        (slug, result)
+    } else if let Err(WordPressOrgApiClientError::RequestExecutionFailed { .. }) = result {
+        println!(
+            "Retry fetching '{slug}', remaining retries: {}",
+            remaining_retry_count - 1
+        );
+        Box::pin(fetch_plugin_information(
+            client,
+            slug.clone(),
+            remaining_retry_count - 1,
+        ))
+        .await
+    } else {
+        (slug, result)
+    }
 }
 
 #[tokio::test]
