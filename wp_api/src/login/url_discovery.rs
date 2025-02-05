@@ -22,24 +22,6 @@ impl AutoDiscoveryAttempt {
 }
 
 #[derive(Debug, uniffi::Record)]
-pub struct IsWordPressSiteUniffiResult {
-    pub user_input_attempt: Arc<IsWordPressSiteAttemptResult>,
-}
-
-impl From<IsWordPressSiteResult> for IsWordPressSiteUniffiResult {
-    fn from(value: IsWordPressSiteResult) -> Self {
-        let get_attempt_result = |attempt_type| {
-            value
-                .get_attempt(&attempt_type)
-                .map(|a| Arc::new(a.clone()))
-        };
-        Self {
-            user_input_attempt: Arc::new(value.user_input_attempt().clone()),
-        }
-    }
-}
-
-#[derive(Debug, uniffi::Record)]
 pub struct AutoDiscoveryUniffiResult {
     pub user_input_attempt: Arc<AutoDiscoveryAttemptResult>,
     pub successful_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
@@ -64,25 +46,6 @@ impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
             ),
             is_successful: value.is_successful(),
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct IsWordPressSiteResult {
-    pub attempts: HashMap<AutoDiscoveryAttemptType, IsWordPressSiteAttemptResult>,
-}
-
-impl IsWordPressSiteResult {
-    pub fn user_input_attempt(&self) -> &IsWordPressSiteAttemptResult {
-        self.get_attempt(&AutoDiscoveryAttemptType::UserInput)
-            .expect("User input url is always attempted")
-    }
-
-    pub fn get_attempt(
-        &self,
-        attempt_type: &AutoDiscoveryAttemptType,
-    ) -> Option<&IsWordPressSiteAttemptResult> {
-        self.attempts.get(attempt_type)
     }
 }
 
@@ -204,12 +167,94 @@ impl AutoDiscoveryAttemptResult {
     }
 }
 
+#[derive(Debug, uniffi::Record)]
+pub struct IsWordPressSiteUniffiResult {
+    pub user_input_attempt: Arc<IsWordPressSiteAttemptResult>,
+    pub successful_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
+    pub auto_https_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
+    pub auto_dot_php_extension_for_wp_admin_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
+}
+
+#[derive(Debug)]
+pub struct IsWordPressSiteResult {
+    pub attempts: HashMap<AutoDiscoveryAttemptType, IsWordPressSiteAttemptResult>,
+}
+
+impl From<IsWordPressSiteResult> for IsWordPressSiteUniffiResult {
+    fn from(value: IsWordPressSiteResult) -> Self {
+        let get_attempt_result = |attempt_type| {
+            value
+                .get_attempt(&attempt_type)
+                .map(|a| Arc::new(a.clone()))
+        };
+        Self {
+            user_input_attempt: Arc::new(value.user_input_attempt().clone()),
+            successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
+            auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
+            auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
+                AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+            ),
+        }
+    }
+}
+
+impl IsWordPressSiteResult {
+    pub fn is_successful(&self) -> bool {
+        self.attempts
+            .iter()
+            .any(|(_, result)| result.is_successful())
+    }
+
+    pub fn user_input_attempt(&self) -> &IsWordPressSiteAttemptResult {
+        self.get_attempt(&AutoDiscoveryAttemptType::UserInput)
+            .expect("User input url is always attempted")
+    }
+
+    pub fn get_attempt(
+        &self,
+        attempt_type: &AutoDiscoveryAttemptType,
+    ) -> Option<&IsWordPressSiteAttemptResult> {
+        self.attempts.get(attempt_type)
+    }
+
+    pub fn find_successful(&self) -> Option<&IsWordPressSiteAttemptResult> {
+        // If the user attempt is successful, prefer it over other attempts
+        let user_input_attempt = self.user_input_attempt();
+        if user_input_attempt.is_successful() {
+            return Some(user_input_attempt);
+        }
+        self.attempts.iter().find_map(|(_, result)| {
+            if result.is_successful() {
+                Some(result)
+            } else {
+                None
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, uniffi::Object)]
 pub struct IsWordPressSiteAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
     pub parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
+}
+
+impl IsWordPressSiteAttemptResult {
+    fn is_successful(&self) -> bool {
+        self.api_link_header_result.is_ok()
+            || self.fetch_wp_json_result.is_ok()
+            || self
+                .parse_html_result
+                .as_ref()
+                .map(|r| {
+                    r.has_wordpress_generator_meta_tag
+                        || r.mentions_wp_content
+                        || r.mentions_wp_includes
+                })
+                .unwrap_or(false)
+    }
 }
 
 #[derive(Debug, Clone)]
