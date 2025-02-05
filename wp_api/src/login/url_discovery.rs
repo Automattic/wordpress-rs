@@ -1,5 +1,6 @@
 use super::WpApiDetails;
 use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
+use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
@@ -208,8 +209,7 @@ pub struct IsWordPressSiteAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
-    pub page_has_generator_meta_tag_result: Result<bool, ParseHtmlFailure>,
-    pub page_has_wp_references: Result<bool, ParseHtmlFailure>,
+    pub parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
 }
 
 #[derive(Debug, Clone)]
@@ -227,6 +227,55 @@ pub struct FetchWpJsonSuccess {
 #[derive(Debug, Clone, Deserialize)]
 pub struct RootWpJson {
     pub namespaces: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IsWordPressSiteParseHtmlResult {
+    /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
+    has_wordpress_generator_meta_tag: bool,
+    /// Whether the HTML script or link tags mention `wp-content`
+    script_or_link_tags_mention_wp_content: bool,
+    /// Whether the HTML script or link tags mention `wp-includes`
+    script_or_link_tags_mention_wp_includes: bool,
+}
+
+impl IsWordPressSiteParseHtmlResult {
+    const HTML_ATTR_NAME: &str = "name";
+    const HTML_ATTR_CONTENT: &str = "content";
+    const META_TAG_GENERATOR: &str = "generator";
+    const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
+    const SELECTOR_META: &str = "meta";
+
+    pub fn parse_response(response_body: &str) -> Self {
+        let html = Html::parse_document(response_body);
+        Self {
+            has_wordpress_generator_meta_tag: Self::html_has_generator_tag(&html),
+            script_or_link_tags_mention_wp_content: Self::does_script_or_link_tags_mention_string(
+                &html,
+                "wp_content",
+            ),
+            script_or_link_tags_mention_wp_includes: Self::does_script_or_link_tags_mention_string(
+                &html,
+                "wp-includes",
+            ),
+        }
+    }
+
+    fn html_has_generator_tag(html: &Html) -> bool {
+        let meta_selector =
+            Selector::parse(Self::SELECTOR_META).expect("'meta' is a valid selector");
+        html.select(&meta_selector).any(|e| {
+            e.value().attr(Self::HTML_ATTR_NAME) == Some(Self::META_TAG_GENERATOR)
+                && e.value()
+                    .attr(Self::HTML_ATTR_CONTENT)
+                    .unwrap_or_default()
+                    .contains(Self::META_TAG_GENERATOR_CONTENT_INCLUDES)
+        })
+    }
+
+    fn does_script_or_link_tags_mention_string(html: &Html, string_to_search: &str) -> bool {
+        html.html().contains(string_to_search)
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -92,6 +92,5 @@ async fn test_is_wordpress_site(#[case] site_url: &str) {
         .get_attempt(&AutoDiscoveryAttemptType::UserInput)
         .unwrap();
     dbg!(&original_attempt_result.fetch_wp_json_result);
-    dbg!(&original_attempt_result.page_has_generator_meta_tag_result);
-    dbg!(&original_attempt_result.page_has_wp_references);
+    dbg!(&original_attempt_result.parse_html_result);
 }
