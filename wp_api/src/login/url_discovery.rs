@@ -233,10 +233,10 @@ pub struct RootWpJson {
 pub struct IsWordPressSiteParseHtmlResult {
     /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
     has_wordpress_generator_meta_tag: bool,
-    /// Whether the HTML script or link tags mention `wp-content`
-    script_or_link_tags_mention_wp_content: bool,
-    /// Whether the HTML script or link tags mention `wp-includes`
-    script_or_link_tags_mention_wp_includes: bool,
+    /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
+    mentions_wp_content: bool,
+    /// Whether the HTML `link`, `script`, `style` tags mention `wp-includes`
+    mentions_wp_includes: bool,
 }
 
 impl IsWordPressSiteParseHtmlResult {
@@ -245,19 +245,41 @@ impl IsWordPressSiteParseHtmlResult {
     const META_TAG_GENERATOR: &str = "generator";
     const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
     const SELECTOR_META: &str = "meta";
+    const SELECTOR_LINK: &str = "link";
+    const SELECTOR_SCRIPT: &str = "script";
+    const SELECTOR_STYLE: &str = "style";
+    const WP_CONTENT: &str = "wp-content";
+    const WP_INCLUDES: &str = "wp-includes";
 
     pub fn parse_response(response_body: &str) -> Self {
         let html = Html::parse_document(response_body);
+
+        // Search for the mention of `wp-content` and `wp-includes` in `link`, `script` & `style`
+        // tags
+        let link_selector =
+            Selector::parse(Self::SELECTOR_LINK).expect("'link' is a valid selector");
+        let script_selector =
+            Selector::parse(Self::SELECTOR_SCRIPT).expect("'script' is a valid selector");
+        let style_selector =
+            Selector::parse(Self::SELECTOR_STYLE).expect("'style' is a valid selector");
+        let (mentions_wp_content, mentions_wp_includes) = html
+            .select(&link_selector)
+            .chain(html.select(&script_selector))
+            .chain(html.select(&style_selector))
+            .fold(
+                (false, false),
+                |(check_wp_content, check_wp_includes), e| {
+                    (
+                        check_wp_content || e.html().contains(Self::WP_CONTENT),
+                        check_wp_includes || e.html().contains(Self::WP_INCLUDES),
+                    )
+                },
+            );
+
         Self {
             has_wordpress_generator_meta_tag: Self::html_has_generator_tag(&html),
-            script_or_link_tags_mention_wp_content: Self::does_script_or_link_tags_mention_string(
-                &html,
-                "wp_content",
-            ),
-            script_or_link_tags_mention_wp_includes: Self::does_script_or_link_tags_mention_string(
-                &html,
-                "wp-includes",
-            ),
+            mentions_wp_content,
+            mentions_wp_includes,
         }
     }
 
@@ -271,10 +293,6 @@ impl IsWordPressSiteParseHtmlResult {
                     .unwrap_or_default()
                     .contains(Self::META_TAG_GENERATOR_CONTENT_INCLUDES)
         })
-    }
-
-    fn does_script_or_link_tags_mention_string(html: &Html, string_to_search: &str) -> bool {
-        html.html().contains(string_to_search)
     }
 }
 
