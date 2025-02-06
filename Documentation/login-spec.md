@@ -239,3 +239,25 @@ Expected Signals:
 Behavior:
 1. The system MUST follow the custom REST API path
 2. The system MUST complete login successfully
+
+# 15: Rate Limited Access
+
+Requirements:
+1. The site MUST be a WordPress Installation.
+2. The site MUST use SSL.
+3. The site MUST implement rate limiting.
+4. The rate limiting response MUST include a valid `Retry-After` header.
+
+Expected Signals:
+1. One or more requests during the login process MUST receive a 429 status code
+2. The 429 response MUST contain a valid `Retry-After` header with either:
+   - A positive integer number of seconds to wait
+   - An HTTP date after which to retry
+
+Behavior:
+1. The system MUST pause the login process when receiving a 429
+2. The system MUST respect the `Retry-After` header value
+3. The system MUST automatically retry after the specified delay
+4. The system MUST complete login successfully after rate limiting expires
+
+Reference Implementation: https://rate-limited.wpmt.co // TODO: Build this test site
