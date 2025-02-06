@@ -304,4 +304,12 @@ mod tests {
 
         assert_eq!(body_map.get("all").unwrap(), "true");
     }
+
+    #[test]
+    fn plugin_directory_single_plugin_case_1() {
+        let json_string =
+            include_str!("../../tests/plugin-directory/plugin_update_check_case_1.json");
+        let parsed = serde_json::from_str::<UpdateCheckResponse>(json_string);
+        assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+    }
 }

@@ -6,6 +6,7 @@ use wp_api::wordpress_org::{
     },
     plugin_directory::PluginInformation,
 };
+
 use wp_api_integration_tests::AsyncWpNetworking;
 
 const FETCH_PLUGIN_INFORMATION_RETRY_COUNT: usize = 5;

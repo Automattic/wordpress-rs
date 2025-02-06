@@ -107,9 +107,9 @@ pub struct Screenshot {
 
 #[derive(Deserialize, Debug, Eq, PartialEq, Default, uniffi::Record)]
 pub struct Banners {
-    #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(deserialize_with = "deserialize_default_values", alias = "1x")]
     pub low: String,
-    #[serde(deserialize_with = "deserialize_default_values")]
+    #[serde(deserialize_with = "deserialize_default_values", alias = "2x")]
     pub high: String,
 }
 
@@ -322,6 +322,14 @@ mod tests {
     fn test_plugin_query_result() {
         let json_string = include_str!("../../tests/plugin-directory/plugin-query-result.json");
         let parsed = serde_json::from_str::<QueryPluginResponse>(json_string);
+        assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+    }
+
+    #[test]
+    fn plugin_directory_single_plugin_case_1() {
+        let json_string =
+            include_str!("../../tests/plugin-directory/plugin_directory_single_plugin_case_1.json");
+        let parsed = serde_json::from_str::<PluginInformation>(json_string);
         assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
     }
 }

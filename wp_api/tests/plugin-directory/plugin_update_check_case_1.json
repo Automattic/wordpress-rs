@@ -1,0 +1,83 @@
+{
+  "plugins": {
+    "akismet\/akismet.php": {
+      "id": "w.org\/plugins\/akismet",
+      "slug": "akismet",
+      "plugin": "akismet\/akismet.php",
+      "new_version": "5.3.6",
+      "url": "https:\/\/wordpress.org\/plugins\/akismet\/",
+      "package": "https:\/\/downloads.wordpress.org\/plugin\/akismet.5.3.6.zip",
+      "icons": {
+        "2x": "https:\/\/ps.w.org\/akismet\/assets\/icon-256x256.png?rev=2818463",
+        "1x": "https:\/\/ps.w.org\/akismet\/assets\/icon-128x128.png?rev=2818463"
+      },
+      "banners": {
+        "2x": "https:\/\/ps.w.org\/akismet\/assets\/banner-1544x500.png?rev=2900731",
+        "1x": "https:\/\/ps.w.org\/akismet\/assets\/banner-772x250.png?rev=2900731"
+      },
+      "banners_rtl": [],
+      "requires": "5.8",
+      "tested": "6.7.1",
+      "requires_php": "5.6.20",
+      "requires_plugins": [],
+      "compatibility": []
+    }
+  },
+  "translations": [],
+  "no_update": {
+    "classic-editor\/classic-editor.php": {
+      "id": "w.org\/plugins\/classic-editor",
+      "slug": "classic-editor",
+      "plugin": "classic-editor\/classic-editor.php",
+      "new_version": "1.6.7",
+      "url": "https:\/\/wordpress.org\/plugins\/classic-editor\/",
+      "package": "https:\/\/downloads.wordpress.org\/plugin\/classic-editor.1.6.7.zip",
+      "icons": {
+        "2x": "https:\/\/ps.w.org\/classic-editor\/assets\/icon-256x256.png?rev=1998671",
+        "1x": "https:\/\/ps.w.org\/classic-editor\/assets\/icon-128x128.png?rev=1998671"
+      },
+      "banners": {
+        "2x": "https:\/\/ps.w.org\/classic-editor\/assets\/banner-1544x500.png?rev=1998671",
+        "1x": "https:\/\/ps.w.org\/classic-editor\/assets\/banner-772x250.png?rev=1998676"
+      },
+      "banners_rtl": [],
+      "requires": "4.9"
+    },
+    "hello.php": {
+      "id": "w.org\/plugins\/hello-dolly",
+      "slug": "hello-dolly",
+      "plugin": "hello.php",
+      "new_version": "1.7.2",
+      "url": "https:\/\/wordpress.org\/plugins\/hello-dolly\/",
+      "package": "https:\/\/downloads.wordpress.org\/plugin\/hello-dolly.1.7.3.zip",
+      "icons": {
+        "2x": "https:\/\/ps.w.org\/hello-dolly\/assets\/icon-256x256.jpg?rev=2052855",
+        "1x": "https:\/\/ps.w.org\/hello-dolly\/assets\/icon-128x128.jpg?rev=2052855"
+      },
+      "banners": {
+        "2x": "https:\/\/ps.w.org\/hello-dolly\/assets\/banner-1544x500.jpg?rev=2645582",
+        "1x": "https:\/\/ps.w.org\/hello-dolly\/assets\/banner-772x250.jpg?rev=2052855"
+      },
+      "banners_rtl": [],
+      "requires": "4.6"
+    },
+    "hello-dolly\/hello.php": {
+      "id": "w.org\/plugins\/hello-dolly",
+      "slug": "hello-dolly",
+      "plugin": "hello-dolly\/hello.php",
+      "new_version": "1.7.2",
+      "url": "https:\/\/wordpress.org\/plugins\/hello-dolly\/",
+      "package": "https:\/\/downloads.wordpress.org\/plugin\/hello-dolly.1.7.3.zip",
+      "icons": {
+        "2x": "https:\/\/ps.w.org\/hello-dolly\/assets\/icon-256x256.jpg?rev=2052855",
+        "1x": "https:\/\/ps.w.org\/hello-dolly\/assets\/icon-128x128.jpg?rev=2052855"
+      },
+      "banners": {
+        "2x": "https:\/\/ps.w.org\/hello-dolly\/assets\/banner-1544x500.jpg?rev=2645582",
+        "1x": "https:\/\/ps.w.org\/hello-dolly\/assets\/banner-772x250.jpg?rev=2052855"
+      },
+      "banners_rtl": [],
+      "requires": "4.6"
+    }
+  }
+}
