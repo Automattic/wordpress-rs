@@ -1,5 +1,8 @@
 use crate::{
-    request::{endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
+    api_error::RequestExecutionErrorReason,
+    request::{
+        endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect,
+    },
     wordpress_org::update_check::UpdateCheckRequest,
     ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
@@ -167,13 +170,15 @@ pub enum WordPressOrgApiClientError {
     #[error("Failed to encode request. Reason: {}", reason)]
     RequestEncodingError { reason: String },
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        redirects: Option<Vec<WpRedirect>>,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
     ResponseParsingError { reason: String, response: String },
@@ -190,9 +195,11 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
         match e {
             RequestExecutionError::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             } => WordPressOrgApiClientError::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             },
         }

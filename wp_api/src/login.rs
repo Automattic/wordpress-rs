@@ -4,16 +4,13 @@ use std::str;
 use std::sync::Arc;
 use wp_serde_helper::deserialize_i64_or_string;
 
-pub use login_client::WpLoginClient;
-pub use url_discovery::{UrlDiscoveryError, UrlDiscoveryState, UrlDiscoverySuccess};
-
 use crate::ParsedUrl;
 use crate::WpUuid;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
-mod login_client;
-mod url_discovery;
+pub mod login_client;
+pub mod url_discovery;
 
 #[derive(Debug, uniffi::Record)]
 pub struct WpRestApiUrls {
@@ -47,7 +44,7 @@ pub fn extract_login_details_from_url(
     })
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Object)]
 pub struct WpApiDetails {
     pub name: String,
     pub description: String,
@@ -70,12 +67,12 @@ impl WpApiDetails {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct WpRestApiAuthenticationScheme {
     pub endpoints: WpRestApiAuthenticationEndpoint,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct WpRestApiAuthenticationEndpoint {
     pub authorization: String,
 }

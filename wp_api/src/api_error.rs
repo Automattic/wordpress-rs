@@ -1,6 +1,9 @@
+use crate::{
+    request::{request_or_response_body_as_string, WpRedirect},
+    ssl::SSLCertificateInfo,
+};
 use serde::Deserialize;
-
-use crate::request::request_or_response_body_as_string;
+use std::sync::Arc;
 
 pub trait ParsedRequestError
 where
@@ -15,13 +18,15 @@ pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]
     InvalidHttpStatusCode { status_code: u16 },
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        redirects: Option<Vec<WpRedirect>>,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
     MediaFileNotFound { file_path: String },
@@ -416,29 +421,54 @@ pub enum WpErrorCode {
     CustomError(String),
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        redirects: Option<Vec<WpRedirect>>,
+        reason: RequestExecutionErrorReason,
     },
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum RequestExecutionErrorReason {
+    // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
+    InvalidSslError {
+        // The SSL certificate for the site we're trying to contact
+        site_certificate: Option<Arc<SSLCertificateInfo>>,
+
+        // Any other certificates in the trust chain
+        certificate_chain: Vec<Arc<SSLCertificateInfo>>,
+
+        // The error message provided by the HTTP stack
+        error_message: Option<String>,
+
+        // Any suggested action provided by the HTTP stack
+        suggested_action: Option<String>,
+    },
+    GenericError {
+        error_message: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum MediaUploadRequestExecutionError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
         status_code,
+        redirects,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        redirects: Option<Vec<WpRedirect>>,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Media file not found at file path: {}", file_path)]
     MediaFileNotFound { file_path: String },
@@ -449,9 +479,11 @@ impl From<RequestExecutionError> for WpApiError {
         match value {
             RequestExecutionError::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             } => Self::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             },
         }
@@ -463,9 +495,11 @@ impl From<MediaUploadRequestExecutionError> for WpApiError {
         match value {
             MediaUploadRequestExecutionError::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             } => Self::RequestExecutionFailed {
                 status_code,
+                redirects,
                 reason,
             },
             MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {

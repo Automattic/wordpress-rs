@@ -1,8 +1,8 @@
 use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
-use wp_api::login::WpLoginClient;
-use wp_api_integration_tests::{AssertResponse, AsyncWpNetworking};
+use wp_api::login::login_client::WpLoginClient;
+use wp_api_integration_tests::AsyncWpNetworking;
 
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
 const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
@@ -50,16 +50,27 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
     "https://jetpack.wpmt.co",
     "https://jetpack.wpmt.co/wp-admin/authorize-application.php"
 )]
+#[case(
+    "http://wordpress-1315525-4803651.cloudwaysapps.com",
+    "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+)]
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
-    let url_discovery = client
-        .api_discovery(site_url.to_string())
-        .await
-        .assert_response();
+    let result = client.api_discovery(site_url.to_string()).await;
+    assert!(
+        result.is_successful(),
+        "Auto discovery failed: {:#?}",
+        result
+    );
     assert_eq!(
-        url_discovery
+        result
+            .find_successful()
+            .expect("Already verified that auto discovery is successful")
+            .result
+            .clone()
+            .expect("Already verified that auto discovery is successful")
             .api_details
             .find_application_passwords_authentication_url(),
         Some(expected_auth_url.to_string())

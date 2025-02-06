@@ -2,8 +2,8 @@
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{
-    MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError, WpApiError,
-    WpError, WpErrorCode,
+    MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,
+    RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
@@ -16,6 +16,7 @@ pub use uuid::{WpUuid, WpUuidParseError};
 mod api_client; // re-exported relevant types
 mod api_error; // re-exported relevant types
 mod parsed_url; // re-exported relevant types
+mod ssl; // re-exported relevant types
 mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
