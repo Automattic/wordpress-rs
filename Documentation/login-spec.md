@@ -226,3 +226,37 @@ Outcome:
 1. Login is successful.
 
 // TODO: Build a test site for this
+
+# 13: Site with Basic Authentication
+
+Conditions:
+1. WordPress Installation with Basic Authentication enabled (via .htaccess or other mechanism)
+2. The site has a valid SSL certificate
+3. User needs to pass Basic Auth before accessing WordPress
+
+Signals:
+1. Initial request receives a 401 status code
+2. After providing Basic Auth credentials:
+   - The `Link` header is present
+   - The `authorization_url` is present in the JSON API root
+
+Outcome:
+1. App should prompt for Basic Auth credentials
+2. After providing correct credentials, login is successful
+
+// TODO: Build a test site for this
+
+# 14: Site with Custom REST API Prefix
+
+Conditions:
+1. WordPress Installation where the REST API prefix has been changed from wp-json
+2. The site has a valid SSL certificate
+
+Signals:
+1. The `Link` header points to a non-standard REST API path
+2. The `<link>` tag in HTML also reflects this custom path
+
+Outcome:
+1. Login should succeed by following the custom REST API path
+
+// TODO: Build a test site for this
