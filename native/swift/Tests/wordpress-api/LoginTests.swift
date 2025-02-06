@@ -72,7 +72,7 @@ class LoginTests {
             _ = try await client.loginURL(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
         }, throws: { error in
             debugPrint(error)
-            true // TODO: It'd be nice to get more details about this error
+            return true // TODO: It'd be nice to get more details about this error
         })
     }
 
