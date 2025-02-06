@@ -287,12 +287,13 @@ pub struct IsWordPressSiteParseHtmlResult {
 impl IsWordPressSiteParseHtmlResult {
     const HTML_ATTR_NAME: &str = "name";
     const HTML_ATTR_CONTENT: &str = "content";
+    const HTML_ATTR_HREF: &str = "href";
+    const HTML_ATTR_SRC: &str = "src";
     const META_TAG_GENERATOR: &str = "generator";
     const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
     const SELECTOR_META: &str = "meta";
     const SELECTOR_LINK: &str = "link";
     const SELECTOR_SCRIPT: &str = "script";
-    const SELECTOR_STYLE: &str = "style";
     const WP_CONTENT: &str = "wp-content";
     const WP_INCLUDES: &str = "wp-includes";
 
@@ -305,18 +306,19 @@ impl IsWordPressSiteParseHtmlResult {
             Selector::parse(Self::SELECTOR_LINK).expect("'link' is a valid selector");
         let script_selector =
             Selector::parse(Self::SELECTOR_SCRIPT).expect("'script' is a valid selector");
-        let style_selector =
-            Selector::parse(Self::SELECTOR_STYLE).expect("'style' is a valid selector");
         let (mentions_wp_content, mentions_wp_includes) = html
             .select(&link_selector)
-            .chain(html.select(&script_selector))
-            .chain(html.select(&style_selector))
+            .flat_map(|e| e.attr(Self::HTML_ATTR_HREF))
+            .chain(
+                html.select(&script_selector)
+                    .flat_map(|e| e.attr(Self::HTML_ATTR_SRC)),
+            )
             .fold(
                 (false, false),
                 |(check_wp_content, check_wp_includes), e| {
                     (
-                        check_wp_content || e.html().contains(Self::WP_CONTENT),
-                        check_wp_includes || e.html().contains(Self::WP_INCLUDES),
+                        check_wp_content || e.contains(Self::WP_CONTENT),
+                        check_wp_includes || e.contains(Self::WP_INCLUDES),
                     )
                 },
             );

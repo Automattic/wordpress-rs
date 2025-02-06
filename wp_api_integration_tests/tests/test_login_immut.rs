@@ -93,7 +93,8 @@ async fn test_is_wordpress_site(#[case] site_url: &str) {
         successful_attempt.parse_html_result,
         Ok(IsWordPressSiteParseHtmlResult {
             has_wordpress_generator_meta_tag: true,
-            mentions_wp_content: true,
+            // `wp-content` is not mentioned in relevant `http://localhost` HTML source tags
+            mentions_wp_content: false,
             mentions_wp_includes: true
         })
     );
