@@ -164,6 +164,8 @@ Behavior:
 1. The system MUST reject the login attempt
 2. The system MUST display the error: "Unable to login to `${DOMAIN}`. Please double-check that this is a WordPress site"
 
+Reference Implementation: https://google.com
+
 # 10: WordPress in Subdirectory with Link Header
 
 Requirements:
@@ -261,3 +263,19 @@ Behavior:
 4. The system MUST complete login successfully after rate limiting expires
 
 Reference Implementation: https://rate-limited.wpmt.co // TODO: Build this test site
+
+# 16: Non-Existent Website
+
+Requirements:
+1. The domain MUST NOT resolve to a valid IP address.
+
+Expected Signals:
+1. HTTP stack emits a failure notice
+2. Network connection MUST fail with either:
+   - DNS resolution error
+   - Connection timeout
+   - Connection refused
+
+Behavior:
+1. The system MUST reject the login attempt
+2. The system MUST display the error: "Unable to connect to `${DOMAIN}`. Please check that the website address is correct"
