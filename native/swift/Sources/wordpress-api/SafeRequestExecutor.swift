@@ -117,8 +117,13 @@ final class WpRequestExecutor: SafeRequestExecutor {
         let nserror = error as NSError
         let info = nserror.userInfo
 
-        return try parseCertificateChain(info["NSErrorPeerCertificateChainKey"] as! NSArray)
-            .compactMap { parseCertificate(data: $0) }
+        guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? NSArray else {
+            return []
+        }
+
+        return try parseCertificateChain(certChainArray).compactMap { data in
+            parseCertificate(data: data)
+        }
     }
 
     private func parseCertificateChain(_ chain: NSArray) throws -> [Data] {
