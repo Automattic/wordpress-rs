@@ -274,14 +274,14 @@ pub struct RootWpJson {
     pub namespaces: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IsWordPressSiteParseHtmlResult {
     /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
-    has_wordpress_generator_meta_tag: bool,
+    pub has_wordpress_generator_meta_tag: bool,
     /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
-    mentions_wp_content: bool,
+    pub mentions_wp_content: bool,
     /// Whether the HTML `link`, `script`, `style` tags mention `wp-includes`
-    mentions_wp_includes: bool,
+    pub mentions_wp_includes: bool,
 }
 
 impl IsWordPressSiteParseHtmlResult {
@@ -370,7 +370,7 @@ pub enum FetchWpJsonFailure {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseHtmlFailure {
     ParseSiteUrl { error: ParseUrlError },
     FetchSite { error: RequestExecutionError },
