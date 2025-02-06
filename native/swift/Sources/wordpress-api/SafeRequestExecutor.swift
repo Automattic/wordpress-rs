@@ -72,6 +72,21 @@ final class WpRequestExecutor: SafeRequestExecutor {
                    abort() // TODO
                }
 
+               if peerCertificateChain.isEmpty {
+                   return .failure(
+                    .RequestExecutionFailed(
+                        statusCode: nil,
+                        redirects: redirectTracker.redirects(for: request.requestId()),
+                        reason: .invalidSslError(
+                            siteCertificate: nil,
+                            certificateChain: [],
+                            errorMessage: error.localizedDescription,
+                            suggestedAction: (error as NSError).localizedRecoverySuggestion
+                        )
+                    )
+                   )
+               }
+
                let siteCertificate = peerCertificateChain.remove(at: 0)
 
                return .failure(
