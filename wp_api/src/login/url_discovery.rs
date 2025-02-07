@@ -216,6 +216,10 @@ pub struct RootWpJson {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IsWordPressSiteParseHtmlResult {
+    /// `href` attribute of a link tag if it has `rel` attribute of "https://api.w.org/".
+    /// For example:
+    /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
+    pub api_root_url_from_link_tag: Option<ParsedUrl>,
     /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
     pub has_wordpress_generator_meta_tag: bool,
     /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
@@ -228,6 +232,7 @@ impl IsWordPressSiteParseHtmlResult {
     const HTML_ATTR_NAME: &str = "name";
     const HTML_ATTR_CONTENT: &str = "content";
     const HTML_ATTR_HREF: &str = "href";
+    const HTML_ATTR_REL: &str = "rel";
     const HTML_ATTR_SRC: &str = "src";
     const META_TAG_GENERATOR: &str = "generator";
     const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
@@ -262,8 +267,17 @@ impl IsWordPressSiteParseHtmlResult {
                     )
                 },
             );
+        let api_root_url_from_link_tag = html.select(&link_selector).find_map(|e| {
+            if let Some(API_ROOT_LINK_HEADER) = e.attr(Self::HTML_ATTR_REL) {
+                e.attr(Self::HTML_ATTR_HREF)
+                    .and_then(|u| ParsedUrl::parse(u).ok())
+            } else {
+                None
+            }
+        });
 
         Self {
+            api_root_url_from_link_tag,
             has_wordpress_generator_meta_tag: Self::html_has_generator_tag(&html),
             mentions_wp_content,
             mentions_wp_includes,

@@ -67,12 +67,20 @@ impl WpLoginClient {
         attempt: AutoDiscoveryAttempt,
     ) -> AutoDiscoveryAttemptResult {
         let attempt_site_url = attempt.attempt_site_url.as_str();
+        let parse_html_result = self
+            .fetch_site(attempt_site_url)
+            .await
+            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
         let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
         let discovery_result = self
-            .inner_attempt_api_discovery(attempt_site_url, api_link_header_result.clone())
+            .inner_attempt_api_discovery(
+                attempt_site_url,
+                api_link_header_result.clone(),
+                parse_html_result.clone(),
+            )
             .await;
         let is_wordpress_site = self
-            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result)
+            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result, parse_html_result)
             .await;
         AutoDiscoveryAttemptResult {
             attempt_type: attempt.attempt_type,
@@ -86,6 +94,7 @@ impl WpLoginClient {
         &self,
         attempt_site_url: &str,
         api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
+        parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
     ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
         let api_root_url_success = api_link_header_result?;
         let fetch_api_details_response = match self
@@ -124,12 +133,9 @@ impl WpLoginClient {
         &self,
         attempt_site_url: &str,
         api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
+        parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
     ) -> IsWordPressSiteAttemptResult {
         let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
-        let parse_html_result = self
-            .fetch_site(attempt_site_url)
-            .await
-            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
         IsWordPressSiteAttemptResult {
             api_link_header_result,
             fetch_wp_json_result,
