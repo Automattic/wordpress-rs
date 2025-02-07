@@ -464,6 +464,7 @@ pub enum AutoDiscoveryAttemptType {
     UserInput,
     AutoHttps,
     AutoRemoveWpAdminSuffix,
+    AutoRemoveWpLoginSuffix,
 }
 
 impl AutoDiscoveryAttemptType {
@@ -491,6 +492,16 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
         attempts.push(AutoDiscoveryAttempt::new(
             a,
             AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
+        ))
+    }
+    if let Some(a) = input_site_url
+        .strip_suffix("wp-login")
+        .or_else(|| input_site_url.strip_suffix("wp-login/"))
+        .or_else(|| input_site_url.strip_suffix("wp-login.php"))
+    {
+        attempts.push(AutoDiscoveryAttempt::new(
+            a,
+            AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix,
         ))
     }
     attempts
@@ -536,6 +547,9 @@ mod tests {
     #[case("http://localhost/wp-admin.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
     #[case("http://localhost/wp-admin", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
     #[case("http://localhost/wp-admin/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
+    #[case("http://localhost/wp-login.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-login.php", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix)])]
+    #[case("http://localhost/wp-login", vec![AutoDiscoveryAttempt::new("http://localhost/wp-login", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix)])]
+    #[case("http://localhost/wp-login/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-login/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix)])]
     #[case("orchestremetropolitain.com/wp-json", vec![AutoDiscoveryAttempt::new("orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("https://orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::AutoHttps)])]
     #[case("https://orchestremetropolitain.com", vec![AutoDiscoveryAttempt::new("https://orchestremetropolitain.com", AutoDiscoveryAttemptType::UserInput)])]
     #[case(
