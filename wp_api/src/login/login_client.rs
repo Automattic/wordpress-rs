@@ -2,16 +2,19 @@ use super::{
     url_discovery::{
         self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, ParseApiRootUrlError,
+        FetchWpJsonFailure, FetchWpJsonSuccess, FindApiRootLinkHeaderFailure,
+        FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult, IsWordPressSiteParseHtmlResult,
+        IsWordPressSiteResult, IsWordPressSiteUniffiResult, ParseApiRootUrlError, ParseHtmlFailure,
     },
     WpApiDetails,
 };
 use crate::{
+    login::url_discovery::RootWpJson,
     request::{
         endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse,
     },
-    ParsedUrl, RequestExecutionError,
+    ParseUrlError, ParsedUrl, RequestExecutionError,
 };
 use std::{str, sync::Arc};
 use uuid::Uuid;
@@ -35,6 +38,13 @@ impl UniffiWpLoginClient {
     async fn api_discovery(&self, site_url: String) -> AutoDiscoveryUniffiResult {
         self.inner.api_discovery(site_url).await.into()
     }
+
+    async fn is_wordpress_site_discovery(&self, site_url: String) -> IsWordPressSiteUniffiResult {
+        self.inner
+            .is_wordpress_site_discovery(site_url)
+            .await
+            .into()
+    }
 }
 
 #[derive(Debug)]
@@ -55,6 +65,18 @@ impl WpLoginClient {
         )
         .await;
         AutoDiscoveryResult {
+            attempts: attempts.into_iter().map(|r| (r.attempt_type, r)).collect(),
+        }
+    }
+
+    pub async fn is_wordpress_site_discovery(&self, site_url: String) -> IsWordPressSiteResult {
+        let attempts = futures::future::join_all(
+            url_discovery::construct_attempts(site_url)
+                .into_iter()
+                .map(|attempt| async { self.attempt_is_wordpress_site(attempt).await }),
+        )
+        .await;
+        IsWordPressSiteResult {
             attempts: attempts.into_iter().map(|r| (r.attempt_type, r)).collect(),
         }
     }
@@ -108,6 +130,25 @@ impl WpLoginClient {
             api_root_url: api_root_url_success.api_root_url,
             api_details,
         })
+    }
+
+    async fn attempt_is_wordpress_site(
+        &self,
+        attempt: AutoDiscoveryAttempt,
+    ) -> IsWordPressSiteAttemptResult {
+        let attempt_site_url = attempt.attempt_site_url.as_str();
+        let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
+        let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
+        let parse_html_result = self
+            .fetch_site(attempt_site_url)
+            .await
+            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
+        IsWordPressSiteAttemptResult {
+            attempt_type: attempt.attempt_type,
+            api_link_header_result,
+            fetch_wp_json_result,
+            parse_html_result,
+        }
     }
 
     async fn find_api_root_url(
@@ -191,5 +232,73 @@ impl WpLoginClient {
                 .into(),
             )
             .await
+    }
+
+    async fn fetch_wp_json(
+        &self,
+        attempt_site_url: &str,
+    ) -> Result<FetchWpJsonSuccess, FetchWpJsonFailure> {
+        let wp_json_url = {
+            let mut wp_json_url = ParsedUrl::parse(attempt_site_url)
+                .map_err(|error| FetchWpJsonFailure::ParseSiteUrl { error })?;
+            wp_json_url
+                .inner
+                .path_segments_mut()
+                .map_err(|_| FetchWpJsonFailure::ParseSiteUrl {
+                    error: ParseUrlError::RelativeUrlWithCannotBeABaseBase,
+                })?
+                .push("wp-json");
+            wp_json_url
+        };
+        let fetch_wp_json_response = match self
+            .request_executor
+            .execute(
+                WpNetworkRequest {
+                    uuid: Uuid::new_v4().into(),
+                    method: RequestMethod::GET,
+                    url: WpEndpointUrl(wp_json_url.url()),
+                    header_map: WpNetworkHeaderMap::default().into(),
+                    body: None,
+                }
+                .into(),
+            )
+            .await
+        {
+            Ok(r) => r,
+            Err(error) => {
+                return Err(FetchWpJsonFailure::FetchWpJson { wp_json_url, error });
+            }
+        };
+
+        let root_wp_json = match serde_json::from_slice::<RootWpJson>(&fetch_wp_json_response.body)
+        {
+            Ok(r) => r,
+            Err(error) => return Err(FetchWpJsonFailure::ParseWpJson { wp_json_url }),
+        };
+        Ok(FetchWpJsonSuccess {
+            wp_json_url,
+            root_wp_json,
+        })
+    }
+
+    async fn fetch_site(
+        &self,
+        attempt_site_url: &str,
+    ) -> Result<WpNetworkResponse, ParseHtmlFailure> {
+        let site_url = ParsedUrl::parse(attempt_site_url)
+            .map_err(|error| ParseHtmlFailure::ParseSiteUrl { error })?;
+        self.request_executor
+            .execute(
+                WpNetworkRequest {
+                    uuid: Uuid::new_v4().into(),
+                    method: RequestMethod::GET,
+                    url: WpEndpointUrl(site_url.url()),
+                    header_map: WpNetworkHeaderMap::default().into(),
+                    body: None,
+                }
+                .into(),
+            )
+            .await
+            .map_err(|error| ParseHtmlFailure::FetchSite { error })
     }
 }

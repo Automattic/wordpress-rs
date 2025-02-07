@@ -1,5 +1,7 @@
 use super::WpApiDetails;
 use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
+use scraper::{Html, Selector};
+use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
 const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
@@ -165,10 +167,180 @@ impl AutoDiscoveryAttemptResult {
     }
 }
 
+#[derive(Debug, uniffi::Record)]
+pub struct IsWordPressSiteUniffiResult {
+    pub user_input_attempt: Arc<IsWordPressSiteAttemptResult>,
+    pub successful_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
+    pub auto_https_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
+    pub auto_dot_php_extension_for_wp_admin_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
+}
+
+#[derive(Debug)]
+pub struct IsWordPressSiteResult {
+    pub attempts: HashMap<AutoDiscoveryAttemptType, IsWordPressSiteAttemptResult>,
+}
+
+impl From<IsWordPressSiteResult> for IsWordPressSiteUniffiResult {
+    fn from(value: IsWordPressSiteResult) -> Self {
+        let get_attempt_result = |attempt_type| {
+            value
+                .get_attempt(&attempt_type)
+                .map(|a| Arc::new(a.clone()))
+        };
+        Self {
+            user_input_attempt: Arc::new(value.user_input_attempt().clone()),
+            successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
+            auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
+            auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
+                AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+            ),
+        }
+    }
+}
+
+impl IsWordPressSiteResult {
+    pub fn is_successful(&self) -> bool {
+        self.attempts
+            .iter()
+            .any(|(_, result)| result.is_successful())
+    }
+
+    pub fn user_input_attempt(&self) -> &IsWordPressSiteAttemptResult {
+        self.get_attempt(&AutoDiscoveryAttemptType::UserInput)
+            .expect("User input url is always attempted")
+    }
+
+    pub fn get_attempt(
+        &self,
+        attempt_type: &AutoDiscoveryAttemptType,
+    ) -> Option<&IsWordPressSiteAttemptResult> {
+        self.attempts.get(attempt_type)
+    }
+
+    pub fn find_successful(&self) -> Option<&IsWordPressSiteAttemptResult> {
+        // If the user attempt is successful, prefer it over other attempts
+        let user_input_attempt = self.user_input_attempt();
+        if user_input_attempt.is_successful() {
+            return Some(user_input_attempt);
+        }
+        self.attempts.iter().find_map(|(_, result)| {
+            if result.is_successful() {
+                Some(result)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Object)]
+pub struct IsWordPressSiteAttemptResult {
+    pub attempt_type: AutoDiscoveryAttemptType,
+    pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
+    pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
+    pub parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
+}
+
+impl IsWordPressSiteAttemptResult {
+    fn is_successful(&self) -> bool {
+        self.api_link_header_result.is_ok()
+            || self.fetch_wp_json_result.is_ok()
+            || self
+                .parse_html_result
+                .as_ref()
+                .map(|r| {
+                    r.has_wordpress_generator_meta_tag
+                        || r.mentions_wp_content
+                        || r.mentions_wp_includes
+                })
+                .unwrap_or(false)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FindApiRootLinkHeaderSuccess {
     pub parsed_site_url: ParsedUrl,
     pub api_root_url: ParsedUrl,
+}
+
+#[derive(Debug, Clone)]
+pub struct FetchWpJsonSuccess {
+    pub wp_json_url: ParsedUrl,
+    pub root_wp_json: RootWpJson,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RootWpJson {
+    pub namespaces: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct IsWordPressSiteParseHtmlResult {
+    /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
+    pub has_wordpress_generator_meta_tag: bool,
+    /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
+    pub mentions_wp_content: bool,
+    /// Whether the HTML `link`, `script`, `style` tags mention `wp-includes`
+    pub mentions_wp_includes: bool,
+}
+
+impl IsWordPressSiteParseHtmlResult {
+    const HTML_ATTR_NAME: &str = "name";
+    const HTML_ATTR_CONTENT: &str = "content";
+    const HTML_ATTR_HREF: &str = "href";
+    const HTML_ATTR_SRC: &str = "src";
+    const META_TAG_GENERATOR: &str = "generator";
+    const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
+    const SELECTOR_META: &str = "meta";
+    const SELECTOR_LINK: &str = "link";
+    const SELECTOR_SCRIPT: &str = "script";
+    const WP_CONTENT: &str = "wp-content";
+    const WP_INCLUDES: &str = "wp-includes";
+
+    pub fn parse_response(response_body: &str) -> Self {
+        let html = Html::parse_document(response_body);
+
+        // Search for the mention of `wp-content` and `wp-includes` in `link`, `script` & `style`
+        // tags
+        let link_selector =
+            Selector::parse(Self::SELECTOR_LINK).expect("'link' is a valid selector");
+        let script_selector =
+            Selector::parse(Self::SELECTOR_SCRIPT).expect("'script' is a valid selector");
+        let (mentions_wp_content, mentions_wp_includes) = html
+            .select(&link_selector)
+            .flat_map(|e| e.attr(Self::HTML_ATTR_HREF))
+            .chain(
+                html.select(&script_selector)
+                    .flat_map(|e| e.attr(Self::HTML_ATTR_SRC)),
+            )
+            .fold(
+                (false, false),
+                |(check_wp_content, check_wp_includes), e| {
+                    (
+                        check_wp_content || e.contains(Self::WP_CONTENT),
+                        check_wp_includes || e.contains(Self::WP_INCLUDES),
+                    )
+                },
+            );
+
+        Self {
+            has_wordpress_generator_meta_tag: Self::html_has_generator_tag(&html),
+            mentions_wp_content,
+            mentions_wp_includes,
+        }
+    }
+
+    fn html_has_generator_tag(html: &Html) -> bool {
+        let meta_selector =
+            Selector::parse(Self::SELECTOR_META).expect("'meta' is a valid selector");
+        html.select(&meta_selector).any(|e| {
+            e.value().attr(Self::HTML_ATTR_NAME) == Some(Self::META_TAG_GENERATOR)
+                && e.value()
+                    .attr(Self::HTML_ATTR_CONTENT)
+                    .unwrap_or_default()
+                    .contains(Self::META_TAG_GENERATOR_CONTENT_INCLUDES)
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +356,26 @@ pub enum FindApiRootLinkHeaderFailure {
         parsed_site_url: ParsedUrl,
         error: ParseApiRootUrlError,
     },
+}
+
+#[derive(Debug, Clone)]
+pub enum FetchWpJsonFailure {
+    ParseSiteUrl {
+        error: ParseUrlError,
+    },
+    FetchWpJson {
+        wp_json_url: ParsedUrl,
+        error: RequestExecutionError,
+    },
+    ParseWpJson {
+        wp_json_url: ParsedUrl,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParseHtmlFailure {
+    ParseSiteUrl { error: ParseUrlError },
+    FetchSite { error: RequestExecutionError },
 }
 
 #[derive(Debug, Clone)]
