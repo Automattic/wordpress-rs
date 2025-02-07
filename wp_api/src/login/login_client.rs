@@ -67,8 +67,13 @@ impl WpLoginClient {
         attempt: AutoDiscoveryAttempt,
     ) -> AutoDiscoveryAttemptResult {
         let attempt_site_url = attempt.attempt_site_url.as_str();
-        let discovery_result = self.inner_attempt_api_discovery(attempt_site_url).await;
-        let is_wordpress_site = self.attempt_is_wordpress_site(attempt_site_url).await;
+        let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
+        let discovery_result = self
+            .inner_attempt_api_discovery(attempt_site_url, api_link_header_result.clone())
+            .await;
+        let is_wordpress_site = self
+            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result)
+            .await;
         AutoDiscoveryAttemptResult {
             attempt_type: attempt.attempt_type,
             attempt_site_url: attempt.attempt_site_url,
@@ -80,8 +85,9 @@ impl WpLoginClient {
     async fn inner_attempt_api_discovery(
         &self,
         attempt_site_url: &str,
+        api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
-        let api_root_url_success = self.find_api_root_url(attempt_site_url).await?;
+        let api_root_url_success = api_link_header_result?;
         let fetch_api_details_response = match self
             .fetch_wp_api_details(&api_root_url_success.api_root_url)
             .await
@@ -117,8 +123,8 @@ impl WpLoginClient {
     async fn attempt_is_wordpress_site(
         &self,
         attempt_site_url: &str,
+        api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     ) -> IsWordPressSiteAttemptResult {
-        let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
         let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
         let parse_html_result = self
             .fetch_site(attempt_site_url)
