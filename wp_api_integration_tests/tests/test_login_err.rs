@@ -16,7 +16,7 @@ async fn test_login_flow_err_parse_api_details(#[case] site_url: &str) {
         .attempts
         .remove(&AutoDiscoveryAttemptType::UserInput)
         .unwrap()
-        .result
+        .api_discovery_result
         .unwrap_err();
     assert_eq!(
         original_attempt_error.has_failed_to_parse_api_details(),
@@ -37,7 +37,7 @@ async fn test_login_flow_err_network_error(#[case] site_url: &str) {
         .attempts
         .remove(&AutoDiscoveryAttemptType::UserInput)
         .unwrap()
-        .result
+        .api_discovery_result
         .unwrap_err();
     assert!(
         original_attempt_error.is_network_error(),
