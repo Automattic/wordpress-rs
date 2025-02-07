@@ -279,3 +279,24 @@ Expected Signals:
 Behavior:
 1. The system MUST reject the login attempt
 2. The system MUST display the error: "Unable to connect to `${DOMAIN}`. Please check that the website address is correct"
+
+# 17: Invalid SSL Certificate
+
+Requirements:
+1. The site MUST be a WordPress Installation
+2. The site MUST use HTTPS
+3. The site's SSL certificate MUST be invalid due to one of:
+   - Self-signed certificate
+   - Expired certificate
+   - Certificate with mismatched domain
+   - Untrusted certificate authority
+
+Expected Signals:
+1. SSL/TLS handshake MUST fail with a certificate validation error
+2. The system MUST NOT bypass certificate validation unless the domain is explicitly allowlisted.
+
+Behavior:
+1. The system MUST reject the login attempt
+2. The system MUST display the error: "Unable to establish a secure connection to `${DOMAIN}`. The site's SSL certificate is invalid or expired"
+
+Reference Implementation: https://wordpress-1315525-4803651.cloudwaysapps.com
