@@ -19,7 +19,7 @@ var package = Package(
     platforms: [
         .iOS(.v15),
         .macOS(.v11),
-        .tvOS(.v15),
+        .tvOS(.v16),
         .watchOS(.v8)
     ],
     products: [
