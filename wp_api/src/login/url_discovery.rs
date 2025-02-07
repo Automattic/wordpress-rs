@@ -87,13 +87,20 @@ impl AutoDiscoveryResult {
     ) -> Option<&AutoDiscoveryAttemptResult> {
         self.attempts.get(attempt_type)
     }
+
+    pub fn is_wordpress_site(&self) -> bool {
+        self.attempts
+            .iter()
+            .any(|(_, result)| result.is_wordpress_site.is_successful())
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Object)]
 pub struct AutoDiscoveryAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub attempt_site_url: String,
-    pub result: Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
+    pub api_discovery_result: Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
+    pub is_wordpress_site: IsWordPressSiteAttemptResult,
 }
 
 #[uniffi::export]
@@ -103,18 +110,18 @@ impl AutoDiscoveryAttemptResult {
     }
 
     fn error_message(&self) -> Option<String> {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(_) => None,
             Err(error) => Some(error.error_message()),
         }
     }
 
     fn is_successful(&self) -> bool {
-        self.result.is_ok()
+        self.api_discovery_result.is_ok()
     }
 
     fn is_network_error(&self) -> bool {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(_) => false,
             Err(error) => error.is_network_error(),
         }
@@ -125,124 +132,57 @@ impl AutoDiscoveryAttemptResult {
     }
 
     fn has_failed_to_parse_site_url(&self) -> bool {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(success) => false,
             Err(error) => error.parsed_site_url().is_none(),
         }
     }
 
     fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(success) => Some(false),
             Err(error) => error.has_failed_to_parse_api_root_url(),
         }
     }
 
     fn has_failed_to_parse_api_details(&self) -> Option<bool> {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(success) => Some(false),
             Err(error) => error.has_failed_to_parse_api_details(),
         }
     }
 
     fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(success) => Some(Arc::new(success.parsed_site_url.clone())),
             Err(error) => error.parsed_site_url().map(|p| Arc::new(p.clone())),
         }
     }
 
     fn api_root_url(&self) -> Option<Arc<ParsedUrl>> {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(success) => Some(Arc::new(success.api_root_url.clone())),
             Err(error) => error.api_root_url().map(|p| Arc::new(p.clone())),
         }
     }
 
     fn api_details(&self) -> Option<Arc<WpApiDetails>> {
-        match &self.result {
+        match &self.api_discovery_result {
             Ok(success) => Some(Arc::new(success.api_details.clone())),
             Err(_) => None,
         }
     }
 }
 
-#[derive(Debug, uniffi::Record)]
-pub struct IsWordPressSiteUniffiResult {
-    pub user_input_attempt: Arc<IsWordPressSiteAttemptResult>,
-    pub successful_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
-    pub auto_https_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
-    pub auto_dot_php_extension_for_wp_admin_attempt: Option<Arc<IsWordPressSiteAttemptResult>>,
-}
-
-#[derive(Debug)]
-pub struct IsWordPressSiteResult {
-    pub attempts: HashMap<AutoDiscoveryAttemptType, IsWordPressSiteAttemptResult>,
-}
-
-impl From<IsWordPressSiteResult> for IsWordPressSiteUniffiResult {
-    fn from(value: IsWordPressSiteResult) -> Self {
-        let get_attempt_result = |attempt_type| {
-            value
-                .get_attempt(&attempt_type)
-                .map(|a| Arc::new(a.clone()))
-        };
-        Self {
-            user_input_attempt: Arc::new(value.user_input_attempt().clone()),
-            successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
-            auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
-            auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
-                AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
-            ),
-        }
-    }
-}
-
-impl IsWordPressSiteResult {
-    pub fn is_successful(&self) -> bool {
-        self.attempts
-            .iter()
-            .any(|(_, result)| result.is_successful())
-    }
-
-    pub fn user_input_attempt(&self) -> &IsWordPressSiteAttemptResult {
-        self.get_attempt(&AutoDiscoveryAttemptType::UserInput)
-            .expect("User input url is always attempted")
-    }
-
-    pub fn get_attempt(
-        &self,
-        attempt_type: &AutoDiscoveryAttemptType,
-    ) -> Option<&IsWordPressSiteAttemptResult> {
-        self.attempts.get(attempt_type)
-    }
-
-    pub fn find_successful(&self) -> Option<&IsWordPressSiteAttemptResult> {
-        // If the user attempt is successful, prefer it over other attempts
-        let user_input_attempt = self.user_input_attempt();
-        if user_input_attempt.is_successful() {
-            return Some(user_input_attempt);
-        }
-        self.attempts.iter().find_map(|(_, result)| {
-            if result.is_successful() {
-                Some(result)
-            } else {
-                None
-            }
-        })
-    }
-}
-
 #[derive(Debug, Clone, uniffi::Object)]
 pub struct IsWordPressSiteAttemptResult {
-    pub attempt_type: AutoDiscoveryAttemptType,
     pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
     pub parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
 }
 
 impl IsWordPressSiteAttemptResult {
-    fn is_successful(&self) -> bool {
+    pub fn is_successful(&self) -> bool {
         self.api_link_header_result.is_ok()
             || self.fetch_wp_json_result.is_ok()
             || self
@@ -411,18 +351,6 @@ pub enum AutoDiscoveryAttemptFailure {
 }
 
 impl AutoDiscoveryAttemptFailure {
-    pub fn into_attempt_result(
-        self,
-        attempt_type: AutoDiscoveryAttemptType,
-        attempt_site_url: String,
-    ) -> AutoDiscoveryAttemptResult {
-        AutoDiscoveryAttemptResult {
-            attempt_type,
-            attempt_site_url,
-            result: Err(self),
-        }
-    }
-
     pub fn error_message(&self) -> String {
         match self {
             AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => error.to_string(),
