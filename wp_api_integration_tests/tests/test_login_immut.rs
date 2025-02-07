@@ -54,6 +54,10 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
     "http://wordpress-1315525-4803651.cloudwaysapps.com",
     "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
 )]
+#[case(
+    "https://aggressive-caching.wpmt.co",
+    "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php"
+)] // Returns gzip responses, may not always include Link header
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
