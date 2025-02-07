@@ -42,7 +42,7 @@ impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
             successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
             auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
             auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
-                AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+                AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
             ),
             is_successful: value.is_successful(),
         }
@@ -463,7 +463,7 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
 pub enum AutoDiscoveryAttemptType {
     UserInput,
     AutoHttps,
-    AutoDotPhpExtensionForWpAdmin,
+    AutoRemoveWpAdminSuffix,
 }
 
 impl AutoDiscoveryAttemptType {
@@ -483,18 +483,14 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
             AutoDiscoveryAttemptType::AutoHttps,
         ))
     }
-    if input_site_url.ends_with("wp-admin") {
+    if let Some(a) = input_site_url
+        .strip_suffix("wp-admin")
+        .or_else(|| input_site_url.strip_suffix("wp-admin/"))
+        .or_else(|| input_site_url.strip_suffix("wp-admin.php"))
+    {
         attempts.push(AutoDiscoveryAttempt::new(
-            format!("{}.php", input_site_url),
-            AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
-        ))
-    } else if input_site_url.ends_with("wp-admin/") {
-        let mut s = input_site_url.clone();
-        s.pop()
-            .expect("Already verified that there is at least one char");
-        attempts.push(AutoDiscoveryAttempt::new(
-            format!("{}.php", s),
-            AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+            a,
+            AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
         ))
     }
     attempts
@@ -537,9 +533,9 @@ mod tests {
     #[case("localhost", vec![AutoDiscoveryAttempt::new("localhost", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("https://localhost", AutoDiscoveryAttemptType::AutoHttps)])]
     #[case("http://localhost", vec![AutoDiscoveryAttempt::new("http://localhost", AutoDiscoveryAttemptType::UserInput)])]
     #[case("http://localhost/wp-json", vec![AutoDiscoveryAttempt::new("http://localhost/wp-json", AutoDiscoveryAttemptType::UserInput)])]
-    #[case("http://localhost/wp-admin.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::UserInput)])]
-    #[case("http://localhost/wp-admin", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin)])]
-    #[case("http://localhost/wp-admin/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin)])]
+    #[case("http://localhost/wp-admin.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
+    #[case("http://localhost/wp-admin", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
+    #[case("http://localhost/wp-admin/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
     #[case("orchestremetropolitain.com/wp-json", vec![AutoDiscoveryAttempt::new("orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("https://orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::AutoHttps)])]
     #[case("https://orchestremetropolitain.com", vec![AutoDiscoveryAttempt::new("https://orchestremetropolitain.com", AutoDiscoveryAttemptType::UserInput)])]
     #[case(
