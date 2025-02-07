@@ -452,6 +452,10 @@ pub enum RequestExecutionErrorReason {
         // Any suggested action provided by the HTTP stack
         suggested_action: Option<String>,
     },
+    NonExistentSiteError {
+        error_message: Option<String>,
+        suggested_action: Option<String>,
+    },
     GenericError {
         error_message: String,
     },
