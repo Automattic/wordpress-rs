@@ -1,7 +1,6 @@
-use std::{borrow::Cow, collections::HashMap, str::FromStr};
+use crate::{date::WpGmtDateTime, impl_as_query_value_from_to_string, OptionFromStr};
+use std::{borrow::Cow, collections::HashMap, str::FromStr, sync::Arc};
 use url::{form_urlencoded, UrlQuery};
-
-use crate::{impl_as_query_value_from_to_string, OptionFromStr};
 
 pub(crate) type QueryPairs<'a> = form_urlencoded::Serializer<'a, UrlQuery<'a>>;
 
@@ -95,6 +94,12 @@ impl AsQueryValue for String {
     }
 }
 
+impl AsQueryValue for Arc<WpGmtDateTime> {
+    fn as_query_value(&self) -> impl AsRef<str> {
+        self.to_rfc3339()
+    }
+}
+
 #[derive(Debug)]
 pub struct UrlQueryPairsMap<'a> {
     inner: HashMap<Cow<'a, str>, Cow<'a, str>>,
@@ -127,6 +132,16 @@ impl<'a> UrlQueryPairsMap<'a> {
                     .collect::<Option<Vec<_>>>()
             })
             .unwrap_or_default()
+    }
+
+    pub(crate) fn get_arc_wp_date_time<'b>(
+        &self,
+        key: impl Into<&'b str>,
+    ) -> Option<Arc<WpGmtDateTime>> {
+        self.inner
+            .get(key.into())
+            .and_then(|v| v.parse::<WpGmtDateTime>().ok())
+            .map(|d| d.into())
     }
 }
 
