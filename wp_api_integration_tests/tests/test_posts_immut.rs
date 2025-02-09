@@ -1,16 +1,20 @@
 use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
-use wp_api::categories::CategoryId;
-use wp_api::posts::{
-    PostId, PostListParams, PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
-    SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
-    WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+use wp_api::{
+    categories::CategoryId,
+    generate,
+    posts::{
+        PostId, PostListParams, PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
+        SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
+        WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+    },
+    tags::TagId,
+    WpApiParamOrder,
 };
-use wp_api::tags::TagId;
-use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, TestCredentials, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID,
+    api_client, expected_wp_gmt_date_time, AssertResponse, TestCredentials, FIRST_POST_ID,
+    FIRST_USER_ID, SECOND_USER_ID,
 };
 
 #[tokio::test]
@@ -198,12 +202,12 @@ async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
 #[case::page(generate!(PostListParams, (page, Some(1))))]
 #[case::per_page(generate!(PostListParams, (per_page, Some(3))))]
 #[case::search(generate!(PostListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(PostListParams, (after, Some("2020-08-14 17:00:00.000".to_string()))))]
-#[case::modified_after(generate!(PostListParams, (modified_after, Some("2024-01-14 17:00:00.000".to_string()))))]
+#[case::after(generate!(PostListParams, (after, Some(expected_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
+#[case::modified_after(generate!(PostListParams, (modified_after, Some(expected_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
 #[case::author(generate!(PostListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case::author_exclude(generate!(PostListParams, (author_exclude, vec![SECOND_USER_ID])))]
-#[case::before(generate!(PostListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))))]
-#[case::modified_before(generate!(PostListParams, (modified_before, Some("2024-01-14 17:00:00.000".to_string()))))]
+#[case::before(generate!(PostListParams, (before, Some(expected_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
+#[case::modified_before(generate!(PostListParams, (modified_before, Some(expected_wp_gmt_date_time("2024-01-14T17:00:00+0000")))))]
 #[case::exclude(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])))]
 #[case::include(generate!(PostListParams, (include, vec![PostId(1)])))]
 #[case::offset(generate!(PostListParams, (offset, Some(2))))]
@@ -218,7 +222,7 @@ async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
 #[case::tags(generate!(PostListParams, (tags, vec![TagId(1)])))]
 #[case::tags_exclude(generate!(PostListParams, (tags_exclude, vec![TagId(1)])))]
 #[case::sticky(generate!(PostListParams, (sticky, Some(true))))]
-pub fn list_cases(#[case] params: PostListParams) {}
+fn list_cases(#[case] params: PostListParams) {}
 
 mod filter {
     use super::*;

@@ -1,12 +1,6 @@
-use std::{num::ParseIntError, str::FromStr};
-
-use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
-use wp_contextual::WpContextual;
-use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
-
 use crate::{
     categories::CategoryId,
+    date::{WpGmtDateTime, WpNaiveDateTime},
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     media::MediaId,
     tags::TagId,
@@ -16,6 +10,11 @@ use crate::{
     },
     UserId, WpApiParamOrder,
 };
+use serde::{Deserialize, Serialize};
+use std::{num::ParseIntError, str::FromStr, sync::Arc};
+use strum_macros::IntoStaticStr;
+use wp_contextual::WpContextual;
+use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 #[derive(
     Debug,
@@ -84,10 +83,10 @@ pub struct PostListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<String>,
+    pub after: Option<Arc<WpGmtDateTime>>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<String>,
+    pub modified_after: Option<Arc<WpGmtDateTime>>,
     /// Limit result set to posts assigned to specific authors.
     #[uniffi(default = [])]
     pub author: Vec<UserId>,
@@ -96,10 +95,10 @@ pub struct PostListParams {
     pub author_exclude: Vec<UserId>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<String>,
+    pub before: Option<Arc<WpGmtDateTime>>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<String>,
+    pub modified_before: Option<Arc<WpGmtDateTime>>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<PostId>,
@@ -247,12 +246,12 @@ impl FromUrlQueryPairs for PostListParams {
             page: query_pairs.get(PostListParamsField::Page),
             per_page: query_pairs.get(PostListParamsField::PerPage),
             search: query_pairs.get(PostListParamsField::Search),
-            after: query_pairs.get(PostListParamsField::After),
-            modified_after: query_pairs.get(PostListParamsField::ModifiedAfter),
+            after: query_pairs.get_arc_wp_date_time(PostListParamsField::After),
+            modified_after: query_pairs.get_arc_wp_date_time(PostListParamsField::ModifiedAfter),
             author: query_pairs.get_csv(PostListParamsField::Author),
             author_exclude: query_pairs.get_csv(PostListParamsField::AuthorExclude),
-            before: query_pairs.get(PostListParamsField::Before),
-            modified_before: query_pairs.get(PostListParamsField::ModifiedBefore),
+            before: query_pairs.get_arc_wp_date_time(PostListParamsField::Before),
+            modified_before: query_pairs.get_arc_wp_date_time(PostListParamsField::ModifiedBefore),
             exclude: query_pairs.get_csv(PostListParamsField::Exclude),
             include: query_pairs.get_csv(PostListParamsField::Include),
             offset: query_pairs.get(PostListParamsField::Offset),
@@ -473,19 +472,19 @@ impl std::fmt::Display for PostId {
 pub struct SparsePost {
     #[WpContext(edit, embed, view)]
     pub id: Option<PostId>,
-    #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    #[WpContext(edit, view, embed)]
+    pub date: Option<Arc<WpNaiveDateTime>>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<Arc<WpGmtDateTime>>,
     #[WpContext(edit, view)]
     #[WpContextualField]
     pub guid: Option<SparsePostGuid>,
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
     #[WpContext(edit, view)]
-    pub modified: Option<String>,
+    pub modified: Option<Arc<WpNaiveDateTime>>,
     #[WpContext(edit, view)]
-    pub modified_gmt: Option<String>,
+    pub modified_gmt: Option<Arc<WpGmtDateTime>>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]
@@ -713,7 +712,13 @@ impl PostFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, unit_test_common::assert_expected_and_from_query_pairs};
+    use crate::{
+        generate,
+        unit_test_common::{
+            assert_expected_and_from_query_pairs, unit_test_example_date_as_option_arc,
+            unit_test_example_date_as_query_value,
+        },
+    };
     use rstest::*;
 
     #[rstest]
@@ -721,12 +726,12 @@ mod tests {
     #[case(generate!(PostListParams, (page, Some(2))), "page=2")]
     #[case(generate!(PostListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(PostListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(PostListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(PostListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (after, unit_test_example_date_as_option_arc())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(PostListParams, (modified_after, unit_test_example_date_as_option_arc())), &unit_test_example_date_as_query_value("modified_after"))]
     #[case(generate!(PostListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(PostListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
-    #[case(generate!(PostListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(PostListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (before, unit_test_example_date_as_option_arc())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(PostListParams, (modified_before, unit_test_example_date_as_option_arc())), &unit_test_example_date_as_query_value("modified_before"))]
     #[case(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])), "exclude=1%2C2")]
     #[case(generate!(PostListParams, (include, vec![PostId(1), PostId(2)])), "include=1%2C2")]
     #[case(generate!(PostListParams, (offset, Some(2))), "offset=2")]
@@ -764,38 +769,59 @@ mod tests {
     #[case(generate!(PostListParams, (tags, vec![TagId(1), TagId(2)])), "tags=1%2C2")]
     #[case(generate!(PostListParams, (tags_exclude, vec![TagId(1), TagId(2)])), "tags_exclude=1%2C2")]
     #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
-    #[case(PostListParams {
-        page: Some(11),
-        per_page: Some(22),
-        search: Some("s_q".to_string()),
-        after: Some("d_a".to_string()),
-        modified_after: Some("d_m_a".to_string()),
-        author: vec![UserId(111), UserId(112)],
-        author_exclude: vec![UserId(211), UserId(212)],
-        before: Some("d_b".to_string()),
-        modified_before: Some("d_m_b".to_string()),
-        exclude: vec![PostId(1111), PostId(1112)],
-        include: vec![PostId(2111), PostId(2112)],
-        offset: Some(11111),
-        order: Some(WpApiParamOrder::Desc),
-        orderby: Some(WpApiParamPostsOrderBy::Slug),
-        search_columns: vec![
-            WpApiParamPostsSearchColumn::PostContent,
-            WpApiParamPostsSearchColumn::PostExcerpt,
-        ],
-        slug: vec!["sl_1".to_string(), "sl_2".to_string()],
-        status: vec![PostStatus::Draft, PostStatus::Future],
-        tax_relation: Some(WpApiParamPostsTaxRelation::Or),
-        categories: vec![CategoryId(333333), CategoryId(333334)],
-        categories_exclude: vec![CategoryId(444444), CategoryId(444445)],
-        tags: vec![TagId(555555), TagId(555556)],
-        tags_exclude: vec![TagId(666666), TagId(666667)],
-        sticky: Some(true),
-        },
-        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=draft%2Cfuture&tax_relation=OR&categories=333333%2C333334&categories_exclude=444444%2C444445&tags=555555%2C555556&tags_exclude=666666%2C666667&sticky=true"
+    #[case(
+        post_list_params_with_all_fields(),
+        &expected_query_pairs_for_post_list_params_with_all_fields()
     )]
     #[trace]
     fn test_post_list_query_pairs(#[case] params: PostListParams, #[case] expected_query: &str) {
         assert_expected_and_from_query_pairs(params, expected_query);
+    }
+
+    fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
+        let after = unit_test_example_date_as_query_value("after");
+        let modified_after = unit_test_example_date_as_query_value("modified_after");
+        let before = unit_test_example_date_as_query_value("before");
+        let modified_before = unit_test_example_date_as_query_value("modified_before");
+        format!("page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true")
+    }
+
+    fn post_list_params_with_all_fields() -> PostListParams {
+        PostListParams {
+            after: unit_test_example_date_as_option_arc(),
+            author: vec![UserId(1), UserId(2)],
+            author_exclude: vec![UserId(1), UserId(2)],
+            before: unit_test_example_date_as_option_arc(),
+            categories: vec![CategoryId(1), CategoryId(2)],
+            categories_exclude: vec![CategoryId(1), CategoryId(2)],
+            exclude: vec![PostId(1), PostId(2)],
+            include: vec![PostId(1), PostId(2)],
+            modified_after: unit_test_example_date_as_option_arc(),
+            modified_before: unit_test_example_date_as_option_arc(),
+            offset: Some(2),
+            order: Some(WpApiParamOrder::Asc),
+            orderby: Some(WpApiParamPostsOrderBy::Author),
+            page: Some(2),
+            per_page: Some(2),
+            search: Some("foo".to_string()),
+            search_columns: vec![
+                WpApiParamPostsSearchColumn::PostContent,
+                WpApiParamPostsSearchColumn::PostExcerpt,
+                WpApiParamPostsSearchColumn::PostTitle,
+            ],
+            slug: vec!["foo".to_string(), "bar".to_string()],
+            status: vec![
+                PostStatus::Draft,
+                PostStatus::Future,
+                PostStatus::Pending,
+                PostStatus::Private,
+                PostStatus::Publish,
+                PostStatus::Custom("foo".to_string()),
+            ],
+            sticky: Some(true),
+            tags: vec![TagId(1), TagId(2)],
+            tags_exclude: vec![TagId(1), TagId(2)],
+            tax_relation: Some(WpApiParamPostsTaxRelation::And),
+        }
     }
 }

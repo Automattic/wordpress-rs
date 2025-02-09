@@ -4,6 +4,11 @@ use serde::{
 };
 use std::{fmt, marker::PhantomData};
 
+pub use wp_serde_date::wp_naive_date_format;
+pub use wp_serde_date::wp_utc_date_format;
+
+mod wp_serde_date;
+
 pub fn serialize_as_json_string<T, S, E>(value: &T, s: S) -> Result<S::Ok, E>
 where
     T: Serialize,
