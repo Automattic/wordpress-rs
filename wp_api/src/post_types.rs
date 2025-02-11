@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use crate::impl_as_query_value_from_to_string;
-use crate::url_query::AsQueryValue;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use wp_contextual::WpContextual;
 
 #[derive(

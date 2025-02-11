@@ -3,7 +3,7 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    AsQueryValue, IntegerOrString,
+    IntegerOrString,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;

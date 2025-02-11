@@ -1,12 +1,10 @@
-use std::fmt::Display;
-
-use serde::{Deserialize, Serialize};
-use wp_contextual::WpContextual;
-
 use crate::{
     impl_as_query_value_from_to_string,
-    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
+    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use wp_contextual::WpContextual;
 
 #[derive(Debug, Default, uniffi::Record)]
 pub struct PluginListParams {

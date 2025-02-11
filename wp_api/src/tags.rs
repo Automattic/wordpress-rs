@@ -1,19 +1,16 @@
-use std::{num::ParseIntError, str::FromStr};
-
-use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
-use wp_contextual::WpContextual;
-
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::PostId,
     taxonomies::TaxonomyType,
     url_query::{
-        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
-        UrlQueryPairsMap,
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
     WpApiParamOrder,
 };
+use serde::{Deserialize, Serialize};
+use std::{num::ParseIntError, str::FromStr};
+use strum_macros::IntoStaticStr;
+use wp_contextual::WpContextual;
 
 impl_as_query_value_for_new_type!(TagId);
 uniffi::custom_newtype!(TagId, i64);

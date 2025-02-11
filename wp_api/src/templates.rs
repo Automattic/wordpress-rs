@@ -3,8 +3,7 @@ use crate::{
     post_types::PostType,
     posts::PostId,
     url_query::{
-        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
-        UrlQueryPairsMap,
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
     UserId,
 };
