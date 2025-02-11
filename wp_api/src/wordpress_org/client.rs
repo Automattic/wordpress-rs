@@ -1,5 +1,6 @@
 use crate::{
     api_error::RequestExecutionErrorReason,
+    impl_as_query_value_from_to_string,
     request::{
         endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect,
     },
@@ -146,24 +147,17 @@ impl WordPressOrgApiClient {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, PartialEq, Eq, uniffi::Enum, strum_macros::EnumString, strum_macros::Display)]
+#[strum(serialize_all = "kebab-case")]
 pub enum WordPressOrgApiPluginDirectoryCategory {
     New,
     Popular,
     Updated,
     TopRated,
+    Recommended,
+    Featured,
 }
-
-impl WordPressOrgApiPluginDirectoryCategory {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            WordPressOrgApiPluginDirectoryCategory::New => "new",
-            WordPressOrgApiPluginDirectoryCategory::Popular => "popular",
-            WordPressOrgApiPluginDirectoryCategory::Updated => "updated",
-            WordPressOrgApiPluginDirectoryCategory::TopRated => "top-rated",
-        }
-    }
-}
+impl_as_query_value_from_to_string!(WordPressOrgApiPluginDirectoryCategory);
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WordPressOrgApiClientError {
