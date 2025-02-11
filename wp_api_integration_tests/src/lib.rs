@@ -287,7 +287,7 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
     }
 }
 
-pub fn expected_wp_gmt_date_time(s: &str) -> Arc<WpGmtDateTime> {
+pub fn expected_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
     s.parse::<WpGmtDateTime>()
         .expect("Expected a valid date")
         .into()

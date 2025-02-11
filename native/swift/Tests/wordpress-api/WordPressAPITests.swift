@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import WordPressAPI
+@testable import WordPressAPIInternal
 
 struct WordPressAPITests {
 
@@ -45,5 +46,13 @@ struct WordPressAPITests {
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
         #expect(user.data.name == "User Name")
+    }
+
+    @Test
+    func testWpGmtDateTime() {
+        let date = wpapiGetDate()
+        print(ISO8601DateFormatter().string(from: date))
+
+        wpapiSetDate(date: date)
     }
 }

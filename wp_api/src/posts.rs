@@ -82,10 +82,10 @@ pub struct PostListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<Arc<WpGmtDateTime>>,
+    pub after: Option<WpGmtDateTime>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<Arc<WpGmtDateTime>>,
+    pub modified_after: Option<WpGmtDateTime>,
     /// Limit result set to posts assigned to specific authors.
     #[uniffi(default = [])]
     pub author: Vec<UserId>,
@@ -94,10 +94,10 @@ pub struct PostListParams {
     pub author_exclude: Vec<UserId>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<Arc<WpGmtDateTime>>,
+    pub before: Option<WpGmtDateTime>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<Arc<WpGmtDateTime>>,
+    pub modified_before: Option<WpGmtDateTime>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<PostId>,
@@ -474,7 +474,7 @@ pub struct SparsePost {
     #[WpContext(edit, view, embed)]
     pub date: Option<Arc<WpNaiveDateTime>>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<Arc<WpGmtDateTime>>,
+    pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
     #[WpContextualField]
     pub guid: Option<SparsePostGuid>,
@@ -483,7 +483,7 @@ pub struct SparsePost {
     #[WpContext(edit, view)]
     pub modified: Option<Arc<WpNaiveDateTime>>,
     #[WpContext(edit, view)]
-    pub modified_gmt: Option<Arc<WpGmtDateTime>>,
+    pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]

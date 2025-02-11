@@ -94,7 +94,7 @@ impl AsQueryValue for String {
     }
 }
 
-impl AsQueryValue for Arc<WpGmtDateTime> {
+impl AsQueryValue for WpGmtDateTime {
     fn as_query_value(&self) -> impl AsRef<str> {
         self.to_rfc3339()
     }
@@ -137,7 +137,7 @@ impl<'a> UrlQueryPairsMap<'a> {
     pub(crate) fn get_arc_wp_date_time<'b>(
         &self,
         key: impl Into<&'b str>,
-    ) -> Option<Arc<WpGmtDateTime>> {
+    ) -> Option<WpGmtDateTime> {
         self.inner
             .get(key.into())
             .and_then(|v| v.parse::<WpGmtDateTime>().ok())

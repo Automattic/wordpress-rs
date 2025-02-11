@@ -28,7 +28,7 @@ where
 }
 
 #[cfg(test)]
-pub fn unit_test_example_date_as_option_arc() -> Option<Arc<WpGmtDateTime>> {
+pub fn unit_test_example_date_as_option_arc() -> Option<WpGmtDateTime> {
     Some(
         "2024-02-09T02:14:13+0000"
             .parse::<WpGmtDateTime>()

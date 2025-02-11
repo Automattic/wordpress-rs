@@ -3,22 +3,30 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use wp_serde_helper::{wp_naive_date_format, wp_utc_date_format};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, uniffi::Object)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct WpGmtDateTime {
     #[serde(with = "wp_utc_date_format")]
     pub inner: DateTime<Utc>,
 }
 
-#[uniffi::export]
+// #[uniffi::export]
 impl WpGmtDateTime {
-    #[uniffi::constructor]
+    // #[uniffi::constructor]
     pub fn parse(date: &str) -> Result<Self, WpGmtDateTimeParseError> {
         date.parse::<WpGmtDateTime>()
     }
 
     pub fn to_rfc3339(&self) -> String {
         self.inner.to_rfc3339()
+    }
+}
+
+impl WpGmtDateTime {
+    fn from_timestamp(seconds: i64) -> Self {
+        let date_time =
+            DateTime::<Utc>::from_timestamp(seconds, 0).unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
+        Self { inner: date_time }
     }
 }
 
@@ -118,4 +126,19 @@ impl From<chrono::format::ParseError> for WpGmtDateTimeParseError {
             ),
         }
     }
+}
+
+uniffi::custom_type!(WpGmtDateTime, f64, {
+    lower: |date_time| date_time.inner.timestamp() as f64,
+    try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds.round() as i64)),
+});
+
+#[uniffi::export]
+fn wpapi_get_date() -> WpGmtDateTime {
+    WpGmtDateTime::from_timestamp(1739316185)
+}
+
+#[uniffi::export]
+fn wpapi_set_date(date: WpGmtDateTime) {
+    println!("Date: {:?}", date);
 }

@@ -10,3 +10,9 @@ ffi_module_filename = "wp_api_uniffi"
 generate_module_map = false
 generate_immutable_records = true
 experimental_sendable_value_types = true
+
+[bindings.swift.custom_types.WpGmtDateTime]
+type_name = "Date"
+imports = ["Foundation"]
+into_custom = "Date(timeIntervalSince1970: {})"
+from_custom = "{}.timeIntervalSince1970"
