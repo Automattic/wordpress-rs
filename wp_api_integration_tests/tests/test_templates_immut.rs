@@ -5,10 +5,11 @@ use wp_api::generate;
 use wp_api::post_types::PostType;
 use wp_api::templates::{
     SparseTemplateFieldWithEditContext, SparseTemplateFieldWithEmbedContext,
-    SparseTemplateFieldWithViewContext, TemplateArea, TemplateListParams,
+    SparseTemplateFieldWithViewContext, TemplateArea, TemplateId, TemplateListParams,
 };
 use wp_api_integration_tests::{
     api_client, AssertResponse, FIRST_POST_ID, POST_ID_555, POST_ID_DRAFT,
+    TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE,
 };
 
 #[tokio::test]
@@ -42,6 +43,49 @@ async fn list_with_view_context(#[case] params: TemplateListParams) {
         .list_with_view_context(&params)
         .await
         .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    let template_id = template_id_for_retrieve_tests();
+    let template = api_client()
+        .templates()
+        .retrieve_with_edit_context(&TemplateId(TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE.to_string()))
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(template_id, template.id);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context() {
+    let template_id = template_id_for_retrieve_tests();
+    let template = api_client()
+        .templates()
+        .retrieve_with_embed_context(&TemplateId(TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE.to_string()))
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(template_id, template.id);
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context() {
+    let template_id = template_id_for_retrieve_tests();
+    let template = api_client()
+        .templates()
+        .retrieve_with_view_context(&template_id)
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(template_id, template.id);
+}
+
+fn template_id_for_retrieve_tests() -> TemplateId {
+    TemplateId(TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE.to_string())
 }
 
 #[template]
@@ -99,6 +143,22 @@ mod filter {
             });
     }
 
+    #[apply(sparse_template_field_with_edit_context_test_cases)]
+    #[case(&[SparseTemplateFieldWithEditContext::Slug, SparseTemplateFieldWithEditContext::Theme])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_edit_context(
+        #[case] fields: &[SparseTemplateFieldWithEditContext],
+    ) {
+        let template = api_client()
+            .templates()
+            .filter_retrieve_with_edit_context(&template_id_for_retrieve_tests(), fields)
+            .await
+            .assert_response()
+            .data;
+        template.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
     #[apply(sparse_template_field_with_embed_context_test_cases)]
     #[case(&[SparseTemplateFieldWithEmbedContext::Slug, SparseTemplateFieldWithEmbedContext::Theme])]
     #[tokio::test]
@@ -126,6 +186,22 @@ mod filter {
             });
     }
 
+    #[apply(sparse_template_field_with_embed_context_test_cases)]
+    #[case(&[SparseTemplateFieldWithEmbedContext::Slug, SparseTemplateFieldWithEmbedContext::Theme])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_embed_context(
+        #[case] fields: &[SparseTemplateFieldWithEmbedContext],
+    ) {
+        let template = api_client()
+            .templates()
+            .filter_retrieve_with_embed_context(&template_id_for_retrieve_tests(), fields)
+            .await
+            .assert_response()
+            .data;
+        template.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
     #[apply(sparse_template_field_with_view_context_test_cases)]
     #[case(&[SparseTemplateFieldWithViewContext::Slug, SparseTemplateFieldWithViewContext::Theme])]
     #[tokio::test]
@@ -151,5 +227,21 @@ mod filter {
             .for_each(|template| {
                 template.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_template_field_with_view_context_test_cases)]
+    #[case(&[SparseTemplateFieldWithViewContext::Slug, SparseTemplateFieldWithViewContext::Theme])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_view_context(
+        #[case] fields: &[SparseTemplateFieldWithViewContext],
+    ) {
+        let template = api_client()
+            .templates()
+            .filter_retrieve_with_view_context(&template_id_for_retrieve_tests(), fields)
+            .await
+            .assert_response()
+            .data;
+        template.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }
