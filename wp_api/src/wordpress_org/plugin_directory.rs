@@ -1,10 +1,6 @@
-#![allow(dead_code)]
-
-use serde::Deserialize;
-
-use std::{collections::HashMap, fmt::Debug};
-
 use super::de::deserialize_default_values;
+use serde::Deserialize;
+use std::{collections::HashMap, fmt::Debug};
 
 #[derive(Deserialize, Debug, uniffi::Record)]
 pub struct PluginInformation {
