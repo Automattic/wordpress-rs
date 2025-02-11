@@ -108,10 +108,48 @@ class LoginTests {
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
-    @Test("Login Spec Example 13: Site uses HTTP basic")
+    @Test("Login Spec Example 13: Site uses HTTP basic with no provided credentials")
     func testWordPressHttpBasic() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "https://http-basic-auth.wpmt.co")
-        #expect("https://http-basic-auth.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+        await #expect(performing: {
+            _ = try await client.loginURL(forSite: "https://basic-auth.wpmt.co")
+        }, throws: { error in
+            #expect(error is LoginError)
+            #expect("The server at https://basic-auth.wpmt.co requires authentication. Please provide your username and password." == (error as? LoginError)?.errorDescription)
+            return true
+        })
+    }
+
+    @Test("Login Spec Example 13: Site uses HTTP basic with invalid credentials provided")
+    func testWordPressHttpBasicWithInvalidCredentials() async throws {
+        let credential = URLCredential(user: "invalid", password: "invalid", persistence: .none)
+
+        await #expect(performing: {
+            _ = try await client.loginURL(
+                forSite: "https://basic-auth.wpmt.co",
+                credential: credential
+            )
+        }, throws: { error in
+            #expect(error is LoginError)
+            #expect("The server at https://basic-auth.wpmt.co rejected your credentials. Please provide a valid username and password." == (error as? LoginError)?.errorDescription)
+            return true
+        })
+    }
+
+
+    @Test("Login Spec Example 13: Site uses HTTP basic with correct credentials provided")
+    func testWordPressHttpBasicWithValidCredentials() async throws {
+        let credential = URLCredential(
+            user: "test@example.com",
+            password: "str0ngp4ssw0rd!",
+            persistence: .none
+        )
+
+        let parsedUrl = try await client.loginURL(
+            forSite: "https://basic-auth.wpmt.co",
+            credential: credential
+        )
+
+        #expect("https://basic-auth.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 14: Custom REST API Prefix")
@@ -139,7 +177,7 @@ class LoginTests {
 
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
-        let session = URLSession(configuration: .default, delegate: SessionDelegate(), delegateQueue: nil)
+        let session = URLSession(configuration: .default)
         let client = WordPressLoginClient(urlSession: session)
         await #expect(performing: {
             _ = try await client.loginURL(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
@@ -154,14 +192,16 @@ class LoginTests {
     func testInvalidHttpsWithExceptionWorks() async throws {
         let session = URLSession(
             configuration: .default,
-            delegate: SessionDelegate(allowedDomains: ["wordpress-1315525-4803651.cloudwaysapps.com"]),
+            delegate: HTTPSSessionDelegate(
+                allowedDomains: ["wordpress-1315525-4803651.cloudwaysapps.com"]
+            ),
             delegateQueue: nil
         )
         let client = WordPressLoginClient(urlSession: session)
         _ = try await client.loginURL(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
     }
 
-    final class SessionDelegate: NSObject, URLSessionDelegate {
+    final class HTTPSSessionDelegate: NSObject, URLSessionDelegate {
 
         let allowedDomains: [String]
 

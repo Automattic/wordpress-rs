@@ -6,6 +6,8 @@ import FoundationNetworking
 #endif
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
+    func withCredential(_ credential: URLCredential) -> Self
+
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 }
 
@@ -18,10 +20,15 @@ extension SafeRequestExecutor {
 
 final class WpRequestExecutor: SafeRequestExecutor {
     private let session: URLSession
-    private let redirectTracker = RedirectTracker()
+    private let executorDelegate: RequestExecutorDelegate
 
-    init(urlSession: URLSession) {
+    init(urlSession: URLSession, httpCredential: URLCredential? = nil) {
         self.session = urlSession
+        self.executorDelegate = RequestExecutorDelegate(credential: httpCredential)
+    }
+
+    func withCredential(_ credential: URLCredential) -> WpRequestExecutor {
+        WpRequestExecutor(urlSession: self.session, httpCredential: credential)
     }
 
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -30,7 +37,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
 
         do {
             let urlrequest = request.asURLRequest()
-            (data, response) = try await self.session.data(for: urlrequest, delegate: redirectTracker)
+            (data, response) = try await self.session.data(for: urlrequest, delegate: executorDelegate)
 
             // swiftlint:disable:next force_cast
             let httpResponse = response as! HTTPURLResponse
@@ -39,6 +46,14 @@ final class WpRequestExecutor: SafeRequestExecutor {
 
             do {
                 headerMap = try WpNetworkHeaderMap.fromMap(hashMap: httpResponse.httpHeaders)
+
+                if isHttpAuthenticationInvalidResponse(httpResponse, for: request) {
+                    return handleHttpAuthenticationInvalidResponse(httpResponse, for: request)
+                }
+
+                if isHttpAuthenticationRequiredResponse(httpResponse) {
+                    return handleHttpAuthenticationRequiredResponse(httpResponse, for: request)
+                }
 
                 return .success(
                     WpNetworkResponse(
@@ -50,7 +65,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
             } catch is WpNetworkHeaderMapError {
                 let error = RequestExecutionError.RequestExecutionFailed(
                     statusCode: nil,
-                    redirects: redirectTracker.redirects(for: request.requestId()),
+                    redirects: executorDelegate.redirects(for: request.requestId()),
                     reason: RequestExecutionErrorReason.genericError(errorMessage: "Invalid Headers")
                 )
 
@@ -60,7 +75,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
                 return .failure(
                     .RequestExecutionFailed(
                         statusCode: nil,
-                        redirects: redirectTracker.redirects(for: request.requestId()),
+                        redirects: executorDelegate.redirects(for: request.requestId()),
                         reason: .genericError(errorMessage: "Unknown error: \(error)")
                     )
                 )
@@ -93,7 +108,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
         else {
             return .failure(.RequestExecutionFailed(
                  statusCode: nil,
-                 redirects: redirectTracker.redirects(for: request.requestId()),
+                 redirects: executorDelegate.redirects(for: request.requestId()),
                  reason: .invalidSslError(
                      siteCertificate: nil,
                      certificateChain: [],
@@ -108,7 +123,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
         return .failure(
          .RequestExecutionFailed(
              statusCode: nil,
-             redirects: redirectTracker.redirects(for: request.requestId()),
+             redirects: executorDelegate.redirects(for: request.requestId()),
              reason: RequestExecutionErrorReason.invalidSslError(
                      siteCertificate: siteCertificate,
                      certificateChain: peerCertificateChain,
@@ -119,6 +134,36 @@ final class WpRequestExecutor: SafeRequestExecutor {
          )
     }
 
+    func handleHttpAuthenticationRequiredResponse(
+        _ response: HTTPURLResponse,
+        for request: WpNetworkRequest
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        .failure(
+            .RequestExecutionFailed(
+                statusCode: UInt16(response.statusCode),
+                redirects: executorDelegate.redirects(for: request.requestId()),
+                reason: .httpAuthenticationRequired(
+                    serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
+                )
+            )
+        )
+    }
+
+    func handleHttpAuthenticationInvalidResponse(
+        _ response: HTTPURLResponse,
+        for request: WpNetworkRequest
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        .failure(
+            .RequestExecutionFailed(
+                statusCode: UInt16(response.statusCode),
+                redirects: executorDelegate.redirects(for: request.requestId()),
+                reason: .httpAuthenticationRejected(
+                    serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
+                )
+            )
+        )
+    }
+
     func handleNonExistentSiteError(
         _ error: Error,
         for request: WpNetworkRequest
@@ -126,7 +171,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
         .failure(
             .RequestExecutionFailed(
                 statusCode: nil,
-                redirects: redirectTracker.redirects(for: request.requestId()),
+                redirects: executorDelegate.redirects(for: request.requestId()),
                 reason: .nonExistentSiteError(
                     errorMessage: error.localizedDescription,
                     suggestedAction: (error as NSError).localizedRecoverySuggestion
@@ -148,6 +193,26 @@ final class WpRequestExecutor: SafeRequestExecutor {
             NSURLErrorServerCertificateHasBadDate,
             NSURLErrorServerCertificateNotYetValid
         ].contains(nserror.code)
+    }
+
+    /// This response indicates that HTTP credentials must be sent as part of the request
+    private func isHttpAuthenticationRequiredResponse(_ response: HTTPURLResponse) -> Bool {
+        response.statusCode == 401
+    }
+
+    /// This response indicates that the provided credentials are invalid (or the user doesn't have access to this)
+    private func isHttpAuthenticationInvalidResponse(
+        _ response: HTTPURLResponse,
+        for request: WpNetworkRequest
+    ) -> Bool {
+
+        // It's hard to get a good signal that an error 403 occcured, but if the server returns it directly
+        // we'll pass that along
+        if response.statusCode == 403 {
+            return true
+        }
+
+        return executorDelegate.isHttp403Failed(for: request.requestId())
     }
 
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
@@ -194,10 +259,18 @@ final class WpRequestExecutor: SafeRequestExecutor {
     // swiftlint:enable force_cast
 }
 
-final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
+    private var http403Failures: Set<String> = []
+
+    let credential: URLCredential?
+
+    init(redirects: [String: [WpRedirect]] = [:], credential: URLCredential? = nil) {
+        self.redirects = redirects
+        self.credential = credential
+    }
 
     func redirects(for taskID: String) -> [WpRedirect]? {
         lock.withLock {
@@ -205,7 +278,13 @@ final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         }
     }
 
-    func removeRedirects(for taskID: String) {
+    func isHttp403Failed(for taskID: String) -> Bool {
+        lock.withLock {
+            http403Failures.contains(taskID)
+        }
+    }
+
+    func c(for taskID: String) {
         lock.withLock {
             redirects[taskID] = nil
         }
@@ -238,6 +317,30 @@ final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendab
         }
 
         return request
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge) async
+    -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+
+        let authMethod = challenge.protectionSpace.authenticationMethod
+
+        guard authMethod == NSURLAuthenticationMethodHTTPBasic else {
+            return (.performDefaultHandling, nil)
+        }
+
+        // Only try the credential once
+        if challenge.previousFailureCount > 0 {
+            if let requestID = task.originalRequest?.requestId {
+                self.http403Failures.insert(requestID)
+            }
+
+            return (.performDefaultHandling, nil)
+        }
+
+        return (.useCredential, credential)
     }
 }
 

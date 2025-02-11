@@ -13,6 +13,10 @@ final class HTTPStubs: SafeRequestExecutor {
         self.missingStub = missingStub
     }
 
+    func withCredential(_ credential: URLCredential) -> Self {
+        self
+    }
+
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
             return .success(response)
