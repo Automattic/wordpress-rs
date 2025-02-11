@@ -456,6 +456,12 @@ pub enum RequestExecutionErrorReason {
         error_message: Option<String>,
         suggested_action: Option<String>,
     },
+    HttpAuthenticationRequired {
+        server_message: Option<String>
+    },
+    HttpAuthenticationRejected {
+        server_message: Option<String>,
+    },
     GenericError {
         error_message: String,
     },

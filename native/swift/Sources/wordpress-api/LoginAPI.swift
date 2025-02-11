@@ -50,8 +50,20 @@ public final class WordPressLoginClient {
         return try handleAuthenticationCallback(urlWithToken)
     }
 
-    public func loginAttempt(forSite proposedSiteUrl: String) async throws(LoginError) -> AutoDiscoveryAttemptResult {
-        let client = UniffiWpLoginClient(requestExecutor: self.requestExecutor)
+    public func loginAttempt(
+        forSite proposedSiteUrl: String,
+        credential: URLCredential? = nil
+    ) async throws(LoginError) -> AutoDiscoveryAttemptResult {
+
+        let temporaryExecutor: SafeRequestExecutor
+
+        if let credential {
+            temporaryExecutor = self.requestExecutor.withCredential(credential)
+        } else {
+            temporaryExecutor = self.requestExecutor
+        }
+
+        let client = UniffiWpLoginClient(requestExecutor: temporaryExecutor)
         let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
         guard let successfulAttempt = discoveryResult.successfulAttempt else {
@@ -61,11 +73,14 @@ public final class WordPressLoginClient {
         return successfulAttempt
     }
 
-    public func loginURL(forSite proposedSiteUrl: String) async throws(LoginError) -> ParsedUrl {
+    public func loginURL(
+        forSite proposedSiteUrl: String,
+        credential: URLCredential? = nil
+    ) async throws(LoginError) -> ParsedUrl {
 
         // All sites should have some form of authentication we can use
         guard
-            let apiDetails = try await loginAttempt(forSite: proposedSiteUrl).apiDetails(),
+            let apiDetails = try await loginAttempt(forSite: proposedSiteUrl, credential: credential).apiDetails(),
             let passwordAuthenticationUrl = apiDetails.findApplicationPasswordsAuthenticationUrl(),
             let parsedLoginUrl = try? ParsedUrl.parse(input: passwordAuthenticationUrl)
         else {
