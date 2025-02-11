@@ -1,7 +1,5 @@
 use url::Url;
 
-use crate::SparseField;
-
 pub mod application_passwords_endpoint;
 pub mod categories_endpoint;
 pub mod comments_endpoint;
@@ -38,10 +36,6 @@ pub struct ApiEndpointUrl {
 impl ApiEndpointUrl {
     pub fn new(url: Url) -> Self {
         Self { url }
-    }
-
-    fn url(&self) -> &Url {
-        &self.url
     }
 
     pub fn as_str(&self) -> &str {
@@ -88,13 +82,6 @@ impl ApiBaseUrl {
         site_base_url.try_into()
     }
 
-    fn by_appending(&self, segment: &str) -> Url {
-        self.url
-            .clone()
-            .append(segment)
-            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
-    }
-
     pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
     where
         I: IntoIterator,
@@ -113,26 +100,16 @@ impl ApiBaseUrl {
             }))
             .expect("ApiBaseUrl is already parsed, so this can't result in an error")
     }
-
-    fn as_str(&self) -> &str {
-        self.url.as_str()
-    }
 }
 
 trait UrlExtension {
-    fn append(self, segment: &str) -> Result<Url, ()>;
     fn extend<I>(self, segments: I) -> Result<Url, ()>
     where
         I: IntoIterator,
         I::Item: AsRef<str>;
-    fn append_filter_fields(self, fields: &[impl SparseField]) -> Url;
 }
 
 impl UrlExtension for Url {
-    fn append(self, segment: &str) -> Result<Url, ()> {
-        self.extend([segment])
-    }
-
     fn extend<I>(mut self, segments: I) -> Result<Url, ()>
     where
         I: IntoIterator,
@@ -147,19 +124,6 @@ impl UrlExtension for Url {
 
         self.path_segments_mut()?.extend(segments);
         Ok(self)
-    }
-
-    fn append_filter_fields(mut self, fields: &[impl SparseField]) -> Url {
-        self.query_pairs_mut().append_pair(
-            "_fields",
-            fields
-                .iter()
-                .map(|f| f.as_str())
-                .collect::<Vec<&str>>()
-                .join(",")
-                .as_str(),
-        );
-        self
     }
 }
 
@@ -216,19 +180,9 @@ mod macros {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
     use rstest::*;
-
-    #[test]
-    fn append_url() {
-        let url = Url::parse("https://example.com").unwrap();
-        assert_eq!(
-            url.append("bar").unwrap().as_str(),
-            "https://example.com/bar"
-        );
-    }
+    use std::sync::Arc;
 
     #[test]
     fn extend_url() {
@@ -257,11 +211,6 @@ mod tests {
     ) {
         let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
         let expected_wp_json_url = wp_json_endpoint(test_base_url);
-        assert_eq!(expected_wp_json_url, api_base_url.as_str());
-        assert_eq!(
-            api_base_url.by_appending("bar").as_str(),
-            format!("{}/bar", expected_wp_json_url)
-        );
         assert_eq!(
             api_base_url
                 .by_extending_and_splitting_by_forward_slash(["bar", "baz"])
@@ -292,10 +241,6 @@ mod tests {
         url
     }
 
-    fn wp_json_endpoint_by_appending(base_url: &str, suffix: &str) -> String {
-        format!("{}{}", wp_json_endpoint(base_url), suffix)
-    }
-
     #[fixture]
     pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
         ApiBaseUrl::try_from("https://example.com").unwrap().into()
@@ -314,7 +259,7 @@ mod tests {
             endpoint_url.as_str(),
             format!(
                 "{}{}{}",
-                fixture_api_base_url().as_str(),
+                fixture_api_base_url().url.as_str(),
                 namespace.as_str(),
                 path
             )

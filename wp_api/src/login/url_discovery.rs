@@ -4,8 +4,6 @@ use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
-const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct AutoDiscoveryAttempt {
     pub(crate) attempt_site_url: String,
@@ -464,12 +462,6 @@ pub enum AutoDiscoveryAttemptType {
     UserInput,
     AutoHttps,
     AutoDotPhpExtensionForWpAdmin,
-}
-
-impl AutoDiscoveryAttemptType {
-    fn is_the_site_url_same_as_the_user_input(&self) -> bool {
-        matches!(self, AutoDiscoveryAttemptType::UserInput)
-    }
 }
 
 pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {

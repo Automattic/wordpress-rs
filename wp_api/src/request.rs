@@ -1,20 +1,15 @@
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
-
-use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
-use http::{HeaderMap, HeaderName, HeaderValue};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use url::Url;
-use uuid::Uuid;
-
+use self::endpoint::WpEndpointUrl;
 use crate::{
-    api_error::{
-        MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError, WpError,
-    },
+    api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
     WpApiError, WpAuthentication,
 };
-
-use self::endpoint::WpEndpointUrl;
+use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
+use http::{HeaderMap, HeaderName, HeaderValue};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use url::Url;
+use uuid::Uuid;
 
 pub mod endpoint;
 
@@ -421,31 +416,6 @@ impl WpNetworkResponse {
     {
         parser(self)
     }
-
-    fn parse_response_for_errors(&self) -> Result<(), WpApiError> {
-        if let Ok(wp_error) = serde_json::from_slice::<WpError>(&self.body) {
-            Err(WpApiError::WpError {
-                error_code: wp_error.code,
-                error_message: wp_error.message,
-                status_code: self.status_code,
-                response: self.body_as_string(),
-            })
-        } else {
-            let status = http::StatusCode::from_u16(self.status_code).map_err(|_| {
-                WpApiError::InvalidHttpStatusCode {
-                    status_code: self.status_code,
-                }
-            })?;
-            if status.is_client_error() || status.is_server_error() {
-                Err(WpApiError::UnknownError {
-                    status_code: self.status_code,
-                    response: self.body_as_string(),
-                })
-            } else {
-                Ok(())
-            }
-        }
-    }
 }
 
 impl Debug for WpNetworkResponse {
@@ -487,7 +457,7 @@ pub struct WpRedirect {
 }
 
 impl WpRedirect {
-    fn new(source: String, destination: String) -> Self {
+    pub fn new(source: String, destination: String) -> Self {
         WpRedirect {
             source,
             destination,
