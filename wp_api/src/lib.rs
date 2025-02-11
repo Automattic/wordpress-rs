@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_variables)]
-
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{
     MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,

@@ -4,8 +4,6 @@ use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
-const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct AutoDiscoveryAttempt {
     pub(crate) attempt_site_url: String,
@@ -133,21 +131,21 @@ impl AutoDiscoveryAttemptResult {
 
     fn has_failed_to_parse_site_url(&self) -> bool {
         match &self.api_discovery_result {
-            Ok(success) => false,
+            Ok(_success) => false,
             Err(error) => error.parsed_site_url().is_none(),
         }
     }
 
     fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
         match &self.api_discovery_result {
-            Ok(success) => Some(false),
+            Ok(_success) => Some(false),
             Err(error) => error.has_failed_to_parse_api_root_url(),
         }
     }
 
     fn has_failed_to_parse_api_details(&self) -> Option<bool> {
         match &self.api_discovery_result {
-            Ok(success) => Some(false),
+            Ok(_success) => Some(false),
             Err(error) => error.has_failed_to_parse_api_details(),
         }
     }
@@ -406,8 +404,8 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
             AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => Some(true),
-            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => Some(false),
-            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(false),
+            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(false),
         }
     }
 
@@ -431,8 +429,8 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
             AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(true),
+            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(true),
         }
     }
 }
@@ -464,12 +462,6 @@ pub enum AutoDiscoveryAttemptType {
     UserInput,
     AutoHttps,
     AutoDotPhpExtensionForWpAdmin,
-}
-
-impl AutoDiscoveryAttemptType {
-    fn is_the_site_url_same_as_the_user_input(&self) -> bool {
-        matches!(self, AutoDiscoveryAttemptType::UserInput)
-    }
 }
 
 pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {

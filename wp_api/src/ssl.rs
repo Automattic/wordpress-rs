@@ -33,7 +33,7 @@ fn extract_data_as_string(data: x509_cert::der::Result<Option<impl AsRef<str>>>)
 }
 
 fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner) -> Vec<String> {
-    let Ok(Some((critical, alternative_names))) = cert.get_extension::<SubjectAltName>() else {
+    let Ok(Some((_critical, alternative_names))) = cert.get_extension::<SubjectAltName>() else {
         return vec![];
     };
     alternative_names

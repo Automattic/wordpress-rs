@@ -193,12 +193,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case(None, &[], "/tags/54?context=view&_fields=")]
-    #[case(Some("foo"), &[SparseTagFieldWithViewContext::Count], "/tags/54?context=view&_fields=count")]
-    #[case(Some("foo"), ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT, &format!("/tags/54?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(&[], "/tags/54?context=view&_fields=")]
+    #[case(&[SparseTagFieldWithViewContext::Count], "/tags/54?context=view&_fields=count")]
+    #[case(ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT, &format!("/tags/54?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT))]
     fn filter_retrieve_tag_with_view_context(
         endpoint: TagsRequestEndpoint,
-        #[case] password: Option<&str>,
         #[case] fields: &[SparseTagFieldWithViewContext],
         #[case] expected_path: &str,
     ) {

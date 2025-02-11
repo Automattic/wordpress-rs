@@ -204,12 +204,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case(None, &[], "/categories/54?context=view&_fields=")]
-    #[case(Some("foo"), &[SparseCategoryFieldWithViewContext::Count], "/categories/54?context=view&_fields=count")]
-    #[case(Some("foo"), ALL_SPARSE_CATEGORY_FIELDS_WITH_VIEW_CONTEXT, &format!("/categories/54?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_CATEGORY_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(&[], "/categories/54?context=view&_fields=")]
+    #[case(&[SparseCategoryFieldWithViewContext::Count], "/categories/54?context=view&_fields=count")]
+    #[case(ALL_SPARSE_CATEGORY_FIELDS_WITH_VIEW_CONTEXT, &format!("/categories/54?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_CATEGORY_FIELDS_WITH_VIEW_CONTEXT))]
     fn filter_retrieve_category_with_view_context(
         endpoint: CategoriesRequestEndpoint,
-        #[case] password: Option<&str>,
         #[case] fields: &[SparseCategoryFieldWithViewContext],
         #[case] expected_path: &str,
     ) {
