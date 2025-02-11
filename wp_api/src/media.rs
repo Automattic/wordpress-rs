@@ -5,8 +5,7 @@ use crate::{
         WpApiParamPostsSearchColumn,
     },
     url_query::{
-        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
-        UrlQueryPairsMap,
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
     JsonValue, UserId, WpApiParamOrder,
 };

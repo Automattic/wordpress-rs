@@ -1,19 +1,16 @@
-use std::{
-    collections::HashMap, convert::Infallible, fmt::Display, num::ParseIntError, str::FromStr,
-};
-
-use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
-use wp_contextual::WpContextual;
-
 use crate::{
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{
-        AppendUrlQueryPairs, AsQueryValue, FromUrlQueryPairs, QueryPairs, QueryPairsExtension,
-        UrlQueryPairsMap,
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
     EnumFromStrParsingError, OptionFromStr, WpApiParamOrder, WpResponseString,
 };
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap, convert::Infallible, fmt::Display, num::ParseIntError, str::FromStr,
+};
+use strum_macros::IntoStaticStr;
+use wp_contextual::WpContextual;
 
 #[derive(
     Debug,

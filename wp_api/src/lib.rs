@@ -9,7 +9,6 @@ pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use url_query::AsQueryValue;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
 

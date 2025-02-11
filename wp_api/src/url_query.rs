@@ -159,7 +159,7 @@ mod macro_helper {
     #[macro_export]
     macro_rules! impl_as_query_value_from_as_str {
         ($ident: ident) => {
-            impl AsQueryValue for $ident {
+            impl $crate::url_query::AsQueryValue for $ident {
                 fn as_query_value(&self) -> impl AsRef<str> {
                     self.as_str()
                 }
@@ -170,7 +170,7 @@ mod macro_helper {
     #[macro_export]
     macro_rules! impl_as_query_value_from_to_string {
         ($ident: ident) => {
-            impl AsQueryValue for $ident {
+            impl $crate::url_query::AsQueryValue for $ident {
                 fn as_query_value(&self) -> impl AsRef<str> {
                     self.to_string()
                 }
@@ -181,7 +181,7 @@ mod macro_helper {
     #[macro_export]
     macro_rules! impl_as_query_value_for_new_type {
         ($ident: ident) => {
-            impl AsQueryValue for $ident {
+            impl $crate::url_query::AsQueryValue for $ident {
                 fn as_query_value(&self) -> impl AsRef<str> {
                     self.0.as_query_value()
                 }

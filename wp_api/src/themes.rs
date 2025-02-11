@@ -3,7 +3,7 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    AsQueryValue, BoolOrVecString,
+    BoolOrVecString,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};
