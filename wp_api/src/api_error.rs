@@ -107,7 +107,7 @@ pub struct WpError {
 }
 
 impl WpError {
-    pub fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
+    pub fn try_parse(response_body: &[u8], _response_status_code: u16) -> Option<Self> {
         serde_json::from_slice::<WpError>(response_body).ok()
     }
 }

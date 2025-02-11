@@ -187,7 +187,6 @@ impl MediaRequestBuilder {
         file_path: String,
         file_content_type: String,
     ) -> MediaUploadRequest {
-        let url = self.endpoint.create();
         let mut header_map = self.inner.header_map();
         header_map.inner.insert(
             http::header::CONTENT_TYPE,

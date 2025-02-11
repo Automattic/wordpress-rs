@@ -146,7 +146,7 @@ where
 }
 
 impl FromUrlQueryPairs for () {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+    fn from_url_query_pairs(_query_pairs: UrlQueryPairsMap) -> Option<Self> {
         None
     }
 

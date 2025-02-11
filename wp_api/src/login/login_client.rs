@@ -69,7 +69,7 @@ impl WpLoginClient {
         let attempt_site_url = attempt.attempt_site_url.as_str();
         let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
         let discovery_result = self
-            .inner_attempt_api_discovery(attempt_site_url, api_link_header_result.clone())
+            .inner_attempt_api_discovery(api_link_header_result.clone())
             .await;
         let is_wordpress_site = self
             .attempt_is_wordpress_site(attempt_site_url, api_link_header_result)
@@ -84,7 +84,6 @@ impl WpLoginClient {
 
     async fn inner_attempt_api_discovery(
         &self,
-        attempt_site_url: &str,
         api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
     ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
         let api_root_url_success = api_link_header_result?;
@@ -152,16 +151,15 @@ impl WpLoginClient {
                 })
             }
         };
-        let api_root_url =
-            match self.parse_api_root_response(&parsed_site_url, fetch_api_root_url_response) {
-                Ok(api_root_url) => api_root_url,
-                Err(error) => {
-                    return Err(FindApiRootLinkHeaderFailure::ParseApiRootUrl {
-                        parsed_site_url,
-                        error,
-                    })
-                }
-            };
+        let api_root_url = match self.parse_api_root_response(fetch_api_root_url_response) {
+            Ok(api_root_url) => api_root_url,
+            Err(error) => {
+                return Err(FindApiRootLinkHeaderFailure::ParseApiRootUrl {
+                    parsed_site_url,
+                    error,
+                })
+            }
+        };
         Ok(FindApiRootLinkHeaderSuccess {
             parsed_site_url,
             api_root_url,
@@ -170,7 +168,6 @@ impl WpLoginClient {
 
     fn parse_api_root_response(
         &self,
-        site_url: &ParsedUrl,
         response: WpNetworkResponse,
     ) -> Result<ParsedUrl, ParseApiRootUrlError> {
         match response
@@ -259,7 +256,7 @@ impl WpLoginClient {
         let root_wp_json = match serde_json::from_slice::<RootWpJson>(&fetch_wp_json_response.body)
         {
             Ok(r) => r,
-            Err(error) => return Err(FetchWpJsonFailure::ParseWpJson { wp_json_url }),
+            Err(_) => return Err(FetchWpJsonFailure::ParseWpJson { wp_json_url }),
         };
         Ok(FetchWpJsonSuccess {
             wp_json_url,

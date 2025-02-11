@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code)]
 
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{
