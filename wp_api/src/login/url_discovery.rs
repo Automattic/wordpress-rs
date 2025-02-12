@@ -40,7 +40,7 @@ impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
             successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
             auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
             auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
-                AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+                AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
             ),
             is_successful: value.is_successful(),
         }
@@ -214,6 +214,10 @@ pub struct RootWpJson {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IsWordPressSiteParseHtmlResult {
+    /// `href` attribute of a link tag if it has `rel` attribute of "https://api.w.org/".
+    /// For example:
+    /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
+    pub api_root_url_from_link_tag: Option<ParsedUrl>,
     /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
     pub has_wordpress_generator_meta_tag: bool,
     /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
@@ -226,6 +230,7 @@ impl IsWordPressSiteParseHtmlResult {
     const HTML_ATTR_NAME: &str = "name";
     const HTML_ATTR_CONTENT: &str = "content";
     const HTML_ATTR_HREF: &str = "href";
+    const HTML_ATTR_REL: &str = "rel";
     const HTML_ATTR_SRC: &str = "src";
     const META_TAG_GENERATOR: &str = "generator";
     const META_TAG_GENERATOR_CONTENT_INCLUDES: &str = "WordPress";
@@ -260,8 +265,17 @@ impl IsWordPressSiteParseHtmlResult {
                     )
                 },
             );
+        let api_root_url_from_link_tag = html.select(&link_selector).find_map(|e| {
+            if let Some(API_ROOT_LINK_HEADER) = e.attr(Self::HTML_ATTR_REL) {
+                e.attr(Self::HTML_ATTR_HREF)
+                    .and_then(|u| ParsedUrl::parse(u).ok())
+            } else {
+                None
+            }
+        });
 
         Self {
+            api_root_url_from_link_tag,
             has_wordpress_generator_meta_tag: Self::html_has_generator_tag(&html),
             mentions_wp_content,
             mentions_wp_includes,
@@ -461,7 +475,8 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
 pub enum AutoDiscoveryAttemptType {
     UserInput,
     AutoHttps,
-    AutoDotPhpExtensionForWpAdmin,
+    AutoRemoveWpAdminSuffix,
+    AutoRemoveWpLoginSuffix,
 }
 
 pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
@@ -475,18 +490,24 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
             AutoDiscoveryAttemptType::AutoHttps,
         ))
     }
-    if input_site_url.ends_with("wp-admin") {
+    if let Some(a) = input_site_url
+        .strip_suffix("wp-admin")
+        .or_else(|| input_site_url.strip_suffix("wp-admin/"))
+        .or_else(|| input_site_url.strip_suffix("wp-admin.php"))
+    {
         attempts.push(AutoDiscoveryAttempt::new(
-            format!("{}.php", input_site_url),
-            AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+            a,
+            AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
         ))
-    } else if input_site_url.ends_with("wp-admin/") {
-        let mut s = input_site_url.clone();
-        s.pop()
-            .expect("Already verified that there is at least one char");
+    }
+    if let Some(a) = input_site_url
+        .strip_suffix("wp-login")
+        .or_else(|| input_site_url.strip_suffix("wp-login/"))
+        .or_else(|| input_site_url.strip_suffix("wp-login.php"))
+    {
         attempts.push(AutoDiscoveryAttempt::new(
-            format!("{}.php", s),
-            AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin,
+            a,
+            AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix,
         ))
     }
     attempts
@@ -529,9 +550,12 @@ mod tests {
     #[case("localhost", vec![AutoDiscoveryAttempt::new("localhost", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("https://localhost", AutoDiscoveryAttemptType::AutoHttps)])]
     #[case("http://localhost", vec![AutoDiscoveryAttempt::new("http://localhost", AutoDiscoveryAttemptType::UserInput)])]
     #[case("http://localhost/wp-json", vec![AutoDiscoveryAttempt::new("http://localhost/wp-json", AutoDiscoveryAttemptType::UserInput)])]
-    #[case("http://localhost/wp-admin.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::UserInput)])]
-    #[case("http://localhost/wp-admin", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin)])]
-    #[case("http://localhost/wp-admin/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::AutoDotPhpExtensionForWpAdmin)])]
+    #[case("http://localhost/wp-admin.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin.php", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
+    #[case("http://localhost/wp-admin", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
+    #[case("http://localhost/wp-admin/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-admin/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix)])]
+    #[case("http://localhost/wp-login.php", vec![AutoDiscoveryAttempt::new("http://localhost/wp-login.php", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix)])]
+    #[case("http://localhost/wp-login", vec![AutoDiscoveryAttempt::new("http://localhost/wp-login", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix)])]
+    #[case("http://localhost/wp-login/", vec![AutoDiscoveryAttempt::new("http://localhost/wp-login/", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("http://localhost/", AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix)])]
     #[case("orchestremetropolitain.com/wp-json", vec![AutoDiscoveryAttempt::new("orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::UserInput), AutoDiscoveryAttempt::new("https://orchestremetropolitain.com/wp-json", AutoDiscoveryAttemptType::AutoHttps)])]
     #[case("https://orchestremetropolitain.com", vec![AutoDiscoveryAttempt::new("https://orchestremetropolitain.com", AutoDiscoveryAttemptType::UserInput)])]
     #[case(

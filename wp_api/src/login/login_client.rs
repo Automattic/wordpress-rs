@@ -67,12 +67,22 @@ impl WpLoginClient {
         attempt: AutoDiscoveryAttempt,
     ) -> AutoDiscoveryAttemptResult {
         let attempt_site_url = attempt.attempt_site_url.as_str();
-        let api_link_header_result = self.find_api_root_url(attempt_site_url).await;
+        let parse_html_result = self
+            .fetch_site(attempt_site_url)
+            .await
+            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
+        let api_root_url_from_link_tag = parse_html_result
+            .as_ref()
+            .ok()
+            .and_then(|h| h.api_root_url_from_link_tag.clone());
+        let api_link_header_result = self
+            .find_api_root_url(attempt_site_url, api_root_url_from_link_tag)
+            .await;
         let discovery_result = self
             .inner_attempt_api_discovery(api_link_header_result.clone())
             .await;
         let is_wordpress_site = self
-            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result)
+            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result, parse_html_result)
             .await;
         AutoDiscoveryAttemptResult {
             attempt_type: attempt.attempt_type,
@@ -123,12 +133,9 @@ impl WpLoginClient {
         &self,
         attempt_site_url: &str,
         api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
+        parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
     ) -> IsWordPressSiteAttemptResult {
         let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
-        let parse_html_result = self
-            .fetch_site(attempt_site_url)
-            .await
-            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
         IsWordPressSiteAttemptResult {
             api_link_header_result,
             fetch_wp_json_result,
@@ -139,9 +146,25 @@ impl WpLoginClient {
     async fn find_api_root_url(
         &self,
         attempt_site_url: &str,
+        api_root_url_from_link_tag: Option<ParsedUrl>,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
         let parsed_site_url = ParsedUrl::parse(attempt_site_url)
             .map_err(|error| FindApiRootLinkHeaderFailure::ParseSiteUrl { error })?;
+        if let Some(api_root_url) = api_root_url_from_link_tag {
+            Ok(FindApiRootLinkHeaderSuccess {
+                parsed_site_url,
+                api_root_url,
+            })
+        } else {
+            self.fetch_and_parse_api_root_url_header(parsed_site_url)
+                .await
+        }
+    }
+
+    async fn fetch_and_parse_api_root_url_header(
+        &self,
+        parsed_site_url: ParsedUrl,
+    ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
         let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
             Ok(r) => r,
             Err(error) => {
