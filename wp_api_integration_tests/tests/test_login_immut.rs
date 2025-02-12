@@ -7,7 +7,9 @@ use wp_api_integration_tests::AsyncWpNetworking;
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
 const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
     "https://automatticwidgets.wpcomstaging.com/wp-admin/authorize-application.php";
-const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-application.php";
+const OPTIONAL_HTTPS_AUTH_URL: &str =
+    "https://optional-https.wpmt.co/wp-admin/authorize-application.php";
+const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-application.php";
 
 #[rstest]
 #[case("http://localhost", LOCALHOST_AUTH_URL)]
@@ -36,12 +38,10 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
     AUTOMATTIC_WIDGETS_AUTH_URL
 )]
 #[case("automatticwidgets.wpcomstaging.com/ ", AUTOMATTIC_WIDGETS_AUTH_URL)]
-#[case("vanilla.wpmt.co", VANILLA_WP_SITE_URL)]
-#[case("http://vanilla.wpmt.co", VANILLA_WP_SITE_URL)]
-#[case(
-    "https://optional-https.wpmt.co",
-    "https://optional-https.wpmt.co/wp-admin/authorize-application.php"
-)]
+#[case("vanilla.wpmt.co", VANILLA_WP_AUTH_URL)]
+#[case("http://vanilla.wpmt.co", VANILLA_WP_AUTH_URL)]
+#[case("http://optional-https.wpmt.co", OPTIONAL_HTTPS_AUTH_URL)]
+#[case("https://optional-https.wpmt.co", OPTIONAL_HTTPS_AUTH_URL)]
 #[case(
     "https://わぷー.wpmt.co",
     "https://xn--39j4bws.wpmt.co/wp-admin/authorize-application.php"
@@ -52,7 +52,7 @@ const VANILLA_WP_SITE_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 )]
 #[case(
     "http://wordpress-1315525-4803651.cloudwaysapps.com",
-    "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    VANILLA_WP_AUTH_URL
 )]
 #[case(
     "https://aggressive-caching.wpmt.co",
