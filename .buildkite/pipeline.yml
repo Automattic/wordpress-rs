@@ -72,6 +72,17 @@ steps:
           - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
         agents:
           queue: mac
+      - label: ":swift: Build Docs"
+        command: |
+          .buildkite/download-xcframework.sh
+
+          echo "--- :swift: Building Documentation"
+          make swift-docs-only
+        agents:
+          queue: mac
+        depends_on: xcframework
+        artifact_paths:
+          - swift-docs.tar.gz
       - label: ":swift: :darwin: Build + Test on Simulators"
         command: .buildkite/swift-test.sh run_tests
         depends_on: xcframework
