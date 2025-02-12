@@ -8,8 +8,19 @@ use crate::{
     UserId,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+
+uniffi::custom_newtype!(TemplateId, String);
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TemplateId(pub String);
+
+impl Display for TemplateId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(
     Debug,
@@ -121,7 +132,7 @@ impl FromUrlQueryPairs for TemplateListParams {
 #[derive(Debug, Serialize, Deserialize, WpContextual)]
 pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
-    pub id: Option<String>,
+    pub id: Option<TemplateId>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, embed, view)]

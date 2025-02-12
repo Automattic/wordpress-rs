@@ -67,6 +67,7 @@ pub const CATEGORY_ID_59: CategoryId = CategoryId(59);
 pub const CATEGORY_ID_INVALID: CategoryId = CategoryId(99999999);
 pub const TAG_ID_100: TagId = TagId(100);
 pub const TAG_ID_INVALID: TagId = TagId(99999999);
+pub const TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE: &str = "twentytwentyfour//single";
 pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
