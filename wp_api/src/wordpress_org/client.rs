@@ -78,7 +78,7 @@ impl WordPressOrgApiClient {
             Some(category) => {
                 let mut url = url;
                 url.query_pairs_mut()
-                    .append_pair("browse", category.as_str());
+                    .append_pair("browse", category.as_ref());
                 url
             }
             None => url,
@@ -146,23 +146,23 @@ impl WordPressOrgApiClient {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, uniffi::Enum)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+    strum_macros::AsRefStr,
+)]
+#[strum(serialize_all = "kebab-case")]
 pub enum WordPressOrgApiPluginDirectoryCategory {
     New,
     Popular,
     Updated,
     TopRated,
-}
-
-impl WordPressOrgApiPluginDirectoryCategory {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            WordPressOrgApiPluginDirectoryCategory::New => "new",
-            WordPressOrgApiPluginDirectoryCategory::Popular => "popular",
-            WordPressOrgApiPluginDirectoryCategory::Updated => "updated",
-            WordPressOrgApiPluginDirectoryCategory::TopRated => "top-rated",
-        }
-    }
+    Recommended,
+    Featured,
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -209,6 +209,7 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
     #[test]
     fn test_plugin_info_requests_include_icons() {
@@ -226,5 +227,20 @@ mod tests {
         assert!(!request.url.0.contains("request[per_page]"));
         assert!(request.url.0.contains("page=3"));
         assert!(request.url.0.contains("per_page=24"));
+    }
+
+    #[rstest]
+    #[case(WordPressOrgApiPluginDirectoryCategory::New, "new")]
+    #[case(WordPressOrgApiPluginDirectoryCategory::Popular, "popular")]
+    #[case(WordPressOrgApiPluginDirectoryCategory::Updated, "updated")]
+    #[case(WordPressOrgApiPluginDirectoryCategory::TopRated, "top-rated")]
+    #[case(WordPressOrgApiPluginDirectoryCategory::Recommended, "recommended")]
+    #[case(WordPressOrgApiPluginDirectoryCategory::Featured, "featured")]
+    fn test_browse_plugins(
+        #[case] category: WordPressOrgApiPluginDirectoryCategory,
+        #[case] expected: &str,
+    ) {
+        let request = WordPressOrgApiClient::browse_plugins_request(Some(category), 3, 24);
+        assert!(request.url.0.contains(&format!("browse={}", expected)));
     }
 }
