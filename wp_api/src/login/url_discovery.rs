@@ -4,6 +4,8 @@ use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
+pub(crate) const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct AutoDiscoveryAttempt {
     pub(crate) attempt_site_url: String,

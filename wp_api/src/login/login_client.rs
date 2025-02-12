@@ -4,7 +4,7 @@ use super::{
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
         FetchWpJsonFailure, FetchWpJsonSuccess, FindApiRootLinkHeaderFailure,
         FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult, IsWordPressSiteParseHtmlResult,
-        ParseApiRootUrlError, ParseHtmlFailure,
+        ParseApiRootUrlError, ParseHtmlFailure, API_ROOT_LINK_HEADER,
     },
     WpApiDetails,
 };
@@ -18,8 +18,6 @@ use crate::{
 };
 use std::{str, sync::Arc};
 use uuid::Uuid;
-
-const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
 #[derive(Debug, uniffi::Object)]
 struct UniffiWpLoginClient {
