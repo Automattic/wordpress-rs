@@ -35,7 +35,16 @@ docs:
 
 docs-archive: docs
 	@# Help: Archive the generated project documentation.
-	tar -czvf  docs.tar.gz docs
+	tar -czvf docs.tar.gz docs
+
+swift-docs: xcframework swift-docs-only
+	@# Help: Generate Xcode documentation.
+
+swift-docs-only:
+	mkdir -p docs/Swift
+	swift package --allow-writing-to-directory docs generate-documentation --target WordPressAPI --output-path docs/Swift/WordPressAPI.doccarchive --disable-indexing
+	swift package --allow-writing-to-directory docs generate-documentation --target WordPressAPIInternal --output-path docs/Swift/WordPressAPIInternal.doccarchive --disable-indexing
+	tar -czf swift-docs.tar.gz docs
 
 release-on-ci:
 	@[ -n "$(BUILDKITE_API_TOKEN)" ] || (echo "BUILDKITE_API_TOKEN is not set" && exit 1)
