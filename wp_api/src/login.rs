@@ -54,16 +54,20 @@ pub struct WpApiDetails {
     pub gmt_offset: i64,
     pub timezone_string: String,
     pub namespaces: Vec<String>,
-    pub authentication: HashMap<String, WpRestApiAuthenticationScheme>,
+    pub authentication: WpApiDetailsAuthenticationMap,
     pub site_icon_url: Option<String>,
 }
 
 #[uniffi::export]
 impl WpApiDetails {
+    pub fn has_application_passwords_authentication_url(&self) -> bool {
+        self.authentication
+            .has_application_passwords_authentication_url()
+    }
+
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
-            .get(KEY_APPLICATION_PASSWORDS)
-            .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
+            .find_application_passwords_authentication_url()
     }
 }
 
@@ -94,6 +98,35 @@ pub enum OAuthResponseUrlError {
     MissingPassword,
     #[error("Unsuccessful Login")]
     UnsuccessfulLogin,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WpApiDetailsAuthenticationMap(HashMap<String, WpRestApiAuthenticationScheme>);
+
+// If the response is `[]`, default to an empty `HashMap`
+impl<'de> Deserialize<'de> for WpApiDetailsAuthenticationMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer
+            .deserialize_any(wp_serde_helper::DeserializeEmptyVecOrT::<
+                HashMap<String, WpRestApiAuthenticationScheme>,
+            >::new(Box::new(HashMap::new)))
+            .map(Self)
+    }
+}
+
+impl WpApiDetailsAuthenticationMap {
+    pub fn has_application_passwords_authentication_url(&self) -> bool {
+        self.0.contains_key(KEY_APPLICATION_PASSWORDS)
+    }
+
+    pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
+        self.0
+            .get(KEY_APPLICATION_PASSWORDS)
+            .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
+    }
 }
 
 /// Return a URL to be used in application password authentication.
@@ -196,5 +229,50 @@ mod tests {
             app_id_str
         );
         assert_eq!(auth_url, ParsedUrl::parse(expected_url.as_str()).unwrap());
+    }
+
+    #[test]
+    fn test_parse_wp_api_details_authentication_map() {
+        let json = r#"{
+          "authentication": {
+            "application-passwords": {
+              "endpoints": {
+                "authorization": "http://localhost/wp-admin/authorize-application.php"
+              }
+            }
+          }
+        }"#;
+        let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json);
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetailsAuthenticationMap`"
+        );
+        assert_eq!(
+            result
+                .expect("Already verified result is Ok")
+                .authentication
+                .find_application_passwords_authentication_url(),
+            Some("http://localhost/wp-admin/authorize-application.php".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_empty_vec_as_wp_api_details_authentication_map() {
+        let json = r#"{"authentication": []}"#;
+        let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json);
+        assert!(
+            result.is_ok(),
+            "Failed to parse '[]' as `WpApiDetailsAuthenticationMap`"
+        );
+        assert!(result
+            .expect("Already verified result is Ok")
+            .authentication
+            .0
+            .is_empty());
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct WpApiDetailsAuthenticationMapWrapper {
+        authentication: WpApiDetailsAuthenticationMap,
     }
 }

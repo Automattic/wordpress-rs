@@ -83,6 +83,12 @@ impl AutoDiscoveryResult {
             .any(|(_, result)| result.is_successful())
     }
 
+    pub fn is_successful_and_has_authorization_url(&self) -> bool {
+        self.attempts
+            .iter()
+            .any(|(_, result)| result.is_successful_and_has_authorization_url())
+    }
+
     pub fn find_successful(&self) -> Option<&AutoDiscoveryAttemptResult> {
         // If the user attempt is successful, prefer it over other attempts
         let user_input_attempt = self.user_input_attempt();
@@ -91,6 +97,21 @@ impl AutoDiscoveryResult {
         }
         self.attempts.iter().find_map(|(_, result)| {
             if result.is_successful() {
+                Some(result)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn find_successful_with_authorization_url(&self) -> Option<&AutoDiscoveryAttemptResult> {
+        // If the user attempt is successful, prefer it over other attempts
+        let user_input_attempt = self.user_input_attempt();
+        if user_input_attempt.is_successful_and_has_authorization_url() {
+            return Some(user_input_attempt);
+        }
+        self.attempts.iter().find_map(|(_, result)| {
+            if result.is_successful_and_has_authorization_url() {
                 Some(result)
             } else {
                 None
@@ -140,6 +161,15 @@ impl AutoDiscoveryAttemptResult {
 
     fn is_successful(&self) -> bool {
         self.api_discovery_result.is_ok()
+    }
+
+    fn is_successful_and_has_authorization_url(&self) -> bool {
+        match &self.api_discovery_result {
+            Ok(attempt) => attempt
+                .api_details
+                .has_application_passwords_authentication_url(),
+            Err(_) => false,
+        }
     }
 
     fn is_network_error(&self) -> bool {
