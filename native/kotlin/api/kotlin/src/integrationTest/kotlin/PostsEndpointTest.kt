@@ -8,6 +8,7 @@ import uniffi.wp_api.PostRetrieveParams
 import uniffi.wp_api.SparsePostFieldWithEditContext
 import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class PostsEndpointTest {
@@ -87,5 +88,16 @@ class PostsEndpointTest {
             requestBuilder.posts().listWithEditContext(nextPageResponse.prevPageParams!!)
         }.assertSuccessAndRetrieveData()
         assert(prevPageResponse.data.isNotEmpty())
+    }
+
+    @Test
+    fun ensureDateGmtIsParsedCorrectly() = runTest {
+        val post = client.request { requestBuilder ->
+            requestBuilder.posts().retrieveWithEditContext(1, PostRetrieveParams())
+        }.assertSuccessAndRetrieveData().data
+        assertEquals(
+            testCredentials.firstPostDateGmt,
+            TestCredentials.UTC_DATE_FORMAT.format(post.dateGmt)
+        )
     }
 }

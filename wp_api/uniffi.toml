@@ -4,6 +4,12 @@ android_cleaner = false
 cdylib_name = "wp_api"
 generate_immutable_records = true
 
+[bindings.kotlin.custom_types.WpGmtDateTime]
+type_name = "Date"
+imports = ["java.util.Date", "java.time.Instant"]
+into_custom = "Date.from(Instant.ofEpochSecond({}))"
+from_custom = "{}.toInstant().epochSecond"
+
 [bindings.swift]
 ffi_module_name = "libwordpressFFI"
 ffi_module_filename = "wp_api_uniffi"

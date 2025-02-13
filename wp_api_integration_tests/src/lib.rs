@@ -5,6 +5,7 @@ use std::sync::Arc;
 use wp_api::{
     categories::CategoryId,
     comments::CommentId,
+    date::WpGmtDateTime,
     media::MediaId,
     posts::PostId,
     request::{
@@ -37,7 +38,14 @@ pub struct TestCredentials {
     pub password_protected_comment_id: i64,
     pub password_protected_comment_author: &'static str,
     pub trashed_post_id: i64,
+    pub first_post_date_gmt: &'static str,
     pub wordpress_core_version: &'static str,
+}
+
+impl TestCredentials {
+    pub fn date_format() -> &'static str {
+        "%Y-%m-%d %H:%M:%S"
+    }
 }
 
 pub mod backend;
@@ -285,4 +293,8 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
         assert!(self.is_ok(), "Request failed with: {}", self.unwrap_err());
         self.unwrap()
     }
+}
+
+pub fn unwrapped_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
+    s.parse::<WpGmtDateTime>().expect("Expected a valid date")
 }
