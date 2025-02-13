@@ -10,6 +10,12 @@ imports = ["java.util.Date", "java.time.Instant"]
 into_custom = "Date.from(Instant.ofEpochSecond({}))"
 from_custom = "{}.toInstant().epochSecond"
 
+[bindings.swift.custom_types.WpGmtDateTime]
+type_name = "Date"
+imports = ["Foundation"]
+into_custom = "Date(timeIntervalSince1970: TimeInterval({}))"
+from_custom = "Int64({}.timeIntervalSince1970)"
+
 [bindings.swift]
 ffi_module_name = "libwordpressFFI"
 ffi_module_filename = "wp_api_uniffi"
