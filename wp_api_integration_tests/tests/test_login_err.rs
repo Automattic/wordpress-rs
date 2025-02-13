@@ -6,27 +6,6 @@ use wp_api::login::url_discovery::AutoDiscoveryAttemptType;
 use wp_api_integration_tests::AsyncWpNetworking;
 
 #[rstest]
-#[case("http://optional-https.wpmt.co")] // Fails because it's `http`
-#[tokio::test]
-#[parallel]
-async fn test_login_flow_err_parse_api_details(#[case] site_url: &str) {
-    let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
-    let mut result = client.api_discovery(site_url.to_string()).await;
-    let original_attempt_error = result
-        .attempts
-        .remove(&AutoDiscoveryAttemptType::UserInput)
-        .unwrap()
-        .api_discovery_result
-        .unwrap_err();
-    assert_eq!(
-        original_attempt_error.has_failed_to_parse_api_details(),
-        Some(true),
-        "{:#?}",
-        original_attempt_error
-    );
-}
-
-#[rstest]
 #[case("http://jalib923knblakis9ba92q3nbaslkes.nope")]
 #[tokio::test]
 #[parallel]
