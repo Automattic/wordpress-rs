@@ -82,6 +82,9 @@ mod tests {
             ApiBaseUrl,
         },
         tags::TagId,
+        unit_test_common::{
+            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
+        },
         UserId, WpApiParamOrder,
     };
     use rstest::*;
@@ -102,12 +105,12 @@ mod tests {
     #[case(generate!(PostListParams, (page, Some(2))), "page=2")]
     #[case(generate!(PostListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(PostListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(PostListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(PostListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(PostListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
     #[case(generate!(PostListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(PostListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
-    #[case(generate!(PostListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(PostListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(PostListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(PostListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
     #[case(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])), "exclude=1%2C2")]
     #[case(generate!(PostListParams, (include, vec![PostId(1), PostId(2)])), "include=1%2C2")]
     #[case(generate!(PostListParams, (offset, Some(2))), "offset=2")]
@@ -144,7 +147,7 @@ mod tests {
     #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
     #[case(
         post_list_params_with_all_fields(),
-        EXPECTED_QUERY_PAIRS_FOR_POST_LIST_PARAMS_WITH_ALL_FIELDS
+        &expected_query_pairs_for_post_list_params_with_all_fields()
     )]
     fn list_posts(
         endpoint: PostsRequestEndpoint,
@@ -175,7 +178,7 @@ mod tests {
     #[rstest]
     #[case(PostListParams::default(), &[], "/posts?context=edit&_fields=")]
     #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparsePostFieldWithEditContext::Author], "/posts?context=edit&orderby=author&_fields=author")]
-    #[case(post_list_params_with_all_fields(), ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT, &format!("/posts?context=edit&{}&{}", EXPECTED_QUERY_PAIRS_FOR_POST_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(post_list_params_with_all_fields(), ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT, &format!("/posts?context=edit&{}&{}", expected_query_pairs_for_post_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT))]
     fn filter_list_post_with_edit_context(
         endpoint: PostsRequestEndpoint,
         #[case] params: PostListParams,
@@ -191,7 +194,7 @@ mod tests {
     #[rstest]
     #[case(PostListParams::default(), &[], "/posts?context=embed&_fields=")]
     #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparsePostFieldWithEmbedContext::Author], "/posts?context=embed&orderby=author&_fields=author")]
-    #[case(post_list_params_with_all_fields(), ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT, &format!("/posts?context=embed&{}&{}", EXPECTED_QUERY_PAIRS_FOR_POST_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(post_list_params_with_all_fields(), ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT, &format!("/posts?context=embed&{}&{}", expected_query_pairs_for_post_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT))]
     fn filter_list_post_with_embed_context(
         endpoint: PostsRequestEndpoint,
         #[case] params: PostListParams,
@@ -272,20 +275,26 @@ mod tests {
         validate_wp_v2_endpoint(endpoint.update(&PostId(54)), "/posts/54");
     }
 
-    const EXPECTED_QUERY_PAIRS_FOR_POST_LIST_PARAMS_WITH_ALL_FIELDS: &str =
-        "page=2&per_page=2&search=foo&after=2023-08-14+17%3A00%3A00.000&modified_after=2023-08-14+17%3A00%3A00.000&author=1%2C2&author_exclude=1%2C2&before=2023-08-14+17%3A00%3A00.000&modified_before=2023-08-14+17%3A00%3A00.000&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true";
+    fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
+        let after = unit_test_example_date_as_query_value("after");
+        let modified_after = unit_test_example_date_as_query_value("modified_after");
+        let before = unit_test_example_date_as_query_value("before");
+        let modified_before = unit_test_example_date_as_query_value("modified_before");
+        format!("page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true")
+    }
+
     fn post_list_params_with_all_fields() -> PostListParams {
         PostListParams {
-            after: Some("2023-08-14 17:00:00.000".to_string()),
+            after: unit_test_example_date_as_option(),
             author: vec![UserId(1), UserId(2)],
             author_exclude: vec![UserId(1), UserId(2)],
-            before: Some("2023-08-14 17:00:00.000".to_string()),
+            before: unit_test_example_date_as_option(),
             categories: vec![CategoryId(1), CategoryId(2)],
             categories_exclude: vec![CategoryId(1), CategoryId(2)],
             exclude: vec![PostId(1), PostId(2)],
             include: vec![PostId(1), PostId(2)],
-            modified_after: Some("2023-08-14 17:00:00.000".to_string()),
-            modified_before: Some("2023-08-14 17:00:00.000".to_string()),
+            modified_after: unit_test_example_date_as_option(),
+            modified_before: unit_test_example_date_as_option(),
             offset: Some(2),
             order: Some(WpApiParamOrder::Asc),
             orderby: Some(WpApiParamPostsOrderBy::Author),

@@ -340,6 +340,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
@@ -3663,6 +3664,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64",
+ "chrono",
  "futures",
  "http 1.2.0",
  "indoc",
@@ -3787,6 +3789,7 @@ dependencies = [
 name = "wp_serde_helper"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "rstest",
  "serde",
  "serde_json",

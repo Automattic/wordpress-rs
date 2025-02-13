@@ -3,6 +3,7 @@ pub use api_error::{
     MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,
     RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
+use date::WpGmtDateTime;
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,7 @@ mod uuid; // re-exported relevant types
 pub mod application_passwords;
 pub mod categories;
 pub mod comments;
+pub mod date;
 pub mod login;
 pub mod media;
 pub mod plugins;
@@ -203,6 +205,11 @@ macro_rules! generate {
         obj
     }};
 }
+
+uniffi::custom_type!(WpGmtDateTime, f64, {
+    lower: |date_time| date_time.0.timestamp() as f64,
+    try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds.round() as i64)),
+});
 
 uniffi::setup_scaffolding!();
 

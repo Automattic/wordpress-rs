@@ -5,6 +5,7 @@ use std::sync::Arc;
 use wp_api::{
     categories::CategoryId,
     comments::CommentId,
+    date::WpGmtDateTime,
     media::MediaId,
     posts::PostId,
     request::{
@@ -284,4 +285,8 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
         assert!(self.is_ok(), "Request failed with: {}", self.unwrap_err());
         self.unwrap()
     }
+}
+
+pub fn unwrapped_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
+    s.parse::<WpGmtDateTime>().expect("Expected a valid date")
 }
