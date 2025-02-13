@@ -127,8 +127,8 @@ final class WpRequestExecutor: SafeRequestExecutor {
              reason: RequestExecutionErrorReason.invalidSslError(
                      siteCertificate: siteCertificate,
                      certificateChain: peerCertificateChain,
-                     errorMessage: nil,
-                     suggestedAction: nil
+                     errorMessage: error.localizedDescription,
+                     suggestedAction: (error as NSError).localizedRecoverySuggestion
                  )
              )
          )
@@ -143,6 +143,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
                 statusCode: UInt16(response.statusCode),
                 redirects: executorDelegate.redirects(for: request.requestId()),
                 reason: .httpAuthenticationRequired(
+                    url: request.url(),
                     serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
                 )
             )
@@ -158,6 +159,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
                 statusCode: UInt16(response.statusCode),
                 redirects: executorDelegate.redirects(for: request.requestId()),
                 reason: .httpAuthenticationRejected(
+                    url: request.url(),
                     serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
                 )
             )

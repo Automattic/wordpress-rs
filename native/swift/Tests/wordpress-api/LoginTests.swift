@@ -114,7 +114,7 @@ class LoginTests {
             _ = try await client.loginURL(forSite: "https://basic-auth.wpmt.co")
         }, throws: { error in
             #expect(error is LoginError)
-            #expect("The server at https://basic-auth.wpmt.co requires authentication. Please provide your username and password." == (error as? LoginError)?.errorDescription)
+            #expect("The server at https://basic-auth.wpmt.co/ requires authentication. Please provide your username and password." == (error as? LoginError)?.errorDescription)
             return true
         })
     }
@@ -130,7 +130,7 @@ class LoginTests {
             )
         }, throws: { error in
             #expect(error is LoginError)
-            #expect("The server at https://basic-auth.wpmt.co rejected your credentials. Please provide a valid username and password." == (error as? LoginError)?.errorDescription)
+            #expect("The server at https://basic-auth.wpmt.co/ rejected your credentials. Please provide a valid username and password." == (error as? LoginError)?.errorDescription)
             return true
         })
     }
@@ -183,7 +183,8 @@ class LoginTests {
             _ = try await client.loginURL(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
         }, throws: { error in
             #expect(error is LoginError)
-            return true // TODO: It'd be nice to get more details about this error
+            #expect("The certificate for this server is invalid. You might be connecting to a server that is pretending to be “wordpress-1315525-4803651.cloudwaysapps.com” which could put your confidential information at risk." == (error as? LoginError)?.errorDescription)
+            return true
         })
     }
 

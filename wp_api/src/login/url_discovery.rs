@@ -1,5 +1,5 @@
 use super::WpApiDetails;
-use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
+use crate::{request::WpNetworkHeaderMap, request::WpRedirect, ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason};
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
@@ -606,13 +606,14 @@ pub enum ParseApiRootUrlError {
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FetchApiDetailsError {
     #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
+        "Request execution faiasdfled!\nStatus Code: '{:?}'.\nResponse: '{}'",
         status_code,
         reason
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        redirects: Option<Vec<WpRedirect>>,
+        reason: RequestExecutionErrorReason
     },
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
