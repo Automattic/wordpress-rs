@@ -168,6 +168,25 @@ async fn retrieve_password_protected_with_view_context() {
 }
 
 #[tokio::test]
+#[parallel]
+async fn ensure_date_gmt_is_parsed_correctly() {
+    let test_credentials = TestCredentials::instance();
+    let post = api_client()
+        .posts()
+        .retrieve_with_edit_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(
+        post.date_gmt
+            .0
+            .format(TestCredentials::date_format())
+            .to_string(),
+        test_credentials.first_post_date_gmt
+    );
+}
+
+#[tokio::test]
 #[rstest]
 #[parallel]
 #[case(PostListParams { per_page: Some(1), ..Default::default() })]

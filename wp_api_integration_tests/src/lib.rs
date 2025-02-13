@@ -38,7 +38,14 @@ pub struct TestCredentials {
     pub password_protected_comment_id: i64,
     pub password_protected_comment_author: &'static str,
     pub trashed_post_id: i64,
+    pub first_post_date_gmt: &'static str,
     pub wordpress_core_version: &'static str,
+}
+
+impl TestCredentials {
+    pub fn date_format() -> &'static str {
+        "%Y-%m-%d %H:%M:%S"
+    }
 }
 
 pub mod backend;

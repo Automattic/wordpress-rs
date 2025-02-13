@@ -90,6 +90,7 @@ create_test_credentials () {
   local PASSWORD_PROTECTED_POST_ID
   local PASSWORD_PROTECTED_COMMENT_ID
   local PASSWORD_PROTECTED_COMMENT_AUTHOR
+  local FIRST_POST_DATE_GMT
   local WORDPRESS_VERSION
   SITE_URL="http://localhost"
   ADMIN_USERNAME="test@example.com"
@@ -106,6 +107,8 @@ create_test_credentials () {
 
   PASSWORD_PROTECTED_COMMENT_AUTHOR="setup-test-site.sh"
   PASSWORD_PROTECTED_COMMENT_ID="$(wp comment create --comment_post_ID="$PASSWORD_PROTECTED_POST_ID" --comment_content="test_comment_for_password_protected_post" --comment_author="$PASSWORD_PROTECTED_COMMENT_AUTHOR" --porcelain)"
+
+  FIRST_POST_DATE_GMT=$(wp post get 1 --fields=post_date_gmt --format=csv | sed -n '2 p' | cut -d ',' -f 2 | cut -d'"' -f 2)
 
   WORDPRESS_VERSION="$(wp core version)"
 
@@ -129,6 +132,7 @@ create_test_credentials () {
     password_protected_comment_id="$PASSWORD_PROTECTED_COMMENT_ID" \
     password_protected_comment_author="$PASSWORD_PROTECTED_COMMENT_AUTHOR" \
     trashed_post_id="$TRASHED_POST_ID" \
+    first_post_date_gmt="$FIRST_POST_DATE_GMT" \
     wordpress_core_version="$WORDPRESS_VERSION" \
     > /app/test_credentials.json
 }
