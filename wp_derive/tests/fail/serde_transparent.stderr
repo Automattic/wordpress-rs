@@ -1,0 +1,10 @@
+error: `#[serde(transparent)]` attribute is not supported.
+
+       `wp_derive::WpDeserialize` and `#[serde(transparent)]` can't be combined. However, you can use `wp_serde_helper::DeserializeEmptyVecOrT` to manually replicate the same behaviour.
+
+       Here is an example of how to do this:
+       https://github.com/Automattic/wordpress-rs/pull/532/commits/1027e6ed6c8bd0e4cd9aec5ec0595f64f5e925b7#diff-139286995fa3539fe509c87c0b832e974c87c687d64330c6a9c0bd117cdf54f7
+ --> tests/fail/serde_transparent.rs:5:9
+  |
+5 | #[serde(transparent)]
+  |         ^^^^^^^^^^^

@@ -142,11 +142,38 @@ impl ParsedStruct {
 
         Ok(fields)
     }
+
+    // Fails if attributes include `#[serde(transparent)]`
+    fn parse_outer(input: ParseStream) -> syn::Result<Vec<Attribute>> {
+        let attrs = Attribute::parse_outer(input)?;
+        for attr in &attrs {
+            if let syn::Meta::List(meta_list) = &attr.meta {
+                if let Some(ident) = meta_list.path.get_ident() {
+                    if *ident != "serde" {
+                        continue;
+                    }
+
+                    if let Some(proc_macro2::TokenTree::Ident(first_token_ident)) =
+                        meta_list.tokens.clone().into_iter().next()
+                    {
+                        if first_token_ident.to_string().as_str() == "transparent" {
+                            return Err(
+                                WpDeserializeParseError::SerdeTransparentAttributeNotSupported
+                                    .into_syn_error(first_token_ident.span()),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Ok(attrs)
+    }
 }
 
 impl Parse for ParsedStruct {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let attrs = Attribute::parse_outer(input)?;
+        let attrs = Self::parse_outer(input)?;
+
         let _vis: syn::Visibility = input.parse()?;
         let _struct_token: Token![struct] = input.parse()?;
         let struct_ident: Ident = input.parse()?;
@@ -169,6 +196,8 @@ enum WpDeserializeParseError {
         original_type
     )]
     NonOptionalField { original_type: String },
+    #[error("{}", SERDE_TRANSPARENT_PARSING_ERROR)]
+    SerdeTransparentAttributeNotSupported,
 }
 
 impl WpDeserializeParseError {
@@ -176,3 +205,10 @@ impl WpDeserializeParseError {
         syn::Error::new(span, self.to_string())
     }
 }
+
+const SERDE_TRANSPARENT_PARSING_ERROR: &str = r#"`#[serde(transparent)]` attribute is not supported.
+
+`wp_derive::WpDeserialize` and `#[serde(transparent)]` can't be combined. However, you can use `wp_serde_helper::DeserializeEmptyVecOrT` to manually replicate the same behaviour.
+
+Here is an example of how to do this:
+https://github.com/Automattic/wordpress-rs/pull/532/commits/1027e6ed6c8bd0e4cd9aec5ec0595f64f5e925b7#diff-139286995fa3539fe509c87c0b832e974c87c687d64330c6a9c0bd117cdf54f7"#;
