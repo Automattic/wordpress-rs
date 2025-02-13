@@ -59,6 +59,7 @@ impl InnerRequestBuilder {
     pub fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
+            retry_count: 0,
             method: RequestMethod::GET,
             url: url.into(),
             header_map: self.header_map().into(),
@@ -72,6 +73,7 @@ impl InnerRequestBuilder {
     {
         WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
+            retry_count: 0,
             method: RequestMethod::POST,
             url: url.into(),
             header_map: self.header_map_for_post_request().into(),
@@ -84,6 +86,7 @@ impl InnerRequestBuilder {
     pub fn delete(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
         WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
+            retry_count: 0,
             method: RequestMethod::DELETE,
             url: url.into(),
             header_map: self.header_map().into(),
@@ -151,9 +154,10 @@ impl WpNetworkRequestBody {
 }
 
 // Has custom `Debug` trait implementation
-#[derive(uniffi::Object)]
+#[derive(uniffi::Object, Clone)]
 pub struct WpNetworkRequest {
     pub(crate) uuid: String,
+    pub(crate) retry_count: u8,
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
@@ -162,8 +166,21 @@ pub struct WpNetworkRequest {
 
 #[uniffi::export]
 impl WpNetworkRequest {
+    /// Unique identifier for this request – used for external record-keeping
     pub fn request_id(&self) -> String {
         self.uuid.clone()
+    }
+
+    /// Increments the retry count for this request by returning a copy of it
+    pub fn increment_retry_count(&self) -> Self {
+        let mut request = self.clone();
+        request.retry_count += 1;
+        return request
+    }
+
+    /// How many times this request has this request been attempted?
+    pub fn retry_count(&self) -> u8 {
+        self.retry_count
     }
 
     pub fn method(&self) -> RequestMethod {
@@ -193,6 +210,7 @@ impl WpNetworkRequest {
     pub fn get(url: WpEndpointUrl) -> Self {
         Self {
             uuid: Uuid::new_v4().into(),
+            retry_count: 0,
             method: RequestMethod::GET,
             url,
             header_map: Arc::new(WpNetworkHeaderMap::default()),

@@ -12,4 +12,8 @@ disabled_rules:
   - type_name
   # The library is still developing. We'll allow todo at this stage.
   - todo
+  # These rule aren't really practical
+  - file_length
+  - function_body_length
+  - type_body_length
 

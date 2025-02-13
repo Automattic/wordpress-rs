@@ -93,6 +93,7 @@ impl TryFrom<UpdateCheckRequest> for WpNetworkRequest {
 
         Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
+            retry_count: 0,
             method: RequestMethod::POST,
             url: crate::request::endpoint::WpEndpointUrl(
                 "https://api.wordpress.org/plugins/update-check/1.1/".to_string(),

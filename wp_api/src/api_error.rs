@@ -449,14 +449,22 @@ pub enum RequestExecutionErrorReason {
         suggested_action: Option<String>,
     },
     #[error("The server at {} requires authentication. Please provide your username and password.", url)]
-    HttpAuthenticationRequired {
+    HttpAuthenticationRequiredError {
         url: String,
         server_message: Option<String>
     },
     #[error("The server at {} rejected your credentials. Please provide a valid username and password.", url)]
-    HttpAuthenticationRejected {
+    HttpAuthenticationRejectedError {
         url: String,
         server_message: Option<String>,
+    },
+    #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
+    MisconfiguredRateLimitError {
+
+    },
+    #[error("{}", error_message)]
+    DeviceIsOfflineError {
+        error_message: String,
     },
     #[error("{}", error_message)]
     GenericError {

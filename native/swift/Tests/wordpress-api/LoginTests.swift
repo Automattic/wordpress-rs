@@ -160,8 +160,29 @@ class LoginTests {
 
     @Test("Login Spec Example 15: Rate Limited")
     func testWordPressHeavyRateLimiting() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "https://rate-limited.wpmt.co")
-        #expect("https://rate-limited.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+        let parsedUrl = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")
+        #expect("https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+    }
+
+    @Test("Login Spec Example 15: Rate Limited that never succeeds")
+    func testWordPressHeavyRateLimitingThatNeverSucceeds() async throws {
+        let executor = WpRequestExecutor(
+            urlSession: .shared,
+            additionalHttpHeadersForAllRequests: [ // guarantees that the window will never open
+                "X-RLT-RETRY-AFTER": "2", // Don't retry for two seconds
+                "X-RLT-RETRY-WINDOW": "1" // But only requests within the first second succeed
+            ]
+        )
+
+        let client = WordPressLoginClient(requestExecutor: executor)
+
+        await #expect(performing: {
+            _ = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")
+        }, throws: { error in
+            #expect(error is LoginError)
+            #expect("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration." == (error as? LoginError)?.errorDescription)
+            return true
+        })
     }
 
     @Test("Login Spec Example 16: Non-existent website")
