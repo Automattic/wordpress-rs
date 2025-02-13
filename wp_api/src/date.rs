@@ -23,3 +23,8 @@ impl FromStr for WpGmtDateTime {
             .map_err(Into::<Self::Err>::into)
     }
 }
+
+uniffi::custom_type!(WpGmtDateTime, i64, {
+    lower: |date_time| date_time.0.timestamp(),
+    try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds)),
+});

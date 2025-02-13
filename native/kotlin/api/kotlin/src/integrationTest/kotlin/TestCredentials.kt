@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import uniffi.wp_api.ParsedUrl
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.TimeZone
 
 @Serializable
 data class TestCredentials(
@@ -21,7 +23,9 @@ data class TestCredentials(
     @SerialName("subscriber_password")
     val subscriberPassword: String,
     @SerialName("subscriber_password_uuid")
-    val subscriberPasswordUuid: String
+    val subscriberPasswordUuid: String,
+    @SerialName("first_post_date_gmt")
+    val firstPostDateGmt: String
 ) {
     companion object {
         private val json by lazy {
@@ -31,6 +35,12 @@ data class TestCredentials(
             val file =
                 File(Companion::class.java.classLoader.getResource("test_credentials.json")!!.file)
             json.decodeFromString<TestCredentials>(file.readText())
+        }
+
+        val UTC_DATE_FORMAT by lazy {
+            SimpleDateFormat("yyyy-MM-dd HH:mm:ss").apply {
+                this.timeZone = TimeZone.getTimeZone("UTC")
+            }
         }
     }
 

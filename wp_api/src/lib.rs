@@ -3,7 +3,6 @@ pub use api_error::{
     MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,
     RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
-use date::WpGmtDateTime;
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};
@@ -205,11 +204,6 @@ macro_rules! generate {
         obj
     }};
 }
-
-uniffi::custom_type!(WpGmtDateTime, f64, {
-    lower: |date_time| date_time.0.timestamp() as f64,
-    try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds.round() as i64)),
-});
 
 uniffi::setup_scaffolding!();
 
