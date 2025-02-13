@@ -19,4 +19,10 @@ struct DateTests {
         let date = assertionExampleDateThatCanBeUsedToVerifyConversionBetweenRustAndNative()
         #expect(testDate == date)
     }
+
+    @Test
+    func roundtrip() {
+        let date = assertionExampleDateThatCanBeUsedToVerifyConversionBetweenRustAndNative()
+        assertDateIsConvertedFromNativeToRustCorrectly(date: date)
+    }
 }
