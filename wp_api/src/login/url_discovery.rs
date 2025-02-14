@@ -240,10 +240,15 @@ impl AutoDiscoveryAttemptResult {
             }
         }
     }
+
+    /// Does the site look like a WordPress site?
+    fn is_wordpress_site(&self) -> bool {
+        self.is_wordpress_site.is_successful()
+    }
 }
 
 // Does the given URL look like it's on a local development environment for the purposes of the Login Spec?
-fn is_local_dev_environment_url(parsed_site_url: &ParsedUrl) -> bool {
+pub fn is_local_dev_environment_url(parsed_site_url: &ParsedUrl) -> bool {
     if let Some(hostname) = parsed_site_url.inner.host_str() {
         return hostname == "localhost"
             || hostname == "127.0.0.1"

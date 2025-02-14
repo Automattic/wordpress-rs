@@ -8,11 +8,8 @@ import FoundationNetworking
 #endif
 
 // swiftlint:disable line_length
-@Suite("Login")
+@Suite("Parallel Login Test")
 class LoginTests {
-
-    // swiftlint:disable:next force_try
-    let appId = { try! WpUuid.parse(input: "caa8b54a-eb5e-4134-8ae2-a3946a428ec7") }()
 
     let client = WordPressLoginClient(urlSession: .shared)
 
@@ -24,6 +21,16 @@ class LoginTests {
 
     @Test("Login Spec Example 2: Local Development Environment")
     func testLocalDevelopmentEnvironment() async throws {
+
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "http://localhost/", with: .init(body: Data(), statusCode: 200, headerMap: .fromMap(hashMap: [
+                "Link": "<http://localhost/wp-json/>; rel=\"https://api.w.org/\""
+            ]))),
+            try HTTPStubs.stub(url: "http://localhost/wp-json/", with: .jsonResponse(named: "localhost-json-root"))
+        ])
+
+        let client = WordPressLoginClient(requestExecutor: stubs)
+
         await #expect(performing: {
             _ = try await client.loginURL(forSite: "http://localhost")
         }, throws: { error in
@@ -158,33 +165,6 @@ class LoginTests {
         #expect("https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
-    @Test("Login Spec Example 15: Rate Limited")
-    func testWordPressHeavyRateLimiting() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")
-        #expect("https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
-    }
-
-    @Test("Login Spec Example 15: Rate Limited that never succeeds")
-    func testWordPressHeavyRateLimitingThatNeverSucceeds() async throws {
-        let executor = WpRequestExecutor(
-            urlSession: .shared,
-            additionalHttpHeadersForAllRequests: [ // guarantees that the window will never open
-                "X-RLT-RETRY-AFTER": "2", // Don't retry for two seconds
-                "X-RLT-RETRY-WINDOW": "1" // But only requests within the first second succeed
-            ]
-        )
-
-        let client = WordPressLoginClient(requestExecutor: executor)
-
-        await #expect(performing: {
-            _ = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")
-        }, throws: { error in
-            #expect(error is LoginError)
-            #expect("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration." == (error as? LoginError)?.errorDescription)
-            return true
-        })
-    }
-
     @Test("Login Spec Example 16: Non-existent website")
     func testInvalidUrl() async {
         await #expect(performing: {
@@ -250,4 +230,38 @@ class LoginTests {
         #endif
     }
 }
+
+@Suite("Serialized Login Tests", .serialized)
+struct SerializedLoginTests {
+    let client = WordPressLoginClient(urlSession: .shared)
+
+    @Test("Login Spec Example 15: Rate Limited")
+    func testWordPressHeavyRateLimiting() async throws {
+        let parsedUrl = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")
+        #expect("https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+    }
+
+    @Test("Login Spec Example 15: Rate Limited that never succeeds")
+    func testWordPressHeavyRateLimitingThatNeverSucceeds() async throws {
+        let executor = WpRequestExecutor(
+            urlSession: .shared,
+            additionalHttpHeadersForAllRequests: [ // guarantees that the window will never open
+                "X-RLT-RETRY-AFTER": "5", // Don't retry for two seconds
+                "X-RLT-RETRY-WINDOW": "1" // But only requests within the first second succeed
+            ]
+        )
+
+        let client = WordPressLoginClient(requestExecutor: executor)
+
+        await #expect(performing: {
+            _ = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")
+        }, throws: { error in
+            #expect(error is LoginError)
+            #expect("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration." == (error as? LoginError)?.errorDescription)
+            return true
+        })
+    }
+}
+
 // swiftlint:enable line_length
+

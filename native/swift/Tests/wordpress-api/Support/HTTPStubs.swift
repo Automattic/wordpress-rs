@@ -79,4 +79,17 @@ extension WpNetworkResponse {
         )
     }
 
+    static func jsonResponse(named name: String, statusCode: UInt16 = 200) throws -> WpNetworkResponse {
+
+        guard let resourceUrl =  Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Responses") else {
+            preconditionFailure("Could not find \(name).json")
+        }
+
+        return WpNetworkResponse(
+            body: try Data(contentsOf: resourceUrl),
+            statusCode: statusCode,
+            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"])
+        )
+    }
+
 }

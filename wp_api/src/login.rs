@@ -4,6 +4,7 @@ use std::str;
 use std::sync::Arc;
 use wp_serde_helper::deserialize_i64_or_string;
 
+use crate::login::url_discovery::is_local_dev_environment_url;
 use crate::ParsedUrl;
 use crate::WpUuid;
 
@@ -88,7 +89,9 @@ impl WpApiDetails {
     }
 
     /// Returns a list of plugins that might be responsible for disabling application passwords.
-    pub fn application_password_blocking_plugins(&self) -> Vec<KnownApplicationPasswordBlockingPlugin> {
+    pub fn application_password_blocking_plugins(
+        &self,
+    ) -> Vec<KnownApplicationPasswordBlockingPlugin> {
         known_application_password_blocking_plugins()
             .iter()
             .filter(|plugin| self.namespaces.contains(&plugin.namespace))
@@ -99,6 +102,12 @@ impl WpApiDetails {
     /// Returns the site URL (as defined by the site itself, not by user input) as a string.
     pub fn site_url_string(&self) -> String {
         self.url.clone()
+    }
+
+    /// Returns `true` if the site URL looks like a local development environment URL.
+    pub fn site_url_is_local_development_environment(&self) -> bool {
+        ParsedUrl::parse(self.url.as_str())
+            .is_ok_and(|parsed_url| is_local_dev_environment_url(&parsed_url))
     }
 }
 
