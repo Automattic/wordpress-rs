@@ -8,7 +8,9 @@ import FoundationNetworking
 public enum LoginError: LocalizedError {
     case missingApplicationPasswordAuthMethod(WpApiDetails)
     case `internal`(String?)
+    case notAWordPressSite(String)
 
+    // swiftlint:disable line_length
     public var errorDescription: String? {
         switch self {
         case .missingApplicationPasswordAuthMethod(let apiDetails):
@@ -17,24 +19,29 @@ public enum LoginError: LocalizedError {
                     let blockingPlugins = apiDetails.applicationPasswordBlockingPlugins()
 
                     if blockingPlugins.count == 1 {
-                        // swiftlint:disable:next line_length
                         return "Unable to login to \(apiDetails.siteUrlString()) – the \(blockingPlugins.first!.name) plugin might have disabled Application Passwords. Please visit \(blockingPlugins.first!.supportUrl) to learn more."
                     } else {
-                        // swiftlint:disable:next line_length
                         return "Unable to login to \(apiDetails.siteUrlString()) – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again."
                     }
                 } else {
                     return "Application Passwords is not enabled for this site."
                 }
             } else {
-                // swiftlint:disable:next line_length
+                if apiDetails.siteUrlIsLocalDevelopmentEnvironment() {
+                    return "This site is a local development environment. You'll need to enable application passwords to connect to it with the app."
+                }
+
                 return "Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again."
             }
 
         case .internal(let underlyingErrorMessage):
             return underlyingErrorMessage
+
+        case .notAWordPressSite(let urlString):
+            return "Unable to login to \(urlString). Please double-check that this is a WordPress site"
         }
     }
+    // swiftlint:enable line_length
 }
 
 public final class WordPressLoginClient {
@@ -94,7 +101,11 @@ public final class WordPressLoginClient {
         let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
         guard let successfulAttempt = discoveryResult.successfulAttempt else {
-            throw LoginError.internal(discoveryResult.userInputAttempt.errorMessage())
+            if discoveryResult.userInputAttempt.isWordpressSite() {
+                throw LoginError.internal(discoveryResult.userInputAttempt.errorMessage())
+            } else {
+                throw LoginError.notAWordPressSite(discoveryResult.userInputAttempt.attemptSiteUrl())
+            }
         }
 
         return successfulAttempt
