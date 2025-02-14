@@ -60,15 +60,67 @@ pub struct WpApiDetails {
 
 #[uniffi::export]
 impl WpApiDetails {
+    /// Does the site have application passwords enabled?
     pub fn has_application_passwords_authentication_url(&self) -> bool {
         self.authentication
             .has_application_passwords_authentication_url()
     }
 
+    /// Returns the URL to be used in application password authentication.
+    ///
+    /// See the "Authorization Flow" section for details:
+    /// https://github.com/WordPress/wordpress-develop/blob/530493396b324f5bed518a494e2843e7fdb020f1/src/wp-includes/rest-api.php#L1099-L1119
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
             .find_application_passwords_authentication_url()
     }
+
+    /// Does the site URL (as defined by the site itself, not by user input) use HTTPS?
+    pub fn uses_https(&self) -> bool {
+        self.url.starts_with("https://")
+    }
+
+    /// Does the site use a plugin that disables application passwords?
+    pub fn has_application_password_blocking_plugin(&self) -> bool {
+        known_application_password_blocking_plugins()
+            .iter()
+            .any(|plugin| self.namespaces.contains(&plugin.namespace))
+    }
+
+    /// Returns a list of plugins that might be responsible for disabling application passwords.
+    pub fn application_password_blocking_plugins(&self) -> Vec<KnownApplicationPasswordBlockingPlugin> {
+        known_application_password_blocking_plugins()
+            .iter()
+            .filter(|plugin| self.namespaces.contains(&plugin.namespace))
+            .cloned()
+            .collect()
+    }
+
+    /// Returns the site URL (as defined by the site itself, not by user input) as a string.
+    pub fn site_url_string(&self) -> String {
+        self.url.clone()
+    }
+}
+
+pub fn known_application_password_blocking_plugins() -> Vec<KnownApplicationPasswordBlockingPlugin>
+{
+    vec![KnownApplicationPasswordBlockingPlugin {
+        name: "Wordfence".to_string(),
+        namespace: "wordfence/v1".to_string(),
+        support_url: "https://www.wordfence.com/support/".to_string(), // TODO: Ensure this is correct with the WordFence folks
+    }]
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct KnownApplicationPasswordBlockingPlugin {
+    /// The name of the plugin.
+    pub name: String,
+
+    /// The plugin's REST API namespace.
+    pub namespace: String,
+
+    /// A URL to the plugin's support page, where users can find help.
+    pub support_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]

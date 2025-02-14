@@ -418,7 +418,7 @@ pub enum WpErrorCode {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
-    #[error("{}",reason)]
+    #[error("{}", reason)]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
@@ -448,28 +448,28 @@ pub enum RequestExecutionErrorReason {
         error_message: Option<String>,
         suggested_action: Option<String>,
     },
-    #[error("The server at {} requires authentication. Please provide your username and password.", url)]
+    #[error(
+        "The server at {} requires authentication. Please provide your username and password.",
+        url
+    )]
     HttpAuthenticationRequiredError {
         url: String,
-        server_message: Option<String>
+        server_message: Option<String>,
     },
-    #[error("The server at {} rejected your credentials. Please provide a valid username and password.", url)]
+    #[error(
+        "The server at {} rejected your credentials. Please provide a valid username and password.",
+        url
+    )]
     HttpAuthenticationRejectedError {
         url: String,
         server_message: Option<String>,
     },
     #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
-    MisconfiguredRateLimitError {
-
-    },
+    MisconfiguredRateLimitError {},
     #[error("{}", error_message)]
-    DeviceIsOfflineError {
-        error_message: String,
-    },
+    DeviceIsOfflineError { error_message: String },
     #[error("{}", error_message)]
-    GenericError {
-        error_message: String,
-    },
+    GenericError { error_message: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]

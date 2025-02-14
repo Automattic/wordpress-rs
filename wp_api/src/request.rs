@@ -175,7 +175,7 @@ impl WpNetworkRequest {
     pub fn increment_retry_count(&self) -> Self {
         let mut request = self.clone();
         request.retry_count += 1;
-        return request
+        request
     }
 
     /// How many times this request has this request been attempted?
