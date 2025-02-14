@@ -295,7 +295,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
     private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
         let nserror = error as NSError
 
-        return nserror.domain == kCFErrorDomainCFNetwork as String && [
+        return nserror.domain == NSURLErrorDomain as String && [
             NSURLErrorNetworkConnectionLost,
             NSURLErrorNotConnectedToInternet
         ].contains(nserror.code)
