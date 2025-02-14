@@ -120,11 +120,21 @@ impl WpLoginClient {
                 }
             };
 
-        Ok(AutoDiscoveryAttemptSuccess {
-            parsed_site_url: api_root_url_success.parsed_site_url,
-            api_root_url: api_root_url_success.api_root_url,
-            api_details,
-        })
+        if !api_details.has_application_passwords_authentication_url() {
+            Err(
+                AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
+                    parsed_site_url: api_root_url_success.parsed_site_url,
+                    api_root_url: api_root_url_success.api_root_url,
+                    api_details,
+                },
+            )
+        } else {
+            Ok(AutoDiscoveryAttemptSuccess {
+                parsed_site_url: api_root_url_success.parsed_site_url,
+                api_root_url: api_root_url_success.api_root_url,
+                api_details,
+            })
+        }
     }
 
     async fn attempt_is_wordpress_site(

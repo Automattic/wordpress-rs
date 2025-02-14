@@ -64,13 +64,13 @@ async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str
     let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
     let result = client.api_discovery(site_url.to_string()).await;
     assert!(
-        result.is_successful_and_has_authorization_url(),
+        result.is_successful(),
         "Auto discovery failed: {:#?}",
         result
     );
 
     let successful_attempt = result
-        .find_successful_with_authorization_url()
+        .find_successful()
         .expect("Already verified that auto discovery is successful");
     assert_eq!(
         successful_attempt
@@ -109,30 +109,4 @@ async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str
     //         mentions_wp_includes: true
     //     })
     // );
-}
-
-#[rstest]
-#[case("https://wordfence.wpmt.co")]
-#[tokio::test]
-#[parallel]
-async fn successful_but_does_not_have_authorization_url(#[case] site_url: &str) {
-    let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
-    let result = client.api_discovery(site_url.to_string()).await;
-    assert!(
-        result.is_successful(),
-        "Auto discovery failed: {:#?}",
-        result
-    );
-    let successful_attempt = result
-        .find_successful()
-        .expect("Already verified that auto discovery is successful");
-    assert_eq!(
-        successful_attempt
-            .api_discovery_result
-            .clone()
-            .expect("Already verified that auto discovery is successful")
-            .api_details
-            .find_application_passwords_authentication_url(),
-        None
-    );
 }
