@@ -1,7 +1,7 @@
 import Foundation
 import WordPressAPIInternal
 
-#if os(Linux)
+#if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
@@ -38,6 +38,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
         WpRequestExecutor(urlSession: self.session, httpCredential: credential)
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
 
         let (data, response): (Data, URLResponse)
@@ -51,8 +52,9 @@ final class WpRequestExecutor: SafeRequestExecutor {
 
             (data, response) = try await self.session.data(for: urlrequest, delegate: executorDelegate)
 
-            // swiftlint:disable:next force_cast
-            let httpResponse = response as! HTTPURLResponse
+            guard let httpResponse = response as? HTTPURLResponse else {
+                preconditionFailure("The HTTP response should always be a HTTPURLResponse")
+            }
 
             let headerMap: WpNetworkHeaderMap
 
@@ -207,14 +209,17 @@ final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func errorIsHttpsError(_ error: Error) -> Bool {
-        let nserror = error as NSError
+        guard let urlError = error as? URLError else {
+            return false
+        }
 
-        return nserror.domain == NSURLErrorDomain && [
-            NSURLErrorServerCertificateUntrusted,
-            NSURLErrorSecureConnectionFailed,
-            NSURLErrorServerCertificateHasBadDate,
-            NSURLErrorServerCertificateNotYetValid
-        ].contains(nserror.code)
+        return [
+            .secureConnectionFailed,
+            .serverCertificateUntrusted,
+            .serverCertificateHasBadDate,
+            .serverCertificateNotYetValid,
+            .serverCertificateHasUnknownRoot
+        ].contains(urlError.code)
     }
 
     /// This response indicates that HTTP credentials must be sent as part of the request
@@ -249,10 +254,10 @@ final class WpRequestExecutor: SafeRequestExecutor {
         let defaultWaitTime: TimeInterval = 5
 
         func wait(for timeInterval: TimeInterval) async throws {
-            if #available(macOS 13.0, *) {
+            if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
                 try await Task.sleep(for: .seconds(timeInterval))
             } else {
-                try await Task.sleep(nanoseconds: UInt64(timeInterval) * NSEC_PER_SEC)
+                try await Task.sleep(nanoseconds: UInt64(timeInterval) * 1_000_000_000)
             }
         }
 
@@ -282,23 +287,19 @@ final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
-        let nserror = error as NSError
-
-        return nserror.domain == NSURLErrorDomain && [
-            NSURLErrorBadURL,
-            NSURLErrorCannotFindHost,
-            NSURLErrorDNSLookupFailed,
-            NSURLErrorCannotConnectToHost
-        ].contains(nserror.code)
+        [
+            .badURL,
+            .cannotConnectToHost,
+            .cannotFindHost,
+            .dnsLookupFailed
+        ].contains((error as? URLError)?.code)
     }
 
     private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
-        let nserror = error as NSError
-
-        return nserror.domain == NSURLErrorDomain as String && [
-            NSURLErrorNetworkConnectionLost,
-            NSURLErrorNotConnectedToInternet
-        ].contains(nserror.code)
+        [
+            .networkConnectionLost,
+            .notConnectedToInternet
+        ].contains((error as? URLError)?.code)
     }
 
     private func handleDeviceIsOfflineError(

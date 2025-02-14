@@ -1,6 +1,11 @@
 import Foundation
 import WordPressAPI
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
+
 final class HTTPStubs: SafeRequestExecutor {
 
     typealias Stub = (condition: @Sendable (WpNetworkRequest) -> Bool, response: WpNetworkResponse)
