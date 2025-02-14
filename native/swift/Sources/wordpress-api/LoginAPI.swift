@@ -5,9 +5,36 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
-public struct LoginError: LocalizedError {
-    public let errorDescription: String?
-    public let recoverySuggestion: String?
+public enum LoginError: LocalizedError {
+    case missingApplicationPasswordAuthMethod(WpApiDetails)
+    case `internal`(String?)
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingApplicationPasswordAuthMethod(let apiDetails):
+            if apiDetails.usesHttps() {
+                if apiDetails.hasApplicationPasswordBlockingPlugin() {
+                    let blockingPlugins = apiDetails.applicationPasswordBlockingPlugins()
+
+                    if blockingPlugins.count == 1 {
+                        // swiftlint:disable:next line_length
+                        return "Unable to login to \(apiDetails.siteUrlString()) – the \(blockingPlugins.first!.name) plugin might have disabled Application Passwords. Please visit \(blockingPlugins.first!.supportUrl) to learn more."
+                    } else {
+                        // swiftlint:disable:next line_length
+                        return "Unable to login to \(apiDetails.siteUrlString()) – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again."
+                    }
+                } else {
+                    return "Application Passwords is not enabled for this site."
+                }
+            } else {
+                // swiftlint:disable:next line_length
+                return "Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again."
+            }
+
+        case .internal(let underlyingErrorMessage):
+            return underlyingErrorMessage
+        }
+    }
 }
 
 public final class WordPressLoginClient {
@@ -67,7 +94,7 @@ public final class WordPressLoginClient {
         let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
         guard let successfulAttempt = discoveryResult.successfulAttempt else {
-            throw LoginError(errorDescription: discoveryResult.userInputAttempt.errorMessage(), recoverySuggestion: nil)
+            throw LoginError.internal(discoveryResult.userInputAttempt.errorMessage())
         }
 
         return successfulAttempt
@@ -79,13 +106,18 @@ public final class WordPressLoginClient {
     ) async throws(LoginError) -> ParsedUrl {
 
         // All sites should have some form of authentication we can use
+        guard let apiDetails = try await loginAttempt(
+            forSite: proposedSiteUrl,
+            credential: credential
+        ).apiDetails() else {
+            preconditionFailure("It shouldn't be possible to hit this case – an error should be emitted instead")
+        }
+
         guard
-            let apiDetails = try await loginAttempt(forSite: proposedSiteUrl, credential: credential).apiDetails(),
             let passwordAuthenticationUrl = apiDetails.findApplicationPasswordsAuthenticationUrl(),
             let parsedLoginUrl = try? ParsedUrl.parse(input: passwordAuthenticationUrl)
         else {
-            abort() // TODO: Throw the right error type
-//          throw WordPressLoginClientError.missingLoginUrl
+            throw LoginError.missingApplicationPasswordAuthMethod(apiDetails)
         }
 
         return parsedLoginUrl

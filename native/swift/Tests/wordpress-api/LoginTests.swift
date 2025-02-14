@@ -41,17 +41,18 @@ class LoginTests {
 
     @Test("Login Spec Example 4: HTTP URL with HTTPS Support")
     func testAutoHttpsSupport() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "http://optional-https.wpmt.co")
-        #expect("https://optional-https.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+        let parsedUrl = try await client.loginURL(forSite: "http://vanilla.wpmt.co")
+        #expect("https://vanilla.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 5: HTTP-only site")
     func testHttpOnlySite() async {
         await #expect(performing: {
-            // TODO
-            try await Task.sleep(nanoseconds: 100)
+            _ = try await client.loginURL(forSite: "http://optional-https.wpmt.co")
         }, throws: { error in
             #expect(error is LoginError)
+            #expect("Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again." == (error as? LoginError)?.errorDescription)
+
             return true
         })
     }
@@ -74,7 +75,7 @@ class LoginTests {
             _ = try await client.loginURL(forSite: "https://wordfence.wpmt.co")
         }, throws: { error in
             #expect(error is LoginError)
-            #expect("Unable to login to https://wordfence.wpmt.co – the WordFence plugin might have disabled Application Passwords" == (error as? LoginError)?.errorDescription)
+            #expect("Unable to login to https://wordfence.wpmt.co – the Wordfence plugin might have disabled Application Passwords. Please visit https://www.wordfence.com/support/ to learn more." == (error as? LoginError)?.errorDescription)
             return true
         })
     }
@@ -134,7 +135,6 @@ class LoginTests {
             return true
         })
     }
-
 
     @Test("Login Spec Example 13: Site uses HTTP basic with correct credentials provided")
     func testWordPressHttpBasicWithValidCredentials() async throws {
