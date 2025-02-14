@@ -83,12 +83,6 @@ impl AutoDiscoveryResult {
             .any(|(_, result)| result.is_successful())
     }
 
-    pub fn is_successful_and_has_authorization_url(&self) -> bool {
-        self.attempts
-            .iter()
-            .any(|(_, result)| result.is_successful_and_has_authorization_url())
-    }
-
     pub fn find_successful(&self) -> Option<&AutoDiscoveryAttemptResult> {
         // If the user attempt is successful, prefer it over other attempts
         let user_input_attempt = self.user_input_attempt();
@@ -97,21 +91,6 @@ impl AutoDiscoveryResult {
         }
         self.attempts.iter().find_map(|(_, result)| {
             if result.is_successful() {
-                Some(result)
-            } else {
-                None
-            }
-        })
-    }
-
-    pub fn find_successful_with_authorization_url(&self) -> Option<&AutoDiscoveryAttemptResult> {
-        // If the user attempt is successful, prefer it over other attempts
-        let user_input_attempt = self.user_input_attempt();
-        if user_input_attempt.is_successful_and_has_authorization_url() {
-            return Some(user_input_attempt);
-        }
-        self.attempts.iter().find_map(|(_, result)| {
-            if result.is_successful_and_has_authorization_url() {
                 Some(result)
             } else {
                 None
@@ -155,21 +134,12 @@ impl AutoDiscoveryAttemptResult {
     fn error_message(&self) -> Option<String> {
         match &self.api_discovery_result {
             Ok(_) => None,
-            Err(error) => Some(error.error_message()),
+            Err(error) => Some(error.to_string()),
         }
     }
 
     fn is_successful(&self) -> bool {
         self.api_discovery_result.is_ok()
-    }
-
-    fn is_successful_and_has_authorization_url(&self) -> bool {
-        match &self.api_discovery_result {
-            Ok(attempt) => attempt
-                .api_details
-                .has_application_passwords_authentication_url(),
-            Err(_) => false,
-        }
     }
 
     fn is_network_error(&self) -> bool {
@@ -391,47 +361,41 @@ pub struct AutoDiscoveryAttemptSuccess {
     pub api_details: WpApiDetails,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AutoDiscoveryAttemptFailure {
-    ParseSiteUrl {
-        error: ParseUrlError,
-    },
+    #[error("{error}")]
+    ParseSiteUrl { error: ParseUrlError },
+    #[error("{error}")]
     FetchApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: RequestExecutionError,
     },
+    #[error("{error}")]
     ParseApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: ParseApiRootUrlError,
     },
+    #[error("{error}")]
     FetchApiDetails {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
         error: RequestExecutionError,
     },
+    #[error("Failed to parse api details: {:#?}", parsing_error_message)]
     ParseApiDetails {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
         parsing_error_message: String,
     },
+    #[error("Application Passwords are not supported")]
+    ApplicationPasswordsNotSupported {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+        api_details: WpApiDetails,
+    },
 }
 
 impl AutoDiscoveryAttemptFailure {
-    pub fn error_message(&self) -> String {
-        match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => error.to_string(),
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { error, .. } => error.to_string(),
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { error, .. } => error.to_string(),
-            AutoDiscoveryAttemptFailure::FetchApiDetails { error, .. } => error.to_string(),
-            AutoDiscoveryAttemptFailure::ParseApiDetails {
-                parsing_error_message,
-                ..
-            } => {
-                format!("Failed to parse api details: {:#?}", parsing_error_message)
-            }
-        }
-    }
-
     pub fn is_network_error(&self) -> bool {
         match self {
             AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => true,
@@ -439,6 +403,7 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => false,
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => false,
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => false,
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => false,
         }
     }
 
@@ -457,6 +422,10 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiDetails {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
+                parsed_site_url,
+                ..
+            } => Some(parsed_site_url),
         }
     }
 
@@ -474,6 +443,7 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => Some(true),
             AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => Some(false),
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
         }
     }
 
@@ -484,6 +454,9 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
             AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
             AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
+                api_root_url, ..
+            } => Some(api_root_url),
         }
     }
 
@@ -499,6 +472,18 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
             AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(true),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+        }
+    }
+
+    pub fn is_application_passwords_disabled(&self) -> Option<bool> {
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
+            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
+            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => None,
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(true),
         }
     }
 }

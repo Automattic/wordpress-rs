@@ -24,3 +24,24 @@ async fn test_login_flow_err_network_error(#[case] site_url: &str) {
         original_attempt_error
     );
 }
+
+#[rstest]
+#[case("https://wordfence.wpmt.co")]
+#[tokio::test]
+#[parallel]
+async fn application_passwords_not_supported(#[case] site_url: &str) {
+    let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
+    let mut result = client.api_discovery(site_url.to_string()).await;
+    let original_attempt_error = result
+        .attempts
+        .remove(&AutoDiscoveryAttemptType::UserInput)
+        .unwrap()
+        .api_discovery_result
+        .unwrap_err();
+    assert_eq!(
+        original_attempt_error.is_application_passwords_disabled(),
+        Some(true),
+        "{:#?}",
+        original_attempt_error
+    );
+}
