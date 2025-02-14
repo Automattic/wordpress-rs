@@ -134,7 +134,7 @@ impl AutoDiscoveryAttemptResult {
     fn error_message(&self) -> Option<String> {
         match &self.api_discovery_result {
             Ok(_) => None,
-            Err(error) => Some(error.error_message()),
+            Err(error) => Some(error.to_string()),
         }
     }
 
@@ -361,29 +361,33 @@ pub struct AutoDiscoveryAttemptSuccess {
     pub api_details: WpApiDetails,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AutoDiscoveryAttemptFailure {
-    ParseSiteUrl {
-        error: ParseUrlError,
-    },
+    #[error( "{}", error.to_string())]
+    ParseSiteUrl { error: ParseUrlError },
+    #[error( "{}", error.to_string())]
     FetchApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: RequestExecutionError,
     },
+    #[error( "{}", error.to_string())]
     ParseApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: ParseApiRootUrlError,
     },
+    #[error( "{}", error.to_string())]
     FetchApiDetails {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
         error: RequestExecutionError,
     },
+    #[error("Failed to parse api details: {:#?}", parsing_error_message)]
     ParseApiDetails {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
         parsing_error_message: String,
     },
+    #[error("Application Passwords are not supported")]
     ApplicationPasswordsNotSupported {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
@@ -392,24 +396,6 @@ pub enum AutoDiscoveryAttemptFailure {
 }
 
 impl AutoDiscoveryAttemptFailure {
-    pub fn error_message(&self) -> String {
-        match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => error.to_string(),
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { error, .. } => error.to_string(),
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { error, .. } => error.to_string(),
-            AutoDiscoveryAttemptFailure::FetchApiDetails { error, .. } => error.to_string(),
-            AutoDiscoveryAttemptFailure::ParseApiDetails {
-                parsing_error_message,
-                ..
-            } => {
-                format!("Failed to parse api details: {:#?}", parsing_error_message)
-            }
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => {
-                "Application Passwords are not supported".to_string()
-            }
-        }
-    }
-
     pub fn is_network_error(&self) -> bool {
         match self {
             AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => true,
