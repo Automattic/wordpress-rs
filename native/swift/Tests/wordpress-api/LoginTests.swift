@@ -59,8 +59,8 @@ class LoginTests {
 
     @Test("Login Spec Example 6: HTTP-Only Site with Application Password Override")
     func testHttpOnlySiteWithApplicationPasswordsEnabled() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "http://http-only.wpmt.co")
-        #expect("http://http-only.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+        let parsedUrl = try await client.loginURL(forSite: "http://no-https.wpmt.co")
+        #expect("http://no-https.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 7: CDN-Cached Site")
