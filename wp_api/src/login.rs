@@ -83,7 +83,7 @@ impl WpApiDetails {
 
     /// Does the site use a plugin that disables application passwords?
     pub fn has_application_password_blocking_plugin(&self) -> bool {
-        known_application_password_blocking_plugins()
+        KnownApplicationPasswordBlockingPlugin::all()
             .iter()
             .any(|plugin| self.namespaces.contains(&plugin.namespace))
     }
@@ -92,7 +92,7 @@ impl WpApiDetails {
     pub fn application_password_blocking_plugins(
         &self,
     ) -> Vec<KnownApplicationPasswordBlockingPlugin> {
-        known_application_password_blocking_plugins()
+        KnownApplicationPasswordBlockingPlugin::all()
             .iter()
             .filter(|plugin| self.namespaces.contains(&plugin.namespace))
             .cloned()
@@ -111,25 +111,25 @@ impl WpApiDetails {
     }
 }
 
-pub fn known_application_password_blocking_plugins() -> Vec<KnownApplicationPasswordBlockingPlugin>
-{
-    vec![KnownApplicationPasswordBlockingPlugin {
-        name: "Wordfence".to_string(),
-        namespace: "wordfence/v1".to_string(),
-        support_url: "https://www.wordfence.com/support/".to_string(), // TODO: Ensure this is correct with the WordFence folks
-    }]
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct KnownApplicationPasswordBlockingPlugin {
     /// The name of the plugin.
     pub name: String,
-
     /// The plugin's REST API namespace.
     pub namespace: String,
-
     /// A URL to the plugin's support page, where users can find help.
     pub support_url: String,
+}
+
+impl KnownApplicationPasswordBlockingPlugin {
+    fn all() -> Vec<Self> {
+        vec![Self {
+            name: "Wordfence".to_string(),
+            namespace: "wordfence/v1".to_string(),
+            // TODO: Ensure this is correct with the WordFence folks
+            support_url: "https://www.wordfence.com/support/".to_string(),
+        }]
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
