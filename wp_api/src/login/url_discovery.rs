@@ -363,19 +363,19 @@ pub struct AutoDiscoveryAttemptSuccess {
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum AutoDiscoveryAttemptFailure {
-    #[error( "{}", error.to_string())]
+    #[error("{error}")]
     ParseSiteUrl { error: ParseUrlError },
-    #[error( "{}", error.to_string())]
+    #[error("{error}")]
     FetchApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: RequestExecutionError,
     },
-    #[error( "{}", error.to_string())]
+    #[error("{error}")]
     ParseApiRootUrl {
         parsed_site_url: ParsedUrl,
         error: ParseApiRootUrlError,
     },
-    #[error( "{}", error.to_string())]
+    #[error("{error}")]
     FetchApiDetails {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
