@@ -17,12 +17,7 @@ where
 pub enum WpApiError {
     #[error("Status code ({}) is not valid", status_code)]
     InvalidHttpStatusCode { status_code: u16 },
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
-        status_code,
-        redirects,
-        reason
-    )]
+    #[error("{}", reason)]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
@@ -423,12 +418,7 @@ pub enum WpErrorCode {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
-        status_code,
-        redirects,
-        reason
-    )]
+    #[error("{}", reason)]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
@@ -436,9 +426,10 @@ pub enum RequestExecutionError {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, thiserror::Error)]
 pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
+    #[error("{}", error_message.as_ref().map_or("An unknown error occurred.", |v| v))]
     InvalidSslError {
         // The SSL certificate for the site we're trying to contact
         site_certificate: Option<Arc<SSLCertificateInfo>>,
@@ -452,9 +443,33 @@ pub enum RequestExecutionErrorReason {
         // Any suggested action provided by the HTTP stack
         suggested_action: Option<String>,
     },
-    GenericError {
-        error_message: String,
+    #[error("A server with the specified hostname could not be found.")]
+    NonExistentSiteError {
+        error_message: Option<String>,
+        suggested_action: Option<String>,
     },
+    #[error(
+        "The server at {} requires authentication. Please provide your username and password.",
+        url
+    )]
+    HttpAuthenticationRequiredError {
+        url: String,
+        server_message: Option<String>,
+    },
+    #[error(
+        "The server at {} rejected your credentials. Please provide a valid username and password.",
+        url
+    )]
+    HttpAuthenticationRejectedError {
+        url: String,
+        server_message: Option<String>,
+    },
+    #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
+    MisconfiguredRateLimitError {},
+    #[error("{}", error_message)]
+    DeviceIsOfflineError { error_message: String },
+    #[error("{}", error_message)]
+    GenericError { error_message: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]

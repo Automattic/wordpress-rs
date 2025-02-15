@@ -222,6 +222,7 @@ impl WpLoginClient {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let api_root_request = WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
+            retry_count: 0,
             method: RequestMethod::HEAD,
             url: WpEndpointUrl(parsed_site_url.url()),
             header_map: WpNetworkHeaderMap::default().into(),
@@ -238,6 +239,7 @@ impl WpLoginClient {
             .execute(
                 WpNetworkRequest {
                     uuid: Uuid::new_v4().into(),
+                    retry_count: 0,
                     method: RequestMethod::GET,
                     url: WpEndpointUrl(api_root_url.url()),
                     header_map: WpNetworkHeaderMap::default().into(),
@@ -269,6 +271,7 @@ impl WpLoginClient {
             .execute(
                 WpNetworkRequest {
                     uuid: Uuid::new_v4().into(),
+                    retry_count: 0,
                     method: RequestMethod::GET,
                     url: WpEndpointUrl(wp_json_url.url()),
                     header_map: WpNetworkHeaderMap::default().into(),
@@ -305,6 +308,7 @@ impl WpLoginClient {
             .execute(
                 WpNetworkRequest {
                     uuid: Uuid::new_v4().into(),
+                    retry_count: 0,
                     method: RequestMethod::GET,
                     url: WpEndpointUrl(site_url.url()),
                     header_map: WpNetworkHeaderMap::default().into(),

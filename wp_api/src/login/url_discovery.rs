@@ -1,5 +1,8 @@
 use super::WpApiDetails;
-use crate::{request::WpNetworkHeaderMap, ParseUrlError, ParsedUrl, RequestExecutionError};
+use crate::{
+    request::WpNetworkHeaderMap, request::WpRedirect, ParseUrlError, ParsedUrl,
+    RequestExecutionError, RequestExecutionErrorReason,
+};
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
@@ -113,7 +116,7 @@ impl AutoDiscoveryResult {
     pub fn is_wordpress_site(&self) -> bool {
         self.attempts
             .iter()
-            .any(|(_, result)| result.is_wordpress_site.is_successful())
+            .any(|(_, result)| result.is_wordpress_site())
     }
 }
 
@@ -194,6 +197,36 @@ impl AutoDiscoveryAttemptResult {
             Err(_) => None,
         }
     }
+
+    fn is_local_dev_environment(&self) -> bool {
+        match &self.api_discovery_result {
+            Ok(success) => is_local_dev_environment_url(&success.parsed_site_url),
+            Err(error) => {
+                if let Some(parsed_url) = error.parsed_site_url() {
+                    is_local_dev_environment_url(parsed_url)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    /// Does the site look like a WordPress site?
+    fn is_wordpress_site(&self) -> bool {
+        self.is_wordpress_site.is_successful()
+    }
+}
+
+// Does the given URL look like it's on a local development environment for the purposes of the Login Spec?
+pub fn is_local_dev_environment_url(parsed_site_url: &ParsedUrl) -> bool {
+    if let Some(hostname) = parsed_site_url.inner.host_str() {
+        return hostname == "localhost"
+            || hostname == "127.0.0.1"
+            || hostname.ends_with(".local")
+            || hostname.ends_with(".test");
+    }
+
+    false
 }
 
 #[derive(Debug, Clone, uniffi::Object)]
@@ -572,7 +605,8 @@ pub enum FetchApiDetailsError {
     )]
     RequestExecutionFailed {
         status_code: Option<u16>,
-        reason: String,
+        redirects: Option<Vec<WpRedirect>>,
+        reason: RequestExecutionErrorReason,
     },
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
@@ -608,5 +642,17 @@ mod tests {
             construct_attempts(input_site_url.to_string()),
             expected_attempts
         )
+    }
+
+    #[rstest]
+    #[case("http://localhost", true)]
+    #[case("http://localhost.local", true)]
+    #[case("http://localhost.test", true)]
+    #[case("http://example.com", false)]
+    #[case("http://127.0.0.1", true)]
+    #[case("http://example.com", false)]
+    fn test_is_local_dev_environment_url(#[case] url: &str, #[case] expected: bool) {
+        let parsed_url = ParsedUrl::parse(url).unwrap();
+        assert_eq!(is_local_dev_environment_url(&parsed_url), expected);
     }
 }
