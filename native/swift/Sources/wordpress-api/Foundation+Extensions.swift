@@ -37,3 +37,14 @@ public extension TimeInterval {
         return nil
     }
 }
+
+extension HTTPURLResponse {
+    /// How long until we should retry the request?
+    var retryAfter: TimeInterval? {
+        guard let stringValue = value(forHTTPHeaderField: "Retry-After") else {
+            return nil
+        }
+
+        return .fromRetryHeaderValue(stringValue)
+    }
+}

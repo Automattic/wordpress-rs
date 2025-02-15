@@ -6,9 +6,11 @@ import FoundationNetworking
 #endif
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
+    var executorDelegate: RequestExecutorDelegate { get }
     func withCredential(_ credential: URLCredential) -> Self
 
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
+    func executeRaw(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
 extension SafeRequestExecutor {
@@ -16,119 +18,124 @@ extension SafeRequestExecutor {
         let result = await execute(request)
         return try result.get()
     }
-}
 
-final class WpRequestExecutor: SafeRequestExecutor {
-    private let session: URLSession
-    private let executorDelegate: RequestExecutorDelegate
+    func handleAutomaticRetryIfNeeded(
+        with data: Data,
+        for response: HTTPURLResponse,
+        to request: URLRequest
+    ) async throws -> (Data, HTTPURLResponse) {
 
-    private let additionalHttpHeadersForAllRequests: [String: String]
+        if isRateLimitExceededResponse(response) {
+            return try await handleRateLimitExceededResponse(response, for: request)
+        }
 
-    init(
-        urlSession: URLSession,
-        httpCredential: URLCredential? = nil,
-        additionalHttpHeadersForAllRequests: [String: String] = [:]
-    ) {
-        self.session = urlSession
-        self.executorDelegate = RequestExecutorDelegate(credential: httpCredential)
-        self.additionalHttpHeadersForAllRequests = additionalHttpHeadersForAllRequests
+        return (data, response)
     }
 
-    func withCredential(_ credential: URLCredential) -> WpRequestExecutor {
-        WpRequestExecutor(urlSession: self.session, httpCredential: credential)
+    func processRawResponse(
+        _ response: HTTPURLResponse,
+        for request: WpNetworkRequest,
+        with data: Data
+    ) async throws -> Result<WpNetworkResponse, RequestExecutionError> {
+
+        let headerMap = try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders)
+
+        if isHttpAuthenticationInvalidResponse(response, for: request) {
+            return .failure(handleHttpAuthenticationInvalidResponse(response, for: request))
+        }
+
+        if isHttpAuthenticationRequiredResponse(response) {
+            return .failure(handleHttpAuthenticationRequiredResponse(response, for: request))
+        }
+
+        return .success(
+            WpNetworkResponse(
+                body: data,
+                statusCode: UInt16(response.statusCode),
+                headerMap: headerMap
+            )
+        )
+
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
-    func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    func processTransportError(
+        _ error: Error,
+        for request: WpNetworkRequest
+    ) -> RequestExecutionError {
 
-        let (data, response): (Data, URLResponse)
+        if errorIsHttpsError(error) {
+            return handleHttpsError(error, for: request)
+        }
 
-        do {
-            var urlrequest = request.asURLRequest()
+        if errorIsNonExistentSiteError(error) {
+            return handleNonExistentSiteError(error, for: request)
+        }
 
-            for (key, value) in additionalHttpHeadersForAllRequests {
-                urlrequest.addValue(value, forHTTPHeaderField: key)
+        if errorIsDeviceIsOffline(error) {
+            return handleDeviceIsOfflineError(error)
+        }
+
+        return .RequestExecutionFailed(
+            statusCode: nil,
+            redirects: nil,
+            reason: .genericError(errorMessage: error.localizedDescription)
+        )
+    }
+
+    func isRateLimitExceededResponse(_ response: WpNetworkResponse) -> Bool {
+        response.statusCode == 429
+    }
+
+    func isRateLimitExceededResponse(_ response: HTTPURLResponse) -> Bool {
+        response.statusCode == 429
+    }
+
+    func handleRateLimitExceededResponse(
+        _ response: HTTPURLResponse,
+        for request: URLRequest
+    ) async throws -> (Data, HTTPURLResponse) {
+
+        var response = response
+
+        let defaultWaitTime: TimeInterval = 5
+
+        func wait(for timeInterval: TimeInterval) async throws {
+            if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+                try await Task.sleep(for: .seconds(timeInterval))
+            } else {
+                try await Task.sleep(nanoseconds: UInt64(timeInterval) * 1_000_000_000)
+            }
+        }
+
+        var data = Data()
+
+        for _ in 1...5 {
+            let retryAfterDuration = response.retryAfter ?? defaultWaitTime
+            try await wait(for: retryAfterDuration)
+
+            let (newData, newResponse) = try await executeRaw(request)
+
+            if !isRateLimitExceededResponse(newResponse) {
+                return (newData, newResponse)
             }
 
-            (data, response) = try await self.session.data(for: urlrequest, delegate: executorDelegate)
+            data = newData
+            response = newResponse
+        }
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                preconditionFailure("The HTTP response should always be a HTTPURLResponse")
-            }
-
-            let headerMap: WpNetworkHeaderMap
-
-            do {
-                headerMap = try WpNetworkHeaderMap.fromMap(hashMap: httpResponse.httpHeaders)
-
-                if isHttpAuthenticationInvalidResponse(httpResponse, for: request) {
-                    return handleHttpAuthenticationInvalidResponse(httpResponse, for: request)
-                }
-
-                if isHttpAuthenticationRequiredResponse(httpResponse) {
-                    return handleHttpAuthenticationRequiredResponse(httpResponse, for: request)
-                }
-
-                if isRateLimitExceededResponse(httpResponse) {
-                    return try await handleRateLimitExceededResponse(httpResponse, for: request)
-                }
-
-                return .success(
-                    WpNetworkResponse(
-                        body: data,
-                        statusCode: UInt16(httpResponse.statusCode),
-                        headerMap: headerMap
-                    )
-                )
-            } catch is WpNetworkHeaderMapError {
-                let error = RequestExecutionError.RequestExecutionFailed(
-                    statusCode: nil,
-                    redirects: executorDelegate.redirects(for: request.requestId()),
-                    reason: RequestExecutionErrorReason.genericError(errorMessage: "Invalid Headers")
-                )
-
-                return .failure(error)
-
-            } catch {
-                return .failure(
-                    .RequestExecutionFailed(
-                        statusCode: nil,
-                        redirects: executorDelegate.redirects(for: request.requestId()),
-                        reason: .genericError(errorMessage: "Unknown error: \(error)")
-                    )
-                )
-            }
-        } catch {
-            if errorIsHttpsError(error) {
-                return handleHttpsError(error, for: request)
-            }
-
-            if errorIsNonExistentSiteError(error) {
-                return handleNonExistentSiteError(error, for: request)
-            }
-
-            if errorIsDeviceIsOffline(error) {
-                return handleDeviceIsOfflineError(error)
-            }
-
-            return .failure(.RequestExecutionFailed(
-                statusCode: nil,
-                redirects: nil,
-                reason: .genericError(errorMessage: error.localizedDescription)
-            ))
-       }
+        return (data, response)
     }
 
     private func handleHttpsError(
         _ error: Error,
         for request: WpNetworkRequest
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+    ) -> RequestExecutionError {
 
         guard
             var peerCertificateChain = getPeerCertificateChain(error),
             !peerCertificateChain.isEmpty
         else {
-            return .failure(.RequestExecutionFailed(
+            return .RequestExecutionFailed(
                  statusCode: nil,
                  redirects: executorDelegate.redirects(for: request.requestId()),
                  reason: .invalidSslError(
@@ -137,13 +144,12 @@ final class WpRequestExecutor: SafeRequestExecutor {
                      errorMessage: error.localizedDescription,
                      suggestedAction: (error as NSError).localizedRecoverySuggestion
                  )
-            ))
+            )
         }
 
         let siteCertificate = peerCertificateChain.remove(at: 0)
 
-        return .failure(
-         .RequestExecutionFailed(
+        return .RequestExecutionFailed(
              statusCode: nil,
              redirects: executorDelegate.redirects(for: request.requestId()),
              reason: RequestExecutionErrorReason.invalidSslError(
@@ -152,22 +158,19 @@ final class WpRequestExecutor: SafeRequestExecutor {
                      errorMessage: error.localizedDescription,
                      suggestedAction: (error as NSError).localizedRecoverySuggestion
                  )
-             )
-         )
+            )
     }
 
     func handleHttpAuthenticationRequiredResponse(
         _ response: HTTPURLResponse,
         for request: WpNetworkRequest
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: UInt16(response.statusCode),
-                redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: .httpAuthenticationRequiredError(
-                    url: request.url(),
-                    serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
-                )
+    ) -> RequestExecutionError {
+        .RequestExecutionFailed(
+            statusCode: UInt16(response.statusCode),
+            redirects: executorDelegate.redirects(for: request.requestId()),
+            reason: .httpAuthenticationRequiredError(
+                url: request.url(),
+                serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
             )
         )
     }
@@ -175,15 +178,13 @@ final class WpRequestExecutor: SafeRequestExecutor {
     func handleHttpAuthenticationInvalidResponse(
         _ response: HTTPURLResponse,
         for request: WpNetworkRequest
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: UInt16(response.statusCode),
-                redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: .httpAuthenticationRejectedError(
-                    url: request.url(),
-                    serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
-                )
+    ) -> RequestExecutionError {
+        .RequestExecutionFailed(
+            statusCode: UInt16(response.statusCode),
+            redirects: executorDelegate.redirects(for: request.requestId()),
+            reason: .httpAuthenticationRejectedError(
+                url: request.url(),
+                serverMessage: response.value(forHTTPHeaderField: "WWW-Authenticate")
             )
         )
     }
@@ -191,21 +192,15 @@ final class WpRequestExecutor: SafeRequestExecutor {
     func handleNonExistentSiteError(
         _ error: Error,
         for request: WpNetworkRequest
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: nil,
-                redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: .nonExistentSiteError(
-                    errorMessage: error.localizedDescription,
-                    suggestedAction: (error as NSError).localizedRecoverySuggestion
-                )
+    ) -> RequestExecutionError {
+        .RequestExecutionFailed(
+            statusCode: nil,
+            redirects: executorDelegate.redirects(for: request.requestId()),
+            reason: .nonExistentSiteError(
+                errorMessage: error.localizedDescription,
+                suggestedAction: (error as NSError).localizedRecoverySuggestion
             )
         )
-    }
-
-    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
     }
 
     private func errorIsHttpsError(_ error: Error) -> Bool {
@@ -242,50 +237,6 @@ final class WpRequestExecutor: SafeRequestExecutor {
         return executorDelegate.isHttp403Failed(for: request.requestId())
     }
 
-    private func isRateLimitExceededResponse(_ response: HTTPURLResponse) -> Bool {
-        response.statusCode == 429
-    }
-
-    private func handleRateLimitExceededResponse(
-        _ response: HTTPURLResponse,
-        for request: WpNetworkRequest
-    ) async throws -> Result<WpNetworkResponse, RequestExecutionError> {
-
-        let defaultWaitTime: TimeInterval = 5
-
-        func wait(for timeInterval: TimeInterval) async throws {
-            if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
-                try await Task.sleep(for: .seconds(timeInterval))
-            } else {
-                try await Task.sleep(nanoseconds: UInt64(timeInterval) * 1_000_000_000)
-            }
-        }
-
-        let newRequest = request.incrementRetryCount()
-
-        guard
-            let retryAfterString = response.allHeaderFields["retry-after"] as? String,
-            let retryAfterDuration = TimeInterval.fromRetryHeaderValue(retryAfterString)
-        else {
-            try await wait(for: defaultWaitTime)
-            return await execute(newRequest)
-        }
-
-        try await wait(for: retryAfterDuration)
-
-        if newRequest.retryCount() >= 2 {
-            return .failure(
-                .RequestExecutionFailed(
-                    statusCode: UInt16(response.statusCode),
-                    redirects: executorDelegate.redirects(for: request.requestId()),
-                    reason: .misconfiguredRateLimitError
-                )
-            )
-        }
-
-        return await execute(newRequest)
-    }
-
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
         [
             .badURL,
@@ -304,14 +255,12 @@ final class WpRequestExecutor: SafeRequestExecutor {
 
     private func handleDeviceIsOfflineError(
         _ error: Error
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
-            .RequestExecutionFailed(
-                statusCode: nil,
-                redirects: nil,
-                reason: .deviceIsOfflineError(
-                    errorMessage: error.localizedDescription
-                )
+    ) -> RequestExecutionError {
+        .RequestExecutionFailed(
+            statusCode: nil,
+            redirects: nil,
+            reason: .deviceIsOfflineError(
+                errorMessage: error.localizedDescription
             )
         )
     }
@@ -349,7 +298,59 @@ final class WpRequestExecutor: SafeRequestExecutor {
     // swiftlint:enable force_cast
 }
 
-final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class WpRequestExecutor: SafeRequestExecutor {
+    private let session: URLSession
+    let executorDelegate: RequestExecutorDelegate
+
+    private let additionalHttpHeadersForAllRequests: [String: String]
+
+    init(
+        urlSession: URLSession,
+        httpCredential: URLCredential? = nil,
+        additionalHttpHeadersForAllRequests: [String: String] = [:]
+    ) {
+        self.session = urlSession
+        self.executorDelegate = RequestExecutorDelegate(credential: httpCredential)
+        self.additionalHttpHeadersForAllRequests = additionalHttpHeadersForAllRequests
+    }
+
+    func withCredential(_ credential: URLCredential) -> WpRequestExecutor {
+        WpRequestExecutor(urlSession: self.session, httpCredential: credential)
+    }
+
+    func executeRaw(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var urlrequest = request
+
+        for (key, value) in additionalHttpHeadersForAllRequests {
+            urlrequest.addValue(value, forHTTPHeaderField: key)
+        }
+
+        let (data, response) = try await self.session.data(for: urlrequest, delegate: executorDelegate)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            preconditionFailure("The HTTP response should always be a HTTPURLResponse")
+        }
+
+        return (data, httpResponse)
+    }
+
+    func execute(_ request: URLRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+
+        do {
+            let (data, httpResponse) = try await executeRaw(request)
+            try await handleAutomaticRetryIfNeeded(for: httpResponse, to: request)
+            return try await processRawResponse(httpResponse, for: request, with: data)
+        } catch {
+            return .failure(processTransportError(error, for: request))
+        }
+    }
+
+    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+        try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
+    }
+}
+
+public final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
@@ -374,7 +375,7 @@ final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecke
         }
     }
 
-    func urlSession(
+    public func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
         willPerformHTTPRedirection response: HTTPURLResponse,
@@ -403,7 +404,7 @@ final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecke
         return request
     }
 
-    func urlSession(
+    public func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
         didReceive challenge: URLAuthenticationChallenge) async

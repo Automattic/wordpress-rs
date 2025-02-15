@@ -12,3 +12,9 @@ extension ParsedUrl {
     }
 
 }
+
+extension WpNetworkHeaderMap {
+    subscript (key: String) -> String? {
+        self.toFlatMap()[key]
+    }
+}

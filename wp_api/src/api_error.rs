@@ -416,6 +416,11 @@ pub enum WpErrorCode {
     CustomError(String),
 }
 
+/// An error type that represents a transport error
+///
+/// Something went wrong below the application layer, so it's not an error we can parse JSON to understand.
+///
+/// This is different from `WpApiError`, which represents an error in the API response.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RequestExecutionError {
     #[error("{}", reason)]

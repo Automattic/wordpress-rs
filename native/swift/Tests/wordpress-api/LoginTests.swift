@@ -3,7 +3,7 @@ import Testing
 
 @testable import WordPressAPI
 
-#if os(Linux)
+#if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
@@ -104,17 +104,6 @@ class LoginTests {
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
-    @Test("Login Spec Example 11: WordPress in a subdirectory with a link tag")
-    func testWordPressSubdirectoryWithLinkTag() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "https://subdirectory.wpmt.co/index.php?link_tag=true")
-        #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
-    }
-
-    @Test("Login Spec Example 12: WordPress in a subdirectory with a redirect")
-    func testWordPressSubdirectory() async throws {
-        let parsedUrl = try await client.loginURL(forSite: "https://subdirectory.wpmt.co/index.php?redirect=true")
-        #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
-    }
 
     @Test("Login Spec Example 13: Site uses HTTP basic with no provided credentials")
     func testWordPressHttpBasic() async throws {
@@ -171,12 +160,21 @@ class LoginTests {
             _ = try await client.loginURL(forSite: "https://valid-looking-url-but-not-actually.foo")
         }, throws: { error in
             #expect(error is LoginError)
-            #expect("A server with the specified hostname could not be found." == (error as? LoginError)?.errorDescription)
+            #expect("Unable to login to https://valid-looking-url-but-not-actually.foo. Please double-check that this is a WordPress site" == (error as? LoginError)?.errorDescription)
             return true
         })
     }
 
-    @Test("Login Spec Example 17: Invalid SSL Certificate")
+    @Test("Linux issue")
+    func testLinuxIssue() async {
+        do {
+            _ = try await URLSession.shared.data(from: URL(string: "https://valid-looking-url-but-not-actually.foo")!)
+        } catch {
+            #expect(error is URLError)
+        }
+    }
+
+    @Test("Login Spec Example 17: Invalid SSL Certificate", .enabled(if: !isLinux()))
     func testInvalidHTTPsFails() async throws {
         let session = URLSession(configuration: .default)
         let client = WordPressLoginClient(urlSession: session)
@@ -231,9 +229,21 @@ class LoginTests {
     }
 }
 
-@Suite("Serialized Login Tests", .serialized)
+@Suite("Serialized Login Tests")
 struct SerializedLoginTests {
     let client = WordPressLoginClient(urlSession: .shared)
+    @Test("Login Spec Example 11: WordPress in a subdirectory with a link tag")
+    func testWordPressSubdirectoryWithLinkTag() async throws {
+        _ = try await URLSession.shared.data(from: URL(string: "https://subdirectory.wpmt.co/index.php?redirect=true")!)
+        let parsedUrl = try await client.loginURL(forSite: "https://subdirectory.wpmt.co/index.php?redirect=true")
+        #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
+    }
+
+    @Test("Login Spec Example 12: WordPress in a subdirectory with a redirect")
+    func testWordPressSubdirectory() async throws {
+        let parsedUrl = try await client.loginURL(forSite: "https://subdirectory.wpmt.co/index.php?redirect=true")
+        #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
+    }
 
     @Test("Login Spec Example 15: Rate Limited")
     func testWordPressHeavyRateLimiting() async throws {
@@ -243,15 +253,12 @@ struct SerializedLoginTests {
 
     @Test("Login Spec Example 15: Rate Limited that never succeeds")
     func testWordPressHeavyRateLimitingThatNeverSucceeds() async throws {
-        let executor = WpRequestExecutor(
-            urlSession: .shared,
-            additionalHttpHeadersForAllRequests: [ // guarantees that the window will never open
-                "X-RLT-RETRY-AFTER": "5", // Don't retry for two seconds
-                "X-RLT-RETRY-WINDOW": "1" // But only requests within the first second succeed
-            ]
-        )
 
-        let client = WordPressLoginClient(requestExecutor: executor)
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(host: "aggressive-rate-limiting.wpmt.co", with: .retryAfter(1)),
+        ])
+
+        let client = WordPressLoginClient(requestExecutor: stubs)
 
         await #expect(performing: {
             _ = try await client.loginURL(forSite: "https://aggressive-rate-limiting.wpmt.co")

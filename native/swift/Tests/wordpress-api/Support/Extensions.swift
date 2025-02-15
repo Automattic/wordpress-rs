@@ -41,3 +41,35 @@ func isLinux() -> Bool {
     return false
     #endif
 }
+
+extension WpNetworkResponse {
+    static func retryAfter(_ seconds: Double) -> WpNetworkResponse {
+        try! WpNetworkResponse(
+            body: Data(),
+            statusCode: 429,
+            headerMap: .fromMap(hashMap: [
+                "Retry-After": String(seconds)
+            ])
+        )
+    }
+}
+
+extension HTTPURLResponse {
+    static func from(_ response: WpNetworkResponse, request: WpNetworkRequest) -> HTTPURLResponse {
+
+        guard let url = URL(string: request.url()) else {
+            preconditionFailure("Invalid URL")
+        }
+
+        guard let httpResponse = HTTPURLResponse(
+            url: url,
+            statusCode: Int(response.statusCode),
+            httpVersion: nil,
+            headerFields: response.headerMap.toFlatMap()
+        ) else {
+            preconditionFailure("Invalid HTTPURLResponse")
+        }
+
+        return httpResponse
+    }
+}

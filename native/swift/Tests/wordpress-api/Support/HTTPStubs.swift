@@ -1,5 +1,5 @@
 import Foundation
-import WordPressAPI
+@testable import WordPressAPI
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -7,6 +7,7 @@ import FoundationNetworking
 
 
 final class HTTPStubs: SafeRequestExecutor {
+    let executorDelegate: RequestExecutorDelegate = RequestExecutorDelegate()
 
     typealias Stub = (condition: @Sendable (WpNetworkRequest) -> Bool, response: WpNetworkResponse)
 
@@ -22,10 +23,25 @@ final class HTTPStubs: SafeRequestExecutor {
         self
     }
 
+    public func executeRaw(_ request: WpNetworkRequest) async throws -> (Data, HTTPURLResponse) {
+        if let response = stub(for: request) {
+            let data = response.body
+            let httpResponse = HTTPURLResponse.from(response, request: request)
+
+            return (data, httpResponse)
+        }
+
+        preconditionFailure("Missing stub for \(request.url())")
+    }
+
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
-            return .success(response)
+            let httpResponse = HTTPURLResponse.from(response, request: request)
+            let retriedResponse = try await handleAutomaticRetryIfNeeded(for: httpResponse, to: request)
+            return try await processRawResponse(httpResponse, for: request, with: response.body)
         }
+
+        debugPrint("Missing stub for \(request.url())")
 
         switch missingStub {
         case let .success(response):
