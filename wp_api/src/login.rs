@@ -4,6 +4,7 @@ use std::str;
 use std::sync::Arc;
 use wp_serde_helper::deserialize_i64_or_string;
 
+use crate::login::url_discovery::is_local_dev_environment_url;
 use crate::ParsedUrl;
 use crate::WpUuid;
 
@@ -60,14 +61,74 @@ pub struct WpApiDetails {
 
 #[uniffi::export]
 impl WpApiDetails {
+    /// Does the site have application passwords enabled?
     pub fn has_application_passwords_authentication_url(&self) -> bool {
         self.authentication
             .has_application_passwords_authentication_url()
     }
 
+    /// Returns the URL to be used in application password authentication.
+    ///
+    /// See the "Authorization Flow" section for details:
+    /// https://github.com/WordPress/wordpress-develop/blob/530493396b324f5bed518a494e2843e7fdb020f1/src/wp-includes/rest-api.php#L1099-L1119
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
             .find_application_passwords_authentication_url()
+    }
+
+    /// Does the site URL (as defined by the site itself, not by user input) use HTTPS?
+    pub fn uses_https(&self) -> bool {
+        self.url.starts_with("https://")
+    }
+
+    /// Does the site use a plugin that disables application passwords?
+    pub fn has_application_password_blocking_plugin(&self) -> bool {
+        KnownApplicationPasswordBlockingPlugin::all()
+            .iter()
+            .any(|plugin| self.namespaces.contains(&plugin.namespace))
+    }
+
+    /// Returns a list of plugins that might be responsible for disabling application passwords.
+    pub fn application_password_blocking_plugins(
+        &self,
+    ) -> Vec<KnownApplicationPasswordBlockingPlugin> {
+        KnownApplicationPasswordBlockingPlugin::all()
+            .iter()
+            .filter(|plugin| self.namespaces.contains(&plugin.namespace))
+            .cloned()
+            .collect()
+    }
+
+    /// Returns the site URL (as defined by the site itself, not by user input) as a string.
+    pub fn site_url_string(&self) -> String {
+        self.url.clone()
+    }
+
+    /// Returns `true` if the site URL looks like a local development environment URL.
+    pub fn site_url_is_local_development_environment(&self) -> bool {
+        ParsedUrl::parse(self.url.as_str())
+            .is_ok_and(|parsed_url| is_local_dev_environment_url(&parsed_url))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct KnownApplicationPasswordBlockingPlugin {
+    /// The name of the plugin.
+    pub name: String,
+    /// The plugin's REST API namespace.
+    pub namespace: String,
+    /// A URL to the plugin's support page, where users can find help.
+    pub support_url: String,
+}
+
+impl KnownApplicationPasswordBlockingPlugin {
+    fn all() -> Vec<Self> {
+        vec![Self {
+            name: "Wordfence".to_string(),
+            namespace: "wordfence/v1".to_string(),
+            // TODO: Ensure this is correct with the WordFence folks
+            support_url: "https://www.wordfence.com/support/".to_string(),
+        }]
     }
 }
 

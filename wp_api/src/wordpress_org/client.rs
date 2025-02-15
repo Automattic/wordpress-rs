@@ -169,12 +169,7 @@ pub enum WordPressOrgApiPluginDirectoryCategory {
 pub enum WordPressOrgApiClientError {
     #[error("Failed to encode request. Reason: {}", reason)]
     RequestEncodingError { reason: String },
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
-        status_code,
-        redirects,
-        reason
-    )]
+    #[error("{:#?}", reason)]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
