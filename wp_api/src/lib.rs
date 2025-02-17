@@ -16,6 +16,9 @@ mod parsed_url; // re-exported relevant types
 mod ssl; // re-exported relevant types
 mod uuid; // re-exported relevant types
 
+// TODO: Should this be public or re-exported
+pub mod localization;
+
 pub mod application_passwords;
 pub mod categories;
 pub mod comments;
@@ -203,6 +206,13 @@ macro_rules! generate {
         $(obj.$f = $v;)*
         obj
     }};
+}
+
+fluent_templates::static_loader! {
+    static LOCALES = {
+        locales: "./localization",
+        fallback_language: "en-US"
+    };
 }
 
 uniffi::setup_scaffolding!();

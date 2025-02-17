@@ -15,7 +15,11 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = [ "serde" ] }
 futures = { workspace = true }
+fluent-bundle = { workspace = true }
+fluent-langneg = { workspace = true }
+fluent-templates = { workspace = true }
 http = { workspace = true }
+icu_locid = { workspace = true }
 indoc = { workspace = true }
 url = { workspace = true }
 parse_link_header = { workspace = true }
@@ -27,6 +31,7 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+unic-langid = { workspace = true }
 uniffi = { workspace = true }
 uuid = { workspace = true, features = [ "v4" ] }
 wp_contextual = { path = "../wp_contextual" }
