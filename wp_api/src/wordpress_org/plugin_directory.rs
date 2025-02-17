@@ -1,3 +1,5 @@
+use crate::plugins::PluginWpOrgDirectorySlug;
+
 use super::de::deserialize_default_values;
 use serde::Deserialize;
 use std::{collections::HashMap, fmt::Debug};
@@ -5,7 +7,7 @@ use std::{collections::HashMap, fmt::Debug};
 #[derive(Deserialize, Debug, uniffi::Record)]
 pub struct PluginInformation {
     pub name: String,
-    pub slug: String,
+    pub slug: PluginWpOrgDirectorySlug,
     pub version: String,
     pub author: String,
     #[serde(deserialize_with = "deserialize_default_values")]

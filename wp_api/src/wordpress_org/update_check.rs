@@ -145,7 +145,7 @@ impl From<PluginWithViewContext> for InstalledPlugin {
 #[derive(Deserialize, Debug, uniffi::Record)]
 pub struct UpdateCheckResponse {
     #[serde(deserialize_with = "deserialize_default_values")]
-    plugins: HashMap<String, UpdateCheckPluginInfo>,
+    plugins: HashMap<PluginSlug, UpdateCheckPluginInfo>,
 }
 
 #[derive(Deserialize, Debug, uniffi::Record)]

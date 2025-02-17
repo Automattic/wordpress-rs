@@ -56,7 +56,7 @@ async fn query_all_plugin_slugs(client: &WordPressOrgApiClient) -> (Vec<String>,
 
     for (page, query_plugins_response) in results {
         match query_plugins_response {
-            Ok(r) => all_slugs.extend(r.plugins.into_iter().map(|p| p.slug)),
+            Ok(r) => all_slugs.extend(r.plugins.into_iter().map(|p| p.slug.slug)),
             Err(e) => query_plugins_failures.push((page, e)),
         }
     }
@@ -160,7 +160,7 @@ async fn test_search_plugins() {
         .assert_response()
         .plugins;
     assert!(
-        plugins.iter().any(|p| p.slug == "jetpack-social"),
+        plugins.iter().any(|p| p.slug == "jetpack-social".into()),
         "Plugins search result doesn't contain 'jetpack-social': {:#?}",
         plugins
     );
