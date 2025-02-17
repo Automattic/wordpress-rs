@@ -104,7 +104,7 @@ impl Display for PluginSlug {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct PluginWpOrgDirectorySlug {
     pub slug: String,
