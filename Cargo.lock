@@ -4132,6 +4132,7 @@ dependencies = [
 name = "wp_derive"
 version = "0.1.0"
 dependencies = [
+ "fluent-syntax",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
@@ -4140,6 +4141,7 @@ dependencies = [
  "serde_json",
  "syn 2.0.98",
  "thiserror 2.0.11",
+ "toml 0.8.20",
  "trybuild",
  "wp_serde_helper",
 ]
