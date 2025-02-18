@@ -1,6 +1,6 @@
 use super::de::deserialize_default_values;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug};
 
 #[derive(Serialize, Deserialize, Debug, uniffi::Record)]
 pub struct PluginInformation {
