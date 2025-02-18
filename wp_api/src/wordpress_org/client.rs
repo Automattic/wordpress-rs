@@ -6,7 +6,7 @@ use crate::{
     wordpress_org::update_check::UpdateCheckRequest,
     ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{result::Result, sync::Arc};
 use url::Url;
 
@@ -147,6 +147,8 @@ impl WordPressOrgApiClient {
 }
 
 #[derive(
+    Serialize,
+    Deserialize,
     Debug,
     PartialEq,
     Eq,
@@ -164,6 +166,11 @@ pub enum WordPressOrgApiPluginDirectoryCategory {
     Recommended,
     Featured,
 }
+
+crate::uniffi_export_serialization!(
+    plugin_directory_category,
+    WordPressOrgApiPluginDirectoryCategory
+);
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum WordPressOrgApiClientError {

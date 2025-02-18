@@ -1,10 +1,10 @@
 use crate::plugins::PluginWpOrgDirectorySlug;
 
 use super::de::deserialize_default_values;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 
-#[derive(Deserialize, Debug, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct PluginInformation {
     pub name: String,
     pub slug: PluginWpOrgDirectorySlug,
@@ -62,14 +62,14 @@ pub struct PluginInformation {
     pub preview_link: String,
 }
 
-#[derive(Deserialize, Debug, Eq, PartialEq, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct ContributorDetails {
     pub profile: String,
     pub avatar: String,
     pub display_name: String,
 }
 
-#[derive(Deserialize, Debug, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct Ratings {
     #[serde(rename = "5")]
     pub five_star: u32,
@@ -84,7 +84,7 @@ pub struct Ratings {
 }
 
 /// https://developer.wordpress.org/plugins/wordpress-org/plugin-assets/#screenshots
-#[derive(Deserialize, Debug, uniffi::Enum)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
 #[serde(untagged)]
 pub enum Screenshots {
     Named(HashMap<String, Screenshot>),
@@ -97,13 +97,13 @@ impl Default for Screenshots {
     }
 }
 
-#[derive(Deserialize, Debug, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct Screenshot {
     pub src: String,
     pub caption: String,
 }
 
-#[derive(Deserialize, Debug, Eq, PartialEq, Default, uniffi::Record)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Default, uniffi::Record)]
 pub struct Banners {
     #[serde(deserialize_with = "deserialize_default_values", alias = "1x")]
     pub low: String,
@@ -111,7 +111,7 @@ pub struct Banners {
     pub high: String,
 }
 
-#[derive(Deserialize, Debug, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct Icons {
     #[serde(rename = "1x")]
     pub low: Option<String>,
@@ -121,18 +121,21 @@ pub struct Icons {
     pub default: Option<String>,
 }
 
-#[derive(Deserialize, Debug, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct QueryPluginResponse {
     pub info: QueryPluginResponseInfo,
     pub plugins: Vec<PluginInformation>,
 }
 
-#[derive(Deserialize, Debug, uniffi::Record)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Record)]
 pub struct QueryPluginResponseInfo {
     pub page: u64,
     pub pages: u64,
     pub results: u64,
 }
+
+crate::uniffi_export_serialization!(plugin_information, PluginInformation);
+crate::uniffi_export_serialization!(plugin_information_list, Vec<PluginInformation>);
 
 #[cfg(test)]
 mod tests {
@@ -329,5 +332,32 @@ mod tests {
             include_str!("../../tests/plugin-directory/plugin_directory_single_plugin_case_1.json");
         let parsed = serde_json::from_str::<PluginInformation>(json_string);
         assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+    }
+
+    #[test]
+    fn serialization_round_trip() {
+        let json_string =
+            include_str!("../../tests/plugin-directory/plugin-with-expected-types.json");
+        let plugin = serde_json::from_str::<PluginInformation>(json_string).unwrap();
+        let serialized = serialize_plugin_information(plugin).unwrap();
+        let deserialized = deserialize_plugin_information(serialized).unwrap();
+
+        let expected = serde_json::from_str::<PluginInformation>(json_string).unwrap();
+        assert_eq!(deserialized, expected);
+    }
+
+    #[test]
+    fn serialization_list_round_trip() {
+        let json_string =
+            include_str!("../../tests/plugin-directory/plugin-with-expected-types.json");
+        let plugin = serde_json::from_str::<PluginInformation>(json_string).unwrap();
+        let serialized = serialize_plugin_information_list(vec![plugin]).unwrap();
+        let deserialized = deserialize_plugin_information_list(serialized)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let expected = serde_json::from_str::<PluginInformation>(json_string).unwrap();
+        assert_eq!(deserialized, expected);
     }
 }
