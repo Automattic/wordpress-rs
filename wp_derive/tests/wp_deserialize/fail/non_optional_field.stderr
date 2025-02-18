@@ -1,5 +1,5 @@
 error: `WpDeserialize` only supports optional fields, consired replacing with `Option<Vec<u32>>`
- --> tests/fail/non_optional_field.rs:6:14
+ --> tests/wp_deserialize/fail/non_optional_field.rs:6:14
   |
 6 |     pub bar: Vec<u32>,
   |              ^^^
