@@ -5,12 +5,6 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
-extension URLSession {
-    public func asRequestExecutor() -> some RequestExecutor {
-        WpRequestExecutor(urlSession: self)
-    }
-}
-
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 }
