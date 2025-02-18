@@ -17,6 +17,7 @@ chrono = { workspace = true, features = [ "serde" ] }
 futures = { workspace = true }
 fluent-bundle = { workspace = true }
 fluent-langneg = { workspace = true }
+fluent-static = { workspace = true }
 fluent-templates = { workspace = true }
 http = { workspace = true }
 icu_locid = { workspace = true }
