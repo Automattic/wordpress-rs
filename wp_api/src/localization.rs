@@ -8,10 +8,6 @@
 //    default_language = "en-US"
 //)]
 //pub struct Messages;
-
-#[wp_derive::wp_translations]
-pub struct Translations {}
-
 //#[uniffi::export(with_foreign)]
 //pub trait WpLocalizedError: Send + Sync {
 //    fn localized_error_message(&self, locale_id: String) -> String;
@@ -62,3 +58,71 @@ pub struct Translations {}
 //        );
 //    }
 //}
+//
+
+use crate::LOCALES;
+use fluent_bundle::FluentValue;
+use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
+use fluent_templates::Loader;
+use std::{borrow::Cow, collections::HashMap};
+
+const DEFAULT_LOCALE: &str = "en-US";
+
+fn locale_language_id(lang_id: &str) -> unic_langid::LanguageIdentifier {
+    // Look up the translated message for `message_key` in `lang_id`.
+    let requested = convert_vec_str_to_langids_lossy([lang_id]);
+    let default: icu_locid::LanguageIdentifier = icu_locid::langid!("en-US");
+    let available: Vec<icu_locid::LanguageIdentifier> = LOCALES
+        .locales()
+        .filter_map(|f| f.to_string().parse().ok())
+        .collect();
+    let supported = negotiate_languages(
+        &requested,
+        &available,
+        Some(&default),
+        NegotiationStrategy::Filtering,
+    );
+    supported
+        .first()
+        .unwrap_or(&&default)
+        .to_string()
+        .parse()
+        .unwrap_or(unic_langid::langid!("en-US"))
+}
+
+pub fn localized_message(lang_id: &str, message_key: &str) -> String {
+    LOCALES.lookup(&locale_language_id(lang_id), message_key)
+}
+
+pub fn localized_message_using_default_locale(message_key: &str) -> String {
+    LOCALES.lookup(&locale_language_id(DEFAULT_LOCALE), message_key)
+}
+
+pub fn localized_message_with_args(
+    lang_id: &str,
+    message_key: &str,
+    args: &HashMap<Cow<'static, str>, FluentValue>,
+) -> String {
+    LOCALES.lookup_with_args(&locale_language_id(lang_id), message_key, args)
+}
+
+pub fn localized_message_using_default_locale_with_args(
+    message_key: &str,
+    args: &HashMap<Cow<'static, str>, FluentValue>,
+) -> String {
+    LOCALES.lookup_with_args(&locale_language_id(DEFAULT_LOCALE), message_key, args)
+}
+
+#[wp_derive::wp_translations]
+pub struct Translations {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_translations() {
+        assert_eq!(localized_message(DEFAULT_LOCALE, "foo_bar"), "Foo is bar");
+        assert_eq!(Translations::foo_bar(), "Foo is bar");
+    }
+}

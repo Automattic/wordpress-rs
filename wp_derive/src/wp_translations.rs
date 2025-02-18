@@ -10,7 +10,6 @@ pub fn wp_translations(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
     let translations_ident = parse_macro_input!(input as DeriveInput).ident;
     let config = TranslationsConfig::read_config();
     let entries = parse_translations_file(&config.path);
-    println!("{:#?}", entries);
 
     proc_macro::TokenStream::from_iter([
         // Since attribute macros completely replace the input, we need to manually preserve it
@@ -110,7 +109,7 @@ mod bindings {
         translations_ident: Ident,
         entries: Vec<TranslationEntry>,
     ) -> TokenStream {
-        let functions = entries.iter().map(|e| generate_entry_function(e));
+        let functions = entries.iter().map(generate_entry_function);
         quote! {
             impl #translations_ident {
                 #(#functions)*
@@ -120,9 +119,10 @@ mod bindings {
 
     fn generate_entry_function(entry: &TranslationEntry) -> TokenStream {
         let function_name = format_ident!("{}", entry.key);
+        let entry_key = format_ident!("{}", entry.key).to_string();
         quote! {
-            fn #function_name() {
-                //LOCALES.lookup("", message_key)
+            fn #function_name() -> String {
+                crate::localization::localized_message_using_default_locale(#entry_key)
             }
         }
     }
