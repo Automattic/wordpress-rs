@@ -124,5 +124,9 @@ mod tests {
     fn test_translations() {
         assert_eq!(localized_message(DEFAULT_LOCALE, "foo_bar"), "Foo is bar");
         assert_eq!(Translations::foo_bar(), "Foo is bar");
+        assert_eq!(
+            Translations::foo_bar_with_arg("baz"),
+            "Foo is \u{2068}baz\u{2069}"
+        );
     }
 }

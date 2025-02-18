@@ -1,6 +1,7 @@
+use convert_case::{Case, Casing};
 use fluent_syntax::ast::{self, Entry, InlineExpression, PatternElement};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use serde::Deserialize;
 use std::{env, fs};
 use syn::{parse_macro_input, DeriveInput, Ident};
@@ -100,16 +101,28 @@ struct TranslationEntry {
     placeables: Vec<String>,
 }
 
-mod bindings {
-    use quote::format_ident;
+impl TranslationEntry {
+    fn key_as_function_name(&self) -> Ident {
+        format_ident!("{}", self.key.to_case(Case::Snake))
+    }
 
+    fn key_as_token_string(&self) -> String {
+        format_ident!("{}", self.key).to_string()
+    }
+}
+
+mod bindings {
     use super::*;
 
     pub(super) fn generate_bindings(
         translations_ident: Ident,
         entries: Vec<TranslationEntry>,
     ) -> TokenStream {
-        let functions = entries.iter().map(generate_entry_function);
+        let functions = entries.iter().map(|e| match e.placeables.len() {
+            0 => generate_no_arg_entry_function(e),
+            1 => generate_single_arg_entry_function(e),
+            _ => generate_multi_arg_entry_function(e),
+        });
         quote! {
             impl #translations_ident {
                 #(#functions)*
@@ -117,13 +130,41 @@ mod bindings {
         }
     }
 
-    fn generate_entry_function(entry: &TranslationEntry) -> TokenStream {
-        let function_name = format_ident!("{}", entry.key);
-        let entry_key = format_ident!("{}", entry.key).to_string();
+    fn generate_no_arg_entry_function(entry: &TranslationEntry) -> TokenStream {
+        let function_name = entry.key_as_function_name();
+        let entry_key = entry.key_as_token_string();
         quote! {
             fn #function_name() -> String {
                 crate::localization::localized_message_using_default_locale(#entry_key)
             }
+        }
+    }
+
+    fn generate_single_arg_entry_function(entry: &TranslationEntry) -> TokenStream {
+        let function_name = entry.key_as_function_name();
+        let entry_key = entry.key_as_token_string();
+        let arg = entry
+            .placeables
+            .first()
+            .expect("Already verified that there is one placeable");
+        let arg_ident_as_string = format_ident!("{}", arg).to_string();
+        quote! {
+            fn #function_name(value: &str) -> String {
+                let args = {
+                    let mut map = std::collections::HashMap::new();
+                    map.insert(#arg_ident_as_string.into(), value.into());
+                    map
+                };
+                crate::localization::localized_message_using_default_locale_with_args(#entry_key, &args)
+            }
+        }
+    }
+
+    fn generate_multi_arg_entry_function(entry: &TranslationEntry) -> TokenStream {
+        let function_name = entry.key_as_function_name();
+        //let entry_key = entry.key_as_token_string();
+        quote! {
+            fn #function_name(value: &str) -> String { "placeholder".to_string() }
         }
     }
 }

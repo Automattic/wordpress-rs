@@ -12,6 +12,7 @@ name = "tests"
 path = "tests/parser_tests.rs"
 
 [dependencies]
+convert_case = { workspace = true }
 fluent-syntax = { workspace = true }
 proc-macro-crate = { workspace = true }
 proc-macro2 = { workspace = true }
