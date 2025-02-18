@@ -21,6 +21,7 @@ pub mod application_passwords;
 pub mod categories;
 pub mod comments;
 pub mod date;
+pub mod localization;
 pub mod login;
 pub mod media;
 pub mod plugins;
