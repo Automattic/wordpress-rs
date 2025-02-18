@@ -6,12 +6,17 @@ use std::{env, fs};
 use syn::{parse_macro_input, DeriveInput, Ident};
 
 pub fn wp_translations(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let original_input = input.clone();
     let translations_ident = parse_macro_input!(input as DeriveInput).ident;
     let config = TranslationsConfig::read_config();
     let entries = parse_translations_file(&config.path);
     println!("{:#?}", entries);
 
-    bindings::generate_bindings(translations_ident, entries).into()
+    proc_macro::TokenStream::from_iter([
+        // Since attribute macros completely replace the input, we need to manually preserve it
+        original_input,
+        bindings::generate_bindings(translations_ident, entries).into(),
+    ])
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,15 +102,27 @@ struct TranslationEntry {
 }
 
 mod bindings {
+    use quote::format_ident;
+
     use super::*;
 
     pub(super) fn generate_bindings(
         translations_ident: Ident,
         entries: Vec<TranslationEntry>,
     ) -> TokenStream {
+        let functions = entries.iter().map(|e| generate_entry_function(e));
         quote! {
-            impl $translations_ident {
-                fn hola() -> String { }
+            impl #translations_ident {
+                #(#functions)*
+            }
+        }
+    }
+
+    fn generate_entry_function(entry: &TranslationEntry) -> TokenStream {
+        let function_name = format_ident!("{}", entry.key);
+        quote! {
+            fn #function_name() {
+                //LOCALES.lookup("", message_key)
             }
         }
     }
