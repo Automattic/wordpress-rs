@@ -2,9 +2,12 @@ use crate::LOCALES;
 use fluent_bundle::FluentValue;
 use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
 use fluent_templates::Loader;
-use std::{borrow::Cow, collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display};
 
 const DEFAULT_LOCALE: &str = "en-US";
+
+#[wp_derive::wp_messages]
+pub struct Messages {}
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum FooError {
@@ -48,32 +51,6 @@ fn locale_language_id(lang_id: &str) -> unic_langid::LanguageIdentifier {
         .parse()
         .unwrap_or(unic_langid::langid!("en-US"))
 }
-
-pub fn localized_message(lang_id: &str, message_key: &str) -> String {
-    LOCALES.lookup(&locale_language_id(lang_id), message_key)
-}
-
-pub fn localized_message_using_default_locale(message_key: &str) -> String {
-    LOCALES.lookup(&locale_language_id(DEFAULT_LOCALE), message_key)
-}
-
-pub fn localized_message_with_args(
-    lang_id: &str,
-    message_key: &str,
-    args: &HashMap<Cow<'static, str>, FluentValue>,
-) -> String {
-    LOCALES.lookup_with_args(&locale_language_id(lang_id), message_key, args)
-}
-
-pub fn localized_message_using_default_locale_with_args(
-    message_key: &str,
-    args: &HashMap<Cow<'static, str>, FluentValue>,
-) -> String {
-    LOCALES.lookup_with_args(&locale_language_id(DEFAULT_LOCALE), message_key, args)
-}
-
-#[wp_derive::wp_messages]
-pub struct Messages {}
 
 #[derive(Debug)]
 pub struct MessageBundle {
@@ -136,5 +113,9 @@ mod tests {
             .to_string(),
             "Foo is \u{2068}baz!!\u{2069}"
         );
+    }
+
+    fn localized_message(lang_id: &str, message_key: &str) -> String {
+        LOCALES.lookup(&locale_language_id(lang_id), message_key)
     }
 }
