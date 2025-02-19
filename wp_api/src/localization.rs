@@ -1,26 +1,20 @@
-//#[allow(clippy::all)]
-//
-//#[fluent_static::message_bundle(
-//    resources = [
-//        ("localization/en-US/main.ftl", "en-US"),
-//    ],
-//    default_language = "en-US"
-//)]
-//pub struct Messages;
-//#[uniffi::export(with_foreign)]
-//pub trait WpLocalizedError: Send + Sync {
-//    fn localized_error_message(&self, locale_id: String) -> String;
-//}
-//
-//#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-//pub enum FooError {
-//    #[error("{}", Messages::default().foo_error_bar())]
-//    Bar,
-//    #[error("{}", Messages::default().foo_error_baz(value))]
-//    Baz { value: String },
-//    #[error("{}", Messages::default().foo_error_bazzz(value1, value2))]
-//    Bazzz { value1: String, value2: String },
-//}
+use crate::LOCALES;
+use fluent_bundle::FluentValue;
+use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
+use fluent_templates::Loader;
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
+
+const DEFAULT_LOCALE: &str = "en-US";
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum FooError {
+    #[error("{}", Messages::foo_error_bar())]
+    Bar,
+    #[error("{}", Messages::foo_error_baz(value))]
+    Baz { value: String },
+    //#[error("{}", Messages::foo_error_bazzz(value1, value2))]
+    //Bazzz { value1: String, value2: String },
+}
 //
 //impl WpLocalizedError for FooError {
 //    fn localized_error_message(&self, locale_id: String) -> String {
@@ -32,40 +26,6 @@
 //        }
 //    }
 //}
-//
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//
-//    #[test]
-//    fn test_foo_error() {
-//        assert_eq!(FooError::Bar.to_string(), "Foo is bar");
-//        assert_eq!(
-//            FooError::Baz {
-//                value: "custom_baz".to_string()
-//            }
-//            .to_string(),
-//            "Foo is \u{2068}custom_baz\u{2069}"
-//        );
-//        assert_eq!(
-//            FooError::Bazzz {
-//                value1: "custom_bazzz1".to_string(),
-//                value2: "custom_bazzz2".to_string()
-//            }
-//            .to_string(),
-//            "Foo is \u{2068}custom_bazzz1\u{2069} & \u{2068}custom_bazzz2\u{2069}"
-//        );
-//    }
-//}
-//
-
-use crate::LOCALES;
-use fluent_bundle::FluentValue;
-use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
-use fluent_templates::Loader;
-use std::{borrow::Cow, collections::HashMap, fmt::Display};
-
-const DEFAULT_LOCALE: &str = "en-US";
 
 fn locale_language_id(lang_id: &str) -> unic_langid::LanguageIdentifier {
     // Look up the translated message for `message_key` in `lang_id`.
@@ -163,6 +123,18 @@ mod tests {
         assert_eq!(
             Messages::foo_bar_with_arg("baz").to_string(),
             "Foo is \u{2068}baz\u{2069}"
+        );
+    }
+
+    #[test]
+    fn test_foo_error() {
+        assert_eq!(FooError::Bar.to_string(), "Foo is bar");
+        assert_eq!(
+            FooError::Baz {
+                value: "baz!!".to_string()
+            }
+            .to_string(),
+            "Foo is \u{2068}baz!!\u{2069}"
         );
     }
 }
