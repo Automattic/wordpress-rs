@@ -1,5 +1,4 @@
 //#[allow(clippy::all)]
-//use fluent_static::MessageBundle;
 //
 //#[fluent_static::message_bundle(
 //    resources = [
@@ -64,7 +63,7 @@ use crate::LOCALES;
 use fluent_bundle::FluentValue;
 use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
 use fluent_templates::Loader;
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 const DEFAULT_LOCALE: &str = "en-US";
 
@@ -116,6 +115,43 @@ pub fn localized_message_using_default_locale_with_args(
 #[wp_derive::wp_translations]
 pub struct Translations {}
 
+#[derive(Debug)]
+pub struct MessageBundle {
+    key: &'static str,
+    args: Option<HashMap<&'static str, String>>,
+}
+
+impl MessageBundle {
+    pub fn new(key: &'static str, args: Option<HashMap<&'static str, String>>) -> Self {
+        Self { key, args }
+    }
+
+    pub fn with_default_locale(&self) -> String {
+        self.localize(DEFAULT_LOCALE)
+    }
+
+    pub fn localize(&self, locale: &'static str) -> String {
+        LOCALES.lookup_complete(
+            &locale_language_id(locale),
+            self.key,
+            self.args
+                .as_ref()
+                .map(|h| {
+                    h.into_iter()
+                        .map(|(k, v)| ((*k).into(), FluentValue::from(v)))
+                        .collect()
+                })
+                .as_ref(),
+        )
+    }
+}
+
+impl Display for MessageBundle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.with_default_locale())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,7 +159,7 @@ mod tests {
     #[test]
     fn test_translations() {
         assert_eq!(localized_message(DEFAULT_LOCALE, "foo_bar"), "Foo is bar");
-        assert_eq!(Translations::foo_bar(), "Foo is bar");
+        assert_eq!(Translations::foo_bar().to_string(), "Foo is bar");
         assert_eq!(
             Translations::foo_bar_with_arg("baz"),
             "Foo is \u{2068}baz\u{2069}"

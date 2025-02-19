@@ -134,8 +134,8 @@ mod bindings {
         let function_name = entry.key_as_function_name();
         let entry_key = entry.key_as_token_string();
         quote! {
-            fn #function_name() -> String {
-                crate::localization::localized_message_using_default_locale(#entry_key)
+            fn #function_name() -> crate::localization::MessageBundle {
+                crate::localization::MessageBundle::new(#entry_key, None)
             }
         }
     }
