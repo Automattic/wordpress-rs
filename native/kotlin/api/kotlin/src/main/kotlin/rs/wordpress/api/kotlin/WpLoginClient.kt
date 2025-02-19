@@ -21,23 +21,7 @@ class WpLoginClient(
     }
 
     suspend fun apiDiscovery(siteUrl: String): AutoDiscoveryUniffiResult = withContext(dispatcher) {
-        try {
-            internalClient.apiDiscovery(siteUrl)
-        } catch (e: SSLPeerUnverifiedException) {
-
-            val reason = RequestExecutionErrorReason.InvalidSslError(
-                siteCertificate = null,
-                certificateChain = emptyList(),
-                errorMessage = "Foo bar",
-                suggestedAction = null
-            )
-
-            throw RequestExecutionFailed(
-                statusCode = null,
-                redirects = null,
-                reason = reason
-            )
-        }
+        internalClient.apiDiscovery(siteUrl)
     }
 
     suspend fun loginUrl(siteUrl: String): String? = withContext(dispatcher) {

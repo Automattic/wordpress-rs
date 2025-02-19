@@ -12,6 +12,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.RequestExecutionException
+import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
@@ -33,6 +35,30 @@ class WpRequestExecutor(
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
+            }
+
+            val url: String = request.url()
+            if (url.startsWith("https://optional-https.wpmt.co")) {
+                val reason = RequestExecutionErrorReason.GenericError(
+                    errorMessage = "foo"
+                )
+                throw RequestExecutionException.RequestExecutionFailed(
+                    statusCode = null,
+                    redirects = null,
+                    reason = reason
+                )
+            } else if (url.startsWith("https://jetpack.wpmt.co")) {
+                val reason = RequestExecutionErrorReason.InvalidSslError(
+                    siteCertificate = null,
+                    certificateChain = emptyList(),
+                    errorMessage = "Foo bar",
+                    suggestedAction = null
+                )
+                throw RequestExecutionException.RequestExecutionFailed(
+                    statusCode = null,
+                    redirects = null,
+                    reason = reason
+                )
             }
 
             okHttpClient.newCall(requestBuilder.build()).execute().use { response ->

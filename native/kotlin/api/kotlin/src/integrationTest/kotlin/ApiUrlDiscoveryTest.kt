@@ -1,13 +1,25 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
-import okhttp3.OkHttp
-import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class ApiUrlDiscoveryTest {
     private val loginClient: WpLoginClient = WpLoginClient()
+
+    @Test
+    fun testThrowingGenericErrors() = runTest {
+        val result = loginClient.apiDiscovery("https://optional-https.wpmt.co")
+        assert(result.userInputAttempt.isNetworkError())
+        assertEquals("foo", result.userInputAttempt.errorMessage())
+    }
+
+    @Test
+    fun testThrowingSslErrors() = runTest {
+        val result = loginClient.apiDiscovery("https://jetpack.wpmt.co")
+        assert(result.userInputAttempt.isNetworkError())
+        assertEquals("Foo bar", result.userInputAttempt.errorMessage())
+    }
 
     @Test // Spec Example 1
     fun testValidSiteWorksCorrectly() = runTest {
