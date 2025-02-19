@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(localized_message(DEFAULT_LOCALE, "foo_bar"), "Foo is bar");
         assert_eq!(Messages::foo_bar().to_string(), "Foo is bar");
         assert_eq!(
-            Messages::foo_bar_with_arg("baz"),
+            Messages::foo_bar_with_arg("baz").to_string(),
             "Foo is \u{2068}baz\u{2069}"
         );
     }

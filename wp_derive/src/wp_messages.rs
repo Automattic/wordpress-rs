@@ -6,7 +6,7 @@ use serde::Deserialize;
 use std::{env, fs};
 use syn::{parse_macro_input, DeriveInput, Ident};
 
-const CONFIG_FILE_NAME: &str = "wp_messages.toml";
+const CONFIG_FILE_NAME: &str = "config_wp_messages.toml";
 
 pub fn wp_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let original_input = input.clone();
@@ -151,13 +151,13 @@ mod bindings {
             .expect("Already verified that there is one placeable");
         let arg_ident_as_string = format_ident!("{}", arg).to_string();
         quote! {
-            fn #function_name(value: &str) -> String {
+            fn #function_name(value: impl Into<String>) -> crate::localization::MessageBundle {
                 let args = {
-                    let mut map = std::collections::HashMap::new();
-                    map.insert(#arg_ident_as_string.into(), value.into());
+                    let mut map = std::collections::HashMap::<&'static str, String>::new();
+                    map.insert(#arg_ident_as_string, value.into());
                     map
                 };
-                crate::localization::localized_message_using_default_locale_with_args(#entry_key, &args)
+                crate::localization::MessageBundle::new(#entry_key, Some(args))
             }
         }
     }
