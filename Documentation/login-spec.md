@@ -99,6 +99,8 @@ Behavior:
 1. The system MUST reject the login attempt
 2. The system MUST display the error: "Unable to securely connect to `${DOMAIN}` – make sure it's using SSL"
 
+Reference Implementation: http://optional-https.wpmt.co
+
 # 6: HTTP-Only Site with Application Password Override
 
 Requirements:
@@ -114,6 +116,8 @@ Expected Signals:
 Behavior:
 1. The system MUST complete login successfully
 2. The system MUST display a warning about the lack of HTTPS security
+
+Reference Implementation: http://no-https.wpmt.co
 
 # 7: CDN-Cached Site
 
@@ -181,6 +185,8 @@ Behavior:
 1. The system MUST complete login successfully
 2. The system MUST NOT display any warnings
 
+Reference Implementation: https://subdirectory.wpmt.co/index.php?link_header=true
+
 # 11: WordPress in Subdirectory with HTML Link Tag
 
 Requirements:
@@ -197,6 +203,8 @@ Behavior:
 1. The system MUST complete login successfully
 2. The system MUST NOT display any warnings
 
+Reference Implementation: https://subdirectory.wpmt.co
+
 # 12: Direct Subdirectory Access
 
 Requirements:
@@ -211,6 +219,8 @@ Expected Signals:
 Behavior:
 1. The system MUST complete login successfully
 2. The system MUST NOT display any warnings
+
+Reference Implementation: https://subdirectory.wpmt.co/index.php?redirect=true
 
 # 13: Basic Authentication
 
@@ -228,6 +238,10 @@ Behavior:
 1. The system MUST prompt for Basic Auth credentials
 2. The system MUST complete login successfully after valid credentials
 
+Reference Implementation: https://basic-auth.wpmt.co
+Username: test@example.com
+Password: str0ngp4ssw0rd!
+
 # 14: Custom REST API Prefix
 
 Requirements:
@@ -241,6 +255,8 @@ Expected Signals:
 Behavior:
 1. The system MUST follow the custom REST API path
 2. The system MUST complete login successfully
+
+Reference Implementation: https://custom-rest-prefix.wpmt.co
 
 # 15: Rate Limited Access
 
@@ -261,8 +277,9 @@ Behavior:
 2. The system MUST respect the `Retry-After` header value
 3. The system MUST automatically retry after the specified delay
 4. The system MUST complete login successfully after rate limiting expires
+5. The system MUST display the error: "The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration." if the rate limit is not lifted after 3 attempts.
 
-Reference Implementation: https://rate-limited.wpmt.co // TODO: Build this test site
+Reference Implementation: https://aggressive-rate-limiting.wpmt.co
 
 # 16: Non-Existent Website
 
@@ -279,6 +296,8 @@ Expected Signals:
 Behavior:
 1. The system MUST reject the login attempt
 2. The system MUST display the error: "Unable to connect to `${DOMAIN}`. Please check that the website address is correct"
+
+Reference Implementation: https://valid-looking-url-but-not-actually.foo
 
 # 17: Invalid SSL Certificate
 
