@@ -4,6 +4,48 @@ use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Display};
 use strum_macros::IntoStaticStr;
 
+mod example {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+    pub enum FooError {
+        Bar,
+        Baz { value: String },
+    }
+
+    impl SupportsLocalization for FooError {
+        fn message_bundle(&self) -> MessageBundle {
+            match self {
+                FooError::Bar => Messages::foo_error_bar(),
+                FooError::Baz { value } => Messages::foo_error_baz(value),
+            }
+        }
+    }
+
+    impl Display for FooError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.with_default_locale())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_foo_error() {
+            assert_eq!(FooError::Bar.to_string(), "Foo is bar");
+            assert_eq!(
+                FooError::Baz {
+                    value: "baz!!".to_string()
+                }
+                .to_string(),
+                "Foo is \u{2068}baz!!\u{2069}"
+            );
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, IntoStaticStr, uniffi::Enum,
 )]
@@ -22,37 +64,28 @@ impl WpLocale {
     }
 }
 
-#[uniffi::export(with_foreign)]
-#[async_trait::async_trait]
-pub trait Localizable: Send + Sync {
-    async fn localize(&self, locale: WpLocale) -> String;
+pub trait SupportsLocalization: Send + Sync {
+    fn message_bundle(&self) -> MessageBundle;
+}
 
-    async fn with_default_locale(&self) -> String;
+#[uniffi::export(with_foreign)]
+pub trait Localizable: Send + Sync {
+    fn localize(&self, locale: WpLocale) -> String;
+    fn with_default_locale(&self) -> String;
+}
+
+impl<T: SupportsLocalization> Localizable for T {
+    fn localize(&self, locale: WpLocale) -> String {
+        self.message_bundle().localize(locale)
+    }
+
+    fn with_default_locale(&self) -> String {
+        self.message_bundle().with_default_locale()
+    }
 }
 
 #[wp_derive::wp_messages]
 pub struct Messages {}
-
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum FooError {
-    #[error("{}", Messages::foo_error_bar())]
-    Bar,
-    #[error("{}", Messages::foo_error_baz(value))]
-    Baz { value: String },
-    //#[error("{}", Messages::foo_error_bazzz(value1, value2))]
-    //Bazzz { value1: String, value2: String },
-}
-//
-//impl WpLocalizedError for FooError {
-//    fn localized_error_message(&self, locale_id: String) -> String {
-//        let messages = Messages::get(&locale_id).unwrap_or_default();
-//        match self {
-//            Self::Bar => messages.foo_bar().to_string(),
-//            Self::Baz { value } => messages.foo_error_baz(value).to_string(),
-//            Self::Bazzz { value1, value2 } => messages.foo_error_bazzz(value1, value2).to_string(),
-//        }
-//    }
-//}
 
 #[derive(Debug)]
 pub struct MessageBundle {
@@ -88,36 +121,5 @@ impl MessageBundle {
 impl Display for MessageBundle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.with_default_locale())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_messages() {
-        assert_eq!(localized_message("foo_bar"), "Foo is bar");
-        assert_eq!(Messages::foo_bar().to_string(), "Foo is bar");
-        assert_eq!(
-            Messages::foo_bar_with_arg("baz").to_string(),
-            "Foo is \u{2068}baz\u{2069}"
-        );
-    }
-
-    #[test]
-    fn test_foo_error() {
-        assert_eq!(FooError::Bar.to_string(), "Foo is bar");
-        assert_eq!(
-            FooError::Baz {
-                value: "baz!!".to_string()
-            }
-            .to_string(),
-            "Foo is \u{2068}baz!!\u{2069}"
-        );
-    }
-
-    fn localized_message(message_key: &str) -> String {
-        LOCALES.lookup(&WpLocale::default().as_language_id(), message_key)
     }
 }
