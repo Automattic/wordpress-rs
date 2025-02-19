@@ -1,10 +1,34 @@
 use crate::LOCALES;
 use fluent_bundle::FluentValue;
-use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
 use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Display};
+use strum_macros::IntoStaticStr;
 
-const DEFAULT_LOCALE: &str = "en-US";
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, IntoStaticStr, uniffi::Enum,
+)]
+pub enum WpLocale {
+    #[default]
+    #[strum(serialize = "en-US")]
+    EnUS,
+}
+
+impl WpLocale {
+    pub fn as_language_id(&self) -> unic_langid::LanguageIdentifier {
+        Into::<&str>::into(self).parse().expect(
+            // TODO: Add the unit tests
+            "All locales are unit tested to ensure they can be converted to LanguageIdentifier",
+        )
+    }
+}
+
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait Localizable: Send + Sync {
+    async fn localize(&self, locale: WpLocale) -> String;
+
+    async fn with_default_locale(&self) -> String;
+}
 
 #[wp_derive::wp_messages]
 pub struct Messages {}
@@ -30,28 +54,6 @@ pub enum FooError {
 //    }
 //}
 
-fn locale_language_id(lang_id: &str) -> unic_langid::LanguageIdentifier {
-    // Look up the translated message for `message_key` in `lang_id`.
-    let requested = convert_vec_str_to_langids_lossy([lang_id]);
-    let default: icu_locid::LanguageIdentifier = icu_locid::langid!("en-US");
-    let available: Vec<icu_locid::LanguageIdentifier> = LOCALES
-        .locales()
-        .filter_map(|f| f.to_string().parse().ok())
-        .collect();
-    let supported = negotiate_languages(
-        &requested,
-        &available,
-        Some(&default),
-        NegotiationStrategy::Filtering,
-    );
-    supported
-        .first()
-        .unwrap_or(&&default)
-        .to_string()
-        .parse()
-        .unwrap_or(unic_langid::langid!("en-US"))
-}
-
 #[derive(Debug)]
 pub struct MessageBundle {
     key: &'static str,
@@ -64,12 +66,12 @@ impl MessageBundle {
     }
 
     pub fn with_default_locale(&self) -> String {
-        self.localize(DEFAULT_LOCALE)
+        self.localize(WpLocale::default())
     }
 
-    pub fn localize(&self, locale: &'static str) -> String {
+    pub fn localize(&self, locale: WpLocale) -> String {
         LOCALES.lookup_complete(
-            &locale_language_id(locale),
+            &locale.as_language_id(),
             self.key,
             self.args
                 .as_ref()
@@ -95,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_messages() {
-        assert_eq!(localized_message(DEFAULT_LOCALE, "foo_bar"), "Foo is bar");
+        assert_eq!(localized_message("foo_bar"), "Foo is bar");
         assert_eq!(Messages::foo_bar().to_string(), "Foo is bar");
         assert_eq!(
             Messages::foo_bar_with_arg("baz").to_string(),
@@ -115,7 +117,7 @@ mod tests {
         );
     }
 
-    fn localized_message(lang_id: &str, message_key: &str) -> String {
-        LOCALES.lookup(&locale_language_id(lang_id), message_key)
+    fn localized_message(message_key: &str) -> String {
+        LOCALES.lookup(&WpLocale::default().as_language_id(), message_key)
     }
 }
