@@ -1,4 +1,5 @@
 use crate::LOCALES;
+use example::FooError;
 use fluent_bundle::FluentValue;
 use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Display};
@@ -24,7 +25,7 @@ mod example {
 
     impl Display for FooError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.with_default_locale())
+            write!(f, "{}", self.message_bundle())
         }
     }
 
@@ -70,17 +71,12 @@ pub trait SupportsLocalization: Send + Sync {
 
 #[uniffi::export(with_foreign)]
 pub trait Localizable: Send + Sync {
-    fn localize(&self, locale: WpLocale) -> String;
-    fn with_default_locale(&self) -> String;
+    fn localize(&self, locale: Option<WpLocale>) -> String;
 }
 
 impl<T: SupportsLocalization> Localizable for T {
-    fn localize(&self, locale: WpLocale) -> String {
+    fn localize(&self, locale: Option<WpLocale>) -> String {
         self.message_bundle().localize(locale)
-    }
-
-    fn with_default_locale(&self) -> String {
-        self.message_bundle().with_default_locale()
     }
 }
 
@@ -98,13 +94,9 @@ impl MessageBundle {
         Self { key, args }
     }
 
-    pub fn with_default_locale(&self) -> String {
-        self.localize(WpLocale::default())
-    }
-
-    pub fn localize(&self, locale: WpLocale) -> String {
+    pub fn localize(&self, locale: Option<WpLocale>) -> String {
         LOCALES.lookup_complete(
-            &locale.as_language_id(),
+            &locale.unwrap_or_default().as_language_id(),
             self.key,
             self.args
                 .as_ref()
@@ -120,6 +112,11 @@ impl MessageBundle {
 
 impl Display for MessageBundle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.with_default_locale())
+        write!(f, "{}", self.localize(None))
     }
+}
+
+#[uniffi::export]
+fn localizable_foo_error(foo: FooError, locale: Option<WpLocale>) -> String {
+    foo.localize(locale)
 }
