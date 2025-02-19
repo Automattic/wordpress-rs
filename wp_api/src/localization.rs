@@ -1,49 +1,44 @@
 use crate::LOCALES;
-use example::FooError;
 use fluent_bundle::FluentValue;
 use fluent_templates::Loader;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
 use strum_macros::IntoStaticStr;
 
-mod example {
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum FooError {
+    Bar,
+    Baz { value: String },
+}
+
+impl SupportsLocalization for FooError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            FooError::Bar => Messages::foo_error_bar(),
+            FooError::Baz { value } => Messages::foo_error_baz(value),
+        }
+    }
+}
+
+impl Display for FooError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message_bundle())
+    }
+}
+
+#[cfg(test)]
+mod tests {
     use super::*;
 
-    #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-    pub enum FooError {
-        Bar,
-        Baz { value: String },
-    }
-
-    impl SupportsLocalization for FooError {
-        fn message_bundle(&self) -> MessageBundle {
-            match self {
-                FooError::Bar => Messages::foo_error_bar(),
-                FooError::Baz { value } => Messages::foo_error_baz(value),
+    #[test]
+    fn test_foo_error() {
+        assert_eq!(FooError::Bar.to_string(), "Foo is bar");
+        assert_eq!(
+            FooError::Baz {
+                value: "baz!!".to_string()
             }
-        }
-    }
-
-    impl Display for FooError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.message_bundle())
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        fn test_foo_error() {
-            assert_eq!(FooError::Bar.to_string(), "Foo is bar");
-            assert_eq!(
-                FooError::Baz {
-                    value: "baz!!".to_string()
-                }
-                .to_string(),
-                "Foo is \u{2068}baz!!\u{2069}"
-            );
-        }
+            .to_string(),
+            "Foo is \u{2068}baz!!\u{2069}"
+        );
     }
 }
 
@@ -65,12 +60,12 @@ impl WpLocale {
     }
 }
 
-pub trait SupportsLocalization: Send + Sync {
+pub trait SupportsLocalization: Send + Sync + Debug {
     fn message_bundle(&self) -> MessageBundle;
 }
 
 #[uniffi::export(with_foreign)]
-pub trait Localizable: Send + Sync {
+pub trait Localizable: Send + Sync + Debug {
     fn localize(&self, locale: Option<WpLocale>) -> String;
 }
 
@@ -116,7 +111,17 @@ impl Display for MessageBundle {
     }
 }
 
+#[derive(Debug, uniffi::Object)]
+struct UniffiLocalizable(Arc<dyn Localizable>);
+
 #[uniffi::export]
-fn localizable_foo_error(foo: FooError, locale: Option<WpLocale>) -> String {
-    foo.localize(locale)
+impl UniffiLocalizable {
+    #[uniffi::constructor]
+    fn foo_error(value: FooError) -> Self {
+        Self(Arc::new(value))
+    }
+
+    fn localize(&self, locale: Option<WpLocale>) -> String {
+        self.0.localize(locale)
+    }
 }
