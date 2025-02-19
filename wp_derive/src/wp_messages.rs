@@ -6,46 +6,48 @@ use serde::Deserialize;
 use std::{env, fs};
 use syn::{parse_macro_input, DeriveInput, Ident};
 
-pub fn wp_translations(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+const CONFIG_FILE_NAME: &str = "wp_messages.toml";
+
+pub fn wp_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let original_input = input.clone();
-    let translations_ident = parse_macro_input!(input as DeriveInput).ident;
-    let config = TranslationsConfig::read_config();
-    let entries = parse_translations_file(&config.path);
+    let messages_ident = parse_macro_input!(input as DeriveInput).ident;
+    let config = Config::read_config();
+    let entries = parse_messages_file(&config.path);
 
     proc_macro::TokenStream::from_iter([
         // Since attribute macros completely replace the input, we need to manually preserve it
         original_input,
-        bindings::generate_bindings(translations_ident, entries).into(),
+        bindings::generate_bindings(messages_ident, entries).into(),
     ])
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TranslationsConfig {
+struct Config {
     path: String,
 }
 
-impl TranslationsConfig {
-    fn read_config() -> TranslationsConfig {
-        let file_path = normalize_file_path("wp_translations.toml");
+impl Config {
+    fn read_config() -> Config {
+        let file_path = normalize_file_path(CONFIG_FILE_NAME);
         let contents = match fs::read_to_string(&file_path) {
             Ok(c) => toml::from_str(c.as_str()).unwrap_or_else(|e| {
                 panic!(
-                    "#[wp_translations] configuration file ('{file_path}'):\n{:#?}",
+                    "#[wp_messages] configuration file ('{file_path}'):\n{:#?}",
                     e
                 )
             }),
             Err(_) => {
-                panic!("#[wp_translations] configuration file is missing: '{file_path}'");
+                panic!("#[wp_messages] configuration file is missing: '{file_path}'");
             }
         };
         contents
     }
 }
 
-fn parse_translations_file(file_path: &str) -> Vec<TranslationEntry> {
+fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
     let file_path = normalize_file_path(file_path);
     let contents =
-        fs::read_to_string(file_path).expect("Couldn't read translations file in '{file_path}'");
+        fs::read_to_string(file_path).expect("Couldn't read messages file in '{file_path}'");
     let resource = fluent_syntax::parser::parse(contents).unwrap();
     resource
         .body
@@ -115,7 +117,7 @@ mod bindings {
     use super::*;
 
     pub(super) fn generate_bindings(
-        translations_ident: Ident,
+        messages_ident: Ident,
         entries: Vec<TranslationEntry>,
     ) -> TokenStream {
         let functions = entries.iter().map(|e| match e.placeables.len() {
@@ -124,7 +126,7 @@ mod bindings {
             _ => generate_multi_arg_entry_function(e),
         });
         quote! {
-            impl #translations_ident {
+            impl #messages_ident {
                 #(#functions)*
             }
         }

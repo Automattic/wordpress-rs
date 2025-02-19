@@ -112,8 +112,8 @@ pub fn localized_message_using_default_locale_with_args(
     LOCALES.lookup_with_args(&locale_language_id(DEFAULT_LOCALE), message_key, args)
 }
 
-#[wp_derive::wp_translations]
-pub struct Translations {}
+#[wp_derive::wp_messages]
+pub struct Messages {}
 
 #[derive(Debug)]
 pub struct MessageBundle {
@@ -137,7 +137,7 @@ impl MessageBundle {
             self.args
                 .as_ref()
                 .map(|h| {
-                    h.into_iter()
+                    h.iter()
                         .map(|(k, v)| ((*k).into(), FluentValue::from(v)))
                         .collect()
                 })
@@ -157,11 +157,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_translations() {
+    fn test_messages() {
         assert_eq!(localized_message(DEFAULT_LOCALE, "foo_bar"), "Foo is bar");
-        assert_eq!(Translations::foo_bar().to_string(), "Foo is bar");
+        assert_eq!(Messages::foo_bar().to_string(), "Foo is bar");
         assert_eq!(
-            Translations::foo_bar_with_arg("baz"),
+            Messages::foo_bar_with_arg("baz"),
             "Foo is \u{2068}baz\u{2069}"
         );
     }

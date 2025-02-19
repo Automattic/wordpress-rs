@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 
 mod wp_deserialize;
-mod wp_translations;
+mod wp_messages;
 
 #[proc_macro_derive(WpDeserialize)]
 pub fn wp_deserialize(input: TokenStream) -> TokenStream {
@@ -9,6 +9,6 @@ pub fn wp_deserialize(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn wp_translations(_args: TokenStream, input: TokenStream) -> TokenStream {
-    wp_translations::wp_translations(input)
+pub fn wp_messages(_args: TokenStream, input: TokenStream) -> TokenStream {
+    wp_messages::wp_messages(input)
 }
