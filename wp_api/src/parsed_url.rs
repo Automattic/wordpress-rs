@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::Display;
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Object)]
@@ -8,6 +10,12 @@ pub struct ParsedUrl {
 impl ParsedUrl {
     pub fn new(url: Url) -> Self {
         Self { inner: url }
+    }
+}
+
+impl Display for ParsedUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.inner)
     }
 }
 
@@ -22,6 +30,18 @@ impl ParsedUrl {
 
     pub fn url(&self) -> String {
         self.inner.to_string()
+    }
+
+    /// A user-facing URL string that omits unnecessary details.
+    pub fn pretty_url(&self) -> String {
+        if self.inner.path() == "/" {
+            self.inner
+                .host_str()
+                .unwrap_or(self.inner.as_str())
+                .to_string()
+        } else {
+            self.inner.to_string()
+        }
     }
 }
 
@@ -111,5 +131,15 @@ mod tests {
     #[case("https://xn--u-ccb.com", ParseUrlError::IdnaError)]
     fn parse_url_error(#[case] input: &str, #[case] expected_err: ParseUrlError) {
         assert_eq!(ParsedUrl::try_from(input).unwrap_err(), expected_err);
+    }
+
+    #[rstest]
+    #[case("https://example.com", "example.com")]
+    #[case("http://example.com", "example.com")]
+    #[case("http://example.com/path", "http://example.com/path")]
+    #[case("http://subdomain.example.com", "subdomain.example.com")]
+    fn pretty_url(#[case] input: &str, #[case] expected_display: &str) {
+        let url = ParsedUrl::parse(input).unwrap();
+        assert_eq!(url.pretty_url(), expected_display);
     }
 }

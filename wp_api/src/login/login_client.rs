@@ -1,10 +1,11 @@
 use super::{
     url_discovery::{
-        self, AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
-        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-        FetchWpJsonFailure, FetchWpJsonSuccess, FindApiRootLinkHeaderFailure,
-        FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult, IsWordPressSiteParseHtmlResult,
-        ParseApiRootUrlError, ParseHtmlFailure, API_ROOT_LINK_HEADER,
+        self, ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttempt,
+        AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult, AutoDiscoveryAttemptSuccess,
+        AutoDiscoveryResult, AutoDiscoveryUniffiResult, FetchWpJsonFailure, FetchWpJsonSuccess,
+        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
+        IsWordPressSiteParseHtmlResult, ParseApiRootUrlError, ParseHtmlFailure,
+        API_ROOT_LINK_HEADER,
     },
     WpApiDetails,
 };
@@ -121,11 +122,35 @@ impl WpLoginClient {
             };
 
         if !api_details.has_application_passwords_authentication_url() {
+            let reason = if api_details.has_application_password_blocking_plugin() {
+                let plugins = api_details.application_password_blocking_plugins();
+
+                if plugins.len() == 1 {
+                    // If there's only one candidate, we can show more information in the error message
+                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
+                        plugin: plugins.first().expect("Already verified there is one plugin").clone(),
+                    })
+                } else {
+                    // If there's more than one, for now we'll just give a generic error
+                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByMultiplePlugins)
+                }
+            } else if !api_details.uses_https() {
+                // Application Passwords are disabled for non-HTTPS sites by default
+                if api_details.site_url_is_local_development_environment() {
+                    Some(ApplicationPasswordsNotSupportedReason::SiteIsLocalDevelopmentEnvironment)
+                } else {
+                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordsDisabledForHttpSite)
+                }
+            } else {
+                None
+            };
+
             Err(
                 AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
                     parsed_site_url: api_root_url_success.parsed_site_url,
                     api_root_url: api_root_url_success.api_root_url,
                     api_details,
+                    reason,
                 },
             )
         } else {

@@ -1,11 +1,12 @@
 use super::WpApiDetails;
 use crate::{
-    request::WpNetworkHeaderMap, request::WpRedirect, ParseUrlError, ParsedUrl,
-    RequestExecutionError, RequestExecutionErrorReason,
+    login::KnownApplicationPasswordBlockingPlugin, request::WpNetworkHeaderMap,
+    request::WpRedirect, ParseUrlError, ParsedUrl, RequestExecutionError,
+    RequestExecutionErrorReason,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 pub(crate) const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -420,12 +421,34 @@ pub enum AutoDiscoveryAttemptFailure {
         api_root_url: ParsedUrl,
         parsing_error_message: String,
     },
-    #[error("Application Passwords are not supported")]
+    #[error("{}", reason.as_ref().map(|r| r.error_message(parsed_site_url)).unwrap_or("Application Passwords are not supported".to_string()))]
     ApplicationPasswordsNotSupported {
         parsed_site_url: ParsedUrl,
         api_root_url: ParsedUrl,
         api_details: WpApiDetails,
+        reason: Option<ApplicationPasswordsNotSupportedReason>,
     },
+}
+
+#[derive(Debug, Clone)]
+pub enum ApplicationPasswordsNotSupportedReason {
+    ApplicationPasswordBlockedByPlugin {
+        plugin: KnownApplicationPasswordBlockingPlugin,
+    },
+    ApplicationPasswordBlockedByMultiplePlugins,
+    SiteIsLocalDevelopmentEnvironment,
+    ApplicationPasswordsDisabledForHttpSite,
+}
+
+impl ApplicationPasswordsNotSupportedReason {
+    fn error_message(&self, parsed_site_url: impl Display) -> String {
+        match self {
+            Self::ApplicationPasswordBlockedByPlugin { plugin } => format!("Unable to login to {} – the {} plugin might have disabled Application Passwords. Please visit {} to learn more", parsed_site_url, plugin.name, plugin.support_url),
+            Self::ApplicationPasswordBlockedByMultiplePlugins => format!("Unable to login to {} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.", parsed_site_url),
+            Self::SiteIsLocalDevelopmentEnvironment => "This site is a local development environment. You'll need to enable application passwords to connect to it with the app.".to_string(),
+            Self::ApplicationPasswordsDisabledForHttpSite => "Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.".to_string(),
+    }
+    }
 }
 
 impl AutoDiscoveryAttemptFailure {
