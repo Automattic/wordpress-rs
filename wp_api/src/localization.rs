@@ -1,7 +1,7 @@
 use fluent_bundle::FluentValue;
 use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
-use strum_macros::IntoStaticStr;
+use strum_macros::{EnumIter, IntoStaticStr};
 
 fluent_templates::static_loader! {
     static LOCALES = {
@@ -9,6 +9,9 @@ fluent_templates::static_loader! {
         fallback_language: "en-US"
     };
 }
+
+#[wp_derive::wp_messages]
+pub struct Messages {}
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum ExampleLocalizableError {
@@ -23,37 +26,21 @@ impl SupportsLocalization for ExampleLocalizableError {
     }
 }
 
-impl Display for ExampleLocalizableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message_bundle())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_example_localizable_error() {
-        assert_eq!(
-            ExampleLocalizableError::Hello {
-                value: "world".to_string()
-            }
-            .to_string(),
-            "Hello \u{2068}world\u{2069}!"
-        );
-        assert_eq!(
-            ExampleLocalizableError::Hello {
-                value: "world".to_string()
-            }
-            .localize(Some(WpLocale::TrTR)),
-            "Merhaba \u{2068}world\u{2069}!"
-        );
-    }
-}
+crate::display_from_supports_localization!(ExampleLocalizableError);
 
 #[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, IntoStaticStr, uniffi::Enum,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    EnumIter,
+    IntoStaticStr,
+    uniffi::Enum,
 )]
 pub enum WpLocale {
     #[default]
@@ -61,12 +48,13 @@ pub enum WpLocale {
     EnUS,
     #[strum(serialize = "tr-TR")]
     TrTR,
+    #[strum(serialize = "invalid")]
+    Invalid,
 }
 
 impl WpLocale {
     pub fn as_language_id(&self) -> unic_langid::LanguageIdentifier {
         Into::<&str>::into(self).parse().expect(
-            // TODO: Add the unit tests
             "All locales are unit tested to ensure they can be converted to LanguageIdentifier",
         )
     }
@@ -87,9 +75,6 @@ impl<T: SupportsLocalization> Localizable for T {
     }
 }
 
-#[wp_derive::wp_messages]
-pub struct Messages {}
-
 #[derive(Debug)]
 pub struct MessageBundle {
     key: &'static str,
@@ -102,9 +87,6 @@ impl MessageBundle {
     }
 
     pub fn localize(&self, locale: Option<WpLocale>) -> String {
-        if let Some(l) = locale {
-            println!("lang_id: {:#?}", l.as_language_id());
-        }
         LOCALES.lookup_complete(
             &locale.unwrap_or_default().as_language_id(),
             self.key,
@@ -138,5 +120,59 @@ impl UniffiLocalizable {
 
     fn localize(&self, locale: Option<WpLocale>) -> String {
         self.0.localize(locale)
+    }
+}
+
+mod macro_helper {
+    #[macro_export]
+    macro_rules! display_from_supports_localization {
+        ($ident:ident) => {
+            paste::paste! {
+                impl Display for ExampleLocalizableError {
+                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(f, "{}", self.message_bundle())
+                    }
+                }
+            }
+        };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn test_example_localizable_error() {
+        assert_eq!(
+            ExampleLocalizableError::Hello {
+                value: "world".to_string()
+            }
+            .to_string(),
+            "Hello \u{2068}world\u{2069}!"
+        );
+        assert_eq!(
+            ExampleLocalizableError::Hello {
+                value: "world".to_string()
+            }
+            .localize(Some(WpLocale::TrTR)),
+            "Merhaba \u{2068}world\u{2069}!"
+        );
+    }
+
+    #[test]
+    fn test_ensure_all_locales_can_be_parsed_into_language_identifiers() {
+        // Note that this _only_ validates that `WpLocale` values can be converted to
+        // `unic_langid::LanguageIdentifier`
+        // https://docs.rs/unic-langid/latest/unic_langid/struct.LanguageIdentifier.html
+        //
+        // Since we unwrap the parsing result in `WpLocale::as_language_id`, we use this test to
+        // make sure it won't panic.
+        WpLocale::iter().for_each(|l| {
+            let language_identifier = l.as_language_id();
+            assert_eq!(language_identifier.to_string(), Into::<&str>::into(l));
+        });
     }
 }
