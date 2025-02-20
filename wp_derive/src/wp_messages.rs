@@ -120,10 +120,12 @@ mod bindings {
         messages_ident: Ident,
         entries: Vec<TranslationEntry>,
     ) -> TokenStream {
-        let functions = entries.iter().map(|e| match e.placeables.len() {
-            0 => generate_no_arg_entry_function(e),
-            1 => generate_single_arg_entry_function(e),
-            _ => generate_multi_arg_entry_function(e),
+        let functions = entries.iter().map(|e| {
+            if e.placeables.is_empty() {
+                generate_argless_function(e)
+            } else {
+                generate_function(e)
+            }
         });
         quote! {
             impl #messages_ident {
@@ -132,7 +134,7 @@ mod bindings {
         }
     }
 
-    fn generate_no_arg_entry_function(entry: &TranslationEntry) -> TokenStream {
+    fn generate_argless_function(entry: &TranslationEntry) -> TokenStream {
         let function_name = entry.key_as_function_name();
         let entry_key = entry.key_as_token_string();
         quote! {
@@ -142,31 +144,30 @@ mod bindings {
         }
     }
 
-    fn generate_single_arg_entry_function(entry: &TranslationEntry) -> TokenStream {
+    fn generate_function(entry: &TranslationEntry) -> TokenStream {
         let function_name = entry.key_as_function_name();
         let entry_key = entry.key_as_token_string();
-        let arg = entry
-            .placeables
-            .first()
-            .expect("Already verified that there is one placeable");
-        let arg_ident_as_string = format_ident!("{}", arg).to_string();
+        let args = entry.placeables.iter().map(|placeable| {
+            let placeable_ident = format_ident!("{}", placeable);
+            quote! {
+                #placeable_ident: impl Into<String>,
+            }
+        });
+        let map_inserts = entry.placeables.iter().map(|placeable| {
+            let placeable_ident = format_ident!("{}", placeable);
+            quote! {
+                map.insert(#placeable, #placeable_ident.into());
+            }
+        });
         quote! {
-            fn #function_name(value: impl Into<String>) -> crate::localization::MessageBundle {
-                let args = {
+            fn #function_name(#(#args)*) -> crate::localization::MessageBundle {
+                let map = {
                     let mut map = std::collections::HashMap::<&'static str, String>::new();
-                    map.insert(#arg_ident_as_string, value.into());
+                    #(#map_inserts)*
                     map
                 };
-                crate::localization::MessageBundle::new(#entry_key, Some(args))
+                crate::localization::MessageBundle::new(#entry_key, Some(map))
             }
-        }
-    }
-
-    fn generate_multi_arg_entry_function(entry: &TranslationEntry) -> TokenStream {
-        let function_name = entry.key_as_function_name();
-        //let entry_key = entry.key_as_token_string();
-        quote! {
-            fn #function_name(value: &str) -> String { "placeholder".to_string() }
         }
     }
 }

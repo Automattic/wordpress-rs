@@ -16,12 +16,16 @@ pub struct Messages {}
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum ExampleLocalizableError {
     Hello { value: String },
+    MultiArg { value1: String, value2: String },
 }
 
 impl SupportsLocalization for ExampleLocalizableError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
             Self::Hello { value } => Messages::example_localizable_error_hello(value),
+            Self::MultiArg { value1, value2 } => {
+                Messages::example_localizable_error_multi_arg(value1, value2)
+            }
         }
     }
 }
@@ -159,6 +163,22 @@ mod tests {
             }
             .localize(Some(WpLocale::TrTR)),
             "Merhaba \u{2068}world\u{2069}!"
+        );
+        assert_eq!(
+            ExampleLocalizableError::MultiArg {
+                value1: "Foo".to_string(),
+                value2: "Bar".to_string()
+            }
+            .to_string(),
+            "Hello \u{2068}Foo\u{2069} and \u{2068}Bar\u{2069}!"
+        );
+        assert_eq!(
+            ExampleLocalizableError::MultiArg {
+                value1: "Foo".to_string(),
+                value2: "Bar".to_string()
+            }
+            .localize(Some(WpLocale::TrTR)),
+            "Merhaba \u{2068}Foo\u{2069} ve \u{2068}Bar\u{2069}!"
         );
     }
 
