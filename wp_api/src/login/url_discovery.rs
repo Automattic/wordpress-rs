@@ -1,7 +1,8 @@
 use super::WpApiDetails;
 use crate::{
-    request::WpNetworkHeaderMap, request::WpRedirect, ParseUrlError, ParsedUrl,
-    RequestExecutionError, RequestExecutionErrorReason,
+    login::KnownApplicationPasswordBlockingPlugin, request::WpNetworkHeaderMap,
+    request::WpRedirect, ParseUrlError, ParsedUrl, RequestExecutionError,
+    RequestExecutionErrorReason,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -426,6 +427,33 @@ pub enum AutoDiscoveryAttemptFailure {
         api_root_url: ParsedUrl,
         api_details: WpApiDetails,
     },
+    #[error("Unable to login to {} – the {} plugin might have disabled Application Passwords. Please visit {} to learn more",
+        parsed_site_url,
+        plugin.name,
+        plugin.support_url
+    )]
+    ApplicationPasswordBlockedByPlugin {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+        plugin: KnownApplicationPasswordBlockingPlugin,
+    },
+    #[error("Unable to login to {} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.",
+        parsed_site_url
+    )]
+    ApplicationPasswordBlockedByMultiplePlugins {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+    },
+    #[error("This site is a local development environment. You'll need to enable application passwords to connect to it with the app.")]
+    SiteIsLocalDevelopmentEnvironment {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+    },
+    #[error("Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.")]
+    ApplicationPasswordsDisabledForHttpSite {
+        parsed_site_url: ParsedUrl,
+        api_root_url: ParsedUrl,
+    },
 }
 
 impl AutoDiscoveryAttemptFailure {
@@ -437,6 +465,12 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => false,
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => false,
             AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => false,
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin { .. } => false,
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins { .. } => {
+                false
+            }
+            AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment { .. } => false,
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite { .. } => false,
         }
     }
 
@@ -459,6 +493,22 @@ impl AutoDiscoveryAttemptFailure {
                 parsed_site_url,
                 ..
             } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin {
+                parsed_site_url,
+                ..
+            } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins {
+                parsed_site_url,
+                ..
+            } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment {
+                parsed_site_url,
+                ..
+            } => Some(parsed_site_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite {
+                parsed_site_url,
+                ..
+            } => Some(parsed_site_url),
         }
     }
 
@@ -477,6 +527,14 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => Some(false),
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(false),
             AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins { .. } => {
+                Some(false)
+            }
+            AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite { .. } => {
+                Some(false)
+            }
         }
     }
 
@@ -489,6 +547,21 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
             AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
                 api_root_url, ..
+            } => Some(api_root_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin {
+                api_root_url,
+                ..
+            } => Some(api_root_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins {
+                api_root_url,
+                ..
+            } => Some(api_root_url),
+            AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment {
+                api_root_url, ..
+            } => Some(api_root_url),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite {
+                api_root_url,
+                ..
             } => Some(api_root_url),
         }
     }
@@ -506,6 +579,14 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(true),
             AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins { .. } => {
+                Some(false)
+            }
+            AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment { .. } => Some(false),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite { .. } => {
+                Some(false)
+            }
         }
     }
 
@@ -517,6 +598,14 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
             AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => None,
             AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(true),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin { .. } => Some(true),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins { .. } => {
+                Some(true)
+            }
+            AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment { .. } => Some(true),
+            AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite { .. } => {
+                Some(true)
+            }
         }
     }
 }
@@ -610,6 +699,11 @@ pub enum FetchApiDetailsError {
     },
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
+    #[error(
+        "Unable to login to {:?}. Please double-check that this is a WordPress site",
+        hostname
+    )]
+    NotAWordPressSiteError { hostname: String },
 }
 
 #[cfg(test)]

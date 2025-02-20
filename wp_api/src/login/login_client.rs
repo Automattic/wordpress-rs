@@ -121,6 +121,49 @@ impl WpLoginClient {
             };
 
         if !api_details.has_application_passwords_authentication_url() {
+            if api_details.has_application_password_blocking_plugin() {
+                let plugins = api_details.application_password_blocking_plugins();
+
+                // If there's only one candidate, we can show more information in the error message
+                if plugins.len() == 1 {
+                    return Err(
+                        AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByPlugin {
+                            parsed_site_url: api_root_url_success.parsed_site_url,
+                            api_root_url: api_root_url_success.api_root_url,
+                            plugin: plugins[0].clone(),
+                        },
+                    );
+                }
+                // If there's more than one, for now we'll just give a generic error
+                else {
+                    return Err(
+                        AutoDiscoveryAttemptFailure::ApplicationPasswordBlockedByMultiplePlugins {
+                            parsed_site_url: api_root_url_success.parsed_site_url,
+                            api_root_url: api_root_url_success.api_root_url,
+                        },
+                    );
+                }
+            }
+
+            // Application Passwords are disabled for non-HTTPS sites by default
+            if !api_details.uses_https() {
+                if api_details.site_url_is_local_development_environment() {
+                    return Err(
+                        AutoDiscoveryAttemptFailure::SiteIsLocalDevelopmentEnvironment {
+                            parsed_site_url: api_root_url_success.parsed_site_url,
+                            api_root_url: api_root_url_success.api_root_url,
+                        },
+                    );
+                }
+
+                return Err(
+                    AutoDiscoveryAttemptFailure::ApplicationPasswordsDisabledForHttpSite {
+                        parsed_site_url: api_root_url_success.parsed_site_url,
+                        api_root_url: api_root_url_success.api_root_url,
+                    },
+                );
+            }
+
             Err(
                 AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
                     parsed_site_url: api_root_url_success.parsed_site_url,
