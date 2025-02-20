@@ -633,11 +633,6 @@ pub enum FetchApiDetailsError {
     },
     #[error("Api details couldn't be parsed from response: {:?}", response)]
     ApiDetailsCouldntBeParsed { reason: String, response: String },
-    #[error(
-        "Unable to login to {:?}. Please double-check that this is a WordPress site",
-        hostname
-    )]
-    NotAWordPressSiteError { hostname: String },
 }
 
 #[cfg(test)]
