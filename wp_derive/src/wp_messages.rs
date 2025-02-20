@@ -1,5 +1,5 @@
 use convert_case::{Case, Casing};
-use fluent_syntax::ast::{self, Entry, InlineExpression, PatternElement};
+use fluent_syntax::ast::{self, Entry, Expression, InlineExpression, PatternElement};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use serde::Deserialize;
@@ -44,6 +44,40 @@ impl Config {
     }
 }
 
+fn message_pattern_to_documentation(
+    message: Option<&fluent_syntax::ast::Pattern<String>>,
+) -> Option<String> {
+    message.map(|p| {
+        p.elements
+            .iter()
+            .flat_map(|e| match e {
+                PatternElement::TextElement { value } => Some(value.clone()),
+                PatternElement::Placeable { expression } => {
+                    expression_to_variable_name(expression).map(|v| format!("{{${v}}}"))
+                }
+            })
+            .collect::<Vec<String>>()
+            .join("")
+    })
+}
+
+fn expression_to_variable_name(expression: &Expression<String>) -> Option<String> {
+    match expression {
+        ast::Expression::Select { .. } => {
+            // Select expressions are not supported yet
+            None
+        }
+        ast::Expression::Inline(inline) => {
+            if let InlineExpression::VariableReference { id } = inline {
+                Some(id.name.clone())
+            } else {
+                // Only `fluent_syntax::ast::InlineExpression::VariableReference` supported
+                None
+            }
+        }
+    }
+}
+
 fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
     let file_path = normalize_file_path(file_path);
     let contents =
@@ -54,6 +88,8 @@ fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
         .into_iter()
         .flat_map(|e| {
             if let Entry::Message(message) = e {
+                // TODO: We are iterating twice, once for documentation, once for placeables
+                let documentation = message_pattern_to_documentation(message.value.as_ref());
                 let key = message.id.name.to_string();
                 let placeables = if let Some(pattern) = message.value {
                     pattern
@@ -61,20 +97,7 @@ fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
                         .into_iter()
                         .filter_map(|pattern_element| {
                             if let PatternElement::Placeable { expression } = pattern_element {
-                                match expression {
-                                    ast::Expression::Select { .. } => {
-                                        // Select expressions are not supported yet
-                                        None
-                                    }
-                                    ast::Expression::Inline(inline) => {
-                                        if let InlineExpression::VariableReference { id } = inline {
-                                            Some(id.name)
-                                        } else {
-                                            // Only `fluent_syntax::ast::InlineExpression::VariableReference` supported
-                                            None
-                                        }
-                                    }
-                                }
+                                expression_to_variable_name(&expression)
                             } else {
                                 None
                             }
@@ -83,7 +106,11 @@ fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
                 } else {
                     vec![]
                 };
-                Some(TranslationEntry { key, placeables })
+                Some(TranslationEntry {
+                    documentation,
+                    key,
+                    placeables,
+                })
             } else {
                 None
             }
@@ -99,6 +126,7 @@ fn normalize_file_path(file_path: &str) -> String {
 
 #[derive(Debug)]
 struct TranslationEntry {
+    documentation: Option<String>,
     key: String,
     placeables: Vec<String>,
 }
@@ -137,16 +165,29 @@ mod bindings {
     fn generate_argless_function(entry: &TranslationEntry) -> TokenStream {
         let function_name = entry.key_as_function_name();
         let entry_key = entry.key_as_token_string();
+        let documentation = generate_documentation(entry);
         quote! {
-            fn #function_name() -> crate::localization::MessageBundle {
+            #documentation
+            pub fn #function_name() -> crate::localization::MessageBundle {
                 crate::localization::MessageBundle::new(#entry_key, None)
             }
+        }
+    }
+
+    fn generate_documentation(entry: &TranslationEntry) -> TokenStream {
+        if let Some(doc) = &entry.documentation {
+            quote! {
+                #[doc = #doc]
+            }
+        } else {
+            quote! {}
         }
     }
 
     fn generate_function(entry: &TranslationEntry) -> TokenStream {
         let function_name = entry.key_as_function_name();
         let entry_key = entry.key_as_token_string();
+        let documentation = generate_documentation(entry);
         let args = entry.placeables.iter().map(|placeable| {
             let placeable_ident = format_ident!("{}", placeable);
             quote! {
@@ -160,7 +201,8 @@ mod bindings {
             }
         });
         quote! {
-            fn #function_name(#(#args)*) -> crate::localization::MessageBundle {
+            #documentation
+            pub fn #function_name(#(#args)*) -> crate::localization::MessageBundle {
                 let map = {
                     let mut map = std::collections::HashMap::<&'static str, String>::new();
                     #(#map_inserts)*
