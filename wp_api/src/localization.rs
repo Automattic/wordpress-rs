@@ -1,25 +1,29 @@
-use crate::LOCALES;
 use fluent_bundle::FluentValue;
 use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
 use strum_macros::IntoStaticStr;
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-pub enum FooError {
-    Bar,
-    Baz { value: String },
+fluent_templates::static_loader! {
+    static LOCALES = {
+        locales: "./localization",
+        fallback_language: "en-US"
+    };
 }
 
-impl SupportsLocalization for FooError {
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum ExampleLocalizableError {
+    Hello { value: String },
+}
+
+impl SupportsLocalization for ExampleLocalizableError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
-            FooError::Bar => Messages::foo_error_bar(),
-            FooError::Baz { value } => Messages::foo_error_baz(value),
+            Self::Hello { value } => Messages::example_localizable_error_hello(value),
         }
     }
 }
 
-impl Display for FooError {
+impl Display for ExampleLocalizableError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.message_bundle())
     }
@@ -30,14 +34,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_foo_error() {
-        assert_eq!(FooError::Bar.to_string(), "Foo is bar");
+    fn test_example_localizable_error() {
         assert_eq!(
-            FooError::Baz {
-                value: "baz!!".to_string()
+            ExampleLocalizableError::Hello {
+                value: "world".to_string()
             }
             .to_string(),
-            "Foo is \u{2068}baz!!\u{2069}"
+            "Hello \u{2068}world\u{2069}!"
+        );
+        assert_eq!(
+            ExampleLocalizableError::Hello {
+                value: "world".to_string()
+            }
+            .localize(Some(WpLocale::TrTR)),
+            "Merhaba \u{2068}world\u{2069}!"
         );
     }
 }
@@ -49,6 +59,8 @@ pub enum WpLocale {
     #[default]
     #[strum(serialize = "en-US")]
     EnUS,
+    #[strum(serialize = "tr-TR")]
+    TrTR,
 }
 
 impl WpLocale {
@@ -90,6 +102,9 @@ impl MessageBundle {
     }
 
     pub fn localize(&self, locale: Option<WpLocale>) -> String {
+        if let Some(l) = locale {
+            println!("lang_id: {:#?}", l.as_language_id());
+        }
         LOCALES.lookup_complete(
             &locale.unwrap_or_default().as_language_id(),
             self.key,
@@ -117,7 +132,7 @@ struct UniffiLocalizable(Arc<dyn Localizable>);
 #[uniffi::export]
 impl UniffiLocalizable {
     #[uniffi::constructor]
-    fn foo_error(value: FooError) -> Self {
+    fn example_localizable_error(value: ExampleLocalizableError) -> Self {
         Self(Arc::new(value))
     }
 

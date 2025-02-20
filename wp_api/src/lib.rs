@@ -209,13 +209,6 @@ macro_rules! generate {
     }};
 }
 
-fluent_templates::static_loader! {
-    static LOCALES = {
-        locales: "./localization",
-        fallback_language: "en-US"
-    };
-}
-
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
