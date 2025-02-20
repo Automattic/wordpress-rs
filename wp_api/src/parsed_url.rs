@@ -15,15 +15,7 @@ impl ParsedUrl {
 
 impl Display for ParsedUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.inner.path() == "/" {
-            write!(
-                f,
-                "{}",
-                self.inner.host_str().unwrap_or(self.inner.as_str())
-            )
-        } else {
-            write!(f, "{}", self.inner.as_str())
-        }
+        write!(f, "{}", self.inner)
     }
 }
 
@@ -38,6 +30,18 @@ impl ParsedUrl {
 
     pub fn url(&self) -> String {
         self.inner.to_string()
+    }
+
+    /// A user-facing URL string that omits unnecessary details.
+    pub fn pretty_url(&self) -> String {
+        if self.inner.path() == "/" {
+            self.inner
+                .host_str()
+                .unwrap_or(self.inner.as_str())
+                .to_string()
+        } else {
+            self.inner.to_string()
+        }
     }
 }
 
@@ -134,8 +138,8 @@ mod tests {
     #[case("http://example.com", "example.com")]
     #[case("http://example.com/path", "http://example.com/path")]
     #[case("http://subdomain.example.com", "subdomain.example.com")]
-    fn display_url(#[case] input: &str, #[case] expected_display: &str) {
+    fn pretty_url(#[case] input: &str, #[case] expected_display: &str) {
         let url = ParsedUrl::parse(input).unwrap();
-        assert_eq!(format!("{}", url), expected_display);
+        assert_eq!(url.pretty_url(), expected_display);
     }
 }
