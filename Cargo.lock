@@ -4047,8 +4047,6 @@ dependencies = [
 name = "wp_derive"
 version = "0.1.0"
 dependencies = [
- "convert_case",
- "fluent-syntax",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
