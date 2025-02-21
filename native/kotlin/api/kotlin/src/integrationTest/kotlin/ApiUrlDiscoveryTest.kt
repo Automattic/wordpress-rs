@@ -2,10 +2,12 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.WpLoginClientConfiguration
 import kotlin.test.assertEquals
 
 class ApiUrlDiscoveryTest {
-    private val loginClient: WpLoginClient = WpLoginClient()
+    private val loginClient: WpLoginClient = WpLoginClient(config = WpLoginClientConfiguration(true,
+        1u, 3u))
 
     @Test
     fun testFindsCorrectApiUrls() = runTest {
