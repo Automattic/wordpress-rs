@@ -15,13 +15,23 @@ pub struct WpMessages {}
 
 #[derive(Debug)]
 pub struct MessageBundle {
+    // Keep the fields private to avoid clients from looking up messages that do not exist.
     key: &'static str,
     args: Option<HashMap<&'static str, String>>,
 }
 
 impl MessageBundle {
-    pub fn new(key: &'static str, args: Option<HashMap<&'static str, String>>) -> Self {
+    // Keep this private to avoid clients from looking up messages that do not exist.
+    fn new(key: &'static str, args: Option<HashMap<&'static str, String>>) -> Self {
         Self { key, args }
+    }
+
+    pub fn key(&self) -> &'static str {
+        self.key
+    }
+
+    pub fn args(&self) -> Option<&HashMap<&'static str, String>> {
+        self.args.as_ref()
     }
 
     pub fn localize(&self, locale: Option<WpLocale>) -> String {
@@ -157,17 +167,49 @@ mod localization_tests {
 
     #[test]
     fn test_example_localizable_error() {
+        let expected_en_message = "Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}foo\u{2069}'";
+        let expected_tr_message = "Api kök bağlantı başlığı bulunamadı!\nDurum kodu: '\u{2068}404\u{2069}'\nBaşlık Haritası: '\u{2068}foo\u{2069}'";
+        {
+            let map = {
+                let mut map = HashMap::new();
+                map.insert("status_code".into(), "404".into());
+                map.insert("header_map".into(), "foo".into());
+                map
+            };
+            assert_eq!(
+                LOCALES.lookup_with_args(
+                    &WpLocale::EnUS.as_language_id(),
+                    "api_root_link_header_not_found",
+                    &map
+                ),
+                expected_en_message
+            );
+            assert_eq!(
+                LOCALES.lookup_with_args(
+                    &WpLocale::TrTR.as_language_id(),
+                    "api_root_link_header_not_found",
+                    &map
+                ),
+                expected_tr_message
+            );
+        }
         let api_root_link_header_not_found = ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
             status_code: 404,
             header_map: "foo".to_string(),
         };
+
+        let message_bundle = api_root_link_header_not_found.message_bundle();
+        assert_eq!(message_bundle.key, "api_root_link_header_not_found");
+        let message_args = message_bundle.args.unwrap();
+        assert_eq!(message_args["status_code"], "404");
+        assert_eq!(message_args["header_map"], "foo");
         assert_eq!(
             api_root_link_header_not_found.to_string(),
-            "Hello \u{2068}world\u{2069}!"
+            expected_en_message
         );
         assert_eq!(
             api_root_link_header_not_found.localize(Some(WpLocale::TrTR)),
-            "Merhaba \u{2068}world\u{2069}!"
+            expected_tr_message
         );
     }
 }

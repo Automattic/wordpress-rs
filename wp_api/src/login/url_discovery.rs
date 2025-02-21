@@ -690,4 +690,26 @@ mod tests {
         let parsed_url = ParsedUrl::parse(url).unwrap();
         assert_eq!(is_local_dev_environment_url(&parsed_url), expected);
     }
+
+    #[test]
+    fn test_parse_api_root_url_error_message_bundle() {
+        let header_map: WpNetworkHeaderMap = {
+            let mut map = http::HeaderMap::new();
+            map.insert(
+                http::header::ACCEPT,
+                http::HeaderValue::from_static("application/json"),
+            );
+            map.into()
+        };
+        let api_root_link_header_not_found = ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+            status_code: 404,
+            header_map: header_map.into(),
+        };
+
+        let message_bundle = api_root_link_header_not_found.message_bundle();
+        assert_eq!(message_bundle.key(), "api_root_link_header_not_found");
+        let message_args = message_bundle.args().unwrap();
+        assert_eq!(message_args["status_code"], "404");
+        assert_eq!(message_args["header_map"], "WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}");
+    }
 }
