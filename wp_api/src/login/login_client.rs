@@ -15,8 +15,10 @@ use crate::{
         endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse,
     },
-    ParseUrlError, ParsedUrl, RequestExecutionError,
+    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason,
 };
+use async_std::task;
+use std::time::Duration;
 use std::{str, sync::Arc};
 use uuid::Uuid;
 
@@ -253,26 +255,25 @@ impl WpLoginClient {
             header_map: WpNetworkHeaderMap::default().into(),
             body: None,
         };
-        self.request_executor.execute(api_root_request.into()).await
+        self.perform(api_root_request.into()).await
     }
 
     async fn fetch_wp_api_details(
         &self,
         api_root_url: &ParsedUrl,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(api_root_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
-                }
-                .into(),
-            )
-            .await
+        self.perform(
+            WpNetworkRequest {
+                uuid: Uuid::new_v4().into(),
+                retry_count: 0,
+                method: RequestMethod::GET,
+                url: WpEndpointUrl(api_root_url.url()),
+                header_map: WpNetworkHeaderMap::default().into(),
+                body: None,
+            }
+            .into(),
+        )
+        .await
     }
 
     async fn fetch_wp_json(
@@ -292,8 +293,7 @@ impl WpLoginClient {
             wp_json_url
         };
         let fetch_wp_json_response = match self
-            .request_executor
-            .execute(
+            .perform(
                 WpNetworkRequest {
                     uuid: Uuid::new_v4().into(),
                     retry_count: 0,
@@ -329,19 +329,49 @@ impl WpLoginClient {
     ) -> Result<WpNetworkResponse, ParseHtmlFailure> {
         let site_url = ParsedUrl::parse(attempt_site_url)
             .map_err(|error| ParseHtmlFailure::ParseSiteUrl { error })?;
-        self.request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(site_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
+        self.perform(
+            WpNetworkRequest {
+                uuid: Uuid::new_v4().into(),
+                retry_count: 0,
+                method: RequestMethod::GET,
+                url: WpEndpointUrl(site_url.url()),
+                header_map: WpNetworkHeaderMap::default().into(),
+                body: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(|error| ParseHtmlFailure::FetchSite { error })
+    }
+
+    async fn perform(
+        &self,
+        request: Arc<WpNetworkRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let mut retry_count = 0;
+
+        loop {
+            let response = self.request_executor.execute(request.clone()).await?;
+
+            if retry_count >= 3 {
+                return Err(RequestExecutionError::RequestExecutionFailed {
+                    status_code: Some(response.status_code),
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
+                });
+            }
+
+            if response.is_http_429() {
+                let retry_after = response.get_retry_after();
+                if let Some(retry_after) = retry_after {
+                    task::sleep(Duration::from_secs(retry_after)).await;
+                } else {
+                    return Ok(response); // It's not ok, but we'll let the layer above handle that – we have no idea how long to wait so we shouldn't try
                 }
-                .into(),
-            )
-            .await
-            .map_err(|error| ParseHtmlFailure::FetchSite { error })
+                retry_count += 1;
+            } else {
+                return Ok(response);
+            }
+        }
     }
 }

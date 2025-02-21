@@ -18,6 +18,7 @@ const CONTENT_TYPE_MULTIPART: &str = "multipart/form-data";
 const LINK_HEADER_KEY: &str = "Link";
 const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
 const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
+const HEADER_KEY_RETRY_AFTER: &str = "Retry-After";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -278,6 +279,13 @@ impl WpNetworkHeaderMap {
             .and_then(|h| h.parse().ok())
     }
 
+    pub fn header_value_as_u64(&self, header_name: &str) -> Option<u64> {
+        self.inner
+            .get(header_name)
+            .and_then(|h_v| h_v.to_str().ok())
+            .and_then(|h| h.parse().ok())
+    }
+
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
         header_name: &str,
@@ -438,6 +446,15 @@ impl WpNetworkResponse {
         F: Fn(&WpNetworkResponse) -> Result<T, WpApiError>,
     {
         parser(self)
+    }
+
+    pub fn is_http_429(&self) -> bool {
+        self.status_code == 429
+    }
+
+    pub fn get_retry_after(&self) -> Option<u64> {
+        // TODO: Handle the case where the header is a string like "120 seconds" or a date like "Tue, 21 Feb 2025 10:00:00 GMT"
+        self.header_map.header_value_as_u64("retry-after")
     }
 }
 

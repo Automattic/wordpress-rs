@@ -12,6 +12,7 @@ name = "wp_api"
 
 [dependencies]
 async-trait = { workspace = true }
+async-std = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = [ "serde" ] }
 futures = { workspace = true }
