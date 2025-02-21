@@ -454,7 +454,7 @@ impl WpNetworkResponse {
 
     pub fn get_retry_after(&self) -> Option<u64> {
         // TODO: Handle the case where the header is a string like "120 seconds" or a date like "Tue, 21 Feb 2025 10:00:00 GMT"
-        self.header_map.header_value_as_u64("retry-after")
+        self.header_map.header_value_as_u64(HEADER_KEY_RETRY_AFTER)
     }
 }
 

@@ -32,7 +32,8 @@ impl UniffiWpLoginClient {
     #[uniffi::constructor]
     fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
         Self {
-            inner: WpLoginClient::new(request_executor).into(),
+            inner: WpLoginClient::new(request_executor, WpLoginClientConfiguration::default())
+                .into(),
         }
     }
 
@@ -41,14 +42,38 @@ impl UniffiWpLoginClient {
     }
 }
 
+#[derive(Debug, uniffi::Record)]
+pub struct WpLoginClientConfiguration {
+    pub should_auto_retry_on_rate_limit: bool,
+    pub max_retries: u32,
+    pub max_retry_wait_seconds: u64,
+}
+
+impl Default for WpLoginClientConfiguration {
+    fn default() -> Self {
+        Self {
+            should_auto_retry_on_rate_limit: true,
+            max_retries: 3,
+            max_retry_wait_seconds: 60,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct WpLoginClient {
     request_executor: Arc<dyn RequestExecutor>,
+    config: WpLoginClientConfiguration,
 }
 
 impl WpLoginClient {
-    pub fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
-        Self { request_executor }
+    pub fn new(
+        request_executor: Arc<dyn RequestExecutor>,
+        config: WpLoginClientConfiguration,
+    ) -> Self {
+        Self {
+            request_executor,
+            config,
+        }
     }
 
     pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
@@ -353,7 +378,7 @@ impl WpLoginClient {
         loop {
             let response = self.request_executor.execute(request.clone()).await?;
 
-            if retry_count >= 3 {
+            if retry_count >= self.config.max_retries {
                 return Err(RequestExecutionError::RequestExecutionFailed {
                     status_code: Some(response.status_code),
                     redirects: None,
@@ -361,9 +386,15 @@ impl WpLoginClient {
                 });
             }
 
-            if response.is_http_429() {
+            if response.is_http_429() && self.config.should_auto_retry_on_rate_limit {
                 let retry_after = response.get_retry_after();
-                if let Some(retry_after) = retry_after {
+
+                if let Some(mut retry_after) = retry_after {
+                    // If the server sends some super-long value, we don't want to wait that long
+                    if retry_after > self.config.max_retry_wait_seconds {
+                        retry_after = self.config.max_retry_wait_seconds;
+                    }
+
                     task::sleep(Duration::from_secs(retry_after)).await;
                 } else {
                     return Ok(response); // It's not ok, but we'll let the layer above handle that – we have no idea how long to wait so we shouldn't try
