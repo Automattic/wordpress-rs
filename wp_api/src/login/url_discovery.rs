@@ -708,7 +708,7 @@ mod tests {
         let e = example_parse_api_root_url_error();
         assert_eq!(e.to_string(), expected);
         assert_eq!(
-            UniffiLocalizable::parse_api_root_url_error(e).localize(None),
+            crate::UniffiLocalizable::parse_api_root_url_error(e).localize(None),
             expected
         );
     }

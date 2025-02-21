@@ -6,6 +6,8 @@ pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
     let derive_input = parse_macro_input!(input as DeriveInput);
     let original_ident = derive_input.ident;
     let snake_case_ident = format_ident!("{}", original_ident.to_string().to_case(Case::Snake));
+    // We import as a different identifier so that we can re-import
+    let import_as_ident = format_ident!("UniffiLocalizable{}", original_ident.to_string());
     quote! {
         impl std::fmt::Display for #original_ident {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -13,10 +15,10 @@ pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
             }
         }
 
-        use crate::UniffiLocalizable;
+        use crate::UniffiLocalizable as #import_as_ident;
 
         #[uniffi::export]
-        impl UniffiLocalizable {
+        impl #import_as_ident {
             #[uniffi::constructor]
             fn #snake_case_ident(value: #original_ident) -> Self {
                 Self(std::sync::Arc::new(value))
