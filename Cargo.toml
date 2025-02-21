@@ -7,6 +7,7 @@ members = [
   "wp_contextual",
   "wp_derive",
   "wp_derive_request_builder",
+  "wp_localization",
   "wp_localization_macro",
   "wp_serde_helper",
   "wp_uniffi_bindgen",

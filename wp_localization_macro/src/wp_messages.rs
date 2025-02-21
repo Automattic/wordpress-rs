@@ -137,7 +137,7 @@ mod bindings {
         let documentation = generate_documentation(entry);
         quote! {
             #documentation
-            pub fn #function_name() -> crate::localization::MessageBundle {
+            pub fn #function_name() -> crate::MessageBundle {
                 crate::localization::MessageBundle::new(#entry_key, None)
             }
         }
@@ -171,13 +171,13 @@ mod bindings {
         });
         quote! {
             #documentation
-            pub fn #function_name(#(#args)*) -> crate::localization::MessageBundle {
+            pub fn #function_name(#(#args)*) -> crate::MessageBundle {
                 let map = {
                     let mut map = std::collections::HashMap::<&'static str, String>::new();
                     #(#map_inserts)*
                     map
                 };
-                crate::localization::MessageBundle::new(#entry_key, Some(map))
+                crate::MessageBundle::new(#entry_key, Some(map))
             }
         }
     }

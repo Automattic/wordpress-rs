@@ -3978,6 +3978,7 @@ dependencies = [
  "wp_contextual",
  "wp_derive",
  "wp_derive_request_builder",
+ "wp_localization",
  "wp_localization_macro",
  "wp_serde_helper",
  "x509-cert",
@@ -4077,6 +4078,23 @@ dependencies = [
  "trybuild",
  "uniffi",
  "url",
+]
+
+[[package]]
+name = "wp_localization"
+version = "0.1.0"
+dependencies = [
+ "fluent-bundle",
+ "fluent-langneg 0.14.1",
+ "fluent-templates",
+ "icu_locid",
+ "paste",
+ "strum",
+ "strum_macros",
+ "thiserror 2.0.11",
+ "unic-langid",
+ "uniffi",
+ "wp_localization_macro",
 ]
 
 [[package]]

@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-const LOCALIZATION_FILE_PATH: &str = "../wp_api/localization/en-US/main.ftl";
+const LOCALIZATION_FILE_PATH: &str = "../wp_localization/localization/en-US/main.ftl";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed={LOCALIZATION_FILE_PATH}");
