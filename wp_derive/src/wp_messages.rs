@@ -2,17 +2,18 @@ use convert_case::{Case, Casing};
 use fluent_syntax::ast::{self, Entry, Expression, InlineExpression, PatternElement};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use serde::Deserialize;
-use std::{env, fs};
+use std::env;
 use syn::{parse_macro_input, DeriveInput, Ident};
 
-const CONFIG_FILE_NAME: &str = "config_wp_messages.toml";
+include!(concat!(
+    env!("OUT_DIR"),
+    "/generated_localization_contents.rs"
+));
 
 pub fn wp_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let original_input = input.clone();
     let messages_ident = parse_macro_input!(input as DeriveInput).ident;
-    let config = Config::read_config();
-    let entries = parse_messages_file(&config.path);
+    let entries = parse_messages_file();
 
     proc_macro::TokenStream::from_iter([
         // Since attribute macros completely replace the input, we need to manually preserve it
@@ -21,37 +22,14 @@ pub fn wp_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     ])
 }
 
-#[derive(Debug, Deserialize)]
-struct Config {
-    path: String,
-}
-
-impl Config {
-    fn read_config() -> Config {
-        let file_path = normalize_file_path(CONFIG_FILE_NAME);
-        let contents = match fs::read_to_string(&file_path) {
-            Ok(c) => toml::from_str(c.as_str()).unwrap_or_else(|e| {
-                panic!(
-                    "#[wp_messages] configuration file ('{file_path}'):\n{:#?}",
-                    e
-                )
-            }),
-            Err(_) => {
-                panic!("#[wp_messages] configuration file is missing: '{file_path}'");
-            }
-        };
-        contents
-    }
-}
-
 fn message_pattern_to_documentation(
-    message: Option<&fluent_syntax::ast::Pattern<String>>,
+    message: Option<&fluent_syntax::ast::Pattern<&'static str>>,
 ) -> Option<String> {
     message.map(|p| {
         p.elements
             .iter()
             .flat_map(|e| match e {
-                PatternElement::TextElement { value } => Some(value.clone()),
+                PatternElement::TextElement { value } => Some(value.to_string()),
                 PatternElement::Placeable { expression } => {
                     expression_to_variable_name(expression).map(|v| format!("{{${v}}}"))
                 }
@@ -61,7 +39,7 @@ fn message_pattern_to_documentation(
     })
 }
 
-fn expression_to_variable_name(expression: &Expression<String>) -> Option<String> {
+fn expression_to_variable_name(expression: &Expression<&'static str>) -> Option<String> {
     match expression {
         ast::Expression::Select { .. } => {
             // Select expressions are not supported yet
@@ -69,7 +47,7 @@ fn expression_to_variable_name(expression: &Expression<String>) -> Option<String
         }
         ast::Expression::Inline(inline) => {
             if let InlineExpression::VariableReference { id } = inline {
-                Some(id.name.clone())
+                Some(id.name.to_string())
             } else {
                 // Only `fluent_syntax::ast::InlineExpression::VariableReference` supported
                 None
@@ -78,11 +56,8 @@ fn expression_to_variable_name(expression: &Expression<String>) -> Option<String
     }
 }
 
-fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
-    let file_path = normalize_file_path(file_path);
-    let contents =
-        fs::read_to_string(file_path).expect("Couldn't read messages file in '{file_path}'");
-    let resource = fluent_syntax::parser::parse(contents).unwrap();
+fn parse_messages_file() -> Vec<TranslationEntry> {
+    let resource = fluent_syntax::parser::parse(LOCALIZATION_CONTENTS).unwrap();
     resource
         .body
         .into_iter()
@@ -90,7 +65,7 @@ fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
             if let Entry::Message(message) = e {
                 // TODO: We are iterating twice, once for documentation, once for placeables
                 let documentation = message_pattern_to_documentation(message.value.as_ref());
-                let key = message.id.name.to_string();
+                let key = message.id.name;
                 let placeables = if let Some(pattern) = message.value {
                     pattern
                         .elements
@@ -118,16 +93,10 @@ fn parse_messages_file(file_path: &str) -> Vec<TranslationEntry> {
         .collect()
 }
 
-fn normalize_file_path(file_path: &str) -> String {
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR")
-        .expect("Crate config can't be found without the `CARGO_MANIFEST_DIR` environment varible");
-    format!("{manifest_dir}/{file_path}")
-}
-
 #[derive(Debug)]
 struct TranslationEntry {
     documentation: Option<String>,
-    key: String,
+    key: &'static str,
     placeables: Vec<String>,
 }
 
