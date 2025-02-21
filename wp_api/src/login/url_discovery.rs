@@ -630,20 +630,35 @@ impl WpSupportsLocalization for ParseApiRootUrlError {
     }
 }
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum FetchApiDetailsError {
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
-        status_code,
-        reason
-    )]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
-    #[error("Api details couldn't be parsed from response: {:?}", response)]
-    ApiDetailsCouldntBeParsed { reason: String, response: String },
+    ApiDetailsCouldntBeParsed {
+        reason: String,
+        response: String,
+    },
+}
+
+impl WpSupportsLocalization for FetchApiDetailsError {
+    fn message_bundle(&self) -> wp_localization::MessageBundle {
+        match self {
+            FetchApiDetailsError::RequestExecutionFailed {
+                status_code,
+                reason,
+                ..
+            } => WpMessages::fetch_api_details_request_execution_failed(
+                format!("{:#?}", status_code),
+                reason.to_string(),
+            ),
+            FetchApiDetailsError::ApiDetailsCouldntBeParsed { response, .. } => {
+                WpMessages::fetch_api_details_api_details_couldnt_be_parsed(response.to_string())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
