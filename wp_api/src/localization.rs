@@ -10,7 +10,7 @@ fluent_templates::static_loader! {
     };
 }
 
-#[wp_derive::wp_messages]
+#[wp_localization_macro::wp_messages]
 pub struct Messages {}
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]

@@ -3978,6 +3978,7 @@ dependencies = [
  "wp_contextual",
  "wp_derive",
  "wp_derive_request_builder",
+ "wp_localization_macro",
  "wp_serde_helper",
  "x509-cert",
 ]
@@ -4078,6 +4079,22 @@ dependencies = [
  "trybuild",
  "uniffi",
  "url",
+]
+
+[[package]]
+name = "wp_localization_macro"
+version = "0.1.0"
+dependencies = [
+ "convert_case",
+ "fluent-syntax",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "rstest",
+ "serde_json",
+ "syn",
+ "trybuild",
+ "wp_serde_helper",
 ]
 
 [[package]]
