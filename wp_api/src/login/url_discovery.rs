@@ -8,6 +8,7 @@ use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 use wp_localization::{WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 pub(crate) const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -607,7 +608,7 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
     attempts
 }
 
-#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum ParseApiRootUrlError {
     ApiRootLinkHeaderNotFound {
         status_code: u16,
@@ -628,8 +629,6 @@ impl WpSupportsLocalization for ParseApiRootUrlError {
         }
     }
 }
-
-wp_localization::display_from_supports_localization!(ParseApiRootUrlError);
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FetchApiDetailsError {
@@ -693,6 +692,28 @@ mod tests {
 
     #[test]
     fn test_parse_api_root_url_error_message_bundle() {
+        let e = example_parse_api_root_url_error();
+
+        let message_bundle = e.message_bundle();
+        assert_eq!(message_bundle.key(), "api_root_link_header_not_found");
+        let message_args = message_bundle.args().unwrap();
+        assert_eq!(message_args["status_code"], "404");
+        assert_eq!(message_args["header_map"], "WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}");
+    }
+
+    #[test]
+    fn test_parse_api_root_url_error_derive_localizable() {
+        let expected="Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}\u{2069}'";
+
+        let e = example_parse_api_root_url_error();
+        assert_eq!(e.to_string(), expected);
+        assert_eq!(
+            UniffiLocalizable::parse_api_root_url_error(e).localize(None),
+            expected
+        );
+    }
+
+    fn example_parse_api_root_url_error() -> ParseApiRootUrlError {
         let header_map: WpNetworkHeaderMap = {
             let mut map = http::HeaderMap::new();
             map.insert(
@@ -701,15 +722,9 @@ mod tests {
             );
             map.into()
         };
-        let api_root_link_header_not_found = ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+        ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
             status_code: 404,
             header_map: header_map.into(),
-        };
-
-        let message_bundle = api_root_link_header_not_found.message_bundle();
-        assert_eq!(message_bundle.key(), "api_root_link_header_not_found");
-        let message_args = message_bundle.args().unwrap();
-        assert_eq!(message_args["status_code"], "404");
-        assert_eq!(message_args["header_map"], "WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}");
+        }
     }
 }

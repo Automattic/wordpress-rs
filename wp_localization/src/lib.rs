@@ -101,21 +101,6 @@ impl<T: WpSupportsLocalization> WpLocalizable for T {
     }
 }
 
-mod macro_helper {
-    #[macro_export]
-    macro_rules! display_from_supports_localization {
-        ($ident:ident) => {
-            paste::paste! {
-                impl std::fmt::Display for $ident {
-                    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        write!(f, "{}", self.message_bundle())
-                    }
-                }
-            }
-        };
-    }
-}
-
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
@@ -138,11 +123,24 @@ mod language_identifier_tests {
     }
 }
 
+// Keep this private because consumers wouldn't be able to add methods to it if we expose it
+// We just use this to test `WpDeriveLocalizable`
+#[derive(Debug, uniffi::Object)]
+struct UniffiLocalizable(std::sync::Arc<dyn WpLocalizable>);
+
+#[uniffi::export]
+impl UniffiLocalizable {
+    fn localize(&self, locale: Option<WpLocale>) -> String {
+        self.0.localize(locale)
+    }
+}
+
 #[cfg(test)]
 mod localization_tests {
     use super::*;
+    use wp_localization_macro::WpDeriveLocalizable;
 
-    #[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+    #[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
     pub enum ParseApiRootUrlError {
         ApiRootLinkHeaderNotFound {
             status_code: u16,
@@ -162,8 +160,6 @@ mod localization_tests {
             }
         }
     }
-
-    crate::display_from_supports_localization!(ParseApiRootUrlError);
 
     #[test]
     fn test_example_localizable_error() {

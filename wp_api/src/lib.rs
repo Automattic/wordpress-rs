@@ -21,7 +21,6 @@ pub mod application_passwords;
 pub mod categories;
 pub mod comments;
 pub mod date;
-pub mod localization;
 pub mod login;
 pub mod media;
 pub mod plugins;
@@ -193,6 +192,16 @@ pub enum BoolOrVecString {
 pub enum IntegerOrString {
     Integer(i64),
     String(String),
+}
+
+#[derive(Debug, uniffi::Object)]
+struct UniffiLocalizable(std::sync::Arc<dyn wp_localization::WpLocalizable>);
+
+#[uniffi::export]
+impl UniffiLocalizable {
+    fn localize(&self, locale: Option<wp_localization::WpLocale>) -> String {
+        self.0.localize(locale)
+    }
 }
 
 #[macro_export]
