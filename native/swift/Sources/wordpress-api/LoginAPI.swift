@@ -16,11 +16,17 @@ public final class WordPressLoginClient {
     private let requestExecutor: SafeRequestExecutor
     private let client: UniffiWpLoginClient
 
-    public convenience init(urlSession: URLSession) {
+    public convenience init(
+        urlSession: URLSession,
+        loginConfiguration: WpLoginClientConfiguration = .default
+    ) {
         self.init(requestExecutor: WpRequestExecutor(urlSession: urlSession))
     }
 
-    init(requestExecutor: SafeRequestExecutor) {
+    init(
+        requestExecutor: SafeRequestExecutor,
+        loginConfiguration: WpLoginClientConfiguration = .default
+    ) {
         self.requestExecutor = requestExecutor
         self.client = UniffiWpLoginClient(requestExecutor: requestExecutor)
     }

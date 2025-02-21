@@ -36,9 +36,18 @@ impl UniffiWpLoginClient {
                 .into(),
         }
     }
-
     async fn api_discovery(&self, site_url: String) -> AutoDiscoveryUniffiResult {
         self.inner.api_discovery(site_url).await.into()
+    }
+}
+
+#[uniffi::export]
+fn uniffiwploginclient_with_config(
+    request_executor: Arc<dyn RequestExecutor>,
+    config: WpLoginClientConfiguration,
+) -> UniffiWpLoginClient {
+    UniffiWpLoginClient {
+        inner: WpLoginClient::new(request_executor, config).into(),
     }
 }
 
@@ -47,6 +56,11 @@ pub struct WpLoginClientConfiguration {
     pub should_auto_retry_on_rate_limit: bool,
     pub max_retries: u32,
     pub max_retry_wait_seconds: u64,
+}
+
+#[uniffi::export]
+fn default_wp_login_client_configuration() -> WpLoginClientConfiguration {
+    WpLoginClientConfiguration::default()
 }
 
 impl Default for WpLoginClientConfiguration {
