@@ -1,2 +1,3 @@
-example_localizable_error_hello = Hello {$value}!
-example_localizable_error_multi_arg = Hello {$value1} and {$value2}!
+api_root_link_header_not_found = Api root link header not found!
+  Status Code: '{$status_code}'
+  Header Map: '{$header_map}'

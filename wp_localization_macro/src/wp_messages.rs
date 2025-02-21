@@ -13,7 +13,7 @@ include!(concat!(
 pub fn wp_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let original_input = input.clone();
     let messages_ident = parse_macro_input!(input as DeriveInput).ident;
-    let entries = parse_messages_file();
+    let entries = parse_messages();
 
     proc_macro::TokenStream::from_iter([
         // Since attribute macros completely replace the input, we need to manually preserve it
@@ -56,8 +56,9 @@ fn expression_to_variable_name(expression: &Expression<&'static str>) -> Option<
     }
 }
 
-fn parse_messages_file() -> Vec<TranslationEntry> {
-    let resource = fluent_syntax::parser::parse(LOCALIZATION_CONTENTS).unwrap();
+fn parse_messages() -> Vec<TranslationEntry> {
+    let resource = fluent_syntax::parser::parse(LOCALIZATION_CONTENTS)
+        .expect("Localization file should be parseable");
     resource
         .body
         .into_iter()
@@ -138,7 +139,7 @@ mod bindings {
         quote! {
             #documentation
             pub fn #function_name() -> crate::MessageBundle {
-                crate::localization::MessageBundle::new(#entry_key, None)
+                crate::MessageBundle::new(#entry_key, None)
             }
         }
     }

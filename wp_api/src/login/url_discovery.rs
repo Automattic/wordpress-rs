@@ -7,6 +7,7 @@ use crate::{
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt::Display, sync::Arc};
+use wp_localization::{WpMessages, WpSupportsLocalization};
 
 pub(crate) const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -608,16 +609,27 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
 
 #[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
 pub enum ParseApiRootUrlError {
-    #[error(
-        "Api root link header not found!\nStatus Code: '{:#?}'\nHeader Map: '{:#?}'",
-        status_code,
-        header_map
-    )]
     ApiRootLinkHeaderNotFound {
-        header_map: Arc<WpNetworkHeaderMap>,
         status_code: u16,
+        header_map: Arc<WpNetworkHeaderMap>,
     },
 }
+
+impl WpSupportsLocalization for ParseApiRootUrlError {
+    fn message_bundle(&self) -> wp_localization::MessageBundle {
+        match self {
+            ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                status_code,
+                header_map,
+            } => WpMessages::api_root_link_header_not_found(
+                status_code.to_string(),
+                format!("{:#?}", header_map),
+            ),
+        }
+    }
+}
+
+wp_localization::display_from_supports_localization!(ParseApiRootUrlError);
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FetchApiDetailsError {

@@ -96,7 +96,7 @@ mod macro_helper {
     macro_rules! display_from_supports_localization {
         ($ident:ident) => {
             paste::paste! {
-                impl Display for ExampleLocalizableError {
+                impl std::fmt::Display for $ident {
                     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                         write!(f, "{}", self.message_bundle())
                     }
@@ -109,62 +109,9 @@ mod macro_helper {
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
-mod tests {
+mod language_identifier_tests {
     use super::*;
     use strum::IntoEnumIterator;
-
-    #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
-    pub enum ExampleLocalizableError {
-        Hello { value: String },
-        MultiArg { value1: String, value2: String },
-    }
-
-    impl WpSupportsLocalization for ExampleLocalizableError {
-        fn message_bundle(&self) -> MessageBundle {
-            match self {
-                Self::Hello { value } => WpMessages::example_localizable_error_hello(value),
-                Self::MultiArg { value1, value2 } => {
-                    WpMessages::example_localizable_error_multi_arg(value1, value2)
-                }
-            }
-        }
-    }
-
-    crate::display_from_supports_localization!(ExampleLocalizableError);
-
-    #[test]
-    fn test_example_localizable_error() {
-        assert_eq!(
-            ExampleLocalizableError::Hello {
-                value: "world".to_string()
-            }
-            .to_string(),
-            "Hello \u{2068}world\u{2069}!"
-        );
-        assert_eq!(
-            ExampleLocalizableError::Hello {
-                value: "world".to_string()
-            }
-            .localize(Some(WpLocale::TrTR)),
-            "Merhaba \u{2068}world\u{2069}!"
-        );
-        assert_eq!(
-            ExampleLocalizableError::MultiArg {
-                value1: "Foo".to_string(),
-                value2: "Bar".to_string()
-            }
-            .to_string(),
-            "Hello \u{2068}Foo\u{2069} and \u{2068}Bar\u{2069}!"
-        );
-        assert_eq!(
-            ExampleLocalizableError::MultiArg {
-                value1: "Foo".to_string(),
-                value2: "Bar".to_string()
-            }
-            .localize(Some(WpLocale::TrTR)),
-            "Merhaba \u{2068}Foo\u{2069} ve \u{2068}Bar\u{2069}!"
-        );
-    }
 
     #[test]
     fn test_ensure_all_locales_can_be_parsed_into_language_identifiers() {
@@ -178,5 +125,49 @@ mod tests {
             let language_identifier = l.as_language_id();
             assert_eq!(language_identifier.to_string(), Into::<&str>::into(l));
         });
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+    pub enum ParseApiRootUrlError {
+        ApiRootLinkHeaderNotFound {
+            status_code: u16,
+            header_map: String,
+        },
+    }
+
+    impl WpSupportsLocalization for ParseApiRootUrlError {
+        fn message_bundle(&self) -> crate::MessageBundle {
+            match self {
+                ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                    status_code,
+                    header_map,
+                } => {
+                    WpMessages::api_root_link_header_not_found(status_code.to_string(), header_map)
+                }
+            }
+        }
+    }
+
+    crate::display_from_supports_localization!(ParseApiRootUrlError);
+
+    #[test]
+    fn test_example_localizable_error() {
+        let api_root_link_header_not_found = ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+            status_code: 404,
+            header_map: "foo".to_string(),
+        };
+        assert_eq!(
+            api_root_link_header_not_found.to_string(),
+            "Hello \u{2068}world\u{2069}!"
+        );
+        assert_eq!(
+            api_root_link_header_not_found.localize(Some(WpLocale::TrTR)),
+            "Merhaba \u{2068}world\u{2069}!"
+        );
     }
 }
