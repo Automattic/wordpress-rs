@@ -22,83 +22,76 @@ pub fn wp_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     ])
 }
 
-fn message_pattern_to_documentation(
-    message: Option<&fluent_syntax::ast::Pattern<&'static str>>,
-) -> Option<String> {
-    message.map(|p| {
-        p.elements
-            .iter()
-            .flat_map(|e| match e {
-                PatternElement::TextElement { value } => Some(value.to_string()),
-                PatternElement::Placeable { expression } => {
-                    expression_to_variable_name(expression).map(|v| format!("{{${v}}}"))
-                }
+fn parse_messages() -> impl Iterator<Item = TranslationEntry> {
+    let resource = fluent_syntax::parser::parse(LOCALIZATION_CONTENTS)
+        .expect("Localization file should be parseable");
+    resource.body.into_iter().flat_map(|e| {
+        if let Entry::Message(message) = e {
+            let mut documentation = String::new();
+            let key = message.id.name;
+            let placeables = if let Some(pattern) = message.value {
+                pattern
+                    .elements
+                    .into_iter()
+                    .filter_map(|pattern_element| match pattern_element {
+                        PatternElement::TextElement { value } => {
+                            documentation.push_str(value);
+                            None
+                        }
+                        PatternElement::Placeable { expression } => {
+                            if let Some(placeable_element) =
+                                EntryPlaceable::placeable_from_expression(&expression)
+                            {
+                                documentation
+                                    .push_str(format!("{{${}}}", placeable_element.0).as_str());
+                                Some(placeable_element)
+                            } else {
+                                None
+                            }
+                        }
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+            Some(TranslationEntry {
+                documentation,
+                key,
+                placeables,
             })
-            .collect::<Vec<String>>()
-            .join("")
+        } else {
+            None
+        }
     })
 }
 
-fn expression_to_variable_name(expression: &Expression<&'static str>) -> Option<String> {
-    match expression {
-        ast::Expression::Select { .. } => {
-            // Select expressions are not supported yet
-            None
-        }
-        ast::Expression::Inline(inline) => {
-            if let InlineExpression::VariableReference { id } = inline {
-                Some(id.name.to_string())
-            } else {
-                // Only `fluent_syntax::ast::InlineExpression::VariableReference` supported
+#[derive(Debug)]
+struct EntryPlaceable(&'static str);
+
+impl EntryPlaceable {
+    fn placeable_from_expression(expression: &Expression<&'static str>) -> Option<Self> {
+        match expression {
+            ast::Expression::Select { .. } => {
+                // Select expressions are not supported yet
                 None
+            }
+            ast::Expression::Inline(inline) => {
+                if let InlineExpression::VariableReference { id } = inline {
+                    Some(Self(id.name))
+                } else {
+                    // Only `fluent_syntax::ast::InlineExpression::VariableReference` supported
+                    None
+                }
             }
         }
     }
 }
 
-fn parse_messages() -> Vec<TranslationEntry> {
-    let resource = fluent_syntax::parser::parse(LOCALIZATION_CONTENTS)
-        .expect("Localization file should be parseable");
-    resource
-        .body
-        .into_iter()
-        .flat_map(|e| {
-            if let Entry::Message(message) = e {
-                // TODO: We are iterating twice, once for documentation, once for placeables
-                let documentation = message_pattern_to_documentation(message.value.as_ref());
-                let key = message.id.name;
-                let placeables = if let Some(pattern) = message.value {
-                    pattern
-                        .elements
-                        .into_iter()
-                        .filter_map(|pattern_element| {
-                            if let PatternElement::Placeable { expression } = pattern_element {
-                                expression_to_variable_name(&expression)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                };
-                Some(TranslationEntry {
-                    documentation,
-                    key,
-                    placeables,
-                })
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
 #[derive(Debug)]
 struct TranslationEntry {
-    documentation: Option<String>,
+    documentation: String,
     key: &'static str,
-    placeables: Vec<String>,
+    placeables: Vec<EntryPlaceable>,
 }
 
 impl TranslationEntry {
@@ -116,13 +109,13 @@ mod bindings {
 
     pub(super) fn generate_bindings(
         messages_ident: Ident,
-        entries: Vec<TranslationEntry>,
+        entries: impl Iterator<Item = TranslationEntry>,
     ) -> TokenStream {
-        let functions = entries.iter().map(|e| {
+        let functions = entries.map(|e| {
             if e.placeables.is_empty() {
-                generate_argless_function(e)
+                generate_argless_function(&e)
             } else {
-                generate_function(e)
+                generate_function(&e)
             }
         });
         quote! {
@@ -145,12 +138,9 @@ mod bindings {
     }
 
     fn generate_documentation(entry: &TranslationEntry) -> TokenStream {
-        if let Some(doc) = &entry.documentation {
-            quote! {
-                #[doc = #doc]
-            }
-        } else {
-            quote! {}
+        let doc = &entry.documentation;
+        quote! {
+            #[doc = #doc]
         }
     }
 
@@ -159,15 +149,16 @@ mod bindings {
         let entry_key = entry.key_as_token_string();
         let documentation = generate_documentation(entry);
         let args = entry.placeables.iter().map(|placeable| {
-            let placeable_ident = format_ident!("{}", placeable);
+            let placeable_ident = format_ident!("{}", placeable.0);
             quote! {
                 #placeable_ident: impl Into<String>,
             }
         });
         let map_inserts = entry.placeables.iter().map(|placeable| {
-            let placeable_ident = format_ident!("{}", placeable);
+            let placeable_string = placeable.0;
+            let placeable_ident = format_ident!("{}", placeable_string);
             quote! {
-                map.insert(#placeable, #placeable_ident.into());
+                map.insert(#placeable_string, #placeable_ident.into());
             }
         });
         quote! {
