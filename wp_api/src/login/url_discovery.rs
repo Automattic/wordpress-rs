@@ -720,12 +720,7 @@ mod tests {
     fn test_parse_api_root_url_error_derive_localizable() {
         let expected="Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}\u{2069}'";
 
-        let e = example_parse_api_root_url_error();
-        assert_eq!(e.to_string(), expected);
-        assert_eq!(
-            crate::UniffiLocalizable::parse_api_root_url_error(e).localize(None),
-            expected
-        );
+        assert_eq!(example_parse_api_root_url_error().to_string(), expected);
     }
 
     fn example_parse_api_root_url_error() -> ParseApiRootUrlError {

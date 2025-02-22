@@ -194,16 +194,6 @@ pub enum IntegerOrString {
     String(String),
 }
 
-#[derive(Debug, uniffi::Object)]
-struct UniffiLocalizable(std::sync::Arc<dyn wp_localization::WpLocalizable>);
-
-#[uniffi::export]
-impl UniffiLocalizable {
-    fn localize(&self, locale: Option<wp_localization::WpLocale>) -> String {
-        self.0.localize(locale)
-    }
-}
-
 #[macro_export]
 macro_rules! generate {
     ($type_name:ident) => {

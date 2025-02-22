@@ -123,18 +123,6 @@ mod language_identifier_tests {
     }
 }
 
-// Keep this private because consumers wouldn't be able to add methods to it if we expose it
-// We just use this to test `WpDeriveLocalizable`
-#[derive(Debug, uniffi::Object)]
-struct UniffiLocalizable(std::sync::Arc<dyn WpLocalizable>);
-
-#[uniffi::export]
-impl UniffiLocalizable {
-    fn localize(&self, locale: Option<WpLocale>) -> String {
-        self.0.localize(locale)
-    }
-}
-
 #[cfg(test)]
 mod localization_tests {
     use super::*;
