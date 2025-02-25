@@ -7,6 +7,8 @@ use crate::{
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt::Display, sync::Arc};
+use wp_localization::{WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 pub(crate) const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
 
@@ -606,33 +608,57 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
     attempts
 }
 
-#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum ParseApiRootUrlError {
-    #[error(
-        "Api root link header not found!\nStatus Code: '{:#?}'\nHeader Map: '{:#?}'",
-        status_code,
-        header_map
-    )]
     ApiRootLinkHeaderNotFound {
-        header_map: Arc<WpNetworkHeaderMap>,
         status_code: u16,
+        header_map: Arc<WpNetworkHeaderMap>,
     },
 }
 
-#[derive(Debug, thiserror::Error, uniffi::Error)]
+impl WpSupportsLocalization for ParseApiRootUrlError {
+    fn message_bundle(&self) -> wp_localization::MessageBundle {
+        match self {
+            ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                status_code,
+                header_map,
+            } => WpMessages::api_root_link_header_not_found(
+                status_code.to_string(),
+                format!("{:#?}", header_map),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum FetchApiDetailsError {
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'.\nResponse: '{}'",
-        status_code,
-        reason
-    )]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
-    #[error("Api details couldn't be parsed from response: {:?}", response)]
-    ApiDetailsCouldntBeParsed { reason: String, response: String },
+    ApiDetailsCouldntBeParsed {
+        reason: String,
+        response: String,
+    },
+}
+
+impl WpSupportsLocalization for FetchApiDetailsError {
+    fn message_bundle(&self) -> wp_localization::MessageBundle {
+        match self {
+            FetchApiDetailsError::RequestExecutionFailed {
+                status_code,
+                reason,
+                ..
+            } => WpMessages::fetch_api_details_request_execution_failed(
+                format!("{:#?}", status_code),
+                reason.to_string(),
+            ),
+            FetchApiDetailsError::ApiDetailsCouldntBeParsed { response, .. } => {
+                WpMessages::fetch_api_details_api_details_couldnt_be_parsed(response.to_string())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -677,5 +703,38 @@ mod tests {
     fn test_is_local_dev_environment_url(#[case] url: &str, #[case] expected: bool) {
         let parsed_url = ParsedUrl::parse(url).unwrap();
         assert_eq!(is_local_dev_environment_url(&parsed_url), expected);
+    }
+
+    #[test]
+    fn test_parse_api_root_url_error_message_bundle() {
+        let e = example_parse_api_root_url_error();
+
+        let message_bundle = e.message_bundle();
+        assert_eq!(message_bundle.key(), "api_root_link_header_not_found");
+        let message_args = message_bundle.args().unwrap();
+        assert_eq!(message_args["status_code"], "404");
+        assert_eq!(message_args["header_map"], "WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}");
+    }
+
+    #[test]
+    fn test_parse_api_root_url_error_derive_localizable() {
+        let expected="Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}\u{2069}'";
+
+        assert_eq!(example_parse_api_root_url_error().to_string(), expected);
+    }
+
+    fn example_parse_api_root_url_error() -> ParseApiRootUrlError {
+        let header_map: WpNetworkHeaderMap = {
+            let mut map = http::HeaderMap::new();
+            map.insert(
+                http::header::ACCEPT,
+                http::HeaderValue::from_static("application/json"),
+            );
+            map.into()
+        };
+        ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+            status_code: 404,
+            header_map: header_map.into(),
+        }
     }
 }

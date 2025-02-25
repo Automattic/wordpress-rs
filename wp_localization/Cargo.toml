@@ -1,0 +1,20 @@
+[package]
+name = "wp_localization"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+uniffi = { workspace = true , features = [ "build", "cli" ] }
+
+[dependencies]
+fluent-bundle = { workspace = true }
+fluent-langneg = { workspace = true }
+fluent-templates = { workspace = true }
+icu_locid = { workspace = true }
+thiserror = { workspace = true }
+paste = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+unic-langid = { workspace = true }
+uniffi = { workspace = true }
+wp_localization_macro = { path = "../wp_localization_macro" }

@@ -70,6 +70,7 @@ steps:
         artifact_paths:
           - target/libwordpressFFI.xcframework.zip
           - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
+          - native/swift/Sources/wordpress-api-wrapper/wp_localization.swift
         agents:
           queue: mac
       - label: ":swift: Build Docs"

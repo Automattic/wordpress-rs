@@ -32,6 +32,7 @@ allprojects {
 
         // Exclude generated bindings
         exclude("**/wp_api.kt")
+        exclude("**/wp_localization.kt")
     }
 
     tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
@@ -39,6 +40,7 @@ allprojects {
 
         // Exclude generated bindings
         exclude("**/wp_api.kt")
+        exclude("**/wp_localization.kt")
     }
 
     dependencies {
