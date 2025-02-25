@@ -164,7 +164,7 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    "2024-09-09T12:00:00".to_string(),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
     |updated_post, updated_post_from_wp_cli| {
         assert_eq!(
             updated_post.date_gmt,

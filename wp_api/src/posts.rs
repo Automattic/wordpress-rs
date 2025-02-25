@@ -301,7 +301,7 @@ pub struct PostCreateParams {
     // The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     // An alphanumeric identifier for the post unique to its type.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -379,7 +379,7 @@ pub struct PostUpdateParams {
     // The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     // An alphanumeric identifier for the post unique to its type.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]

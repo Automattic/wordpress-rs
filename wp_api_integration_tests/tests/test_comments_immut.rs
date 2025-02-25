@@ -10,8 +10,8 @@ use wp_api::posts::PostId;
 use wp_api::users::UserAvatarSize;
 use wp_api::{generate, WpApiParamOrder};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, TestCredentials, FIRST_COMMENT_ID, FIRST_USER_EMAIL, FIRST_USER_ID,
-    SECOND_USER_ID,
+    api_client, unwrapped_wp_gmt_date_time, AssertResponse, TestCredentials, FIRST_COMMENT_ID,
+    FIRST_USER_EMAIL, FIRST_USER_ID, SECOND_USER_ID,
 };
 
 #[tokio::test]
@@ -218,11 +218,11 @@ async fn list_comments_with_edit_context_parse_author_avatar_urls(
 #[case::page(generate!(CommentListParams, (page, Some(1))))]
 #[case::per_page(generate!(CommentListParams, (per_page, Some(3))))]
 #[case::search(generate!(CommentListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(CommentListParams, (after, Some("2020-08-14 17:00:00.000".to_string()))))]
+#[case::after(generate!(CommentListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
 #[case::author(generate!(CommentListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case::author_exclude(generate!(CommentListParams, (author_exclude, vec![SECOND_USER_ID])))]
 #[case::author_email(generate!(CommentListParams, (author_email, Some(FIRST_USER_EMAIL.to_string()))))]
-#[case::before(generate!(CommentListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))))]
+#[case::before(generate!(CommentListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
 #[case::exclude(generate!(CommentListParams, (exclude, vec![CommentId(1), CommentId(2)])))]
 #[case::include(generate!(CommentListParams, (include, vec![CommentId(1)])))]
 #[case::offset(generate!(CommentListParams, (offset, Some(2))))]

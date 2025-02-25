@@ -11,7 +11,8 @@ use wp_api::{
     WpApiParamOrder,
 };
 use wp_api_integration_tests::{
-    api_client, AssertResponse, FIRST_USER_ID, MEDIA_ID_611, SECOND_USER_ID,
+    api_client, unwrapped_wp_gmt_date_time, AssertResponse, FIRST_USER_ID, MEDIA_ID_611,
+    SECOND_USER_ID,
 };
 
 #[tokio::test]
@@ -112,12 +113,12 @@ async fn paginate_list_media_with_edit_context(#[case] params: MediaListParams) 
 #[case::page(generate!(MediaListParams, (page, Some(1))))]
 #[case::per_page(generate!(MediaListParams, (per_page, Some(3))))]
 #[case::search(generate!(MediaListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(MediaListParams, (after, Some("2020-08-14 17:00:00.000".to_string()))))]
-#[case::modified_after(generate!(MediaListParams, (modified_after, Some("2024-01-14 17:00:00.000".to_string()))))]
+#[case::after(generate!(MediaListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
+#[case::modified_after(generate!(MediaListParams, (modified_after, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
 #[case::author(generate!(MediaListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case::author_exclude(generate!(MediaListParams, (author_exclude, vec![SECOND_USER_ID])))]
-#[case::before(generate!(MediaListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))))]
-#[case::modified_before(generate!(MediaListParams, (modified_before, Some("2024-01-14 17:00:00.000".to_string()))))]
+#[case::before(generate!(MediaListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
+#[case::modified_before(generate!(MediaListParams, (modified_before, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0000")))))]
 #[case::exclude(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])))]
 #[case::include(generate!(MediaListParams, (include, vec![MediaId(1)])))]
 #[case::offset(generate!(MediaListParams, (offset, Some(2))))]

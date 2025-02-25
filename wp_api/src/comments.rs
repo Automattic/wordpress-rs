@@ -1,4 +1,5 @@
 use crate::{
+    date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
@@ -99,7 +100,7 @@ pub struct CommentListParams {
     pub search: Option<String>,
     /// Limit response to comments published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<String>,
+    pub after: Option<WpGmtDateTime>,
     /// Limit result set to comments assigned to specific user IDs. Requires authorization.
     #[uniffi(default = [])]
     pub author: Vec<UserId>,
@@ -111,7 +112,7 @@ pub struct CommentListParams {
     pub author_email: Option<String>,
     /// Limit response to comments published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<String>,
+    pub before: Option<WpGmtDateTime>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<CommentId>,
@@ -342,7 +343,7 @@ pub struct CommentCreateParams {
     /// The date the comment was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     /// The ID for the parent of the comment.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -418,7 +419,7 @@ impl CommentCreateParamsBuilder {
         self
     }
 
-    pub fn date_gmt(mut self, date_gmt: Option<String>) -> Self {
+    pub fn date_gmt(mut self, date_gmt: Option<WpGmtDateTime>) -> Self {
         self.params.date_gmt = date_gmt;
         self
     }
@@ -475,7 +476,7 @@ pub struct CommentUpdateParams {
     /// The date the comment was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     /// The ID for the parent of the comment.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -513,7 +514,7 @@ pub struct SparseComment {
     #[WpContext(edit, embed, view)]
     pub date: Option<String>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
     #[WpContext(edit, embed, view)]
@@ -581,7 +582,14 @@ impl_as_query_value_from_to_string!(CommentStatus);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, unit_test_common::assert_expected_and_from_query_pairs};
+    use crate::{
+        generate,
+        unit_test_common::{
+            assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
+            unit_test_example_date_as_query_value,
+        },
+    };
+
     use rstest::*;
 
     #[rstest]
@@ -590,12 +598,12 @@ mod tests {
     #[case(generate!(CommentListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(CommentListParams, (search, Some("foo".to_string()))), "search=foo")]
     #[case(generate!(CommentListParams, (search, Some("foo + bar".to_string()))), "search=foo+%2B+bar")]
-    #[case(generate!(CommentListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(CommentListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
     #[case(generate!(CommentListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(CommentListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
     #[case(generate!(CommentListParams, (author_email, Some("foo".to_string()))), "author_email=foo")]
     #[case(generate!(CommentListParams, (author_email, Some("foo+bar@example.com".to_string()))), "author_email=foo%2Bbar%40example.com")]
-    #[case(generate!(CommentListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(CommentListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
     #[case(generate!(CommentListParams, (exclude, vec![CommentId(1), CommentId(2)])), "exclude=1%2C2")]
     #[case(generate!(CommentListParams, (include, vec![CommentId(1), CommentId(2)])), "include=1%2C2")]
     #[case(generate!(CommentListParams, (offset, Some(2))), "offset=2")]
@@ -625,11 +633,11 @@ mod tests {
             page: Some(11),
             per_page: Some(22),
             search: Some("s_q".to_string()),
-            after: Some("d_a".to_string()),
+            after: unit_test_example_date_as_option(),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
             author_email: Some("a_email@example.com".to_string()),
-            before: Some("d_b".to_string()),
+            before: unit_test_example_date_as_option(),
             exclude: vec![CommentId(1111), CommentId(1112)],
             include: vec![CommentId(2111), CommentId(2112)],
             offset: Some(11111),
@@ -642,7 +650,7 @@ mod tests {
             comment_type: Some(CommentType::Pingback),
             password: Some("p_q".to_string()),
         },
-        "page=11&per_page=22&search=s_q&after=d_a&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&before=d_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q"
+        &expected_query_pairs_for_comment_list_params_with_all_fields()
     )]
     #[trace]
     fn test_comment_list_query_pairs(
@@ -650,5 +658,11 @@ mod tests {
         #[case] expected_query: &str,
     ) {
         assert_expected_and_from_query_pairs(params, expected_query);
+    }
+
+    fn expected_query_pairs_for_comment_list_params_with_all_fields() -> String {
+        let after = unit_test_example_date_as_query_value("after");
+        let before = unit_test_example_date_as_query_value("before");
+        format!("page=11&per_page=22&search=s_q&{after}&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&{before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q")
     }
 }

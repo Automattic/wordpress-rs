@@ -1,4 +1,5 @@
 use crate::{
+    date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::{
         PostCommentStatus, PostId, PostPingStatus, PostStatus, WpApiParamPostsOrderBy,
@@ -135,10 +136,10 @@ pub struct MediaListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<String>,
+    pub after: Option<WpGmtDateTime>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<String>,
+    pub modified_after: Option<WpGmtDateTime>,
     /// Limit result set to posts assigned to specific authors.
     #[uniffi(default = [])]
     pub author: Vec<UserId>,
@@ -147,10 +148,10 @@ pub struct MediaListParams {
     pub author_exclude: Vec<UserId>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<String>,
+    pub before: Option<WpGmtDateTime>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<String>,
+    pub modified_before: Option<WpGmtDateTime>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<MediaId>,
@@ -324,7 +325,7 @@ pub struct MediaUpdateParams {
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     /// An alphanumeric identifier for the post unique to its type.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -391,7 +392,7 @@ pub struct MediaCreateParams {
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     /// An alphanumeric identifier for the post unique to its type.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -452,7 +453,7 @@ impl From<MediaCreateParams> for HashMap<String, String> {
             }
         };
         add("date", params.date);
-        add("date_gmt", params.date_gmt);
+        add("date_gmt", params.date_gmt.map(|d| d.to_string()));
         add("slug", params.slug);
         add("status", params.status.map(|x| x.to_string()));
         add("title", params.title);
@@ -478,7 +479,7 @@ pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub date: Option<String>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
     #[WpContextualField]
     pub guid: Option<crate::posts::SparsePostGuid>,
@@ -487,7 +488,7 @@ pub struct SparseMedia {
     #[WpContext(edit, view)]
     pub modified: Option<String>,
     #[WpContext(edit, view)]
-    pub modified_gmt: Option<String>,
+    pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]
@@ -557,7 +558,14 @@ pub struct SparseMediaCaption {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate, posts::PostId, unit_test_common::assert_expected_and_from_query_pairs};
+    use crate::{
+        generate,
+        posts::PostId,
+        unit_test_common::{
+            assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
+            unit_test_example_date_as_query_value,
+        },
+    };
     use rstest::*;
 
     #[rstest]
@@ -565,12 +573,12 @@ mod tests {
     #[case(generate!(MediaListParams, (page, Some(2))), "page=2")]
     #[case(generate!(MediaListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(MediaListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(MediaListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(MediaListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(MediaListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
     #[case(generate!(MediaListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(MediaListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
-    #[case(generate!(MediaListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(MediaListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(MediaListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
     #[case(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])), "exclude=1%2C2")]
     #[case(generate!(MediaListParams, (include, vec![MediaId(1), MediaId(2)])), "include=1%2C2")]
     #[case(generate!(MediaListParams, (offset, Some(2))), "offset=2")]
@@ -604,12 +612,12 @@ mod tests {
             page: Some(11),
             per_page: Some(22),
             search: Some("s_q".to_string()),
-            after: Some("d_a".to_string()),
-            modified_after: Some("d_m_a".to_string()),
+            after: unit_test_example_date_as_option(),
+            modified_after: unit_test_example_date_as_option(),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
-            before: Some("d_b".to_string()),
-            modified_before: Some("d_m_b".to_string()),
+            before: unit_test_example_date_as_option(),
+            modified_before: unit_test_example_date_as_option(),
             exclude: vec![MediaId(1111), MediaId(1112)],
             include: vec![MediaId(2111), MediaId(2112)],
             offset: Some(11111),
@@ -626,10 +634,18 @@ mod tests {
             media_type: Some(MediaTypeParam::Image),
             mime_type: Some("image/jpeg".to_string()),
         },
-        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
+        &expected_query_pairs_for_media_list_params_with_all_fields()
     )]
     #[trace]
     fn test_media_list_query_pairs(#[case] params: MediaListParams, #[case] expected_query: &str) {
         assert_expected_and_from_query_pairs(params, expected_query);
+    }
+
+    fn expected_query_pairs_for_media_list_params_with_all_fields() -> String {
+        let after = unit_test_example_date_as_query_value("after");
+        let modified_after = unit_test_example_date_as_query_value("modified_after");
+        let before = unit_test_example_date_as_query_value("before");
+        let modified_before = unit_test_example_date_as_query_value("modified_before");
+        format!("page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg")
     }
 }

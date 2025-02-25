@@ -7,8 +7,8 @@ use wp_api::comments::{
 use wp_api_integration_tests::{
     api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, FIRST_COMMENT_ID, FIRST_POST_ID, POST_ID_555, SECOND_COMMENT_ID,
-    SECOND_USER_ID,
+    unwrapped_wp_gmt_date_time, AssertResponse, FIRST_COMMENT_ID, FIRST_POST_ID, POST_ID_555,
+    SECOND_COMMENT_ID, SECOND_USER_ID,
 };
 use wp_cli::WpCliComment;
 
@@ -178,9 +178,12 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    "2024-09-09T12:00:00".to_string(),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
     |updated_comment, updated_comment_from_wp_cli| {
-        assert_eq!(updated_comment.date_gmt, "2024-09-09T12:00:00");
+        assert_eq!(
+            updated_comment.date_gmt,
+            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+        );
         assert_eq!(updated_comment_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }
 );

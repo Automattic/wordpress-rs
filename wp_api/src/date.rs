@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 use wp_serde_helper::wp_utc_date_format;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -21,6 +21,12 @@ impl FromStr for WpGmtDateTime {
         s.parse::<DateTime<Utc>>()
             .map(Self)
             .map_err(Into::<Self::Err>::into)
+    }
+}
+
+impl Display for WpGmtDateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.to_rfc3339())
     }
 }
 
