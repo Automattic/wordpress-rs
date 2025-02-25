@@ -77,6 +77,9 @@ mod tests {
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
+        unit_test_common::{
+            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
+        },
         UserId, WpApiParamOrder,
     };
     use rstest::*;
@@ -87,11 +90,11 @@ mod tests {
     #[case(generate!(CommentListParams, (page, Some(2))), "page=2")]
     #[case(generate!(CommentListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(CommentListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(CommentListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(CommentListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
     #[case(generate!(CommentListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(CommentListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
     #[case(generate!(CommentListParams, (author_email, Some("foo".to_string()))), "author_email=foo")]
-    #[case(generate!(CommentListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(CommentListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
     #[case(generate!(CommentListParams, (exclude, vec![CommentId(1), CommentId(2)])), "exclude=1%2C2")]
     #[case(generate!(CommentListParams, (include, vec![CommentId(1), CommentId(2)])), "include=1%2C2")]
     #[case(generate!(CommentListParams, (offset, Some(2))), "offset=2")]
@@ -119,7 +122,7 @@ mod tests {
     #[case(generate!(CommentListParams, (password, Some("foo".to_string()))), "password=foo")]
     #[case(
         comment_list_params_with_all_fields(),
-        EXPECTED_QUERY_PAIRS_FOR_COMMENT_LIST_PARAMS_WITH_ALL_FIELDS
+        &expected_query_pairs_for_comment_list_params_with_all_fields()
     )]
     fn list_comments(
         endpoint: CommentsRequestEndpoint,
@@ -153,7 +156,7 @@ mod tests {
     #[rstest]
     #[case(CommentListParams::default(), &[], "/comments?context=edit&_fields=")]
     #[case(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::Id))), &[SparseCommentFieldWithEditContext::Author], "/comments?context=edit&orderby=id&_fields=author")]
-    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT, &format!("/comments?context=edit&{}&{}", EXPECTED_QUERY_PAIRS_FOR_COMMENT_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT, &format!("/comments?context=edit&{}&{}", &expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT))]
     fn filter_list_comments_with_edit_context(
         endpoint: CommentsRequestEndpoint,
         #[case] params: CommentListParams,
@@ -169,7 +172,7 @@ mod tests {
     #[rstest]
     #[case(CommentListParams::default(), &[], "/comments?context=embed&_fields=")]
     #[case(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::DateGmt))), &[SparseCommentFieldWithEmbedContext::Author], "/comments?context=embed&orderby=date_gmt&_fields=author")]
-    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT, &format!("/comments?context=embed&{}&{}", EXPECTED_QUERY_PAIRS_FOR_COMMENT_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT, &format!("/comments?context=embed&{}&{}", &expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT))]
     fn filter_list_comments_with_embed_context(
         endpoint: CommentsRequestEndpoint,
         #[case] params: CommentListParams,
@@ -185,7 +188,7 @@ mod tests {
     #[rstest]
     #[case(CommentListParams::default(), &[], "/comments?context=view&_fields=")]
     #[case(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::Include))), &[SparseCommentFieldWithViewContext::Author], "/comments?context=view&orderby=include&_fields=author")]
-    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments?context=view&{}&{}", EXPECTED_QUERY_PAIRS_FOR_COMMENT_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments?context=view&{}&{}", &expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT))]
     fn filter_list_comments_with_view_context(
         endpoint: CommentsRequestEndpoint,
         #[case] params: CommentListParams,
@@ -198,17 +201,22 @@ mod tests {
         );
     }
 
-    const EXPECTED_QUERY_PAIRS_FOR_COMMENT_LIST_PARAMS_WITH_ALL_FIELDS: &str = "page=11&per_page=22&search=s_q&after=d_a&author=111%2C112&author_exclude=211%2C212&author_email=a_email&before=d_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q";
+    fn expected_query_pairs_for_comment_list_params_with_all_fields() -> String {
+        let after = unit_test_example_date_as_query_value("after");
+        let before = unit_test_example_date_as_query_value("before");
+        format!("page=11&per_page=22&search=s_q&{after}&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&{before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q")
+    }
+
     fn comment_list_params_with_all_fields() -> CommentListParams {
         CommentListParams {
             page: Some(11),
             per_page: Some(22),
             search: Some("s_q".to_string()),
-            after: Some("d_a".to_string()),
+            after: unit_test_example_date_as_option(),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
-            author_email: Some("a_email".to_string()),
-            before: Some("d_b".to_string()),
+            author_email: Some("a_email@example.com".to_string()),
+            before: unit_test_example_date_as_option(),
             exclude: vec![CommentId(1111), CommentId(1112)],
             include: vec![CommentId(2111), CommentId(2112)],
             offset: Some(11111),

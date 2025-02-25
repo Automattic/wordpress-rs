@@ -96,7 +96,7 @@ impl AsQueryValue for String {
 
 impl AsQueryValue for WpGmtDateTime {
     fn as_query_value(&self) -> impl AsRef<str> {
-        self.0.to_rfc3339()
+        self.to_string()
     }
 }
 

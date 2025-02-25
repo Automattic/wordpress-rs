@@ -5,8 +5,8 @@ use wp_api::{
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
 use wp_api_integration_tests::{
-    api_client, backend::RestoreServer, AssertResponse, FIRST_POST_ID, MEDIA_ID_611,
-    MEDIA_TEST_FILE_CONTENT_TYPE, MEDIA_TEST_FILE_PATH,
+    api_client, backend::RestoreServer, unwrapped_wp_gmt_date_time, AssertResponse, FIRST_POST_ID,
+    MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE, MEDIA_TEST_FILE_PATH,
 };
 
 #[tokio::test]
@@ -46,7 +46,11 @@ async fn delete_media() {
 
 generate_update_test!(update_date, date, "2024-09-09T12:00:00".to_string());
 
-generate_update_test!(update_date_gmt, date_gmt, "2024-09-09T12:00:00".to_string());
+generate_update_test!(
+    update_date_gmt,
+    date_gmt,
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+);
 
 generate_update_test!(update_slug, slug, "new_slug".to_string());
 

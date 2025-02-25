@@ -232,6 +232,9 @@ mod tests {
             tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
         },
+        unit_test_common::{
+            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
+        },
         UserId, WpApiParamOrder,
     };
     use rstest::*;
@@ -252,12 +255,12 @@ mod tests {
     #[case(generate!(MediaListParams, (page, Some(2))), "page=2")]
     #[case(generate!(MediaListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(MediaListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(MediaListParams, (after, Some("2023-08-14 17:00:00.000".to_string()))), "after=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(MediaListParams, (modified_after, Some("2023-08-14 17:00:00.000".to_string()))), "modified_after=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(MediaListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
     #[case(generate!(MediaListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(MediaListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
-    #[case(generate!(MediaListParams, (before, Some("2023-08-14 17:00:00.000".to_string()))), "before=2023-08-14+17%3A00%3A00.000")]
-    #[case(generate!(MediaListParams, (modified_before, Some("2023-08-14 17:00:00.000".to_string()))), "modified_before=2023-08-14+17%3A00%3A00.000")]
+    #[case(generate!(MediaListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(MediaListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
     #[case(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])), "exclude=1%2C2")]
     #[case(generate!(MediaListParams, (include, vec![MediaId(1), MediaId(2)])), "include=1%2C2")]
     #[case(generate!(MediaListParams, (offset, Some(2))), "offset=2")]
@@ -289,7 +292,7 @@ mod tests {
     #[case(generate!(MediaListParams, (mime_type, Some("image/jpeg".to_string()))), "mime_type=image%2Fjpeg")]
     #[case(
         media_list_params_with_all_fields(),
-        EXPECTED_QUERY_PAIRS_FOR_MEDIA_LIST_PARAMS_WITH_ALL_FIELDS
+        &expected_query_pairs_for_media_list_params_with_all_fields()
     )]
     fn list_media(
         endpoint: MediaRequestEndpoint,
@@ -320,7 +323,7 @@ mod tests {
     #[rstest]
     #[case(MediaListParams::default(), &[], "/media?context=edit&_fields=")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseMediaFieldWithEditContext::Author], "/media?context=edit&orderby=author&_fields=author")]
-    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT, &format!("/media?context=edit&{}&{}", EXPECTED_QUERY_PAIRS_FOR_MEDIA_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT, &format!("/media?context=edit&{}&{}", &expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT))]
     fn filter_list_media_with_edit_context(
         endpoint: MediaRequestEndpoint,
         #[case] params: MediaListParams,
@@ -336,7 +339,7 @@ mod tests {
     #[rstest]
     #[case(MediaListParams::default(), &[], "/media?context=embed&_fields=")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseMediaFieldWithEmbedContext::Author], "/media?context=embed&orderby=author&_fields=author")]
-    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT, &format!("/media?context=embed&{}&{}", EXPECTED_QUERY_PAIRS_FOR_MEDIA_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT, &format!("/media?context=embed&{}&{}", &expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT))]
     fn filter_list_media_with_embed_context(
         endpoint: MediaRequestEndpoint,
         #[case] params: MediaListParams,
@@ -352,7 +355,7 @@ mod tests {
     #[rstest]
     #[case(MediaListParams::default(), &[], "/media?context=view&_fields=")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseMediaFieldWithViewContext::Author], "/media?context=view&orderby=author&_fields=author")]
-    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT, &format!("/media?context=view&{}&{}", EXPECTED_QUERY_PAIRS_FOR_MEDIA_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT, &format!("/media?context=view&{}&{}", &expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT))]
     fn filter_list_media_with_view_context(
         endpoint: MediaRequestEndpoint,
         #[case] params: MediaListParams,
@@ -417,19 +420,25 @@ mod tests {
         );
     }
 
-    const EXPECTED_QUERY_PAIRS_FOR_MEDIA_LIST_PARAMS_WITH_ALL_FIELDS: &str =
-        "page=11&per_page=22&search=s_q&after=d_a&modified_after=d_m_a&author=111%2C112&author_exclude=211%2C212&before=d_b&modified_before=d_m_b&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg";
+    fn expected_query_pairs_for_media_list_params_with_all_fields() -> String {
+        let after = unit_test_example_date_as_query_value("after");
+        let modified_after = unit_test_example_date_as_query_value("modified_after");
+        let before = unit_test_example_date_as_query_value("before");
+        let modified_before = unit_test_example_date_as_query_value("modified_before");
+        format!("page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg")
+    }
+
     fn media_list_params_with_all_fields() -> MediaListParams {
         MediaListParams {
             page: Some(11),
             per_page: Some(22),
             search: Some("s_q".to_string()),
-            after: Some("d_a".to_string()),
-            modified_after: Some("d_m_a".to_string()),
+            after: unit_test_example_date_as_option(),
+            modified_after: unit_test_example_date_as_option(),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
-            before: Some("d_b".to_string()),
-            modified_before: Some("d_m_b".to_string()),
+            before: unit_test_example_date_as_option(),
+            modified_before: unit_test_example_date_as_option(),
             exclude: vec![MediaId(1111), MediaId(1112)],
             include: vec![MediaId(2111), MediaId(2112)],
             offset: Some(11111),
