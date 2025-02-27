@@ -1,3 +1,4 @@
+use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError};
 use crate::{
     request::{request_or_response_body_as_string, WpRedirect},
     ssl::SSLCertificateInfo,
@@ -450,20 +451,22 @@ pub enum RequestExecutionErrorReason {
     },
     #[error(
         "The server at {} requires authentication. Please provide your username and password.",
-        url
+        hostname
     )]
     HttpAuthenticationRequiredError {
-        url: String,
+        hostname: String,
         server_message: Option<String>,
     },
     #[error(
         "The server at {} rejected your credentials. Please provide a valid username and password.",
-        url
+        hostname
     )]
     HttpAuthenticationRejectedError {
-        url: String,
-        server_message: Option<String>,
+        hostname: String,
+        method: Option<HttpAuthMethod>,
     },
+    #[error("The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.")]
+    MisconfiguredHttpAuthenticationError { issue: HttpAuthMethodParsingError },
     #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
     MisconfiguredRateLimitError {},
     #[error("{}", error_message)]
@@ -520,6 +523,18 @@ impl From<MediaUploadRequestExecutionError> for WpApiError {
             MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {
                 Self::MediaFileNotFound { file_path }
             }
+        }
+    }
+}
+
+impl From<HttpAuthMethodParsingError> for WpApiError {
+    fn from(value: HttpAuthMethodParsingError) -> Self {
+        WpApiError::RequestExecutionFailed {
+            status_code: None,
+            redirects: None,
+            reason: RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
+                issue: value,
+            },
         }
     }
 }
