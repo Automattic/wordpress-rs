@@ -1,12 +1,15 @@
 use self::endpoint::WpEndpointUrl;
+use crate::RequestExecutionErrorReason;
 use crate::{
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
     WpApiError, WpAuthentication,
 };
+use chrono::{DateTime, Utc};
 use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::str::FromStr;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use url::Url;
 use uuid::Uuid;
@@ -15,7 +18,6 @@ pub mod endpoint;
 
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_MULTIPART: &str = "multipart/form-data";
-const LINK_HEADER_KEY: &str = "Link";
 const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
 const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
 
@@ -209,6 +211,14 @@ impl WpNetworkRequest {
             .as_ref()
             .map(|b| request_or_response_body_as_string(&b.inner))
     }
+
+    /// Does this request specify HTTP login details of some kind?
+    pub fn has_http_authorization_header(&self) -> bool {
+        self.header_map
+            .inner
+            .get(http::header::AUTHORIZATION)
+            .is_some()
+    }
 }
 
 impl WpNetworkRequest {
@@ -276,6 +286,11 @@ impl WpNetworkHeaderMap {
             .get(header_name)
             .and_then(|h_v| h_v.to_str().ok())
             .and_then(|h| h.parse().ok())
+    }
+
+    pub fn insert(&mut self, header_name: HeaderName, header_value: String) {
+        self.inner
+            .insert(header_name, header_value.parse().unwrap());
     }
 
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
@@ -372,10 +387,10 @@ pub enum WpNetworkHeaderMapError {
 impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
         [
-            self.header_map.inner.get_all(LINK_HEADER_KEY),
+            self.header_map.inner.get_all(http::header::LINK),
             self.header_map
                 .inner
-                .get_all(LINK_HEADER_KEY.to_lowercase()),
+                .get_all(http::header::LINK.to_string().to_lowercase()),
         ]
         .into_iter()
         .flatten()
@@ -439,6 +454,175 @@ impl WpNetworkResponse {
     {
         parser(self)
     }
+
+    pub fn is_rate_limit_exceeded(&self) -> bool {
+        self.status_code == 429
+    }
+
+    pub fn get_retry_after(&self) -> Option<u64> {
+        self.header_map
+            .inner
+            .get(http::header::RETRY_AFTER)
+            .and_then(|h_v| h_v.to_str().ok())
+            .and_then(|s| HttpRetryDuration::from_str(s).ok())
+            .map(|d| d.seconds)
+    }
+
+    pub fn is_http_authentication_required(&self) -> bool {
+        self.status_code == 401 || self.status_code == 403
+    }
+
+    pub fn get_http_auth_method(
+        &self,
+    ) -> Result<Option<HttpAuthMethod>, HttpAuthMethodParsingError> {
+        let header_value = self
+            .header_map
+            .inner
+            .get(http::header::WWW_AUTHENTICATE)
+            .and_then(|h_v| h_v.to_str().ok());
+
+        if let Some(header_value) = header_value {
+            let result = HttpAuthMethod::from_str(header_value);
+
+            return match result {
+                Ok(method) => Ok(Some(method)),
+                Err(e) => Err(e),
+            };
+        }
+
+        Ok(None)
+    }
+}
+
+struct HttpRetryDuration {
+    seconds: u64,
+}
+
+/// Parser based on https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
+///
+impl FromStr for HttpRetryDuration {
+    type Err = WpApiError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Handle the simple case where the header is a number of seconds
+        if let Ok(seconds) = s.parse::<u64>() {
+            return Ok(HttpRetryDuration { seconds });
+        }
+
+        // Handle the case where the header is a date string
+        let parsed =
+            DateTime::parse_from_rfc2822(s).map_err(|_| WpApiError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
+            })?;
+
+        let now = Utc::now();
+        let duration = parsed.signed_duration_since(now);
+        let seconds = duration.num_seconds();
+
+        Ok(HttpRetryDuration {
+            seconds: seconds as u64,
+        })
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, uniffi::Record)]
+pub struct BasicAuthenticationDetails {
+    pub realm: Option<String>,
+    pub requires_utf8: bool,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, uniffi::Record)]
+pub struct DigestAuthenticationDetails {
+    pub realm: Option<String>,
+    pub nonce: String,
+    pub qop: String,
+    pub algorithm: Option<String>,
+    pub opaque: String,
+    pub requires_utf8: bool,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, uniffi::Enum)]
+pub enum HttpAuthMethod {
+    Basic(BasicAuthenticationDetails),
+    Digest(DigestAuthenticationDetails),
+    Other(String, HashMap<String, String>),
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, uniffi::Error)]
+pub enum HttpAuthMethodParsingError {
+    MissingNonce,
+    MissingQop,
+    MissingAlgorithm,
+    MissingOpaque,
+    Unknown, // Some case we're not handling yet
+}
+
+/// Parser based on https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
+///
+impl FromStr for HttpAuthMethod {
+    type Err = HttpAuthMethodParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = s.splitn(2, ' ').collect::<Vec<&str>>();
+
+        let method = parts[0];
+
+        let mut details = HashMap::new();
+        parts[1].split(',').for_each(|part| {
+            let parts = part.splitn(2, "=").collect::<Vec<&str>>();
+            details.insert(
+                parts[0].trim(),
+                parts[1].trim_matches('\"').trim_matches('"'),
+            );
+        });
+
+        if method == "Basic" {
+            return Ok(HttpAuthMethod::Basic(BasicAuthenticationDetails {
+                realm: details.get("realm").map(|s| s.to_string()),
+                requires_utf8: details
+                    .get("charset")
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+                    .to_ascii_lowercase()
+                    .contains("utf-8"),
+            }));
+        }
+
+        if method == "Digest" {
+            return Ok(HttpAuthMethod::Digest(DigestAuthenticationDetails {
+                realm: details.get("realm").map(|s| s.to_string()),
+                nonce: details
+                    .get("nonce")
+                    .map(|s| s.to_string())
+                    .ok_or(HttpAuthMethodParsingError::MissingNonce)?,
+                qop: details
+                    .get("qop")
+                    .map(|s| s.to_string())
+                    .ok_or(HttpAuthMethodParsingError::MissingQop)?,
+                algorithm: details.get("algorithm").map(|s| s.to_string()),
+                opaque: details
+                    .get("opaque")
+                    .map(|s| s.to_string())
+                    .ok_or(HttpAuthMethodParsingError::MissingOpaque)?,
+                requires_utf8: details
+                    .get("charset")
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+                    .to_ascii_lowercase()
+                    .contains("utf-8"),
+            }));
+        }
+
+        Ok(HttpAuthMethod::Other(
+            method.to_string(),
+            details
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        ))
+    }
 }
 
 impl Debug for WpNetworkResponse {
@@ -491,7 +675,10 @@ impl WpRedirect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use rstest::*;
+    use std::ops::Add;
+    use std::time::Duration;
 
     #[rstest]
     #[case(
@@ -544,7 +731,7 @@ mod tests {
         let hash_map = [
             ("Age".to_string(), "1,2".to_string()),
             (
-                LINK_HEADER_KEY.to_string(),
+                http::header::LINK.to_string(),
                 "<https://one.example.com>; rel=\"preconnect\", <https://two.example.com>"
                     .to_string(),
             ),
@@ -555,7 +742,7 @@ mod tests {
         assert_header_map_values(&header_map, "Age", vec!["1", "2"]);
         assert_header_map_values(
             &header_map,
-            LINK_HEADER_KEY,
+            http::header::LINK.as_str(),
             vec![
                 "<https://one.example.com>; rel=\"preconnect\"",
                 "<https://two.example.com>",
@@ -569,7 +756,7 @@ mod tests {
         let hash_map = [
             ("Age".to_string(), vec!["1".to_string(), "2,3".to_string()]),
             (
-                LINK_HEADER_KEY.to_string(),
+                http::header::LINK.to_string(),
                 vec![
                     "<https://one.example.com>; rel=\"preconnect\", <https://two.example.com>"
                         .to_string(),
@@ -583,7 +770,7 @@ mod tests {
         assert_header_map_values(&header_map, "Age", vec!["1", "2", "3"]);
         assert_header_map_values(
             &header_map,
-            LINK_HEADER_KEY,
+            http::header::LINK.as_str(),
             vec![
                 "<https://one.example.com>; rel=\"preconnect\"",
                 "<https://two.example.com>",
@@ -591,6 +778,83 @@ mod tests {
         );
         assert_header_map_values(&header_map, "Retry-After", vec!["120"]);
         assert_header_map_values(&header_map, "User-Agent", vec![]);
+    }
+
+    #[rstest]
+    #[case("Basic realm=\"example\", charset=\"UTF-8\"", HttpAuthMethod::Basic(BasicAuthenticationDetails {
+        realm: Some("example".to_string()),
+        requires_utf8: true,
+    }))]
+    #[case("Basic realm=\"example\"", HttpAuthMethod::Basic(BasicAuthenticationDetails {
+        realm: Some("example".to_string()),
+        requires_utf8: false,
+    }))]
+    #[case("Digest realm=\"example\", nonce=\"123\", qop=\"auth\", algorithm=\"MD5\", opaque=\"123\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+        realm: Some("example".to_string()),
+        nonce: "123".to_string(),
+        qop: "auth".to_string(),
+        algorithm: Some("MD5".to_string()),
+        opaque: "123".to_string(),
+        requires_utf8: false,
+    }))]
+    #[case("Digest realm=\"secure\", nonce=\"xyz789\", qop=\"auth\", algorithm=\"SHA-256\", opaque=\"abc\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+        realm: Some("secure".to_string()),
+        nonce: "xyz789".to_string(),
+        qop: "auth".to_string(),
+        algorithm: Some("SHA-256".to_string()),
+        opaque: "abc".to_string(),
+        requires_utf8: false,
+    }))]
+    #[case("Digest realm=\"api\", nonce=\"456def\", qop=\"auth-int\", algorithm=\"SHA-512\", opaque=\"def\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+        realm: Some("api".to_string()),
+        nonce: "456def".to_string(),
+        qop: "auth-int".to_string(),
+        algorithm: Some("SHA-512".to_string()),
+        opaque: "def".to_string(),
+        requires_utf8: false,
+    }))]
+    #[case("Digest realm=\"test\", nonce=\"789ghi\", qop=\"auth\", algorithm=\"SHA3-256\", opaque=\"ghi\", charset=\"UTF-8\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+        realm: Some("test".to_string()),
+        nonce: "789ghi".to_string(),
+        qop: "auth".to_string(),
+        algorithm: Some("SHA3-256".to_string()),
+        opaque: "ghi".to_string(),
+        requires_utf8: true,
+    }))]
+
+    fn assert_get_http_auth_message_parses_valid_values(
+        #[case] header_value: &str,
+        #[case] expected_value: HttpAuthMethod,
+    ) {
+        let mut header_map: WpNetworkHeaderMap = WpNetworkHeaderMap::new(HeaderMap::new());
+        header_map.insert(http::header::WWW_AUTHENTICATE, header_value.to_string());
+
+        let response = WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 401,
+            header_map: Arc::new(header_map),
+        };
+
+        assert_eq!(response.get_http_auth_method(), Ok(Some(expected_value)));
+    }
+
+    #[rstest]
+    #[case("120", 120)]
+    #[case( Utc::now().add(Duration::from_secs(121)).to_rfc2822(), 120)]
+    fn assert_get_http_retry_duration_parses_valid_values(
+        #[case] header_value: String,
+        #[case] expected_value: u64,
+    ) {
+        let mut header_map: WpNetworkHeaderMap = WpNetworkHeaderMap::new(HeaderMap::new());
+        header_map.insert(http::header::RETRY_AFTER, header_value);
+
+        let response = WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 429,
+            header_map: Arc::new(header_map),
+        };
+
+        assert_eq!(response.get_retry_after(), Some(expected_value));
     }
 
     fn assert_header_map_values(header_map: &WpNetworkHeaderMap, key: &str, values: Vec<&str>) {
