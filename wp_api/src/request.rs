@@ -288,11 +288,6 @@ impl WpNetworkHeaderMap {
             .and_then(|h| h.parse().ok())
     }
 
-    pub fn insert(&mut self, header_name: HeaderName, header_value: String) {
-        self.inner
-            .insert(header_name, header_value.parse().unwrap());
-    }
-
     // Splits the `header_value` by `,` then parses name & values into `HeaderName` & `HeaderValue`
     fn build_header_name_value(
         header_name: &str,
@@ -679,6 +674,13 @@ mod tests {
     use rstest::*;
     use std::ops::Add;
     use std::time::Duration;
+
+    impl WpNetworkHeaderMap {
+        pub fn insert(&mut self, header_name: HeaderName, header_value: String) {
+            let value = header_value.parse().expect("Header Value must be ascii");
+            self.inner.insert(header_name, value);
+        }
+    }
 
     #[rstest]
     #[case(
