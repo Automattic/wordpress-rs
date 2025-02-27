@@ -72,7 +72,7 @@ impl QueryPairsExtension for QueryPairs<'_> {
     }
 }
 
-pub(crate) trait AsQueryValue {
+pub trait AsQueryValue {
     fn as_query_value(&self) -> impl AsRef<str>;
 }
 

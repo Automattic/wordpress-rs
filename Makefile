@@ -102,8 +102,8 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 
 # Build the library for a specific target
 _build-apple-%:
-	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
-	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libwp_api.a
+	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package jetpack --profile $(CARGO_PROFILE)
+	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libjetpack.a
 
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
