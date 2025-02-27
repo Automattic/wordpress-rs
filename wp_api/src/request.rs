@@ -783,15 +783,15 @@ mod tests {
     }
 
     #[rstest]
-    #[case("Basic realm=\"example\", charset=\"UTF-8\"", HttpAuthMethod::Basic(BasicAuthenticationDetails {
+    #[case(r#"Basic realm="example", charset="UTF-8""#, HttpAuthMethod::Basic(BasicAuthenticationDetails {
         realm: Some("example".to_string()),
         requires_utf8: true,
     }))]
-    #[case("Basic realm=\"example\"", HttpAuthMethod::Basic(BasicAuthenticationDetails {
+    #[case(r#"Basic realm="example""#, HttpAuthMethod::Basic(BasicAuthenticationDetails {
         realm: Some("example".to_string()),
         requires_utf8: false,
     }))]
-    #[case("Digest realm=\"example\", nonce=\"123\", qop=\"auth\", algorithm=\"MD5\", opaque=\"123\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+    #[case(r#"Digest realm="example", nonce="123", qop="auth", algorithm="MD5", opaque="123""#, HttpAuthMethod::Digest(DigestAuthenticationDetails {
         realm: Some("example".to_string()),
         nonce: "123".to_string(),
         qop: "auth".to_string(),
@@ -799,7 +799,7 @@ mod tests {
         opaque: "123".to_string(),
         requires_utf8: false,
     }))]
-    #[case("Digest realm=\"secure\", nonce=\"xyz789\", qop=\"auth\", algorithm=\"SHA-256\", opaque=\"abc\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+    #[case(r#"Digest realm="secure", nonce="xyz789", qop="auth", algorithm="SHA-256", opaque="abc""#, HttpAuthMethod::Digest(DigestAuthenticationDetails {
         realm: Some("secure".to_string()),
         nonce: "xyz789".to_string(),
         qop: "auth".to_string(),
@@ -807,7 +807,7 @@ mod tests {
         opaque: "abc".to_string(),
         requires_utf8: false,
     }))]
-    #[case("Digest realm=\"api\", nonce=\"456def\", qop=\"auth-int\", algorithm=\"SHA-512\", opaque=\"def\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+    #[case(r#"Digest realm="api", nonce="456def", qop="auth-int", algorithm="SHA-512", opaque="def""#, HttpAuthMethod::Digest(DigestAuthenticationDetails {
         realm: Some("api".to_string()),
         nonce: "456def".to_string(),
         qop: "auth-int".to_string(),
@@ -815,7 +815,7 @@ mod tests {
         opaque: "def".to_string(),
         requires_utf8: false,
     }))]
-    #[case("Digest realm=\"test\", nonce=\"789ghi\", qop=\"auth\", algorithm=\"SHA3-256\", opaque=\"ghi\", charset=\"UTF-8\"", HttpAuthMethod::Digest(DigestAuthenticationDetails {
+    #[case(r#"Digest realm="test", nonce="789ghi", qop="auth", algorithm="SHA3-256", opaque="ghi", charset="UTF-8""#, HttpAuthMethod::Digest(DigestAuthenticationDetails {
         realm: Some("test".to_string()),
         nonce: "789ghi".to_string(),
         qop: "auth".to_string(),
