@@ -5,6 +5,7 @@ use crate::{
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
     WpApiError, WpAuthentication,
 };
+use base64::Engine;
 use chrono::{DateTime, Utc};
 use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
 use http::{HeaderMap, HeaderName, HeaderValue};
@@ -213,11 +214,32 @@ impl WpNetworkRequest {
     }
 
     /// Does this request specify HTTP login details of some kind?
-    pub fn has_http_authorization_header(&self) -> bool {
+    pub fn has_http_authentication(&self) -> bool {
         self.header_map
             .inner
             .get(http::header::AUTHORIZATION)
             .is_some()
+    }
+
+    pub fn adding_http_authentication(&self, username: &str, password: &str) -> Self {
+        let encoded_credentials =
+            base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", username, password));
+
+        let mut new_header_map = self.header_map.inner.clone();
+
+        new_header_map.insert(
+            http::header::AUTHORIZATION,
+            format!("Basic {}", encoded_credentials).parse().unwrap(), // base64 can only produce ASCII, so this string is guaranteed to be parseable
+        );
+
+        WpNetworkRequest {
+            uuid: self.uuid.clone(),
+            retry_count: self.retry_count,
+            method: self.method.clone(),
+            url: self.url.clone(),
+            header_map: Arc::new(new_header_map.into()),
+            body: self.body.clone(),
+        }
     }
 }
 

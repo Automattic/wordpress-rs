@@ -455,7 +455,7 @@ pub enum RequestExecutionErrorReason {
     )]
     HttpAuthenticationRequiredError {
         hostname: String,
-        server_message: Option<String>,
+        method: Option<HttpAuthMethod>,
     },
     #[error(
         "The server at {} rejected your credentials. Please provide a valid username and password.",

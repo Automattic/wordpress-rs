@@ -1,7 +1,7 @@
 use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
-use wp_api::login::login_client::WpLoginClient;
+use wp_api::{login::login_client::WpLoginClient, middleware::WpApiMiddlewarePipeline};
 use wp_api_integration_tests::AsyncWpNetworking;
 
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
@@ -61,7 +61,10 @@ const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
-    let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
+    let client = WpLoginClient::new(
+        Arc::new(AsyncWpNetworking::default()),
+        Arc::new(WpApiMiddlewarePipeline::default()),
+    );
     let result = client.api_discovery(site_url.to_string()).await;
     assert!(
         result.is_successful(),

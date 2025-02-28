@@ -28,6 +28,12 @@ impl From<Url> for WpEndpointUrl {
     }
 }
 
+impl From<WpEndpointUrl> for String {
+    fn from(url: WpEndpointUrl) -> Self {
+        url.0
+    }
+}
+
 #[derive(Debug)]
 pub struct ApiEndpointUrl {
     url: Url,

@@ -9,6 +9,8 @@ use super::{
     },
     WpApiDetails,
 };
+use crate::middleware::PerformsRequests;
+use crate::middleware::WpApiMiddlewarePipeline;
 use crate::{
     login::url_discovery::RootWpJson,
     request::{
@@ -28,9 +30,12 @@ struct UniffiWpLoginClient {
 #[uniffi::export]
 impl UniffiWpLoginClient {
     #[uniffi::constructor]
-    fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
+    fn new(
+        request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    ) -> Self {
         Self {
-            inner: WpLoginClient::new(request_executor).into(),
+            inner: WpLoginClient::new(request_executor, middleware_pipeline).into(),
         }
     }
 
@@ -42,11 +47,18 @@ impl UniffiWpLoginClient {
 #[derive(Debug)]
 pub struct WpLoginClient {
     request_executor: Arc<dyn RequestExecutor>,
+    middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
 }
 
 impl WpLoginClient {
-    pub fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
-        Self { request_executor }
+    pub fn new(
+        request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    ) -> Self {
+        Self {
+            request_executor,
+            middleware_pipeline,
+        }
     }
 
     pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
@@ -253,26 +265,25 @@ impl WpLoginClient {
             header_map: WpNetworkHeaderMap::default().into(),
             body: None,
         };
-        self.request_executor.execute(api_root_request.into()).await
+        self.perform(api_root_request.into()).await
     }
 
     async fn fetch_wp_api_details(
         &self,
         api_root_url: &ParsedUrl,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(api_root_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
-                }
-                .into(),
-            )
-            .await
+        self.perform(
+            WpNetworkRequest {
+                uuid: Uuid::new_v4().into(),
+                retry_count: 0,
+                method: RequestMethod::GET,
+                url: WpEndpointUrl(api_root_url.url()),
+                header_map: WpNetworkHeaderMap::default().into(),
+                body: None,
+            }
+            .into(),
+        )
+        .await
     }
 
     async fn fetch_wp_json(
@@ -292,8 +303,7 @@ impl WpLoginClient {
             wp_json_url
         };
         let fetch_wp_json_response = match self
-            .request_executor
-            .execute(
+            .perform(
                 WpNetworkRequest {
                     uuid: Uuid::new_v4().into(),
                     retry_count: 0,
@@ -329,19 +339,28 @@ impl WpLoginClient {
     ) -> Result<WpNetworkResponse, ParseHtmlFailure> {
         let site_url = ParsedUrl::parse(attempt_site_url)
             .map_err(|error| ParseHtmlFailure::ParseSiteUrl { error })?;
-        self.request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(site_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
-                }
-                .into(),
-            )
-            .await
-            .map_err(|error| ParseHtmlFailure::FetchSite { error })
+        self.perform(
+            WpNetworkRequest {
+                uuid: Uuid::new_v4().into(),
+                retry_count: 0,
+                method: RequestMethod::GET,
+                url: WpEndpointUrl(site_url.url()),
+                header_map: WpNetworkHeaderMap::default().into(),
+                body: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(|error| ParseHtmlFailure::FetchSite { error })
+    }
+}
+
+impl PerformsRequests for WpLoginClient {
+    fn get_middleware_pipeline(&self) -> Arc<WpApiMiddlewarePipeline> {
+        self.middleware_pipeline.clone()
+    }
+
+    fn get_request_executor(&self) -> Arc<dyn RequestExecutor> {
+        self.request_executor.clone()
     }
 }
