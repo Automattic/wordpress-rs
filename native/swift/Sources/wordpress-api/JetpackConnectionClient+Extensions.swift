@@ -1,0 +1,16 @@
+import Foundation
+import WordPressAPIInternal
+
+#if os(Linux)
+import FoundationNetworking
+#endif
+
+extension JetpackConnectionClient {
+    public convenience init(siteUrl: ParsedUrl, urlSession: URLSession, authentication: WpAuthentication) {
+        self.init(
+            siteUrl: siteUrl,
+            requestExecutor: WpRequestExecutor(urlSession: urlSession),
+            siteAuthentication: authentication
+        )
+    }
+}
