@@ -26,6 +26,28 @@ for swift_binding in "$output_dir"/*.swift; do
     fi
 
     sed "${options[@]}" 's/errorHandler: FfiConverterTypeWpApiError\.lift/errorHandler: FfiConverterTypeWpApiError_lift/' "$swift_binding"
+
+    if [[ $(basename "$swift_binding") == "wp_api.swift" ]]; then
+        # Create a multi-line string variable for Swift API documentation
+        cat <<'EOF' >> "$swift_binding"
+
+// Some types in the bindings do not get `Hashable & Equatable` implemented
+// by the uniffi-rs codegen. We implement them manually here.
+
+extension SslCertificateInfo: Hashable, Equatable {
+    public static func == (lhs: SslCertificateInfo, rhs: SslCertificateInfo) -> Bool {
+        return lhs.equals(other: rhs)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(hashValue)
+    }
+}
+
+extension WpApiError: Hashable, Equatable {}
+extension RequestExecutionErrorReason: Hashable, Equatable {}
+EOF
+    fi
 done
 
 mv "$output_dir"/*.swift native/swift/Sources/wordpress-api-wrapper/
