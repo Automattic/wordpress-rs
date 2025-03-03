@@ -50,6 +50,7 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
 pub struct SSLCertificateInfo {
     /// The domain this certificate is valid for (or the signer's name, if this is an intermediate or root certificate)
     pub common_name: String,
@@ -71,19 +72,6 @@ impl SSLCertificateInfo {
 
     fn issuer(&self) -> SSLCertificateIssuer {
         self.issuer.clone()
-    }
-
-    fn equals(&self, other: Arc<SSLCertificateInfo>) -> bool {
-        *self == *other
-    }
-
-    fn hash_value(&self) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        hasher.finish()
     }
 }
 
