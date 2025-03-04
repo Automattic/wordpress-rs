@@ -17,6 +17,32 @@ cargo run --release --quiet --bin wp_uniffi_bindgen generate \
     --out-dir "$output_dir" \
     --language swift
 
+function patch_wp_api {
+    error_types=$(grep -r "impl WpSupportsLocalization for" wp_api/src | grep -o "for [A-Za-z0-9]*" | cut -d' ' -f2)
+
+    for error_type in $error_types; do
+        cat <<EOF >> "$1"
+
+extension $error_type: LocalizedError {
+    public var errorDescription: String? {
+        localize${error_type}(value: self, locale: .preferred())
+    }
+}
+EOF
+    done
+}
+
+function patch_wp_localization {
+    cat <<'EOF' >> "$1"
+
+extension WpLocale {
+    public static func preferred() -> WpLocale {
+        wpLocaleResolve(langIds: Locale.preferredLanguages)
+    }
+}
+EOF
+}
+
 # The search-and-replace below can be removed after updating to a uniffi-rs
 # version that includes this PR https://github.com/mozilla/uniffi-rs/pull/2341
 for swift_binding in "$output_dir"/*.swift; do
@@ -25,6 +51,11 @@ for swift_binding in "$output_dir"/*.swift; do
         options+=("")
     fi
     sed "${options[@]}" 's/^protocol UniffiForeignFutureTask /fileprivate protocol UniffiForeignFutureTask /' "$swift_binding"
+
+    basename=$(basename "$swift_binding" .swift)
+    if [ "$(type -t "patch_$basename")" = "function" ]; then
+        "patch_$basename" "$swift_binding"
+    fi
 done
 
 mv "$output_dir"/*.swift native/swift/Sources/wordpress-api-wrapper/
