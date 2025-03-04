@@ -286,7 +286,7 @@ pub trait AssertResponse {
     fn assert_response(self) -> Self::Item;
 }
 
-impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
+impl<T: std::fmt::Debug, E: std::fmt::Display + std::fmt::Debug> AssertResponse for Result<T, E> {
     type Item = T;
 
     fn assert_response(self) -> T {

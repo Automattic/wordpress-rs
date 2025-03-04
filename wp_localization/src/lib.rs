@@ -1,7 +1,8 @@
 use fluent_bundle::FluentValue;
+use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
 use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Debug, fmt::Display};
-use strum_macros::{EnumIter, IntoStaticStr};
+use unic_langid::{langid, LanguageIdentifier};
 
 fluent_templates::static_loader! {
     static LOCALES = {
@@ -36,7 +37,7 @@ impl MessageBundle {
 
     pub fn localize(&self, locale: Option<WpLocale>) -> String {
         LOCALES.lookup_complete(
-            &locale.unwrap_or_default().as_language_id(),
+            locale.unwrap_or_default().as_language_id(),
             self.key,
             self.args
                 .as_ref()
@@ -56,34 +57,74 @@ impl Display for MessageBundle {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    EnumIter,
-    IntoStaticStr,
-    uniffi::Enum,
-)]
-pub enum WpLocale {
-    #[default]
-    #[strum(serialize = "en-US")]
-    EnUS,
-    #[strum(serialize = "tr-TR")]
-    TrTR,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WpLocale {
+    lang_id: LanguageIdentifier,
 }
 
+// Export `WpLocale` as a string (i.e. "en-US"). Native platforms can pass any string
+// to Rust code. Rust code will convert it to a `WpLocale` object, which would be one
+// of the supported languages.
+uniffi::custom_type!(WpLocale, String, {
+    lower: |locale| locale.into(),
+    try_lift: |str| Ok(str.as_str().into()),
+});
+
+include!(concat!(env!("OUT_DIR"), "/generated_wp_locale.rs"));
+
 impl WpLocale {
-    pub fn as_language_id(&self) -> unic_langid::LanguageIdentifier {
-        Into::<&str>::into(self).parse().expect(
-            "All locales are unit tested to ensure they can be converted to LanguageIdentifier",
-        )
+    pub fn as_language_id(&self) -> &LanguageIdentifier {
+        &self.lang_id
     }
+}
+
+impl Default for WpLocale {
+    fn default() -> Self {
+        WpLocale {
+            lang_id: langid!("en-US"),
+        }
+    }
+}
+
+impl From<&str> for WpLocale {
+    fn from(lang_id: &str) -> Self {
+        vec![lang_id].into()
+    }
+}
+
+impl<'a> From<Vec<&'a str>> for WpLocale {
+    fn from(lang_ids: Vec<&'a str>) -> Self {
+        let requested = convert_vec_str_to_langids_lossy(&lang_ids);
+        let supported = negotiate_languages(
+            &requested,
+            AVAILABLE_LANGUAGES,
+            None,
+            NegotiationStrategy::Filtering,
+        );
+
+        if supported.is_empty() {
+            return WpLocale::default();
+        }
+
+        WpLocale {
+            lang_id: supported[0].clone(),
+        }
+    }
+}
+
+impl From<WpLocale> for String {
+    fn from(locale: WpLocale) -> Self {
+        locale.lang_id.to_string()
+    }
+}
+
+#[uniffi::export]
+fn wp_locale_resolve(lang_ids: Vec<String>) -> WpLocale {
+    lang_ids
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<&str>>()
+        .into()
 }
 
 pub trait WpSupportsLocalization: Send + Sync + Debug {
@@ -106,26 +147,43 @@ uniffi::setup_scaffolding!();
 #[cfg(test)]
 mod language_identifier_tests {
     use super::*;
-    use strum::IntoEnumIterator;
 
     #[test]
-    fn test_ensure_all_locales_can_be_parsed_into_language_identifiers() {
-        // Note that this _only_ validates that `WpLocale` values can be converted to
-        // `unic_langid::LanguageIdentifier`
-        // https://docs.rs/unic-langid/latest/unic_langid/struct.LanguageIdentifier.html
-        //
-        // Since we unwrap the parsing result in `WpLocale::as_language_id`, we use this test to
-        // make sure it won't panic.
-        WpLocale::iter().for_each(|l| {
-            let language_identifier = l.as_language_id();
-            assert_eq!(language_identifier.to_string(), Into::<&str>::into(l));
-        });
+    fn test_ensure_all_localization_message_files_exist() {
+        let localization_dir = std::path::Path::new("localization");
+        assert!(
+            localization_dir.exists(),
+            "Localization directory should exist"
+        );
+
+        assert!(
+            !AVAILABLE_LANGUAGES.is_empty(),
+            "At least one language should be available"
+        );
+        for lang_id in AVAILABLE_LANGUAGES {
+            let lang_str = lang_id.to_string();
+            let dir_path = localization_dir.join(&lang_str);
+            assert!(
+                dir_path.exists(),
+                "Language directory '{}' should exist in localization directory",
+                lang_str
+            );
+        }
+
+        let default_lang = WpLocale::default().lang_id.to_string();
+        let dir_path = localization_dir.join(&default_lang);
+        assert!(
+            dir_path.exists(),
+            "The default language directory '{}' should exist in localization directory",
+            default_lang
+        );
     }
 }
 
 #[cfg(test)]
 mod localization_tests {
     use super::*;
+    use rstest::*;
     use wp_localization_macro::WpDeriveLocalizable;
 
     #[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
@@ -162,7 +220,7 @@ mod localization_tests {
             };
             assert_eq!(
                 LOCALES.lookup_with_args(
-                    &WpLocale::EnUS.as_language_id(),
+                    WpLocale::en_us().as_language_id(),
                     "api_root_link_header_not_found",
                     &map
                 ),
@@ -170,7 +228,7 @@ mod localization_tests {
             );
             assert_eq!(
                 LOCALES.lookup_with_args(
-                    &WpLocale::TrTR.as_language_id(),
+                    WpLocale::tr_tr().as_language_id(),
                     "api_root_link_header_not_found",
                     &map
                 ),
@@ -192,8 +250,25 @@ mod localization_tests {
             expected_en_message
         );
         assert_eq!(
-            api_root_link_header_not_found.localize(Some(WpLocale::TrTR)),
+            api_root_link_header_not_found.localize(Some(WpLocale::tr_tr())),
             expected_tr_message
         );
+    }
+
+    #[rstest]
+    fn test_parse_unknown_language() {
+        let locale = WpLocale::from(vec!["unknown-language"]);
+        assert_eq!(locale.lang_id.to_string(), "en-US");
+    }
+
+    #[rstest]
+    #[case(vec!["en-US"], "en-US")]
+    #[case(vec!["tr-TR"], "tr-TR")]
+    #[case(vec!["en-US", "tr-TR"], "en-US")]
+    #[case(vec!["unknown-lang", "en-US", "tr-TR"], "en-US")]
+    #[case(vec!["unknown-lang", "tr-TR", "en-US"], "tr-TR")]
+    fn test_parse_language(#[case] lang_ids: Vec<&str>, #[case] expected: &str) {
+        let locale = WpLocale::from(lang_ids);
+        assert_eq!(locale.lang_id.to_string(), expected);
     }
 }
