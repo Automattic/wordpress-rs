@@ -7,7 +7,7 @@ use crate::{
 use scraper::{Html, Selector};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt::Display, sync::Arc};
-use wp_localization::{WpMessages, WpSupportsLocalization};
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
 pub(crate) const API_ROOT_LINK_HEADER: &str = "https://api.w.org/";
@@ -617,15 +617,11 @@ pub enum ParseApiRootUrlError {
 }
 
 impl WpSupportsLocalization for ParseApiRootUrlError {
-    fn message_bundle(&self) -> wp_localization::MessageBundle {
+    fn message_bundle(&self) -> MessageBundle {
         match self {
-            ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-                status_code,
-                header_map,
-            } => WpMessages::api_root_link_header_not_found(
-                status_code.to_string(),
-                format!("{:#?}", header_map),
-            ),
+            ParseApiRootUrlError::ApiRootLinkHeaderNotFound { .. } => {
+                WpMessages::api_root_link_header_not_found()
+            }
         }
     }
 }
@@ -644,18 +640,11 @@ pub enum FetchApiDetailsError {
 }
 
 impl WpSupportsLocalization for FetchApiDetailsError {
-    fn message_bundle(&self) -> wp_localization::MessageBundle {
+    fn message_bundle(&self) -> MessageBundle {
         match self {
-            FetchApiDetailsError::RequestExecutionFailed {
-                status_code,
-                reason,
-                ..
-            } => WpMessages::fetch_api_details_request_execution_failed(
-                format!("{:#?}", status_code),
-                reason.to_string(),
-            ),
-            FetchApiDetailsError::ApiDetailsCouldntBeParsed { response, .. } => {
-                WpMessages::fetch_api_details_api_details_couldnt_be_parsed(response.to_string())
+            FetchApiDetailsError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
+            FetchApiDetailsError::ApiDetailsCouldntBeParsed { reason, .. } => {
+                WpMessages::response_parsing_error(reason)
             }
         }
     }

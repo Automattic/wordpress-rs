@@ -5,6 +5,8 @@ use crate::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 pub trait ParsedRequestError
 where
@@ -14,39 +16,30 @@ where
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiError {
-    #[error("Status code ({}) is not valid", status_code)]
-    InvalidHttpStatusCode { status_code: u16 },
-    #[error("{}", reason)]
+    InvalidHttpStatusCode {
+        status_code: u16,
+    },
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
-    #[error("Media file not found at file path: {}", file_path)]
-    MediaFileNotFound { file_path: String },
-    #[error(
-        "Error while parsing. \nReason: {}\nResponse: {}",
-        reason,
-        maybe_json_response(response)
-    )]
-    ResponseParsingError { reason: String, response: String },
-    #[error("Error while parsing site url: {}", reason)]
-    SiteUrlParsingError { reason: String },
-    #[error(
-        "Error that's not yet handled by the library:\nStatus Code: '{}'.\nResponse: '{}'",
-        status_code,
-        response
-    )]
-    UnknownError { status_code: u16, response: String },
-    #[error(
-        "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"\n\tresponse: \"{}\"\n}}",
-        status_code,
-        error_code,
-        error_message,
-        response
-    )]
+    MediaFileNotFound {
+        file_path: String,
+    },
+    ResponseParsingError {
+        reason: String,
+        response: String,
+    },
+    SiteUrlParsingError {
+        reason: String,
+    },
+    UnknownError {
+        status_code: u16,
+        response: String,
+    },
     WpError {
         error_code: WpErrorCode,
         error_message: String,
@@ -55,11 +48,26 @@ pub enum WpApiError {
     },
 }
 
-// Pretty print the response as JSON if it can be parsed as such, return as is otherwise
-fn maybe_json_response(response: &String) -> String {
-    serde_json::from_str::<serde_json::Value>(response.as_str())
-        .and_then(|value| serde_json::to_string_pretty(&value))
-        .unwrap_or(response.to_string())
+impl WpSupportsLocalization for WpApiError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            WpApiError::InvalidHttpStatusCode { status_code } => {
+                WpMessages::invalid_http_status_code(status_code.to_string())
+            }
+            WpApiError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
+            WpApiError::MediaFileNotFound { file_path } => {
+                WpMessages::media_file_not_found(file_path)
+            }
+            WpApiError::ResponseParsingError { reason, .. } => {
+                WpMessages::response_parsing_error(reason)
+            }
+            WpApiError::SiteUrlParsingError { .. } => WpMessages::url_parsing_error(),
+            WpApiError::UnknownError { .. } => WpMessages::generic_error(),
+            WpApiError::WpError { error_message, .. } => {
+                WpMessages::site_error_message(error_message)
+            }
+        }
+    }
 }
 
 impl ParsedRequestError for WpApiError {
@@ -417,9 +425,8 @@ pub enum WpErrorCode {
     CustomError(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
 pub enum RequestExecutionError {
-    #[error("{}", reason)]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
@@ -427,10 +434,17 @@ pub enum RequestExecutionError {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, thiserror::Error)]
+impl WpSupportsLocalization for RequestExecutionError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            RequestExecutionError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, WpDeriveLocalizable)]
 pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
-    #[error("{}", error_message.as_ref().map_or("An unknown error occurred.", |v| v))]
     InvalidSslError {
         // The SSL certificate for the site we're trying to contact
         site_certificate: Option<Arc<SSLCertificateInfo>>,
@@ -444,52 +458,82 @@ pub enum RequestExecutionErrorReason {
         // Any suggested action provided by the HTTP stack
         suggested_action: Option<String>,
     },
-    #[error("A server with the specified hostname could not be found.")]
     NonExistentSiteError {
         error_message: Option<String>,
         suggested_action: Option<String>,
     },
-    #[error(
-        "The server at {} requires authentication. Please provide your username and password.",
-        hostname
-    )]
     HttpAuthenticationRequiredError {
         hostname: String,
         server_message: Option<String>,
     },
-    #[error(
-        "The server at {} rejected your credentials. Please provide a valid username and password.",
-        hostname
-    )]
     HttpAuthenticationRejectedError {
         hostname: String,
         method: Option<HttpAuthMethod>,
     },
-    #[error("The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.")]
-    MisconfiguredHttpAuthenticationError { issue: HttpAuthMethodParsingError },
-    #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
+    MisconfiguredHttpAuthenticationError {
+        issue: HttpAuthMethodParsingError,
+    },
     MisconfiguredRateLimitError {},
-    #[error("{}", error_message)]
-    DeviceIsOfflineError { error_message: String },
-    #[error("{}", error_message)]
-    GenericError { error_message: String },
+    DeviceIsOfflineError {
+        error_message: String,
+    },
+    GenericError {
+        error_message: String,
+    },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+impl WpSupportsLocalization for RequestExecutionErrorReason {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            RequestExecutionErrorReason::InvalidSslError { .. } => WpMessages::invalid_ssl_error(),
+            RequestExecutionErrorReason::NonExistentSiteError { .. } => {
+                WpMessages::non_existent_site_error()
+            }
+            RequestExecutionErrorReason::HttpAuthenticationRequiredError { hostname, .. } => {
+                WpMessages::http_authentication_required_error(hostname)
+            }
+            RequestExecutionErrorReason::HttpAuthenticationRejectedError { hostname, .. } => {
+                WpMessages::http_authentication_rejected_error(hostname)
+            }
+            RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { .. } => {
+                WpMessages::misconfigured_http_authentication_error()
+            }
+            RequestExecutionErrorReason::MisconfiguredRateLimitError { .. } => {
+                WpMessages::misconfigured_rate_limit_error()
+            }
+            RequestExecutionErrorReason::DeviceIsOfflineError { error_message } => {
+                WpMessages::just(error_message)
+            }
+            RequestExecutionErrorReason::GenericError { error_message } => {
+                WpMessages::just(error_message)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
 pub enum MediaUploadRequestExecutionError {
-    #[error(
-        "Request execution failed!\nStatus Code: '{:?}'\nRedirects: '{:#?}'\nReason: '{:#?}'",
-        status_code,
-        redirects,
-        reason
-    )]
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
-    #[error("Media file not found at file path: {}", file_path)]
-    MediaFileNotFound { file_path: String },
+    MediaFileNotFound {
+        file_path: String,
+    },
+}
+
+impl WpSupportsLocalization for MediaUploadRequestExecutionError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            MediaUploadRequestExecutionError::RequestExecutionFailed { reason, .. } => {
+                reason.message_bundle()
+            }
+            MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {
+                WpMessages::media_file_not_found(file_path)
+            }
+        }
+    }
 }
 
 impl From<RequestExecutionError> for WpApiError {

@@ -197,11 +197,8 @@ mod localization_tests {
     impl WpSupportsLocalization for ParseApiRootUrlError {
         fn message_bundle(&self) -> crate::MessageBundle {
             match self {
-                ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-                    status_code,
-                    header_map,
-                } => {
-                    WpMessages::api_root_link_header_not_found(status_code.to_string(), header_map)
+                ParseApiRootUrlError::ApiRootLinkHeaderNotFound { .. } => {
+                    WpMessages::api_root_link_header_not_found()
                 }
             }
         }

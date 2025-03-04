@@ -13,6 +13,8 @@ use std::str::FromStr;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use url::Url;
 use uuid::Uuid;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 pub mod endpoint;
 
@@ -371,12 +373,23 @@ impl From<HeaderMap> for WpNetworkHeaderMap {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpNetworkHeaderMapError {
-    #[error("Invalid header name: {}", header_name)]
     InvalidHeaderName { header_name: String },
-    #[error("Invalid header value: {}", header_value)]
     InvalidHeaderValue { header_value: String },
+}
+
+impl WpSupportsLocalization for WpNetworkHeaderMapError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            WpNetworkHeaderMapError::InvalidHeaderName { header_name } => {
+                WpMessages::invalid_header_name_error(header_name.clone())
+            }
+            WpNetworkHeaderMapError::InvalidHeaderValue { header_value } => {
+                WpMessages::invalid_header_value_error(header_value.clone())
+            }
+        }
+    }
 }
 
 impl WpNetworkResponse {
@@ -545,13 +558,31 @@ pub enum HttpAuthMethod {
     Other(String, HashMap<String, String>),
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, uniffi::Error)]
+#[derive(PartialEq, Eq, Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
 pub enum HttpAuthMethodParsingError {
     MissingNonce,
     MissingQop,
     MissingAlgorithm,
     MissingOpaque,
     Unknown, // Some case we're not handling yet
+}
+
+impl WpSupportsLocalization for HttpAuthMethodParsingError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            HttpAuthMethodParsingError::MissingNonce => {
+                WpMessages::http_auth_method_missing_nonce()
+            }
+            HttpAuthMethodParsingError::MissingQop => WpMessages::http_auth_method_missing_qop(),
+            HttpAuthMethodParsingError::MissingAlgorithm => {
+                WpMessages::http_auth_method_missing_algorithm()
+            }
+            HttpAuthMethodParsingError::MissingOpaque => {
+                WpMessages::http_auth_method_missing_opaque()
+            }
+            HttpAuthMethodParsingError::Unknown => WpMessages::http_auth_method_unknown(),
+        }
+    }
 }
 
 /// Parser based on https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate

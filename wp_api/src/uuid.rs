@@ -1,4 +1,6 @@
 use uuid::Uuid;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Object)]
 pub struct WpUuid {
@@ -16,13 +18,19 @@ impl WpUuid {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpUuidParseError {
-    #[error("Invalid UUID string")]
     InvalidUuid,
-
-    #[error("Not a version 4 UUID")]
     NotVersion4,
+}
+
+impl WpSupportsLocalization for WpUuidParseError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            WpUuidParseError::InvalidUuid => WpMessages::uuid_parse_error_invalid_uuid(),
+            WpUuidParseError::NotVersion4 => WpMessages::uuid_parse_error_not_version_4(),
+        }
+    }
 }
 
 #[uniffi::export]

@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::Display;
 use url::Url;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Object)]
 pub struct ParsedUrl {
@@ -45,30 +47,25 @@ impl ParsedUrl {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Error, WpDeriveLocalizable)]
 pub enum ParseUrlError {
-    #[error("Error while parsing url: {}", reason)]
     Generic { reason: String },
-    #[error("empty host")]
     EmptyHost,
-    #[error("invalid international domain name")]
     IdnaError,
-    #[error("invalid port number")]
     InvalidPort,
-    #[error("invalid IPv4 address")]
     InvalidIpv4Address,
-    #[error("invalid IPv6 address")]
     InvalidIpv6Address,
-    #[error("invalid domain character")]
     InvalidDomainCharacter,
-    #[error("relative URL without a base")]
     RelativeUrlWithoutBase,
-    #[error("relative URL with a cannot-be-a-base base")]
     RelativeUrlWithCannotBeABaseBase,
-    #[error("a cannot-be-a-base URL doesn’t have a host to set")]
     SetHostOnCannotBeABaseUrl,
-    #[error("URLs more than 4 GB are not supported")]
     Overflow,
+}
+
+impl WpSupportsLocalization for ParseUrlError {
+    fn message_bundle(&self) -> MessageBundle {
+        WpMessages::url_parsing_error()
+    }
 }
 
 impl From<url::ParseError> for ParseUrlError {
