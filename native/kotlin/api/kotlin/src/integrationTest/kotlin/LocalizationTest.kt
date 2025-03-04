@@ -21,7 +21,7 @@ class LocalizationTest {
         )
         assertEquals(
             "Api kök bağlantı başlığı bulunamadı!\nDurum kodu: '\u2068404\u2069'\nBaşlık Haritası: '\u2068WpNetworkHeaderMap {\n    inner: {},\n}\u2069'",
-            localizeParseApiRootUrlError(error, locale = WpLocale.TR_TR)
+            localizeParseApiRootUrlError(error, locale = "tr-TR")
         )
     }
 }
