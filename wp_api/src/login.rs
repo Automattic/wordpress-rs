@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
-use wp_serde_helper::deserialize_i64_or_string;
+use wp_serde_helper::deserialize_offset;
 
 use crate::login::url_discovery::is_local_dev_environment_url;
 use crate::ParsedUrl;
@@ -51,8 +51,8 @@ pub struct WpApiDetails {
     pub description: String,
     pub url: String,
     pub home: String,
-    #[serde(deserialize_with = "deserialize_i64_or_string")]
-    pub gmt_offset: i64,
+    #[serde(deserialize_with = "deserialize_offset")]
+    pub gmt_offset: f64,
     pub timezone_string: String,
     pub namespaces: Vec<String>,
     pub authentication: WpApiDetailsAuthenticationMap,
