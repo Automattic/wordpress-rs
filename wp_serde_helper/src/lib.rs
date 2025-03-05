@@ -174,6 +174,45 @@ where
     }
 }
 
+struct DeserializeFalseOrStringVisitor;
+
+impl de::Visitor<'_> for DeserializeFalseOrStringVisitor {
+    type Value = Option<String>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Boolean `false` or a string")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v == true {
+            Err(E::invalid_value(Unexpected::Bool(v), &self))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v.to_lowercase().trim() == "false" {
+            return Ok(None);
+        }
+
+        Ok(Some(v.to_string()))
+    }
+}
+
+pub fn deserialize_false_or_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeFalseOrStringVisitor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,11 +249,28 @@ mod tests {
     #[case(r#"{"offset": -1}"#, -1.0)]
     #[case(r#"{"offset": 5.5}"#, 5.5)]
     #[case(r#"{"offset": "5.5"}"#, 5.5)]
-    fn test_deserialize_offset(
-        #[case] test_case: &str,
-        #[case] expected_result: f64,
-    ) {
-        let offset: Offset = serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+    fn test_deserialize_offset(#[case] test_case: &str, #[case] expected_result: f64) {
+        let offset: Offset =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, offset.offset);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct StringOrBool {
+        #[serde(deserialize_with = "deserialize_false_or_string")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "foo"}"#, Some("foo".to_string()))]
+    #[case(r#"{"value": "false"}"#, None)]
+    #[case(r#"{"value": false}"#, None)]
+    fn test_deserialize_false_or_string(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<String>,
+    ) {
+        let string_or_bool: StringOrBool =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, string_or_bool.value);
     }
 }

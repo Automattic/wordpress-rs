@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
+use wp_serde_helper::deserialize_false_or_string;
 use wp_serde_helper::deserialize_offset;
 
 use crate::login::url_discovery::is_local_dev_environment_url;
@@ -56,6 +57,7 @@ pub struct WpApiDetails {
     pub timezone_string: String,
     pub namespaces: Vec<String>,
     pub authentication: WpApiDetailsAuthenticationMap,
+    #[serde(deserialize_with = "deserialize_false_or_string")]
     pub site_icon_url: Option<String>,
 }
 
