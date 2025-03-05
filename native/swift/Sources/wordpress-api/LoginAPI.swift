@@ -11,6 +11,10 @@ public final class WordPressLoginClient {
         func authenticate(url: URL, callbackURL: URL) async throws -> URL
     }
 
+    public struct LoginError: LocalizedError {
+        public var errorDescription: String?
+    }
+
     private static let callbackURL = URL(string: "x-wordpress-app://login-callback")!
 
     private let requestExecutor: SafeRequestExecutor
@@ -57,8 +61,13 @@ public final class WordPressLoginClient {
             let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
             guard let apiDetails = discoveryResult.successfulAttempt?.apiDetails() else {
-                debugPrint("Error: \(discoveryResult.userInputAttempt.errorMessage())")
-                throw CocoaError(.fileReadUnknown) // TODO: Throw a better error here
+                if let errorMessage = discoveryResult.userInputAttempt.errorMessage() {
+                    throw LoginError(errorDescription: errorMessage)
+                } else if let errorMessage = discoveryResult.autoStrippedHttpsAttempt?.errorMessage() {
+                    throw LoginError(errorDescription: errorMessage)
+                } else {
+                    throw LoginError(errorDescription: "Unknown error")
+                }
             }
 
             // All sites should have some form of authentication we can use

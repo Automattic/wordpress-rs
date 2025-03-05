@@ -30,6 +30,8 @@ var package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0"),
+        .package(url: "https://github.com/swiftcsv/SwiftCSV.git", from: "0.8.0")
     ],
     targets: [
         .target(
@@ -55,6 +57,22 @@ var package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
+        .executableTarget(
+            name: "wordpress-cli-testing",
+            dependencies: [
+                .target(name: "WordPressAPI"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "SwiftCSV", package: "SwiftCSV"),
+            ],
+            path: "native/swift/Sources/wordpress-cli-testing",
+//            exclude: [
+//                "README.md"
+//            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+
         libwordpressFFI,
         .testTarget(
             name: "WordPressAPITests",
