@@ -25,22 +25,12 @@ function patch_wp_api {
 
 extension $error_type: LocalizedError {
     public var errorDescription: String? {
-        localize${error_type}(value: self, locale: .preferred())
+        let preferred = wpLocaleResolve(langIds: Locale.preferredLanguages)
+        return localize${error_type}(value: self, locale: preferred)
     }
 }
 EOF
     done
-}
-
-function patch_wp_localization {
-    cat <<'EOF' >> "$1"
-
-extension WpLocale {
-    public static func preferred() -> WpLocale {
-        wpLocaleResolve(langIds: Locale.preferredLanguages)
-    }
-}
-EOF
 }
 
 # The search-and-replace below can be removed after updating to a uniffi-rs
