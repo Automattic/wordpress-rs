@@ -149,6 +149,27 @@ mod language_identifier_tests {
     use super::*;
 
     #[test]
+    fn test_ensure_locales_are_loaded() {
+        assert!(
+            !AVAILABLE_LANGUAGES.is_empty(),
+            "At least one language should be available"
+        );
+        assert_eq!(
+            AVAILABLE_LANGUAGES.len(),
+            LOCALES.locales().count(),
+            "The number of available languages should match the number of loaded locales"
+        );
+
+        for lang_id in LOCALES.locales() {
+            assert!(
+                AVAILABLE_LANGUAGES.contains(lang_id),
+                "Language identifier '{}' should be available",
+                lang_id
+            );
+        }
+    }
+
+    #[test]
     fn test_ensure_all_localization_message_files_exist() {
         let localization_dir = std::path::Path::new("localization");
         assert!(
@@ -265,6 +286,16 @@ mod localization_tests {
     #[case(vec!["unknown-lang", "en-US", "tr-TR"], "en-US")]
     #[case(vec!["unknown-lang", "tr-TR", "en-US"], "tr-TR")]
     fn test_parse_language(#[case] lang_ids: Vec<&str>, #[case] expected: &str) {
+        let locale = WpLocale::from(lang_ids);
+        assert_eq!(locale.lang_id.to_string(), expected);
+    }
+
+    #[rstest]
+    #[case("en", "en-US")]
+    #[case("tr", "tr-TR")]
+    #[case("zh-Hans", "zh-CN")]
+    #[case("fr-FR", "fr")]
+    fn test_fallback_locale(#[case] lang_ids: &str, #[case] expected: &str) {
         let locale = WpLocale::from(lang_ids);
         assert_eq!(locale.lang_id.to_string(), expected);
     }
