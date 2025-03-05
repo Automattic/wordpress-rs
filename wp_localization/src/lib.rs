@@ -209,68 +209,54 @@ mod localization_tests {
 
     #[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
     pub enum ParseApiRootUrlError {
-        ApiRootLinkHeaderNotFound {
-            status_code: u16,
-            header_map: String,
-        },
+        Error { message: String },
     }
 
     impl WpSupportsLocalization for ParseApiRootUrlError {
         fn message_bundle(&self) -> crate::MessageBundle {
             match self {
-                ParseApiRootUrlError::ApiRootLinkHeaderNotFound { .. } => {
-                    WpMessages::api_root_link_header_not_found()
-                }
+                ParseApiRootUrlError::Error { message } => WpMessages::site_error_message(message),
             }
         }
     }
 
     #[test]
     fn test_example_localizable_error() {
-        let expected_en_message = "Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}foo\u{2069}'";
-        let expected_tr_message = "Api kök bağlantı başlığı bulunamadı!\nDurum kodu: '\u{2068}404\u{2069}'\nBaşlık Haritası: '\u{2068}foo\u{2069}'";
+        let expected_en_message = "Your site sent an error message: \u{2068}foo\u{2069}";
+        let expected_tr_message = "Siteniz bir hata mesajı gönderdi: \u{2068}foo\u{2069}";
         {
             let map = {
                 let mut map = HashMap::new();
-                map.insert("status_code".into(), "404".into());
-                map.insert("header_map".into(), "foo".into());
+                map.insert("error_message".into(), "foo".into());
                 map
             };
             assert_eq!(
                 LOCALES.lookup_with_args(
-                    WpLocale::en_us().as_language_id(),
-                    "api_root_link_header_not_found",
+                    WpLocale::from("en-US").as_language_id(),
+                    "site_error_message",
                     &map
                 ),
                 expected_en_message
             );
             assert_eq!(
                 LOCALES.lookup_with_args(
-                    WpLocale::tr_tr().as_language_id(),
-                    "api_root_link_header_not_found",
+                    WpLocale::from("tr-TR").as_language_id(),
+                    "site_error_message",
                     &map
                 ),
                 expected_tr_message
             );
         }
-        let api_root_link_header_not_found = ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-            status_code: 404,
-            header_map: "foo".to_string(),
+        let error = ParseApiRootUrlError::Error {
+            message: "foo".to_string(),
         };
 
-        let message_bundle = api_root_link_header_not_found.message_bundle();
-        assert_eq!(message_bundle.key, "api_root_link_header_not_found");
+        let message_bundle = error.message_bundle();
+        assert_eq!(message_bundle.key, "site_error_message");
         let message_args = message_bundle.args.unwrap();
-        assert_eq!(message_args["status_code"], "404");
-        assert_eq!(message_args["header_map"], "foo");
-        assert_eq!(
-            api_root_link_header_not_found.to_string(),
-            expected_en_message
-        );
-        assert_eq!(
-            api_root_link_header_not_found.localize(Some(WpLocale::tr_tr())),
-            expected_tr_message
-        );
+        assert_eq!(message_args["error_message"], "foo");
+        assert_eq!(error.to_string(), expected_en_message);
+        assert_eq!(error.localize(Some("tr-TR".into())), expected_tr_message);
     }
 
     #[rstest]
