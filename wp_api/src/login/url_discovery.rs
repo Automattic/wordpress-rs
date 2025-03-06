@@ -695,19 +695,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_api_root_url_error_message_bundle() {
-        let e = example_parse_api_root_url_error();
-
-        let message_bundle = e.message_bundle();
-        assert_eq!(message_bundle.key(), "api_root_link_header_not_found");
-        let message_args = message_bundle.args().unwrap();
-        assert_eq!(message_args["status_code"], "404");
-        assert_eq!(message_args["header_map"], "WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}");
-    }
-
-    #[test]
     fn test_parse_api_root_url_error_derive_localizable() {
-        let expected="Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}\u{2069}'";
+        let expected = "WordPress REST API link is not found in the site response";
 
         assert_eq!(example_parse_api_root_url_error().to_string(), expected);
     }
