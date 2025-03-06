@@ -1,3 +1,53 @@
-api_root_link_header_not_found = Api kök bağlantı başlığı bulunamadı!
-  Durum kodu: '{$status_code}'
-  Başlık Haritası: '{$header_map}'
+api_root_link_header_not_found = WordPress REST API bağlantısı site yanıtında bulunamadı
+
+generic_error = Bir şeyler yanlış gitti
+
+site_error_message = Siteniz bir hata mesajı gönderdi: {$error_message}
+
+url_parsing_error = Geçersiz URL
+
+response_parsing_error = Yanıt işlenemedi: {$reason}
+
+media_file_not_found = {$path} konumunda medya dosyası bulunamadı
+
+invalid_http_status_code = Geçersiz HTTP durum kodu: {$status_code}
+
+request_execution_failed = HTTP gönderimi başarısız oldu
+
+just = {$message}
+
+invalid_ssl_error = Geçersiz SSL sertifikası
+
+non_existent_site_error = Belirtilen ana bilgisayar adıyla bir sunucu bulunamadı
+
+http_authentication_required_error = {$url} adresindeki sunucu kimlik doğrulaması gerektiriyor. Kullanıcı adınızı ve şifrenizi girin
+
+http_authentication_rejected_error = {$url} adresindeki sunucu kimlik bilgilerinizi reddetti. Geçerli bir kullanıcı adı ve şifre girin.
+
+misconfigured_http_authentication_error = Sunucu geçersiz HTTP kimlik doğrulama bilgileri gönderiyor. Sitenizin HTTP kimlik doğrulama yapılandırmasını kontrol edin
+
+misconfigured_rate_limit_error = Sunucu istekleri asla başarılı olmayacak şekilde sınırlıyor. Sitenizin hız sınırlama yapılandırmasını kontrol edin
+
+oauth_response_url_error_missing_site_url = Verilen URL'de `site_url` sorgu parametresi eksik
+oauth_response_url_error_missing_username = Verilen URL'de `username` sorgu parametresi eksik
+oauth_response_url_error_missing_password = Verilen URL'de `password` sorgu parametresi eksik
+oauth_response_url_error_unsuccessful_login = Giriş başarısız oldu
+
+boolean_true_is_returned_when_string_is_expected = Bu alan için `String` değeri bekleniyordu ancak boolean `true` değeri alındı
+
+invalid_header_name_error = Geçersiz başlık adı: {$header_name}
+
+invalid_header_value_error = Geçersiz başlık değeri: {$header_value}
+
+http_auth_method_missing_nonce = HTTP kimlik doğrulama yönteminde nonce eksik
+http_auth_method_missing_qop = HTTP kimlik doğrulama yönteminde QOP (Quality of Protection) eksik
+http_auth_method_missing_algorithm = HTTP kimlik doğrulama yönteminde algoritma eksik
+http_auth_method_missing_opaque = HTTP kimlik doğrulama yönteminde opaque değeri eksik
+http_auth_method_unknown = Bilinmeyen HTTP kimlik doğrulama yöntemi
+
+uniffi_serialization_error_serde = Serileştirme hatası: {$reason}
+
+uuid_parse_error_invalid_uuid = Geçersiz UUID dizesi
+uuid_parse_error_not_version_4 = Sürüm 4 UUID değil
+
+wordpress_org_api_client_error_request_encoding = İstek kodlanamadı. Neden: {$reason}
