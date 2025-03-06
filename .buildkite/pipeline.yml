@@ -152,7 +152,7 @@ steps:
           cd ./native/kotlin
           ./gradlew detektMain detektTest
         agents:
-          queue: android
+          queue: android-staging
       - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
         key: "publish-wp-api-kotlin"
         plugins: [$CI_TOOLKIT]
@@ -168,7 +168,7 @@ steps:
           echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
           .buildkite/publish-wp-api-kotlin.sh
         agents:
-          queue: android
+          queue: android-staging
       - label: ":kotlin: Publish `rs.wordpress.api:android`"
         key: "publish-wp-api-android"
         plugins: [$CI_TOOLKIT]
@@ -187,7 +187,7 @@ steps:
           echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
           .buildkite/publish-wp-api-android.sh
         agents:
-          queue: android
+          queue: android-staging
 
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
