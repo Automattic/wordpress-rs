@@ -16,11 +16,11 @@ class LocalizationTest {
             headerMap = WpNetworkHeaderMap.fromMap(mapOf())
         )
         assertEquals(
-            "Api root link header not found!\nStatus Code: '\u2068404\u2069'\nHeader Map: '\u2068WpNetworkHeaderMap {\n    inner: {},\n}\u2069'",
+            "WordPress REST API link is not found in the site response",
             localizeParseApiRootUrlError(error, locale = null)
         )
         assertEquals(
-            "Api kök bağlantı başlığı bulunamadı!\nDurum kodu: '\u2068404\u2069'\nBaşlık Haritası: '\u2068WpNetworkHeaderMap {\n    inner: {},\n}\u2069'",
+            "WordPress REST API bağlantısı site yanıtında bulunamadı",
             localizeParseApiRootUrlError(error, locale = "tr-TR")
         )
     }
