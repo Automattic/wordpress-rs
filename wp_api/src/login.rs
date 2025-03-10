@@ -123,12 +123,20 @@ pub struct KnownApplicationPasswordBlockingPlugin {
 
 impl KnownApplicationPasswordBlockingPlugin {
     fn all() -> Vec<Self> {
-        vec![Self {
-            name: "Wordfence".to_string(),
-            namespace: "wordfence/v1".to_string(),
-            // TODO: Ensure this is correct with the WordFence folks
-            support_url: "https://www.wordfence.com/support/".to_string(),
-        }]
+        vec![
+            Self {
+                name: "Wordfence".to_string(),
+                namespace: "wordfence/v1".to_string(),
+                // TODO: Ensure this is correct with the WordFence folks
+                support_url: "https://www.wordfence.com/support/".to_string(),
+            },
+            Self {
+                name: "Hostinger Tools".to_string(),
+                namespace: "hostinger-tools-plugin/v1".to_string(),
+                // TODO: Ensure this is correct with the Hostinger folks
+                support_url: "https://wordpress.org/support/plugin/hostinger/".to_string(),
+            },
+        ]
     }
 }
 
