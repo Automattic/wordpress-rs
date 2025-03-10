@@ -140,16 +140,16 @@ pub trait PerformsRequests {
     }
 }
 
-// MARK: - RetryMiddleware
+// MARK: - RetryAfterMiddleware
 
 #[derive(Debug, uniffi::Object)]
-struct RetryMiddleware {
+struct RetryAfterMiddleware {
     max_retries: u32,
     max_retry_wait_seconds: u64,
 }
 
 #[uniffi::export]
-impl RetryMiddleware {
+impl RetryAfterMiddleware {
     #[uniffi::constructor]
     fn new(max_retries: u32, max_retry_wait_seconds: u64) -> Self {
         println!("Creating retry middleware");
@@ -162,7 +162,7 @@ impl RetryMiddleware {
 
 #[uniffi::export]
 #[async_trait::async_trait]
-impl WpApiMiddleware for RetryMiddleware {
+impl WpApiMiddleware for RetryAfterMiddleware {
     async fn process(
         &self,
         request_executor: Arc<dyn RequestExecutor>,
