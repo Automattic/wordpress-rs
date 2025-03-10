@@ -138,6 +138,12 @@ impl KnownApplicationPasswordBlockingPlugin {
                 // TODO: Ensure this is correct with the Hostinger folks
                 support_url: "https://wordpress.org/support/plugin/hostinger/".to_string(),
             },
+            Self {
+                name: "FluentAuth".to_string(),
+                namespace: "fluent-auth".to_string(),
+                // TODO: Ensure this is correct with the FluentAuth folks
+                support_url: "https://wordpress.org/support/plugin/fluent-security/".to_string(),
+            },
         ]
     }
 }
