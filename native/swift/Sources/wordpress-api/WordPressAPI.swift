@@ -96,6 +96,7 @@ public extension WpNetworkRequest {
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
         request.allHTTPHeaderFields?["X-REQUEST-ID"] = self.requestId()
         request.httpBody = self.body()?.contents()
+        request.timeoutInterval = 10
         return request
     }
 

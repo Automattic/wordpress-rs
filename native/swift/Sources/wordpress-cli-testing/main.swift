@@ -32,10 +32,12 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
 
     case wordfence
     case hostingerTools
+    case multipleBadPlugins
     case unhelpfulError
     case unableToParse
     case unknownApplicationPasswordsDisabled
     case testFailure
+    case invalidResponse
     case unknown
 
     init(stringLiteral value: StringLiteralType) {
@@ -49,6 +51,10 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
 
         if string.contains("Hostinger") {
             return .hostingerTools
+        }
+
+        if string.contains("there are multiple installed plugins that might have disabled Application Passwords") {
+            return .multipleBadPlugins
         }
 
         if string.contains("Failed to parse api details") {
@@ -67,6 +73,10 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
             return .testFailure
         }
 
+        if string.contains("returning invalid data") {
+            return .invalidResponse
+        }
+
         return .unknown
     }
 }
@@ -77,18 +87,34 @@ struct TestApplicationPasswordsEnabledCommand: AsyncParsableCommand {
 
     private let maxConcurrency: Int = 100
 
-    @Argument(help: "Specify the CSV file you'd like to use")
-    public var csvFilePath: String
 
-    @Argument(help: "Specify the path for the output file")
-    public var outputFilePath: String
+    @Option(help: "Specify a single site URL")
+    public var siteUrl: String?
+
+    @Option(help: "Specify the CSV file you'd like to use")
+    public var csvFilePath: String?
+
+    @Option(help: "Specify the path for the output file")
+    public var outputFilePath: String?
 
     static let configuration = CommandConfiguration(
         commandName: "test-application-passwords-enabled"
     )
 
     public func run() async throws {
-        let csvFile: CSV = try CSV<Named>(url: URL(fileURLWithPath: csvFilePath))
+        if let inputPath = self.csvFilePath, let outputPath = self.outputFilePath {
+            try await self.handleCsvFile(inputPath: inputPath, outputPath: outputPath)
+        }
+
+        if let siteUrl {
+            print("Testing 1 site...")
+            let result = try await testSite(withUrl: URL(string: siteUrl)!, printingRawError: true)
+            print(result)
+        }
+    }
+
+    private func handleCsvFile(inputPath: String, outputPath: String) async throws {
+        let csvFile: CSV = try CSV<Named>(url: URL(fileURLWithPath: inputPath))
 
         let urls: [URL] = csvFile.rows
             .compactMap { row in
@@ -111,23 +137,7 @@ struct TestApplicationPasswordsEnabledCommand: AsyncParsableCommand {
                     }
                 }
                 group.addTask {
-                    do {
-                        let apiClient = WordPressLoginClient(urlSession: session)
-                        let loginUrl = try await apiClient.loginURL(forSite: item.element.absoluteString)
-                        return ApplicationPasswordTestResult(
-                            siteUrl: item.element,
-                            loginUrl: loginUrl.asURL(),
-                            success: true,
-                            error: nil
-                        )
-                    } catch {
-                        return ApplicationPasswordTestResult(
-                            siteUrl: item.element,
-                            loginUrl: nil,
-                            success: false,
-                            error: ApplicationPasswordTestResultError(stringLiteral: error.localizedDescription)
-                        )
-                    }
+                    try await testSite(withUrl: item.element)
                 }
 
             }
@@ -138,12 +148,38 @@ struct TestApplicationPasswordsEnabledCommand: AsyncParsableCommand {
         }
 
         let data = try JSONEncoder().encode(results)
-        FileManager.default.createFile(atPath: self.outputFilePath, contents: data)
+        FileManager.default.createFile(atPath: outputPath, contents: data)
+    }
+
+    private func testSite(withUrl url: URL, printingRawError: Bool = false) async throws -> ApplicationPasswordTestResult {
+        do {
+            let apiClient = WordPressLoginClient(urlSession: session)
+            let loginUrl = try await apiClient.loginURL(forSite: url.absoluteString)
+            return ApplicationPasswordTestResult(
+                siteUrl: url,
+                loginUrl: loginUrl.asURL(),
+                success: true,
+                error: nil
+            )
+        } catch {
+            if printingRawError {
+                debugPrint(error)
+                print(error.localizedDescription)
+            }
+
+            return ApplicationPasswordTestResult(
+                siteUrl: url,
+                loginUrl: nil,
+                success: false,
+                error: ApplicationPasswordTestResultError(stringLiteral: error.localizedDescription)
+            )
+        }
     }
 
     enum CodingKeys: CodingKey {
         case csvFilePath
         case outputFilePath
+        case siteUrl
     }
 }
 
