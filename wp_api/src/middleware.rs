@@ -69,42 +69,23 @@ fn default_middleware_pipeline() -> WpApiMiddlewarePipeline {
 
 #[derive(Debug, uniffi::Object)]
 struct WpApiMiddlewarePipelineBuilder {
-    inner: InnerPipelineBuilder,
-}
-
-#[uniffi::export]
-impl WpApiMiddlewarePipelineBuilder {
-    #[uniffi::constructor]
-    fn new() -> Self {
-        Self {
-            inner: InnerPipelineBuilder {
-                middlewares: Vec::new(),
-            },
-        }
-    }
-}
-
-#[derive(Debug)]
-struct InnerPipelineBuilder {
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 }
 
 #[uniffi::export]
 impl WpApiMiddlewarePipelineBuilder {
     fn add_middleware(&self, middleware: Arc<dyn WpApiMiddleware>) -> Self {
-        let mut new_middlewares = self.inner.middlewares.clone();
+        let mut new_middlewares = self.middlewares.clone();
         new_middlewares.push(middleware.clone());
         WpApiMiddlewarePipelineBuilder {
-            inner: InnerPipelineBuilder {
-                middlewares: new_middlewares,
-            },
+            middlewares: new_middlewares,
         }
     }
 
     fn build(&self) -> WpApiMiddlewarePipeline {
         println!("Building middleware pipeline");
         WpApiMiddlewarePipeline::new(<Vec<Arc<dyn WpApiMiddleware>> as Clone>::clone(
-            &self.inner.middlewares,
+            &self.middlewares,
         ))
     }
 }
