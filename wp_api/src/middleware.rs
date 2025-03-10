@@ -13,11 +13,6 @@ use std::time::Duration;
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiMiddlewarePipeline {
-    inner: Arc<_WpApiMiddlewarePipeline>,
-}
-
-#[derive(Debug)]
-struct _WpApiMiddlewarePipeline {
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 }
 
@@ -25,9 +20,7 @@ struct _WpApiMiddlewarePipeline {
 impl WpApiMiddlewarePipeline {
     #[uniffi::constructor]
     fn new(middlewares: Vec<Arc<dyn WpApiMiddleware>>) -> Self {
-        Self {
-            inner: Arc::new(_WpApiMiddlewarePipeline { middlewares }),
-        }
+        Self { middlewares }
     }
 
     pub async fn process(
@@ -38,7 +31,7 @@ impl WpApiMiddlewarePipeline {
     ) -> Result<WpNetworkResponse, WpApiError> {
         let mut response = response;
 
-        for middleware in self.inner.middlewares.iter() {
+        for middleware in self.middlewares.iter() {
             let result = middleware
                 .process(request_executor.clone(), response, request.clone())
                 .await;
@@ -110,13 +103,9 @@ impl WpApiMiddlewarePipelineBuilder {
 
     fn build(&self) -> WpApiMiddlewarePipeline {
         println!("Building middleware pipeline");
-        WpApiMiddlewarePipeline {
-            inner: Arc::new(_WpApiMiddlewarePipeline {
-                middlewares: <Vec<Arc<dyn WpApiMiddleware>> as Clone>::clone(
-                    &self.inner.middlewares,
-                ),
-            }),
-        }
+        WpApiMiddlewarePipeline::new(<Vec<Arc<dyn WpApiMiddleware>> as Clone>::clone(
+            &self.inner.middlewares,
+        ))
     }
 }
 
