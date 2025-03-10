@@ -125,7 +125,7 @@ impl WpApiMiddlewarePipelineBuilder {
 pub trait WpApiMiddleware: Send + Sync + Debug {
     async fn process(
         &self,
-        request_executor: Arc<(dyn RequestExecutor + 'static)>,
+        request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, WpApiError>;
@@ -202,7 +202,7 @@ impl RetryMiddleware {
 impl WpApiMiddleware for RetryMiddleware {
     async fn process(
         &self,
-        request_executor: Arc<(dyn RequestExecutor + 'static)>,
+        request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, WpApiError> {
@@ -274,7 +274,7 @@ impl HttpAuthenticationMiddleware {
 impl WpApiMiddleware for HttpAuthenticationMiddleware {
     async fn process(
         &self,
-        request_executor: Arc<(dyn RequestExecutor + 'static)>,
+        request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, WpApiError> {
@@ -332,7 +332,7 @@ impl HttpAuthenticationDetectionMiddleware {
 impl WpApiMiddleware for HttpAuthenticationDetectionMiddleware {
     async fn process(
         &self,
-        _request_executor: Arc<(dyn RequestExecutor + 'static)>,
+        _request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, WpApiError> {
