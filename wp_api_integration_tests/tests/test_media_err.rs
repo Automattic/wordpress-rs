@@ -259,4 +259,8 @@ impl RequestExecutor for MediaErrNetworking {
             header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
         })
     }
+
+    async fn sleep(&self, millis: u64) {
+        tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+    }
 }

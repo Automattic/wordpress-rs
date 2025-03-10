@@ -278,6 +278,10 @@ impl RequestExecutor for AsyncWpNetworking {
                 },
             )
     }
+
+    async fn sleep(&self, millis: u64) {
+        tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+    }
 }
 
 pub trait AssertResponse {

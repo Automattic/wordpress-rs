@@ -2,7 +2,7 @@ use crate::{
     request::{HttpAuthMethodParsingError, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
     RequestExecutionError, RequestExecutionErrorReason, WpApiError,
 };
-use std::{fmt::Debug, future::Future, sync::Arc, thread, time::Duration};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiMiddlewarePipeline {
@@ -182,36 +182,25 @@ impl WpApiMiddleware for RetryMiddleware {
             }
 
             if response.is_rate_limit_exceeded() && self.max_retries != 0 {
-                let retry_after = response.get_retry_after();
-
-                if let Some(mut retry_after) = retry_after {
-                    // If the server sends some super-long value, we don't want to wait that long
-                    if retry_after > self.max_retry_wait_seconds {
-                        retry_after = self.max_retry_wait_seconds;
-                        async_sleep(Duration::from_secs(retry_after)).await;
-                    }
-
-                    // task::sleep(Duration::from_secs(retry_after)).await;
+                if let Some(retry_after) = response.get_retry_after() {
+                    request_executor
+                        .sleep(
+                            // If the server sends some super-long value, we don't want to wait that long
+                            Duration::from_secs(std::cmp::min(
+                                retry_after,
+                                self.max_retry_wait_seconds,
+                            ))
+                            .as_millis() as u64,
+                        )
+                        .await;
                     response = request_executor.execute(request.clone()).await?;
                 } else {
-                    return Ok(response); // It's not ok, but we'll let the layer above handle that – we have no idea how long to wait so we shouldn't try
+                    // It's not ok, but we'll let the layer above handle that – we have no idea how long to wait so we shouldn't try
+                    return Ok(response);
                 }
                 retry_count += 1;
             }
         }
-    }
-}
-
-fn async_sleep(duration: std::time::Duration) -> impl Future<Output = ()> {
-    let (tx, rx) = futures::channel::oneshot::channel::<i32>();
-
-    thread::spawn(move || {
-        thread::sleep(duration);
-        let _ = tx.send(0); // ignore error because it is perfectly ok when the receiver is dropped
-    });
-
-    async move {
-        rx.await.unwrap();
     }
 }
 

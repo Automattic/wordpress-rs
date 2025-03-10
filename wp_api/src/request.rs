@@ -136,6 +136,8 @@ pub trait RequestExecutor: Send + Sync + Debug {
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
+
+    async fn sleep(&self, millis: u64);
 }
 
 #[derive(uniffi::Object)]
