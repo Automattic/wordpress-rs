@@ -122,7 +122,7 @@ impl de::Visitor<'_> for DeserializeOffsetVisitor {
     where
         E: de::Error,
     {
-        Ok(v.parse::<f64>().map_err(E::custom)?)
+        v.parse::<f64>().map_err(E::custom)
     }
 }
 
@@ -187,7 +187,7 @@ impl de::Visitor<'_> for DeserializeFalseOrStringVisitor {
     where
         E: de::Error,
     {
-        if v == true {
+        if v {
             Err(E::invalid_value(Unexpected::Bool(v), &self))
         } else {
             Ok(None)
