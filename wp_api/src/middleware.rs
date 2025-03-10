@@ -1,15 +1,8 @@
-use crate::request::HttpAuthMethodParsingError;
-use crate::RequestExecutionError;
-use crate::WpApiError;
 use crate::{
-    request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
-    RequestExecutionErrorReason,
+    request::{HttpAuthMethodParsingError, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
+    RequestExecutionError, RequestExecutionErrorReason, WpApiError,
 };
-use std::fmt::Debug;
-use std::future::Future;
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
+use std::{fmt::Debug, future::Future, sync::Arc, thread, time::Duration};
 
 #[derive(Debug, uniffi::Object)]
 pub struct WpApiMiddlewarePipeline {
