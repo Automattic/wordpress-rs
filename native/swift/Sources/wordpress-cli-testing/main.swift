@@ -38,6 +38,7 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
     case unknownApplicationPasswordsDisabled
     case testFailure
     case invalidResponse
+    case invalidssl
     case unknown
 
     init(stringLiteral value: StringLiteralType) {
@@ -73,6 +74,10 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
             return .testFailure
         }
 
+        if string.contains("The certificate for this server is invalid") {
+            return .invalidssl
+        }
+
         if string.contains("returning invalid data") {
             return .invalidResponse
         }
@@ -85,7 +90,7 @@ struct TestApplicationPasswordsEnabledCommand: AsyncParsableCommand {
 
     private var session = URLSession(configuration: .default)
 
-    private let maxConcurrency: Int = 100
+    private let maxConcurrency: Int = 20
 
 
     @Option(help: "Specify a single site URL")
