@@ -96,47 +96,44 @@ pub trait WpApiMiddleware: Send + Sync + Debug {
 
 /// A trait for types that perform HTTP requests. Types that implement this trait
 /// have middleware that can modify the HTTP request and response.
+#[async_trait::async_trait]
 pub trait PerformsRequests {
     fn get_middleware_pipeline(&self) -> Arc<WpApiMiddlewarePipeline>;
     fn get_request_executor(&self) -> Arc<dyn RequestExecutor>;
 
-    fn perform(
+    async fn perform(
         &self,
         request: Arc<WpNetworkRequest>,
-    ) -> impl std::future::Future<Output = Result<WpNetworkResponse, RequestExecutionError>> + Send
-    where
-        Self: Sync,
-    {
-        async move {
-            let pipeline = &self.get_middleware_pipeline();
-            let response = self.get_request_executor().execute(request.clone()).await?;
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let pipeline = &self.get_middleware_pipeline();
+        let response = self.get_request_executor().execute(request.clone()).await?;
 
-            pipeline
-                .process(
-                    self.get_request_executor().clone(),
-                    response,
-                    request.clone(),
-                )
-                .await
-                .map_err(|e| match e {
-                    WpApiError::RequestExecutionFailed {
-                        status_code,
-                        redirects,
-                        reason,
-                    } => RequestExecutionError::RequestExecutionFailed {
-                        status_code,
-                        redirects,
-                        reason,
+        pipeline
+            .process(
+                self.get_request_executor().clone(),
+                response,
+                request.clone(),
+            )
+            .await
+            // TODO: This leads to information loss because the middleware can return `WpApiError`
+            .map_err(|e| match e {
+                WpApiError::RequestExecutionFailed {
+                    status_code,
+                    redirects,
+                    reason,
+                } => RequestExecutionError::RequestExecutionFailed {
+                    status_code,
+                    redirects,
+                    reason,
+                },
+                _ => RequestExecutionError::RequestExecutionFailed {
+                    status_code: None,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::GenericError {
+                        error_message: e.to_string(),
                     },
-                    _ => RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
-                        redirects: None,
-                        reason: RequestExecutionErrorReason::GenericError {
-                            error_message: e.to_string(),
-                        },
-                    },
-                })
-        }
+                },
+            })
     }
 }
 
