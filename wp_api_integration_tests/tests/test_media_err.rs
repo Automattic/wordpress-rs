@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use http::{HeaderMap, HeaderValue};
 use serial_test::parallel;
+use std::sync::Arc;
 use wp_api::{
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
@@ -256,7 +255,9 @@ impl RequestExecutor for MediaErrNetworking {
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            request_url: media_upload_request.url(),
+            request_header_map: media_upload_request.header_map(),
         })
     }
 

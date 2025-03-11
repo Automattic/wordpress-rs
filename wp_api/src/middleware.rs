@@ -36,11 +36,7 @@ impl WpApiMiddlewarePipeline {
 
 impl WpApiMiddlewarePipeline {
     fn default_middlewares() -> Vec<Arc<dyn WpApiMiddleware>> {
-        // This middleware is used to detect if the server requires HTTP authentication
-        // and if it does (and none was provided), it will return an error.
-        //
-        // Due to its importance, it's currently not possible to opt out of it for `uniffi` clients
-        vec![Arc::new(HttpAuthenticationDetectionMiddleware::new())]
+        Vec::new()
     }
 }
 
@@ -240,55 +236,6 @@ impl WpApiMiddleware for HttpAuthenticationMiddleware {
     }
 }
 
-// MARK: - HttpAuthenticationDetectionMiddleware
-
-#[derive(Debug, Default, uniffi::Object)]
-struct HttpAuthenticationDetectionMiddleware {}
-
-#[uniffi::export]
-impl HttpAuthenticationDetectionMiddleware {
-    #[uniffi::constructor]
-    fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[uniffi::export]
-#[async_trait::async_trait]
-impl WpApiMiddleware for HttpAuthenticationDetectionMiddleware {
-    async fn process(
-        &self,
-        _request_executor: Arc<dyn RequestExecutor>,
-        response: WpNetworkResponse,
-        request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        if !response.is_http_authentication_required() || request.has_http_authentication() {
-            return Ok(response);
-        }
-
-        let reason = match response.get_http_auth_method() {
-            Ok(maybe_method) => match maybe_method {
-                Some(method) => RequestExecutionErrorReason::HttpAuthenticationRequiredError {
-                    hostname: request.url().into(),
-                    method: Some(method),
-                },
-                None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                    issue: HttpAuthMethodParsingError::Unknown,
-                },
-            },
-            Err(e) => {
-                RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
-            }
-        };
-
-        Err(RequestExecutionError::RequestExecutionFailed {
-            status_code: Some(response.status_code),
-            redirects: None,
-            reason,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,7 +274,9 @@ mod tests {
                     Ok(WpNetworkResponse {
                         body: vec![],
                         status_code: 200,
-                        header_map: WpNetworkHeaderMap::default().into(),
+                        response_header_map: WpNetworkHeaderMap::default().into(),
+                        request_url: WpEndpointUrl("http://example.com".to_string()),
+                        request_header_map: Arc::new(WpNetworkHeaderMap::default()),
                     })
                 }
             }
@@ -395,7 +344,9 @@ mod tests {
             WpNetworkResponse {
                 body: vec![],
                 status_code: 429,
-                header_map: Arc::new(map.into()),
+                response_header_map: Arc::new(map.into()),
+                request_url: WpEndpointUrl("http://example.com".to_string()),
+                request_header_map: Arc::new(WpNetworkHeaderMap::default()),
             }
         }
     }
