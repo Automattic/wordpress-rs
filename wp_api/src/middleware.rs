@@ -169,37 +169,36 @@ impl WpApiMiddleware for RetryAfterMiddleware {
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, WpApiError> {
-        let mut retry_count = 0;
         let mut response = response;
 
-        loop {
-            if retry_count >= self.max_retries {
-                return Err(WpApiError::RequestExecutionFailed {
-                    status_code: Some(response.status_code),
-                    redirects: None,
-                    reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
-                });
+        for _ in 0..self.max_retries {
+            if !response.is_rate_limit_exceeded() {
+                // If the status code is not `429`, there is nothing to do
+                return Ok(response);
             }
-
-            if response.is_rate_limit_exceeded() && self.max_retries != 0 {
-                if let Some(retry_after) = response.get_retry_after() {
-                    request_executor
-                        .sleep(
-                            // If the server sends some super-long value, we don't want to wait that long
-                            Duration::from_secs(std::cmp::min(
-                                retry_after,
-                                self.max_retry_wait_seconds,
-                            ))
+            if let Some(retry_after) = response.get_retry_after() {
+                request_executor
+                    .sleep(
+                        // If the server sends some super-long value, we don't want to wait that long
+                        Duration::from_secs(std::cmp::min(retry_after, self.max_retry_wait_seconds))
                             .as_millis() as u64,
-                        )
-                        .await;
-                    response = request_executor.execute(request.clone()).await?;
-                } else {
-                    // It's not ok, but we'll let the layer above handle that – we have no idea how long to wait so we shouldn't try
-                    return Ok(response);
-                }
-                retry_count += 1;
+                    )
+                    .await;
+                response = request_executor.execute(request.clone()).await?;
+            } else {
+                // We have no idea how long to wait so we shouldn't try
+                return Ok(response);
             }
+        }
+
+        if response.is_rate_limit_exceeded() {
+            Err(WpApiError::RequestExecutionFailed {
+                status_code: Some(response.status_code),
+                redirects: None,
+                reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
+            })
+        } else {
+            Ok(response)
         }
     }
 }
