@@ -30,25 +30,24 @@ impl WpApiMiddlewarePipeline {
                 .await?;
         }
 
-        // This hard-coded middleware is used to detect if the server requires HTTP authentication
-        // and if it does (and none was provided), it will return an error.
-        response = HttpAuthenticationDetectionMiddleware::new()
-            .process(request_executor.clone(), response, request.clone())
-            .await?;
-
         Ok(response)
+    }
+}
+
+impl WpApiMiddlewarePipeline {
+    fn default_middlewares() -> Vec<Arc<dyn WpApiMiddleware>> {
+        // This middleware is used to detect if the server requires HTTP authentication
+        // and if it does (and none was provided), it will return an error.
+        //
+        // Due to its importance, it's currently not possible to opt out of it for `uniffi` clients
+        vec![Arc::new(HttpAuthenticationDetectionMiddleware::new())]
     }
 }
 
 impl Default for WpApiMiddlewarePipeline {
     fn default() -> Self {
-        Self::new(Vec::new())
+        Self::new(Self::default_middlewares())
     }
-}
-
-#[uniffi::export]
-fn default_middleware_pipeline() -> WpApiMiddlewarePipeline {
-    WpApiMiddlewarePipeline::default()
 }
 
 #[derive(Debug, uniffi::Object)]
@@ -58,6 +57,13 @@ struct WpApiMiddlewarePipelineBuilder {
 
 #[uniffi::export]
 impl WpApiMiddlewarePipelineBuilder {
+    #[uniffi::constructor]
+    fn new() -> Self {
+        Self {
+            middlewares: WpApiMiddlewarePipeline::default_middlewares(),
+        }
+    }
+
     fn add_middleware(&self, middleware: Arc<dyn WpApiMiddleware>) -> Self {
         let mut new_middlewares = self.middlewares.clone();
         new_middlewares.push(middleware.clone());
@@ -236,14 +242,14 @@ impl WpApiMiddleware for HttpAuthenticationMiddleware {
 
 // MARK: - HttpAuthenticationDetectionMiddleware
 
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug, Default, uniffi::Object)]
 struct HttpAuthenticationDetectionMiddleware {}
 
 #[uniffi::export]
 impl HttpAuthenticationDetectionMiddleware {
     #[uniffi::constructor]
     fn new() -> Self {
-        Self {}
+        Self::default()
     }
 }
 
