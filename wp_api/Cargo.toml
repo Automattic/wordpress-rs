@@ -40,6 +40,7 @@ x509-cert = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
+tokio = { workspace = true, features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

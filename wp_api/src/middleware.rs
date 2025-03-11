@@ -314,3 +314,115 @@ impl WpApiMiddleware for HttpAuthenticationDetectionMiddleware {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod retry_after {
+        use super::*;
+        use crate::{
+            request::{
+                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl},
+                WpNetworkHeaderMap,
+            },
+            MediaUploadRequestExecutionError,
+        };
+        use async_trait::async_trait;
+        use http::HeaderMap;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        // This executor will return `429` for the first request and `200` afterwards
+        #[derive(Debug)]
+        struct FooExecutor {
+            first_request: AtomicBool,
+        }
+
+        #[async_trait]
+        impl RequestExecutor for FooExecutor {
+            async fn execute(
+                &self,
+                _: Arc<WpNetworkRequest>,
+            ) -> Result<WpNetworkResponse, RequestExecutionError> {
+                if self.first_request.load(Ordering::Relaxed) {
+                    println!("First mock request; returning 429..");
+                    self.first_request.store(false, Ordering::Relaxed);
+                    Ok(rate_limit_exceeded_response())
+                } else {
+                    println!("Second mock request; returning 200..");
+                    Ok(WpNetworkResponse {
+                        body: vec![],
+                        status_code: 200,
+                        header_map: WpNetworkHeaderMap::default().into(),
+                    })
+                }
+            }
+
+            async fn upload_media(
+                &self,
+                _: Arc<MediaUploadRequest>,
+            ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+                Err(MediaUploadRequestExecutionError::RequestExecutionFailed {
+                    status_code: None,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::GenericError {
+                        error_message: "test condition".to_string(),
+                    },
+                })
+            }
+
+            async fn sleep(&self, _: u64) {}
+        }
+
+        #[tokio::test]
+        async fn test_retry_after_middleware_success() {
+            // Since the executor returns `429` for the first request, we need to retry twice
+            let result = execute_retry_after_middleware(2).await;
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap().status_code, 200);
+        }
+
+        #[tokio::test]
+        async fn test_retry_after_middleware_failure() {
+            // Since the executor returns `429` for the first request, we can retry once
+            let result = execute_retry_after_middleware(1).await;
+            assert!(matches!(
+                result,
+                Err(WpApiError::RequestExecutionFailed {
+                    status_code: Some(429),
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
+                })
+            ));
+        }
+
+        async fn execute_retry_after_middleware(
+            max_retries: u32,
+        ) -> Result<WpNetworkResponse, WpApiError> {
+            let foo_executor = FooExecutor {
+                first_request: AtomicBool::new(true),
+            };
+            let retry_middleware = RetryAfterMiddleware::new(max_retries, 10);
+            retry_middleware
+                .process(
+                    Arc::new(foo_executor),
+                    rate_limit_exceeded_response(),
+                    WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
+                )
+                .await
+        }
+
+        fn rate_limit_exceeded_response() -> WpNetworkResponse {
+            let mut map = HeaderMap::new();
+            map.insert(
+                http::header::RETRY_AFTER,
+                http::header::HeaderValue::from_static("1"),
+            );
+            WpNetworkResponse {
+                body: vec![],
+                status_code: 429,
+                header_map: Arc::new(map.into()),
+            }
+        }
+    }
+}
