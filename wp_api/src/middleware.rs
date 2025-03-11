@@ -1,6 +1,6 @@
 use crate::{
     request::{HttpAuthMethodParsingError, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
-    RequestExecutionError, RequestExecutionErrorReason, WpApiError,
+    RequestExecutionError, RequestExecutionErrorReason,
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
@@ -21,7 +21,7 @@ impl WpApiMiddlewarePipeline {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, WpApiError> {
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
         for middleware in self.middlewares.iter() {
@@ -91,7 +91,7 @@ pub trait WpApiMiddleware: Send + Sync + Debug {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, WpApiError>;
+    ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
 /// A trait for types that perform HTTP requests. Types that implement this trait
@@ -115,25 +115,6 @@ pub trait PerformsRequests {
                 request.clone(),
             )
             .await
-            // TODO: This leads to information loss because the middleware can return `WpApiError`
-            .map_err(|e| match e {
-                WpApiError::RequestExecutionFailed {
-                    status_code,
-                    redirects,
-                    reason,
-                } => RequestExecutionError::RequestExecutionFailed {
-                    status_code,
-                    redirects,
-                    reason,
-                },
-                _ => RequestExecutionError::RequestExecutionFailed {
-                    status_code: None,
-                    redirects: None,
-                    reason: RequestExecutionErrorReason::GenericError {
-                        error_message: e.to_string(),
-                    },
-                },
-            })
     }
 }
 
@@ -165,7 +146,7 @@ impl WpApiMiddleware for RetryAfterMiddleware {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, WpApiError> {
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
         for _ in 0..self.max_retries {
@@ -189,7 +170,7 @@ impl WpApiMiddleware for RetryAfterMiddleware {
         }
 
         if response.is_rate_limit_exceeded() {
-            Err(WpApiError::RequestExecutionFailed {
+            Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: Some(response.status_code),
                 redirects: None,
                 reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
@@ -225,7 +206,7 @@ impl WpApiMiddleware for HttpAuthenticationMiddleware {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, WpApiError> {
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         if !response.is_http_authentication_required() {
             return Ok(response);
         }
@@ -251,7 +232,7 @@ impl WpApiMiddleware for HttpAuthenticationMiddleware {
                 }
             };
 
-            return Err(WpApiError::RequestExecutionFailed {
+            return Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: Some(response.status_code),
                 redirects: None,
                 reason,
@@ -283,7 +264,7 @@ impl WpApiMiddleware for HttpAuthenticationDetectionMiddleware {
         _request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, WpApiError> {
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
         if !response.is_http_authentication_required() || request.has_http_authentication() {
             return Ok(response);
         }
@@ -303,7 +284,7 @@ impl WpApiMiddleware for HttpAuthenticationDetectionMiddleware {
             }
         };
 
-        Err(WpApiError::RequestExecutionFailed {
+        Err(RequestExecutionError::RequestExecutionFailed {
             status_code: Some(response.status_code),
             redirects: None,
             reason,
@@ -384,7 +365,7 @@ mod tests {
             let result = execute_retry_after_middleware(1).await;
             assert!(matches!(
                 result,
-                Err(WpApiError::RequestExecutionFailed {
+                Err(RequestExecutionError::RequestExecutionFailed {
                     status_code: Some(429),
                     redirects: None,
                     reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
@@ -394,7 +375,7 @@ mod tests {
 
         async fn execute_retry_after_middleware(
             max_retries: u32,
-        ) -> Result<WpNetworkResponse, WpApiError> {
+        ) -> Result<WpNetworkResponse, RequestExecutionError> {
             let foo_executor = FooExecutor {
                 first_request: AtomicBool::new(true),
             };
