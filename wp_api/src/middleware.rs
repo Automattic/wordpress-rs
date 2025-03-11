@@ -24,19 +24,10 @@ impl WpApiMiddlewarePipeline {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
-        for middleware in self.middlewares.iter() {
-            let result = middleware
+        for middleware in &self.middlewares {
+            response = middleware
                 .process(request_executor.clone(), response, request.clone())
-                .await;
-
-            match result {
-                Ok(_response) => {
-                    response = _response;
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
+                .await?;
         }
 
         // This hard-coded middleware is used to detect if the server requires HTTP authentication
