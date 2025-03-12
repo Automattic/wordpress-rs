@@ -206,7 +206,142 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
 mod tests {
     use super::*;
 
-    mod retry_after {
+    mod api_discovery_authentication_middleware {
+        use crate::{
+            request::{
+                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl},
+                WpNetworkHeaderMap,
+            },
+            MediaUploadRequestExecutionError,
+        };
+
+        use super::*;
+        use async_trait::async_trait;
+        use http::HeaderMap;
+
+        #[derive(Debug)]
+        struct FooExecutor {
+            execute_fn:
+                fn(Arc<WpNetworkRequest>) -> Result<WpNetworkResponse, RequestExecutionError>,
+        }
+
+        #[async_trait]
+        impl RequestExecutor for FooExecutor {
+            async fn execute(
+                &self,
+                request: Arc<WpNetworkRequest>,
+            ) -> Result<WpNetworkResponse, RequestExecutionError> {
+                (self.execute_fn)(request)
+            }
+
+            async fn upload_media(
+                &self,
+                _: Arc<MediaUploadRequest>,
+            ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+                Err(MediaUploadRequestExecutionError::RequestExecutionFailed {
+                    status_code: None,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::GenericError {
+                        error_message: "upload_media is not used".to_string(),
+                    },
+                })
+            }
+
+            async fn sleep(&self, _: u64) {}
+        }
+
+        #[tokio::test]
+        async fn test_api_discovery_authentication_middleware_request_has_http_authentication() {
+            // This test covers the case where the initial request has authentication header and
+            // the initial response is 403. This should be no-op by the middleware because the
+            // initial request has the authentication header.
+
+            let executor = FooExecutor {
+                execute_fn: |_| panic!("execute function shouldn't be called for this test"),
+            };
+            let result =
+                execute_api_discovery_authentication_middleware(executor.into(), true, 403).await;
+            assert!(
+                result.is_ok(),
+                "Since the initial request is authenticated, middleware should be no-op"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_api_discovery_authentication_middleware_response_is_http_authentication_required_false(
+        ) {
+            // This test covers the case where the initial request doesn't have authentication
+            // header but the initial response is not 401 or 403. This should be no-op by the
+            // middleware because the initial response is not 401 or 403.
+
+            let executor = FooExecutor {
+                execute_fn: |_| panic!("execute function shouldn't be called for this test"),
+            };
+            let result =
+                execute_api_discovery_authentication_middleware(executor.into(), false, 301).await;
+            assert!(
+                result.is_ok(),
+                "Since the initial response is not 401 or 403, middleware should be no-op"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_api_discovery_authentication_middleware_retries_with_authentication_headers()
+        {
+            // This test covers the case where the initial request doesn't have authentication
+            // header and the initial response is 401 or 403. This should result in middleware
+            // making a second request by adding the authentication header.
+
+            let executor = FooExecutor {
+                execute_fn: |request| {
+                    assert_eq!(request.retry_count, 1);
+                    Ok(WpNetworkResponse {
+                        body: vec![],
+                        status_code: 204,
+                        response_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                        request_url: WpEndpointUrl("http://example.com".to_string()),
+                        request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                    })
+                },
+            };
+            let response =
+                execute_api_discovery_authentication_middleware(executor.into(), false, 403)
+                    .await
+                    .expect("");
+            assert_eq!(response.status_code, 204);
+        }
+
+        async fn execute_api_discovery_authentication_middleware(
+            request_executor: Arc<FooExecutor>,
+            initial_request_has_authorization_header: bool,
+            initial_response_status_code: u16,
+        ) -> Result<WpNetworkResponse, RequestExecutionError> {
+            let middleware =
+                ApiDiscoveryAuthenticationMiddleware::new("foo".to_string(), "bar".to_string());
+            let mut map = HeaderMap::new();
+            if initial_request_has_authorization_header {
+                map.insert(
+                    http::header::AUTHORIZATION,
+                    http::header::HeaderValue::from_static("any_value"),
+                );
+            }
+            middleware
+                .process(
+                    request_executor,
+                    WpNetworkResponse {
+                        body: vec![],
+                        status_code: initial_response_status_code,
+                        response_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                        request_url: WpEndpointUrl("http://example.com".to_string()),
+                        request_header_map: Arc::new(map.into()),
+                    },
+                    WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
+                )
+                .await
+        }
+    }
+
+    mod retry_after_middleware {
         use super::*;
         use crate::{
             request::{
@@ -255,7 +390,7 @@ mod tests {
                     status_code: None,
                     redirects: None,
                     reason: RequestExecutionErrorReason::GenericError {
-                        error_message: "test condition".to_string(),
+                        error_message: "upload_media is not used".to_string(),
                     },
                 })
             }

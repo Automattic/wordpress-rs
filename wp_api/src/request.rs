@@ -234,7 +234,7 @@ impl WpNetworkRequest {
 
         WpNetworkRequest {
             uuid: self.uuid.clone(),
-            retry_count: self.retry_count,
+            retry_count: self.retry_count + 1,
             method: self.method.clone(),
             url: self.url.clone(),
             header_map: Arc::new(new_header_map.into()),
