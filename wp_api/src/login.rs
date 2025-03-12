@@ -61,6 +61,19 @@ pub struct WpApiDetails {
     pub site_icon_url: Option<String>,
 }
 
+impl TryFrom<Vec<u8>> for WpApiDetails {
+    type Error = serde_json::Error;
+
+    fn try_from(mut value: Vec<u8>) -> Result<Self, Self::Error> {
+        // If the body starts with the UTF-8 BOM, remove it
+        if value.starts_with(&[0xEF, 0xBB, 0xBF]) {
+            value = value[3..].to_vec();
+        }
+
+        serde_json::from_slice::<WpApiDetails>(&value)
+    }
+}
+
 #[uniffi::export]
 impl WpApiDetails {
     /// Does the site have application passwords enabled?
@@ -244,6 +257,7 @@ pub fn create_application_password_authentication_url(
 mod tests {
     use super::*;
     use rstest::rstest;
+    use std::io::Read;
 
     #[rstest]
     #[case(
@@ -346,6 +360,38 @@ mod tests {
             .authentication
             .0
             .is_empty());
+    }
+
+    #[rstest]
+    #[case("api-details/invalid-json-01.json")]
+    fn test_valid_json_documents(#[case] input: &str) {
+        let json = test_json(input).expect("Failed to read test resource");
+
+        let result = WpApiDetails::try_from(json);
+
+        if result.is_err() {
+            // Logging the error should give us a line number or missing field name to figure out the problem
+            println!(
+                "Failed to parse json as `WpApiDetails`: {}",
+                result.as_ref().err().unwrap()
+            );
+        }
+
+        assert!(result.is_ok());
+    }
+
+    fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        file_path.push("tests");
+        file_path.push(input);
+
+        let mut f = std::fs::File::open(file_path)?;
+        let mut buffer = Vec::new();
+
+        // read the whole file
+        f.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
     }
 
     #[derive(Debug, Deserialize)]
