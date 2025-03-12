@@ -58,6 +58,7 @@ pub struct WpApiDetails {
     pub namespaces: Vec<String>,
     pub authentication: WpApiDetailsAuthenticationMap,
     #[serde(deserialize_with = "deserialize_false_or_string")]
+    #[serde(default)]
     pub site_icon_url: Option<String>,
 }
 
@@ -364,6 +365,7 @@ mod tests {
 
     #[rstest]
     #[case("api-details/invalid-json-01.json")]
+    #[case("api-details/invalid-json-02.json")]
     fn test_valid_json_documents(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
