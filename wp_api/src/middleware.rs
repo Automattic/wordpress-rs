@@ -4,7 +4,7 @@ use crate::{
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug, Default, uniffi::Object)]
 pub struct WpApiMiddlewarePipeline {
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 }
@@ -34,19 +34,7 @@ impl WpApiMiddlewarePipeline {
     }
 }
 
-impl WpApiMiddlewarePipeline {
-    fn default_middlewares() -> Vec<Arc<dyn WpApiMiddleware>> {
-        Vec::new()
-    }
-}
-
-impl Default for WpApiMiddlewarePipeline {
-    fn default() -> Self {
-        Self::new(Self::default_middlewares())
-    }
-}
-
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug, Default, uniffi::Object)]
 struct WpApiMiddlewarePipelineBuilder {
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 }
@@ -55,9 +43,7 @@ struct WpApiMiddlewarePipelineBuilder {
 impl WpApiMiddlewarePipelineBuilder {
     #[uniffi::constructor]
     fn new() -> Self {
-        Self {
-            middlewares: WpApiMiddlewarePipeline::default_middlewares(),
-        }
+        Self::default()
     }
 
     fn add_middleware(&self, middleware: Arc<dyn WpApiMiddleware>) -> Self {
