@@ -197,6 +197,11 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        if response.request_header_map.has_http_authentication() {
+            // Request was already authenticated
+            return Ok(response);
+        }
+
         if !response.is_http_authentication_required() {
             return Ok(response);
         }
