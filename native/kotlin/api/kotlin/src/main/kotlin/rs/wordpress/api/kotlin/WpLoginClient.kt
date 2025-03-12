@@ -7,11 +7,10 @@ import uniffi.wp_api.AutoDiscoveryUniffiResult
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpLoginClient
 import uniffi.wp_api.WpApiMiddlewarePipeline
-import uniffi.wp_api.defaultMiddlewarePipeline
 
 class WpLoginClient(
     requestExecutor: RequestExecutor = WpRequestExecutor(),
-    middlewarePipeline: WpApiMiddlewarePipeline = defaultMiddlewarePipeline(),
+    middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     private val internalClient: UniffiWpLoginClient =

@@ -14,7 +14,7 @@ class DebugMiddleware : WpApiMiddleware {
         println("Request: ${request.url()}")
         println("Response:")
         println("\tStatus Code: ${response.statusCode}")
-        println("\tHeaders: ${response.headerMap}")
+        println("\tHeaders: ${response.responseHeaderMap}")
         return response
     }
 }
