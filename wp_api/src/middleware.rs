@@ -115,14 +115,14 @@ pub trait PerformsRequests {
 
 #[derive(Debug, uniffi::Object)]
 struct RetryAfterMiddleware {
-    max_retries: u32,
+    max_retries: u8,
     max_retry_wait_seconds: u64,
 }
 
 #[uniffi::export]
 impl RetryAfterMiddleware {
     #[uniffi::constructor]
-    fn new(max_retries: u32, max_retry_wait_seconds: u64) -> Self {
+    fn new(max_retries: u8, max_retry_wait_seconds: u64) -> Self {
         println!("Creating retry middleware");
         Self {
             max_retries,
@@ -142,33 +142,30 @@ impl WpApiMiddleware for RetryAfterMiddleware {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
-        for _ in 0..self.max_retries {
-            if !response.is_rate_limit_exceeded() {
-                // If the status code is not `429`, there is nothing to do
-                return Ok(response);
-            }
-            if let Some(retry_after) = response.get_retry_after() {
-                request_executor
-                    .sleep(
-                        // If the server sends some super-long value, we don't want to wait that long
-                        Duration::from_secs(std::cmp::min(retry_after, self.max_retry_wait_seconds))
-                            .as_millis() as u64,
-                    )
-                    .await;
-                response = request_executor.execute(request.clone()).await?;
-            } else {
-                // We have no idea how long to wait so we shouldn't try
-                return Ok(response);
-            }
+        if !response.is_rate_limit_exceeded() {
+            // If the status code is not `429`, there is nothing to do
+            return Ok(response);
         }
-
-        if response.is_rate_limit_exceeded() {
-            Err(RequestExecutionError::RequestExecutionFailed {
+        if request.retry_count >= self.max_retries {
+            return Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: Some(response.status_code),
                 redirects: None,
                 reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
-            })
+            });
+        }
+        if let Some(retry_after) = response.get_retry_after() {
+            request_executor
+                .sleep(
+                    // If the server sends some super-long value, we don't want to wait that long
+                    Duration::from_secs(std::cmp::min(retry_after, self.max_retry_wait_seconds))
+                        .as_millis() as u64,
+                )
+                .await;
+            let new_request = Arc::new(request.clone_with_incremented_retry_count());
+            response = request_executor.execute(new_request.clone()).await?;
+            self.process(request_executor, response, new_request).await
         } else {
+            // We have no idea how long to wait so we shouldn't try
             Ok(response)
         }
     }
@@ -298,7 +295,7 @@ mod tests {
         }
 
         async fn execute_retry_after_middleware(
-            max_retries: u32,
+            max_retries: u8,
         ) -> Result<WpNetworkResponse, RequestExecutionError> {
             let foo_executor = FooExecutor {
                 first_request: AtomicBool::new(true),
