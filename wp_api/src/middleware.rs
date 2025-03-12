@@ -1,5 +1,5 @@
 use crate::{
-    request::{HttpAuthMethodParsingError, RequestExecutor, WpNetworkRequest, WpNetworkResponse},
+    request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
     RequestExecutionError, RequestExecutionErrorReason,
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
@@ -204,35 +204,13 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
             return Ok(response);
         }
 
-        let new_request = request.adding_http_authentication(&self.username, &self.password);
-        let original_url = new_request.url();
-
-        let response = request_executor.execute(new_request.into()).await?;
-
-        if response.is_http_authentication_required() {
-            let reason = match response.get_http_auth_method() {
-                Ok(maybe_method) => match maybe_method {
-                    Some(method) => RequestExecutionErrorReason::HttpAuthenticationRejectedError {
-                        hostname: original_url.into(),
-                        method: Some(method),
-                    },
-                    None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                        issue: HttpAuthMethodParsingError::Unknown,
-                    },
-                },
-                Err(e) => {
-                    RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
-                }
-            };
-
-            return Err(RequestExecutionError::RequestExecutionFailed {
-                status_code: Some(response.status_code),
-                redirects: None,
-                reason,
-            });
-        }
-
-        Ok(response)
+        request_executor
+            .execute(
+                request
+                    .adding_http_authentication(&self.username, &self.password)
+                    .into(),
+            )
+            .await
     }
 }
 

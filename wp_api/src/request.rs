@@ -227,7 +227,9 @@ impl WpNetworkRequest {
 
         new_header_map.insert(
             http::header::AUTHORIZATION,
-            format!("Basic {}", encoded_credentials).parse().unwrap(), // base64 can only produce ASCII, so this string is guaranteed to be parseable
+            format!("Basic {}", encoded_credentials).parse().expect(
+                "base64 can only produce ASCII, so this string is guaranteed to be parseable",
+            ),
         );
 
         WpNetworkRequest {
