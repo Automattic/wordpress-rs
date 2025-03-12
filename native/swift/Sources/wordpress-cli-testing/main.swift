@@ -32,6 +32,7 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
 
     case wordfence
     case hostingerTools
+    case fluentAuth
     case multipleBadPlugins
     case unhelpfulError
     case unableToParse
@@ -39,6 +40,7 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
     case testFailure
     case invalidResponse
     case invalidssl
+    case siteUnreachable
     case unknown
 
     init(stringLiteral value: StringLiteralType) {
@@ -52,6 +54,10 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
 
         if string.contains("Hostinger") {
             return .hostingerTools
+        }
+
+        if string.contains("FluentAuth") {
+            return .fluentAuth
         }
 
         if string.contains("there are multiple installed plugins that might have disabled Application Passwords") {
@@ -74,8 +80,15 @@ enum ApplicationPasswordTestResultError: String, ExpressibleByStringLiteral, Cod
             return .testFailure
         }
 
-        if string.contains("The certificate for this server is invalid") {
+        if string.contains("The certificate for this server is invalid") || string.contains("An SSL error has occurred") {
             return .invalidssl
+        }
+
+        if string.contains("specified hostname could not be found")
+            || string.contains("The request timed out")
+            || string.contains("The network connection was lost")
+        {
+            return .siteUnreachable
         }
 
         if string.contains("returning invalid data") {
