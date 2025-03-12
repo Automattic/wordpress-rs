@@ -368,6 +368,9 @@ pub enum FindApiRootLinkHeaderFailure {
         parsed_site_url: ParsedUrl,
         error: ParseApiRootUrlError,
     },
+    ApiRootNotFound {
+        parsed_site_url: ParsedUrl
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -563,6 +566,15 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
             } => Self::ParseApiRootUrl {
                 parsed_site_url,
                 error,
+            },
+            FindApiRootLinkHeaderFailure::ApiRootNotFound {
+                parsed_site_url,
+            } => Self::ParseApiRootUrl {
+                parsed_site_url,
+                error: ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                    status_code: 404,
+                    header_map: Arc::new(WpNetworkHeaderMap::default()),
+                },
             },
         }
     }
