@@ -64,6 +64,7 @@ final class HTTPStubs: SafeRequestExecutor {
     }
 
     func sleep(millis: UInt64) async {
+        // swiftlint:disable:next force_try
         try! await Task.sleep(nanoseconds: millis * 1000)
     }
 }
