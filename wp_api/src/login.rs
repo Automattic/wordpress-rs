@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
-use wp_serde_helper::deserialize_i64_or_string;
+use wp_serde_helper::deserialize_false_or_string;
+use wp_serde_helper::deserialize_offset;
 
 use crate::login::url_discovery::is_local_dev_environment_url;
 use crate::ParsedUrl;
@@ -51,12 +52,27 @@ pub struct WpApiDetails {
     pub description: String,
     pub url: String,
     pub home: String,
-    #[serde(deserialize_with = "deserialize_i64_or_string")]
-    pub gmt_offset: i64,
+    #[serde(deserialize_with = "deserialize_offset")]
+    pub gmt_offset: f64,
     pub timezone_string: String,
     pub namespaces: Vec<String>,
     pub authentication: WpApiDetailsAuthenticationMap,
+    #[serde(deserialize_with = "deserialize_false_or_string")]
+    #[serde(default)]
     pub site_icon_url: Option<String>,
+}
+
+impl TryFrom<Vec<u8>> for WpApiDetails {
+    type Error = serde_json::Error;
+
+    fn try_from(mut value: Vec<u8>) -> Result<Self, Self::Error> {
+        // If the body starts with the UTF-8 BOM, remove it
+        if value.starts_with(&[0xEF, 0xBB, 0xBF]) {
+            value.drain(0..3);
+        }
+
+        serde_json::from_slice::<WpApiDetails>(&value)
+    }
 }
 
 #[uniffi::export]
@@ -123,12 +139,26 @@ pub struct KnownApplicationPasswordBlockingPlugin {
 
 impl KnownApplicationPasswordBlockingPlugin {
     fn all() -> Vec<Self> {
-        vec![Self {
-            name: "Wordfence".to_string(),
-            namespace: "wordfence/v1".to_string(),
-            // TODO: Ensure this is correct with the WordFence folks
-            support_url: "https://www.wordfence.com/support/".to_string(),
-        }]
+        vec![
+            Self {
+                name: "Wordfence".to_string(),
+                namespace: "wordfence/v1".to_string(),
+                // TODO: Ensure this is correct with the WordFence folks
+                support_url: "https://www.wordfence.com/support/".to_string(),
+            },
+            Self {
+                name: "Hostinger Tools".to_string(),
+                namespace: "hostinger-tools-plugin/v1".to_string(),
+                // TODO: Ensure this is correct with the Hostinger folks
+                support_url: "https://wordpress.org/support/plugin/hostinger/".to_string(),
+            },
+            Self {
+                name: "FluentAuth".to_string(),
+                namespace: "fluent-auth".to_string(),
+                // TODO: Ensure this is correct with the FluentAuth folks
+                support_url: "https://wordpress.org/support/plugin/fluent-security/".to_string(),
+            },
+        ]
     }
 }
 
@@ -228,6 +258,7 @@ pub fn create_application_password_authentication_url(
 mod tests {
     use super::*;
     use rstest::rstest;
+    use std::io::Read;
 
     #[rstest]
     #[case(
@@ -330,6 +361,35 @@ mod tests {
             .authentication
             .0
             .is_empty());
+    }
+
+    #[rstest]
+    #[case("api-details/test-case-01.json")]
+    #[case("api-details/test-case-02.json")]
+    fn test_api_details_json(#[case] input: &str) {
+        let json = test_json(input).expect("Failed to read test resource");
+
+        let result = WpApiDetails::try_from(json);
+
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetails`: {:#?}",
+            result
+        );
+    }
+
+    fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        file_path.push("test-data");
+        file_path.push(input);
+
+        let mut f = std::fs::File::open(file_path)?;
+        let mut buffer = Vec::new();
+
+        // read the whole file
+        f.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
     }
 
     #[derive(Debug, Deserialize)]
