@@ -113,7 +113,6 @@ impl WpLoginClient {
             match WpApiDetails::try_from(fetch_api_details_response.body) {
                 Ok(api_details) => api_details,
                 Err(error) => {
-                    // println!("Error parsing API details: {}", String::from_utf8(fetch_api_details_response.body).unwrap());
                     return Err(AutoDiscoveryAttemptFailure::ParseApiDetails {
                         parsed_site_url: api_root_url_success.parsed_site_url,
                         api_root_url: api_root_url_success.api_root_url,

@@ -68,7 +68,7 @@ impl TryFrom<Vec<u8>> for WpApiDetails {
     fn try_from(mut value: Vec<u8>) -> Result<Self, Self::Error> {
         // If the body starts with the UTF-8 BOM, remove it
         if value.starts_with(&[0xEF, 0xBB, 0xBF]) {
-            value = value[3..].to_vec();
+            value.drain(0..3);
         }
 
         serde_json::from_slice::<WpApiDetails>(&value)
@@ -371,15 +371,11 @@ mod tests {
 
         let result = WpApiDetails::try_from(json);
 
-        if result.is_err() {
-            // Logging the error should give us a line number or missing field name to figure out the problem
-            println!(
-                "Failed to parse json as `WpApiDetails`: {}",
-                result.as_ref().err().unwrap()
-            );
-        }
-
-        assert!(result.is_ok());
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetails`: {:#?}",
+            result
+        );
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
