@@ -174,16 +174,16 @@ impl WpApiMiddleware for RetryAfterMiddleware {
     }
 }
 
-// MARK: - HttpAuthenticationMiddleware
+// MARK: - ApiDiscoveryAuthenticationMiddleware
 
 #[derive(Debug, uniffi::Object)]
-struct HttpAuthenticationMiddleware {
+struct ApiDiscoveryAuthenticationMiddleware {
     username: String,
     password: String,
 }
 
 #[uniffi::export]
-impl HttpAuthenticationMiddleware {
+impl ApiDiscoveryAuthenticationMiddleware {
     #[uniffi::constructor]
     fn new(username: String, password: String) -> Self {
         println!("Creating HTTP authentication middleware");
@@ -193,7 +193,7 @@ impl HttpAuthenticationMiddleware {
 
 #[uniffi::export]
 #[async_trait::async_trait]
-impl WpApiMiddleware for HttpAuthenticationMiddleware {
+impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
     async fn process(
         &self,
         request_executor: Arc<dyn RequestExecutor>,
