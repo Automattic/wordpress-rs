@@ -2,7 +2,6 @@ import Foundation
 import WordPressAPI
 
 final class HTTPStubs: SafeRequestExecutor {
-
     typealias Stub = (condition: @Sendable (WpNetworkRequest) -> Bool, response: WpNetworkResponse)
 
     private let stubs: [Stub]
@@ -35,7 +34,7 @@ final class HTTPStubs: SafeRequestExecutor {
     }
 
     func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
+        preconditionFailure("This method is not yet implemented")
     }
 
     private func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
@@ -63,6 +62,10 @@ final class HTTPStubs: SafeRequestExecutor {
             response: response
         )
     }
+
+    func sleep(millis: UInt64) async {
+        try! await Task.sleep(nanoseconds: millis * 1000)
+    }
 }
 
 extension WpNetworkResponse {
@@ -71,7 +74,9 @@ extension WpNetworkResponse {
         WpNetworkResponse(
             body: content.data(using: .utf8)!,
             statusCode: 200,
-            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"])
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"]),
+            requestUrl: "https://example.com",
+            requestHeaderMap: .empty
         )
     }
 

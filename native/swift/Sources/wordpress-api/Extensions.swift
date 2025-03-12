@@ -7,20 +7,22 @@ import FoundationNetworking
 
 public extension MiddlewarePipeline {
     static var `default`: MiddlewarePipeline {
-        defaultMiddlewarePipeline()
+        MiddlewarePipeline(middlewares: [])
     }
 }
 
 extension WpNetworkResponse {
-    init(data: Data, response: URLResponse) throws {
+    init(data: Data, request: WpNetworkRequest, response: URLResponse) throws {
         guard let response = response as? HTTPURLResponse else {
             preconditionFailure("We should never wind up here")
         }
 
-        self = WpNetworkResponse(
+        self =  WpNetworkResponse(
             body: data,
             statusCode: UInt16(response.statusCode),
-            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders)
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
+            requestUrl: request.url(),
+            requestHeaderMap: request.headerMap()
         )
     }
 }

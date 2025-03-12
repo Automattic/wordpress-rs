@@ -33,19 +33,12 @@ final class WpRequestExecutor: SafeRequestExecutor {
             let urlrequest = request.asURLRequest()
             (data, response) = try await self.session.data(for: urlrequest, delegate: redirectTracker)
 
-            // swiftlint:disable:next force_cast
-            let httpResponse = response as! HTTPURLResponse
-
-            let headerMap: WpNetworkHeaderMap
-
             do {
-                headerMap = try WpNetworkHeaderMap.fromMap(hashMap: httpResponse.httpHeaders)
-
                 return .success(
-                    WpNetworkResponse(
-                        body: data,
-                        statusCode: UInt16(httpResponse.statusCode),
-                        headerMap: headerMap
+                    try WpNetworkResponse(
+                        data: data,
+                        request: request,
+                        response: response
                     )
                 )
             } catch is WpNetworkHeaderMapError {
@@ -113,7 +106,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
     // swiftlint:enable function_body_length
 
     func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        try WpNetworkResponse(body: Data(), statusCode: 500, headerMap: .fromMap(hashMap: [:]))
+        abort() // TODO: This is implemented in a different branch, we'll sync it later
     }
 
     // swiftlint:disable force_cast
@@ -158,6 +151,16 @@ final class WpRequestExecutor: SafeRequestExecutor {
         }
     }
     // swiftlint:enable force_cast
+
+    // swiftlint:disable force_try
+    func sleep(millis: UInt64) async {
+        if #available(macOS 13.0, *) {
+            try! await Task.sleep(for: .milliseconds(millis))
+        } else {
+            try! await Task.sleep(nanoseconds: millis * 1000)
+        }
+    }
+    // swiftlint:enable force_try
 }
 
 final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
