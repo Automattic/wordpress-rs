@@ -154,7 +154,7 @@ final class WpRequestExecutor: SafeRequestExecutor {
 
     // swiftlint:disable force_try
     func sleep(millis: UInt64) async {
-        if #available(macOS 13.0, *) {
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
             try! await Task.sleep(for: .milliseconds(millis))
         } else {
             try! await Task.sleep(nanoseconds: millis * 1000)
