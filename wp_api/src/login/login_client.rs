@@ -245,7 +245,7 @@ impl WpLoginClient {
         {
             Some(url) => Ok(ParsedUrl::new(url)),
             None => Err(ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-                header_map: response.header_map,
+                header_map: response.response_header_map,
                 status_code: response.status_code,
             }),
         }

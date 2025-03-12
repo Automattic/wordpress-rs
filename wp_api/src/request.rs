@@ -136,6 +136,8 @@ pub trait RequestExecutor: Send + Sync + Debug {
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
+
+    async fn sleep(&self, millis: u64);
 }
 
 #[derive(uniffi::Object)]
@@ -213,12 +215,8 @@ impl WpNetworkRequest {
             .map(|b| request_or_response_body_as_string(&b.inner))
     }
 
-    /// Does this request specify HTTP login details of some kind?
     pub fn has_http_authentication(&self) -> bool {
-        self.header_map
-            .inner
-            .get(http::header::AUTHORIZATION)
-            .is_some()
+        self.header_map.has_http_authentication()
     }
 
     pub fn adding_http_authentication(&self, username: &str, password: &str) -> Self {
@@ -229,12 +227,14 @@ impl WpNetworkRequest {
 
         new_header_map.insert(
             http::header::AUTHORIZATION,
-            format!("Basic {}", encoded_credentials).parse().unwrap(), // base64 can only produce ASCII, so this string is guaranteed to be parseable
+            format!("Basic {}", encoded_credentials).parse().expect(
+                "base64 can only produce ASCII, so this string is guaranteed to be parseable",
+            ),
         );
 
         WpNetworkRequest {
             uuid: self.uuid.clone(),
-            retry_count: self.retry_count,
+            retry_count: self.retry_count + 1,
             method: self.method.clone(),
             url: self.url.clone(),
             header_map: Arc::new(new_header_map.into()),
@@ -282,7 +282,9 @@ impl Debug for WpNetworkRequest {
 pub struct WpNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
-    pub header_map: Arc<WpNetworkHeaderMap>,
+    pub response_header_map: Arc<WpNetworkHeaderMap>,
+    pub request_url: WpEndpointUrl,
+    pub request_header_map: Arc<WpNetworkHeaderMap>,
 }
 
 #[derive(Debug, Default, Clone, uniffi::Object)]
@@ -344,6 +346,11 @@ impl WpNetworkHeaderMap {
     pub fn to_header_map(&self) -> HeaderMap {
         self.inner.clone()
     }
+
+    /// Does this request specify HTTP login details of some kind?
+    pub fn has_http_authentication(&self) -> bool {
+        self.inner.get(http::header::AUTHORIZATION).is_some()
+    }
 }
 
 #[uniffi::export]
@@ -404,8 +411,8 @@ pub enum WpNetworkHeaderMapError {
 impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
         [
-            self.header_map.inner.get_all(http::header::LINK),
-            self.header_map
+            self.response_header_map.inner.get_all(http::header::LINK),
+            self.response_header_map
                 .inner
                 .get_all(http::header::LINK.to_string().to_lowercase()),
         ]
@@ -446,7 +453,7 @@ impl WpNetworkResponse {
         ParamsType: FromUrlQueryPairs,
         E: ParsedRequestError,
     {
-        if let Some(err) = E::try_parse(&self.body, self.status_code) {
+        if let Some(err) = E::try_parse(&self) {
             return Err(err);
         }
 
@@ -460,7 +467,7 @@ impl WpNetworkResponse {
                     parsed_response.prev_page_params =
                         self.get_pagination_header(PaginationHeaderKey::Prev);
                 }
-                parsed_response.header_map = self.header_map;
+                parsed_response.header_map = self.response_header_map;
                 ResponseType::from(parsed_response)
             })
     }
@@ -477,7 +484,7 @@ impl WpNetworkResponse {
     }
 
     pub fn get_retry_after(&self) -> Option<u64> {
-        self.header_map
+        self.response_header_map
             .inner
             .get(http::header::RETRY_AFTER)
             .and_then(|h_v| h_v.to_str().ok())
@@ -493,7 +500,7 @@ impl WpNetworkResponse {
         &self,
     ) -> Result<Option<HttpAuthMethod>, HttpAuthMethodParsingError> {
         let header_value = self
-            .header_map
+            .response_header_map
             .inner
             .get(http::header::WWW_AUTHENTICATE)
             .and_then(|h_v| h_v.to_str().ok());
@@ -653,7 +660,7 @@ impl Debug for WpNetworkResponse {
                 }}
                 "},
             self.status_code,
-            self.header_map,
+            self.response_header_map,
             self.body_as_string()
         );
         s.pop(); // Remove the new line at the end
@@ -727,10 +734,12 @@ mod tests {
         let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 200,
-            header_map: Arc::new(
+            response_header_map: Arc::new(
                 WpNetworkHeaderMap::from_map([("Link".to_string(), link.to_string())].into())
                     .unwrap(),
             ),
+            request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
         assert_eq!(
             expected_prev_link_header
@@ -738,7 +747,7 @@ mod tests {
                 .as_ref(),
             response.get_link_header("prev").first(),
             "response headers: {:?}",
-            response.header_map.inner
+            response.response_header_map.inner
         );
         assert_eq!(
             expected_next_link_header
@@ -746,7 +755,7 @@ mod tests {
                 .as_ref(),
             response.get_link_header("next").first(),
             "response headers: {:?}",
-            response.header_map.inner
+            response.response_header_map.inner
         );
     }
 
@@ -856,7 +865,9 @@ mod tests {
         let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 401,
-            header_map: Arc::new(header_map),
+            response_header_map: Arc::new(header_map),
+            request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
 
         assert_eq!(response.get_http_auth_method(), Ok(Some(expected_value)));
@@ -875,7 +886,9 @@ mod tests {
         let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 429,
-            header_map: Arc::new(header_map),
+            response_header_map: Arc::new(header_map),
+            request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
 
         assert_eq!(response.get_retry_after(), Some(expected_value));

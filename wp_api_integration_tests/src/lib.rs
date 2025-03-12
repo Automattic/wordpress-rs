@@ -192,7 +192,9 @@ impl AsyncWpNetworking {
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            request_url: wp_request.url(),
+            request_header_map: wp_request.header_map(),
         })
     }
 
@@ -231,7 +233,9 @@ impl AsyncWpNetworking {
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            request_url: media_upload_request.url(),
+            request_header_map: media_upload_request.header_map(),
         })
     }
 
@@ -277,6 +281,10 @@ impl RequestExecutor for AsyncWpNetworking {
                     },
                 },
             )
+    }
+
+    async fn sleep(&self, millis: u64) {
+        tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
     }
 }
 

@@ -18,7 +18,6 @@ resolver = "2"
 [workspace.dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-async-std = "1.10"
 base64 = "0.22"
 chrono = "0.4"
 clap = "4.5"
