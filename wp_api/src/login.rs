@@ -364,9 +364,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case("api-details/invalid-json-01.json")]
-    #[case("api-details/invalid-json-02.json")]
-    fn test_valid_json_documents(#[case] input: &str) {
+    #[case("api-details/test-case-01.json")]
+    #[case("api-details/test-case-02.json")]
+    fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
         let result = WpApiDetails::try_from(json);
@@ -380,7 +380,7 @@ mod tests {
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
         let mut file_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file_path.push("tests");
+        file_path.push("test-data");
         file_path.push(input);
 
         let mut f = std::fs::File::open(file_path)?;
