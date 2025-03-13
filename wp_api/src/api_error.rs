@@ -1,3 +1,4 @@
+use crate::login::url_discovery::AutoDiscoveryAttemptFailure;
 use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError};
 use crate::{
     request::{request_or_response_body_as_string, WpRedirect},
@@ -12,6 +13,16 @@ where
 {
     fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self>;
     fn as_parse_error(reason: String, response: String) -> Self;
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum UrlDiscoveryError {
+    #[error("{}", reason)]
+    Transparent { reason: String },
+    #[error("{}", error)]
+    ApiError { error: WpApiError },
+    #[error("{}", reason)]
+    RequestExecutionError { reason: RequestExecutionErrorReason },
 }
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -535,6 +546,25 @@ impl From<HttpAuthMethodParsingError> for WpApiError {
             reason: RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
                 issue: value,
             },
+        }
+    }
+}
+
+impl TryFrom<AutoDiscoveryAttemptFailure> for WpApiError {
+    type Error = AutoDiscoveryAttemptFailure;
+
+    fn try_from(value: AutoDiscoveryAttemptFailure) -> Result<Self, Self::Error> {
+        match value {
+            AutoDiscoveryAttemptFailure::FetchApiRootUrl {
+                parsed_site_url: _,
+                error,
+            } => Ok(error.into()),
+            AutoDiscoveryAttemptFailure::FetchApiDetails {
+                parsed_site_url: _,
+                api_root_url: _,
+                error,
+            } => Ok(error.into()),
+            _ => Err(value),
         }
     }
 }

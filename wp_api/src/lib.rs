@@ -27,6 +27,7 @@ pub mod plugins;
 pub mod post_types;
 pub mod posts;
 pub mod request;
+pub mod request_executor;
 pub mod search_results;
 pub mod site_settings;
 pub mod tags;

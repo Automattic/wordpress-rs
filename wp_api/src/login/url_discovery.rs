@@ -1,8 +1,8 @@
 use super::WpApiDetails;
 use crate::{
-    login::KnownApplicationPasswordBlockingPlugin, request::WpNetworkHeaderMap,
-    request::WpRedirect, ParseUrlError, ParsedUrl, RequestExecutionError,
-    RequestExecutionErrorReason,
+    login::KnownApplicationPasswordBlockingPlugin,
+    request::{WpNetworkHeaderMap, WpRedirect},
+    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -109,6 +109,11 @@ impl AutoDiscoveryResult {
             .expect("User input url is always attempted")
     }
 
+    pub fn auto_discovery_attempt(&self) -> &AutoDiscoveryAttemptResult {
+        self.get_attempt(&AutoDiscoveryAttemptType::AutoHttps)
+            .expect("Auto discovery url is always attempted")
+    }
+
     pub fn get_attempt(
         &self,
         attempt_type: &AutoDiscoveryAttemptType,
@@ -137,7 +142,7 @@ impl AutoDiscoveryAttemptResult {
         self.attempt_site_url.clone()
     }
 
-    fn error_message(&self) -> Option<String> {
+    pub fn error_message(&self) -> Option<String> {
         match &self.api_discovery_result {
             Ok(_) => None,
             Err(error) => Some(error.to_string()),
@@ -217,6 +222,16 @@ impl AutoDiscoveryAttemptResult {
     /// Does the site look like a WordPress site?
     fn is_wordpress_site(&self) -> bool {
         self.is_wordpress_site.is_successful()
+    }
+}
+
+impl AutoDiscoveryAttemptResult {
+    pub fn error(&self) -> Option<AutoDiscoveryAttemptFailure> {
+        if let Err(error) = &self.api_discovery_result {
+            Some(error.clone())
+        } else {
+            None
+        }
     }
 }
 
@@ -446,10 +461,10 @@ impl ApplicationPasswordsNotSupportedReason {
     fn error_message(&self, parsed_site_url: impl Display) -> String {
         match self {
             Self::ApplicationPasswordBlockedByPlugin { plugin } => format!("Unable to login to {} – the {} plugin might have disabled Application Passwords. Please visit {} to learn more", parsed_site_url, plugin.name, plugin.support_url),
-            Self::ApplicationPasswordBlockedByMultiplePlugins => format!("Unable to login to {} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.", parsed_site_url),
+            Self::ApplicationPasswordBlockedByMultiplePlugins => format!("Unable to login to {} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.", parsed_site_url),
             Self::SiteIsLocalDevelopmentEnvironment => "This site is a local development environment. You'll need to enable application passwords to connect to it with the app.".to_string(),
-            Self::ApplicationPasswordsDisabledForHttpSite => "Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.".to_string(),
-    }
+            Self::ApplicationPasswordsDisabledForHttpSite => "Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.".to_string(),
+        }
     }
 }
 

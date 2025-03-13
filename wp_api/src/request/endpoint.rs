@@ -22,6 +22,12 @@ uniffi::custom_newtype!(WpEndpointUrl, String);
 #[derive(Debug, Clone)]
 pub struct WpEndpointUrl(pub String);
 
+impl WpEndpointUrl {
+    pub fn url(&self) -> Url {
+        Url::parse(self.0.as_str()).expect("The request should be a valid URL")
+    }
+}
+
 impl From<Url> for WpEndpointUrl {
     fn from(url: Url) -> Self {
         Self(url.to_string())
