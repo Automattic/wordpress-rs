@@ -17,7 +17,7 @@ use crate::{
     },
     ParseUrlError, ParsedUrl, RequestExecutionError,
 };
-use std::{str, sync::Arc};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, uniffi::Object)]
@@ -65,20 +65,21 @@ impl WpLoginClient {
         &self,
         attempt: AutoDiscoveryAttempt,
     ) -> AutoDiscoveryAttemptResult {
-        // TODO: Create a `ParsedUrl` here instead of parsing it in every helper
-        let attempt_site_url = &attempt.attempt_site_url.clone();
+        let parsed_attempt_site_url_result = ParsedUrl::parse(&attempt.attempt_site_url);
         let parse_html_result = self
-            .fetch_site(attempt_site_url)
+            .fetch_site(parsed_attempt_site_url_result.clone())
             .await
             .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
         let api_root_url_from_link_tag = parse_html_result
             .as_ref()
             .ok()
             .and_then(|h| h.api_root_url_from_link_tag.clone());
-        let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
+        let fetch_wp_json_result = self
+            .fetch_wp_json(parsed_attempt_site_url_result.clone())
+            .await;
         let api_link_header_result = self
             .find_api_root_url(
-                attempt_site_url,
+                parsed_attempt_site_url_result.clone(),
                 api_root_url_from_link_tag,
                 fetch_wp_json_result.clone(),
             )
@@ -172,11 +173,11 @@ impl WpLoginClient {
 
     async fn find_api_root_url(
         &self,
-        attempt_site_url: &str,
+        parsed_attempt_site_url_result: Result<ParsedUrl, ParseUrlError>,
         api_root_url_from_link_tag: Option<ParsedUrl>,
         fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
-        let parsed_site_url = ParsedUrl::parse(attempt_site_url)
+        let parsed_site_url = parsed_attempt_site_url_result
             .map_err(|error| FindApiRootLinkHeaderFailure::ParseSiteUrl { error })?;
         if let Some(api_root_url) = api_root_url_from_link_tag {
             Ok(FindApiRootLinkHeaderSuccess {
@@ -281,10 +282,10 @@ impl WpLoginClient {
 
     async fn fetch_wp_json(
         &self,
-        attempt_site_url: &str,
+        parsed_attempt_site_url_result: Result<ParsedUrl, ParseUrlError>,
     ) -> Result<FetchWpJsonSuccess, FetchWpJsonFailure> {
         let wp_json_url = {
-            let mut wp_json_url = ParsedUrl::parse(attempt_site_url)
+            let mut wp_json_url = parsed_attempt_site_url_result
                 .map_err(|error| FetchWpJsonFailure::ParseSiteUrl { error })?;
             wp_json_url
                 .inner
@@ -329,9 +330,9 @@ impl WpLoginClient {
 
     async fn fetch_site(
         &self,
-        attempt_site_url: &str,
+        parsed_attempt_site_url_result: Result<ParsedUrl, ParseUrlError>,
     ) -> Result<WpNetworkResponse, ParseHtmlFailure> {
-        let site_url = ParsedUrl::parse(attempt_site_url)
+        let site_url = parsed_attempt_site_url_result
             .map_err(|error| ParseHtmlFailure::ParseSiteUrl { error })?;
         self.request_executor
             .execute(
