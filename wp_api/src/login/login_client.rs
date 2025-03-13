@@ -195,9 +195,8 @@ impl WpLoginClient {
                 // If we can't find the link header, but we were able to fetch `/wp-json` from the
                 // attempt url, we assume that it's the correct api root url
                 //
-                // We don't immediately rely on this because there might be cases where there are
-                // multiple `/wp-json` paths in which case we want to prioritize the one returned
-                // from the link header
+                // We don't immediately rely on this because there might be cases where `/wp-json`
+                // exists, but its not the actual API root
                 if let Ok(fetch_wp_json_success) = fetch_wp_json_result {
                     Ok(FindApiRootLinkHeaderSuccess {
                         parsed_site_url,
@@ -258,7 +257,7 @@ impl WpLoginClient {
         }
     }
 
-    // Fetches the site's homepage with a HEAD request
+    // Fetches the site's homepage headers with a HEAD request
     async fn fetch_api_root_url(
         &self,
         parsed_site_url: &ParsedUrl,
