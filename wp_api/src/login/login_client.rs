@@ -189,11 +189,11 @@ impl WpLoginClient {
                 api_root_url,
             })
         } else if let Ok(success) = self
-            .fetch_and_parse_api_root_url_header(&parsed_site_url)
+            .fetch_and_parse_api_root_url_header(parsed_site_url.clone())
             .await
         {
             Ok(success)
-        } else if let Ok(response) = self.guess_api_root_url(&parsed_site_url).await {
+        } else if let Ok(response) = self.guess_api_root_url(parsed_site_url.clone()).await {
             Ok(FindApiRootLinkHeaderSuccess {
                 parsed_site_url,
                 api_root_url: response,
@@ -205,13 +205,13 @@ impl WpLoginClient {
 
     async fn fetch_and_parse_api_root_url_header(
         &self,
-        parsed_site_url: &ParsedUrl,
+        parsed_site_url: ParsedUrl,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
-        let fetch_api_root_url_response = match self.fetch_api_root_url(parsed_site_url).await {
+        let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
             Ok(r) => r,
             Err(error) => {
                 return Err(FindApiRootLinkHeaderFailure::FetchApiRootUrl {
-                    parsed_site_url: parsed_site_url.clone(),
+                    parsed_site_url,
                     error,
                 })
             }
@@ -220,7 +220,7 @@ impl WpLoginClient {
             Ok(api_root_url) => api_root_url,
             Err(error) => {
                 return Err(FindApiRootLinkHeaderFailure::ParseApiRootUrl {
-                    parsed_site_url: parsed_site_url.clone(),
+                    parsed_site_url,
                     error,
                 })
             }
@@ -270,9 +270,9 @@ impl WpLoginClient {
     /// find it, but if it's a standard setup this will work.
     async fn guess_api_root_url(
         &self,
-        parsed_site_url: &ParsedUrl,
+        parsed_site_url: ParsedUrl,
     ) -> Result<ParsedUrl, RequestExecutionError> {
-        let mut api_root_url = parsed_site_url.clone();
+        let mut api_root_url = parsed_site_url;
         api_root_url
             .inner
             .path_segments_mut()
