@@ -276,7 +276,7 @@ impl WpLoginClient {
         api_root_url
             .inner
             .path_segments_mut()
-            .unwrap()
+            .expect("`parsed_site_url` is already parsed and should have path segments")
             .push("wp-json");
         self.fetch_api_root_url(&api_root_url)
             .await
