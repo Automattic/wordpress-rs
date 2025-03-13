@@ -12,8 +12,8 @@ use super::{
 use crate::{
     login::url_discovery::RootWpJson,
     request::{
-        endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
-        WpNetworkRequest, WpNetworkResponse,
+        endpoint::{WpEndpointUrl, WP_JSON_PATH_SEGMENTS},
+        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
     ParseUrlError, ParsedUrl, RequestExecutionError,
 };
@@ -292,7 +292,7 @@ impl WpLoginClient {
                 .map_err(|_| FetchWpJsonFailure::ParseSiteUrl {
                     error: ParseUrlError::RelativeUrlWithCannotBeABaseBase,
                 })?
-                .push("wp-json");
+                .extend(WP_JSON_PATH_SEGMENTS);
             wp_json_url
         };
         let fetch_wp_json_response = match self
