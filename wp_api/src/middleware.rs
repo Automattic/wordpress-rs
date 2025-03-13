@@ -87,6 +87,18 @@ pub trait PerformsRequests {
         let pipeline = &self.get_middleware_pipeline();
         let response = self.get_request_executor().execute(request.clone()).await?;
 
+        // TODO: `WpApiError::try_parse` also handles this case. Neither of these seem like the
+        // correct way to handle these errors, because neither implementation is "central" enough.
+        // Since there isn't a great place to handle this at the moment, and it's not clear whether
+        // we'll include middleware in `WpApiClient`, we are including this logic here for now.
+        if let Some(reason) = RequestExecutionErrorReason::try_from_response(&response) {
+            return Err(RequestExecutionError::RequestExecutionFailed {
+                status_code: Some(response.status_code),
+                redirects: None,
+                reason,
+            });
+        }
+
         pipeline
             .process(
                 self.get_request_executor().clone(),

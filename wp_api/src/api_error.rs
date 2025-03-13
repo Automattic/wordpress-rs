@@ -69,26 +69,7 @@ impl ParsedRequestError for WpApiError {
                 response: response.body_as_string(),
             })
         } else {
-            if response.is_http_authentication_required()
-                && !response.request_header_map.has_http_authentication()
-            {
-                let reason = match response.get_http_auth_method() {
-                    Ok(maybe_method) => match maybe_method {
-                        Some(method) => {
-                            RequestExecutionErrorReason::HttpAuthenticationRequiredError {
-                                hostname: response.request_url.0.clone(),
-                                method: Some(method),
-                            }
-                        }
-                        None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                            issue: HttpAuthMethodParsingError::Unknown,
-                        },
-                    },
-                    Err(e) => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                        issue: e,
-                    },
-                };
-
+            if let Some(reason) = RequestExecutionErrorReason::try_from_response(response) {
                 return Some(WpApiError::RequestExecutionFailed {
                     status_code: Some(response.status_code),
                     redirects: None,
@@ -497,6 +478,32 @@ pub enum RequestExecutionErrorReason {
     DeviceIsOfflineError { error_message: String },
     #[error("{}", error_message)]
     GenericError { error_message: String },
+}
+
+impl RequestExecutionErrorReason {
+    pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
+        if response.is_http_authentication_required()
+            && !response.request_header_map.has_http_authentication()
+        {
+            let reason = match response.get_http_auth_method() {
+                Ok(maybe_method) => match maybe_method {
+                    Some(method) => RequestExecutionErrorReason::HttpAuthenticationRequiredError {
+                        hostname: response.request_url.0.clone(),
+                        method: Some(method),
+                    },
+                    None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
+                        issue: HttpAuthMethodParsingError::Unknown,
+                    },
+                },
+                Err(e) => {
+                    RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
+                }
+            };
+            Some(reason)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
