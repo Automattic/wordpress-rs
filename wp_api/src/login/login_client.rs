@@ -65,7 +65,8 @@ impl WpLoginClient {
         &self,
         attempt: AutoDiscoveryAttempt,
     ) -> AutoDiscoveryAttemptResult {
-        let attempt_site_url = attempt.attempt_site_url.as_str();
+        // TODO: Create a `ParsedUrl` here instead of parsing it in every helper
+        let attempt_site_url = &attempt.attempt_site_url.clone();
         let parse_html_result = self
             .fetch_site(attempt_site_url)
             .await
@@ -74,15 +75,22 @@ impl WpLoginClient {
             .as_ref()
             .ok()
             .and_then(|h| h.api_root_url_from_link_tag.clone());
+        let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
         let api_link_header_result = self
-            .find_api_root_url(attempt_site_url, api_root_url_from_link_tag)
+            .find_api_root_url(
+                attempt_site_url,
+                api_root_url_from_link_tag,
+                fetch_wp_json_result.clone(),
+            )
             .await;
         let discovery_result = self
             .inner_attempt_api_discovery(api_link_header_result.clone())
             .await;
-        let is_wordpress_site = self
-            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result, parse_html_result)
-            .await;
+        let is_wordpress_site = IsWordPressSiteAttemptResult {
+            api_link_header_result,
+            fetch_wp_json_result,
+            parse_html_result,
+        };
         AutoDiscoveryAttemptResult {
             attempt_type: attempt.attempt_type,
             attempt_site_url: attempt.attempt_site_url,
@@ -162,24 +170,11 @@ impl WpLoginClient {
         }
     }
 
-    async fn attempt_is_wordpress_site(
-        &self,
-        attempt_site_url: &str,
-        api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
-        parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
-    ) -> IsWordPressSiteAttemptResult {
-        let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
-        IsWordPressSiteAttemptResult {
-            api_link_header_result,
-            fetch_wp_json_result,
-            parse_html_result,
-        }
-    }
-
     async fn find_api_root_url(
         &self,
         attempt_site_url: &str,
         api_root_url_from_link_tag: Option<ParsedUrl>,
+        fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
         let parsed_site_url = ParsedUrl::parse(attempt_site_url)
             .map_err(|error| FindApiRootLinkHeaderFailure::ParseSiteUrl { error })?;
@@ -193,10 +188,10 @@ impl WpLoginClient {
             .await
         {
             Ok(success)
-        } else if let Ok(response) = self.guess_api_root_url(parsed_site_url.clone()).await {
+        } else if let Ok(fetch_wp_json_success) = fetch_wp_json_result {
             Ok(FindApiRootLinkHeaderSuccess {
                 parsed_site_url,
-                api_root_url: response,
+                api_root_url: fetch_wp_json_success.wp_json_url,
             })
         } else {
             Err(FindApiRootLinkHeaderFailure::ApiRootNotFound { parsed_site_url })
@@ -263,24 +258,6 @@ impl WpLoginClient {
             body: None,
         };
         self.request_executor.execute(api_root_request.into()).await
-    }
-
-    /// Guess the REST API root URL from the site root. Many sites don't emit a link header or the
-    /// link tag, but the JSON API works just fine. If they use a custom REST route we won't be able to
-    /// find it, but if it's a standard setup this will work.
-    async fn guess_api_root_url(
-        &self,
-        parsed_site_url: ParsedUrl,
-    ) -> Result<ParsedUrl, RequestExecutionError> {
-        let mut api_root_url = parsed_site_url;
-        api_root_url
-            .inner
-            .path_segments_mut()
-            .expect("`parsed_site_url` is already parsed and should have path segments")
-            .push("wp-json");
-        self.fetch_api_root_url(&api_root_url)
-            .await
-            .map(|_| api_root_url)
     }
 
     async fn fetch_wp_api_details(
