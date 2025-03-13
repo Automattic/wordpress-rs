@@ -188,7 +188,10 @@ impl WpLoginClient {
                 parsed_site_url,
                 api_root_url,
             })
-        } else if let Ok(success) = self.fetch_and_parse_api_root_url_header(&parsed_site_url).await {
+        } else if let Ok(success) = self
+            .fetch_and_parse_api_root_url_header(&parsed_site_url)
+            .await
+        {
             Ok(success)
         } else if let Ok(response) = self.guess_api_root_url(&parsed_site_url).await {
             Ok(FindApiRootLinkHeaderSuccess {
@@ -196,9 +199,7 @@ impl WpLoginClient {
                 api_root_url: response,
             })
         } else {
-            Err(FindApiRootLinkHeaderFailure::ApiRootNotFound {
-                parsed_site_url,
-            })
+            Err(FindApiRootLinkHeaderFailure::ApiRootNotFound { parsed_site_url })
         }
     }
 
@@ -206,11 +207,11 @@ impl WpLoginClient {
         &self,
         parsed_site_url: &ParsedUrl,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
-        let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
+        let fetch_api_root_url_response = match self.fetch_api_root_url(parsed_site_url).await {
             Ok(r) => r,
             Err(error) => {
                 return Err(FindApiRootLinkHeaderFailure::FetchApiRootUrl {
-                    parsed_site_url:parsed_site_url.clone(),
+                    parsed_site_url: parsed_site_url.clone(),
                     error,
                 })
             }
@@ -219,13 +220,13 @@ impl WpLoginClient {
             Ok(api_root_url) => api_root_url,
             Err(error) => {
                 return Err(FindApiRootLinkHeaderFailure::ParseApiRootUrl {
-                    parsed_site_url:parsed_site_url.clone(),
+                    parsed_site_url: parsed_site_url.clone(),
                     error,
                 })
             }
         };
         Ok(FindApiRootLinkHeaderSuccess {
-            parsed_site_url:parsed_site_url.clone(),
+            parsed_site_url: parsed_site_url.clone(),
             api_root_url,
         })
     }
@@ -265,17 +266,21 @@ impl WpLoginClient {
     }
 
     /// Guess the REST API root URL from the site root. Many sites don't emit a link header or the
-    /// link tag, but the JSON API works just fine. If they use a custom REST route we won't be able to 
+    /// link tag, but the JSON API works just fine. If they use a custom REST route we won't be able to
     /// find it, but if it's a standard setup this will work.
-    async fn guess_api_root_url(&self, parsed_site_url: &ParsedUrl) -> Result<ParsedUrl, RequestExecutionError> {
+    async fn guess_api_root_url(
+        &self,
+        parsed_site_url: &ParsedUrl,
+    ) -> Result<ParsedUrl, RequestExecutionError> {
         let mut api_root_url = parsed_site_url.clone();
-        api_root_url.inner.path_segments_mut().unwrap().push("wp-json");
-
-        if let Err(error) = self.fetch_api_root_url(&api_root_url).await {
-            return Err(error)
-        } else {
-            Ok(api_root_url)
-        }
+        api_root_url
+            .inner
+            .path_segments_mut()
+            .unwrap()
+            .push("wp-json");
+        self.fetch_api_root_url(&api_root_url)
+            .await
+            .map(|_| api_root_url)
     }
 
     async fn fetch_wp_api_details(
