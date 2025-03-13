@@ -181,22 +181,34 @@ impl WpLoginClient {
         fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
         if let Some(api_root_url) = api_root_url_from_link_tag {
-            Ok(FindApiRootLinkHeaderSuccess {
+            return Ok(FindApiRootLinkHeaderSuccess {
                 parsed_site_url,
                 api_root_url,
-            })
-        } else if let Ok(success) = self
+            });
+        }
+        match self
             .fetch_and_parse_api_root_url_header(parsed_site_url.clone())
             .await
         {
-            Ok(success)
-        } else if let Ok(fetch_wp_json_success) = fetch_wp_json_result {
-            Ok(FindApiRootLinkHeaderSuccess {
-                parsed_site_url,
-                api_root_url: fetch_wp_json_success.wp_json_url,
-            })
-        } else {
-            Err(FindApiRootLinkHeaderFailure::ApiRootNotFound { parsed_site_url })
+            Ok(s) => Ok(s),
+            Err(fetch_and_parse_api_root_url_header_err) => {
+                // If we can't find the link header, but we were able to fetch `/wp-json` from the
+                // attempt url, we assume that it's the correct api root url
+                //
+                // We don't immediately rely on this because there might be cases where there are
+                // multiple `/wp-json` paths in which case we want to prioritize the one returned
+                // from the link header
+                if let Ok(fetch_wp_json_success) = fetch_wp_json_result {
+                    Ok(FindApiRootLinkHeaderSuccess {
+                        parsed_site_url,
+                        api_root_url: fetch_wp_json_success.wp_json_url,
+                    })
+                } else {
+                    // If fetching `/wp-json` wasn't successful, we return the original error from
+                    // fetching the api root link header
+                    Err(fetch_and_parse_api_root_url_header_err)
+                }
+            }
         }
     }
 
