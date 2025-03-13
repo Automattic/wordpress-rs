@@ -226,7 +226,7 @@ impl WpLoginClient {
             }
         };
         Ok(FindApiRootLinkHeaderSuccess {
-            parsed_site_url: parsed_site_url.clone(),
+            parsed_site_url,
             api_root_url,
         })
     }
