@@ -220,6 +220,22 @@ impl AutoDiscoveryAttemptResult {
     }
 }
 
+impl AutoDiscoveryAttemptResult {
+    pub(crate) fn from_parse_site_url_error(
+        attempt: AutoDiscoveryAttempt,
+        error: ParseUrlError,
+    ) -> Self {
+        Self {
+            attempt_type: attempt.attempt_type,
+            attempt_site_url: attempt.attempt_site_url,
+            api_discovery_result: Err(AutoDiscoveryAttemptFailure::ParseSiteUrl {
+                error: error.clone(),
+            }),
+            is_wordpress_site: IsWordPressSiteAttemptResult::from_parse_site_url_error(error),
+        }
+    }
+}
+
 // Does the given URL look like it's on a local development environment for the purposes of the Login Spec?
 pub fn is_local_dev_environment_url(parsed_site_url: &ParsedUrl) -> bool {
     if let Some(hostname) = parsed_site_url.inner.host_str() {
@@ -252,6 +268,18 @@ impl IsWordPressSiteAttemptResult {
                         || r.mentions_wp_includes
                 })
                 .unwrap_or(false)
+    }
+
+    pub fn from_parse_site_url_error(error: ParseUrlError) -> Self {
+        Self {
+            api_link_header_result: Err(FindApiRootLinkHeaderFailure::ParseSiteUrl {
+                error: error.clone(),
+            }),
+            fetch_wp_json_result: Err(FetchWpJsonFailure::ParseSiteUrl {
+                error: error.clone(),
+            }),
+            parse_html_result: Err(ParseHtmlFailure::ParseSiteUrl { error }),
+        }
     }
 }
 
@@ -369,8 +397,8 @@ pub enum FindApiRootLinkHeaderFailure {
         error: ParseApiRootUrlError,
     },
     ApiRootNotFound {
-        parsed_site_url: ParsedUrl
-    }
+        parsed_site_url: ParsedUrl,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -567,15 +595,15 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
                 parsed_site_url,
                 error,
             },
-            FindApiRootLinkHeaderFailure::ApiRootNotFound {
-                parsed_site_url,
-            } => Self::ParseApiRootUrl {
-                parsed_site_url,
-                error: ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-                    status_code: 404,
-                    header_map: Arc::new(WpNetworkHeaderMap::default()),
-                },
-            },
+            FindApiRootLinkHeaderFailure::ApiRootNotFound { parsed_site_url } => {
+                Self::ParseApiRootUrl {
+                    parsed_site_url,
+                    error: ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
+                        status_code: 404,
+                        header_map: Arc::new(WpNetworkHeaderMap::default()),
+                    },
+                }
+            }
         }
     }
 }
