@@ -1,10 +1,11 @@
 use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
-use wp_api::login::login_client::WpLoginClient;
-use wp_api::login::url_discovery::AutoDiscoveryAttemptType;
-use wp_api::middleware::WpApiMiddlewarePipeline;
-use wp_api_integration_tests::AsyncWpNetworking;
+use wp_api::{
+    login::{login_client::WpLoginClient, url_discovery::AutoDiscoveryAttemptType},
+    middleware::WpApiMiddlewarePipeline,
+    reqwest_request_executor::ReqwestRequestExecutor,
+};
 
 #[rstest]
 #[case("http://jalib923knblakis9ba92q3nbaslkes.nope")]
@@ -12,7 +13,7 @@ use wp_api_integration_tests::AsyncWpNetworking;
 #[parallel]
 async fn test_login_flow_err_network_error(#[case] site_url: &str) {
     let client = WpLoginClient::new(
-        Arc::new(AsyncWpNetworking::default()),
+        Arc::new(ReqwestRequestExecutor::new(true)),
         Arc::new(WpApiMiddlewarePipeline::default()),
     );
     let mut result = client.api_discovery(site_url.to_string()).await;
@@ -35,7 +36,7 @@ async fn test_login_flow_err_network_error(#[case] site_url: &str) {
 #[parallel]
 async fn application_passwords_not_supported(#[case] site_url: &str) {
     let client = WpLoginClient::new(
-        Arc::new(AsyncWpNetworking::default()),
+        Arc::new(ReqwestRequestExecutor::new(true)),
         Arc::new(WpApiMiddlewarePipeline::default()),
     );
     let mut result = client.api_discovery(site_url.to_string()).await;

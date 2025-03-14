@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 integration-tests = []
+reqwest-request-executor = ["dep:reqwest", "dep:tokio"]
 
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
@@ -21,12 +22,14 @@ url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate" ], optional = true }
 scraper = { workspace = true }
 serde = { workspace = true, features = [ "derive", "rc" ] }
 serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = [ "full" ], optional = true }
 uniffi = { workspace = true }
 uuid = { workspace = true, features = [ "v4" ] }
 wp_contextual = { path = "../wp_contextual" }
