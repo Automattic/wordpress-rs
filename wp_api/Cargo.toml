@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 integration-tests = []
-reqwest-request-executor = ["dep:reqwest"]
+reqwest-request-executor = ["dep:reqwest", "dep:tokio"]
 
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
@@ -29,6 +29,7 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = [ "full" ], optional = true }
 uniffi = { workspace = true }
 uuid = { workspace = true, features = [ "v4" ] }
 wp_contextual = { path = "../wp_contextual" }
@@ -42,6 +43,7 @@ x509-cert = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
+tokio = { workspace = true, features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

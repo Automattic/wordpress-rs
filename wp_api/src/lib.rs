@@ -23,6 +23,7 @@ pub mod comments;
 pub mod date;
 pub mod login;
 pub mod media;
+pub mod middleware;
 pub mod plugins;
 pub mod post_types;
 pub mod posts;

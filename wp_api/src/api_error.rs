@@ -1,8 +1,5 @@
-use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError};
-use crate::{
-    request::{request_or_response_body_as_string, WpRedirect},
-    ssl::SSLCertificateInfo,
-};
+use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError, WpNetworkResponse};
+use crate::{request::WpRedirect, ssl::SSLCertificateInfo};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -10,7 +7,7 @@ pub trait ParsedRequestError
 where
     Self: Sized,
 {
-    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self>;
+    fn try_parse(response: &WpNetworkResponse) -> Option<Self>;
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
@@ -63,28 +60,36 @@ fn maybe_json_response(response: &String) -> String {
 }
 
 impl ParsedRequestError for WpApiError {
-    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
-        if let Some(wp_error) = WpError::try_parse(response_body, response_status_code) {
+    fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
+        if let Some(wp_error) = WpError::try_parse(&response.body, response.status_code) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
-                status_code: response_status_code,
-                response: request_or_response_body_as_string(response_body),
+                status_code: response.status_code,
+                response: response.body_as_string(),
             })
         } else {
-            match http::StatusCode::from_u16(response_status_code) {
+            if let Some(reason) = RequestExecutionErrorReason::try_from_response(response) {
+                return Some(WpApiError::RequestExecutionFailed {
+                    status_code: Some(response.status_code),
+                    redirects: None,
+                    reason,
+                });
+            }
+
+            match http::StatusCode::from_u16(response.status_code) {
                 Ok(status) => {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
-                            status_code: response_status_code,
-                            response: request_or_response_body_as_string(response_body),
+                            status_code: response.status_code,
+                            response: response.body_as_string(),
                         })
                     } else {
                         None
                     }
                 }
                 Err(_) => Some(WpApiError::InvalidHttpStatusCode {
-                    status_code: response_status_code,
+                    status_code: response.status_code,
                 }),
             }
         }
@@ -455,7 +460,7 @@ pub enum RequestExecutionErrorReason {
     )]
     HttpAuthenticationRequiredError {
         hostname: String,
-        server_message: Option<String>,
+        method: Option<HttpAuthMethod>,
     },
     #[error(
         "The server at {} rejected your credentials. Please provide a valid username and password.",
@@ -473,6 +478,32 @@ pub enum RequestExecutionErrorReason {
     DeviceIsOfflineError { error_message: String },
     #[error("{}", error_message)]
     GenericError { error_message: String },
+}
+
+impl RequestExecutionErrorReason {
+    pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
+        if response.is_http_authentication_required()
+            && !response.request_header_map.has_http_authentication()
+        {
+            let reason = match response.get_http_auth_method() {
+                Ok(maybe_method) => match maybe_method {
+                    Some(method) => RequestExecutionErrorReason::HttpAuthenticationRequiredError {
+                        hostname: response.request_url.0.clone(),
+                        method: Some(method),
+                    },
+                    None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
+                        issue: HttpAuthMethodParsingError::Unknown,
+                    },
+                },
+                Err(e) => {
+                    RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
+                }
+            };
+            Some(reason)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]

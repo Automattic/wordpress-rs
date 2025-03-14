@@ -1,7 +1,8 @@
 use serial_test::parallel;
 use std::sync::Arc;
 use wp_api::{
-    reqwest_request_executor::ReqwestRequestExecutor, wordpress_org::client::WordPressOrgApiClient,
+    middleware::WpApiMiddlewarePipeline, reqwest_request_executor::ReqwestRequestExecutor,
+    wordpress_org::client::WordPressOrgApiClient,
 };
 use wp_api_integration_tests::{api_client, test_site_url, AssertResponse, TestCredentials};
 
@@ -16,7 +17,10 @@ async fn plugins_update_check() {
         .data;
     assert!(!plugins.is_empty());
 
-    let wp_org_client = WordPressOrgApiClient::new(Arc::new(ReqwestRequestExecutor::new(true)));
+    let wp_org_client = WordPressOrgApiClient::new(
+        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(WpApiMiddlewarePipeline::default()),
+    );
     wp_org_client
         .check_plugin_updates(
             TestCredentials::instance()
