@@ -6,7 +6,7 @@ use std::{fmt::Debug, sync::Arc, time::Duration};
 
 #[derive(Debug, Default, uniffi::Object)]
 pub struct WpApiMiddlewarePipeline {
-    middlewares: Vec<Arc<dyn WpApiMiddleware>>,
+    pub middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 }
 
 #[uniffi::export]
@@ -87,6 +87,14 @@ pub trait PerformsRequests {
         let pipeline = &self.get_middleware_pipeline();
         let response = self.get_request_executor().execute(request.clone()).await?;
 
+        let response = pipeline
+            .process(
+                self.get_request_executor().clone(),
+                response,
+                request.clone(),
+            )
+            .await?;
+
         // TODO: `WpApiError::try_parse` also handles this case. Neither of these seem like the
         // correct way to handle these errors, because neither implementation is "central" enough.
         // Since there isn't a great place to handle this at the moment, and it's not clear whether
@@ -99,13 +107,7 @@ pub trait PerformsRequests {
             });
         }
 
-        pipeline
-            .process(
-                self.get_request_executor().clone(),
-                response,
-                request.clone(),
-            )
-            .await
+        Ok(response)
     }
 }
 
@@ -172,7 +174,7 @@ impl WpApiMiddleware for RetryAfterMiddleware {
 // MARK: - ApiDiscoveryAuthenticationMiddleware
 
 #[derive(Debug, uniffi::Object)]
-struct ApiDiscoveryAuthenticationMiddleware {
+pub struct ApiDiscoveryAuthenticationMiddleware {
     username: String,
     password: String,
 }
@@ -180,7 +182,7 @@ struct ApiDiscoveryAuthenticationMiddleware {
 #[uniffi::export]
 impl ApiDiscoveryAuthenticationMiddleware {
     #[uniffi::constructor]
-    fn new(username: String, password: String) -> Self {
+    pub fn new(username: String, password: String) -> Self {
         println!("Creating HTTP authentication middleware");
         Self { username, password }
     }

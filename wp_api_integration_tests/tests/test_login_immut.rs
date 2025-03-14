@@ -2,7 +2,8 @@ use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
 use wp_api::{
-    login::login_client::WpLoginClient, middleware::WpApiMiddlewarePipeline,
+    login::login_client::WpLoginClient,
+    middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 
@@ -63,10 +64,42 @@ const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
+    login_flow_helper(site_url, expected_auth_url, vec![]).await;
+}
+
+#[rstest]
+#[case(
+    "https://basic-auth.wpmt.co",
+    "https://basic-auth.wpmt.co/wp-admin/authorize-application.php"
+)]
+#[tokio::test]
+#[parallel]
+async fn test_login_flow_with_authentication_middleware(
+    #[case] site_url: &str,
+    #[case] expected_auth_url: &str,
+) {
+    login_flow_helper(
+        site_url,
+        expected_auth_url,
+        vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
+            // These credentials are safe to check into the repo
+            "test@example.com".to_string(),
+            "str0ngp4ssw0rd!".to_string(),
+        ))],
+    )
+    .await;
+}
+
+async fn login_flow_helper(
+    site_url: &str,
+    expected_auth_url: &str,
+    middlewares: Vec<Arc<dyn WpApiMiddleware>>,
+) {
     let client = WpLoginClient::new(
         Arc::new(ReqwestRequestExecutor::new(true)),
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        Arc::new(WpApiMiddlewarePipeline { middlewares }),
     );
+
     let result = client.api_discovery(site_url.to_string()).await;
     assert!(
         result.is_successful(),
