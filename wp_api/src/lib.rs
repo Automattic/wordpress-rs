@@ -38,6 +38,9 @@ pub mod users;
 pub mod wordpress_org;
 pub mod wp_site_health_tests;
 
+#[cfg(feature = "reqwest-request-executor")]
+pub mod reqwest_request_executor;
+
 #[cfg(test)]
 mod unit_test_common;
 
