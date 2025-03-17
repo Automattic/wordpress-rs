@@ -137,6 +137,10 @@ impl AutoDiscoveryAttemptResult {
         self.attempt_site_url.clone()
     }
 
+    fn api_discovery_error(&self) -> Option<AutoDiscoveryAttemptFailure> {
+        self.api_discovery_result.as_ref().err().cloned()
+    }
+
     fn error_message(&self) -> Option<String> {
         match &self.api_discovery_result {
             Ok(_) => None,
@@ -182,14 +186,14 @@ impl AutoDiscoveryAttemptResult {
 
     fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
         match &self.api_discovery_result {
-            Ok(success) => Some(Arc::new(success.parsed_site_url.clone())),
+            Ok(success) => Some(Arc::clone(&success.parsed_site_url)),
             Err(error) => error.parsed_site_url().map(|p| Arc::new(p.clone())),
         }
     }
 
     fn api_root_url(&self) -> Option<Arc<ParsedUrl>> {
         match &self.api_discovery_result {
-            Ok(success) => Some(Arc::new(success.api_root_url.clone())),
+            Ok(success) => Some(Arc::clone(&success.api_root_url)),
             Err(error) => error.api_root_url().map(|p| Arc::new(p.clone())),
         }
     }
@@ -285,13 +289,13 @@ impl IsWordPressSiteAttemptResult {
 
 #[derive(Debug, Clone)]
 pub struct FindApiRootLinkHeaderSuccess {
-    pub parsed_site_url: ParsedUrl,
-    pub api_root_url: ParsedUrl,
+    pub parsed_site_url: Arc<ParsedUrl>,
+    pub api_root_url: Arc<ParsedUrl>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FetchWpJsonSuccess {
-    pub wp_json_url: ParsedUrl,
+    pub wp_json_url: Arc<ParsedUrl>,
     pub root_wp_json: RootWpJson,
 }
 
@@ -305,7 +309,7 @@ pub struct IsWordPressSiteParseHtmlResult {
     /// `href` attribute of a link tag if it has `rel` attribute of "https://api.w.org/".
     /// For example:
     /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
-    pub api_root_url_from_link_tag: Option<ParsedUrl>,
+    pub api_root_url_from_link_tag: Option<Arc<ParsedUrl>>,
     /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
     pub has_wordpress_generator_meta_tag: bool,
     /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
@@ -356,7 +360,7 @@ impl IsWordPressSiteParseHtmlResult {
         let api_root_url_from_link_tag = html.select(&link_selector).find_map(|e| {
             if let Some(API_ROOT_LINK_HEADER) = e.attr(Self::HTML_ATTR_REL) {
                 e.attr(Self::HTML_ATTR_HREF)
-                    .and_then(|u| ParsedUrl::parse(u).ok())
+                    .and_then(|u| ParsedUrl::parse(u).ok().map(Arc::new))
             } else {
                 None
             }
@@ -389,11 +393,11 @@ pub enum FindApiRootLinkHeaderFailure {
         error: ParseUrlError,
     },
     FetchApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
     },
     ParseApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: ParseApiRootUrlError,
     },
 }
@@ -420,47 +424,47 @@ pub enum ParseHtmlFailure {
 
 #[derive(Debug, Clone)]
 pub struct AutoDiscoveryAttemptSuccess {
-    pub parsed_site_url: ParsedUrl,
-    pub api_root_url: ParsedUrl,
+    pub parsed_site_url: Arc<ParsedUrl>,
+    pub api_root_url: Arc<ParsedUrl>,
     pub api_details: WpApiDetails,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
 pub enum AutoDiscoveryAttemptFailure {
     #[error("{error}")]
     ParseSiteUrl { error: ParseUrlError },
     #[error("{error}")]
     FetchApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
     },
     #[error("{error}")]
     ParseApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: ParseApiRootUrlError,
     },
     #[error("{error}")]
     FetchApiDetails {
-        parsed_site_url: ParsedUrl,
-        api_root_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
     },
     #[error("Failed to parse api details: {:#?}", parsing_error_message)]
     ParseApiDetails {
-        parsed_site_url: ParsedUrl,
-        api_root_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         parsing_error_message: String,
     },
     #[error("{}", reason.as_ref().map(|r| r.error_message(parsed_site_url)).unwrap_or("Application Passwords are not supported".to_string()))]
     ApplicationPasswordsNotSupported {
-        parsed_site_url: ParsedUrl,
-        api_root_url: ParsedUrl,
-        api_details: WpApiDetails,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
+        api_details: Arc<WpApiDetails>,
         reason: Option<ApplicationPasswordsNotSupportedReason>,
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, uniffi::Error)]
 pub enum ApplicationPasswordsNotSupportedReason {
     ApplicationPasswordBlockedByPlugin {
         plugin: KnownApplicationPasswordBlockingPlugin,
