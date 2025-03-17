@@ -482,27 +482,34 @@ pub enum RequestExecutionErrorReason {
 
 impl RequestExecutionErrorReason {
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
-        if response.is_http_authentication_required()
-            && !response.request_header_map.has_http_authentication()
-        {
-            let reason = match response.get_http_auth_method() {
-                Ok(maybe_method) => match maybe_method {
-                    Some(method) => RequestExecutionErrorReason::HttpAuthenticationRequiredError {
-                        hostname: response.request_url.0.clone(),
-                        method: Some(method),
-                    },
-                    None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                        issue: HttpAuthMethodParsingError::Unknown,
-                    },
-                },
-                Err(e) => {
-                    RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
-                }
-            };
-            Some(reason)
-        } else {
-            None
+        if !response.is_http_authentication_required() {
+            return None;
         }
+
+        let reason = match response.get_http_auth_method() {
+            Ok(maybe_method) => match maybe_method {
+                Some(method) => {
+                    if response.request_header_map.has_http_authentication() {
+                        RequestExecutionErrorReason::HttpAuthenticationRejectedError {
+                            hostname: response.request_url.0.clone(),
+                            method: Some(method),
+                        }
+                    } else {
+                        RequestExecutionErrorReason::HttpAuthenticationRequiredError {
+                            hostname: response.request_url.0.clone(),
+                            method: Some(method),
+                        }
+                    }
+                }
+                None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
+                    issue: HttpAuthMethodParsingError::Unknown,
+                },
+            },
+            Err(e) => {
+                RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
+            }
+        };
+        Some(reason)
     }
 }
 
