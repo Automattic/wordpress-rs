@@ -1,0 +1,19 @@
+[package]
+name = "wordpress-rs"
+version = "0.1.0"
+edition = "2021"
+description = "A command-line interface for interacting with WordPress sites"
+authors = ["WordPress-rs Contributors"]
+license = "GPL-2.0-or-later"
+
+[dependencies]
+wp_api = { path = "../wp_api" }
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+colored = "3.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+
+[[bin]]
+name = "wp_rs_cli"
