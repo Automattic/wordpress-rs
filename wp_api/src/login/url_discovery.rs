@@ -30,22 +30,38 @@ impl AutoDiscoveryAttempt {
         Self::new(attempt_site_url, AutoDiscoveryAttemptType::UserInput)
     }
 
-    fn with_auto_https_attempt_type(attempt_site_url: impl Into<String>) -> Self {
-        Self::new(attempt_site_url, AutoDiscoveryAttemptType::AutoHttps)
-    }
-
-    fn with_auto_remove_wp_admin_suffix_attempt_type(attempt_site_url: impl Into<String>) -> Self {
+    fn with_auto_stripped_https_attempt_type(attempt_site_url: impl Into<String>) -> Self {
         Self::new(
             attempt_site_url,
-            AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
+            AutoDiscoveryAttemptType::AutoStrippedHttps,
         )
     }
 
-    fn with_auto_remove_wp_login_suffix_attempt_type(attempt_site_url: impl Into<String>) -> Self {
-        Self::new(
-            attempt_site_url,
-            AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix,
-        )
+    fn maybe_auto_stripped_https_attempt_type_from_input(
+        input_site_url: impl Into<String>,
+    ) -> Option<Self> {
+        let input_url_as_string: String = input_site_url.into();
+        let processed_site_url = input_url_as_string
+            .strip_suffix("wp-admin")
+            .or_else(|| input_url_as_string.strip_suffix("wp-admin/"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-admin.php"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-login"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-login/"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-login.php"))
+            .unwrap_or(input_url_as_string.as_str());
+        let url = if !processed_site_url.starts_with("http") {
+            format!("https://{}", processed_site_url)
+        } else if !processed_site_url.starts_with("https") {
+            processed_site_url.replacen("http", "https", 1)
+        } else {
+            if processed_site_url == input_url_as_string {
+                // The `input_site_url` hasn't been modified in any way, so no need to add an
+                // additional attempt for it
+                return None;
+            }
+            processed_site_url.to_string()
+        };
+        Some(Self::with_auto_stripped_https_attempt_type(url))
     }
 }
 
@@ -53,8 +69,7 @@ impl AutoDiscoveryAttempt {
 pub struct AutoDiscoveryUniffiResult {
     pub user_input_attempt: Arc<AutoDiscoveryAttemptResult>,
     pub successful_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
-    pub auto_https_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
-    pub auto_dot_php_extension_for_wp_admin_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
+    pub auto_stripped_https_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
     pub is_successful: bool,
 }
 
@@ -68,9 +83,8 @@ impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
         Self {
             user_input_attempt: Arc::new(value.user_input_attempt().clone()),
             successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
-            auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
-            auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
-                AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
+            auto_stripped_https_attempt: get_attempt_result(
+                AutoDiscoveryAttemptType::AutoStrippedHttps,
             ),
             is_successful: value.is_successful(),
         }
@@ -603,39 +617,20 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, uniffi::Enum)]
 pub enum AutoDiscoveryAttemptType {
     UserInput,
-    AutoHttps,
-    AutoRemoveWpAdminSuffix,
-    AutoRemoveWpLoginSuffix,
+    // Removes `/wp-login` & `/wp-admin` suffixes and replaces `http` with `https`
+    AutoStrippedHttps,
 }
 
 pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
     let mut attempts = vec![AutoDiscoveryAttempt::with_user_input_attempt_type(
         input_site_url.clone(),
     )];
-    if !input_site_url.starts_with("http") {
-        attempts.push(AutoDiscoveryAttempt::with_auto_https_attempt_type(format!(
-            "https://{}",
-            input_site_url
-        )));
-    } else if !input_site_url.starts_with("https") {
-        // Url starts with `http`, but not `https`
-        attempts.push(AutoDiscoveryAttempt::with_auto_https_attempt_type(
-            input_site_url.replacen("http", "https", 1),
-        ));
-    }
-    if let Some(a) = input_site_url
-        .strip_suffix("wp-admin")
-        .or_else(|| input_site_url.strip_suffix("wp-admin/"))
-        .or_else(|| input_site_url.strip_suffix("wp-admin.php"))
+    if let Some(auto_https_attempt) =
+        AutoDiscoveryAttempt::maybe_auto_stripped_https_attempt_type_from_input(
+            input_site_url.as_str(),
+        )
     {
-        attempts.push(AutoDiscoveryAttempt::with_auto_remove_wp_admin_suffix_attempt_type(a));
-    }
-    if let Some(a) = input_site_url
-        .strip_suffix("wp-login")
-        .or_else(|| input_site_url.strip_suffix("wp-login/"))
-        .or_else(|| input_site_url.strip_suffix("wp-login.php"))
-    {
-        attempts.push(AutoDiscoveryAttempt::with_auto_remove_wp_login_suffix_attempt_type(a));
+        attempts.push(auto_https_attempt);
     }
     attempts
 }
@@ -700,21 +695,22 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case::localhost("localhost", vec![A::with_user_input_attempt_type("localhost"), A::with_auto_https_attempt_type("https://localhost")])]
-    #[case::http_localhost("http://localhost", vec![A::with_user_input_attempt_type("http://localhost"), A::with_auto_https_attempt_type("https://localhost")])]
-    #[case::http_localhost_wp_json("http://localhost/wp-json", vec![A::with_user_input_attempt_type("http://localhost/wp-json"), A::with_auto_https_attempt_type("https://localhost/wp-json")])]
-    #[case::http_localhost_wp_admin_php("http://localhost/wp-admin.php", vec![A::with_user_input_attempt_type("http://localhost/wp-admin.php"), A::with_auto_https_attempt_type("https://localhost/wp-admin.php"), A::with_auto_remove_wp_admin_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_admin("http://localhost/wp-admin", vec![A::with_user_input_attempt_type("http://localhost/wp-admin"), A::with_auto_https_attempt_type("https://localhost/wp-admin") ,A::with_auto_remove_wp_admin_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_admin_slash("http://localhost/wp-admin/", vec![A::with_user_input_attempt_type("http://localhost/wp-admin/"), A::with_auto_https_attempt_type("https://localhost/wp-admin/"), A::with_auto_remove_wp_admin_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_login_php("http://localhost/wp-login.php", vec![A::with_user_input_attempt_type("http://localhost/wp-login.php"), A::with_auto_https_attempt_type("https://localhost/wp-login.php"), A::with_auto_remove_wp_login_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_login("http://localhost/wp-login", vec![A::with_user_input_attempt_type("http://localhost/wp-login"), A::with_auto_https_attempt_type("https://localhost/wp-login"), A::with_auto_remove_wp_login_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_login_slash("http://localhost/wp-login/", vec![A::with_user_input_attempt_type("http://localhost/wp-login/"), A::with_auto_https_attempt_type("https://localhost/wp-login/"), A::with_auto_remove_wp_login_suffix_attempt_type("http://localhost/")])]
-    #[case::automatticwidgets_wp_json("automatticwidgets.wpcomstaging.com/wp-json", vec![A::with_user_input_attempt_type("automatticwidgets.wpcomstaging.com/wp-json"), A::with_auto_https_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-json")])]
+    #[case::localhost("localhost", vec![A::with_user_input_attempt_type("localhost"), A::with_auto_stripped_https_attempt_type("https://localhost")])]
+    #[case::http_localhost("http://localhost", vec![A::with_user_input_attempt_type("http://localhost"), A::with_auto_stripped_https_attempt_type("https://localhost")])]
+    #[case::http_localhost_wp_json("http://localhost/wp-json", vec![A::with_user_input_attempt_type("http://localhost/wp-json"), A::with_auto_stripped_https_attempt_type("https://localhost/wp-json")])]
+    #[case::http_localhost_wp_admin_php("http://localhost/wp-admin.php", vec![A::with_user_input_attempt_type("http://localhost/wp-admin.php"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_admin("http://localhost/wp-admin", vec![A::with_user_input_attempt_type("http://localhost/wp-admin"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_admin_slash("http://localhost/wp-admin/", vec![A::with_user_input_attempt_type("http://localhost/wp-admin/"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_login_php("http://localhost/wp-login.php", vec![A::with_user_input_attempt_type("http://localhost/wp-login.php"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_login("http://localhost/wp-login", vec![A::with_user_input_attempt_type("http://localhost/wp-login"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_login_slash("http://localhost/wp-login/", vec![A::with_user_input_attempt_type("http://localhost/wp-login/"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::automatticwidgets_wp_json("automatticwidgets.wpcomstaging.com/wp-json", vec![A::with_user_input_attempt_type("automatticwidgets.wpcomstaging.com/wp-json"), A::with_auto_stripped_https_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-json")])]
     #[case::automatticwidgets_https("https://automatticwidgets.wpcomstaging.com", vec![A::with_user_input_attempt_type("https://automatticwidgets.wpcomstaging.com")])]
     #[case::automatticwidgets_https_wp_json(
         "https://automatticwidgets.wpcomstaging.com/wp-json",
         vec![A::with_user_input_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-json")]
     )]
+    #[case::automatticwidgets_https_wp_admin("https://automatticwidgets.wpcomstaging.com/wp-admin", vec![A::with_user_input_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-admin"), A::with_auto_stripped_https_attempt_type("https://automatticwidgets.wpcomstaging.com/")])]
     fn test_construct_attempts(
         #[case] input_site_url: &str,
         #[case] expected_attempts: Vec<AutoDiscoveryAttempt>,
