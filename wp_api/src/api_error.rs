@@ -61,7 +61,7 @@ fn maybe_json_response(response: &String) -> String {
 
 impl ParsedRequestError for WpApiError {
     fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
-        if let Some(wp_error) = WpError::try_parse(&response.body, response.status_code) {
+        if let Some(wp_error) = WpError::try_parse(&response.body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
@@ -108,12 +108,12 @@ pub struct WpError {
 }
 
 impl WpError {
-    pub fn try_parse(response_body: &[u8], _response_status_code: u16) -> Option<Self> {
+    pub fn try_parse(response_body: &[u8]) -> Option<Self> {
         serde_json::from_slice::<WpError>(response_body).ok()
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpErrorCode {
     #[serde(rename = "rest_already_trashed")]
     AlreadyTrashed,
@@ -197,6 +197,8 @@ pub enum WpErrorCode {
     CommentTrashPost,
     #[serde(rename = "empty_content")]
     EmptyContent,
+    #[serde(rename = "rest_forbidden")]
+    Forbidden,
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
     #[serde(rename = "rest_forbidden_param")]
@@ -454,22 +456,18 @@ pub enum RequestExecutionErrorReason {
         error_message: Option<String>,
         suggested_action: Option<String>,
     },
-    #[error(
-        "The server at {} requires authentication. Please provide your username and password.",
-        hostname
-    )]
+    #[error("The server at {hostname} requires authentication. Please provide your username and password.")]
     HttpAuthenticationRequiredError {
         hostname: String,
         method: Option<HttpAuthMethod>,
     },
-    #[error(
-        "The server at {} rejected your credentials. Please provide a valid username and password.",
-        hostname
-    )]
+    #[error("The server at {hostname} rejected your credentials. Please provide a valid username and password.")]
     HttpAuthenticationRejectedError {
         hostname: String,
         method: Option<HttpAuthMethod>,
     },
+    #[error("The server at {hostname} denied access to the requested resource. Please check your site's configuration.")]
+    HttpForbiddenError { hostname: String },
     #[error("The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.")]
     MisconfiguredHttpAuthenticationError { issue: HttpAuthMethodParsingError },
     #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
@@ -482,7 +480,15 @@ pub enum RequestExecutionErrorReason {
 
 impl RequestExecutionErrorReason {
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
-        if !response.is_http_authentication_required() {
+        if response.status_code != 401 && response.status_code != 403 {
+            return None;
+        }
+
+        // TODO: We are currently parsing the response for `WpError` twice. There is currently no
+        // good way to avoid it, but we are planning to rework some of the error handling once we
+        // finish the login work. At that time, we'll try to remove the double parsing.
+        if WpError::try_parse(&response.body).is_some() {
+            // If the response is a `WpError`, don't map it to an auth error
             return None;
         }
 
@@ -501,9 +507,18 @@ impl RequestExecutionErrorReason {
                         }
                     }
                 }
-                None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                    issue: HttpAuthMethodParsingError::Unknown,
-                },
+                None => {
+                    if response.request_header_map.has_http_authentication() {
+                        RequestExecutionErrorReason::HttpAuthenticationRejectedError {
+                            hostname: response.request_url.0.clone(),
+                            method: None,
+                        }
+                    } else {
+                        RequestExecutionErrorReason::HttpForbiddenError {
+                            hostname: response.request_url.0.clone(),
+                        }
+                    }
+                }
             },
             Err(e) => {
                 RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }

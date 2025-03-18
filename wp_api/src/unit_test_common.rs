@@ -1,7 +1,9 @@
 use crate::{
     date::WpGmtDateTime,
+    request::{endpoint::WpEndpointUrl, WpNetworkHeaderMap, WpNetworkResponse},
     url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, UrlQueryPairsMap},
 };
+use std::sync::Arc;
 use url::Url;
 
 #[cfg(test)]
@@ -38,4 +40,15 @@ pub fn unit_test_example_date_as_option() -> Option<WpGmtDateTime> {
 #[cfg(test)]
 pub fn unit_test_example_date_as_query_value(key: &str) -> String {
     format!("{key}=2024-02-09T02%3A14%3A13%2B00%3A00")
+}
+
+#[cfg(test)]
+pub fn wp_network_response_from_json(json: &str, status_code: u16) -> WpNetworkResponse {
+    WpNetworkResponse {
+        body: json.into(),
+        status_code,
+        response_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        request_url: WpEndpointUrl("http://example.com".to_string()),
+        request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+    }
 }

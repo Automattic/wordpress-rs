@@ -62,16 +62,16 @@ pub struct WpApiDetails {
     pub site_icon_url: Option<String>,
 }
 
-impl TryFrom<Vec<u8>> for WpApiDetails {
+impl TryFrom<&[u8]> for WpApiDetails {
     type Error = serde_json::Error;
 
-    fn try_from(mut value: Vec<u8>) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         // If the body starts with the UTF-8 BOM, remove it
         if value.starts_with(&[0xEF, 0xBB, 0xBF]) {
-            value.drain(0..3);
+            serde_json::from_slice::<WpApiDetails>(&value[3..])
+        } else {
+            serde_json::from_slice::<WpApiDetails>(value)
         }
-
-        serde_json::from_slice::<WpApiDetails>(&value)
     }
 }
 
@@ -369,7 +369,7 @@ mod tests {
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
-        let result = WpApiDetails::try_from(json);
+        let result = WpApiDetails::try_from(json.as_slice());
 
         assert!(
             result.is_ok(),

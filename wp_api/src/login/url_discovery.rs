@@ -1,8 +1,8 @@
 use super::WpApiDetails;
 use crate::{
-    login::KnownApplicationPasswordBlockingPlugin, request::WpNetworkHeaderMap,
-    request::WpRedirect, ParseUrlError, ParsedUrl, RequestExecutionError,
-    RequestExecutionErrorReason,
+    login::KnownApplicationPasswordBlockingPlugin,
+    request::{WpNetworkHeaderMap, WpRedirect},
+    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -469,6 +469,19 @@ pub enum AutoDiscoveryAttemptFailure {
         api_root_url: Arc<ParsedUrl>,
         parsing_error_message: String,
     },
+    #[error(
+        "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"",
+        status_code,
+        error_code,
+        error_message
+    )]
+    WpError {
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
+        error_code: WpErrorCode,
+        error_message: String,
+        status_code: u16,
+    },
     #[error("{}", reason.as_ref().map(|r| r.error_message(parsed_site_url)).unwrap_or("Application Passwords are not supported".to_string()))]
     ApplicationPasswordsNotSupported {
         parsed_site_url: Arc<ParsedUrl>,
@@ -502,33 +515,36 @@ impl ApplicationPasswordsNotSupportedReason {
 impl AutoDiscoveryAttemptFailure {
     pub fn is_network_error(&self) -> bool {
         match self {
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => true,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => true,
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => false,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => false,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => false,
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => false,
+            Self::FetchApiRootUrl { .. } => true,
+            Self::FetchApiDetails { .. } => true,
+            Self::ParseSiteUrl { .. } => false,
+            Self::ParseApiRootUrl { .. } => false,
+            Self::ParseApiDetails { .. } => false,
+            Self::WpError { .. } => false,
+            Self::ApplicationPasswordsNotSupported { .. } => false,
         }
     }
 
     pub fn parsed_site_url(&self) -> Option<&ParsedUrl> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl {
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl {
+            Self::ParseApiRootUrl {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::FetchApiDetails {
+            Self::FetchApiDetails {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::ParseApiDetails {
+            Self::ParseApiDetails {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
-                parsed_site_url,
-                ..
+            Self::WpError {
+                parsed_site_url, ..
+            } => Some(parsed_site_url),
+            Self::ApplicationPasswordsNotSupported {
+                parsed_site_url, ..
             } => Some(parsed_site_url),
         }
     }
@@ -536,58 +552,63 @@ impl AutoDiscoveryAttemptFailure {
     // If it failed while parsing the site url or fetching the api root url, we never tried to
     // parse it, so we return `None`
     //
-    // If we fail to parse with `AutoDiscoveryAttemptFailure::ParseApiRootUrl`, we return
-    // `Some(true)`, because that's exactly when the failure happened.
+    // If we fail to parse with `Self::ParseApiRootUrl`, we return `Some(true)`, because
+    // that's exactly when the failure happened.
     //
     // If an error occurs after parsing the api root url, we return `Some(false)`.
     pub fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => Some(true),
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => Some(false),
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(false),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => Some(true),
+            Self::FetchApiDetails { .. } => Some(false),
+            Self::ParseApiDetails { .. } => Some(false),
+            Self::WpError { .. } => Some(false),
+            Self::ApplicationPasswordsNotSupported { .. } => Some(false),
         }
     }
 
     pub fn api_root_url(&self) -> Option<&ParsedUrl> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
-            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
-                api_root_url, ..
-            } => Some(api_root_url),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => None,
+            Self::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
+            Self::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
+            Self::WpError { api_root_url, .. } => Some(api_root_url),
+            Self::ApplicationPasswordsNotSupported { api_root_url, .. } => Some(api_root_url),
         }
     }
 
     // If it failed while parsing the site url, fetching the api root url, parsing the api root url
     // or fetching the api details, we never tried to parse it, so we return `None`.
     //
-    // If we fail to parse with `AutoDiscoveryAttemptFailure::ParseApiDetails`, we return
-    // `Some(true)`, because that's exactly when the failure happened.
+    // If we fail to parse with `Self::ParseApiDetails`, we return `Some(true)`, because
+    // that's exactly when the failure happened.
+    //
+    // If we parse the api details as `Self::WpError`, we return `Some(false)`, because the
+    // response was parseable.
     pub fn has_failed_to_parse_api_details(&self) -> Option<bool> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(true),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => None,
+            Self::FetchApiDetails { .. } => None,
+            Self::ParseApiDetails { .. } => Some(true),
+            Self::WpError { .. } => Some(false),
+            Self::ApplicationPasswordsNotSupported { .. } => Some(false),
         }
     }
 
     pub fn is_application_passwords_disabled(&self) -> Option<bool> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => None,
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(true),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => None,
+            Self::FetchApiDetails { .. } => None,
+            Self::ParseApiDetails { .. } => None,
+            Self::WpError { .. } => None,
+            Self::ApplicationPasswordsNotSupported { .. } => Some(true),
         }
     }
 }

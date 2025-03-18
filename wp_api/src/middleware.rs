@@ -202,7 +202,7 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
             return Ok(response);
         }
 
-        if !response.is_http_authentication_required() {
+        if response.status_code != 401 && response.status_code != 403 {
             return Ok(response);
         }
 
