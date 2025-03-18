@@ -197,6 +197,8 @@ pub enum WpErrorCode {
     CommentTrashPost,
     #[serde(rename = "empty_content")]
     EmptyContent,
+    #[serde(rename = "rest_forbidden")]
+    Forbidden,
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
     #[serde(rename = "rest_forbidden_param")]

@@ -134,7 +134,7 @@ impl WpLoginClient {
                 })
             }
         };
-        let api_details = self.parse_api_details(
+        let api_details = Self::parse_api_details(
             &fetch_api_details_response,
             Arc::clone(&api_root_url_success.parsed_site_url),
             Arc::clone(&api_root_url_success.api_root_url),
@@ -366,7 +366,6 @@ impl WpLoginClient {
     }
 
     fn parse_api_details(
-        &self,
         fetch_api_details_response: &WpNetworkResponse,
         parsed_site_url: Arc<ParsedUrl>,
         api_root_url: Arc<ParsedUrl>,
@@ -398,5 +397,38 @@ impl PerformsRequests for WpLoginClient {
 
     fn get_request_executor(&self) -> Arc<dyn RequestExecutor> {
         self.request_executor.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{unit_test_common::wp_network_response_from_json, WpErrorCode};
+
+    #[test]
+    fn test_parse_api_details_wp_error_rest_forbidden() {
+        let json = r#"{
+          "code": "rest_forbidden",
+          "message": "REST API access is restricted."
+        }"#;
+        let response = wp_network_response_from_json(json, 403);
+        let parsed_url = Arc::new(ParsedUrl::parse("http://example.com").expect("valid url"));
+        let result = WpLoginClient::parse_api_details(
+            &response,
+            Arc::clone(&parsed_url),
+            Arc::clone(&parsed_url),
+        );
+        assert!(
+            matches!(
+                result,
+                Err(AutoDiscoveryAttemptFailure::WpError {
+                    error_code: WpErrorCode::Forbidden,
+                    status_code: 403,
+                    ..
+                })
+            ),
+            "{:#?}",
+            result
+        );
     }
 }
