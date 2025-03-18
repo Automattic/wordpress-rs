@@ -16,7 +16,7 @@ use crate::{
         endpoint::{WpEndpointUrl, WP_JSON_PATH_SEGMENTS},
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
     },
-    ParseUrlError, ParsedUrl, RequestExecutionError,
+    ParseUrlError, ParsedUrl, RequestExecutionError, WpError,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -134,17 +134,11 @@ impl WpLoginClient {
                 })
             }
         };
-        let api_details: WpApiDetails =
-            match WpApiDetails::try_from(fetch_api_details_response.body) {
-                Ok(api_details) => api_details,
-                Err(error) => {
-                    return Err(AutoDiscoveryAttemptFailure::ParseApiDetails {
-                        parsed_site_url: api_root_url_success.parsed_site_url,
-                        api_root_url: api_root_url_success.api_root_url,
-                        parsing_error_message: error.to_string(),
-                    });
-                }
-            };
+        let api_details = self.parse_api_details(
+            &fetch_api_details_response,
+            Arc::clone(&api_root_url_success.parsed_site_url),
+            Arc::clone(&api_root_url_success.api_root_url),
+        )?;
 
         if !api_details.has_application_passwords_authentication_url() {
             let reason = if api_details.has_application_password_blocking_plugin() {
@@ -369,6 +363,31 @@ impl WpLoginClient {
         )
         .await
         .map_err(|error| ParseHtmlFailure::FetchSite { error })
+    }
+
+    fn parse_api_details(
+        &self,
+        fetch_api_details_response: &WpNetworkResponse,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
+    ) -> Result<WpApiDetails, AutoDiscoveryAttemptFailure> {
+        WpApiDetails::try_from(fetch_api_details_response.body.as_slice()).map_err(|error| {
+            if let Some(wp_error) = WpError::try_parse(&fetch_api_details_response.body) {
+                AutoDiscoveryAttemptFailure::WpError {
+                    parsed_site_url,
+                    api_root_url,
+                    error_code: wp_error.code,
+                    error_message: wp_error.message,
+                    status_code: fetch_api_details_response.status_code,
+                }
+            } else {
+                AutoDiscoveryAttemptFailure::ParseApiDetails {
+                    parsed_site_url,
+                    api_root_url,
+                    parsing_error_message: error.to_string(),
+                }
+            }
+        })
     }
 }
 

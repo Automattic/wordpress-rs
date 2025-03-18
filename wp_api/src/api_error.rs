@@ -61,7 +61,7 @@ fn maybe_json_response(response: &String) -> String {
 
 impl ParsedRequestError for WpApiError {
     fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
-        if let Some(wp_error) = WpError::try_parse(&response.body, response.status_code) {
+        if let Some(wp_error) = WpError::try_parse(&response.body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
@@ -108,12 +108,12 @@ pub struct WpError {
 }
 
 impl WpError {
-    pub fn try_parse(response_body: &[u8], _response_status_code: u16) -> Option<Self> {
+    pub fn try_parse(response_body: &[u8]) -> Option<Self> {
         serde_json::from_slice::<WpError>(response_body).ok()
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpErrorCode {
     #[serde(rename = "rest_already_trashed")]
     AlreadyTrashed,
