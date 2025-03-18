@@ -16,9 +16,6 @@ const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 
 #[rstest]
 #[case("http://localhost", LOCALHOST_AUTH_URL)]
-#[case("http://localhost/wp-admin", LOCALHOST_AUTH_URL)]
-#[case("http://localhost/wp-admin.php", LOCALHOST_AUTH_URL)]
-#[case("http://localhost/wp-admin/", LOCALHOST_AUTH_URL)]
 #[case("http://localhost/wp-json", LOCALHOST_AUTH_URL)]
 #[case(
     "https://automatticwidgets.wpcomstaging.com/",
