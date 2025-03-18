@@ -484,6 +484,14 @@ pub enum RequestExecutionErrorReason {
 
 impl RequestExecutionErrorReason {
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
+        // TODO: We are currently parsing the response for `WpError` twice. There is currently no
+        // good way to avoid it, but we are planning to rework some of the error handling once we
+        // finish the login work. At that time, we'll try to remove the double parsing.
+        if WpError::try_parse(&response.body).is_some() {
+            // If the response is a `WpError`, don't map it to an auth error
+            return None;
+        }
+
         if !response.is_http_authentication_required() {
             return None;
         }
