@@ -472,6 +472,8 @@ pub enum RequestExecutionErrorReason {
         hostname: String,
         method: Option<HttpAuthMethod>,
     },
+    #[error("HttpForbiddenError")]
+    HttpForbiddenError,
     #[error("The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.")]
     MisconfiguredHttpAuthenticationError { issue: HttpAuthMethodParsingError },
     #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
@@ -484,15 +486,15 @@ pub enum RequestExecutionErrorReason {
 
 impl RequestExecutionErrorReason {
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
+        if response.status_code != 401 && response.status_code != 403 {
+            return None;
+        }
+
         // TODO: We are currently parsing the response for `WpError` twice. There is currently no
         // good way to avoid it, but we are planning to rework some of the error handling once we
         // finish the login work. At that time, we'll try to remove the double parsing.
         if WpError::try_parse(&response.body).is_some() {
             // If the response is a `WpError`, don't map it to an auth error
-            return None;
-        }
-
-        if !response.is_http_authentication_required() {
             return None;
         }
 
@@ -511,9 +513,16 @@ impl RequestExecutionErrorReason {
                         }
                     }
                 }
-                None => RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                    issue: HttpAuthMethodParsingError::Unknown,
-                },
+                None => {
+                    if response.request_header_map.has_http_authentication() {
+                        RequestExecutionErrorReason::HttpAuthenticationRejectedError {
+                            hostname: response.request_url.0.clone(),
+                            method: None,
+                        }
+                    } else {
+                        RequestExecutionErrorReason::HttpForbiddenError
+                    }
+                }
             },
             Err(e) => {
                 RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }

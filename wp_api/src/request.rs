@@ -492,10 +492,6 @@ impl WpNetworkResponse {
             .map(|d| d.seconds)
     }
 
-    pub fn is_http_authentication_required(&self) -> bool {
-        self.status_code == 401 || self.status_code == 403
-    }
-
     pub fn get_http_auth_method(
         &self,
     ) -> Result<Option<HttpAuthMethod>, HttpAuthMethodParsingError> {
