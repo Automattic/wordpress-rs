@@ -2,6 +2,7 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -39,7 +40,9 @@ class WpRequestExecutor(
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
-                    headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
+                    responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
+                    requestUrl = request.url(),
+                    requestHeaderMap = request.headerMap()
                 )
             }
         }
@@ -78,8 +81,14 @@ class WpRequestExecutor(
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
-                    headerMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap())
+                    responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
+                    requestUrl = mediaUploadRequest.url(),
+                    requestHeaderMap = mediaUploadRequest.headerMap()
                 )
             }
         }
+
+    override suspend fun sleep(millis: ULong) {
+        delay(millis.toLong())
+    }
 }

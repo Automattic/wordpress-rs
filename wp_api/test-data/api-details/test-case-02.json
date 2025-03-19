@@ -1,0 +1,40 @@
+{
+  "name": "Site with no site icon url field",
+  "description": "Site with no site icon url field",
+  "url": "https://example.com",
+  "home": "https://example.com",
+  "gmt_offset": 8,
+  "timezone_string": "Asia/Hong_Kong",
+  "namespaces": [
+    "oembed/1.0"
+  ],
+  "authentication": [],
+  "site_logo": 110703,
+  "site_icon": 110706,
+  "_links": {
+    "help": [
+      {
+        "href": "https://developer.wordpress.org/rest-api/"
+      }
+    ],
+    "wp:featuredmedia": [
+      {
+        "embeddable": true,
+        "type": "site_logo",
+        "href": "https://example.com/wp-json/wp/v2/media/110703"
+      },
+      {
+        "embeddable": true,
+        "type": "site_icon",
+        "href": "https://example.com/wp-json/wp/v2/media/110706"
+      }
+    ],
+    "curies": [
+      {
+        "name": "wp",
+        "href": "https://api.w.org/{rel}",
+        "templated": true
+      }
+    ]
+  }
+}

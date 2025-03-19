@@ -132,21 +132,6 @@ extension Result {
     }
 }
 
-extension WpNetworkResponse {
-    static func from(data: Data, response: URLResponse) throws -> WpNetworkResponse {
-        guard let response = response as? HTTPURLResponse else {
-            abort()
-        }
-
-        return WpNetworkResponse(
-            body: data,
-            statusCode: UInt16(response.statusCode),
-            headerMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders)
-        )
-
-    }
-}
-
 extension HTTPURLResponse {
 
     var httpHeaders: [String: String] {

@@ -21,6 +21,7 @@ invalid_ssl_error = Invalid SSL certificate
 non_existent_site_error = A server with the specified hostname could not be found
 
 http_authentication_required_error = The server at {$url} requires authentication. Please provide your username and password
+http_forbidden_error = The server at {$url} denied access to the requested resource. Please check your site's configuration
 
 http_authentication_rejected_error = The server at {$url} rejected your credentials. Please provide a valid username and password.
 

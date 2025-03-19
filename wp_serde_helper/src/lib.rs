@@ -88,6 +88,51 @@ where
     deserializer.deserialize_any(DeserializeI64OrStringVisitor)
 }
 
+pub struct DeserializeOffsetVisitor;
+
+impl de::Visitor<'_> for DeserializeOffsetVisitor {
+    type Value = f64;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("f64 or i64 or a string")
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(v)
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(v as f64)
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(v as f64)
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        v.parse::<f64>().map_err(E::custom)
+    }
+}
+
+pub fn deserialize_offset<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeOffsetVisitor)
+}
+
 pub struct DeserializeEmptyVecOrT<T> {
     fallback: Box<dyn Fn() -> T>,
 }
@@ -129,6 +174,45 @@ where
     }
 }
 
+struct DeserializeFalseOrStringVisitor;
+
+impl de::Visitor<'_> for DeserializeFalseOrStringVisitor {
+    type Value = Option<String>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Boolean `false` or a string")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v {
+            Err(E::invalid_value(Unexpected::Bool(v), &self))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v.to_lowercase().trim() == "false" {
+            return Ok(None);
+        }
+
+        Ok(Some(v.to_string()))
+    }
+}
+
+pub fn deserialize_false_or_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeFalseOrStringVisitor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +235,42 @@ mod tests {
     ) {
         let foo: Foo = serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, foo.bar);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct Offset {
+        #[serde(deserialize_with = "deserialize_offset")]
+        pub offset: f64,
+    }
+
+    #[rstest]
+    #[case(r#"{"offset": "1"}"#, 1.0)]
+    #[case(r#"{"offset": 1}"#, 1.0)]
+    #[case(r#"{"offset": -1}"#, -1.0)]
+    #[case(r#"{"offset": 5.5}"#, 5.5)]
+    #[case(r#"{"offset": "5.5"}"#, 5.5)]
+    fn test_deserialize_offset(#[case] test_case: &str, #[case] expected_result: f64) {
+        let offset: Offset =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, offset.offset);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct StringOrBool {
+        #[serde(deserialize_with = "deserialize_false_or_string")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "foo"}"#, Some("foo".to_string()))]
+    #[case(r#"{"value": "false"}"#, None)]
+    #[case(r#"{"value": false}"#, None)]
+    fn test_deserialize_false_or_string(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<String>,
+    ) {
+        let string_or_bool: StringOrBool =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, string_or_bool.value);
     }
 }

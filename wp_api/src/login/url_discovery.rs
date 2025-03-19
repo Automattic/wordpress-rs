@@ -1,8 +1,8 @@
 use super::WpApiDetails;
 use crate::{
-    login::KnownApplicationPasswordBlockingPlugin, request::WpNetworkHeaderMap,
-    request::WpRedirect, ParseUrlError, ParsedUrl, RequestExecutionError,
-    RequestExecutionErrorReason,
+    login::KnownApplicationPasswordBlockingPlugin,
+    request::{WpNetworkHeaderMap, WpRedirect},
+    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -30,22 +30,38 @@ impl AutoDiscoveryAttempt {
         Self::new(attempt_site_url, AutoDiscoveryAttemptType::UserInput)
     }
 
-    fn with_auto_https_attempt_type(attempt_site_url: impl Into<String>) -> Self {
-        Self::new(attempt_site_url, AutoDiscoveryAttemptType::AutoHttps)
-    }
-
-    fn with_auto_remove_wp_admin_suffix_attempt_type(attempt_site_url: impl Into<String>) -> Self {
+    fn with_auto_stripped_https_attempt_type(attempt_site_url: impl Into<String>) -> Self {
         Self::new(
             attempt_site_url,
-            AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
+            AutoDiscoveryAttemptType::AutoStrippedHttps,
         )
     }
 
-    fn with_auto_remove_wp_login_suffix_attempt_type(attempt_site_url: impl Into<String>) -> Self {
-        Self::new(
-            attempt_site_url,
-            AutoDiscoveryAttemptType::AutoRemoveWpLoginSuffix,
-        )
+    fn maybe_auto_stripped_https_attempt_type_from_input(
+        input_site_url: impl Into<String>,
+    ) -> Option<Self> {
+        let input_url_as_string: String = input_site_url.into();
+        let processed_site_url = input_url_as_string
+            .strip_suffix("wp-admin")
+            .or_else(|| input_url_as_string.strip_suffix("wp-admin/"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-admin.php"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-login"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-login/"))
+            .or_else(|| input_url_as_string.strip_suffix("wp-login.php"))
+            .unwrap_or(input_url_as_string.as_str());
+        let url = if !processed_site_url.starts_with("http") {
+            format!("https://{}", processed_site_url)
+        } else if !processed_site_url.starts_with("https") {
+            processed_site_url.replacen("http", "https", 1)
+        } else {
+            if processed_site_url == input_url_as_string {
+                // The `input_site_url` hasn't been modified in any way, so no need to add an
+                // additional attempt for it
+                return None;
+            }
+            processed_site_url.to_string()
+        };
+        Some(Self::with_auto_stripped_https_attempt_type(url))
     }
 }
 
@@ -53,8 +69,7 @@ impl AutoDiscoveryAttempt {
 pub struct AutoDiscoveryUniffiResult {
     pub user_input_attempt: Arc<AutoDiscoveryAttemptResult>,
     pub successful_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
-    pub auto_https_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
-    pub auto_dot_php_extension_for_wp_admin_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
+    pub auto_stripped_https_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
     pub is_successful: bool,
 }
 
@@ -68,9 +83,8 @@ impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
         Self {
             user_input_attempt: Arc::new(value.user_input_attempt().clone()),
             successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
-            auto_https_attempt: get_attempt_result(AutoDiscoveryAttemptType::AutoHttps),
-            auto_dot_php_extension_for_wp_admin_attempt: get_attempt_result(
-                AutoDiscoveryAttemptType::AutoRemoveWpAdminSuffix,
+            auto_stripped_https_attempt: get_attempt_result(
+                AutoDiscoveryAttemptType::AutoStrippedHttps,
             ),
             is_successful: value.is_successful(),
         }
@@ -137,6 +151,10 @@ impl AutoDiscoveryAttemptResult {
         self.attempt_site_url.clone()
     }
 
+    fn api_discovery_error(&self) -> Option<AutoDiscoveryAttemptFailure> {
+        self.api_discovery_result.as_ref().err().cloned()
+    }
+
     fn error_message(&self) -> Option<String> {
         match &self.api_discovery_result {
             Ok(_) => None,
@@ -182,14 +200,14 @@ impl AutoDiscoveryAttemptResult {
 
     fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
         match &self.api_discovery_result {
-            Ok(success) => Some(Arc::new(success.parsed_site_url.clone())),
+            Ok(success) => Some(Arc::clone(&success.parsed_site_url)),
             Err(error) => error.parsed_site_url().map(|p| Arc::new(p.clone())),
         }
     }
 
     fn api_root_url(&self) -> Option<Arc<ParsedUrl>> {
         match &self.api_discovery_result {
-            Ok(success) => Some(Arc::new(success.api_root_url.clone())),
+            Ok(success) => Some(Arc::clone(&success.api_root_url)),
             Err(error) => error.api_root_url().map(|p| Arc::new(p.clone())),
         }
     }
@@ -217,6 +235,22 @@ impl AutoDiscoveryAttemptResult {
     /// Does the site look like a WordPress site?
     fn is_wordpress_site(&self) -> bool {
         self.is_wordpress_site.is_successful()
+    }
+}
+
+impl AutoDiscoveryAttemptResult {
+    pub(crate) fn from_parse_site_url_error(
+        attempt: AutoDiscoveryAttempt,
+        error: ParseUrlError,
+    ) -> Self {
+        Self {
+            attempt_type: attempt.attempt_type,
+            attempt_site_url: attempt.attempt_site_url,
+            api_discovery_result: Err(AutoDiscoveryAttemptFailure::ParseSiteUrl {
+                error: error.clone(),
+            }),
+            is_wordpress_site: IsWordPressSiteAttemptResult::from_parse_site_url_error(error),
+        }
     }
 }
 
@@ -253,17 +287,29 @@ impl IsWordPressSiteAttemptResult {
                 })
                 .unwrap_or(false)
     }
+
+    pub fn from_parse_site_url_error(error: ParseUrlError) -> Self {
+        Self {
+            api_link_header_result: Err(FindApiRootLinkHeaderFailure::ParseSiteUrl {
+                error: error.clone(),
+            }),
+            fetch_wp_json_result: Err(FetchWpJsonFailure::ParseSiteUrl {
+                error: error.clone(),
+            }),
+            parse_html_result: Err(ParseHtmlFailure::ParseSiteUrl { error }),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct FindApiRootLinkHeaderSuccess {
-    pub parsed_site_url: ParsedUrl,
-    pub api_root_url: ParsedUrl,
+    pub parsed_site_url: Arc<ParsedUrl>,
+    pub api_root_url: Arc<ParsedUrl>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FetchWpJsonSuccess {
-    pub wp_json_url: ParsedUrl,
+    pub wp_json_url: Arc<ParsedUrl>,
     pub root_wp_json: RootWpJson,
 }
 
@@ -277,7 +323,7 @@ pub struct IsWordPressSiteParseHtmlResult {
     /// `href` attribute of a link tag if it has `rel` attribute of "https://api.w.org/".
     /// For example:
     /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
-    pub api_root_url_from_link_tag: Option<ParsedUrl>,
+    pub api_root_url_from_link_tag: Option<Arc<ParsedUrl>>,
     /// Whether the HTML has 'generator' meta tag that mentions `WordPress`
     pub has_wordpress_generator_meta_tag: bool,
     /// Whether the HTML `link`, `script`, `style` tags mention `wp-content`
@@ -328,7 +374,7 @@ impl IsWordPressSiteParseHtmlResult {
         let api_root_url_from_link_tag = html.select(&link_selector).find_map(|e| {
             if let Some(API_ROOT_LINK_HEADER) = e.attr(Self::HTML_ATTR_REL) {
                 e.attr(Self::HTML_ATTR_HREF)
-                    .and_then(|u| ParsedUrl::parse(u).ok())
+                    .and_then(|u| ParsedUrl::parse(u).ok().map(Arc::new))
             } else {
                 None
             }
@@ -361,11 +407,11 @@ pub enum FindApiRootLinkHeaderFailure {
         error: ParseUrlError,
     },
     FetchApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
     },
     ParseApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: ParseApiRootUrlError,
     },
 }
@@ -392,47 +438,60 @@ pub enum ParseHtmlFailure {
 
 #[derive(Debug, Clone)]
 pub struct AutoDiscoveryAttemptSuccess {
-    pub parsed_site_url: ParsedUrl,
-    pub api_root_url: ParsedUrl,
+    pub parsed_site_url: Arc<ParsedUrl>,
+    pub api_root_url: Arc<ParsedUrl>,
     pub api_details: WpApiDetails,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
 pub enum AutoDiscoveryAttemptFailure {
     #[error("{error}")]
     ParseSiteUrl { error: ParseUrlError },
     #[error("{error}")]
     FetchApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
     },
     #[error("{error}")]
     ParseApiRootUrl {
-        parsed_site_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
         error: ParseApiRootUrlError,
     },
     #[error("{error}")]
     FetchApiDetails {
-        parsed_site_url: ParsedUrl,
-        api_root_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
     },
     #[error("Failed to parse api details: {:#?}", parsing_error_message)]
     ParseApiDetails {
-        parsed_site_url: ParsedUrl,
-        api_root_url: ParsedUrl,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         parsing_error_message: String,
+    },
+    #[error(
+        "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"",
+        status_code,
+        error_code,
+        error_message
+    )]
+    WpError {
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
+        error_code: WpErrorCode,
+        error_message: String,
+        status_code: u16,
     },
     #[error("{}", reason.as_ref().map(|r| r.error_message(parsed_site_url)).unwrap_or("Application Passwords are not supported".to_string()))]
     ApplicationPasswordsNotSupported {
-        parsed_site_url: ParsedUrl,
-        api_root_url: ParsedUrl,
-        api_details: WpApiDetails,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
+        api_details: Arc<WpApiDetails>,
         reason: Option<ApplicationPasswordsNotSupportedReason>,
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, uniffi::Error)]
 pub enum ApplicationPasswordsNotSupportedReason {
     ApplicationPasswordBlockedByPlugin {
         plugin: KnownApplicationPasswordBlockingPlugin,
@@ -456,33 +515,36 @@ impl ApplicationPasswordsNotSupportedReason {
 impl AutoDiscoveryAttemptFailure {
     pub fn is_network_error(&self) -> bool {
         match self {
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => true,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => true,
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => false,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => false,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => false,
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => false,
+            Self::FetchApiRootUrl { .. } => true,
+            Self::FetchApiDetails { .. } => true,
+            Self::ParseSiteUrl { .. } => false,
+            Self::ParseApiRootUrl { .. } => false,
+            Self::ParseApiDetails { .. } => false,
+            Self::WpError { .. } => false,
+            Self::ApplicationPasswordsNotSupported { .. } => false,
         }
     }
 
     pub fn parsed_site_url(&self) -> Option<&ParsedUrl> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl {
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl {
+            Self::ParseApiRootUrl {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::FetchApiDetails {
+            Self::FetchApiDetails {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::ParseApiDetails {
+            Self::ParseApiDetails {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
-                parsed_site_url,
-                ..
+            Self::WpError {
+                parsed_site_url, ..
+            } => Some(parsed_site_url),
+            Self::ApplicationPasswordsNotSupported {
+                parsed_site_url, ..
             } => Some(parsed_site_url),
         }
     }
@@ -490,58 +552,63 @@ impl AutoDiscoveryAttemptFailure {
     // If it failed while parsing the site url or fetching the api root url, we never tried to
     // parse it, so we return `None`
     //
-    // If we fail to parse with `AutoDiscoveryAttemptFailure::ParseApiRootUrl`, we return
-    // `Some(true)`, because that's exactly when the failure happened.
+    // If we fail to parse with `Self::ParseApiRootUrl`, we return `Some(true)`, because
+    // that's exactly when the failure happened.
     //
     // If an error occurs after parsing the api root url, we return `Some(false)`.
     pub fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => Some(true),
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => Some(false),
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(false),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => Some(true),
+            Self::FetchApiDetails { .. } => Some(false),
+            Self::ParseApiDetails { .. } => Some(false),
+            Self::WpError { .. } => Some(false),
+            Self::ApplicationPasswordsNotSupported { .. } => Some(false),
         }
     }
 
     pub fn api_root_url(&self) -> Option<&ParsedUrl> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
-            AutoDiscoveryAttemptFailure::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
-                api_root_url, ..
-            } => Some(api_root_url),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => None,
+            Self::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
+            Self::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
+            Self::WpError { api_root_url, .. } => Some(api_root_url),
+            Self::ApplicationPasswordsNotSupported { api_root_url, .. } => Some(api_root_url),
         }
     }
 
     // If it failed while parsing the site url, fetching the api root url, parsing the api root url
     // or fetching the api details, we never tried to parse it, so we return `None`.
     //
-    // If we fail to parse with `AutoDiscoveryAttemptFailure::ParseApiDetails`, we return
-    // `Some(true)`, because that's exactly when the failure happened.
+    // If we fail to parse with `Self::ParseApiDetails`, we return `Some(true)`, because
+    // that's exactly when the failure happened.
+    //
+    // If we parse the api details as `Self::WpError`, we return `Some(false)`, because the
+    // response was parseable.
     pub fn has_failed_to_parse_api_details(&self) -> Option<bool> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => Some(true),
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(false),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => None,
+            Self::FetchApiDetails { .. } => None,
+            Self::ParseApiDetails { .. } => Some(true),
+            Self::WpError { .. } => Some(false),
+            Self::ApplicationPasswordsNotSupported { .. } => Some(false),
         }
     }
 
     pub fn is_application_passwords_disabled(&self) -> Option<bool> {
         match self {
-            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiRootUrl { .. } => None,
-            AutoDiscoveryAttemptFailure::FetchApiDetails { .. } => None,
-            AutoDiscoveryAttemptFailure::ParseApiDetails { .. } => None,
-            AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported { .. } => Some(true),
+            Self::ParseSiteUrl { .. } => None,
+            Self::FetchApiRootUrl { .. } => None,
+            Self::ParseApiRootUrl { .. } => None,
+            Self::FetchApiDetails { .. } => None,
+            Self::ParseApiDetails { .. } => None,
+            Self::WpError { .. } => None,
+            Self::ApplicationPasswordsNotSupported { .. } => Some(true),
         }
     }
 }
@@ -571,39 +638,20 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, uniffi::Enum)]
 pub enum AutoDiscoveryAttemptType {
     UserInput,
-    AutoHttps,
-    AutoRemoveWpAdminSuffix,
-    AutoRemoveWpLoginSuffix,
+    // Removes `/wp-login` & `/wp-admin` suffixes and replaces `http` with `https`
+    AutoStrippedHttps,
 }
 
 pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAttempt> {
     let mut attempts = vec![AutoDiscoveryAttempt::with_user_input_attempt_type(
         input_site_url.clone(),
     )];
-    if !input_site_url.starts_with("http") {
-        attempts.push(AutoDiscoveryAttempt::with_auto_https_attempt_type(format!(
-            "https://{}",
-            input_site_url
-        )));
-    } else if !input_site_url.starts_with("https") {
-        // Url starts with `http`, but not `https`
-        attempts.push(AutoDiscoveryAttempt::with_auto_https_attempt_type(
-            input_site_url.replacen("http", "https", 1),
-        ));
-    }
-    if let Some(a) = input_site_url
-        .strip_suffix("wp-admin")
-        .or_else(|| input_site_url.strip_suffix("wp-admin/"))
-        .or_else(|| input_site_url.strip_suffix("wp-admin.php"))
+    if let Some(auto_https_attempt) =
+        AutoDiscoveryAttempt::maybe_auto_stripped_https_attempt_type_from_input(
+            input_site_url.as_str(),
+        )
     {
-        attempts.push(AutoDiscoveryAttempt::with_auto_remove_wp_admin_suffix_attempt_type(a));
-    }
-    if let Some(a) = input_site_url
-        .strip_suffix("wp-login")
-        .or_else(|| input_site_url.strip_suffix("wp-login/"))
-        .or_else(|| input_site_url.strip_suffix("wp-login.php"))
-    {
-        attempts.push(AutoDiscoveryAttempt::with_auto_remove_wp_login_suffix_attempt_type(a));
+        attempts.push(auto_https_attempt);
     }
     attempts
 }
@@ -657,21 +705,22 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case::localhost("localhost", vec![A::with_user_input_attempt_type("localhost"), A::with_auto_https_attempt_type("https://localhost")])]
-    #[case::http_localhost("http://localhost", vec![A::with_user_input_attempt_type("http://localhost"), A::with_auto_https_attempt_type("https://localhost")])]
-    #[case::http_localhost_wp_json("http://localhost/wp-json", vec![A::with_user_input_attempt_type("http://localhost/wp-json"), A::with_auto_https_attempt_type("https://localhost/wp-json")])]
-    #[case::http_localhost_wp_admin_php("http://localhost/wp-admin.php", vec![A::with_user_input_attempt_type("http://localhost/wp-admin.php"), A::with_auto_https_attempt_type("https://localhost/wp-admin.php"), A::with_auto_remove_wp_admin_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_admin("http://localhost/wp-admin", vec![A::with_user_input_attempt_type("http://localhost/wp-admin"), A::with_auto_https_attempt_type("https://localhost/wp-admin") ,A::with_auto_remove_wp_admin_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_admin_slash("http://localhost/wp-admin/", vec![A::with_user_input_attempt_type("http://localhost/wp-admin/"), A::with_auto_https_attempt_type("https://localhost/wp-admin/"), A::with_auto_remove_wp_admin_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_login_php("http://localhost/wp-login.php", vec![A::with_user_input_attempt_type("http://localhost/wp-login.php"), A::with_auto_https_attempt_type("https://localhost/wp-login.php"), A::with_auto_remove_wp_login_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_login("http://localhost/wp-login", vec![A::with_user_input_attempt_type("http://localhost/wp-login"), A::with_auto_https_attempt_type("https://localhost/wp-login"), A::with_auto_remove_wp_login_suffix_attempt_type("http://localhost/")])]
-    #[case::http_localhost_wp_login_slash("http://localhost/wp-login/", vec![A::with_user_input_attempt_type("http://localhost/wp-login/"), A::with_auto_https_attempt_type("https://localhost/wp-login/"), A::with_auto_remove_wp_login_suffix_attempt_type("http://localhost/")])]
-    #[case::automatticwidgets_wp_json("automatticwidgets.wpcomstaging.com/wp-json", vec![A::with_user_input_attempt_type("automatticwidgets.wpcomstaging.com/wp-json"), A::with_auto_https_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-json")])]
+    #[case::localhost("localhost", vec![A::with_user_input_attempt_type("localhost"), A::with_auto_stripped_https_attempt_type("https://localhost")])]
+    #[case::http_localhost("http://localhost", vec![A::with_user_input_attempt_type("http://localhost"), A::with_auto_stripped_https_attempt_type("https://localhost")])]
+    #[case::http_localhost_wp_json("http://localhost/wp-json", vec![A::with_user_input_attempt_type("http://localhost/wp-json"), A::with_auto_stripped_https_attempt_type("https://localhost/wp-json")])]
+    #[case::http_localhost_wp_admin_php("http://localhost/wp-admin.php", vec![A::with_user_input_attempt_type("http://localhost/wp-admin.php"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_admin("http://localhost/wp-admin", vec![A::with_user_input_attempt_type("http://localhost/wp-admin"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_admin_slash("http://localhost/wp-admin/", vec![A::with_user_input_attempt_type("http://localhost/wp-admin/"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_login_php("http://localhost/wp-login.php", vec![A::with_user_input_attempt_type("http://localhost/wp-login.php"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_login("http://localhost/wp-login", vec![A::with_user_input_attempt_type("http://localhost/wp-login"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::http_localhost_wp_login_slash("http://localhost/wp-login/", vec![A::with_user_input_attempt_type("http://localhost/wp-login/"), A::with_auto_stripped_https_attempt_type("https://localhost/")])]
+    #[case::automatticwidgets_wp_json("automatticwidgets.wpcomstaging.com/wp-json", vec![A::with_user_input_attempt_type("automatticwidgets.wpcomstaging.com/wp-json"), A::with_auto_stripped_https_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-json")])]
     #[case::automatticwidgets_https("https://automatticwidgets.wpcomstaging.com", vec![A::with_user_input_attempt_type("https://automatticwidgets.wpcomstaging.com")])]
     #[case::automatticwidgets_https_wp_json(
         "https://automatticwidgets.wpcomstaging.com/wp-json",
         vec![A::with_user_input_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-json")]
     )]
+    #[case::automatticwidgets_https_wp_admin("https://automatticwidgets.wpcomstaging.com/wp-admin", vec![A::with_user_input_attempt_type("https://automatticwidgets.wpcomstaging.com/wp-admin"), A::with_auto_stripped_https_attempt_type("https://automatticwidgets.wpcomstaging.com/")])]
     fn test_construct_attempts(
         #[case] input_site_url: &str,
         #[case] expected_attempts: Vec<AutoDiscoveryAttempt>,

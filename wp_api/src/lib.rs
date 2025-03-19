@@ -25,6 +25,7 @@ pub mod comments;
 pub mod date;
 pub mod login;
 pub mod media;
+pub mod middleware;
 pub mod plugins;
 pub mod post_types;
 pub mod posts;
@@ -39,6 +40,9 @@ pub mod url_query;
 pub mod users;
 pub mod wordpress_org;
 pub mod wp_site_health_tests;
+
+#[cfg(feature = "reqwest-request-executor")]
+pub mod reqwest_request_executor;
 
 #[cfg(test)]
 mod unit_test_common;

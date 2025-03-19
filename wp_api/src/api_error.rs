@@ -1,8 +1,5 @@
-use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError};
-use crate::{
-    request::{request_or_response_body_as_string, WpRedirect},
-    ssl::SSLCertificateInfo,
-};
+use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError, WpNetworkResponse};
+use crate::{request::WpRedirect, ssl::SSLCertificateInfo};
 use serde::Deserialize;
 use std::sync::Arc;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
@@ -12,7 +9,7 @@ pub trait ParsedRequestError
 where
     Self: Sized,
 {
-    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self>;
+    fn try_parse(response: &WpNetworkResponse) -> Option<Self>;
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
@@ -71,28 +68,36 @@ impl WpSupportsLocalization for WpApiError {
 }
 
 impl ParsedRequestError for WpApiError {
-    fn try_parse(response_body: &[u8], response_status_code: u16) -> Option<Self> {
-        if let Some(wp_error) = WpError::try_parse(response_body, response_status_code) {
+    fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
+        if let Some(wp_error) = WpError::try_parse(&response.body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
-                status_code: response_status_code,
-                response: request_or_response_body_as_string(response_body),
+                status_code: response.status_code,
+                response: response.body_as_string(),
             })
         } else {
-            match http::StatusCode::from_u16(response_status_code) {
+            if let Some(reason) = RequestExecutionErrorReason::try_from_response(response) {
+                return Some(WpApiError::RequestExecutionFailed {
+                    status_code: Some(response.status_code),
+                    redirects: None,
+                    reason,
+                });
+            }
+
+            match http::StatusCode::from_u16(response.status_code) {
                 Ok(status) => {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
-                            status_code: response_status_code,
-                            response: request_or_response_body_as_string(response_body),
+                            status_code: response.status_code,
+                            response: response.body_as_string(),
                         })
                     } else {
                         None
                     }
                 }
                 Err(_) => Some(WpApiError::InvalidHttpStatusCode {
-                    status_code: response_status_code,
+                    status_code: response.status_code,
                 }),
             }
         }
@@ -111,12 +116,12 @@ pub struct WpError {
 }
 
 impl WpError {
-    pub fn try_parse(response_body: &[u8], _response_status_code: u16) -> Option<Self> {
+    pub fn try_parse(response_body: &[u8]) -> Option<Self> {
         serde_json::from_slice::<WpError>(response_body).ok()
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, uniffi::Error)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, uniffi::Error)]
 pub enum WpErrorCode {
     #[serde(rename = "rest_already_trashed")]
     AlreadyTrashed,
@@ -200,6 +205,8 @@ pub enum WpErrorCode {
     CommentTrashPost,
     #[serde(rename = "empty_content")]
     EmptyContent,
+    #[serde(rename = "rest_forbidden")]
+    Forbidden,
     #[serde(rename = "rest_forbidden_context")]
     ForbiddenContext,
     #[serde(rename = "rest_forbidden_param")]
@@ -464,11 +471,14 @@ pub enum RequestExecutionErrorReason {
     },
     HttpAuthenticationRequiredError {
         hostname: String,
-        server_message: Option<String>,
+        method: Option<HttpAuthMethod>,
     },
     HttpAuthenticationRejectedError {
         hostname: String,
         method: Option<HttpAuthMethod>,
+    },
+    HttpForbiddenError {
+        hostname: String,
     },
     MisconfiguredHttpAuthenticationError {
         issue: HttpAuthMethodParsingError,
@@ -480,6 +490,56 @@ pub enum RequestExecutionErrorReason {
     GenericError {
         error_message: String,
     },
+}
+
+impl RequestExecutionErrorReason {
+    pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
+        if response.status_code != 401 && response.status_code != 403 {
+            return None;
+        }
+
+        // TODO: We are currently parsing the response for `WpError` twice. There is currently no
+        // good way to avoid it, but we are planning to rework some of the error handling once we
+        // finish the login work. At that time, we'll try to remove the double parsing.
+        if WpError::try_parse(&response.body).is_some() {
+            // If the response is a `WpError`, don't map it to an auth error
+            return None;
+        }
+
+        let reason = match response.get_http_auth_method() {
+            Ok(maybe_method) => match maybe_method {
+                Some(method) => {
+                    if response.request_header_map.has_http_authentication() {
+                        RequestExecutionErrorReason::HttpAuthenticationRejectedError {
+                            hostname: response.request_url.0.clone(),
+                            method: Some(method),
+                        }
+                    } else {
+                        RequestExecutionErrorReason::HttpAuthenticationRequiredError {
+                            hostname: response.request_url.0.clone(),
+                            method: Some(method),
+                        }
+                    }
+                }
+                None => {
+                    if response.request_header_map.has_http_authentication() {
+                        RequestExecutionErrorReason::HttpAuthenticationRejectedError {
+                            hostname: response.request_url.0.clone(),
+                            method: None,
+                        }
+                    } else {
+                        RequestExecutionErrorReason::HttpForbiddenError {
+                            hostname: response.request_url.0.clone(),
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { issue: e }
+            }
+        };
+        Some(reason)
+    }
 }
 
 impl WpSupportsLocalization for RequestExecutionErrorReason {
@@ -500,6 +560,9 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             }
             RequestExecutionErrorReason::MisconfiguredRateLimitError { .. } => {
                 WpMessages::misconfigured_rate_limit_error()
+            }
+            RequestExecutionErrorReason::HttpForbiddenError { hostname } => {
+                WpMessages::http_forbidden_error(hostname)
             }
             RequestExecutionErrorReason::DeviceIsOfflineError { error_message } => {
                 WpMessages::just(error_message)

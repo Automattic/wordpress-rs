@@ -16,7 +16,7 @@ pub mod themes_endpoint;
 pub mod users_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
-const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
+pub const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 
 uniffi::custom_newtype!(WpEndpointUrl, String);
 #[derive(Debug, Clone)]
@@ -25,6 +25,12 @@ pub struct WpEndpointUrl(pub String);
 impl From<Url> for WpEndpointUrl {
     fn from(url: Url) -> Self {
         Self(url.to_string())
+    }
+}
+
+impl From<WpEndpointUrl> for String {
+    fn from(url: WpEndpointUrl) -> Self {
+        url.0
     }
 }
 
