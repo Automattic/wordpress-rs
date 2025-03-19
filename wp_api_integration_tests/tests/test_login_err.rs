@@ -81,6 +81,17 @@ async fn test_login_flow_err_http_authentication_rejected_error(#[case] site_url
     ));
 }
 
+#[rstest]
+#[case("https://www.beeper.com/")]
+#[tokio::test]
+#[parallel]
+async fn test_login_flow_err_not_a_wordpress_site(#[case] site_url: &str) {
+    assert!(matches!(
+        login_flow_err_helper(site_url, vec![]).await,
+        AutoDiscoveryAttemptFailure::ProbablyNotAWordPressSite { .. }
+    ));
+}
+
 async fn login_flow_err_helper(
     site_url: &str,
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
