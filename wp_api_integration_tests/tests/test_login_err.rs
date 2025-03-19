@@ -111,7 +111,7 @@ async fn login_flow_err_helper(
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 ) -> AutoDiscoveryAttemptFailure {
     WpLoginClient::new(
-        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     )
     .api_discovery(site_url.to_string())

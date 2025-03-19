@@ -18,7 +18,7 @@ async fn plugins_update_check() {
     assert!(!plugins.is_empty());
 
     let wp_org_client = WordPressOrgApiClient::new(
-        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
         Arc::new(WpApiMiddlewarePipeline::default()),
     );
     wp_org_client

@@ -93,7 +93,7 @@ async fn login_flow_helper(
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 ) {
     let client = WpLoginClient::new(
-        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     );
 

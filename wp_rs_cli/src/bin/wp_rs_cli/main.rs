@@ -47,7 +47,7 @@ async fn discover_login_url(site: String) -> Result<()> {
     let intro = format!("Discovering login URL for {}", site).blue();
     println!("{}", intro);
 
-    let request_executor = Arc::new(ReqwestRequestExecutor::new(false));
+    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_default_timeout(false));
     let login_client = WpLoginClient::new(request_executor, Arc::new(WpApiMiddlewarePipeline{ middlewares: vec![] }));
     let result = login_client.api_discovery(site).await;
 
