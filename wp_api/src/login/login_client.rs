@@ -82,38 +82,25 @@ impl WpLoginClient {
             }
         }
         .into();
-        let parse_html_result = self
-            .fetch_site(Arc::clone(&parsed_site_url))
-            .await
-            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
-        let api_root_url_from_link_tag = parse_html_result
-            .as_ref()
-            .ok()
-            .and_then(|r| r.api_root_url_from_link_tag.as_ref())
-            .map(Arc::clone);
-        let fetch_wp_json_result = self.fetch_wp_json(Arc::clone(&parsed_site_url)).await;
-        let api_link_header_result = self
-            .find_api_root_url(
-                Arc::clone(&parsed_site_url),
-                api_root_url_from_link_tag,
-                fetch_wp_json_result.clone(),
-            )
-            .await;
-        let discovery_result = self
-            .inner_attempt_api_discovery(api_link_header_result.clone())
-            .await;
-        AutoDiscoveryAttemptResult {
-            attempt_type: attempt.attempt_type,
-            attempt_site_url: attempt.attempt_site_url,
-            api_discovery_result: discovery_result,
+
+        match self.find_api_root_url(Arc::clone(&parsed_site_url)).await {
+            Ok(api_root_url_success) => AutoDiscoveryAttemptResult {
+                attempt_type: attempt.attempt_type,
+                attempt_site_url: attempt.attempt_site_url,
+                api_discovery_result: self.inner_attempt_api_discovery(api_root_url_success).await,
+            },
+            Err(e) => AutoDiscoveryAttemptResult {
+                attempt_type: attempt.attempt_type,
+                attempt_site_url: attempt.attempt_site_url,
+                api_discovery_result: Err(e.into()),
+            },
         }
     }
 
     async fn inner_attempt_api_discovery(
         &self,
-        api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
+        api_root_url_success: FindApiRootLinkHeaderSuccess,
     ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
-        let api_root_url_success = api_link_header_result?;
         let fetch_api_details_response = match self
             .fetch_wp_api_details(&api_root_url_success.api_root_url)
             .await
@@ -177,27 +164,35 @@ impl WpLoginClient {
     async fn find_api_root_url(
         &self,
         parsed_site_url: Arc<ParsedUrl>,
-        api_root_url_from_link_tag: Option<Arc<ParsedUrl>>,
-        fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
     ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
-        if let Some(api_root_url) = api_root_url_from_link_tag {
-            return Ok(FindApiRootLinkHeaderSuccess {
-                parsed_site_url,
-                api_root_url,
-            });
-        }
         match self
             .fetch_and_parse_api_root_url_header(parsed_site_url.clone())
             .await
         {
             Ok(s) => Ok(s),
             Err(fetch_and_parse_api_root_url_header_err) => {
+                // If we can't find the link header, we try parsing the html
+                if let Some(api_root_url) = self
+                    .fetch_site(Arc::clone(&parsed_site_url))
+                    .await
+                    .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()))
+                    .ok()
+                    .and_then(|r| r.api_root_url_from_link_tag)
+                {
+                    return Ok(FindApiRootLinkHeaderSuccess {
+                        parsed_site_url,
+                        api_root_url,
+                    });
+                }
+
                 // If we can't find the link header, but we were able to fetch `/wp-json` from the
                 // attempt url, we assume that it's the correct api root url
                 //
                 // We don't immediately rely on this because there might be cases where `/wp-json`
                 // exists, but its not the actual API root
-                if let Ok(fetch_wp_json_success) = fetch_wp_json_result {
+                if let Ok(fetch_wp_json_success) =
+                    self.fetch_wp_json(Arc::clone(&parsed_site_url)).await
+                {
                     Ok(FindApiRootLinkHeaderSuccess {
                         parsed_site_url,
                         api_root_url: fetch_wp_json_success.wp_json_url,

@@ -355,9 +355,6 @@ impl IsWordPressSiteParseHtmlResult {
 
 #[derive(Debug, Clone)]
 pub enum FindApiRootLinkHeaderFailure {
-    ParseSiteUrl {
-        error: ParseUrlError,
-    },
     FetchApiRootUrl {
         parsed_site_url: Arc<ParsedUrl>,
         error: RequestExecutionError,
@@ -399,6 +396,8 @@ pub struct AutoDiscoveryAttemptSuccess {
 pub enum AutoDiscoveryAttemptFailure {
     #[error("{error}")]
     ParseSiteUrl { error: ParseUrlError },
+    #[error("ProbablyNotAWordPressSite")]
+    ProbablyNotAWordPressSite { parsed_site_url: Arc<ParsedUrl> },
     #[error("{error}")]
     FetchApiRootUrl {
         parsed_site_url: Arc<ParsedUrl>,
@@ -467,9 +466,10 @@ impl ApplicationPasswordsNotSupportedReason {
 impl AutoDiscoveryAttemptFailure {
     pub fn is_network_error(&self) -> bool {
         match self {
+            Self::ParseSiteUrl { .. } => false,
+            Self::ProbablyNotAWordPressSite { .. } => false,
             Self::FetchApiRootUrl { .. } => true,
             Self::FetchApiDetails { .. } => true,
-            Self::ParseSiteUrl { .. } => false,
             Self::ParseApiRootUrl { .. } => false,
             Self::ParseApiDetails { .. } => false,
             Self::WpError { .. } => false,
@@ -480,6 +480,7 @@ impl AutoDiscoveryAttemptFailure {
     pub fn parsed_site_url(&self) -> Option<&ParsedUrl> {
         match self {
             Self::ParseSiteUrl { .. } => None,
+            Self::ProbablyNotAWordPressSite { parsed_site_url } => Some(parsed_site_url),
             Self::FetchApiRootUrl {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
@@ -511,6 +512,8 @@ impl AutoDiscoveryAttemptFailure {
     pub fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
         match self {
             Self::ParseSiteUrl { .. } => None,
+            // TODO: Is this correct?
+            Self::ProbablyNotAWordPressSite { .. } => None,
             Self::FetchApiRootUrl { .. } => None,
             Self::ParseApiRootUrl { .. } => Some(true),
             Self::FetchApiDetails { .. } => Some(false),
@@ -523,6 +526,8 @@ impl AutoDiscoveryAttemptFailure {
     pub fn api_root_url(&self) -> Option<&ParsedUrl> {
         match self {
             Self::ParseSiteUrl { .. } => None,
+            // TODO: Is this correct?
+            Self::ProbablyNotAWordPressSite { .. } => None,
             Self::FetchApiRootUrl { .. } => None,
             Self::ParseApiRootUrl { .. } => None,
             Self::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
@@ -543,6 +548,8 @@ impl AutoDiscoveryAttemptFailure {
     pub fn has_failed_to_parse_api_details(&self) -> Option<bool> {
         match self {
             Self::ParseSiteUrl { .. } => None,
+            // TODO: Is this correct?
+            Self::ProbablyNotAWordPressSite { .. } => None,
             Self::FetchApiRootUrl { .. } => None,
             Self::ParseApiRootUrl { .. } => None,
             Self::FetchApiDetails { .. } => None,
@@ -555,6 +562,8 @@ impl AutoDiscoveryAttemptFailure {
     pub fn is_application_passwords_disabled(&self) -> Option<bool> {
         match self {
             Self::ParseSiteUrl { .. } => None,
+            // TODO: Is this correct?
+            Self::ProbablyNotAWordPressSite { .. } => None,
             Self::FetchApiRootUrl { .. } => None,
             Self::ParseApiRootUrl { .. } => None,
             Self::FetchApiDetails { .. } => None,
@@ -568,7 +577,6 @@ impl AutoDiscoveryAttemptFailure {
 impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
     fn from(value: FindApiRootLinkHeaderFailure) -> Self {
         match value {
-            FindApiRootLinkHeaderFailure::ParseSiteUrl { error } => Self::ParseSiteUrl { error },
             FindApiRootLinkHeaderFailure::FetchApiRootUrl {
                 parsed_site_url,
                 error,
@@ -576,13 +584,10 @@ impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
                 parsed_site_url,
                 error,
             },
+            // TODO: Is this the correct interpretation?
             FindApiRootLinkHeaderFailure::ParseApiRootUrl {
-                parsed_site_url,
-                error,
-            } => Self::ParseApiRootUrl {
-                parsed_site_url,
-                error,
-            },
+                parsed_site_url, ..
+            } => Self::ProbablyNotAWordPressSite { parsed_site_url },
         }
     }
 }
