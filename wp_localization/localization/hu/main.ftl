@@ -51,3 +51,5 @@ uuid_parse_error_invalid_uuid = Érvénytelen UUID karakterlánc
 uuid_parse_error_not_version_4 = Nem 4-es verziójú UUID
 
 wordpress_org_api_client_error_request_encoding = A kérés kódolása sikertelen. Ok: {$reason}
+
+http_forbidden_error = A {$url} szerver megtagadta a hozzáférést a kért erőforráshoz. Kérjük, ellenőrizze az oldal konfigurációját

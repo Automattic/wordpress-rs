@@ -51,3 +51,5 @@ uuid_parse_error_invalid_uuid = Invalid UUID string
 uuid_parse_error_not_version_4 = UUID version is not 4
 
 wordpress_org_api_client_error_request_encoding = Could not encode request. Reason: {$reason}
+
+http_forbidden_error = The server at {$url} denied access to the requested resource. Please check your site's configuration

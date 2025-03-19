@@ -51,3 +51,5 @@ uuid_parse_error_invalid_uuid = سلسلة UUID غير صالحة
 uuid_parse_error_not_version_4 = ليس UUID الإصدار 4
 
 wordpress_org_api_client_error_request_encoding = فشل في ترميز الطلب. السبب: {$reason}
+
+http_forbidden_error = رفض الخادم في {$url} الوصول إلى المورد المطلوب. يرجى التحقق من تكوين موقعك

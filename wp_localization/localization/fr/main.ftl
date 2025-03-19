@@ -1,14 +1,14 @@
-api_root_link_header_not_found = Le lien de l'API REST WordPress n'est pas trouvé dans la réponse du site
+api_root_link_header_not_found = Le lien WordPress REST API n'a pas été trouvé dans la réponse du site
 
 generic_error = Une erreur s'est produite
 
 site_error_message = Votre site a envoyé un message d'erreur : {$error_message}
 
-url_parsing_error = L'URL n'est pas valide
+url_parsing_error = URL invalide
 
-response_parsing_error = La réponse n'a pas pu être analysée : {$reason}
+response_parsing_error = Impossible de traiter la réponse : {$reason}
 
-media_file_not_found = Fichier média non trouvé à {$path}
+media_file_not_found = Fichier multimédia non trouvé à {$path}
 
 invalid_http_status_code = Code d'état HTTP invalide : {$status_code}
 
@@ -18,22 +18,22 @@ just = {$message}
 
 invalid_ssl_error = Certificat SSL invalide
 
-non_existent_site_error = Un serveur avec le nom d'hôte spécifié n'a pas pu être trouvé
+non_existent_site_error = Impossible de trouver un serveur avec le nom d'hôte spécifié
 
-http_authentication_required_error = Le serveur à {$url} nécessite une authentification. Veuillez fournir votre nom d'utilisateur et mot de passe
+http_authentication_required_error = Le serveur à {$url} nécessite une authentification. Veuillez saisir votre nom d'utilisateur et mot de passe
 
-http_authentication_rejected_error = Le serveur à {$url} a rejeté vos identifiants. Veuillez fournir un nom d'utilisateur et mot de passe valides.
+http_authentication_rejected_error = Le serveur à {$url} a rejeté vos identifiants. Veuillez saisir un nom d'utilisateur et mot de passe valides.
 
 misconfigured_http_authentication_error = Le serveur envoie des informations d'authentification HTTP invalides. Veuillez vérifier la configuration d'authentification HTTP de votre site
 
-misconfigured_rate_limit_error = Le serveur limite les requêtes d'une manière qui ne réussira jamais. Veuillez vérifier la configuration de limitation de taux de votre site
+misconfigured_rate_limit_error = Le serveur limite les requêtes d'une manière qui ne réussira jamais. Veuillez vérifier la configuration de limite de taux de votre site
 
-oauth_response_url_error_missing_site_url = L'URL donnée ne contient pas le paramètre de requête `site_url`
-oauth_response_url_error_missing_username = L'URL donnée ne contient pas le paramètre de requête `username`
-oauth_response_url_error_missing_password = L'URL donnée ne contient pas le paramètre de requête `password`
-oauth_response_url_error_unsuccessful_login = Connexion échouée
+oauth_response_url_error_missing_site_url = L'URL fournie ne contient pas le paramètre de requête `site_url`
+oauth_response_url_error_missing_username = L'URL fournie ne contient pas le paramètre de requête `username`
+oauth_response_url_error_missing_password = L'URL fournie ne contient pas le paramètre de requête `password`
+oauth_response_url_error_unsuccessful_login = Échec de la connexion
 
-boolean_true_is_returned_when_string_is_expected = Une valeur `String` est attendue pour ce champ, mais le booléen `true` a été reçu à la place
+boolean_true_is_returned_when_string_is_expected = Une valeur `String` était attendue pour ce champ, mais un booléen `true` a été reçu
 
 invalid_header_name_error = Nom d'en-tête invalide : {$header_name}
 
@@ -51,3 +51,5 @@ uuid_parse_error_invalid_uuid = Chaîne UUID invalide
 uuid_parse_error_not_version_4 = N'est pas un UUID version 4
 
 wordpress_org_api_client_error_request_encoding = Échec de l'encodage de la requête. Raison : {$reason}
+
+http_forbidden_error = Le serveur à {$url} a refusé l'accès à la ressource demandée. Veuillez vérifier la configuration de votre site
