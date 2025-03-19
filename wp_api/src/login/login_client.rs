@@ -3,9 +3,8 @@ use super::{
         self, ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttempt,
         AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult, AutoDiscoveryAttemptSuccess,
         AutoDiscoveryResult, AutoDiscoveryUniffiResult, FetchWpJsonFailure, FetchWpJsonSuccess,
-        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
-        IsWordPressSiteParseHtmlResult, ParseApiRootUrlError, ParseHtmlFailure,
-        API_ROOT_LINK_HEADER,
+        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteParseHtmlResult,
+        ParseApiRootUrlError, ParseHtmlFailure, API_ROOT_LINK_HEADER,
     },
     WpApiDetails,
 };
@@ -103,16 +102,10 @@ impl WpLoginClient {
         let discovery_result = self
             .inner_attempt_api_discovery(api_link_header_result.clone())
             .await;
-        let is_wordpress_site = IsWordPressSiteAttemptResult {
-            api_link_header_result,
-            fetch_wp_json_result,
-            parse_html_result,
-        };
         AutoDiscoveryAttemptResult {
             attempt_type: attempt.attempt_type,
             attempt_site_url: attempt.attempt_site_url,
             api_discovery_result: discovery_result,
-            is_wordpress_site,
         }
     }
 

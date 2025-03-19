@@ -129,12 +129,6 @@ impl AutoDiscoveryResult {
     ) -> Option<&AutoDiscoveryAttemptResult> {
         self.attempts.get(attempt_type)
     }
-
-    pub fn is_wordpress_site(&self) -> bool {
-        self.attempts
-            .iter()
-            .any(|(_, result)| result.is_wordpress_site())
-    }
 }
 
 #[derive(Debug, Clone, uniffi::Object)]
@@ -142,7 +136,6 @@ pub struct AutoDiscoveryAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub attempt_site_url: String,
     pub api_discovery_result: Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
-    pub is_wordpress_site: IsWordPressSiteAttemptResult,
 }
 
 #[uniffi::export]
@@ -231,11 +224,6 @@ impl AutoDiscoveryAttemptResult {
             }
         }
     }
-
-    /// Does the site look like a WordPress site?
-    fn is_wordpress_site(&self) -> bool {
-        self.is_wordpress_site.is_successful()
-    }
 }
 
 impl AutoDiscoveryAttemptResult {
@@ -249,7 +237,6 @@ impl AutoDiscoveryAttemptResult {
             api_discovery_result: Err(AutoDiscoveryAttemptFailure::ParseSiteUrl {
                 error: error.clone(),
             }),
-            is_wordpress_site: IsWordPressSiteAttemptResult::from_parse_site_url_error(error),
         }
     }
 }
@@ -264,41 +251,6 @@ pub fn is_local_dev_environment_url(parsed_site_url: &ParsedUrl) -> bool {
     }
 
     false
-}
-
-#[derive(Debug, Clone, uniffi::Object)]
-pub struct IsWordPressSiteAttemptResult {
-    pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
-    pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
-    pub parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
-}
-
-impl IsWordPressSiteAttemptResult {
-    pub fn is_successful(&self) -> bool {
-        self.api_link_header_result.is_ok()
-            || self.fetch_wp_json_result.is_ok()
-            || self
-                .parse_html_result
-                .as_ref()
-                .map(|r| {
-                    r.has_wordpress_generator_meta_tag
-                        || r.mentions_wp_content
-                        || r.mentions_wp_includes
-                })
-                .unwrap_or(false)
-    }
-
-    pub fn from_parse_site_url_error(error: ParseUrlError) -> Self {
-        Self {
-            api_link_header_result: Err(FindApiRootLinkHeaderFailure::ParseSiteUrl {
-                error: error.clone(),
-            }),
-            fetch_wp_json_result: Err(FetchWpJsonFailure::ParseSiteUrl {
-                error: error.clone(),
-            }),
-            parse_html_result: Err(ParseHtmlFailure::ParseSiteUrl { error }),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
