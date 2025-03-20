@@ -49,13 +49,13 @@ async fn test_login_flow_err_http_authentication_required_error(#[case] site_url
     assert!(matches!(
         original_attempt_error,
         AutoDiscoveryAttemptFailure::FindApiRoot {
-            error: FindApiRootFailure::FetchHomepage {
+            find_api_root_failure: FindApiRootFailure::FetchHomepage {
                 error: RequestExecutionError::RequestExecutionFailed {
                     reason: RequestExecutionErrorReason::HttpAuthenticationRequiredError { .. },
                     ..
                 },
-                ..
-            }
+            },
+            ..
         }
     ));
 }
@@ -76,13 +76,13 @@ async fn test_login_flow_err_http_authentication_rejected_error(#[case] site_url
     assert!(matches!(
         original_attempt_error,
         AutoDiscoveryAttemptFailure::FindApiRoot {
-            error: FindApiRootFailure::FetchHomepage {
+            find_api_root_failure: FindApiRootFailure::FetchHomepage {
                 error: RequestExecutionError::RequestExecutionFailed {
                     reason: RequestExecutionErrorReason::HttpAuthenticationRejectedError { .. },
                     ..
                 },
-                ..
-            }
+            },
+            ..
         }
     ));
 }
@@ -97,7 +97,8 @@ async fn test_login_flow_err_not_a_wordpress_site(#[case] site_url: &str) {
         matches!(
             err,
             AutoDiscoveryAttemptFailure::FindApiRoot {
-                error: FindApiRootFailure::ProbablyNotAWordPressSite { .. }
+                find_api_root_failure: FindApiRootFailure::ProbablyNotAWordPressSite { .. },
+                ..
             }
         ),
         "{:#?}",
