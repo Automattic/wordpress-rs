@@ -114,7 +114,7 @@ async fn batch_test_autodiscovery(input_file: String, output_file: String) -> Re
     println!("{}", count);
 
     while let Some(result) = s.next().await {
-        println!("{:?}", result);
+        // println!("{:?}", result);
         let outcome = result.is_successful().to_string();
         let site_url = result.user_input_attempt().attempt_site_url.to_string();
 
@@ -126,14 +126,28 @@ async fn batch_test_autodiscovery(input_file: String, output_file: String) -> Re
                 .get(&AutoDiscoveryAttemptType::AutoStrippedHttps)
             {
                 if let Some(error) = attempt.api_discovery_result.as_ref().err() {
-                    writer.write_record(&[outcome, site_url, error.to_string()])?;
+                    writer.write_record(&[outcome, site_url, rewrite_error(error.to_string())])?;
+                    continue;
                 }
+            }
+            
+            let attempt= result.user_input_attempt();
+            if let Some(error) = attempt.api_discovery_result.as_ref().err() {
+                writer.write_record(&[outcome, site_url, rewrite_error(error.to_string())])?;
             }
         }
         writer.flush()?;
     }
 
     Ok(())
+}
+
+fn rewrite_error(error: String) -> String {
+    if error.contains("Api root link header not found") {
+        "Unhelpful error".to_string()
+    } else {
+        error.to_string()
+    }
 }
 
 fn parse_input_file(input_file: String) -> Result<Vec<BatchTestRow>> {

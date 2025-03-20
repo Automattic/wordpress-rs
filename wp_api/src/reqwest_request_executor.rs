@@ -8,12 +8,14 @@ use crate::{
 use async_trait::async_trait;
 use http::{HeaderMap, HeaderValue};
 use reqwest::multipart::Part;
-use std::{error::Error};
+use std::{error::{Error}};
 use std::{sync::Arc, time::Duration};
 use hickory_resolver::error::ResolveError;
 use rustls::CertificateError;
 use rustls::Error as TlsError;
 use crate::api_error::InvalidSslError;
+use hyper::Error as HyperError;
+use h2::Error as Http2Error;
 
 #[derive(Debug)]
 pub struct ReqwestRequestExecutor {
@@ -155,14 +157,21 @@ impl RequestExecutor for ReqwestRequestExecutor {
 }
 
 impl From<reqwest::Error> for RequestExecutionError {
-    fn from(error: reqwest::Error) -> Self {
-        let hostname = error.url().unwrap().host_str().unwrap().to_string();
+    fn from(error: reqwest::Error) -> Self {        
+        
+        // let Some(url) = error.url() else {
+        //     panic!("The request URL should be valid: {:?}", error.url());
+        // };
+
+        // let Some(hostname) = url.host_str() else {
+        //     panic!("The request URL should have a valid hostname: {:?}", error.url());
+        // };
 
         if error.is_timeout() {
             return RequestExecutionError::RequestExecutionFailed {
                 status_code: error.status().map(|s| s.as_u16()),
                 redirects: None,
-                reason: RequestExecutionErrorReason::HttpTimeoutError { hostname: hostname },
+                reason: RequestExecutionErrorReason::HttpTimeoutError { hostname: "hostname".to_string() },
             };
         }
 
@@ -175,6 +184,7 @@ impl From<reqwest::Error> for RequestExecutionError {
         }
 
         if let Some(io_error) = error.as_io_error() {
+
             match io_error.kind() {
                 std::io::ErrorKind::ConnectionRefused => {
                     return RequestExecutionError::RequestExecutionFailed {
@@ -185,42 +195,36 @@ impl From<reqwest::Error> for RequestExecutionError {
                             suggested_action: None,
                         },
                     };
-                }
-                _ => {}
-            }
+                },
+                std::io::ErrorKind::UnexpectedEof => { // Server terminated the connection unexpectedly
+                    return RequestExecutionError::RequestExecutionFailed {
+                        status_code: None,
+                        redirects: None,
+                        reason: RequestExecutionErrorReason::NonExistentSiteError {
+                            error_message: Some("The server terminated the connection unexpectedly".to_string()),
+                            suggested_action: None,
+                        },
+                    };
 
-            todo!("Unhandled io error");
+                },
+                _ => {
+                    return RequestExecutionError::RequestExecutionFailed {
+                        status_code: None,
+                        redirects: None,
+                        reason: RequestExecutionErrorReason::GenericError {
+                            error_message: error.to_string(),
+                        },
+                    };
+                }
+            }
         }
 
-        if error.is_connect() {
-
-            // if let Some(error_kind) = error.get_connect_error_kind() {
-            //     match error_kind {
-            //         std::io::ErrorKind::HostUnreachable => {
-            //             return RequestExecutionError::RequestExecutionFailed {
-            //                 status_code: None,
-            //                 redirects: None,
-            //                 reason: RequestExecutionErrorReason::NonExistentSiteError {
-            //                     error_message: Some("Host unreachable".to_string()),
-            //                     suggested_action: None,
-            //                 },
-            //             };
-            //         }
-            //         std::io::ErrorKind::NetworkUnreachable => {
-            //             return RequestExecutionError::RequestExecutionFailed {
-            //                 status_code: None,
-            //                 redirects: None,
-            //                 reason: RequestExecutionErrorReason::DeviceIsOfflineError {
-            //                     error_message: "Network unreachable".to_string(),
-            //                 },
-            //             };
-            //         },
-            //         std::io::ErrorKind::InvalidData => {
-            //             println!("Invalid data!!!");
-            //         },
-            //         _ => {}
-            //     }
-            // }
+        if let Some(hyper_error) = error.as_hyper_error() {
+            return RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: hyper_error.into(),
+            };
         }
 
         if let Some(dns_error) = error.as_dns_error() {
@@ -235,14 +239,6 @@ impl From<reqwest::Error> for RequestExecutionError {
         println!("Error: {:?}", error);
         println!("Error: {:?}", error.source());
         todo!("Unhandled error – aborting");
-
-        // RequestExecutionError::RequestExecutionFailed {
-        //     status_code: None,
-        //     redirects: None,
-        //     reason: RequestExecutionErrorReason::GenericError {
-        //         error_message: error.to_string(),
-        //     },
-        // }
     }
 }
 
@@ -286,12 +282,41 @@ impl From<&ResolveError> for RequestExecutionErrorReason {
         }
     }
 }
+
+/// Converts from the Hyper frameworks underlying errors to a RequestExecutionErrorReason
+impl From<&HyperError> for RequestExecutionErrorReason {
+    fn from(error: &HyperError) -> Self {
+
+        if let Some(http2_error) = error.find::<Http2Error>() {
+            // TODO: We can probably handle more cases here, such as:
+            // - Connection reset
+
+            return RequestExecutionErrorReason::GenericError {
+                error_message: http2_error.to_string(),
+            };
+        }
+
+        if error.is_closed() {
+            return RequestExecutionErrorReason::GenericError {
+                error_message: error.to_string(),
+            };
+        }
+
+        if error.is_incomplete_message() {
+            // The server terminated the connection unexpectedly
+            return RequestExecutionErrorReason::GenericError {
+                error_message: error.to_string(),
+            };
+        }
+
+        todo!("Unhandled hyper error: {:?}", error);
+    }
+}
 trait ExaminableError {
     fn as_io_error(&self) -> Option<&std::io::Error>;
     fn as_dns_error(&self) -> Option<&ResolveError>;
     fn as_tls_error(&self) -> Option<&TlsError>;
-
-    fn find<'a, E: Error + 'static>(&self) -> Option<&E>;
+    fn as_hyper_error(&self) -> Option<&HyperError>;
 }
 
 impl ExaminableError for reqwest::Error {
@@ -305,24 +330,66 @@ impl ExaminableError for reqwest::Error {
 
     fn as_tls_error(&self) -> Option<&TlsError> {
         if let Some(error) = self.as_io_error() {
-            if let Some(inner_error) = error.get_ref().unwrap().downcast_ref::<std::io::Error>() {
-                if inner_error.get_ref().unwrap().is::<TlsError>() {
-                    return Some(inner_error.get_ref().unwrap().downcast_ref::<TlsError>().unwrap());
-                }
-            }
+            let Some(inner_error) = error.get_ref() else {
+                println!("No inner error found for {:?}", self.url());
+                return None;
+            };
+
+            let Some(io_error) = inner_error.downcast_ref::<std::io::Error>() else {
+                return None;
+            };
+
+            let Some(io_error) = io_error.get_ref() else {
+                println!("No inner error found for {:?}", self.url());
+                return None;
+            };
+
+            let Some(tls_error) = io_error.downcast_ref::<TlsError>() else {
+                println!("No inner error found for {:?}", self.url());
+                return None;
+            };
+
+            return Some(tls_error);
         }
 
         None
     }
 
+    fn as_hyper_error(&self) -> Option<&HyperError> {
+        self.find::<HyperError>()
+    }
+}
+
+
+// It's probably possible to have a single implementation for all of these, but we can do that later
+trait FindsError {
+    fn find<'a, E: Error + 'static>(&self) -> Option<&E>;
+}
+
+impl FindsError for reqwest::Error {
     fn find<'a, E: Error + 'static>(&self) -> Option<&E> {
-        let mut err: Option<&dyn Error> = Some(self);
-        while let Some(src) = err {
-            if src.is::<E>() {
-                return src.downcast_ref::<E>();
-            }
-            err = src.source();
-        }
-        None
+        find_error::<E>(self)
     }
+}
+impl FindsError for HyperError{
+    fn find<'a, E: Error + 'static>(&self) -> Option<&E> {
+        find_error::<E>(self)
+    }
+}
+impl FindsError for Http2Error{
+    fn find<'a, E: Error + 'static>(&self) -> Option<&E> {
+        find_error::<E>(self)
+    }
+}
+
+// From https://github.com/hyperium/hyper-util/blob/master/src/error.rs
+pub(crate) fn find_error<'a, E: Error + 'static>(top: &'a (dyn Error + 'static)) -> Option<&'a E> {
+    let mut err = Some(top);
+    while let Some(src) = err {
+        if src.is::<E>() {
+            return src.downcast_ref();
+        }
+        err = src.source();
+    }
+    None
 }

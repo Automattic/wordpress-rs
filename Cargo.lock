@@ -4515,6 +4515,7 @@ dependencies = [
  "base64",
  "chrono",
  "futures",
+ "h2 0.4.7",
  "hickory-resolver",
  "http 1.3.1",
  "hyper 1.6.0",
