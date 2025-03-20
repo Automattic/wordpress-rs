@@ -1,9 +1,12 @@
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use x509_cert::{
     Certificate,
     der::Decode,
     ext::pkix::{SubjectAltName, name::GeneralName::DnsName},
 };
+
+use crate::date::WpGmtDateTime;
 
 // Parse a DER-encoded certificate into a Struct we can use to get better
 // information about a site's SSL certificate.
@@ -12,10 +15,12 @@ use x509_cert::{
 #[uniffi::export]
 pub fn parse_certificate(data: &[u8]) -> Option<Arc<SSLCertificateInfo>> {
     let certificate = Certificate::from_der(data).ok()?;
-    let certificate = certificate.tbs_certificate();
+    let certificate: &x509_cert::certificate::TbsCertificateInner = certificate.tbs_certificate();
 
     Some(
         SSLCertificateInfo {
+            valid_at: certificate.validity().not_before.into(),
+            expires_at: certificate.validity().not_after.into(),
             common_name: extract_data_as_string(certificate.subject().common_name())?,
             alternative_names: extract_alternative_names(certificate),
             issuer: SSLCertificateIssuer {
@@ -58,6 +63,10 @@ pub struct SSLCertificateInfo {
     pub alternative_names: Vec<String>,
     /// Information about whomever signed this certificate
     pub issuer: SSLCertificateIssuer,
+    /// The date this certificate was issued
+    pub valid_at: WpGmtDateTime,
+    /// The date this certificate expires
+    pub expires_at: WpGmtDateTime,
 }
 
 #[uniffi::export]
@@ -80,4 +89,10 @@ pub struct SSLCertificateIssuer {
     pub common_name: String,
     pub organization: Option<String>,
     pub country: Option<String>,
+}
+
+impl From<x509_cert::time::Time> for WpGmtDateTime {
+    fn from(date_time: x509_cert::time::Time) -> Self {
+        WpGmtDateTime::from_utimestamp(date_time.to_unix_duration().as_secs())
+    }
 }
