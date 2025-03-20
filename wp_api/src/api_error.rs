@@ -1,7 +1,6 @@
 use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError, WpNetworkResponse};
-use crate::{request::WpRedirect, ssl::SSLCertificateInfo};
+use crate::{request::WpRedirect};
 use serde::Deserialize;
-use std::sync::Arc;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -449,21 +448,19 @@ impl WpSupportsLocalization for RequestExecutionError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum InvalidSslError {
+    CertificateNotValidForName {
+        hostname: String,
+        presented_hostnames: Vec<String>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, WpDeriveLocalizable)]
 pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
     InvalidSslError {
-        // The SSL certificate for the site we're trying to contact
-        site_certificate: Option<Arc<SSLCertificateInfo>>,
-
-        // Any other certificates in the trust chain
-        certificate_chain: Vec<Arc<SSLCertificateInfo>>,
-
-        // The error message provided by the HTTP stack
-        error_message: Option<String>,
-
-        // Any suggested action provided by the HTTP stack
-        suggested_action: Option<String>,
+        inner: InvalidSslError,
     },
     NonExistentSiteError {
         error_message: Option<String>,

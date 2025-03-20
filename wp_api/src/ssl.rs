@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use x509_cert::{
     Certificate,

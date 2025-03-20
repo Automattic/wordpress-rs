@@ -1,9 +1,11 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, str::FromStr};
 use wp_serde_helper::wp_utc_date_format;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+
+#[derive(Hash)]
 pub struct WpGmtDateTime(#[serde(with = "wp_utc_date_format")] pub DateTime<Utc>);
 
 impl WpGmtDateTime {

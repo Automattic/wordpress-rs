@@ -1,4 +1,3 @@
-use crate::RequestExecutionErrorReason::InvalidSslError;
 use crate::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
     request::{
@@ -8,12 +7,13 @@ use crate::{
 };
 use async_trait::async_trait;
 use http::{HeaderMap, HeaderValue};
-use reqwest::{multipart::Part, tls::TlsInfo};
-use std::error::Error;
+use reqwest::multipart::Part;
+use std::{error::Error};
 use std::{sync::Arc, time::Duration};
-use hickory_resolver::ResolveError;
+use hickory_resolver::error::ResolveError;
 use rustls::CertificateError;
 use rustls::Error as TlsError;
+use crate::api_error::InvalidSslError;
 
 #[derive(Debug)]
 pub struct ReqwestRequestExecutor {
@@ -224,14 +224,17 @@ impl From<reqwest::Error> for RequestExecutionError {
         }
 
         if let Some(dns_error) = error.as_dns_error() {
-            println!("DNS error!!!! : {:?}", dns_error);
-            todo!();
+            return RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: dns_error.into()
+            };
         }
 
         println!("================================================");
         println!("Error: {:?}", error);
         println!("Error: {:?}", error.source());
-        todo!();
+        todo!("Unhandled error – aborting");
 
         // RequestExecutionError::RequestExecutionFailed {
         //     status_code: None,
@@ -243,21 +246,21 @@ impl From<reqwest::Error> for RequestExecutionError {
     }
 }
 
+/// Converts all HTTPS errors to a RequestExecutionErrorReason
 impl From<&TlsError> for RequestExecutionErrorReason {
     fn from(error: &TlsError) -> Self {
         match error {
-            TlsError::InvalidCertificate(ref certificate_error) => match certificate_error {
-                CertificateError::NotValidForName {
+            TlsError::InvalidCertificate(certificate_error) => match certificate_error {
+                CertificateError::NotValidForNameContext {
                     expected,
                     presented,
                 } => {
-                    let certificate_error = crate::RequestExecutionErrorReason::InvalidCertificateError {
-                        hostname: expected.to_str().to_string(),
-                        presented_hostnames: presented.to_vec(),
-                    };
-                    return RequestExecutionErrorReason::InvalidSslError {
-                        error_message: None,
-                    };
+                    crate::RequestExecutionErrorReason::InvalidSslError {
+                        inner: InvalidSslError::CertificateNotValidForName {
+                            hostname: expected.to_str().to_string(),
+                            presented_hostnames: presented.to_vec(),
+                        },
+                    }
                 }
                 _ => RequestExecutionErrorReason::GenericError {
                     error_message: error.to_string(),
@@ -270,20 +273,19 @@ impl From<&TlsError> for RequestExecutionErrorReason {
     }
 }
 
-// impl From<ResolveError> for RequestExecutionError {
-//     fn from(error: ResolveError) -> Self {
-//         println!("ResolveError: {:?}", error);
+/// Converts all DNS errors to a RequestExecutionErrorReason
+impl From<&ResolveError> for RequestExecutionErrorReason {
+    fn from(error: &ResolveError) -> Self {
 
-//         RequestExecutionError::RequestExecutionFailed {
-//             status_code: None,
-//             redirects: None,
-//             reason: RequestExecutionErrorReason::NonExistentSiteError {
-//                 error_message: None,
-//                 suggested_action: None,
-//             },
-//         }
-//     }
-// }
+        // Future improvement: We could probably detect when the domain is valid, but
+        // there's no DNS record for the provided hostname
+
+        RequestExecutionErrorReason::NonExistentSiteError {
+                error_message: Some(error.to_string()),
+                suggested_action: None,
+        }
+    }
+}
 trait ExaminableError {
     fn as_io_error(&self) -> Option<&std::io::Error>;
     fn as_dns_error(&self) -> Option<&ResolveError>;
@@ -293,19 +295,6 @@ trait ExaminableError {
 }
 
 impl ExaminableError for reqwest::Error {
-    // fn is_an_internal_connect_error(&self) -> bool {
-
-    //     if let Some(source) = self.source() {
-    //         if source.is::<hyper_util::client::legacy::Error>() {
-    //             if let Some(error) = source.downcast_ref::<hyper_util::client::legacy::Error>() {
-    //                 return error.is_connect();
-    //             }
-    //         }
-    //     }
-
-    //     false
-    // }
-
     fn as_io_error(&self) -> Option<&std::io::Error> {
         self.find::<std::io::Error>()
     }
