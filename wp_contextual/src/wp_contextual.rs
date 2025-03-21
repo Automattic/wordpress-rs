@@ -95,7 +95,7 @@ fn struct_fields(
     data: &syn::Data,
 ) -> Result<&syn::punctuated::Punctuated<syn::Field, syn::token::Comma>, WpContextualParseError> {
     if let syn::Data::Struct(syn::DataStruct {
-        fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+        fields: syn::Fields::Named(syn::FieldsNamed { named, .. }),
         ..
     }) = data
     {
@@ -530,7 +530,7 @@ fn find_contextual_field_inner_segment(
 ) -> Result<&mut syn::PathSegment, syn::Error> {
     let unsupported_err =
         WpContextualParseError::WpContextualFieldTypeNotSupported.into_syn_error(ty.span());
-    if let syn::Type::Path(ref mut p) = ty {
+    if let syn::Type::Path(p) = ty {
         // A `syn::Type::Path` has to have at least one segment.
         assert!(!p.path.segments.is_empty());
 
@@ -562,7 +562,11 @@ fn find_contextual_field_inner_segment(
         //     pub baz: baz::BazWithEditContext,
         // }
         // ```
-        let segment: &mut syn::PathSegment = p.path.segments.last_mut().unwrap();
+        let segment: &mut syn::PathSegment = p
+            .path
+            .segments
+            .last_mut()
+            .expect("Already verified there is at least one segment");
 
         match segment.arguments {
             // No inner type
@@ -620,7 +624,7 @@ fn find_contextual_field_inner_segment(
 // it'd be fairly straightforward to do so, it's also unnecessary as we want to encourage the
 // usage of simple `Option` type for consistency.
 fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
-    if let syn::Type::Path(ref p) = ty {
+    if let syn::Type::Path(p) = ty {
         let first_segment = &p.path.segments[0];
 
         // `Option` type has only one segment with an ident `Option`

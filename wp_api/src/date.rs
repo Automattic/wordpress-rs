@@ -18,9 +18,7 @@ impl FromStr for WpGmtDateTime {
     type Err = chrono::ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<DateTime<Utc>>()
-            .map(Self)
-            .map_err(Into::<Self::Err>::into)
+        s.parse::<DateTime<Utc>>().map(Self)
     }
 }
 
