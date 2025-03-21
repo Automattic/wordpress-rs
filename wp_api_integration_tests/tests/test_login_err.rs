@@ -4,7 +4,9 @@ use std::sync::Arc;
 use wp_api::{
     login::{
         login_client::WpLoginClient,
-        url_discovery::{AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptType},
+        url_discovery::{
+            AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptType, FindApiRootFailure,
+        },
     },
     middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
     reqwest_request_executor::ReqwestRequestExecutor,
@@ -46,10 +48,12 @@ async fn test_login_flow_err_http_authentication_required_error(#[case] site_url
     let original_attempt_error = login_flow_err_helper(site_url, vec![]).await;
     assert!(matches!(
         original_attempt_error,
-        AutoDiscoveryAttemptFailure::FetchApiRootUrl {
-            error: RequestExecutionError::RequestExecutionFailed {
-                reason: RequestExecutionErrorReason::HttpAuthenticationRequiredError { .. },
-                ..
+        AutoDiscoveryAttemptFailure::FindApiRoot {
+            find_api_root_failure: FindApiRootFailure::FetchHomepage {
+                error: RequestExecutionError::RequestExecutionFailed {
+                    reason: RequestExecutionErrorReason::HttpAuthenticationRequiredError { .. },
+                    ..
+                },
             },
             ..
         }
@@ -71,14 +75,35 @@ async fn test_login_flow_err_http_authentication_rejected_error(#[case] site_url
     .await;
     assert!(matches!(
         original_attempt_error,
-        AutoDiscoveryAttemptFailure::FetchApiRootUrl {
-            error: RequestExecutionError::RequestExecutionFailed {
-                reason: RequestExecutionErrorReason::HttpAuthenticationRejectedError { .. },
-                ..
+        AutoDiscoveryAttemptFailure::FindApiRoot {
+            find_api_root_failure: FindApiRootFailure::FetchHomepage {
+                error: RequestExecutionError::RequestExecutionFailed {
+                    reason: RequestExecutionErrorReason::HttpAuthenticationRejectedError { .. },
+                    ..
+                },
             },
             ..
         }
     ));
+}
+
+#[rstest]
+#[case("https://www.beeper.com/")]
+#[tokio::test]
+#[parallel]
+async fn test_login_flow_err_not_a_wordpress_site(#[case] site_url: &str) {
+    let err = login_flow_err_helper(site_url, vec![]).await;
+    assert!(
+        matches!(
+            err,
+            AutoDiscoveryAttemptFailure::FindApiRoot {
+                find_api_root_failure: FindApiRootFailure::ProbablyNotAWordPressSite { .. },
+                ..
+            }
+        ),
+        "{:#?}",
+        err
+    );
 }
 
 async fn login_flow_err_helper(

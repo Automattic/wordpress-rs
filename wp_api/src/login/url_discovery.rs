@@ -1,8 +1,7 @@
 use super::WpApiDetails;
 use crate::{
-    login::KnownApplicationPasswordBlockingPlugin,
-    request::{WpNetworkHeaderMap, WpRedirect},
-    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
+    login::KnownApplicationPasswordBlockingPlugin, request::WpRedirect, ParseUrlError, ParsedUrl,
+    RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -129,12 +128,6 @@ impl AutoDiscoveryResult {
     ) -> Option<&AutoDiscoveryAttemptResult> {
         self.attempts.get(attempt_type)
     }
-
-    pub fn is_wordpress_site(&self) -> bool {
-        self.attempts
-            .iter()
-            .any(|(_, result)| result.is_wordpress_site())
-    }
 }
 
 #[derive(Debug, Clone, uniffi::Object)]
@@ -142,7 +135,6 @@ pub struct AutoDiscoveryAttemptResult {
     pub attempt_type: AutoDiscoveryAttemptType,
     pub attempt_site_url: String,
     pub api_discovery_result: Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
-    pub is_wordpress_site: IsWordPressSiteAttemptResult,
 }
 
 #[uniffi::export]
@@ -184,20 +176,6 @@ impl AutoDiscoveryAttemptResult {
         }
     }
 
-    fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
-        match &self.api_discovery_result {
-            Ok(_success) => Some(false),
-            Err(error) => error.has_failed_to_parse_api_root_url(),
-        }
-    }
-
-    fn has_failed_to_parse_api_details(&self) -> Option<bool> {
-        match &self.api_discovery_result {
-            Ok(_success) => Some(false),
-            Err(error) => error.has_failed_to_parse_api_details(),
-        }
-    }
-
     fn parsed_site_url(&self) -> Option<Arc<ParsedUrl>> {
         match &self.api_discovery_result {
             Ok(success) => Some(Arc::clone(&success.parsed_site_url)),
@@ -231,11 +209,6 @@ impl AutoDiscoveryAttemptResult {
             }
         }
     }
-
-    /// Does the site look like a WordPress site?
-    fn is_wordpress_site(&self) -> bool {
-        self.is_wordpress_site.is_successful()
-    }
 }
 
 impl AutoDiscoveryAttemptResult {
@@ -249,7 +222,6 @@ impl AutoDiscoveryAttemptResult {
             api_discovery_result: Err(AutoDiscoveryAttemptFailure::ParseSiteUrl {
                 error: error.clone(),
             }),
-            is_wordpress_site: IsWordPressSiteAttemptResult::from_parse_site_url_error(error),
         }
     }
 }
@@ -266,46 +238,8 @@ pub fn is_local_dev_environment_url(parsed_site_url: &ParsedUrl) -> bool {
     false
 }
 
-#[derive(Debug, Clone, uniffi::Object)]
-pub struct IsWordPressSiteAttemptResult {
-    pub api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
-    pub fetch_wp_json_result: Result<FetchWpJsonSuccess, FetchWpJsonFailure>,
-    pub parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
-}
-
-impl IsWordPressSiteAttemptResult {
-    pub fn is_successful(&self) -> bool {
-        self.api_link_header_result.is_ok()
-            || self.fetch_wp_json_result.is_ok()
-            || self
-                .parse_html_result
-                .as_ref()
-                .map(|r| {
-                    r.has_wordpress_generator_meta_tag
-                        || r.mentions_wp_content
-                        || r.mentions_wp_includes
-                })
-                .unwrap_or(false)
-    }
-
-    pub fn from_parse_site_url_error(error: ParseUrlError) -> Self {
-        Self {
-            api_link_header_result: Err(FindApiRootLinkHeaderFailure::ParseSiteUrl {
-                error: error.clone(),
-            }),
-            fetch_wp_json_result: Err(FetchWpJsonFailure::ParseSiteUrl {
-                error: error.clone(),
-            }),
-            parse_html_result: Err(ParseHtmlFailure::ParseSiteUrl { error }),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
-pub struct FindApiRootLinkHeaderSuccess {
-    pub parsed_site_url: Arc<ParsedUrl>,
-    pub api_root_url: Arc<ParsedUrl>,
-}
+pub struct ApiRootUrl(pub Arc<ParsedUrl>);
 
 #[derive(Debug, Clone)]
 pub struct FetchWpJsonSuccess {
@@ -319,7 +253,7 @@ pub struct RootWpJson {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IsWordPressSiteParseHtmlResult {
+pub struct ParseHomepageResult {
     /// `href` attribute of a link tag if it has `rel` attribute of "https://api.w.org/".
     /// For example:
     /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
@@ -332,7 +266,7 @@ pub struct IsWordPressSiteParseHtmlResult {
     pub mentions_wp_includes: bool,
 }
 
-impl IsWordPressSiteParseHtmlResult {
+impl ParseHomepageResult {
     const HTML_ATTR_NAME: &str = "name";
     const HTML_ATTR_CONTENT: &str = "content";
     const HTML_ATTR_HREF: &str = "href";
@@ -399,21 +333,13 @@ impl IsWordPressSiteParseHtmlResult {
                     .contains(Self::META_TAG_GENERATOR_CONTENT_INCLUDES)
         })
     }
-}
 
-#[derive(Debug, Clone)]
-pub enum FindApiRootLinkHeaderFailure {
-    ParseSiteUrl {
-        error: ParseUrlError,
-    },
-    FetchApiRootUrl {
-        parsed_site_url: Arc<ParsedUrl>,
-        error: RequestExecutionError,
-    },
-    ParseApiRootUrl {
-        parsed_site_url: Arc<ParsedUrl>,
-        error: ParseApiRootUrlError,
-    },
+    pub fn does_look_like_a_wp_site(&self) -> bool {
+        self.api_root_url_from_link_tag.is_some()
+            || self.mentions_wp_content
+            || self.mentions_wp_includes
+            || self.has_wordpress_generator_meta_tag
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -430,12 +356,6 @@ pub enum FetchWpJsonFailure {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseHtmlFailure {
-    ParseSiteUrl { error: ParseUrlError },
-    FetchSite { error: RequestExecutionError },
-}
-
 #[derive(Debug, Clone)]
 pub struct AutoDiscoveryAttemptSuccess {
     pub parsed_site_url: Arc<ParsedUrl>,
@@ -447,48 +367,71 @@ pub struct AutoDiscoveryAttemptSuccess {
 pub enum AutoDiscoveryAttemptFailure {
     #[error("{error}")]
     ParseSiteUrl { error: ParseUrlError },
-    #[error("{error}")]
-    FetchApiRootUrl {
+    #[error("{find_api_root_failure}")]
+    FindApiRoot {
         parsed_site_url: Arc<ParsedUrl>,
-        error: RequestExecutionError,
+        find_api_root_failure: FindApiRootFailure,
     },
-    #[error("{error}")]
-    ParseApiRootUrl {
-        parsed_site_url: Arc<ParsedUrl>,
-        error: ParseApiRootUrlError,
-    },
-    #[error("{error}")]
-    FetchApiDetails {
+    #[error("{}", fetch_and_parse_api_root_failure.error_message(parsed_site_url))]
+    FetchAndParseApiRoot {
         parsed_site_url: Arc<ParsedUrl>,
         api_root_url: Arc<ParsedUrl>,
+        fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure,
+    },
+}
+
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+pub enum FindApiRootFailure {
+    #[error("{error}")]
+    FetchHomepage { error: RequestExecutionError },
+    // if no WP mentions
+    #[error("ProbablyNotAWordPressSite")]
+    ProbablyNotAWordPressSite,
+    // WP mentions
+    #[error("RestApiDisabled")]
+    RestApiDisabled,
+}
+
+#[derive(Debug, Clone, uniffi::Error)]
+pub enum FetchAndParseApiRootFailure {
+    FetchApiRoot {
         error: RequestExecutionError,
     },
-    #[error("Failed to parse api details: {:#?}", parsing_error_message)]
-    ParseApiDetails {
-        parsed_site_url: Arc<ParsedUrl>,
-        api_root_url: Arc<ParsedUrl>,
+    ParseApiRoot {
         parsing_error_message: String,
     },
-    #[error(
-        "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"",
-        status_code,
-        error_code,
-        error_message
-    )]
     WpError {
-        parsed_site_url: Arc<ParsedUrl>,
-        api_root_url: Arc<ParsedUrl>,
         error_code: WpErrorCode,
         error_message: String,
         status_code: u16,
     },
-    #[error("{}", reason.as_ref().map(|r| r.error_message(parsed_site_url)).unwrap_or("Application Passwords are not supported".to_string()))]
     ApplicationPasswordsNotSupported {
-        parsed_site_url: Arc<ParsedUrl>,
-        api_root_url: Arc<ParsedUrl>,
         api_details: Arc<WpApiDetails>,
         reason: Option<ApplicationPasswordsNotSupportedReason>,
     },
+}
+
+impl FetchAndParseApiRootFailure {
+    pub fn error_message(&self, parsed_site_url: impl Display) -> String {
+        match self {
+            Self::FetchApiRoot { error } => error.to_string(),
+            Self::ParseApiRoot {
+                parsing_error_message,
+            } => format!("Failed to parse api details: {:#?}", parsing_error_message),
+            Self::WpError {
+                error_code,
+                error_message,
+                status_code,
+            } => format!(
+                "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"",
+                status_code, error_code, error_message
+            ),
+            Self::ApplicationPasswordsNotSupported { reason, .. } => reason
+                .as_ref()
+                .map(|r| r.error_message(parsed_site_url))
+                .unwrap_or("Application Passwords are not supported".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Error)]
@@ -513,124 +456,100 @@ impl ApplicationPasswordsNotSupportedReason {
 }
 
 impl AutoDiscoveryAttemptFailure {
+    pub fn from_find_api_root_failure(
+        parsed_site_url: Arc<ParsedUrl>,
+        find_api_root_failure: FindApiRootFailure,
+    ) -> Self {
+        Self::FindApiRoot {
+            parsed_site_url,
+            find_api_root_failure,
+        }
+    }
+
+    pub fn from_fetch_and_parse_api_root_failure(
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
+        fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure,
+    ) -> Self {
+        Self::FetchAndParseApiRoot {
+            parsed_site_url,
+            api_root_url,
+            fetch_and_parse_api_root_failure,
+        }
+    }
+
     pub fn is_network_error(&self) -> bool {
         match self {
-            Self::FetchApiRootUrl { .. } => true,
-            Self::FetchApiDetails { .. } => true,
             Self::ParseSiteUrl { .. } => false,
-            Self::ParseApiRootUrl { .. } => false,
-            Self::ParseApiDetails { .. } => false,
-            Self::WpError { .. } => false,
-            Self::ApplicationPasswordsNotSupported { .. } => false,
+            Self::FindApiRoot {
+                find_api_root_failure,
+                ..
+            } => find_api_root_failure.is_network_error(),
+            Self::FetchAndParseApiRoot {
+                fetch_and_parse_api_root_failure,
+                ..
+            } => fetch_and_parse_api_root_failure.is_network_error(),
         }
     }
 
     pub fn parsed_site_url(&self) -> Option<&ParsedUrl> {
         match self {
             Self::ParseSiteUrl { .. } => None,
-            Self::FetchApiRootUrl {
+            Self::FindApiRoot {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            Self::ParseApiRootUrl {
+            Self::FetchAndParseApiRoot {
                 parsed_site_url, ..
             } => Some(parsed_site_url),
-            Self::FetchApiDetails {
-                parsed_site_url, ..
-            } => Some(parsed_site_url),
-            Self::ParseApiDetails {
-                parsed_site_url, ..
-            } => Some(parsed_site_url),
-            Self::WpError {
-                parsed_site_url, ..
-            } => Some(parsed_site_url),
-            Self::ApplicationPasswordsNotSupported {
-                parsed_site_url, ..
-            } => Some(parsed_site_url),
-        }
-    }
-
-    // If it failed while parsing the site url or fetching the api root url, we never tried to
-    // parse it, so we return `None`
-    //
-    // If we fail to parse with `Self::ParseApiRootUrl`, we return `Some(true)`, because
-    // that's exactly when the failure happened.
-    //
-    // If an error occurs after parsing the api root url, we return `Some(false)`.
-    pub fn has_failed_to_parse_api_root_url(&self) -> Option<bool> {
-        match self {
-            Self::ParseSiteUrl { .. } => None,
-            Self::FetchApiRootUrl { .. } => None,
-            Self::ParseApiRootUrl { .. } => Some(true),
-            Self::FetchApiDetails { .. } => Some(false),
-            Self::ParseApiDetails { .. } => Some(false),
-            Self::WpError { .. } => Some(false),
-            Self::ApplicationPasswordsNotSupported { .. } => Some(false),
         }
     }
 
     pub fn api_root_url(&self) -> Option<&ParsedUrl> {
         match self {
             Self::ParseSiteUrl { .. } => None,
-            Self::FetchApiRootUrl { .. } => None,
-            Self::ParseApiRootUrl { .. } => None,
-            Self::FetchApiDetails { api_root_url, .. } => Some(api_root_url),
-            Self::ParseApiDetails { api_root_url, .. } => Some(api_root_url),
-            Self::WpError { api_root_url, .. } => Some(api_root_url),
-            Self::ApplicationPasswordsNotSupported { api_root_url, .. } => Some(api_root_url),
-        }
-    }
-
-    // If it failed while parsing the site url, fetching the api root url, parsing the api root url
-    // or fetching the api details, we never tried to parse it, so we return `None`.
-    //
-    // If we fail to parse with `Self::ParseApiDetails`, we return `Some(true)`, because
-    // that's exactly when the failure happened.
-    //
-    // If we parse the api details as `Self::WpError`, we return `Some(false)`, because the
-    // response was parseable.
-    pub fn has_failed_to_parse_api_details(&self) -> Option<bool> {
-        match self {
-            Self::ParseSiteUrl { .. } => None,
-            Self::FetchApiRootUrl { .. } => None,
-            Self::ParseApiRootUrl { .. } => None,
-            Self::FetchApiDetails { .. } => None,
-            Self::ParseApiDetails { .. } => Some(true),
-            Self::WpError { .. } => Some(false),
-            Self::ApplicationPasswordsNotSupported { .. } => Some(false),
+            Self::FindApiRoot { .. } => None,
+            Self::FetchAndParseApiRoot { api_root_url, .. } => Some(api_root_url),
         }
     }
 
     pub fn is_application_passwords_disabled(&self) -> Option<bool> {
         match self {
             Self::ParseSiteUrl { .. } => None,
-            Self::FetchApiRootUrl { .. } => None,
-            Self::ParseApiRootUrl { .. } => None,
-            Self::FetchApiDetails { .. } => None,
-            Self::ParseApiDetails { .. } => None,
-            Self::WpError { .. } => None,
-            Self::ApplicationPasswordsNotSupported { .. } => Some(true),
+            Self::FindApiRoot { .. } => None,
+            Self::FetchAndParseApiRoot {
+                fetch_and_parse_api_root_failure,
+                ..
+            } => fetch_and_parse_api_root_failure.is_application_passwords_disabled(),
         }
     }
 }
 
-impl From<FindApiRootLinkHeaderFailure> for AutoDiscoveryAttemptFailure {
-    fn from(value: FindApiRootLinkHeaderFailure) -> Self {
-        match value {
-            FindApiRootLinkHeaderFailure::ParseSiteUrl { error } => Self::ParseSiteUrl { error },
-            FindApiRootLinkHeaderFailure::FetchApiRootUrl {
-                parsed_site_url,
-                error,
-            } => Self::FetchApiRootUrl {
-                parsed_site_url,
-                error,
-            },
-            FindApiRootLinkHeaderFailure::ParseApiRootUrl {
-                parsed_site_url,
-                error,
-            } => Self::ParseApiRootUrl {
-                parsed_site_url,
-                error,
-            },
+impl FindApiRootFailure {
+    pub fn is_network_error(&self) -> bool {
+        match self {
+            Self::FetchHomepage { .. } => true,
+            Self::ProbablyNotAWordPressSite { .. } => false,
+            Self::RestApiDisabled { .. } => false,
+        }
+    }
+}
+
+impl FetchAndParseApiRootFailure {
+    pub fn is_network_error(&self) -> bool {
+        match self {
+            Self::FetchApiRoot { .. } => true,
+            Self::ParseApiRoot { .. } => false,
+            Self::WpError { .. } => false,
+            Self::ApplicationPasswordsNotSupported { .. } => false,
+        }
+    }
+
+    pub fn is_application_passwords_disabled(&self) -> Option<bool> {
+        match self {
+            Self::FetchApiRoot { .. } => None,
+            Self::ParseApiRoot { .. } => None,
+            Self::WpError { .. } => None,
+            Self::ApplicationPasswordsNotSupported { .. } => Some(true),
         }
     }
 }
@@ -654,28 +573,6 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
         attempts.push(auto_https_attempt);
     }
     attempts
-}
-
-#[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
-pub enum ParseApiRootUrlError {
-    ApiRootLinkHeaderNotFound {
-        status_code: u16,
-        header_map: Arc<WpNetworkHeaderMap>,
-    },
-}
-
-impl WpSupportsLocalization for ParseApiRootUrlError {
-    fn message_bundle(&self) -> wp_localization::MessageBundle {
-        match self {
-            ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-                status_code,
-                header_map,
-            } => WpMessages::api_root_link_header_not_found(
-                status_code.to_string(),
-                format!("{:#?}", header_map),
-            ),
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
@@ -752,38 +649,5 @@ mod tests {
     fn test_is_local_dev_environment_url(#[case] url: &str, #[case] expected: bool) {
         let parsed_url = ParsedUrl::parse(url).unwrap();
         assert_eq!(is_local_dev_environment_url(&parsed_url), expected);
-    }
-
-    #[test]
-    fn test_parse_api_root_url_error_message_bundle() {
-        let e = example_parse_api_root_url_error();
-
-        let message_bundle = e.message_bundle();
-        assert_eq!(message_bundle.key(), "api_root_link_header_not_found");
-        let message_args = message_bundle.args().unwrap();
-        assert_eq!(message_args["status_code"], "404");
-        assert_eq!(message_args["header_map"], "WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}");
-    }
-
-    #[test]
-    fn test_parse_api_root_url_error_derive_localizable() {
-        let expected="Api root link header not found!\nStatus Code: '\u{2068}404\u{2069}'\nHeader Map: '\u{2068}WpNetworkHeaderMap {\n    inner: {\n        \"accept\": \"application/json\",\n    },\n}\u{2069}'";
-
-        assert_eq!(example_parse_api_root_url_error().to_string(), expected);
-    }
-
-    fn example_parse_api_root_url_error() -> ParseApiRootUrlError {
-        let header_map: WpNetworkHeaderMap = {
-            let mut map = http::HeaderMap::new();
-            map.insert(
-                http::header::ACCEPT,
-                http::HeaderValue::from_static("application/json"),
-            );
-            map.into()
-        };
-        ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-            status_code: 404,
-            header_map: header_map.into(),
-        }
     }
 }
