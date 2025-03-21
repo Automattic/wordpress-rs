@@ -1,9 +1,9 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
+    SparseField,
     search_results::{
         SparseSearchResultFieldWithEmbedContext, SparseSearchResultFieldWithViewContext,
     },
-    SparseField,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -45,8 +45,8 @@ mod tests {
     use crate::{
         generate,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
         search_results::{SearchListParams, SearchResultSubtype, SearchResultType},
     };

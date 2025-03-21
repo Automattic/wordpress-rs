@@ -1,7 +1,7 @@
 use super::WpApiDetails;
 use crate::{
-    login::KnownApplicationPasswordBlockingPlugin, request::WpRedirect, ParseUrlError, ParsedUrl,
-    RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
+    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
+    login::KnownApplicationPasswordBlockingPlugin, request::WpRedirect,
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;

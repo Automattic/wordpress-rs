@@ -6,7 +6,7 @@ use wp_api::search_results::{
     SearchListParams, SearchResultSubtype, SearchResultType,
     SparseSearchResultFieldWithEmbedContext, SparseSearchResultFieldWithViewContext,
 };
-use wp_api_integration_tests::{api_client, AssertResponse};
+use wp_api_integration_tests::{AssertResponse, api_client};
 
 #[tokio::test]
 #[apply(list_cases)]

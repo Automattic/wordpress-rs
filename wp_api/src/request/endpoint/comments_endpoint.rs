@@ -1,8 +1,8 @@
+use crate::SparseField;
 use crate::comments::{
     CommentId, CommentListParams, CommentUpdateParams, SparseCommentFieldWithEditContext,
     SparseCommentFieldWithEmbedContext, SparseCommentFieldWithViewContext,
 };
-use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
 
 use super::{AsNamespace, DerivedRequest, WpNamespace};
@@ -67,6 +67,7 @@ impl SparseField for SparseCommentFieldWithViewContext {
 mod tests {
     use super::*;
     use crate::{
+        UserId, WpApiParamOrder,
         comments::{
             CommentDeleteParams, CommentId, CommentRetrieveParams, CommentStatus, CommentType,
             WpApiParamCommentsOrderBy,
@@ -74,13 +75,12 @@ mod tests {
         generate,
         posts::PostId,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
-        UserId, WpApiParamOrder,
     };
     use rstest::*;
     use std::sync::Arc;
@@ -204,7 +204,9 @@ mod tests {
     fn expected_query_pairs_for_comment_list_params_with_all_fields() -> String {
         let after = unit_test_example_date_as_query_value("after");
         let before = unit_test_example_date_as_query_value("before");
-        format!("page=11&per_page=22&search=s_q&{after}&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&{before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q")
+        format!(
+            "page=11&per_page=22&search=s_q&{after}&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&{before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q"
+        )
     }
 
     fn comment_list_params_with_all_fields() -> CommentListParams {
@@ -342,8 +344,7 @@ mod tests {
         SparseCommentFieldWithEditContext::AuthorAvatarUrls,
     ];
 
-    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT: &str =
-        "_fields=id%2Cauthor%2Cauthor_name%2Cauthor_url%2Ccontent%2Cdate%2Clink%2Cparent%2Ctype%2Cauthor_avatar_urls";
+    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT: &str = "_fields=id%2Cauthor%2Cauthor_name%2Cauthor_url%2Ccontent%2Cdate%2Clink%2Cparent%2Ctype%2Cauthor_avatar_urls";
     const ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT: &[SparseCommentFieldWithEmbedContext; 10] =
         &[
             SparseCommentFieldWithEmbedContext::Id,

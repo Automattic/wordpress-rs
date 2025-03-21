@@ -5,7 +5,7 @@ use wp_api::wp_site_health_tests::{
     SparseWpSiteHealthTest, SparseWpSiteHealthTestField,
 };
 
-use wp_api_integration_tests::{api_client, AssertResponse};
+use wp_api_integration_tests::{AssertResponse, api_client};
 
 macro_rules! generate_tests {
     ($ident:ident) => {

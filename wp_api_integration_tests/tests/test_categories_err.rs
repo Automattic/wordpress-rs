@@ -1,11 +1,11 @@
 use serial_test::parallel;
 use wp_api::{
-    categories::{CategoryCreateParams, CategoryListParams, CategoryUpdateParams},
     WpErrorCode,
+    categories::{CategoryCreateParams, CategoryListParams, CategoryUpdateParams},
 };
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, AssertWpError, CATEGORY_ID_59, CATEGORY_ID_INVALID,
-    POST_ID_INVALID,
+    AssertWpError, CATEGORY_ID_59, CATEGORY_ID_INVALID, POST_ID_INVALID, api_client,
+    api_client_as_subscriber,
 };
 
 #[tokio::test]

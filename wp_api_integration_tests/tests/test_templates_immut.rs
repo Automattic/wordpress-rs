@@ -8,8 +8,8 @@ use wp_api::templates::{
     SparseTemplateFieldWithViewContext, TemplateArea, TemplateId, TemplateListParams,
 };
 use wp_api_integration_tests::{
-    api_client, AssertResponse, FIRST_POST_ID, POST_ID_555, POST_ID_DRAFT,
-    TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE,
+    AssertResponse, FIRST_POST_ID, POST_ID_555, POST_ID_DRAFT, TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE,
+    api_client,
 };
 
 #[tokio::test]

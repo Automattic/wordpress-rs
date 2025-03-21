@@ -5,8 +5,8 @@ use wp_api::categories::{
     CategoryListParams, SparseCategoryFieldWithEditContext, SparseCategoryFieldWithEmbedContext,
     SparseCategoryFieldWithViewContext, WpApiParamCategoriesOrderBy,
 };
-use wp_api::{generate, WpApiParamOrder};
-use wp_api_integration_tests::{api_client, AssertResponse, CATEGORY_ID_59, FIRST_POST_ID};
+use wp_api::{WpApiParamOrder, generate};
+use wp_api_integration_tests::{AssertResponse, CATEGORY_ID_59, FIRST_POST_ID, api_client};
 
 #[tokio::test]
 #[apply(list_cases)]

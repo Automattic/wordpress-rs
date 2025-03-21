@@ -3,7 +3,7 @@ use std::{fmt::Display, slice::Iter, str::FromStr};
 use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{spanned::Spanned, DeriveInput, Ident};
+use syn::{DeriveInput, Ident, spanned::Spanned};
 
 const IDENT_PREFIX: &str = "Sparse";
 
@@ -767,9 +767,7 @@ impl FromStr for WpContextAttr {
 
 #[derive(Debug, thiserror::Error)]
 enum WpContextualParseError {
-    #[error(
-        "WpContextual didn't generate anything. Did you forget to add #[WpContext] attribute?"
-    )]
+    #[error("WpContextual didn't generate anything. Did you forget to add #[WpContext] attribute?")]
     EmptyResult,
     #[error("#[WpContextualField] & #[WpContextualOption] can't be used together")]
     WpContextualBothOptionAndField,
@@ -778,15 +776,24 @@ enum WpContextualParseError {
         IDENT_PREFIX
     )]
     WpContextualFieldMissingSparsePrefix,
-    #[error("#[WpContextualField] doesn't have any contexts. Did you forget to add #[WpContext] attribute?")]
+    #[error(
+        "#[WpContextualField] doesn't have any contexts. Did you forget to add #[WpContext] attribute?"
+    )]
     WpContextualFieldWithoutWpContext,
-    #[error("Only Option<SparseFoo> & Option<Vec<SparseFoo>> types are supported by #[WpContextualField]")]
+    #[error(
+        "Only Option<SparseFoo> & Option<Vec<SparseFoo>> types are supported by #[WpContextualField]"
+    )]
     WpContextualFieldTypeNotSupported,
-    #[error("WpContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.", IDENT_PREFIX)]
+    #[error(
+        "WpContextual types need to start with '{}' prefix. This prefix will be removed from the generated Structs, so it needs to be followed up with a proper Rust type name, starting with an uppercase letter.",
+        IDENT_PREFIX
+    )]
     WpContextualMissingSparsePrefix,
     #[error("#[WpContextual] is only implemented for Structs")]
     WpContextualNotAStruct,
-    #[error("#[WpContextualOption] doesn't have any contexts. Did you forget to add #[WpContext] attribute?")]
+    #[error(
+        "#[WpContextualOption] doesn't have any contexts. Did you forget to add #[WpContext] attribute?"
+    )]
     WpContextualOptionWithoutWpContext,
 }
 
@@ -802,7 +809,9 @@ enum WpContextualParseAttrError {
     // however that's not a valid syntax. There is probably no valid syntax that uses `::` in the
     // current setup, but in case we are missing anything, we should be able to improve the
     // messaging by asking it to be reported.
-    #[error("Expected #[WpContext] or #[WpContextualField], found multi-segment path.\nPlease report this case to the `wp_contextual` developers.")]
+    #[error(
+        "Expected #[WpContext] or #[WpContextualField], found multi-segment path.\nPlease report this case to the `wp_contextual` developers."
+    )]
     UnexpectedAttrPathSegmentCount,
     #[error("Did you mean ','?")]
     UnexpectedPunct,

@@ -7,7 +7,7 @@ use wp_api::{
 };
 use wp_api_integration_tests::backend::{Backend, RestoreServer};
 use wp_api_integration_tests::{
-    api_client, AssertResponse, TestCredentials, FIRST_USER_ID, SECOND_USER_ID,
+    AssertResponse, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
 };
 use wp_cli::WpCliUserMeta;
 
@@ -16,11 +16,13 @@ use wp_cli::WpCliUserMeta;
 async fn create_application_password() {
     let password_name = "IntegrationTest";
     // Assert that the application password name doesn't exist
-    assert!(!application_password_meta_for_user(&SECOND_USER_ID)
-        .await
-        .unwrap()
-        .meta_value
-        .contains(password_name));
+    assert!(
+        !application_password_meta_for_user(&SECOND_USER_ID)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(password_name)
+    );
 
     // Create an application password using the API
     let params = ApplicationPasswordCreateParams {
@@ -49,11 +51,13 @@ async fn create_application_password() {
 async fn update_application_password() {
     let password_name = "IntegrationTest";
     // Assert that the application password name doesn't exist
-    assert!(!application_password_meta_for_user(&FIRST_USER_ID)
-        .await
-        .unwrap()
-        .meta_value
-        .contains(password_name));
+    assert!(
+        !application_password_meta_for_user(&FIRST_USER_ID)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(password_name)
+    );
 
     // Update the application password to use the new name using the API
     let params = ApplicationPasswordUpdateParams {
@@ -91,11 +95,13 @@ async fn delete_single_application_password() {
         uuid: subscriber_password_uuid.to_string(),
     };
     // Assert that the application password exists
-    assert!(application_password_meta_for_user(&SECOND_USER_ID)
-        .await
-        .unwrap()
-        .meta_value
-        .contains(subscriber_password_uuid));
+    assert!(
+        application_password_meta_for_user(&SECOND_USER_ID)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(subscriber_password_uuid)
+    );
     // Delete the user's application passwords using the API and ensure it's successful
     let response = api_client()
         .application_passwords()
@@ -107,11 +113,13 @@ async fn delete_single_application_password() {
     // Assert that the application password is deleted
     assert!(response.deleted);
     assert_eq!(response.previous.uuid, uuid);
-    assert!(!application_password_meta_for_user(&SECOND_USER_ID)
-        .await
-        .unwrap()
-        .meta_value
-        .contains(subscriber_password_uuid));
+    assert!(
+        !application_password_meta_for_user(&SECOND_USER_ID)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(subscriber_password_uuid)
+    );
 
     RestoreServer::db().await;
 }
@@ -121,11 +129,13 @@ async fn delete_single_application_password() {
 async fn delete_all_application_passwords() {
     let subscriber_password_uuid = TestCredentials::instance().subscriber_password_uuid;
     // Assert that the application password exists
-    assert!(application_password_meta_for_user(&SECOND_USER_ID)
-        .await
-        .unwrap()
-        .meta_value
-        .contains(subscriber_password_uuid));
+    assert!(
+        application_password_meta_for_user(&SECOND_USER_ID)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(subscriber_password_uuid)
+    );
     // Delete the user's application passwords using the API and ensure it's successful
     let response = api_client()
         .application_passwords()
@@ -137,11 +147,13 @@ async fn delete_all_application_passwords() {
     // Assert that the application password is deleted
     assert!(response.deleted);
     assert_eq!(response.count, 1);
-    assert!(!application_password_meta_for_user(&SECOND_USER_ID)
-        .await
-        .unwrap()
-        .meta_value
-        .contains(subscriber_password_uuid));
+    assert!(
+        !application_password_meta_for_user(&SECOND_USER_ID)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(subscriber_password_uuid)
+    );
 
     RestoreServer::db().await;
 }

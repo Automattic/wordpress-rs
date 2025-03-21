@@ -1,4 +1,4 @@
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use wp_api::{
     categories::CategoryId, comments::CommentId, posts::PostId, tags::TagId, users::UserId,
 };

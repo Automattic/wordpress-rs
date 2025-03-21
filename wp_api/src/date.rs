@@ -43,8 +43,8 @@ mod native_test_helper {
     const EXAMPLE_DATE: &str = "2020-08-14T15:00:00+02:00";
 
     #[uniffi::export]
-    fn assertion_example_date_that_can_be_used_to_verify_conversion_between_rust_and_native(
-    ) -> WpGmtDateTime {
+    fn assertion_example_date_that_can_be_used_to_verify_conversion_between_rust_and_native()
+    -> WpGmtDateTime {
         EXAMPLE_DATE
             .parse::<WpGmtDateTime>()
             .expect("Example date is parseable")

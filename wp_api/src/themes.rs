@@ -1,9 +1,8 @@
 use crate::{
-    impl_as_query_value_from_to_string,
+    BoolOrVecString, impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    BoolOrVecString,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};

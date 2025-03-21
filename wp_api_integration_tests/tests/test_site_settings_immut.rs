@@ -5,7 +5,7 @@ use wp_api::site_settings::{
     SparseSiteSettingsFieldWithEditContext, SparseSiteSettingsFieldWithEmbedContext,
     SparseSiteSettingsFieldWithViewContext,
 };
-use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_EMAIL};
+use wp_api_integration_tests::{AssertResponse, FIRST_USER_EMAIL, api_client};
 
 #[rstest]
 #[tokio::test]

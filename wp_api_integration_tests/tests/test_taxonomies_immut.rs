@@ -6,7 +6,7 @@ use wp_api::taxonomies::{
     SparseTaxonomyTypeDetailsFieldWithEditContext, SparseTaxonomyTypeDetailsFieldWithEmbedContext,
     SparseTaxonomyTypeDetailsFieldWithViewContext, TaxonomyListParams, TaxonomyType,
 };
-use wp_api_integration_tests::{api_client, AssertResponse};
+use wp_api_integration_tests::{AssertResponse, api_client};
 
 #[tokio::test]
 #[apply(list_cases)]

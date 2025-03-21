@@ -3,8 +3,8 @@ use serial_test::serial;
 use wp_api::plugins::{PluginCreateParams, PluginSlug, PluginStatus, PluginUpdateParams};
 use wp_api_integration_tests::backend::RestoreServer;
 use wp_api_integration_tests::{
-    api_client, AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
-    WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS,
+    AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
+    WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS, api_client,
 };
 
 #[tokio::test]

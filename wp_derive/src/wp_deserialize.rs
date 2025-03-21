@@ -1,13 +1,12 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
-    braced,
+    Attribute, Field, Token, braced,
     parse::{Parse, ParseBuffer, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
     spanned::Spanned,
     token::Comma,
-    Attribute, Field, Token,
 };
 
 pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

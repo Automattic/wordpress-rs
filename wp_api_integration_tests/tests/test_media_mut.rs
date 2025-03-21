@@ -5,8 +5,8 @@ use wp_api::{
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
 use wp_api_integration_tests::{
-    api_client, backend::RestoreServer, unwrapped_wp_gmt_date_time, AssertResponse, FIRST_POST_ID,
-    MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE, MEDIA_TEST_FILE_PATH,
+    AssertResponse, FIRST_POST_ID, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
+    MEDIA_TEST_FILE_PATH, api_client, backend::RestoreServer, unwrapped_wp_gmt_date_time,
 };
 
 #[tokio::test]

@@ -1,4 +1,5 @@
 use crate::{
+    JsonValue, UserId, WpApiParamOrder,
     date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::{
@@ -8,7 +9,6 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    JsonValue, UserId, WpApiParamOrder,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::ParseIntError, str::FromStr};
@@ -646,6 +646,8 @@ mod tests {
         let modified_after = unit_test_example_date_as_query_value("modified_after");
         let before = unit_test_example_date_as_query_value("before");
         let modified_before = unit_test_example_date_as_query_value("modified_before");
-        format!("page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg")
+        format!(
+            "page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
+        )
     }
 }

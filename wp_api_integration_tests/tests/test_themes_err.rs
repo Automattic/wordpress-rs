@@ -1,10 +1,10 @@
 use serial_test::parallel;
 use wp_api::{
-    themes::{ThemeListParams, ThemeStatus},
     WpErrorCode,
+    themes::{ThemeListParams, ThemeStatus},
 };
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, AssertWpError, THEME_TWENTY_TWENTY_FIVE,
+    AssertWpError, THEME_TWENTY_TWENTY_FIVE, api_client, api_client_as_subscriber,
 };
 
 #[tokio::test]

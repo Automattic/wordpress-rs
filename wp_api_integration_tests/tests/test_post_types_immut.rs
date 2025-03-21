@@ -6,7 +6,7 @@ use wp_api::post_types::{
     SparsePostTypeDetailsFieldWithEmbedContext, SparsePostTypeDetailsFieldWithViewContext,
 };
 
-use wp_api_integration_tests::{api_client, AssertResponse};
+use wp_api_integration_tests::{AssertResponse, api_client};
 
 #[tokio::test]
 #[parallel]
@@ -106,11 +106,13 @@ async fn retrieve_post_types_with_edit_context(
     // It's possible that we might have more test sites in the future and some of their
     // post types might not support `EditPost` capability in which case it's perfectly fine
     // to completely remove this assertion.
-    assert!(!post_type
-        .capabilities
-        .get(&PostTypeCapabilities::EditPost)
-        .unwrap()
-        .is_empty());
+    assert!(
+        !post_type
+            .capabilities
+            .get(&PostTypeCapabilities::EditPost)
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[rstest]

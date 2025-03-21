@@ -1,8 +1,8 @@
 use convert_case::{Case, Casing};
-use proc_macro2::Span;
 use proc_macro_crate::FoundCrate;
+use proc_macro2::Span;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput, Ident};
+use syn::{DeriveInput, Ident, parse_macro_input};
 
 pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let localization_crate_ident = crate_ident("wp_localization");

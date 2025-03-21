@@ -7,10 +7,10 @@ use wp_api::posts::{
     PostStatus, PostUpdateParams, PostWithEditContext,
 };
 use wp_api_integration_tests::{
-    api_client,
+    AssertResponse, CATEGORY_ID_59, FIRST_POST_ID, MEDIA_ID_611, POST_TEMPLATE_SINGLE_WITH_SIDEBAR,
+    SECOND_USER_ID, TAG_ID_100, api_client,
     backend::{Backend, RestoreServer},
-    unwrapped_wp_gmt_date_time, AssertResponse, CATEGORY_ID_59, FIRST_POST_ID, MEDIA_ID_611,
-    POST_TEMPLATE_SINGLE_WITH_SIDEBAR, SECOND_USER_ID, TAG_ID_100,
+    unwrapped_wp_gmt_date_time,
 };
 use wp_cli::WpCliPost;
 

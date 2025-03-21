@@ -43,11 +43,11 @@ super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFi
 mod tests {
     use super::*;
     use crate::{
-        request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-            ApiBaseUrl,
-        },
         WpApiParamUsersHasPublishedPosts,
+        request::endpoint::{
+            ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
+        },
     };
     use rstest::*;
     use std::sync::Arc;
@@ -148,7 +148,13 @@ mod tests {
             ])),
         };
         validate_wp_v2_endpoint(
-            endpoint.filter_list_with_edit_context(&params, &[SparseUserFieldWithEditContext::Name, SparseUserFieldWithEditContext::Email]),
+            endpoint.filter_list_with_edit_context(
+                &params,
+                &[
+                    SparseUserFieldWithEditContext::Name,
+                    SparseUserFieldWithEditContext::Email,
+                ],
+            ),
             "/users?context=edit&page=2&per_page=60&search=foo&slug=bar%2Cbaz&has_published_posts=post%2Cpage&_fields=name%2Cemail",
         );
     }

@@ -2,6 +2,7 @@ use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
 use wp_api::{
+    RequestExecutionError, RequestExecutionErrorReason,
     login::{
         login_client::WpLoginClient,
         url_discovery::{
@@ -10,7 +11,6 @@ use wp_api::{
     },
     middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
     reqwest_request_executor::ReqwestRequestExecutor,
-    RequestExecutionError, RequestExecutionErrorReason,
 };
 
 #[rstest]

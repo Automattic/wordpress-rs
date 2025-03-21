@@ -1,9 +1,9 @@
 use serial_test::parallel;
 use wp_api::{
-    taxonomies::{TaxonomyListParams, TaxonomyType},
     WpErrorCode,
+    taxonomies::{TaxonomyListParams, TaxonomyType},
 };
-use wp_api_integration_tests::{api_client_as_subscriber, AssertWpError};
+use wp_api_integration_tests::{AssertWpError, api_client_as_subscriber};
 
 #[tokio::test]
 #[parallel]

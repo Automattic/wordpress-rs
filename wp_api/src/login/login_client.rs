@@ -1,19 +1,19 @@
 use super::{
-    url_discovery::{
-        self, ApiRootUrl, ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttempt,
-        AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult, AutoDiscoveryAttemptSuccess,
-        AutoDiscoveryResult, AutoDiscoveryUniffiResult, FetchAndParseApiRootFailure,
-        FindApiRootFailure, ParseHomepageResult, API_ROOT_LINK_HEADER,
-    },
     WpApiDetails,
+    url_discovery::{
+        self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
+        AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
+        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
+        FetchAndParseApiRootFailure, FindApiRootFailure, ParseHomepageResult,
+    },
 };
 use crate::{
+    ParsedUrl, RequestExecutionError, WpError,
     middleware::{PerformsRequests, WpApiMiddlewarePipeline},
     request::{
-        endpoint::{WpEndpointUrl, WP_JSON_PATH_SEGMENTS},
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::{WP_JSON_PATH_SEGMENTS, WpEndpointUrl},
     },
-    ParsedUrl, RequestExecutionError, WpError,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -110,7 +110,7 @@ impl WpLoginClient {
                                         find_api_root_failure,
                                     ),
                                 ),
-                            }
+                            };
                         }
                     }
                     .into();
@@ -333,7 +333,7 @@ impl PerformsRequests for WpLoginClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{unit_test_common::wp_network_response_from_json, WpErrorCode};
+    use crate::{WpErrorCode, unit_test_common::wp_network_response_from_json};
 
     #[test]
     fn test_parse_api_details_wp_error_rest_forbidden() {

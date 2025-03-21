@@ -2,16 +2,16 @@ use std::{collections::HashMap, sync::Arc};
 
 use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
+    SparseField,
     media::{
         MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
         SparseMediaFieldWithViewContext,
     },
     request::{
-        ParsedResponse, RequestMethod, WpNetworkHeaderMap, WpNetworkResponse,
-        CONTENT_TYPE_MULTIPART,
+        CONTENT_TYPE_MULTIPART, ParsedResponse, RequestMethod, WpNetworkHeaderMap,
+        WpNetworkResponse,
     },
-    SparseField,
 };
 use http::HeaderValue;
 use wp_derive_request_builder::WpDerivedRequest;
@@ -225,17 +225,16 @@ impl MediaRequestExecutor {
 mod tests {
     use super::*;
     use crate::{
-        generate,
+        UserId, WpApiParamOrder, generate,
         media::{MediaId, MediaStatus, MediaTypeParam},
         posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
-        UserId, WpApiParamOrder,
     };
     use rstest::*;
     use std::sync::Arc;
@@ -425,7 +424,9 @@ mod tests {
         let modified_after = unit_test_example_date_as_query_value("modified_after");
         let before = unit_test_example_date_as_query_value("before");
         let modified_before = unit_test_example_date_as_query_value("modified_before");
-        format!("page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg")
+        format!(
+            "page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
+        )
     }
 
     fn media_list_params_with_all_fields() -> MediaListParams {
@@ -492,8 +493,7 @@ mod tests {
         SparseMediaFieldWithEditContext::MissingImageSizes,
     ];
 
-    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT: &str =
-        "_fields=id%2Cdate%2Clink%2Cslug%2Ctype%2Ctitle%2Cauthor%2Calt_text%2Ccaption%2Cmedia_type%2Cmime_type%2Cmedia_details%2Csource_url";
+    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT: &str = "_fields=id%2Cdate%2Clink%2Cslug%2Ctype%2Ctitle%2Cauthor%2Calt_text%2Ccaption%2Cmedia_type%2Cmime_type%2Cmedia_details%2Csource_url";
     const ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT: &[SparseMediaFieldWithEmbedContext; 13] = &[
         SparseMediaFieldWithEmbedContext::Id,
         SparseMediaFieldWithEmbedContext::Date,

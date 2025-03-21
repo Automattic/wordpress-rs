@@ -1,14 +1,14 @@
 use crate::middleware::PerformsRequests;
 use crate::middleware::WpApiMiddlewarePipeline;
 use crate::{
+    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
     api_error::RequestExecutionErrorReason,
     request::{
-        endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect,
+        RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect, endpoint::WpEndpointUrl,
     },
     wordpress_org::update_check::UpdateCheckRequest,
-    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{result::Result, sync::Arc};
 use url::Url;
 
