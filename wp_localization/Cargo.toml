@@ -1,7 +1,7 @@
 [package]
 name = "wp_localization"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

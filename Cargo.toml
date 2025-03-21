@@ -13,7 +13,7 @@ members = [
   "wp_uniffi_bindgen",
   "xcframework",
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.dependencies]
 anyhow = "1.0"
