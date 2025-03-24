@@ -7,8 +7,8 @@ use wp_api::themes::{
     SparseThemeFieldWithViewContext, ThemeListParams, ThemeStatus, ThemeStylesheet, ThemeSupports,
 };
 use wp_api_integration_tests::{
-    api_client, AssertResponse, THEME_TWENTY_TWENTY_FIVE, THEME_TWENTY_TWENTY_FOUR,
-    THEME_TWENTY_TWENTY_THREE,
+    AssertResponse, THEME_TWENTY_TWENTY_FIVE, THEME_TWENTY_TWENTY_FOUR, THEME_TWENTY_TWENTY_THREE,
+    api_client,
 };
 
 #[tokio::test]

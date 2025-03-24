@@ -1,15 +1,15 @@
 use self::endpoint::WpEndpointUrl;
 use crate::RequestExecutionErrorReason;
 use crate::{
+    WpApiError, WpAuthentication,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
-    WpApiError, WpAuthentication,
 };
 use base64::Engine;
 use chrono::{DateTime, Utc};
-use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
+use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use http::{HeaderMap, HeaderName, HeaderValue};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::str::FromStr;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use url::Url;
@@ -713,10 +713,11 @@ mod tests {
         None,
         Some("http://localhost/wp-json/wp/v2/posts?page=2")
     )]
-    #[case("<http://localhost/wp-json/wp/v2/posts?page=1>; rel=\"prev\", <http://localhost/wp-json/wp/v2/posts?page=3>; rel=\"next\"",
-            Some("http://localhost/wp-json/wp/v2/posts?page=1"),
-            Some("http://localhost/wp-json/wp/v2/posts?page=3")
-        )]
+    #[case(
+        "<http://localhost/wp-json/wp/v2/posts?page=1>; rel=\"prev\", <http://localhost/wp-json/wp/v2/posts?page=3>; rel=\"next\"",
+        Some("http://localhost/wp-json/wp/v2/posts?page=1"),
+        Some("http://localhost/wp-json/wp/v2/posts?page=3")
+    )]
     #[case(
         "<http://localhost/wp-json/wp/v2/posts?page=5>; rel=\"prev\"",
         Some("http://localhost/wp-json/wp/v2/posts?page=5"),

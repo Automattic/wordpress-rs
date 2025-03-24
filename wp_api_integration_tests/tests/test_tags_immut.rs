@@ -5,8 +5,8 @@ use wp_api::tags::{
     SparseTagFieldWithEditContext, SparseTagFieldWithEmbedContext, SparseTagFieldWithViewContext,
     TagListParams, WpApiParamTagsOrderBy,
 };
-use wp_api::{generate, WpApiParamOrder};
-use wp_api_integration_tests::{api_client, AssertResponse, FIRST_POST_ID, TAG_ID_100};
+use wp_api::{WpApiParamOrder, generate};
+use wp_api_integration_tests::{AssertResponse, FIRST_POST_ID, TAG_ID_100, api_client};
 
 #[tokio::test]
 #[apply(list_cases)]

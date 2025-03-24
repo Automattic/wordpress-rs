@@ -1,6 +1,6 @@
 use crate::{
     date::WpGmtDateTime,
-    request::{endpoint::WpEndpointUrl, WpNetworkHeaderMap, WpNetworkResponse},
+    request::{WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl},
     url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use std::sync::Arc;

@@ -1,15 +1,15 @@
 use serial_test::parallel;
 use wp_api::{
+    WpErrorCode,
     posts::{
         PostCreateParams, PostId, PostListParams, PostRetrieveParams, PostUpdateParams,
         WpApiParamPostsOrderBy,
     },
     users::UserId,
-    WpErrorCode,
 };
 use wp_api_integration_tests::{
-    api_client, api_client_as_author, api_client_as_subscriber, AssertWpError, TestCredentials,
-    FIRST_POST_ID,
+    AssertWpError, FIRST_POST_ID, TestCredentials, api_client, api_client_as_author,
+    api_client_as_subscriber,
 };
 
 #[tokio::test]

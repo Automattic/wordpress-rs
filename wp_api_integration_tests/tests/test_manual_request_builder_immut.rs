@@ -3,16 +3,15 @@ use rstest::*;
 use rstest_reuse::{self, apply};
 use serial_test::parallel;
 use wp_api::{
-    generate,
+    WpApiError, WpApiParamOrder, WpApiRequestBuilder, WpAuthentication, generate,
     request::endpoint::users_endpoint::UsersRequestListWithEditContextResponse,
     reqwest_request_executor::ReqwestRequestExecutor,
     users::{
         UserListParams, WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy,
         WpApiParamUsersWho,
     },
-    WpApiError, WpApiParamOrder, WpApiRequestBuilder, WpAuthentication,
 };
-use wp_api_integration_tests::{test_site_url, TestCredentials, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api_integration_tests::{FIRST_USER_ID, SECOND_USER_ID, TestCredentials, test_site_url};
 
 pub mod reusable_test_cases;
 

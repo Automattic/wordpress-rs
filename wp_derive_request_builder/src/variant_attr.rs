@@ -1,8 +1,8 @@
 use proc_macro2::{Span, TokenStream, TokenTree};
 use syn::{
+    Attribute, Ident, MetaList,
     parse::{Parse, ParseStream},
     spanned::Spanned,
-    Attribute, Ident, MetaList,
 };
 
 use crate::{generate::WpContext, parse::RequestType};
@@ -280,7 +280,7 @@ impl ParsedVariantAttribute {
                     return Err(
                         ItemVariantAttributeParseError::AvailableContextsUnexpectedTokens
                             .into_syn_error(error_span),
-                    )
+                    );
                 }
             }
             Ok(contexts)
@@ -374,7 +374,9 @@ enum ItemVariantAttributeParseError {
     MoreThanOneOuterAttr,
     #[error("Expecting a syn::Meta::List found {:?}", meta)]
     MetaInWrongFormat { meta: syn::Meta },
-    #[error("Expecting key value pairs (url = \"\", params = FooParam, output = FooOutput, filter_by = FooSparseField)")]
+    #[error(
+        "Expecting key value pairs (url = \"\", params = FooParam, output = FooOutput, filter_by = FooSparseField)"
+    )]
     ExpectingKeyValuePairs,
     #[error("Did you mean '='?")]
     NotEqualsSign,
@@ -384,7 +386,9 @@ enum ItemVariantAttributeParseError {
     UrlShouldBeLiteral,
     #[error("Missing (output = crate::Foo)")]
     MissingOutput,
-    #[error("`available_contexts` contains unexpected tokens. It should be a comma separated string: \"edit,embed,view\"")]
+    #[error(
+        "`available_contexts` contains unexpected tokens. It should be a comma separated string: \"edit,embed,view\""
+    )]
     AvailableContextsUnexpectedTokens,
     #[error("`available_contexts` should be a single comma separated string: \"edit,embed,view\"")]
     AvailableContextsShouldBeASingleString,
@@ -393,7 +397,9 @@ enum ItemVariantAttributeParseError {
         unexpected_context
     )]
     AvailableContextsUnexpectedContext { unexpected_context: String },
-    #[error("`available_contexts` should be set as a String: (available_contexts = \"edit,embed,view\")")]
+    #[error(
+        "`available_contexts` should be set as a String: (available_contexts = \"edit,embed,view\")"
+    )]
     AvailableContextShouldBeLiteral,
     #[error("Only 'contextual_get', 'contextual_paged', 'get', 'post' & 'delete' are supported")]
     UnsupportedRequestType,

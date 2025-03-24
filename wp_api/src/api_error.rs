@@ -456,21 +456,31 @@ pub enum RequestExecutionErrorReason {
         error_message: Option<String>,
         suggested_action: Option<String>,
     },
-    #[error("The server at {hostname} requires authentication. Please provide your username and password.")]
+    #[error(
+        "The server at {hostname} requires authentication. Please provide your username and password."
+    )]
     HttpAuthenticationRequiredError {
         hostname: String,
         method: Option<HttpAuthMethod>,
     },
-    #[error("The server at {hostname} rejected your credentials. Please provide a valid username and password.")]
+    #[error(
+        "The server at {hostname} rejected your credentials. Please provide a valid username and password."
+    )]
     HttpAuthenticationRejectedError {
         hostname: String,
         method: Option<HttpAuthMethod>,
     },
-    #[error("The server at {hostname} denied access to the requested resource. Please check your site's configuration.")]
+    #[error(
+        "The server at {hostname} denied access to the requested resource. Please check your site's configuration."
+    )]
     HttpForbiddenError { hostname: String },
-    #[error("The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.")]
+    #[error(
+        "The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration."
+    )]
     MisconfiguredHttpAuthenticationError { issue: HttpAuthMethodParsingError },
-    #[error("The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.")]
+    #[error(
+        "The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration."
+    )]
     MisconfiguredRateLimitError {},
     #[error("{}", error_message)]
     DeviceIsOfflineError { error_message: String },

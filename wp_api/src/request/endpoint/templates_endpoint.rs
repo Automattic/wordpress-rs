@@ -1,9 +1,9 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
+use crate::SparseField;
 use crate::templates::{
     SparseTemplateFieldWithEditContext, SparseTemplateFieldWithEmbedContext,
     SparseTemplateFieldWithViewContext, TemplateId,
 };
-use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -58,8 +58,8 @@ mod tests {
         post_types::PostType,
         posts::PostId,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
         templates::{TemplateArea, TemplateListParams},
     };

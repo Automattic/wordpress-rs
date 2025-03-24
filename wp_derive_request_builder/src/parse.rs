@@ -1,9 +1,8 @@
 use syn::{
-    braced,
+    Ident, Token, braced,
     parse::{Parse, ParseBuffer, ParseStream},
     punctuated::Punctuated,
     token::Comma,
-    Ident, Token,
 };
 
 use crate::variant_attr::ParsedVariantAttribute;

@@ -1,9 +1,8 @@
 use crate::{
-    impl_as_query_value_from_to_string,
+    IntegerOrString, impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    IntegerOrString,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;

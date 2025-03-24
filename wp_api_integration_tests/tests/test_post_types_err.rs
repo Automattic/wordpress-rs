@@ -1,7 +1,7 @@
 use rstest::*;
 use serial_test::parallel;
-use wp_api::{post_types::PostType, WpErrorCode};
-use wp_api_integration_tests::{api_client, api_client_as_subscriber, AssertWpError};
+use wp_api::{WpErrorCode, post_types::PostType};
+use wp_api_integration_tests::{AssertWpError, api_client, api_client_as_subscriber};
 
 #[rstest]
 #[tokio::test]

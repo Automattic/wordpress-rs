@@ -1,6 +1,6 @@
-use crate::{date::WpGmtDateTime, impl_as_query_value_from_to_string, OptionFromStr};
+use crate::{OptionFromStr, date::WpGmtDateTime, impl_as_query_value_from_to_string};
 use std::{borrow::Cow, collections::HashMap, str::FromStr};
-use url::{form_urlencoded, UrlQuery};
+use url::{UrlQuery, form_urlencoded};
 
 pub(crate) type QueryPairs<'a> = form_urlencoded::Serializer<'a, UrlQuery<'a>>;
 

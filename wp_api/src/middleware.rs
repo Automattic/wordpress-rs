@@ -1,6 +1,6 @@
 use crate::{
-    request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
     RequestExecutionError, RequestExecutionErrorReason,
+    request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
@@ -222,11 +222,11 @@ mod tests {
 
     mod api_discovery_authentication_middleware {
         use crate::{
-            request::{
-                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl},
-                WpNetworkHeaderMap,
-            },
             MediaUploadRequestExecutionError,
+            request::{
+                WpNetworkHeaderMap,
+                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
+            },
         };
 
         use super::*;
@@ -282,8 +282,8 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_api_discovery_authentication_middleware_response_is_http_authentication_required_false(
-        ) {
+        async fn test_api_discovery_authentication_middleware_response_is_http_authentication_required_false()
+         {
             // This test covers the case where the initial request doesn't have authentication
             // header but the initial response is not 401 or 403. This should be no-op by the
             // middleware because the initial response is not 401 or 403.
@@ -358,11 +358,11 @@ mod tests {
     mod retry_after_middleware {
         use super::*;
         use crate::{
-            request::{
-                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl},
-                WpNetworkHeaderMap,
-            },
             MediaUploadRequestExecutionError,
+            request::{
+                WpNetworkHeaderMap,
+                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
+            },
         };
         use async_trait::async_trait;
         use http::HeaderMap;

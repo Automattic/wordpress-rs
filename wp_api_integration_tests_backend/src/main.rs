@@ -1,6 +1,6 @@
 use rocket::http::Status;
 use rocket::serde::json::Json;
-use rocket::{get, launch, routes, Responder};
+use rocket::{Responder, get, launch, routes};
 use std::fs;
 use std::fs::metadata;
 use std::io;

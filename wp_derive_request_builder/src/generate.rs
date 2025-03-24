@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use helpers_to_generate_tokens::*;
-use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::FoundCrate;
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de::Error};
 use syn::Ident;
 
 use crate::{
