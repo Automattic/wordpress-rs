@@ -52,3 +52,14 @@ uuid_parse_error_invalid_uuid = Invalid UUID string
 uuid_parse_error_not_version_4 = Not a version 4 UUID
 
 wordpress_org_api_client_error_request_encoding = Failed to encode request. Reason: {$reason}
+
+probably_not_wordpress_site = The site does not appear to be a WordPress site
+rest_api_disabled = The site's REST API is disabled. Please update your site settings to enable REST API
+
+application_password_blocked_by_plugin = Unable to login to {$url} – the {$plugin} plugin might have disabled Application Passwords. Please visit {$support_url} to learn more.
+application_password_blocked_by_multiple_plugins = Unable to login to {$url} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.
+site_is_local_development_environment = This site is a local development environment. You'll need to enable application passwords to connect to it with the app.
+application_passwords_disabled_for_http_site = Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.
+application_passwords_not_supported = The site does not support Application Passwords.
+
+parse_api_root = Failed to parse the the site's WordPress REST API root response.

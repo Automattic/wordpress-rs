@@ -5,7 +5,7 @@ use crate::{
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -363,16 +363,15 @@ pub struct AutoDiscoveryAttemptSuccess {
     pub api_details: WpApiDetails,
 }
 
-#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
 pub enum AutoDiscoveryAttemptFailure {
-    #[error("{error}")]
-    ParseSiteUrl { error: ParseUrlError },
-    #[error("{find_api_root_failure}")]
+    ParseSiteUrl {
+        error: ParseUrlError,
+    },
     FindApiRoot {
         parsed_site_url: Arc<ParsedUrl>,
         find_api_root_failure: FindApiRootFailure,
     },
-    #[error("{}", fetch_and_parse_api_root_failure.error_message(parsed_site_url))]
     FetchAndParseApiRoot {
         parsed_site_url: Arc<ParsedUrl>,
         api_root_url: Arc<ParsedUrl>,
@@ -380,16 +379,39 @@ pub enum AutoDiscoveryAttemptFailure {
     },
 }
 
-#[derive(Debug, Clone, thiserror::Error, uniffi::Error)]
+impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            Self::ParseSiteUrl { error } => error.message_bundle(),
+            Self::FindApiRoot {
+                find_api_root_failure,
+                ..
+            } => find_api_root_failure.message_bundle(),
+            Self::FetchAndParseApiRoot {
+                fetch_and_parse_api_root_failure,
+                ..
+            } => fetch_and_parse_api_root_failure.message_bundle(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Error)]
 pub enum FindApiRootFailure {
-    #[error("{error}")]
     FetchHomepage { error: RequestExecutionError },
     // if no WP mentions
-    #[error("ProbablyNotAWordPressSite")]
     ProbablyNotAWordPressSite,
     // WP mentions
-    #[error("RestApiDisabled")]
     RestApiDisabled,
+}
+
+impl WpSupportsLocalization for FindApiRootFailure {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            Self::FetchHomepage { error } => error.message_bundle(),
+            Self::ProbablyNotAWordPressSite => WpMessages::probably_not_wordpress_site(),
+            Self::RestApiDisabled => WpMessages::rest_api_disabled(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Error)]
@@ -411,47 +433,53 @@ pub enum FetchAndParseApiRootFailure {
     },
 }
 
-impl FetchAndParseApiRootFailure {
-    pub fn error_message(&self, parsed_site_url: impl Display) -> String {
+impl WpSupportsLocalization for FetchAndParseApiRootFailure {
+    fn message_bundle(&self) -> MessageBundle {
         match self {
-            Self::FetchApiRoot { error } => error.to_string(),
-            Self::ParseApiRoot {
-                parsing_error_message,
-            } => format!("Failed to parse api details: {:#?}", parsing_error_message),
-            Self::WpError {
-                error_code,
-                error_message,
-                status_code,
-            } => format!(
-                "WpError {{\n\tstatus_code: {}\n\terror_code: {:?}\n\terror_message: \"{}\"",
-                status_code, error_code, error_message
-            ),
+            Self::FetchApiRoot { error } => error.message_bundle(),
+            Self::ParseApiRoot { .. } => WpMessages::parse_api_root(),
+            Self::WpError { error_message, .. } => WpMessages::site_error_message(error_message),
             Self::ApplicationPasswordsNotSupported { reason, .. } => reason
                 .as_ref()
-                .map(|r| r.error_message(parsed_site_url))
-                .unwrap_or("Application Passwords are not supported".to_string()),
+                .map(|r| r.message_bundle())
+                .unwrap_or(WpMessages::application_passwords_not_supported()),
         }
     }
 }
 
-#[derive(Debug, Clone, uniffi::Error)]
+#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
 pub enum ApplicationPasswordsNotSupportedReason {
     ApplicationPasswordBlockedByPlugin {
+        site_url: Arc<ParsedUrl>,
         plugin: KnownApplicationPasswordBlockingPlugin,
     },
-    ApplicationPasswordBlockedByMultiplePlugins,
+    ApplicationPasswordBlockedByMultiplePlugins {
+        site_url: Arc<ParsedUrl>,
+    },
     SiteIsLocalDevelopmentEnvironment,
     ApplicationPasswordsDisabledForHttpSite,
 }
 
-impl ApplicationPasswordsNotSupportedReason {
-    fn error_message(&self, parsed_site_url: impl Display) -> String {
+impl WpSupportsLocalization for ApplicationPasswordsNotSupportedReason {
+    fn message_bundle(&self) -> MessageBundle {
         match self {
-            Self::ApplicationPasswordBlockedByPlugin { plugin } => format!("Unable to login to {} – the {} plugin might have disabled Application Passwords. Please visit {} to learn more", parsed_site_url, plugin.name, plugin.support_url),
-            Self::ApplicationPasswordBlockedByMultiplePlugins => format!("Unable to login to {} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.", parsed_site_url),
-            Self::SiteIsLocalDevelopmentEnvironment => "This site is a local development environment. You'll need to enable application passwords to connect to it with the app.".to_string(),
-            Self::ApplicationPasswordsDisabledForHttpSite => "Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.".to_string(),
-    }
+            Self::ApplicationPasswordBlockedByPlugin { site_url, plugin } => {
+                WpMessages::application_password_blocked_by_plugin(
+                    site_url.to_string(),
+                    plugin.name.clone(),
+                    plugin.support_url.clone(),
+                )
+            }
+            Self::ApplicationPasswordBlockedByMultiplePlugins { site_url } => {
+                WpMessages::application_password_blocked_by_multiple_plugins(site_url.to_string())
+            }
+            Self::SiteIsLocalDevelopmentEnvironment => {
+                WpMessages::site_is_local_development_environment()
+            }
+            Self::ApplicationPasswordsDisabledForHttpSite => {
+                WpMessages::application_passwords_disabled_for_http_site()
+            }
+        }
     }
 }
 
@@ -575,7 +603,7 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
     attempts
 }
 
-#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, uniffi::Error, WpDeriveLocalizable)]
 pub enum FetchApiDetailsError {
     RequestExecutionFailed {
         status_code: Option<u16>,

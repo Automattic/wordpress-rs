@@ -1,8 +1,8 @@
 use fluent_bundle::FluentValue;
-use fluent_langneg::{convert_vec_str_to_langids_lossy, negotiate_languages, NegotiationStrategy};
+use fluent_langneg::{NegotiationStrategy, convert_vec_str_to_langids_lossy, negotiate_languages};
 use fluent_templates::Loader;
 use std::{collections::HashMap, fmt::Debug, fmt::Display};
-use unic_langid::{langid, LanguageIdentifier};
+use unic_langid::{LanguageIdentifier, langid};
 
 fluent_templates::static_loader! {
     static LOCALES = {

@@ -53,3 +53,19 @@ uuid_parse_error_not_version_4 = Sürüm 4 UUID değil
 wordpress_org_api_client_error_request_encoding = İstek kodlanamadı. Neden: {$reason}
 
 http_forbidden_error = {$url} adresindeki sunucu istenen kaynağa erişimi reddetti. Lütfen sitenizin yapılandırmasını kontrol edin
+
+probably_not_wordpress_site = Site bir WordPress sitesi gibi görünmüyor
+
+rest_api_disabled = Sitenin REST API'si devre dışı. Lütfen REST API'yi etkinleştirmek için site ayarlarınızı güncelleyin
+
+application_password_blocked_by_plugin = {$url} adresine giriş yapılamıyor – {$plugin} eklentisi Uygulama Şifrelerini devre dışı bırakmış olabilir. Daha fazla bilgi için lütfen {$support_url} adresini ziyaret edin
+
+application_password_blocked_by_multiple_plugins = {$url} adresine giriş yapılamıyor – Uygulama Şifrelerini devre dışı bırakmış olabilecek birden fazla eklenti yüklü. Lütfen bunları devre dışı bırakın ve tekrar deneyin
+
+site_is_local_development_environment = Bu site yerel bir geliştirme ortamı. Uygulama ile bağlanabilmek için uygulama şifrelerini etkinleştirmeniz gerekiyor
+
+application_passwords_disabled_for_http_site = Bu site için Uygulama Şifreleri etkin değil – bunun nedeni muhtemelen güvenli bir bağlantı kuramamamız. Lütfen bu siteye bir SSL sertifikası ekleyin ve tekrar deneyin
+
+application_passwords_not_supported = Site Uygulama Şifrelerini desteklemiyor
+
+parse_api_root = Sitenin WordPress REST API kök yanıtı ayrıştırılamadı
