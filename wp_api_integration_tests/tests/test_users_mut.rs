@@ -1,9 +1,8 @@
 use serial_test::serial;
 use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
 use wp_api_integration_tests::{
-    api_client,
+    AssertResponse, FIRST_USER_ID, SECOND_USER_ID, api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse, FIRST_USER_ID, SECOND_USER_ID,
 };
 use wp_cli::{WpCliUser, WpCliUserMeta};
 

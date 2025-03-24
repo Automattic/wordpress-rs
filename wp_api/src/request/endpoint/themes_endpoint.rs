@@ -1,8 +1,8 @@
+use crate::SparseField;
 use crate::themes::{
     SparseThemeFieldWithEditContext, SparseThemeFieldWithEmbedContext,
     SparseThemeFieldWithViewContext, ThemeStylesheet,
 };
-use crate::SparseField;
 use wp_derive_request_builder::WpDerivedRequest;
 
 use super::{AsNamespace, DerivedRequest, WpNamespace};
@@ -36,8 +36,8 @@ mod tests {
     use crate::{
         generate,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
         themes::{ThemeListParams, ThemeStatus},
     };
@@ -210,8 +210,7 @@ mod tests {
         SparseThemeFieldWithEditContext::ThemeSupports,
     ];
 
-    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT: &str =
-        "_fields=stylesheet%2Ctemplate%2Crequires_php%2Crequires_wp%2Ctextdomain%2Cversion%2Cscreenshot%2Cauthor%2Cauthor_uri%2Cdescription%2Cname%2Ctags%2Ctheme_uri%2Cstatus%2Cis_block_theme%2Cstylesheet_uri%2Ctemplate_uri%2Ctheme_supports";
+    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT: &str = "_fields=stylesheet%2Ctemplate%2Crequires_php%2Crequires_wp%2Ctextdomain%2Cversion%2Cscreenshot%2Cauthor%2Cauthor_uri%2Cdescription%2Cname%2Ctags%2Ctheme_uri%2Cstatus%2Cis_block_theme%2Cstylesheet_uri%2Ctemplate_uri%2Ctheme_supports";
     const ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT: &[SparseThemeFieldWithEmbedContext; 18] = &[
         SparseThemeFieldWithEmbedContext::Stylesheet,
         SparseThemeFieldWithEmbedContext::Template,

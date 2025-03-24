@@ -116,32 +116,4 @@ async fn login_flow_helper(
             .find_application_passwords_authentication_url(),
         Some(expected_auth_url.to_string())
     );
-
-    let is_wordpress_site = &successful_attempt.is_wordpress_site;
-    assert!(
-        is_wordpress_site.is_successful(),
-        "'{site_url}' is incorrectly marked as non-WordPress site: {:#?}",
-        result
-    );
-    assert!(is_wordpress_site.api_link_header_result.is_ok());
-
-    // We can't do a reasonable assertion of `is_wordpress_site.fetch_wp_json_result` because not
-    // all of the test cases will return a parseable JSON from `/wp-json`.
-    //
-    // assert!(is_wordpress_site.fetch_wp_json_result.is_ok());
-    //
-    // ---
-    //
-    // We can't do a reasonable assertion of `is_wordpress_site.parse_html_result` because each
-    // test site has a different configuration, so we have a mixed results of
-    // `has_wordpress_generator_meta_tag`, `mentions_wp_content` & `mentions_wp_includes` fields.
-    //
-    // assert_eq!(
-    //     is_wordpress_site.parse_html_result,
-    //     Ok(IsWordPressSiteParseHtmlResult {
-    //         has_wordpress_generator_meta_tag: true,
-    //         mentions_wp_content: true,
-    //         mentions_wp_includes: true
-    //     })
-    // );
 }

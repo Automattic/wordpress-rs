@@ -1,10 +1,10 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
+    SparseField,
     categories::{
         CategoryId, CategoryListParams, SparseCategoryFieldWithEditContext,
         SparseCategoryFieldWithEmbedContext, SparseCategoryFieldWithViewContext,
     },
-    SparseField,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -51,14 +51,14 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 mod tests {
     use super::*;
     use crate::{
+        WpApiParamOrder,
         categories::{CategoryId, WpApiParamCategoriesOrderBy},
         generate,
         posts::PostId,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
-        WpApiParamOrder,
     };
     use rstest::*;
     use std::sync::Arc;

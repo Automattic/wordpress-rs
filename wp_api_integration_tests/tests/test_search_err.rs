@@ -1,9 +1,9 @@
 use serial_test::parallel;
 use wp_api::{
-    search_results::{SearchListParams, SearchResultSubtype, SearchResultType},
     WpErrorCode,
+    search_results::{SearchListParams, SearchResultSubtype, SearchResultType},
 };
-use wp_api_integration_tests::{api_client, AssertWpError};
+use wp_api_integration_tests::{AssertWpError, api_client};
 
 #[tokio::test]
 #[parallel]

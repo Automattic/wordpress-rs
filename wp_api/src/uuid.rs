@@ -98,18 +98,22 @@ mod tests {
     fn test_parse_other_formats(#[case] uuid_str: String) {
         let uuid = WpUuid::parse(uuid_str.to_string()).unwrap();
         let uuid = uuid.uuid_string();
-        assert!(Regex::new(WP_DEFAULT_REGEX)
-            .unwrap()
-            .is_match(uuid.as_str()));
+        assert!(
+            Regex::new(WP_DEFAULT_REGEX)
+                .unwrap()
+                .is_match(uuid.as_str())
+        );
         assert!(Regex::new(WP_V4_REGEX).unwrap().is_match(uuid.as_str()));
     }
 
     #[rstest]
     fn test_new_uuid_is_compatible_with_wordpress() {
         let uuid = WpUuid::new().uuid_string();
-        assert!(Regex::new(WP_DEFAULT_REGEX)
-            .unwrap()
-            .is_match(uuid.as_str()));
+        assert!(
+            Regex::new(WP_DEFAULT_REGEX)
+                .unwrap()
+                .is_match(uuid.as_str())
+        );
         assert!(Regex::new(WP_V4_REGEX).unwrap().is_match(uuid.as_str()));
     }
 

@@ -36,8 +36,8 @@ impl WpCliCategory {
     }
     pub fn list() -> Result<Vec<Self>> {
         let output = run_wp_cli_command(["term", "list", "category", CATEGORIES_FIELDS_ARG]);
-        serde_json::from_slice::<Vec<Self>>(&output.stdout).with_context(|| {
-            "Failed to parse `wp term list category --format=json` into Vec<WpCliCategory>"
-        })
+        serde_json::from_slice::<Vec<Self>>(&output.stdout).with_context(
+            || "Failed to parse `wp term list category --format=json` into Vec<WpCliCategory>",
+        )
     }
 }

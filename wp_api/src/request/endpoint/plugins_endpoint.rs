@@ -40,12 +40,11 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 mod tests {
     use super::*;
     use crate::{
-        generate,
+        PluginListParams, PluginStatus, generate,
         request::endpoint::{
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
             ApiBaseUrl,
+            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         },
-        PluginListParams, PluginStatus,
     };
     use rstest::*;
     use std::sync::Arc;

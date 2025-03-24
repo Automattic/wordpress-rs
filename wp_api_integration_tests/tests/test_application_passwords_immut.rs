@@ -7,8 +7,8 @@ use wp_api::application_passwords::{
 };
 use wp_api::users::UserId;
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, AssertResponse, TestCredentials, FIRST_USER_ID,
-    SECOND_USER_ID,
+    AssertResponse, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
+    api_client_as_subscriber,
 };
 
 pub mod reusable_test_cases;

@@ -1,9 +1,9 @@
 use crate::{
-    request::{
-        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, RequestMethod,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-    },
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
+    request::{
+        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::media_endpoint::MediaUploadRequest,
+    },
 };
 use async_trait::async_trait;
 use http::{HeaderMap, HeaderValue};

@@ -8,9 +8,9 @@ use wp_localization_macro::WpDeriveLocalizable;
 use wp_serde_helper::deserialize_false_or_string;
 use wp_serde_helper::deserialize_offset;
 
-use crate::login::url_discovery::is_local_dev_environment_url;
 use crate::ParsedUrl;
 use crate::WpUuid;
+use crate::login::url_discovery::is_local_dev_environment_url;
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
@@ -374,11 +374,13 @@ mod tests {
             result.is_ok(),
             "Failed to parse '[]' as `WpApiDetailsAuthenticationMap`"
         );
-        assert!(result
-            .expect("Already verified result is Ok")
-            .authentication
-            .0
-            .is_empty());
+        assert!(
+            result
+                .expect("Already verified result is Ok")
+                .authentication
+                .0
+                .is_empty()
+        );
     }
 
     #[rstest]

@@ -1,11 +1,10 @@
 use crate::{
-    impl_as_query_value_from_to_string,
+    UserId, impl_as_query_value_from_to_string,
     post_types::PostType,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    UserId,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

@@ -1,5 +1,6 @@
 use wp_derive_request_builder::WpDerivedRequest;
 
+use crate::SparseField;
 use crate::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordDeleteAllResponse,
     ApplicationPasswordDeleteResponse, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
@@ -10,7 +11,6 @@ use crate::application_passwords::{
     SparseApplicationPasswordWithViewContext,
 };
 use crate::users::UserId;
-use crate::SparseField;
 
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 
@@ -52,8 +52,8 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 mod tests {
     use super::*;
     use crate::request::endpoint::{
-        tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         ApiBaseUrl,
+        tests::{fixture_api_base_url, validate_wp_v2_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;

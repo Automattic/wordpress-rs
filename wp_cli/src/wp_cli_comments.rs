@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use wp_serde_helper::deserialize_i64_or_string;
 
-use crate::{run_wp_cli_command, AsWpCliArguments};
+use crate::{AsWpCliArguments, run_wp_cli_command};
 
 const COMMENT_FIELDS_ARG: &str = "--fields=comment_ID,comment_post_ID,comment_author,comment_author_email,comment_author_url,comment_author_IP,comment_date,comment_date_gmt,comment_content,comment_karma,comment_approved,comment_agent,comment_type,comment_parent,user_id";
 
@@ -66,9 +66,9 @@ impl WpCliComment {
             comment_id.to_string().as_str(),
             COMMENT_FIELDS_ARG,
         ]);
-        serde_json::from_slice::<Self>(&output.stdout).with_context(|| {
-            "Failed to parse `wp get {comment_id} --format=json` into WpCliComment"
-        })
+        serde_json::from_slice::<Self>(&output.stdout).with_context(
+            || "Failed to parse `wp get {comment_id} --format=json` into WpCliComment",
+        )
     }
     pub fn list(arguments: Option<WpCliCommentListArguments>) -> Result<Vec<Self>> {
         let output = if let Some(cli_arguments) = arguments.and_then(|a| a.as_wp_cli_arguments()) {

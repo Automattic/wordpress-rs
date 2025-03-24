@@ -2,6 +2,7 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::{
+    WpApiParamOrder,
     categories::CategoryId,
     generate,
     posts::{
@@ -10,11 +11,10 @@ use wp_api::{
         WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
     },
     tags::TagId,
-    WpApiParamOrder,
 };
 use wp_api_integration_tests::{
-    api_client, unwrapped_wp_gmt_date_time, AssertResponse, TestCredentials, FIRST_POST_ID,
-    FIRST_USER_ID, SECOND_USER_ID,
+    AssertResponse, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
+    unwrapped_wp_gmt_date_time,
 };
 
 #[tokio::test]

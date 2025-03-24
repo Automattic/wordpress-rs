@@ -3,7 +3,7 @@ use fluent_syntax::ast::{self, Entry, Expression, InlineExpression, PatternEleme
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::env;
-use syn::{parse_macro_input, DeriveInput, Ident};
+use syn::{DeriveInput, Ident, parse_macro_input};
 
 include!(concat!(
     env!("OUT_DIR"),

@@ -3,15 +3,14 @@ use rstest::*;
 use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::{
-    generate,
+    WpApiParamOrder, generate,
     users::{
         SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
         SparseUserFieldWithViewContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
         WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
-    WpApiParamOrder,
 };
-use wp_api_integration_tests::{api_client, AssertResponse, FIRST_USER_ID, SECOND_USER_ID};
+use wp_api_integration_tests::{AssertResponse, FIRST_USER_ID, SECOND_USER_ID, api_client};
 
 pub mod reusable_test_cases;
 

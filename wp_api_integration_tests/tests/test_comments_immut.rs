@@ -8,10 +8,10 @@ use wp_api::comments::{
 };
 use wp_api::posts::PostId;
 use wp_api::users::UserAvatarSize;
-use wp_api::{generate, WpApiParamOrder};
+use wp_api::{WpApiParamOrder, generate};
 use wp_api_integration_tests::{
-    api_client, unwrapped_wp_gmt_date_time, AssertResponse, TestCredentials, FIRST_COMMENT_ID,
-    FIRST_USER_EMAIL, FIRST_USER_ID, SECOND_USER_ID,
+    AssertResponse, FIRST_COMMENT_ID, FIRST_USER_EMAIL, FIRST_USER_ID, SECOND_USER_ID,
+    TestCredentials, api_client, unwrapped_wp_gmt_date_time,
 };
 
 #[tokio::test]

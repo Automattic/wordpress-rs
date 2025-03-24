@@ -1,6 +1,6 @@
 use serde::{
-    de::{self, IgnoredAny},
     Deserialize, Deserializer,
+    de::{self, IgnoredAny},
 };
 
 #[derive(Deserialize, Debug)]
