@@ -84,6 +84,10 @@ impl TryFrom<&str> for ApiBaseUrl {
 }
 
 impl ApiBaseUrl {
+    pub fn with_api_url(url: Url) -> Self {
+        Self { url }
+    }
+
     pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
         site_base_url.try_into()
     }

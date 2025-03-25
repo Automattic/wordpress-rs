@@ -112,6 +112,11 @@ impl InnerRequestBuilder {
                 let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
                 header_map.insert(http::header::AUTHORIZATION, hv);
             }
+            WpAuthentication::Bearer { ref token } => {
+                let hv = HeaderValue::from_str(&format!("Bearer {}", token));
+                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token");
+                header_map.insert(http::header::AUTHORIZATION, hv);
+            }
         };
         header_map.into()
     }

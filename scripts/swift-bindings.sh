@@ -34,13 +34,26 @@ EOF
 }
 
 # The search-and-replace below can be removed after updating to a uniffi-rs
-# version that includes this PR https://github.com/mozilla/uniffi-rs/pull/2341
+# version that includes this PR https://github.com/mozilla/uniffi-rs/pull/2456
 for swift_binding in "$output_dir"/*.swift; do
     options=("-i")
     if [[ $(uname) == "Darwin" ]]; then
         options+=("")
     fi
-    sed "${options[@]}" 's/^protocol UniffiForeignFutureTask /fileprivate protocol UniffiForeignFutureTask /' "$swift_binding"
+
+    sed "${options[@]}" 's/errorHandler: FfiConverterTypeWpApiError\.lift/errorHandler: FfiConverterTypeWpApiError_lift/' "$swift_binding"
+
+    if [[ $(basename "$swift_binding") == "wp_api.swift" ]]; then
+        # Create a multi-line string variable for Swift API documentation
+        cat <<'EOF' >> "$swift_binding"
+
+// Some types in the bindings do not get `Hashable & Equatable` implemented
+// by the uniffi-rs codegen. We implement them manually here.
+
+extension WpApiError: Hashable, Equatable {}
+extension RequestExecutionErrorReason: Hashable, Equatable {}
+EOF
+    fi
 
     basename=$(basename "$swift_binding" .swift)
     if [ "$(type -t "patch_$basename")" = "function" ]; then

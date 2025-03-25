@@ -1,0 +1,6 @@
+[bindings.swift]
+ffi_module_name = "libwordpressFFI"
+ffi_module_filename = "jetpack_uniffi"
+generate_module_map = false
+generate_immutable_records = true
+experimental_sendable_value_types = true
