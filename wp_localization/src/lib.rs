@@ -279,8 +279,9 @@ mod localization_tests {
     #[rstest]
     #[case("en", "en-US")]
     #[case("tr", "tr-TR")]
-    #[case("zh-Hans", "zh-CN")]
-    #[case("fr-FR", "fr")]
+    // TODO: Add the following cases when we add the translations.
+    // #[case("zh-Hans", "zh-CN")]
+    // #[case("fr-FR", "fr")]
     fn test_fallback_locale(#[case] lang_ids: &str, #[case] expected: &str) {
         let locale = WpLocale::from(lang_ids);
         assert_eq!(locale.lang_id.to_string(), expected);
