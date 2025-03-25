@@ -40,11 +40,8 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 mod tests {
     use super::*;
     use crate::{
-        PluginListParams, PluginStatus, generate,
-        request::endpoint::{
-            ApiBaseUrl,
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-        },
+        ParsedUrl, PluginListParams, PluginStatus, generate,
+        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;
@@ -122,7 +119,7 @@ mod tests {
         "/plugins?context=edit&status=active&_fields=name%2Cplugin_uri"
     )]
     #[case(
-        generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))), 
+        generate!(PluginListParams, (search, Some("foo".to_string())), (status, Some(PluginStatus::Inactive))),
         &[SparsePluginFieldWithEditContext::NetworkOnly, SparsePluginFieldWithEditContext::RequiresPhp, SparsePluginFieldWithEditContext::Textdomain],
         "/plugins?context=edit&search=foo&status=inactive&_fields=network_only%2Crequires_php%2Ctextdomain"
     )]
@@ -213,7 +210,7 @@ mod tests {
     }
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> PluginsRequestEndpoint {
+    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> PluginsRequestEndpoint {
         PluginsRequestEndpoint::new(fixture_api_base_url)
     }
 }

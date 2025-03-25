@@ -61,78 +61,6 @@ impl From<ApiEndpointUrl> for WpEndpointUrl {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ApiBaseUrl {
-    url: Url,
-}
-
-impl From<Url> for ApiBaseUrl {
-    fn from(url: Url) -> Self {
-        let url = url
-            .extend(WP_JSON_PATH_SEGMENTS)
-            .expect("Given url is already parsed, so this can't result in an error");
-        Self { url }
-    }
-}
-
-impl TryFrom<&str> for ApiBaseUrl {
-    type Error = url::ParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Url::parse(value).map(ApiBaseUrl::from)
-    }
-}
-
-impl ApiBaseUrl {
-    pub fn new(site_base_url: &str) -> Result<Self, url::ParseError> {
-        site_base_url.try_into()
-    }
-
-    pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        self.url
-            .clone()
-            .extend(segments.into_iter().flat_map(|s| {
-                s.as_ref()
-                    .split('/')
-                    .filter_map(|x| match x.trim() {
-                        "" => None,
-                        y => Some(y.to_string()),
-                    })
-                    .collect::<Vec<String>>()
-            }))
-            .expect("ApiBaseUrl is already parsed, so this can't result in an error")
-    }
-}
-
-trait UrlExtension {
-    fn extend<I>(self, segments: I) -> Result<Url, ()>
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>;
-}
-
-impl UrlExtension for Url {
-    fn extend<I>(mut self, segments: I) -> Result<Url, ()>
-    where
-        I: IntoIterator,
-        I::Item: AsRef<str>,
-    {
-        // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
-        if let Some(segments) = self.path_segments() {
-            if segments.last() == Some("") {
-                self.path_segments_mut()?.pop();
-            }
-        }
-
-        self.path_segments_mut()?.extend(segments);
-        Ok(self)
-    }
-}
-
 pub trait DerivedRequest {
     // This can be used to add additional parameters to a request if it has no params type.
     //
@@ -186,70 +114,17 @@ mod macros {
 
 #[cfg(test)]
 mod tests {
+    use crate::ParsedUrl;
+
     use super::*;
     use rstest::*;
     use std::sync::Arc;
 
-    #[test]
-    fn extend_url() {
-        let url = Url::parse("https://example.com").unwrap();
-        assert_eq!(
-            url.extend(["bar", "baz"]).unwrap().as_str(),
-            "https://example.com/bar/baz"
-        );
-    }
-
-    #[rstest]
-    fn api_base_url(
-        #[values(
-            "http://example.com",
-            "http://example.com/",
-            "https://example.com",
-            "https://example.com/",
-            "https://www.example.com",
-            "https://www.example.com/",
-            "https://f.example.com",
-            "https://f.example.com/",
-            "https://example.com/f",
-            "https://example.com/f/"
-        )]
-        test_base_url: &str,
-    ) {
-        let api_base_url: ApiBaseUrl = test_base_url.try_into().unwrap();
-        let expected_wp_json_url = wp_json_endpoint(test_base_url);
-        assert_eq!(
-            api_base_url
-                .by_extending_and_splitting_by_forward_slash(["bar", "baz"])
-                .as_str(),
-            format!("{}/bar/baz", expected_wp_json_url)
-        );
-        assert_eq!(
-            api_base_url
-                .by_extending_and_splitting_by_forward_slash(["bar", "baz/quox"])
-                .as_str(),
-            format!("{}/bar/baz/quox", expected_wp_json_url)
-        );
-        assert_eq!(
-            api_base_url
-                .by_extending_and_splitting_by_forward_slash(["/bar", "/baz/quox"])
-                .as_str(),
-            format!("{}/bar/baz/quox", expected_wp_json_url)
-        );
-    }
-
-    fn wp_json_endpoint(base_url: &str) -> String {
-        let mut url = base_url.to_string();
-        if !url.ends_with('/') {
-            url.push('/')
-        }
-        url.push_str(WP_JSON_PATH_SEGMENTS.join("/").as_str());
-
-        url
-    }
-
     #[fixture]
-    pub fn fixture_api_base_url() -> Arc<ApiBaseUrl> {
-        ApiBaseUrl::try_from("https://example.com").unwrap().into()
+    pub fn fixture_api_base_url() -> Arc<ParsedUrl> {
+        ParsedUrl::try_from("https://example.com/wp-json")
+            .unwrap()
+            .into()
     }
 
     pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
@@ -265,7 +140,7 @@ mod tests {
             endpoint_url.as_str(),
             format!(
                 "{}{}{}",
-                fixture_api_base_url().url.as_str(),
+                fixture_api_base_url().as_str(),
                 namespace.as_str(),
                 path
             )

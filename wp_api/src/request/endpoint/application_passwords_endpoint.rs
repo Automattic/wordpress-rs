@@ -51,9 +51,9 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::{
-        ApiBaseUrl,
-        tests::{fixture_api_base_url, validate_wp_v2_endpoint},
+    use crate::{
+        ParsedUrl,
+        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> ApplicationPasswordsRequestEndpoint {
+    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> ApplicationPasswordsRequestEndpoint {
         ApplicationPasswordsRequestEndpoint::new(fixture_api_base_url)
     }
 }

@@ -42,12 +42,10 @@ impl SparseField for SparseSearchResultFieldWithViewContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ParsedUrl;
     use crate::{
         generate,
-        request::endpoint::{
-            ApiBaseUrl,
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-        },
+        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         search_results::{SearchListParams, SearchResultSubtype, SearchResultType},
     };
     use rstest::*;
@@ -159,7 +157,7 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> SearchRequestEndpoint {
+    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> SearchRequestEndpoint {
         SearchRequestEndpoint::new(fixture_api_base_url)
     }
 }

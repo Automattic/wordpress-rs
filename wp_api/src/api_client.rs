@@ -1,7 +1,6 @@
 use crate::request::{
     RequestExecutor,
     endpoint::{
-        ApiBaseUrl,
         application_passwords_endpoint::{
             ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
         },
@@ -64,10 +63,9 @@ pub struct WpApiRequestBuilder {
 }
 
 impl WpApiRequestBuilder {
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
-        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
+    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         api_client_generate_request_builder!(
-            api_base_url,
+            api_root_url,
             authentication;
             application_passwords,
             categories,
@@ -128,14 +126,12 @@ pub struct WpApiClient {
 
 impl WpApiClient {
     pub fn new(
-        site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Self {
-        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
-
         api_client_generate_api_client!(
-            api_base_url,
+            api_root_url,
             authentication,
             request_executor;
             application_passwords,

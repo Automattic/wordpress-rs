@@ -225,13 +225,10 @@ impl MediaRequestExecutor {
 mod tests {
     use super::*;
     use crate::{
-        UserId, WpApiParamOrder, generate,
+        ParsedUrl, UserId, WpApiParamOrder, generate,
         media::{MediaId, MediaStatus, MediaTypeParam},
         posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
-        request::endpoint::{
-            ApiBaseUrl,
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-        },
+        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
@@ -538,7 +535,7 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> MediaRequestEndpoint {
+    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> MediaRequestEndpoint {
         MediaRequestEndpoint::new(fixture_api_base_url)
     }
 }

@@ -67,17 +67,14 @@ impl SparseField for SparseCommentFieldWithViewContext {
 mod tests {
     use super::*;
     use crate::{
-        UserId, WpApiParamOrder,
+        ParsedUrl, UserId, WpApiParamOrder,
         comments::{
             CommentDeleteParams, CommentId, CommentRetrieveParams, CommentStatus, CommentType,
             WpApiParamCommentsOrderBy,
         },
         generate,
         posts::PostId,
-        request::endpoint::{
-            ApiBaseUrl,
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-        },
+        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
@@ -377,7 +374,7 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> CommentsRequestEndpoint {
+    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> CommentsRequestEndpoint {
         CommentsRequestEndpoint::new(fixture_api_base_url)
     }
 }

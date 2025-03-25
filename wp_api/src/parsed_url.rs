@@ -11,11 +11,59 @@ impl ParsedUrl {
     pub fn new(url: Url) -> Self {
         Self { inner: url }
     }
+
+    pub fn as_str(&self) -> &str {
+        self.inner.as_str()
+    }
+
+    pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        self.inner
+            .clone()
+            .extend(segments.into_iter().flat_map(|s| {
+                s.as_ref()
+                    .split('/')
+                    .filter_map(|x| match x.trim() {
+                        "" => None,
+                        y => Some(y.to_string()),
+                    })
+                    .collect::<Vec<String>>()
+            }))
+            .expect("ParsedUrl is already parsed, so this can't result in an error")
+    }
 }
 
 impl Display for ParsedUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.inner)
+    }
+}
+
+trait UrlExtension {
+    fn extend<I>(self, segments: I) -> Result<Url, ()>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>;
+}
+
+impl UrlExtension for Url {
+    fn extend<I>(mut self, segments: I) -> Result<Url, ()>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
+        if let Some(segments) = self.path_segments() {
+            if segments.last() == Some("") {
+                self.path_segments_mut()?.pop();
+            }
+        }
+
+        self.path_segments_mut()?.extend(segments);
+        Ok(self)
     }
 }
 
@@ -141,5 +189,14 @@ mod tests {
     fn pretty_url(#[case] input: &str, #[case] expected_display: &str) {
         let url = ParsedUrl::parse(input).unwrap();
         assert_eq!(url.pretty_url(), expected_display);
+    }
+
+    #[test]
+    fn extend_url() {
+        let url = Url::parse("https://example.com").unwrap();
+        assert_eq!(
+            url.extend(["bar", "baz"]).unwrap().as_str(),
+            "https://example.com/bar/baz"
+        );
     }
 }
