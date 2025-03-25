@@ -388,14 +388,15 @@ impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
                 ..
             } => find_api_root_failure.message_bundle(),
             Self::FetchAndParseApiRoot {
+                parsed_site_url,
                 fetch_and_parse_api_root_failure,
                 ..
-            } => fetch_and_parse_api_root_failure.message_bundle(),
+            } => fetch_and_parse_api_root_failure.message_bundle(parsed_site_url),
         }
     }
 }
 
-#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum FindApiRootFailure {
     FetchHomepage { error: RequestExecutionError },
     // if no WP mentions
@@ -404,7 +405,7 @@ pub enum FindApiRootFailure {
     RestApiDisabled,
 }
 
-impl WpSupportsLocalization for FindApiRootFailure {
+impl FindApiRootFailure {
     fn message_bundle(&self) -> MessageBundle {
         match self {
             Self::FetchHomepage { error } => error.message_bundle(),
@@ -414,7 +415,7 @@ impl WpSupportsLocalization for FindApiRootFailure {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum FetchAndParseApiRootFailure {
     FetchApiRoot {
         error: RequestExecutionError,
@@ -433,45 +434,44 @@ pub enum FetchAndParseApiRootFailure {
     },
 }
 
-impl WpSupportsLocalization for FetchAndParseApiRootFailure {
-    fn message_bundle(&self) -> MessageBundle {
+impl FetchAndParseApiRootFailure {
+    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
         match self {
             Self::FetchApiRoot { error } => error.message_bundle(),
             Self::ParseApiRoot { .. } => WpMessages::parse_api_root(),
             Self::WpError { error_message, .. } => WpMessages::site_error_message(error_message),
             Self::ApplicationPasswordsNotSupported { reason, .. } => reason
                 .as_ref()
-                .map(|r| r.message_bundle())
+                .map(|r| r.message_bundle(parsed_site_url))
                 .unwrap_or(WpMessages::application_passwords_not_supported()),
         }
     }
 }
 
-#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, uniffi::Enum)]
 pub enum ApplicationPasswordsNotSupportedReason {
     ApplicationPasswordBlockedByPlugin {
-        site_url: Arc<ParsedUrl>,
         plugin: KnownApplicationPasswordBlockingPlugin,
     },
-    ApplicationPasswordBlockedByMultiplePlugins {
-        site_url: Arc<ParsedUrl>,
-    },
+    ApplicationPasswordBlockedByMultiplePlugins,
     SiteIsLocalDevelopmentEnvironment,
     ApplicationPasswordsDisabledForHttpSite,
 }
 
-impl WpSupportsLocalization for ApplicationPasswordsNotSupportedReason {
-    fn message_bundle(&self) -> MessageBundle {
+impl ApplicationPasswordsNotSupportedReason {
+    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
         match self {
-            Self::ApplicationPasswordBlockedByPlugin { site_url, plugin } => {
+            Self::ApplicationPasswordBlockedByPlugin { plugin } => {
                 WpMessages::application_password_blocked_by_plugin(
-                    site_url.to_string(),
+                    parsed_site_url.to_string(),
                     plugin.name.clone(),
                     plugin.support_url.clone(),
                 )
             }
-            Self::ApplicationPasswordBlockedByMultiplePlugins { site_url } => {
-                WpMessages::application_password_blocked_by_multiple_plugins(site_url.to_string())
+            Self::ApplicationPasswordBlockedByMultiplePlugins => {
+                WpMessages::application_password_blocked_by_multiple_plugins(
+                    parsed_site_url.to_string(),
+                )
             }
             Self::SiteIsLocalDevelopmentEnvironment => {
                 WpMessages::site_is_local_development_environment()

@@ -187,12 +187,11 @@ impl WpLoginClient {
                 if plugins.len() == 1 {
                     // If there's only one candidate, we can show more information in the error message
                     Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
-                        site_url: parsed_site_url.clone(),
                         plugin: plugins.first().expect("Already verified there is one plugin").clone(),
                     })
                 } else {
                     // If there's more than one, for now we'll just give a generic error
-                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByMultiplePlugins { site_url: parsed_site_url.clone() })
+                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByMultiplePlugins)
                 }
             } else if !api_details.uses_https() {
                 // Application Passwords are disabled for non-HTTPS sites by default
