@@ -10,7 +10,7 @@ class LocalizationTests {
             _ = try ParsedUrl.parse(input: "not-url")
             Issue.record("Got an unexpected successful result")
         } catch {
-            #expect(error.localizedDescription == "URL is invalid")
+            #expect(error.localizedDescription == "URL is invalid.")
         }
     }
 }
