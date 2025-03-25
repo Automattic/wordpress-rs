@@ -12,6 +12,7 @@ extension WordPressAPI {
             }
 
             let parsedUrl = try ParsedUrl.parse(input: defaultSiteUrl)
+            let apiRootUrl = try ParsedUrl.parse(input: parsedUrl.asURL().appendingPathComponent("wp-json").absoluteString)
 
             guard let loginCredentials = try await loginManager.getLoginCredentials() else {
                 throw CocoaError(.xpcConnectionInvalid)
@@ -19,7 +20,7 @@ extension WordPressAPI {
 
             return WordPressAPI(
                urlSession: .shared,
-               baseUrl: parsedUrl,
+               apiRootUrl: apiRootUrl,
                authenticationStategy: loginCredentials
            )
         }

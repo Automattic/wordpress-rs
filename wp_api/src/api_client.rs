@@ -36,9 +36,9 @@ struct UniffiWpApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         Self {
-            inner: WpApiRequestBuilder::new(site_url, authentication),
+            inner: WpApiRequestBuilder::new(api_root_url, authentication),
         }
     }
 }
@@ -95,12 +95,12 @@ struct UniffiWpApiClient {
 impl UniffiWpApiClient {
     #[uniffi::constructor]
     fn new(
-        site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Self {
         Self {
-            inner: WpApiClient::new(site_url, authentication, request_executor),
+            inner: WpApiClient::new(api_root_url, authentication, request_executor),
         }
     }
 }
