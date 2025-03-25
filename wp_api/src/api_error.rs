@@ -59,7 +59,7 @@ impl WpSupportsLocalization for WpApiError {
                 WpMessages::response_parsing_error(reason)
             }
             WpApiError::SiteUrlParsingError { .. } => WpMessages::url_parsing_error(),
-            WpApiError::UnknownError { .. } => WpMessages::generic_error(),
+            WpApiError::UnknownError { .. } => WpMessages::wp_api_error_generic_error(),
             WpApiError::WpError { error_message, .. } => {
                 WpMessages::site_error_message(error_message)
             }

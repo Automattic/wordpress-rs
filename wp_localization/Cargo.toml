@@ -11,10 +11,12 @@ fluent-bundle = { workspace = true }
 fluent-langneg = { workspace = true }
 fluent-templates = { workspace = true }
 paste = { workspace = true }
-rstest = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 unic-langid = { workspace = true }
 uniffi = { workspace = true }
 wp_localization_macro = { path = "../wp_localization_macro" }
+
+[dev-dependencies]
+rstest = { workspace = true }
