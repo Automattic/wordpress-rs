@@ -66,6 +66,7 @@ impl WpContext {
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WpAuthentication {
     AuthorizationHeader { token: String },
+    Bearer { token: String },
     None,
 }
 

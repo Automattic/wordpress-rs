@@ -49,7 +49,8 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, uniffi::Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
 pub struct SSLCertificateInfo {
     /// The domain this certificate is valid for (or the signer's name, if this is an intermediate or root certificate)
     pub common_name: String,
@@ -74,7 +75,7 @@ impl SSLCertificateInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, uniffi::Record)]
 pub struct SSLCertificateIssuer {
     pub common_name: String,
     pub organization: Option<String>,

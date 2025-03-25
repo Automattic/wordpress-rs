@@ -1,0 +1,2 @@
+error_type = "wp_api::WpApiError"
+request_executor = "wp_api::request::RequestExecutor"
