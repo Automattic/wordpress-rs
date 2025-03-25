@@ -1,8 +1,7 @@
 use std::sync::Arc;
 use wp_api::{
-    api_client_generate_api_client, api_client_generate_endpoint_impl,
-    request::{endpoint::ApiBaseUrl, RequestExecutor},
-    ParsedUrl, WpAuthentication,
+    ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
+    request::{RequestExecutor, endpoint::ApiBaseUrl},
 };
 
 use super::endpoint::jetpack_connection_endpoint::{

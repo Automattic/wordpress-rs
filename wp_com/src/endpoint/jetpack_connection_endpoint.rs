@@ -3,8 +3,8 @@ use wp_derive_request_builder::WpDerivedRequest;
 use wp_api::request::endpoint::{AsNamespace, DerivedRequest};
 
 use crate::{
-    jetpack_connection::{JetpackRemoteConnectionParams, JetpackRemoteConnectionResult},
     WpComNamespace, WpComSiteId,
+    jetpack_connection::{JetpackRemoteConnectionParams, JetpackRemoteConnectionResult},
 };
 
 #[derive(WpDerivedRequest)]
