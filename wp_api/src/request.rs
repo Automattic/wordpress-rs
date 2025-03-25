@@ -1,14 +1,15 @@
 use self::endpoint::WpEndpointUrl;
 use crate::RequestExecutionErrorReason;
 use crate::{
+    WpApiError, WpAuthentication,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
-    WpApiError, WpAuthentication,
 };
+use base64::Engine;
 use chrono::{DateTime, Utc};
-use endpoint::{media_endpoint::MediaUploadRequest, ApiEndpointUrl};
+use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use http::{HeaderMap, HeaderName, HeaderValue};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::str::FromStr;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use url::Url;
@@ -140,6 +141,8 @@ pub trait RequestExecutor: Send + Sync + Debug {
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
+
+    async fn sleep(&self, millis: u64);
 }
 
 #[derive(uniffi::Object)]
@@ -217,12 +220,31 @@ impl WpNetworkRequest {
             .map(|b| request_or_response_body_as_string(&b.inner))
     }
 
-    /// Does this request specify HTTP login details of some kind?
-    pub fn has_http_authorization_header(&self) -> bool {
-        self.header_map
-            .inner
-            .get(http::header::AUTHORIZATION)
-            .is_some()
+    pub fn has_http_authentication(&self) -> bool {
+        self.header_map.has_http_authentication()
+    }
+
+    pub fn adding_http_authentication(&self, username: &str, password: &str) -> Self {
+        let encoded_credentials =
+            base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", username, password));
+
+        let mut new_header_map = self.header_map.inner.clone();
+
+        new_header_map.insert(
+            http::header::AUTHORIZATION,
+            format!("Basic {}", encoded_credentials).parse().expect(
+                "base64 can only produce ASCII, so this string is guaranteed to be parseable",
+            ),
+        );
+
+        WpNetworkRequest {
+            uuid: self.uuid.clone(),
+            retry_count: self.retry_count + 1,
+            method: self.method.clone(),
+            url: self.url.clone(),
+            header_map: Arc::new(new_header_map.into()),
+            body: self.body.clone(),
+        }
     }
 }
 
@@ -265,7 +287,9 @@ impl Debug for WpNetworkRequest {
 pub struct WpNetworkResponse {
     pub body: Vec<u8>,
     pub status_code: u16,
-    pub header_map: Arc<WpNetworkHeaderMap>,
+    pub response_header_map: Arc<WpNetworkHeaderMap>,
+    pub request_url: WpEndpointUrl,
+    pub request_header_map: Arc<WpNetworkHeaderMap>,
 }
 
 #[derive(Debug, Default, Clone, uniffi::Object)]
@@ -327,6 +351,11 @@ impl WpNetworkHeaderMap {
     pub fn to_header_map(&self) -> HeaderMap {
         self.inner.clone()
     }
+
+    /// Does this request specify HTTP login details of some kind?
+    pub fn has_http_authentication(&self) -> bool {
+        self.inner.get(http::header::AUTHORIZATION).is_some()
+    }
 }
 
 #[uniffi::export]
@@ -387,8 +416,8 @@ pub enum WpNetworkHeaderMapError {
 impl WpNetworkResponse {
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
         [
-            self.header_map.inner.get_all(http::header::LINK),
-            self.header_map
+            self.response_header_map.inner.get_all(http::header::LINK),
+            self.response_header_map
                 .inner
                 .get_all(http::header::LINK.to_string().to_lowercase()),
         ]
@@ -429,7 +458,7 @@ impl WpNetworkResponse {
         ParamsType: FromUrlQueryPairs,
         E: ParsedRequestError,
     {
-        if let Some(err) = E::try_parse(&self.body, self.status_code) {
+        if let Some(err) = E::try_parse(&self) {
             return Err(err);
         }
 
@@ -443,7 +472,7 @@ impl WpNetworkResponse {
                     parsed_response.prev_page_params =
                         self.get_pagination_header(PaginationHeaderKey::Prev);
                 }
-                parsed_response.header_map = self.header_map;
+                parsed_response.header_map = self.response_header_map;
                 ResponseType::from(parsed_response)
             })
     }
@@ -460,7 +489,7 @@ impl WpNetworkResponse {
     }
 
     pub fn get_retry_after(&self) -> Option<u64> {
-        self.header_map
+        self.response_header_map
             .inner
             .get(http::header::RETRY_AFTER)
             .and_then(|h_v| h_v.to_str().ok())
@@ -468,15 +497,11 @@ impl WpNetworkResponse {
             .map(|d| d.seconds)
     }
 
-    pub fn is_http_authentication_required(&self) -> bool {
-        self.status_code == 401 || self.status_code == 403
-    }
-
     pub fn get_http_auth_method(
         &self,
     ) -> Result<Option<HttpAuthMethod>, HttpAuthMethodParsingError> {
         let header_value = self
-            .header_map
+            .response_header_map
             .inner
             .get(http::header::WWW_AUTHENTICATE)
             .and_then(|h_v| h_v.to_str().ok());
@@ -636,7 +661,7 @@ impl Debug for WpNetworkResponse {
                 }}
                 "},
             self.status_code,
-            self.header_map,
+            self.response_header_map,
             self.body_as_string()
         );
         s.pop(); // Remove the new line at the end
@@ -693,10 +718,11 @@ mod tests {
         None,
         Some("http://localhost/wp-json/wp/v2/posts?page=2")
     )]
-    #[case("<http://localhost/wp-json/wp/v2/posts?page=1>; rel=\"prev\", <http://localhost/wp-json/wp/v2/posts?page=3>; rel=\"next\"",
-            Some("http://localhost/wp-json/wp/v2/posts?page=1"),
-            Some("http://localhost/wp-json/wp/v2/posts?page=3")
-        )]
+    #[case(
+        "<http://localhost/wp-json/wp/v2/posts?page=1>; rel=\"prev\", <http://localhost/wp-json/wp/v2/posts?page=3>; rel=\"next\"",
+        Some("http://localhost/wp-json/wp/v2/posts?page=1"),
+        Some("http://localhost/wp-json/wp/v2/posts?page=3")
+    )]
     #[case(
         "<http://localhost/wp-json/wp/v2/posts?page=5>; rel=\"prev\"",
         Some("http://localhost/wp-json/wp/v2/posts?page=5"),
@@ -710,10 +736,12 @@ mod tests {
         let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 200,
-            header_map: Arc::new(
+            response_header_map: Arc::new(
                 WpNetworkHeaderMap::from_map([("Link".to_string(), link.to_string())].into())
                     .unwrap(),
             ),
+            request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
         assert_eq!(
             expected_prev_link_header
@@ -721,7 +749,7 @@ mod tests {
                 .as_ref(),
             response.get_link_header("prev").first(),
             "response headers: {:?}",
-            response.header_map.inner
+            response.response_header_map.inner
         );
         assert_eq!(
             expected_next_link_header
@@ -729,7 +757,7 @@ mod tests {
                 .as_ref(),
             response.get_link_header("next").first(),
             "response headers: {:?}",
-            response.header_map.inner
+            response.response_header_map.inner
         );
     }
 
@@ -839,7 +867,9 @@ mod tests {
         let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 401,
-            header_map: Arc::new(header_map),
+            response_header_map: Arc::new(header_map),
+            request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
 
         assert_eq!(response.get_http_auth_method(), Ok(Some(expected_value)));
@@ -858,7 +888,9 @@ mod tests {
         let response = WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 429,
-            header_map: Arc::new(header_map),
+            response_header_map: Arc::new(header_map),
+            request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
 
         assert_eq!(response.get_retry_after(), Some(expected_value));

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use x509_cert::{
-    der::Decode,
-    ext::pkix::{name::GeneralName::DnsName, SubjectAltName},
     Certificate,
+    der::Decode,
+    ext::pkix::{SubjectAltName, name::GeneralName::DnsName},
 };
 
 // Parse a DER-encoded certificate into a Struct we can use to get better

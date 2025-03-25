@@ -1,5 +1,7 @@
 use crate::request::{
+    RequestExecutor,
     endpoint::{
+        ApiBaseUrl,
         application_passwords_endpoint::{
             ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
         },
@@ -19,13 +21,11 @@ use crate::request::{
         wp_site_health_tests_endpoint::{
             WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
         },
-        ApiBaseUrl,
     },
-    RequestExecutor,
 };
 use crate::{
-    api_client_generate_api_client, api_client_generate_endpoint_impl,
-    api_client_generate_request_builder, ParsedUrl, WpAuthentication,
+    ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder,
 };
 use std::sync::Arc;
 

@@ -1,13 +1,13 @@
 use rstest::*;
 use serial_test::parallel;
+use wp_api::WpErrorCode;
 use wp_api::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
 };
-use wp_api::WpErrorCode;
 
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
-    TestCredentials, FIRST_USER_ID, SECOND_USER_ID,
+    AssertWpError, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
+    api_client_as_subscriber, api_client_as_unauthenticated,
 };
 
 pub mod reusable_test_cases;
@@ -112,8 +112,8 @@ async fn delete_application_passwords_err_cannot_delete_application_passwords() 
 #[rstest]
 #[tokio::test]
 #[parallel]
-async fn retrieve_application_password_err_cannot_introspect_app_password_for_non_authenticated_user_401(
-) {
+async fn retrieve_application_password_err_cannot_introspect_app_password_for_non_authenticated_user_401()
+ {
     // Unauthenticated user can not retrieve the current application password for the second user
     api_client_as_unauthenticated()
         .application_passwords()

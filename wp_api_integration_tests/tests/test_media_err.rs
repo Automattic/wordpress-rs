@@ -1,23 +1,22 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use http::{HeaderMap, HeaderValue};
 use serial_test::parallel;
+use std::sync::Arc;
 use wp_api::{
+    MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
+    WpApiClient, WpAuthentication, WpErrorCode,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     request::{
-        endpoint::media_endpoint::MediaUploadRequest, RequestExecutor, WpNetworkHeaderMap,
-        WpNetworkRequest, WpNetworkResponse,
+        RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::media_endpoint::MediaUploadRequest,
     },
+    reqwest_request_executor::ReqwestRequestExecutor,
     users::UserId,
-    MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
-    WpApiClient, WpAuthentication, WpErrorCode,
 };
 use wp_api_integration_tests::{
-    api_client, api_client_as_author, api_client_as_subscriber, test_site_url, AssertWpError,
-    AsyncWpNetworking, TestCredentials, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
-    MEDIA_TEST_FILE_PATH,
+    AssertWpError, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE, MEDIA_TEST_FILE_PATH,
+    TestCredentials, api_client, api_client_as_author, api_client_as_subscriber, test_site_url,
 };
 
 #[tokio::test]
@@ -222,7 +221,7 @@ impl RequestExecutor for MediaErrNetworking {
         let mut request = self
             .client
             .request(
-                AsyncWpNetworking::request_method(media_upload_request.method()),
+                ReqwestRequestExecutor::request_method(media_upload_request.method()),
                 media_upload_request.url().0.as_str(),
             )
             .headers(media_upload_request.header_map().to_header_map());
@@ -256,7 +255,13 @@ impl RequestExecutor for MediaErrNetworking {
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
-            header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            request_url: media_upload_request.url(),
+            request_header_map: media_upload_request.header_map(),
         })
+    }
+
+    async fn sleep(&self, millis: u64) {
+        tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
     }
 }

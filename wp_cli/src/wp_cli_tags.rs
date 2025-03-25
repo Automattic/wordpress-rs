@@ -34,8 +34,8 @@ impl WpCliTag {
     }
     pub fn list() -> Result<Vec<Self>> {
         let output = run_wp_cli_command(["term", "list", "post_tag", TAGS_FIELDS_ARG]);
-        serde_json::from_slice::<Vec<Self>>(&output.stdout).with_context(|| {
-            "Failed to parse `wp term list post_tag --format=json` into Vec<WpCliTag>"
-        })
+        serde_json::from_slice::<Vec<Self>>(&output.stdout).with_context(
+            || "Failed to parse `wp term list post_tag --format=json` into Vec<WpCliTag>",
+        )
     }
 }

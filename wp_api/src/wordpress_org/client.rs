@@ -1,12 +1,14 @@
+use crate::middleware::PerformsRequests;
+use crate::middleware::WpApiMiddlewarePipeline;
 use crate::{
+    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
     api_error::RequestExecutionErrorReason,
     request::{
-        endpoint::WpEndpointUrl, RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect,
+        RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect, endpoint::WpEndpointUrl,
     },
     wordpress_org::update_check::UpdateCheckRequest,
-    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{result::Result, sync::Arc};
 use url::Url;
 
@@ -16,13 +18,20 @@ use super::update_check::UpdateCheckResponse;
 #[derive(Debug, uniffi::Object)]
 pub struct WordPressOrgApiClient {
     pub(crate) request_executor: Arc<dyn RequestExecutor>,
+    pub(crate) middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
 }
 
 #[uniffi::export]
 impl WordPressOrgApiClient {
     #[uniffi::constructor]
-    pub fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
-        Self { request_executor }
+    pub fn new(
+        request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    ) -> Self {
+        Self {
+            request_executor,
+            middleware_pipeline,
+        }
     }
 
     pub async fn plugin_information(
@@ -143,6 +152,16 @@ impl WordPressOrgApiClient {
                 response: String::from_utf8_lossy(&response.body).to_string(),
             }),
         }
+    }
+}
+
+impl PerformsRequests for WordPressOrgApiClient {
+    fn get_middleware_pipeline(&self) -> Arc<WpApiMiddlewarePipeline> {
+        self.middleware_pipeline.clone()
+    }
+
+    fn get_request_executor(&self) -> Arc<dyn RequestExecutor> {
+        self.request_executor.clone()
     }
 }
 

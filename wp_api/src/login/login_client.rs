@@ -1,23 +1,21 @@
 use super::{
-    url_discovery::{
-        self, ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttempt,
-        AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult, AutoDiscoveryAttemptSuccess,
-        AutoDiscoveryResult, AutoDiscoveryUniffiResult, FetchWpJsonFailure, FetchWpJsonSuccess,
-        FindApiRootLinkHeaderFailure, FindApiRootLinkHeaderSuccess, IsWordPressSiteAttemptResult,
-        IsWordPressSiteParseHtmlResult, ParseApiRootUrlError, ParseHtmlFailure,
-        API_ROOT_LINK_HEADER,
-    },
     WpApiDetails,
+    url_discovery::{
+        self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
+        AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
+        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
+        FetchAndParseApiRootFailure, FindApiRootFailure, ParseHomepageResult,
+    },
 };
 use crate::{
-    login::url_discovery::RootWpJson,
+    ParsedUrl, RequestExecutionError, WpError,
+    middleware::{PerformsRequests, WpApiMiddlewarePipeline},
     request::{
-        endpoint::WpEndpointUrl, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
-        WpNetworkRequest, WpNetworkResponse,
+        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::{WP_JSON_PATH_SEGMENTS, WpEndpointUrl},
     },
-    ParseUrlError, ParsedUrl, RequestExecutionError,
 };
-use std::{str, sync::Arc};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, uniffi::Object)]
@@ -28,9 +26,12 @@ struct UniffiWpLoginClient {
 #[uniffi::export]
 impl UniffiWpLoginClient {
     #[uniffi::constructor]
-    fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
+    fn new(
+        request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    ) -> Self {
         Self {
-            inner: WpLoginClient::new(request_executor).into(),
+            inner: WpLoginClient::new(request_executor, middleware_pipeline).into(),
         }
     }
 
@@ -42,11 +43,18 @@ impl UniffiWpLoginClient {
 #[derive(Debug)]
 pub struct WpLoginClient {
     request_executor: Arc<dyn RequestExecutor>,
+    middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
 }
 
 impl WpLoginClient {
-    pub fn new(request_executor: Arc<dyn RequestExecutor>) -> Self {
-        Self { request_executor }
+    pub fn new(
+        request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    ) -> Self {
+        Self {
+            request_executor,
+            middleware_pipeline,
+        }
     }
 
     pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
@@ -65,61 +73,112 @@ impl WpLoginClient {
         &self,
         attempt: AutoDiscoveryAttempt,
     ) -> AutoDiscoveryAttemptResult {
-        let attempt_site_url = attempt.attempt_site_url.as_str();
-        let parse_html_result = self
-            .fetch_site(attempt_site_url)
-            .await
-            .map(|r| IsWordPressSiteParseHtmlResult::parse_response(&r.body_as_string()));
-        let api_root_url_from_link_tag = parse_html_result
-            .as_ref()
-            .ok()
-            .and_then(|h| h.api_root_url_from_link_tag.clone());
-        let api_link_header_result = self
-            .find_api_root_url(attempt_site_url, api_root_url_from_link_tag)
-            .await;
-        let discovery_result = self
-            .inner_attempt_api_discovery(api_link_header_result.clone())
-            .await;
-        let is_wordpress_site = self
-            .attempt_is_wordpress_site(attempt_site_url, api_link_header_result, parse_html_result)
-            .await;
-        AutoDiscoveryAttemptResult {
-            attempt_type: attempt.attempt_type,
-            attempt_site_url: attempt.attempt_site_url,
-            api_discovery_result: discovery_result,
-            is_wordpress_site,
+        let parsed_site_url: Arc<ParsedUrl> = match ParsedUrl::parse(&attempt.attempt_site_url) {
+            Ok(u) => u,
+            Err(e) => {
+                return AutoDiscoveryAttemptResult::from_parse_site_url_error(attempt, e);
+            }
+        }
+        .into();
+
+        match self.find_api_root_url(Arc::clone(&parsed_site_url)).await {
+            Ok(api_root_url) => AutoDiscoveryAttemptResult {
+                attempt_type: attempt.attempt_type,
+                attempt_site_url: attempt.attempt_site_url,
+                api_discovery_result: self
+                    .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url)
+                    .await
+                    .map_err(|fetch_and_parse_api_root_failure| {
+                        AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
+                            parsed_site_url,
+                            api_root_url.0,
+                            fetch_and_parse_api_root_failure,
+                        )
+                    }),
+            },
+            Err(find_api_root_failure) => {
+                let root_wp_json_url: Arc<ParsedUrl> =
+                    match Self::root_wp_json_url((*parsed_site_url).clone()) {
+                        Some(u) => u,
+                        None => {
+                            return AutoDiscoveryAttemptResult {
+                                attempt_type: attempt.attempt_type,
+                                attempt_site_url: attempt.attempt_site_url,
+                                api_discovery_result: Err(
+                                    AutoDiscoveryAttemptFailure::from_find_api_root_failure(
+                                        parsed_site_url,
+                                        find_api_root_failure,
+                                    ),
+                                ),
+                            };
+                        }
+                    }
+                    .into();
+
+                // If we can't find the api root, we try using the root `/wp-json` as a last resort
+                match self
+                    .fetch_and_parse_api_root(
+                        Arc::clone(&parsed_site_url),
+                        &ApiRootUrl(Arc::clone(&root_wp_json_url)),
+                    )
+                    .await
+                {
+                    Ok(api_discovery_success) => AutoDiscoveryAttemptResult {
+                        attempt_type: attempt.attempt_type,
+                        attempt_site_url: attempt.attempt_site_url,
+                        api_discovery_result: Ok(api_discovery_success),
+                    },
+                    Err(fetch_and_parse_api_root_failure) => match fetch_and_parse_api_root_failure
+                    {
+                        FetchAndParseApiRootFailure::FetchApiRoot { .. }
+                        | FetchAndParseApiRootFailure::ParseApiRoot { .. } => {
+                            // If we fail to fetch or parse root `/wp-json`, we return the original
+                            // find API root url failure
+                            AutoDiscoveryAttemptResult {
+                                attempt_type: attempt.attempt_type,
+                                attempt_site_url: attempt.attempt_site_url,
+                                api_discovery_result: Err(
+                                    AutoDiscoveryAttemptFailure::from_find_api_root_failure(
+                                        parsed_site_url,
+                                        find_api_root_failure,
+                                    ),
+                                ),
+                            }
+                        }
+                        _ => {
+                            // If we successfully fetch the root `/wp-json`, but had another
+                            // failure afterwards, we return that failure, because the API
+                            // discovery has progressed further than the original find API root url
+                            // failure
+                            let err = Err(
+                                AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
+                                    parsed_site_url,
+                                    root_wp_json_url,
+                                    fetch_and_parse_api_root_failure,
+                                ),
+                            );
+                            AutoDiscoveryAttemptResult {
+                                attempt_type: attempt.attempt_type,
+                                attempt_site_url: attempt.attempt_site_url,
+                                api_discovery_result: err,
+                            }
+                        }
+                    },
+                }
+            }
         }
     }
 
-    async fn inner_attempt_api_discovery(
+    async fn fetch_and_parse_api_root(
         &self,
-        api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
-    ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
-        let api_root_url_success = api_link_header_result?;
-        let fetch_api_details_response = match self
-            .fetch_wp_api_details(&api_root_url_success.api_root_url)
-            .await
-        {
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: &ApiRootUrl,
+    ) -> Result<AutoDiscoveryAttemptSuccess, FetchAndParseApiRootFailure> {
+        let fetch_api_details_response = match self.fetch_api_root(api_root_url).await {
             Ok(r) => r,
-            Err(error) => {
-                return Err(AutoDiscoveryAttemptFailure::FetchApiDetails {
-                    parsed_site_url: api_root_url_success.parsed_site_url,
-                    api_root_url: api_root_url_success.api_root_url,
-                    error,
-                })
-            }
+            Err(error) => return Err(FetchAndParseApiRootFailure::FetchApiRoot { error }),
         };
-        let api_details: WpApiDetails =
-            match serde_json::from_slice::<WpApiDetails>(&fetch_api_details_response.body) {
-                Ok(api_details) => api_details,
-                Err(error) => {
-                    return Err(AutoDiscoveryAttemptFailure::ParseApiDetails {
-                        parsed_site_url: api_root_url_success.parsed_site_url,
-                        api_root_url: api_root_url_success.api_root_url,
-                        parsing_error_message: error.to_string(),
-                    })
-                }
-            };
+        let api_details = Self::parse_api_root(&fetch_api_details_response)?;
 
         if !api_details.has_application_passwords_authentication_url() {
             let reason = if api_details.has_application_password_blocking_plugin() {
@@ -146,202 +205,155 @@ impl WpLoginClient {
             };
 
             Err(
-                AutoDiscoveryAttemptFailure::ApplicationPasswordsNotSupported {
-                    parsed_site_url: api_root_url_success.parsed_site_url,
-                    api_root_url: api_root_url_success.api_root_url,
-                    api_details,
+                FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
+                    api_details: api_details.into(),
                     reason,
                 },
             )
         } else {
             Ok(AutoDiscoveryAttemptSuccess {
-                parsed_site_url: api_root_url_success.parsed_site_url,
-                api_root_url: api_root_url_success.api_root_url,
+                parsed_site_url,
+                api_root_url: Arc::clone(&api_root_url.0),
                 api_details,
             })
         }
     }
 
-    async fn attempt_is_wordpress_site(
-        &self,
-        attempt_site_url: &str,
-        api_link_header_result: Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure>,
-        parse_html_result: Result<IsWordPressSiteParseHtmlResult, ParseHtmlFailure>,
-    ) -> IsWordPressSiteAttemptResult {
-        let fetch_wp_json_result = self.fetch_wp_json(attempt_site_url).await;
-        IsWordPressSiteAttemptResult {
-            api_link_header_result,
-            fetch_wp_json_result,
-            parse_html_result,
-        }
-    }
-
     async fn find_api_root_url(
         &self,
-        attempt_site_url: &str,
-        api_root_url_from_link_tag: Option<ParsedUrl>,
-    ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
-        let parsed_site_url = ParsedUrl::parse(attempt_site_url)
-            .map_err(|error| FindApiRootLinkHeaderFailure::ParseSiteUrl { error })?;
-        if let Some(api_root_url) = api_root_url_from_link_tag {
-            Ok(FindApiRootLinkHeaderSuccess {
-                parsed_site_url,
-                api_root_url,
-            })
+        parsed_site_url: Arc<ParsedUrl>,
+    ) -> Result<ApiRootUrl, FindApiRootFailure> {
+        let response = self
+            .fetch_homepage(Arc::clone(&parsed_site_url))
+            .await
+            .map_err(|error| FindApiRootFailure::FetchHomepage { error })?;
+        // First check if we can find and parse the api root from the link header
+        if let Some(api_root_url) = self.parse_response_link_header_to_find_api_root(&response) {
+            return Ok(ApiRootUrl(api_root_url.into()));
+        }
+        // If we can't find the api root in the link header, we parse the HTML page to look for it
+        // in the link tags
+        let parse_html_result = ParseHomepageResult::parse_response(&response.body_as_string());
+        if let Some(api_root_url) = parse_html_result.api_root_url_from_link_tag {
+            return Ok(ApiRootUrl(api_root_url));
+        }
+
+        if parse_html_result.does_look_like_a_wp_site() {
+            Err(FindApiRootFailure::RestApiDisabled)
         } else {
-            self.fetch_and_parse_api_root_url_header(parsed_site_url)
-                .await
+            Err(FindApiRootFailure::ProbablyNotAWordPressSite)
         }
     }
 
-    async fn fetch_and_parse_api_root_url_header(
+    fn parse_response_link_header_to_find_api_root(
         &self,
-        parsed_site_url: ParsedUrl,
-    ) -> Result<FindApiRootLinkHeaderSuccess, FindApiRootLinkHeaderFailure> {
-        let fetch_api_root_url_response = match self.fetch_api_root_url(&parsed_site_url).await {
-            Ok(r) => r,
-            Err(error) => {
-                return Err(FindApiRootLinkHeaderFailure::FetchApiRootUrl {
-                    parsed_site_url,
-                    error,
-                })
-            }
-        };
-        let api_root_url = match self.parse_api_root_response(fetch_api_root_url_response) {
-            Ok(api_root_url) => api_root_url,
-            Err(error) => {
-                return Err(FindApiRootLinkHeaderFailure::ParseApiRootUrl {
-                    parsed_site_url,
-                    error,
-                })
-            }
-        };
-        Ok(FindApiRootLinkHeaderSuccess {
-            parsed_site_url,
-            api_root_url,
-        })
-    }
-
-    fn parse_api_root_response(
-        &self,
-        response: WpNetworkResponse,
-    ) -> Result<ParsedUrl, ParseApiRootUrlError> {
-        match response
+        response: &WpNetworkResponse,
+    ) -> Option<ParsedUrl> {
+        response
             .get_link_header(API_ROOT_LINK_HEADER)
             .into_iter()
             .nth(0)
-        {
-            Some(url) => Ok(ParsedUrl::new(url)),
-            None => Err(ParseApiRootUrlError::ApiRootLinkHeaderNotFound {
-                header_map: response.header_map,
-                status_code: response.status_code,
-            }),
-        }
+            .map(ParsedUrl::new)
     }
 
-    // Fetches the site's homepage with a HEAD request, then extracts the Link header pointing
-    // to the WP.org API root
-    async fn fetch_api_root_url(
+    async fn fetch_api_root(
         &self,
-        parsed_site_url: &ParsedUrl,
+        api_root_url: &ApiRootUrl,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        let api_root_request = WpNetworkRequest {
-            uuid: Uuid::new_v4().into(),
-            retry_count: 0,
-            method: RequestMethod::HEAD,
-            url: WpEndpointUrl(parsed_site_url.url()),
-            header_map: WpNetworkHeaderMap::default().into(),
-            body: None,
-        };
-        self.request_executor.execute(api_root_request.into()).await
-    }
-
-    async fn fetch_wp_api_details(
-        &self,
-        api_root_url: &ParsedUrl,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(api_root_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
-                }
-                .into(),
-            )
-            .await
-    }
-
-    async fn fetch_wp_json(
-        &self,
-        attempt_site_url: &str,
-    ) -> Result<FetchWpJsonSuccess, FetchWpJsonFailure> {
-        let wp_json_url = {
-            let mut wp_json_url = ParsedUrl::parse(attempt_site_url)
-                .map_err(|error| FetchWpJsonFailure::ParseSiteUrl { error })?;
-            wp_json_url
-                .inner
-                .path_segments_mut()
-                .map_err(|_| FetchWpJsonFailure::ParseSiteUrl {
-                    error: ParseUrlError::RelativeUrlWithCannotBeABaseBase,
-                })?
-                .push("wp-json");
-            wp_json_url
-        };
-        let fetch_wp_json_response = match self
-            .request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(wp_json_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
-                }
-                .into(),
-            )
-            .await
-        {
-            Ok(r) => r,
-            Err(error) => {
-                return Err(FetchWpJsonFailure::FetchWpJson { wp_json_url, error });
+        self.perform(
+            WpNetworkRequest {
+                uuid: Uuid::new_v4().into(),
+                retry_count: 0,
+                method: RequestMethod::GET,
+                url: WpEndpointUrl(api_root_url.0.url()),
+                header_map: WpNetworkHeaderMap::default().into(),
+                body: None,
             }
-        };
+            .into(),
+        )
+        .await
+    }
 
-        let root_wp_json = match serde_json::from_slice::<RootWpJson>(&fetch_wp_json_response.body)
-        {
-            Ok(r) => r,
-            Err(_) => return Err(FetchWpJsonFailure::ParseWpJson { wp_json_url }),
-        };
-        Ok(FetchWpJsonSuccess {
-            wp_json_url,
-            root_wp_json,
+    fn root_wp_json_url(parsed_site_url: ParsedUrl) -> Option<ParsedUrl> {
+        let mut root_wp_json_url = parsed_site_url.inner;
+        root_wp_json_url
+            .path_segments_mut()
+            .ok()?
+            .extend(WP_JSON_PATH_SEGMENTS);
+        Some(root_wp_json_url.into())
+    }
+
+    async fn fetch_homepage(
+        &self,
+        parsed_site_url: Arc<ParsedUrl>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.perform(
+            WpNetworkRequest {
+                uuid: Uuid::new_v4().into(),
+                retry_count: 0,
+                method: RequestMethod::GET,
+                url: WpEndpointUrl(parsed_site_url.url()),
+                header_map: WpNetworkHeaderMap::default().into(),
+                body: None,
+            }
+            .into(),
+        )
+        .await
+    }
+
+    fn parse_api_root(
+        fetch_api_details_response: &WpNetworkResponse,
+    ) -> Result<WpApiDetails, FetchAndParseApiRootFailure> {
+        WpApiDetails::try_from(fetch_api_details_response.body.as_slice()).map_err(|error| {
+            if let Some(wp_error) = WpError::try_parse(&fetch_api_details_response.body) {
+                FetchAndParseApiRootFailure::WpError {
+                    error_code: wp_error.code,
+                    error_message: wp_error.message,
+                    status_code: fetch_api_details_response.status_code,
+                }
+            } else {
+                FetchAndParseApiRootFailure::ParseApiRoot {
+                    parsing_error_message: error.to_string(),
+                }
+            }
         })
     }
+}
 
-    async fn fetch_site(
-        &self,
-        attempt_site_url: &str,
-    ) -> Result<WpNetworkResponse, ParseHtmlFailure> {
-        let site_url = ParsedUrl::parse(attempt_site_url)
-            .map_err(|error| ParseHtmlFailure::ParseSiteUrl { error })?;
-        self.request_executor
-            .execute(
-                WpNetworkRequest {
-                    uuid: Uuid::new_v4().into(),
-                    retry_count: 0,
-                    method: RequestMethod::GET,
-                    url: WpEndpointUrl(site_url.url()),
-                    header_map: WpNetworkHeaderMap::default().into(),
-                    body: None,
-                }
-                .into(),
-            )
-            .await
-            .map_err(|error| ParseHtmlFailure::FetchSite { error })
+impl PerformsRequests for WpLoginClient {
+    fn get_middleware_pipeline(&self) -> Arc<WpApiMiddlewarePipeline> {
+        self.middleware_pipeline.clone()
+    }
+
+    fn get_request_executor(&self) -> Arc<dyn RequestExecutor> {
+        self.request_executor.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{WpErrorCode, unit_test_common::wp_network_response_from_json};
+
+    #[test]
+    fn test_parse_api_details_wp_error_rest_forbidden() {
+        let json = r#"{
+          "code": "rest_forbidden",
+          "message": "REST API access is restricted."
+        }"#;
+        let response = wp_network_response_from_json(json, 403);
+        let result = WpLoginClient::parse_api_root(&response);
+        assert!(
+            matches!(
+                result,
+                Err(FetchAndParseApiRootFailure::WpError {
+                    error_code: WpErrorCode::Forbidden,
+                    status_code: 403,
+                    ..
+                })
+            ),
+            "{:#?}",
+            result
+        );
     }
 }

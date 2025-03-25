@@ -16,13 +16,19 @@ public final class WordPressLoginClient {
     private let requestExecutor: SafeRequestExecutor
     private let client: UniffiWpLoginClient
 
-    public convenience init(urlSession: URLSession) {
+    public convenience init(
+        urlSession: URLSession,
+        middleware: WpApiMiddlewarePipeline = .default
+    ) {
         self.init(requestExecutor: WpRequestExecutor(urlSession: urlSession))
     }
 
-    init(requestExecutor: SafeRequestExecutor) {
+    init(
+        requestExecutor: SafeRequestExecutor,
+        middleware: WpApiMiddlewarePipeline = .default
+    ) {
         self.requestExecutor = requestExecutor
-        self.client = UniffiWpLoginClient(requestExecutor: requestExecutor)
+        self.client = UniffiWpLoginClient(requestExecutor: requestExecutor, middlewarePipeline: middleware)
     }
 
     public func login(
@@ -48,7 +54,6 @@ public final class WordPressLoginClient {
     public func loginURL(forSite proposedSiteUrl: String) async throws -> ParsedUrl {
 
 //        do {
-            let client = UniffiWpLoginClient(requestExecutor: self.requestExecutor)
             let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
             guard let apiDetails = discoveryResult.successfulAttempt?.apiDetails() else {

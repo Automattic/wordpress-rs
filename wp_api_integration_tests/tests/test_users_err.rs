@@ -1,14 +1,14 @@
 use serial_test::parallel;
 use wp_api::{
+    WpErrorCode,
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
         WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
     },
-    WpErrorCode,
 };
 use wp_api_integration_tests::{
-    api_client, api_client_as_subscriber, api_client_as_unauthenticated, AssertWpError,
-    FIRST_USER_ID, SECOND_USER_EMAIL, SECOND_USER_ID, SECOND_USER_SLUG,
+    AssertWpError, FIRST_USER_ID, SECOND_USER_EMAIL, SECOND_USER_ID, SECOND_USER_SLUG, api_client,
+    api_client_as_subscriber, api_client_as_unauthenticated,
 };
 
 #[tokio::test]
@@ -150,7 +150,7 @@ async fn list_users_has_published_posts_err_invalid_param() {
         .users()
         .list_with_edit_context(&UserListParams {
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec![
-                "foo".to_string()
+                "foo".to_string(),
             ])),
             ..Default::default()
         })

@@ -1,8 +1,11 @@
 use rstest::rstest;
 use serial_test::parallel;
 use std::sync::Arc;
-use wp_api::login::login_client::WpLoginClient;
-use wp_api_integration_tests::AsyncWpNetworking;
+use wp_api::{
+    login::login_client::WpLoginClient,
+    middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
+    reqwest_request_executor::ReqwestRequestExecutor,
+};
 
 const LOCALHOST_AUTH_URL: &str = "http://localhost/wp-admin/authorize-application.php";
 const AUTOMATTIC_WIDGETS_AUTH_URL: &str =
@@ -13,9 +16,6 @@ const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 
 #[rstest]
 #[case("http://localhost", LOCALHOST_AUTH_URL)]
-#[case("http://localhost/wp-admin", LOCALHOST_AUTH_URL)]
-#[case("http://localhost/wp-admin.php", LOCALHOST_AUTH_URL)]
-#[case("http://localhost/wp-admin/", LOCALHOST_AUTH_URL)]
 #[case("http://localhost/wp-json", LOCALHOST_AUTH_URL)]
 #[case(
     "https://automatticwidgets.wpcomstaging.com/",
@@ -61,7 +61,42 @@ const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
 #[tokio::test]
 #[parallel]
 async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str) {
-    let client = WpLoginClient::new(Arc::new(AsyncWpNetworking::default()));
+    login_flow_helper(site_url, expected_auth_url, vec![]).await;
+}
+
+#[rstest]
+#[case(
+    "https://basic-auth.wpmt.co",
+    "https://basic-auth.wpmt.co/wp-admin/authorize-application.php"
+)]
+#[tokio::test]
+#[parallel]
+async fn test_login_flow_with_authentication_middleware(
+    #[case] site_url: &str,
+    #[case] expected_auth_url: &str,
+) {
+    login_flow_helper(
+        site_url,
+        expected_auth_url,
+        vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
+            // These credentials are safe to check into the repo
+            "test@example.com".to_string(),
+            "str0ngp4ssw0rd!".to_string(),
+        ))],
+    )
+    .await;
+}
+
+async fn login_flow_helper(
+    site_url: &str,
+    expected_auth_url: &str,
+    middlewares: Vec<Arc<dyn WpApiMiddleware>>,
+) {
+    let client = WpLoginClient::new(
+        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(WpApiMiddlewarePipeline { middlewares }),
+    );
+
     let result = client.api_discovery(site_url.to_string()).await;
     assert!(
         result.is_successful(),
@@ -81,32 +116,4 @@ async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str
             .find_application_passwords_authentication_url(),
         Some(expected_auth_url.to_string())
     );
-
-    let is_wordpress_site = &successful_attempt.is_wordpress_site;
-    assert!(
-        is_wordpress_site.is_successful(),
-        "'{site_url}' is incorrectly marked as non-WordPress site: {:#?}",
-        result
-    );
-    assert!(is_wordpress_site.api_link_header_result.is_ok());
-
-    // We can't do a reasonable assertion of `is_wordpress_site.fetch_wp_json_result` because not
-    // all of the test cases will return a parseable JSON from `/wp-json`.
-    //
-    // assert!(is_wordpress_site.fetch_wp_json_result.is_ok());
-    //
-    // ---
-    //
-    // We can't do a reasonable assertion of `is_wordpress_site.parse_html_result` because each
-    // test site has a different configuration, so we have a mixed results of
-    // `has_wordpress_generator_meta_tag`, `mentions_wp_content` & `mentions_wp_includes` fields.
-    //
-    // assert_eq!(
-    //     is_wordpress_site.parse_html_result,
-    //     Ok(IsWordPressSiteParseHtmlResult {
-    //         has_wordpress_generator_meta_tag: true,
-    //         mentions_wp_content: true,
-    //         mentions_wp_includes: true
-    //     })
-    // );
 }

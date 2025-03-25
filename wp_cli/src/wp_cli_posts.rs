@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use wp_serde_helper::deserialize_i64_or_string;
 
-use crate::{run_wp_cli_command, AsWpCliArguments};
+use crate::{AsWpCliArguments, run_wp_cli_command};
 
 const POST_FIELDS_ARG: &str = "--fields=ID,post_name,post_title,post_date,post_status,post_author,post_date_gmt,post_content,post_excerpt,comment_status,ping_status,post_password,post_modified,post_modified_gmt,guid,post_type";
 

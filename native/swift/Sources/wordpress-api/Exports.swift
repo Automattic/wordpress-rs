@@ -13,6 +13,10 @@ public typealias WpUuid = WordPressAPIInternal.WpUuid
 public typealias WpNetworkRequest = WordPressAPIInternal.WpNetworkRequest
 public typealias WpNetworkResponse = WordPressAPIInternal.WpNetworkResponse
 public typealias WpNetworkHeaderMap = WordPressAPIInternal.WpNetworkHeaderMap
+public typealias MiddlewarePipeline = WordPressAPIInternal.WpApiMiddlewarePipeline
+public typealias MiddlewarePipelineBuilder = WordPressAPIInternal.WpApiMiddlewarePipelineBuilder
+public typealias ApiDiscoveryAuthenticationMiddleware = WordPressAPIInternal.ApiDiscoveryAuthenticationMiddleware
+public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddleware
 
 // MARK: - Login
 

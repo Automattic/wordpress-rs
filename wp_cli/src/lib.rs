@@ -45,10 +45,6 @@ impl AsWpCliArguments for HashMap<&'static str, &String> {
         self.iter().for_each(|(k, v)| {
             s.push_str(format!("--{}={}", k, v).as_str());
         });
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
-        }
+        if s.is_empty() { None } else { Some(s) }
     }
 }

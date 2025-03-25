@@ -1,19 +1,25 @@
 use futures::{FutureExt, StreamExt};
 use std::{env, sync::Arc};
-use wp_api::wordpress_org::{
-    client::{
-        WordPressOrgApiClient, WordPressOrgApiClientError, WordPressOrgApiPluginDirectoryCategory,
+use wp_api::{
+    middleware::WpApiMiddlewarePipeline,
+    reqwest_request_executor::ReqwestRequestExecutor,
+    wordpress_org::{
+        client::{
+            WordPressOrgApiClient, WordPressOrgApiClientError,
+            WordPressOrgApiPluginDirectoryCategory,
+        },
+        plugin_directory::PluginInformation,
     },
-    plugin_directory::PluginInformation,
 };
-
-use wp_api_integration_tests::AsyncWpNetworking;
 
 const FETCH_PLUGIN_INFORMATION_RETRY_COUNT: usize = 5;
 const TOKIO_STREAM_SIZE: usize = 100;
 
 fn wordpress_org_api_client() -> WordPressOrgApiClient {
-    WordPressOrgApiClient::new(Arc::new(AsyncWpNetworking::default()))
+    WordPressOrgApiClient::new(
+        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(WpApiMiddlewarePipeline::default()),
+    )
 }
 
 #[tokio::test]

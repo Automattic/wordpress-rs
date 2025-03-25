@@ -36,8 +36,8 @@ impl DerivedRequest for WpSiteHealthTestsRequest {
 mod tests {
     use super::*;
     use crate::request::endpoint::{
-        tests::{fixture_api_base_url, validate_wp_site_health_endpoint},
         ApiBaseUrl,
+        tests::{fixture_api_base_url, validate_wp_site_health_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;

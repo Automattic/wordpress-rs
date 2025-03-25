@@ -3,9 +3,8 @@ use wp_api::site_settings::{
     SiteSettingsCommentStatus, SiteSettingsPingStatus, SiteSettingsUpdateParams,
 };
 use wp_api_integration_tests::{
-    api_client,
+    AssertResponse, api_client,
     backend::{Backend, RestoreServer},
-    AssertResponse,
 };
 
 macro_rules! generate_test {

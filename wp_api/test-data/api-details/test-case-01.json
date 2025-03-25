@@ -1,0 +1,15 @@
+﻿{
+  "name": "Site with BOM",
+  "description": "Site with BOM",
+  "url": "https://example.com",
+  "home": "https://example.com",
+  "gmt_offset": -3,
+  "timezone_string": "America/Sao_Paulo",
+  "namespaces": [
+    "oembed/1.0"
+  ],
+  "authentication": [],
+  "site_logo": 0,
+  "site_icon": 26343,
+  "site_icon_url": false
+}
