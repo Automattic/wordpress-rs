@@ -1,6 +1,6 @@
 import WordPressAPIInternal
 
-public class DebugMiddleware: WpApiMiddleware {
+public final class DebugMiddleware: WpApiMiddleware {
     public func process(
         requestExecutor: any WordPressAPIInternal.RequestExecutor,
         response: WordPressAPIInternal.WpNetworkResponse,
