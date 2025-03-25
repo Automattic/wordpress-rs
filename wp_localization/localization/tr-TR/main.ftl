@@ -26,9 +26,7 @@ misconfigured_http_authentication_error = Sunucu geçersiz HTTP kimlik doğrulam
 
 misconfigured_rate_limit_error = Sunucu istekleri asla başarılı olmayacak şekilde sınırlıyor. Lütfen sitenizin hız sınırı yapılandırmasını kontrol edin.
 
-oauth_response_url_error_missing_site_url = Verilen URL'de `site_url` sorgu parametresi eksik.
-oauth_response_url_error_missing_username = Verilen URL'de `username` sorgu parametresi eksik.
-oauth_response_url_error_missing_password = Verilen URL'de `password` sorgu parametresi eksik.
+oauth_response_url_error_url_invalid = Site geçersiz bir kimlik doğrulama yanıt URL'si gönderdi.
 oauth_response_url_error_unsuccessful_login = Başarısız giriş.
 
 boolean_true_is_returned_when_string_is_expected = Bu alan için `String` değeri beklenirken boolean `true` değeri alındı.

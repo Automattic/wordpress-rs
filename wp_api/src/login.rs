@@ -193,14 +193,10 @@ pub enum OAuthResponseUrlError {
 impl WpSupportsLocalization for OAuthResponseUrlError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
-            OAuthResponseUrlError::MissingSiteUrl => {
-                WpMessages::oauth_response_url_error_missing_site_url()
-            }
-            OAuthResponseUrlError::MissingUsername => {
-                WpMessages::oauth_response_url_error_missing_username()
-            }
-            OAuthResponseUrlError::MissingPassword => {
-                WpMessages::oauth_response_url_error_missing_password()
+            OAuthResponseUrlError::MissingSiteUrl
+            | OAuthResponseUrlError::MissingUsername
+            | OAuthResponseUrlError::MissingPassword => {
+                WpMessages::oauth_response_url_error_url_invalid()
             }
             OAuthResponseUrlError::UnsuccessfulLogin => {
                 WpMessages::oauth_response_url_error_unsuccessful_login()

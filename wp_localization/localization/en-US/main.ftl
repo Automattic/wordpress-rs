@@ -27,9 +27,7 @@ misconfigured_http_authentication_error = The server is sending invalid HTTP aut
 
 misconfigured_rate_limit_error = The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.
 
-oauth_response_url_error_missing_site_url = The given URL is missing the `site_url` query parameter.
-oauth_response_url_error_missing_username = The given URL is missing the `username` query parameter.
-oauth_response_url_error_missing_password = The given URL is missing the `password` query parameter.
+oauth_response_url_error_url_invalid = The site sent an invalid authentication response URL.
 oauth_response_url_error_unsuccessful_login = Unsuccessful Login.
 
 boolean_true_is_returned_when_string_is_expected = Expecting a `String` value for this field, but received the boolean `true` instead.
