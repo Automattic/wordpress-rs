@@ -444,7 +444,7 @@ pub struct ConfigStaticTypes {
 impl ConfigStaticTypes {
     fn new(crate_ident: &Ident) -> Self {
         Self {
-            api_base_url: quote! { std::sync::Arc<#crate_ident::parsed_url::ParsedUrl> },
+            api_base_url: quote! { std::sync::Arc<#crate_ident::ParsedUrl> },
             api_endpoint_url: quote! { #crate_ident::request::endpoint::ApiEndpointUrl },
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
             wp_authentication: quote! { #crate_ident::WpAuthentication },

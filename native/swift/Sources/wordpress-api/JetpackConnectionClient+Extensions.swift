@@ -6,9 +6,9 @@ import FoundationNetworking
 #endif
 
 extension JetpackConnectionClient {
-    public convenience init(siteUrl: ParsedUrl, urlSession: URLSession, authentication: WpAuthentication) {
+    public convenience init(apiRootUrl: ParsedUrl, urlSession: URLSession, authentication: WpAuthentication) {
         self.init(
-            siteUrl: siteUrl,
+            apiRootUrl: apiRootUrl,
             requestExecutor: WpRequestExecutor(urlSession: urlSession),
             siteAuthentication: authentication
         )
