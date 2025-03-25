@@ -395,7 +395,7 @@ impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Error)]
+#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
 pub enum FindApiRootFailure {
     FetchHomepage { error: RequestExecutionError },
     // if no WP mentions
@@ -414,7 +414,7 @@ impl WpSupportsLocalization for FindApiRootFailure {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Error)]
+#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
 pub enum FetchAndParseApiRootFailure {
     FetchApiRoot {
         error: RequestExecutionError,
