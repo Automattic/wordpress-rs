@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_api::{
-    request::RequestExecutor, users::UserId, ParsedUrl, WpApiError, WpAuthentication, WpErrorCode,
+    ParsedUrl, WpApiError, WpAuthentication, WpErrorCode, request::RequestExecutor, users::UserId,
 };
 use wp_com::{
-    client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams, WpComSiteId,
+    WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,
 };
 
 use crate::client::JetpackApiClient;
@@ -249,8 +249,14 @@ mod test {
     use rstest::*;
 
     #[rstest]
-    #[case("https://jetpack.wordpress.com/jetpack.authorize/1/?response_type=code&client_id=1234567890&redirect_uri=uri", Some(WpComSiteId(1234567890)))]
-    #[case("https://jetpack.wordpress.com/jetpack.authorize/1/?response_type=code&client_id=abc&redirect_uri=uri", None)]
+    #[case(
+        "https://jetpack.wordpress.com/jetpack.authorize/1/?response_type=code&client_id=1234567890&redirect_uri=uri",
+        Some(WpComSiteId(1234567890))
+    )]
+    #[case(
+        "https://jetpack.wordpress.com/jetpack.authorize/1/?response_type=code&client_id=abc&redirect_uri=uri",
+        None
+    )]
     fn test_parsing_blog_id(#[case] url: &str, #[case] expected: Option<WpComSiteId>) {
         let result = JetpackConnectionRegisterResult {
             authorize_url: url.to_string(),

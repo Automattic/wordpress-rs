@@ -1496,7 +1496,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "thiserror 2.0.11",
+ "thiserror 2.0.12",
  "uniffi",
  "url",
  "wp_api",
