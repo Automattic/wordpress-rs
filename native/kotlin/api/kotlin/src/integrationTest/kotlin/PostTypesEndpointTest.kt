@@ -13,9 +13,8 @@ import kotlin.test.assertNull
 
 class PostTypesEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.parsedSiteUrl
     private val client = WpApiClient(
-        siteUrl, wpAuthenticationFromUsernameAndPassword(
+        testCredentials.apiRootUrl, wpAuthenticationFromUsernameAndPassword(
             username = testCredentials.adminUsername, password = testCredentials.adminPassword
         )
     )

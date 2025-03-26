@@ -16,14 +16,13 @@ import kotlin.test.assertNull
 
 class PluginsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.parsedSiteUrl
     private val client = WpApiClient(
-        siteUrl, wpAuthenticationFromUsernameAndPassword(
+        testCredentials.apiRootUrl, wpAuthenticationFromUsernameAndPassword(
             username = testCredentials.adminUsername, password = testCredentials.adminPassword
         )
     )
     private val clientAsSubscriber = WpApiClient(
-        siteUrl, wpAuthenticationFromUsernameAndPassword(
+        testCredentials.apiRootUrl, wpAuthenticationFromUsernameAndPassword(
             username = testCredentials.subscriberUsername,
             password = testCredentials.subscriberPassword
         )
