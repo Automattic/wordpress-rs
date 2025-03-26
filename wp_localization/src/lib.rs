@@ -222,8 +222,8 @@ mod localization_tests {
 
     #[test]
     fn test_example_localizable_error() {
-        let expected_en_message = "Your site sent an error message: \u{2068}foo\u{2069}";
-        let expected_tr_message = "Siteniz bir hata mesajı gönderdi: \u{2068}foo\u{2069}";
+        let expected_en_message = "Your site sent an error message: \u{2068}foo\u{2069}.";
+        let expected_tr_message = "Siteniz bir hata mesajı gönderdi: \u{2068}foo\u{2069}.";
         {
             let map = {
                 let mut map = HashMap::new();
