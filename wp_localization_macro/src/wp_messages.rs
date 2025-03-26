@@ -119,7 +119,7 @@ mod bindings {
             }
         });
         quote! {
-            impl #messages_ident {
+            impl #messages_ident<'_> {
                 #(#functions)*
             }
         }
@@ -131,7 +131,7 @@ mod bindings {
         let documentation = generate_documentation(entry);
         quote! {
             #documentation
-            pub fn #function_name() -> crate::MessageBundle {
+            pub fn #function_name<'a>() -> crate::MessageBundle<'a> {
                 crate::MessageBundle::new(#entry_key, None)
             }
         }
@@ -151,21 +151,21 @@ mod bindings {
         let args = entry.placeables.iter().map(|placeable| {
             let placeable_ident = format_ident!("{}", placeable.0);
             quote! {
-                #placeable_ident: impl Into<String>,
+                #placeable_ident: impl Into<fluent_bundle::FluentValue<'a>>,
             }
         });
         let map_inserts = entry.placeables.iter().map(|placeable| {
             let placeable_string = placeable.0;
             let placeable_ident = format_ident!("{}", placeable_string);
             quote! {
-                map.insert(#placeable_string, #placeable_ident.into());
+                map.insert(std::borrow::Cow::Borrowed(#placeable_string), #placeable_ident.into());
             }
         });
         quote! {
             #documentation
-            pub fn #function_name(#(#args)*) -> crate::MessageBundle {
+            pub fn #function_name<'a>(#(#args)*) -> crate::MessageBundle<'a> {
                 let map = {
-                    let mut map = std::collections::HashMap::<&'static str, String>::new();
+                    let mut map = std::collections::HashMap::new();
                     #(#map_inserts)*
                     map
                 };

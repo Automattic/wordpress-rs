@@ -464,8 +464,8 @@ impl ApplicationPasswordsNotSupportedReason {
             Self::ApplicationPasswordBlockedByPlugin { plugin } => {
                 WpMessages::application_password_blocked_by_plugin(
                     parsed_site_url.to_string(),
-                    plugin.name.clone(),
-                    plugin.support_url.clone(),
+                    &plugin.name,
+                    &plugin.support_url,
                 )
             }
             Self::ApplicationPasswordBlockedByMultiplePlugins => {
