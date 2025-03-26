@@ -407,7 +407,7 @@ impl From<HeaderMap> for WpNetworkHeaderMap {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpNetworkHeaderMapError {
     InvalidHeaderName { header_name: String },
     InvalidHeaderValue { header_value: String },
@@ -588,7 +588,7 @@ pub enum HttpAuthMethod {
     Other(String, HashMap<String, String>),
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
+#[derive(PartialEq, Eq, Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum HttpAuthMethodParsingError {
     MissingNonce,
     MissingQop,

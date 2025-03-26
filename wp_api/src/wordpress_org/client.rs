@@ -193,7 +193,7 @@ crate::uniffi_export_serialization!(
     WordPressOrgApiPluginDirectoryCategory
 );
 
-#[derive(Debug, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WordPressOrgApiClientError {
     RequestEncodingError {
         reason: String,

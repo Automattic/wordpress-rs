@@ -1,7 +1,7 @@
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
-#[derive(Debug, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub(crate) enum UniffiSerializationError {
     Serde { reason: String },
 }

@@ -47,7 +47,17 @@ impl ParsedUrl {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Error, WpDeriveLocalizable)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    thiserror::Error,
+    uniffi::Error,
+    WpDeriveLocalizable,
+)]
 pub enum ParseUrlError {
     Generic { reason: String },
     EmptyHost,

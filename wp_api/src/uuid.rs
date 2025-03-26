@@ -18,7 +18,9 @@ impl WpUuid {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, uniffi::Error, WpDeriveLocalizable)]
+#[derive(
+    Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error, WpDeriveLocalizable,
+)]
 pub enum WpUuidParseError {
     InvalidUuid,
     NotVersion4,

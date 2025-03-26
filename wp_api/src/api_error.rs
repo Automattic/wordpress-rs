@@ -13,7 +13,7 @@ where
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
-#[derive(Debug, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiError {
     InvalidHttpStatusCode {
         status_code: u16,
@@ -432,7 +432,7 @@ pub enum WpErrorCode {
     CustomError(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum RequestExecutionError {
     RequestExecutionFailed {
         status_code: Option<u16>,
@@ -574,7 +574,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum MediaUploadRequestExecutionError {
     RequestExecutionFailed {
         status_code: Option<u16>,

@@ -363,7 +363,7 @@ pub struct AutoDiscoveryAttemptSuccess {
     pub api_details: WpApiDetails,
 }
 
-#[derive(Debug, Clone, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum AutoDiscoveryAttemptFailure {
     ParseSiteUrl {
         error: ParseUrlError,
@@ -603,7 +603,7 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
     attempts
 }
 
-#[derive(Debug, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum FetchApiDetailsError {
     RequestExecutionFailed {
         status_code: Option<u16>,

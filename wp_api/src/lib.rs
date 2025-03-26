@@ -155,7 +155,7 @@ pub struct WpResponseString(pub Option<String>);
 // For example, when we are expecting a `String` field, if we get a `false` value, we can assume
 // that it's `null`, but there isn't a clear conversion for the `true` value, so we return an
 // error.
-#[derive(Debug, PartialEq, Eq, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiNewtypeParsingError {
     BooleanTrueIsReturnedWhenStringIsExpected,
 }
