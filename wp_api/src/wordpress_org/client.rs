@@ -11,6 +11,8 @@ use crate::{
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{result::Result, sync::Arc};
 use url::Url;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 use super::plugin_directory::{PluginInformation, QueryPluginResponse};
 use super::update_check::UpdateCheckResponse;
@@ -191,24 +193,43 @@ crate::uniffi_export_serialization!(
     WordPressOrgApiPluginDirectoryCategory
 );
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WordPressOrgApiClientError {
-    #[error("Failed to encode request. Reason: {}", reason)]
-    RequestEncodingError { reason: String },
-    #[error("{:#?}", reason)]
+    RequestEncodingError {
+        reason: String,
+    },
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
-    #[error("Error while parsing. \nReason: {}\nResponse: {}", reason, response)]
-    ResponseParsingError { reason: String, response: String },
-    #[error(
-        "Received a response with an unexpected status code. \nStatus code: {}\nResponse: {}",
-        status_code,
-        response
-    )]
-    UnexpectedStatusCodeError { status_code: u16, response: String },
+    ResponseParsingError {
+        reason: String,
+        response: String,
+    },
+    UnexpectedStatusCodeError {
+        status_code: u16,
+        response: String,
+    },
+}
+
+impl WpSupportsLocalization for WordPressOrgApiClientError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            WordPressOrgApiClientError::RequestEncodingError { reason } => {
+                WpMessages::wordpress_org_api_client_error_request_encoding(reason)
+            }
+            WordPressOrgApiClientError::RequestExecutionFailed { reason, .. } => {
+                reason.message_bundle()
+            }
+            WordPressOrgApiClientError::ResponseParsingError { reason, .. } => {
+                WpMessages::response_parsing_error(reason)
+            }
+            WordPressOrgApiClientError::UnexpectedStatusCodeError { status_code, .. } => {
+                WpMessages::invalid_http_status_code(status_code.to_string())
+            }
+        }
+    }
 }
 
 impl From<RequestExecutionError> for WordPressOrgApiClientError {

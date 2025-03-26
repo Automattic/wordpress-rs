@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
+use wp_localization::MessageBundle;
+use wp_localization::{WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 use wp_serde_helper::deserialize_false_or_string;
 use wp_serde_helper::deserialize_offset;
 
@@ -179,16 +182,29 @@ pub struct WpApiApplicationPasswordDetails {
     pub password: String,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error)]
+#[derive(
+    Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error, WpDeriveLocalizable,
+)]
 pub enum OAuthResponseUrlError {
-    #[error("The given URL is missing the `site_url` query parameter")]
     MissingSiteUrl,
-    #[error("The given URL is missing the `username` query parameter")]
     MissingUsername,
-    #[error("The given URL is missing the `password` query parameter")]
     MissingPassword,
-    #[error("Unsuccessful Login")]
     UnsuccessfulLogin,
+}
+
+impl WpSupportsLocalization for OAuthResponseUrlError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            OAuthResponseUrlError::MissingSiteUrl
+            | OAuthResponseUrlError::MissingUsername
+            | OAuthResponseUrlError::MissingPassword => {
+                WpMessages::oauth_response_url_error_url_invalid()
+            }
+            OAuthResponseUrlError::UnsuccessfulLogin => {
+                WpMessages::oauth_response_url_error_unsuccessful_login()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

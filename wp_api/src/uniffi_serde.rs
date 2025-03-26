@@ -1,7 +1,19 @@
-#[derive(Debug, uniffi::Error, thiserror::Error)]
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
+
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub(crate) enum UniffiSerializationError {
-    #[error("{reason:?}")]
     Serde { reason: String },
+}
+
+impl WpSupportsLocalization for UniffiSerializationError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            UniffiSerializationError::Serde { reason } => {
+                WpMessages::uniffi_serialization_error_serde(reason.clone())
+            }
+        }
+    }
 }
 
 impl From<serde_json::Error> for UniffiSerializationError {

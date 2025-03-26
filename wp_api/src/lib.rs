@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 mod api_client; // re-exported relevant types
 mod api_error; // re-exported relevant types
@@ -153,10 +155,19 @@ pub struct WpResponseString(pub Option<String>);
 // For example, when we are expecting a `String` field, if we get a `false` value, we can assume
 // that it's `null`, but there isn't a clear conversion for the `true` value, so we return an
 // error.
-#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiNewtypeParsingError {
-    #[error("Expecting a `String` value for this field, but received the boolean `true` instead")]
     BooleanTrueIsReturnedWhenStringIsExpected,
+}
+
+impl WpSupportsLocalization for WpApiNewtypeParsingError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            WpApiNewtypeParsingError::BooleanTrueIsReturnedWhenStringIsExpected => {
+                WpMessages::boolean_true_is_returned_when_string_is_expected()
+            }
+        }
+    }
 }
 
 impl TryFrom<BoolOrString> for WpResponseString {

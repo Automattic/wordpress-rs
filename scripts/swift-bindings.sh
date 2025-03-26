@@ -17,19 +17,22 @@ cargo run --release --quiet --bin wp_uniffi_bindgen generate \
     --out-dir "$output_dir" \
     --language swift
 
-# The search-and-replace below can be removed after updating to a uniffi-rs
-# version that includes this PR https://github.com/mozilla/uniffi-rs/pull/2456
-for swift_binding in "$output_dir"/*.swift; do
-    options=("-i")
-    if [[ $(uname) == "Darwin" ]]; then
-        options+=("")
-    fi
+function patch_wp_api {
+    error_types=$(grep -r "impl WpSupportsLocalization for" wp_api/src | grep -o "for [A-Za-z0-9]*" | cut -d' ' -f2)
 
-    sed "${options[@]}" 's/errorHandler: FfiConverterTypeWpApiError\.lift/errorHandler: FfiConverterTypeWpApiError_lift/' "$swift_binding"
+    for error_type in $error_types; do
+        cat <<EOF >> "$1"
 
-    if [[ $(basename "$swift_binding") == "wp_api.swift" ]]; then
-        # Create a multi-line string variable for Swift API documentation
-        cat <<'EOF' >> "$swift_binding"
+extension $error_type: LocalizedError {
+    public var errorDescription: String? {
+        let preferred = wpLocaleResolve(langIds: Locale.preferredLanguages)
+        return localize${error_type}(value: self, locale: preferred)
+    }
+}
+EOF
+    done
+
+    cat <<'EOF' >> "$swift_binding"
 
 // Some types in the bindings do not get `Hashable & Equatable` implemented
 // by the uniffi-rs codegen. We implement them manually here.
@@ -37,6 +40,17 @@ for swift_binding in "$output_dir"/*.swift; do
 extension WpApiError: Hashable, Equatable {}
 extension RequestExecutionErrorReason: Hashable, Equatable {}
 EOF
+}
+
+for swift_binding in "$output_dir"/*.swift; do
+    options=("-i")
+    if [[ $(uname) == "Darwin" ]]; then
+        options+=("")
+    fi
+
+    basename=$(basename "$swift_binding" .swift)
+    if [ "$(type -t "patch_$basename")" = "function" ]; then
+        "patch_$basename" "$swift_binding"
     fi
 done
 
