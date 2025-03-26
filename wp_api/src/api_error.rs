@@ -49,7 +49,7 @@ impl WpSupportsLocalization for WpApiError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
             WpApiError::InvalidHttpStatusCode { status_code } => {
-                WpMessages::invalid_http_status_code(status_code.to_string())
+                WpMessages::invalid_http_status_code(status_code)
             }
             WpApiError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
             WpApiError::MediaFileNotFound { file_path } => {

@@ -10,7 +10,7 @@ impl WpSupportsLocalization for UniffiSerializationError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
             UniffiSerializationError::Serde { reason } => {
-                WpMessages::uniffi_serialization_error_serde(reason.clone())
+                WpMessages::uniffi_serialization_error_serde(reason)
             }
         }
     }

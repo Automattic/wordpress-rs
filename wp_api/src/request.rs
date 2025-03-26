@@ -417,10 +417,10 @@ impl WpSupportsLocalization for WpNetworkHeaderMapError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
             WpNetworkHeaderMapError::InvalidHeaderName { header_name } => {
-                WpMessages::invalid_header_name_error(header_name.clone())
+                WpMessages::invalid_header_name_error(header_name)
             }
             WpNetworkHeaderMapError::InvalidHeaderValue { header_value } => {
-                WpMessages::invalid_header_value_error(header_value.clone())
+                WpMessages::invalid_header_value_error(header_value)
             }
         }
     }

@@ -226,7 +226,7 @@ impl WpSupportsLocalization for WordPressOrgApiClientError {
                 WpMessages::response_parsing_error(reason)
             }
             WordPressOrgApiClientError::UnexpectedStatusCodeError { status_code, .. } => {
-                WpMessages::invalid_http_status_code(status_code.to_string())
+                WpMessages::invalid_http_status_code(status_code)
             }
         }
     }

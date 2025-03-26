@@ -1,7 +1,12 @@
 use fluent_bundle::FluentValue;
 use fluent_langneg::{NegotiationStrategy, convert_vec_str_to_langids_lossy, negotiate_languages};
 use fluent_templates::Loader;
-use std::{collections::HashMap, fmt::Debug, fmt::Display};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    fmt::{Debug, Display},
+    marker::PhantomData,
+};
 use unic_langid::{LanguageIdentifier, langid};
 
 fluent_templates::static_loader! {
@@ -12,18 +17,20 @@ fluent_templates::static_loader! {
 }
 
 #[wp_localization_macro::wp_messages]
-pub struct WpMessages {}
-
-#[derive(Debug)]
-pub struct MessageBundle {
-    // Keep the fields private to avoid clients from looking up messages that do not exist.
-    key: &'static str,
-    args: Option<HashMap<&'static str, String>>,
+pub struct WpMessages<'a> {
+    _phantom: PhantomData<&'a ()>,
 }
 
-impl MessageBundle {
+#[derive(Debug)]
+pub struct MessageBundle<'a> {
+    // Keep the fields private to avoid clients from looking up messages that do not exist.
+    key: &'static str,
+    args: Option<HashMap<Cow<'static, str>, FluentValue<'a>>>,
+}
+
+impl<'a> MessageBundle<'a> {
     // Keep this private to avoid clients from looking up messages that do not exist.
-    fn new(key: &'static str, args: Option<HashMap<&'static str, String>>) -> Self {
+    fn new(key: &'static str, args: Option<HashMap<Cow<'static, str>, FluentValue<'a>>>) -> Self {
         Self { key, args }
     }
 
@@ -31,7 +38,7 @@ impl MessageBundle {
         self.key
     }
 
-    pub fn args(&self) -> Option<&HashMap<&'static str, String>> {
+    pub fn args(&self) -> Option<&HashMap<Cow<'static, str>, FluentValue<'a>>> {
         self.args.as_ref()
     }
 
@@ -39,19 +46,12 @@ impl MessageBundle {
         LOCALES.lookup_complete(
             locale.unwrap_or_default().as_language_id(),
             self.key,
-            self.args
-                .as_ref()
-                .map(|h| {
-                    h.iter()
-                        .map(|(k, v)| ((*k).into(), FluentValue::from(v)))
-                        .collect()
-                })
-                .as_ref(),
+            self.args(),
         )
     }
 }
 
-impl Display for MessageBundle {
+impl Display for MessageBundle<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.localize(None))
     }
@@ -128,7 +128,7 @@ fn wp_locale_resolve(lang_ids: Vec<String>) -> WpLocale {
 }
 
 pub trait WpSupportsLocalization: Send + Sync + Debug {
-    fn message_bundle(&self) -> MessageBundle;
+    fn message_bundle(&self) -> MessageBundle<'_>;
 }
 
 #[uniffi::export(with_foreign)]
@@ -213,7 +213,7 @@ mod localization_tests {
     }
 
     impl WpSupportsLocalization for ParseApiRootUrlError {
-        fn message_bundle(&self) -> crate::MessageBundle {
+        fn message_bundle(&self) -> crate::MessageBundle<'_> {
             match self {
                 ParseApiRootUrlError::Error { message } => WpMessages::site_error_message(message),
             }
@@ -254,7 +254,7 @@ mod localization_tests {
         let message_bundle = error.message_bundle();
         assert_eq!(message_bundle.key, "site_error_message");
         let message_args = message_bundle.args.unwrap();
-        assert_eq!(message_args["error_message"], "foo");
+        assert_eq!(message_args["error_message"], "foo".into());
         assert_eq!(error.to_string(), expected_en_message);
         assert_eq!(error.localize(Some("tr-TR".into())), expected_tr_message);
     }
