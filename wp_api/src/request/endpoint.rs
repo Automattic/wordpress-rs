@@ -121,7 +121,7 @@ mod tests {
     use std::sync::Arc;
 
     #[fixture]
-    pub fn fixture_api_base_url() -> Arc<ParsedUrl> {
+    pub fn fixture_api_root_url() -> Arc<ParsedUrl> {
         ParsedUrl::try_from("https://example.com/wp-json")
             .unwrap()
             .into()
@@ -140,7 +140,7 @@ mod tests {
             endpoint_url.as_str(),
             format!(
                 "{}{}{}",
-                fixture_api_base_url().as_str(),
+                fixture_api_root_url().as_str(),
                 namespace.as_str(),
                 path
             )

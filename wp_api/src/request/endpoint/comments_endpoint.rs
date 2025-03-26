@@ -74,7 +74,7 @@ mod tests {
         },
         generate,
         posts::PostId,
-        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
+        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
@@ -374,7 +374,7 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> CommentsRequestEndpoint {
-        CommentsRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> CommentsRequestEndpoint {
+        CommentsRequestEndpoint::new(fixture_api_root_url)
     }
 }

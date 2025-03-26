@@ -58,7 +58,7 @@ mod tests {
         generate,
         post_types::PostType,
         posts::PostId,
-        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
+        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
         templates::{TemplateArea, TemplateListParams},
     };
     use rstest::*;
@@ -194,7 +194,7 @@ mod tests {
         ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> TemplatesRequestEndpoint {
-        TemplatesRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> TemplatesRequestEndpoint {
+        TemplatesRequestEndpoint::new(fixture_api_root_url)
     }
 }

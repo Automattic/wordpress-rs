@@ -205,11 +205,11 @@ macro_rules! api_client_generate_endpoint_impl {
 
 #[macro_export]
 macro_rules! api_client_generate_request_builder {
-    ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $authentication:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestBuilder>]::new(
-                    $api_base_url.clone(),
+                    $api_root_url.clone(),
                     $authentication.clone(),
                 )
                 .into(),)*
@@ -220,11 +220,11 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
-                    $api_base_url.clone(),
+                    $api_root_url.clone(),
                     $authentication.clone(),
                     $request_executor.clone(),
                 )

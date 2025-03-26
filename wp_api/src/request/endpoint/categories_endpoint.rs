@@ -55,7 +55,7 @@ mod tests {
         categories::{CategoryId, WpApiParamCategoriesOrderBy},
         generate,
         posts::PostId,
-        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
+        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;
@@ -273,7 +273,7 @@ mod tests {
         ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> CategoriesRequestEndpoint {
-        CategoriesRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> CategoriesRequestEndpoint {
+        CategoriesRequestEndpoint::new(fixture_api_root_url)
     }
 }

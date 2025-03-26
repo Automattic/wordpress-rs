@@ -53,7 +53,7 @@ mod tests {
     use super::*;
     use crate::{
         ParsedUrl,
-        request::endpoint::tests::{fixture_api_base_url, validate_wp_v2_endpoint},
+        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> ApplicationPasswordsRequestEndpoint {
-        ApplicationPasswordsRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> ApplicationPasswordsRequestEndpoint {
+        ApplicationPasswordsRequestEndpoint::new(fixture_api_root_url)
     }
 }

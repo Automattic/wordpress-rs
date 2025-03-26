@@ -36,7 +36,7 @@ impl DerivedRequest for WpSiteHealthTestsRequest {
 mod tests {
     use super::*;
     use crate::ParsedUrl;
-    use crate::request::endpoint::tests::{fixture_api_base_url, validate_wp_site_health_endpoint};
+    use crate::request::endpoint::tests::{fixture_api_root_url, validate_wp_site_health_endpoint};
     use rstest::*;
     use std::sync::Arc;
 
@@ -168,7 +168,7 @@ mod tests {
     }
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ParsedUrl>) -> WpSiteHealthTestsRequestEndpoint {
-        WpSiteHealthTestsRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> WpSiteHealthTestsRequestEndpoint {
+        WpSiteHealthTestsRequestEndpoint::new(fixture_api_root_url)
     }
 }
