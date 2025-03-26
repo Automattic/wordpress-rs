@@ -14,23 +14,23 @@ public actor WordPressAPI {
     private let internalExecutor: SafeRequestExecutor
     package let requestBuilder: UniffiWpApiClient
 
-    public init(urlSession: URLSession, baseUrl: ParsedUrl, authenticationStategy: WpAuthentication) {
+    public init(urlSession: URLSession, apiRootUrl: ParsedUrl, authenticationStategy: WpAuthentication) {
         self.init(
-            baseUrl: baseUrl,
+            apiRootUrl: apiRootUrl,
             authenticationStategy: authenticationStategy,
             executor: WpRequestExecutor(urlSession: urlSession)
         )
     }
 
     init(
-        baseUrl: ParsedUrl,
+        apiRootUrl: ParsedUrl,
         authenticationStategy: WpAuthentication,
         executor: SafeRequestExecutor
     ) {
         self.internalExecutor = executor
 
         self.requestBuilder = UniffiWpApiClient(
-            siteUrl: baseUrl,
+            apiRootUrl: apiRootUrl,
             authentication: authenticationStategy,
             requestExecutor: executor
         )

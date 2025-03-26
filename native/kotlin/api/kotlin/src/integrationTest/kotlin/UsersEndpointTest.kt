@@ -12,11 +12,10 @@ import kotlin.test.assertNull
 
 class UsersEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.parsedSiteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val client = WpApiClient(siteUrl, authentication)
+    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
 
     @Test
     fun testUserListRequest() = runTest {

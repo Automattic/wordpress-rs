@@ -51,14 +51,11 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 mod tests {
     use super::*;
     use crate::{
-        WpApiParamOrder,
+        ParsedUrl, WpApiParamOrder,
         categories::{CategoryId, WpApiParamCategoriesOrderBy},
         generate,
         posts::PostId,
-        request::endpoint::{
-            ApiBaseUrl,
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-        },
+        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
     };
     use rstest::*;
     use std::sync::Arc;
@@ -276,7 +273,7 @@ mod tests {
         ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> CategoriesRequestEndpoint {
-        CategoriesRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> CategoriesRequestEndpoint {
+        CategoriesRequestEndpoint::new(fixture_api_root_url)
     }
 }

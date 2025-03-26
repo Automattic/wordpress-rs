@@ -94,13 +94,17 @@ pub struct JetpackConnectionClient {
 impl JetpackConnectionClient {
     #[uniffi::constructor]
     pub fn new(
-        site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         request_executor: Arc<dyn RequestExecutor>,
         site_authentication: WpAuthentication,
     ) -> Self {
         Self {
             request_executor: request_executor.clone(),
-            jetpack_client: JetpackApiClient::new(site_url, site_authentication, request_executor),
+            jetpack_client: JetpackApiClient::new(
+                api_root_url,
+                site_authentication,
+                request_executor,
+            ),
         }
     }
 

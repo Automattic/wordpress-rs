@@ -14,11 +14,10 @@ private const val THEME_TWENTY_TWENTY_FIVE: String = "twentytwentyfive"
 
 class ThemesEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.parsedSiteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val client = WpApiClient(siteUrl, authentication)
+    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
 
     @Test
     fun testThemeListRequest() = runTest {

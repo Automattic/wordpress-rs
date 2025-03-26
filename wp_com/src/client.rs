@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use wp_api::{
     ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    request::{RequestExecutor, endpoint::ApiBaseUrl},
+    request::RequestExecutor,
 };
 
 use super::endpoint::jetpack_connection_endpoint::{
@@ -16,9 +16,9 @@ struct UniffiWpComApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpComApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         Self {
-            inner: WpComApiRequestBuilder::new(site_url, authentication),
+            inner: WpComApiRequestBuilder::new(api_root_url, authentication),
         }
     }
 }
@@ -29,11 +29,10 @@ pub struct WpComApiRequestBuilder {
 }
 
 impl WpComApiRequestBuilder {
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
-        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
+    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         Self {
             jetpack_connection: JetpackConnectionRequestBuilder::new(
-                api_base_url.clone(),
+                api_root_url.clone(),
                 authentication.clone(),
             )
             .into(),
@@ -67,10 +66,10 @@ impl WpComApiClient {
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Self {
         let url = url::Url::parse("https://public-api.wordpress.com").expect("This is a valid URL");
-        let api_base_url: Arc<ApiBaseUrl> = Arc::new(ApiBaseUrl::with_api_url(url));
+        let api_root_url: Arc<ParsedUrl> = ParsedUrl::new(url).into();
 
         api_client_generate_api_client!(
-            api_base_url,
+            api_root_url,
             authentication,
             request_executor;
             jetpack_connection

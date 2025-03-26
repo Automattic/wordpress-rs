@@ -7,11 +7,10 @@ import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 
 class WpSiteHealthTestsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.parsedSiteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val client = WpApiClient(siteUrl, authentication)
+    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
 
     @Test
     fun testBackgroundUpdates() = runTest {

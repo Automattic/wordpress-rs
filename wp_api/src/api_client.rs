@@ -1,7 +1,6 @@
 use crate::request::{
     RequestExecutor,
     endpoint::{
-        ApiBaseUrl,
         application_passwords_endpoint::{
             ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
         },
@@ -37,9 +36,9 @@ struct UniffiWpApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         Self {
-            inner: WpApiRequestBuilder::new(site_url, authentication),
+            inner: WpApiRequestBuilder::new(api_root_url, authentication),
         }
     }
 }
@@ -64,10 +63,9 @@ pub struct WpApiRequestBuilder {
 }
 
 impl WpApiRequestBuilder {
-    pub fn new(site_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
-        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
+    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
         api_client_generate_request_builder!(
-            api_base_url,
+            api_root_url,
             authentication;
             application_passwords,
             categories,
@@ -97,12 +95,12 @@ struct UniffiWpApiClient {
 impl UniffiWpApiClient {
     #[uniffi::constructor]
     fn new(
-        site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Self {
         Self {
-            inner: WpApiClient::new(site_url, authentication, request_executor),
+            inner: WpApiClient::new(api_root_url, authentication, request_executor),
         }
     }
 }
@@ -128,14 +126,12 @@ pub struct WpApiClient {
 
 impl WpApiClient {
     pub fn new(
-        site_url: Arc<ParsedUrl>,
+        api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Self {
-        let api_base_url: Arc<ApiBaseUrl> = Arc::new(site_url.inner.clone().into());
-
         api_client_generate_api_client!(
-            api_base_url,
+            api_root_url,
             authentication,
             request_executor;
             application_passwords,
@@ -209,11 +205,11 @@ macro_rules! api_client_generate_endpoint_impl {
 
 #[macro_export]
 macro_rules! api_client_generate_request_builder {
-    ($api_base_url:ident, $authentication:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $authentication:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestBuilder>]::new(
-                    $api_base_url.clone(),
+                    $api_root_url.clone(),
                     $authentication.clone(),
                 )
                 .into(),)*
@@ -224,11 +220,11 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_base_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
-                    $api_base_url.clone(),
+                    $api_root_url.clone(),
                     $authentication.clone(),
                     $request_executor.clone(),
                 )

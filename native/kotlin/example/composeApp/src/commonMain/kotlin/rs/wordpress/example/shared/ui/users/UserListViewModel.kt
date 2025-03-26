@@ -14,7 +14,7 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
     fun setAuthenticatedSite(authenticatedSite: AuthenticatedSite) {
         apiClient = null
         authRepository.authenticationForSite(authenticatedSite)?.let {
-            apiClient = WpApiClient(siteUrl = authenticatedSite.url, authentication = it)
+            apiClient = WpApiClient(apiRootUrl = authenticatedSite.url, authentication = it)
         }
     }
 

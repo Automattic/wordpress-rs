@@ -33,12 +33,10 @@ super::macros::default_sparse_field_implementation_from_field_name!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ParsedUrl;
     use crate::{
         generate,
-        request::endpoint::{
-            ApiBaseUrl,
-            tests::{fixture_api_base_url, validate_wp_v2_endpoint},
-        },
+        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
         themes::{ThemeListParams, ThemeStatus},
     };
     use rstest::*;
@@ -255,7 +253,7 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_base_url: Arc<ApiBaseUrl>) -> ThemesRequestEndpoint {
-        ThemesRequestEndpoint::new(fixture_api_base_url)
+    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> ThemesRequestEndpoint {
+        ThemesRequestEndpoint::new(fixture_api_root_url)
     }
 }

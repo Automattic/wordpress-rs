@@ -10,7 +10,6 @@ import kotlin.test.assertEquals
 
 class ManualParserTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val siteUrl = testCredentials.parsedSiteUrl
     private val authentication = wpAuthenticationFromUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
@@ -18,7 +17,7 @@ class ManualParserTest {
 
     @Test
     fun testUserListManualRequestAndParsing() = runTest {
-        val requestBuilder = UniffiWpApiRequestBuilder(siteUrl, authentication)
+        val requestBuilder = UniffiWpApiRequestBuilder(testCredentials.apiRootUrl, authentication)
         val userListRequest = requestBuilder.users().listWithEditContext(UserListParams())
         val userListResponse = requestExecutor.execute(userListRequest)
         val userList = parseAsUsersRequestListWithEditContextResponse(userListResponse).data

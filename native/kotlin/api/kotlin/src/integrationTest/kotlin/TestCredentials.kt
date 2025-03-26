@@ -44,5 +44,5 @@ data class TestCredentials(
         }
     }
 
-    val parsedSiteUrl by lazy { ParsedUrl.parse(siteUrl) }
+    val apiRootUrl by lazy { ParsedUrl.parse("$siteUrl/wp-json") }
 }
