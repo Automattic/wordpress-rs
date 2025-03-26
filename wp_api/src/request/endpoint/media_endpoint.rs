@@ -74,7 +74,7 @@ impl SparseField for SparseMediaFieldWithViewContext {
 
 impl MediaRequestEndpoint {
     pub fn create(&self) -> crate::request::endpoint::ApiEndpointUrl {
-        self.api_base_url
+        self.api_root_url
             .by_extending_and_splitting_by_forward_slash([
                 MediaRequest::namespace().as_str(),
                 "media",
