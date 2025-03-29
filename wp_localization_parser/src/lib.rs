@@ -1,10 +1,16 @@
-use fluent_syntax::ast::{self, Entry, Expression, InlineExpression, PatternElement};
+use fluent_syntax::{
+    ast::{self, Entry, Expression, InlineExpression, PatternElement},
+    parser::Slice,
+};
 
-#[derive(Debug)]
-pub struct EntryPlaceable(pub &'static str);
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EntryPlaceable(pub String);
 
 impl EntryPlaceable {
-    pub fn placeable_from_expression(expression: &Expression<&'static str>) -> Option<Self> {
+    pub fn placeable_from_expression<'s, S>(expression: &Expression<S>) -> Option<Self>
+    where
+        S: Slice<'s>,
+    {
         match expression {
             ast::Expression::Select { .. } => {
                 // Select expressions are not supported yet
@@ -12,7 +18,7 @@ impl EntryPlaceable {
             }
             ast::Expression::Inline(inline) => {
                 if let InlineExpression::VariableReference { id } = inline {
-                    Some(Self(id.name))
+                    Some(Self(id.name.as_ref().to_string()))
                 } else {
                     // Only `fluent_syntax::ast::InlineExpression::VariableReference` supported
                     None
@@ -25,7 +31,7 @@ impl EntryPlaceable {
 #[derive(Debug)]
 pub struct TranslationEntry {
     pub documentation: String,
-    pub key: &'static str,
+    pub key: String,
     pub placeables: Vec<EntryPlaceable>,
 }
 
@@ -35,22 +41,24 @@ pub enum LocalizationFileContentsParsingError {
     Generic,
 }
 
-pub fn parse(
-    input: &'static str,
-) -> Result<impl Iterator<Item = TranslationEntry>, LocalizationFileContentsParsingError> {
+pub fn parse<'s, S>(
+    input: S,
+) -> Result<impl Iterator<Item = TranslationEntry>, LocalizationFileContentsParsingError>
+where
+    S: Slice<'s>,
+{
     let resource = fluent_syntax::parser::parse(input)
         .map_err(|_| LocalizationFileContentsParsingError::Generic)?;
     Ok(resource.body.into_iter().flat_map(|e| {
         if let Entry::Message(message) = e {
             let mut documentation = String::new();
-            let key = message.id.name;
             let placeables = if let Some(pattern) = message.value {
                 pattern
                     .elements
                     .into_iter()
                     .filter_map(|pattern_element| match pattern_element {
                         PatternElement::TextElement { value } => {
-                            documentation.push_str(value);
+                            documentation.push_str(value.as_ref());
                             None
                         }
                         PatternElement::Placeable { expression } => {
@@ -71,7 +79,7 @@ pub fn parse(
             };
             Some(TranslationEntry {
                 documentation,
-                key,
+                key: message.id.name.as_ref().to_string(),
                 placeables,
             })
         } else {

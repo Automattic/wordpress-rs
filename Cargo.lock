@@ -4153,6 +4153,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wp_localization_validation"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "fluent-syntax",
+ "thiserror 2.0.12",
+ "wp_localization_parser",
+]
+
+[[package]]
 name = "wp_serde_helper"
 version = "0.1.0"
 dependencies = [
