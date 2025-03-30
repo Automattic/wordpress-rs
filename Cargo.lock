@@ -4140,7 +4140,16 @@ dependencies = [
  "serde_json",
  "syn",
  "trybuild",
+ "wp_localization_parser",
  "wp_serde_helper",
+]
+
+[[package]]
+name = "wp_localization_parser"
+version = "0.1.0"
+dependencies = [
+ "fluent-syntax",
+ "thiserror 2.0.12",
 ]
 
 [[package]]

@@ -1,0 +1,8 @@
+[package]
+name = "wp_localization_parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fluent-syntax = { workspace = true }
+thiserror = { workspace = true }

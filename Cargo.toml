@@ -9,6 +9,7 @@ members = [
   "wp_derive_request_builder",
   "wp_localization",
   "wp_localization_macro",
+  "wp_localization_parser",
   "jetpack",
   "wp_com",
   "wp_serde_helper",
