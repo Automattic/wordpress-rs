@@ -278,11 +278,117 @@ impl Display for TranslationLanguage {
     }
 }
 
+impl From<&str> for TranslationLanguage {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TranslationKey(pub String);
 
 impl Display for TranslationKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for TranslationKey {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wp_localization_parser::EntryPlaceable;
+
+    use super::*;
+    use std::collections::{HashMap, HashSet};
+
+    #[test]
+    fn test_find_keys_not_in_default_language_issues() {
+        let mut translations = HashMap::new();
+        translations.insert("key".into(), mock_translation_entry());
+
+        let mut entries_by_language = HashMap::new();
+        entries_by_language.insert("tr-TR".into(), translations);
+
+        let issues: Vec<_> = ValidationError::find_keys_not_in_default_language_issues(
+            &HashSet::new(),
+            &entries_by_language,
+        )
+        .collect();
+
+        assert_eq!(issues.len(), 1);
+        assert!(matches!(issues[0], ValidationError::KeyNotInDefault { .. }));
+    }
+
+    #[test]
+    fn test_find_mismatched_placeables() {
+        let mut default_lang_translations = HashMap::new();
+        default_lang_translations.insert(
+            "key".into(),
+            TranslationEntry {
+                documentation: "".to_string(),
+                key: "foo".to_string(),
+                placeables: vec![EntryPlaceable("bar".to_string())],
+            },
+        );
+
+        let mut tr_translations = HashMap::new();
+        tr_translations.insert(
+            "key".into(),
+            TranslationEntry {
+                documentation: "".to_string(),
+                key: "foo".to_string(),
+                placeables: vec![EntryPlaceable("baz".to_string())],
+            },
+        );
+
+        let mut entries_by_language = HashMap::new();
+        entries_by_language.insert("tr-TR".into(), tr_translations);
+
+        let issues: Vec<_> = ValidationError::find_mismatched_placeables(
+            &default_lang_translations,
+            &entries_by_language,
+        )
+        .collect();
+
+        assert_eq!(issues.len(), 1);
+        assert!(matches!(
+            issues[0],
+            ValidationError::MismatchedPlaceables { .. }
+        ));
+    }
+
+    #[test]
+    fn test_find_missing_translation_issues() {
+        let mock_key = "key1".into();
+        let mut default_lang_keys = HashSet::new();
+        default_lang_keys.insert(&mock_key);
+
+        let mut entries_by_language = HashMap::new();
+        entries_by_language.insert("tr-TR".into(), HashMap::new());
+
+        let issues: Vec<_> = ValidationError::find_missing_translation_issues(
+            &default_lang_keys,
+            &entries_by_language,
+        )
+        .collect();
+
+        assert_eq!(issues.len(), 1);
+        assert!(matches!(
+            issues[0],
+            ValidationError::MissingTranslations { .. }
+        ));
+    }
+
+    fn mock_translation_entry() -> TranslationEntry {
+        TranslationEntry {
+            placeables: vec![],
+            documentation: "".to_string(),
+            key: "".to_string(),
+        }
     }
 }
