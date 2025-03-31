@@ -266,6 +266,8 @@ fn print_and_check_errors(errors: &[ValidationError], config: &Config) {
     }
     if has_critical_issues {
         panic!("Critical issues found");
+    } else {
+        println!("No critical issues found!")
     }
 }
 
