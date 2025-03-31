@@ -131,19 +131,23 @@ impl ValidationError {
         default_lang_keys: &HashSet<&TranslationKey>,
         map: &HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>,
     ) -> impl Iterator<Item = Self> {
-        map.iter().map(|(lang_id, translations)| {
+        map.iter().filter_map(|(lang_id, translations)| {
             let translation_keys: HashSet<_> = translations.keys().collect();
 
             // Find keys that exist in this language but not in the default language
-            let keys_not_in_default = translation_keys
+            let keys_not_in_default: Vec<TranslationKey> = translation_keys
                 .difference(default_lang_keys)
                 .cloned()
                 .cloned()
                 .collect();
 
-            ValidationError::KeyNotInDefault {
-                keys: keys_not_in_default,
-                lang_id: lang_id.clone(),
+            if keys_not_in_default.is_empty() {
+                None
+            } else {
+                Some(ValidationError::KeyNotInDefault {
+                    keys: keys_not_in_default,
+                    lang_id: lang_id.clone(),
+                })
             }
         })
     }
@@ -192,21 +196,27 @@ impl ValidationError {
             HashMap<TranslationKey, TranslationEntry>,
         >,
     ) -> impl Iterator<Item = Self> {
-        entries_by_languages.iter().map(|(lang_id, translations)| {
-            let translation_keys: HashSet<_> = translations.keys().collect();
+        entries_by_languages
+            .iter()
+            .filter_map(|(lang_id, translations)| {
+                let translation_keys: HashSet<_> = translations.keys().collect();
 
-            // Find keys that exist in the default language but are missing in this language
-            let missing_keys = default_lang_keys
-                .difference(&translation_keys)
-                .cloned()
-                .cloned()
-                .collect();
+                // Find keys that exist in the default language but are missing in this language
+                let missing_keys: Vec<TranslationKey> = default_lang_keys
+                    .difference(&translation_keys)
+                    .cloned()
+                    .cloned()
+                    .collect();
 
-            ValidationError::MissingTranslations {
-                keys: missing_keys,
-                lang_id: lang_id.clone(),
-            }
-        })
+                if missing_keys.is_empty() {
+                    None
+                } else {
+                    Some(ValidationError::MissingTranslations {
+                        keys: missing_keys,
+                        lang_id: lang_id.clone(),
+                    })
+                }
+            })
     }
 }
 
