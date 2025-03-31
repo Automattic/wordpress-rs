@@ -1,8 +1,5 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    fs,
-};
+use crate::TranslationLanguage;
+use std::{collections::HashMap, fmt::Debug, fs};
 use wp_localization_parser::TranslationEntry;
 
 /// The file extension for Fluent translation files.
@@ -25,8 +22,7 @@ const FTL_EXTENSION: &str = "ftl";
 /// A map of language codes to their translation entries.
 pub fn parse_localization_files(
     localization_dir: &str,
-) -> Result<HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>, FtlSetupError>
-{
+) -> Result<HashMap<TranslationLanguage, Vec<TranslationEntry>>, FtlSetupError> {
     let files = fs::read_dir(localization_dir)
         .map_err(FtlSetupError::FileReadError)?
         .filter_map(|entry| entry.ok())
@@ -46,22 +42,8 @@ pub fn parse_localization_files(
             match ftl_files.len() {
                 0 => Err(FtlSetupError::NoFtlFiles { lang_id }),
                 1 => {
-                    let mut entries = HashMap::new();
-                    let mut duplicate_keys = vec![];
-                    for entry in translation_entries(&ftl_files[0].path())? {
-                        let key = TranslationKey(entry.key.clone());
-                        if entries.insert(key.clone(), entry).is_some() {
-                            duplicate_keys.push(key);
-                        }
-                    }
-                    if !duplicate_keys.is_empty() {
-                        Err(FtlSetupError::DuplicateKeys {
-                            keys: duplicate_keys,
-                            lang_id,
-                        })
-                    } else {
-                        Ok((lang_id, entries))
-                    }
+                    let entries = translation_entries(&ftl_files[0].path())?;
+                    Ok((lang_id, entries))
                 }
                 _ => Err(FtlSetupError::MultipleFilesForLanguage { lang_id }),
             }
@@ -94,35 +76,11 @@ pub enum FtlSetupError {
 
     #[error("No FTL files found in language directory '{lang_id}'")]
     NoFtlFiles { lang_id: TranslationLanguage },
-
-    #[error("Duplicate keys found in language '{lang_id}': '{}'", keys.iter().map(|k| k.0.as_str()).collect::<Vec<&str>>().join(", "))]
-    DuplicateKeys {
-        keys: Vec<TranslationKey>,
-        lang_id: TranslationLanguage,
-    },
 }
 
 // Forward the `Display` trait implementation
 impl Debug for FtlSetupError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TranslationKey(pub String);
-
-impl Display for TranslationKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TranslationLanguage(pub String);
-
-impl Display for TranslationLanguage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }

@@ -1,10 +1,9 @@
 use clap::Parser;
-use ftl_file::TranslationKey;
-use ftl_file::TranslationLanguage;
-use std::collections::{HashMap, HashSet};
-use wp_localization_parser::TranslationEntry;
-
 use ftl_file::FtlSetupError;
+use itertools::Itertools;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
+use wp_localization_parser::TranslationEntry;
 
 mod ftl_file;
 
@@ -15,14 +14,16 @@ fn main() -> Result<(), FtlSetupError> {
         strict_mode: args.strict,
     };
 
-    let mut entries_by_language = ftl_file::parse_localization_files(&args.localization_folder)?;
+    let entries_by_language = ftl_file::parse_localization_files(&args.localization_folder)?;
+    let (mut entries_by_language, mut validation_errors) =
+        find_duplicates_and_convert_to_map(entries_by_language);
     let default_lang = entries_by_language
         .remove(&config.default_lang)
         .ok_or_else(|| FtlSetupError::DefaultLanguageNotFound(config.default_lang.clone()))?;
 
     // Handle validation errors
-    let errors = find_translation_issues(&default_lang, &entries_by_language);
-    print_and_check_errors(&errors, &config);
+    validation_errors.extend(find_translation_issues(&default_lang, &entries_by_language));
+    print_and_check_errors(&validation_errors, &config);
     Ok(())
 }
 
@@ -30,16 +31,16 @@ fn main() -> Result<(), FtlSetupError> {
 #[derive(Debug, PartialEq, thiserror::Error)]
 enum ValidationError {
     /// Found when a translation key exists in a non-default language but not in the default language.
-    #[error("Key '{key}' exists in language '{lang_id}' but not in the default language")]
+    #[error("Following keys exists in language '{lang_id}' but not in the default language: '{}'", keys.iter().join(", "))]
     KeyNotInDefault {
-        key: TranslationKey,
+        keys: Vec<TranslationKey>,
         lang_id: TranslationLanguage,
     },
 
-    /// Found when a translation key exists in the default language but is missing in another language.
-    #[error("Key '{key}' is missing in language '{lang_id}'")]
-    MissingTranslation {
-        key: TranslationKey,
+    // Found when a language has duplicate translation keys
+    #[error("Duplicate keys found in language '{lang_id}': '{}'", keys.iter().join(", "))]
+    DuplicateKeys {
+        keys: Vec<TranslationKey>,
         lang_id: TranslationLanguage,
     },
 
@@ -52,6 +53,13 @@ enum ValidationError {
         lang_id: TranslationLanguage,
         expected: String,
         found: String,
+    },
+
+    /// Found when a translation key exists in the default language but is missing in another language.
+    #[error("Key '{}' is missing in language '{lang_id}'", keys.iter().join(", "))]
+    MissingTranslations {
+        keys: Vec<TranslationKey>,
+        lang_id: TranslationLanguage,
     },
 }
 
@@ -91,8 +99,9 @@ impl ValidationError {
     fn is_critical(&self, config: &Config) -> bool {
         match self {
             ValidationError::KeyNotInDefault { .. }
+            | ValidationError::DuplicateKeys { .. }
             | ValidationError::MismatchedPlaceables { .. } => true,
-            ValidationError::MissingTranslation { .. } => config.strict_mode,
+            ValidationError::MissingTranslations { .. } => config.strict_mode,
         }
     }
 }
@@ -116,25 +125,30 @@ fn find_translation_issues(
     errors.extend(map.iter().flat_map(|(lang_id, translations)| {
         let translation_keys: HashSet<_> = translations.keys().collect();
 
+        // Find keys that exist in this language but not in the default language
+        let keys_not_in_default = translation_keys
+            .difference(&default_keys)
+            .cloned()
+            .cloned()
+            .collect();
+
         // Find keys that exist in the default language but are missing in this language
         let missing_keys = default_keys
             .difference(&translation_keys)
-            .map(|key| ValidationError::MissingTranslation {
-                key: (*key).clone(),
-                lang_id: lang_id.clone(),
-            })
-            .collect::<Vec<_>>();
+            .cloned()
+            .cloned()
+            .collect();
 
-        // Find keys that exist in this language but not in the default language
-        let extra_keys = translation_keys
-            .difference(&default_keys)
-            .map(|key| ValidationError::KeyNotInDefault {
-                key: (*key).clone(),
+        [
+            ValidationError::KeyNotInDefault {
+                keys: keys_not_in_default,
                 lang_id: lang_id.clone(),
-            })
-            .collect::<Vec<_>>();
-
-        missing_keys.into_iter().chain(extra_keys)
+            },
+            ValidationError::MissingTranslations {
+                keys: missing_keys,
+                lang_id: lang_id.clone(),
+            },
+        ]
     }));
 
     // Check for mismatched placeables
@@ -167,6 +181,38 @@ fn find_translation_issues(
     errors
 }
 
+#[must_use]
+fn find_duplicates_and_convert_to_map(
+    entries_by_language: HashMap<TranslationLanguage, Vec<TranslationEntry>>,
+) -> (
+    HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>,
+    Vec<ValidationError>,
+) {
+    let mut errors = Vec::new();
+    let map = {
+        let mut lang_entries = HashMap::new();
+        for (lang_id, ftl_entries) in entries_by_language {
+            let mut entries = HashMap::new();
+            let mut duplicate_keys = vec![];
+            for entry in ftl_entries {
+                let key = TranslationKey(entry.key.clone());
+                if entries.insert(key.clone(), entry).is_some() {
+                    duplicate_keys.push(key);
+                }
+            }
+            if !duplicate_keys.is_empty() {
+                errors.push(ValidationError::DuplicateKeys {
+                    keys: duplicate_keys,
+                    lang_id: lang_id.clone(),
+                });
+            }
+            lang_entries.insert(lang_id, entries);
+        }
+        lang_entries
+    };
+    (map, errors)
+}
+
 /// Prints validation errors and panics if critical issues were found.
 /// See [ValidationError::is_critical] for a list of what constitutes a critical issue.
 fn print_and_check_errors(errors: &[ValidationError], config: &Config) {
@@ -181,5 +227,23 @@ fn print_and_check_errors(errors: &[ValidationError], config: &Config) {
     }
     if has_critical_issues {
         panic!("Critical issues found");
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TranslationLanguage(pub String);
+
+impl Display for TranslationLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TranslationKey(pub String);
+
+impl Display for TranslationKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 fluent-syntax = { workspace = true }
+itertools = { workspace = true }
 thiserror = { workspace = true }
 wp_localization_parser = { path = "../wp_localization_parser" }
