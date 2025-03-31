@@ -309,7 +309,14 @@ mod tests {
     #[test]
     fn test_find_keys_not_in_default_language_issues() {
         let mut translations = HashMap::new();
-        translations.insert("key".into(), mock_translation_entry());
+        translations.insert(
+            "key".into(),
+            TranslationEntry {
+                placeables: vec![],
+                documentation: "".to_string(),
+                key: "".to_string(),
+            },
+        );
 
         let mut entries_by_language = HashMap::new();
         entries_by_language.insert("tr-TR".into(), translations);
@@ -384,11 +391,52 @@ mod tests {
         ));
     }
 
-    fn mock_translation_entry() -> TranslationEntry {
-        TranslationEntry {
-            placeables: vec![],
-            documentation: "".to_string(),
-            key: "".to_string(),
+    #[test]
+    fn test_find_duplicates_and_convert_to_map() {
+        let mut entries_by_language = HashMap::new();
+        let entries = vec![
+            TranslationEntry {
+                documentation: "First entry".to_string(),
+                key: "key1".to_string(),
+                placeables: vec![],
+            },
+            TranslationEntry {
+                documentation: "Duplicate entry".to_string(),
+                key: "key1".to_string(), // Duplicate key
+                placeables: vec![],
+            },
+            TranslationEntry {
+                documentation: "Unique entry".to_string(),
+                key: "key2".to_string(),
+                placeables: vec![],
+            },
+        ];
+        entries_by_language.insert("en-US".into(), entries);
+
+        let (result_map, errors) = find_duplicates_and_convert_to_map(entries_by_language);
+
+        // Check the result map
+        assert_eq!(result_map.len(), 1);
+        let map = result_map.get(&"en-US".into()).expect(
+            "'find_duplicates_and_convert_to_map' function didn't correctly convert to a map",
+        );
+        assert_eq!(
+            map.get(&"key1".into()).map(|t| t.key.as_str()),
+            Some("key1")
+        );
+        assert_eq!(
+            map.get(&"key2".into()).map(|t| t.key.as_str()),
+            Some("key2")
+        );
+
+        // Check that the errors contain the duplicate key
+        assert_eq!(errors.len(), 1);
+        if let ValidationError::DuplicateKeys { keys, lang_id } = &errors[0] {
+            assert_eq!(lang_id.0, "en-US");
+            assert_eq!(keys.len(), 1);
+            assert_eq!(keys[0].0, "key1"); // Check the duplicate key
+        } else {
+            panic!("Expected a DuplicateKeys error");
         }
     }
 }
