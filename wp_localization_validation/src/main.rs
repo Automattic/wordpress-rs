@@ -26,6 +26,9 @@ fn main() -> Result<(), FtlSetupError> {
         &entries_by_language,
     ));
     print_and_check_errors(&validation_errors, &config);
+    // We only print translation percentages if there are no critical errors since we rely on the
+    // number of entries to calculate the percentages
+    print_translation_percentages(default_lang.len(), &entries_by_language);
     Ok(())
 }
 
@@ -129,27 +132,32 @@ impl ValidationError {
 
     fn find_keys_not_in_default_language_issues(
         default_lang_keys: &HashSet<&TranslationKey>,
-        map: &HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>,
+        entries_by_language: &HashMap<
+            TranslationLanguage,
+            HashMap<TranslationKey, TranslationEntry>,
+        >,
     ) -> impl Iterator<Item = Self> {
-        map.iter().filter_map(|(lang_id, translations)| {
-            let translation_keys: HashSet<_> = translations.keys().collect();
+        entries_by_language
+            .iter()
+            .filter_map(|(lang_id, translations)| {
+                let translation_keys: HashSet<_> = translations.keys().collect();
 
-            // Find keys that exist in this language but not in the default language
-            let keys_not_in_default: Vec<TranslationKey> = translation_keys
-                .difference(default_lang_keys)
-                .cloned()
-                .cloned()
-                .collect();
+                // Find keys that exist in this language but not in the default language
+                let keys_not_in_default: Vec<TranslationKey> = translation_keys
+                    .difference(default_lang_keys)
+                    .cloned()
+                    .cloned()
+                    .collect();
 
-            if keys_not_in_default.is_empty() {
-                None
-            } else {
-                Some(ValidationError::KeyNotInDefault {
-                    keys: keys_not_in_default,
-                    lang_id: lang_id.clone(),
-                })
-            }
-        })
+                if keys_not_in_default.is_empty() {
+                    None
+                } else {
+                    Some(ValidationError::KeyNotInDefault {
+                        keys: keys_not_in_default,
+                        lang_id: lang_id.clone(),
+                    })
+                }
+            })
     }
 
     fn find_mismatched_placeables(
@@ -252,6 +260,23 @@ fn find_duplicates_and_convert_to_map(
     (map, errors)
 }
 
+fn print_translation_percentages(
+    number_of_entries_in_default_language: usize,
+    entries_by_language: &HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>,
+) {
+    entries_by_language
+        .iter()
+        .for_each(|(lang_id, translations)| {
+            let number_of_translation_entries = translations.len();
+            println!(
+                "Translation percentage for '{lang_id}' is %{:.2}",
+                (number_of_translation_entries as f64
+                    / number_of_entries_in_default_language as f64)
+                    * 100.
+            );
+        });
+}
+
 /// Prints validation errors and panics if critical issues were found.
 /// See [ValidationError::is_critical] for a list of what constitutes a critical issue.
 fn print_and_check_errors(errors: &[ValidationError], config: &Config) {
@@ -266,8 +291,6 @@ fn print_and_check_errors(errors: &[ValidationError], config: &Config) {
     }
     if has_critical_issues {
         panic!("Critical issues found");
-    } else {
-        println!("No critical issues found!")
     }
 }
 
