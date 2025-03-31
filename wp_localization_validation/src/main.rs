@@ -21,8 +21,10 @@ fn main() -> Result<(), FtlSetupError> {
         .remove(&config.default_lang)
         .ok_or_else(|| FtlSetupError::DefaultLanguageNotFound(config.default_lang.clone()))?;
 
-    // Handle validation errors
-    validation_errors.extend(find_translation_issues(&default_lang, &entries_by_language));
+    validation_errors.extend(ValidationError::find_all_issues(
+        &default_lang,
+        &entries_by_language,
+    ));
     print_and_check_errors(&validation_errors, &config);
     Ok(())
 }
@@ -104,81 +106,108 @@ impl ValidationError {
             ValidationError::MissingTranslations { .. } => config.strict_mode,
         }
     }
-}
 
-/// Finds all translation issues by comparing each language's translations
-/// against the default language.
-///
-/// This function performs a single pass through all languages to check for:
-/// 1. Keys that exist in non-default languages but not in the default language
-/// 2. Keys that exist in the default language but are missing in other languages
-/// 3. Mismatched placeables
-#[must_use]
-fn find_translation_issues(
-    default_lang: &HashMap<TranslationKey, TranslationEntry>,
-    map: &HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>,
-) -> Vec<ValidationError> {
-    let default_keys: HashSet<_> = default_lang.keys().collect();
-    let mut errors = Vec::new();
+    fn find_all_issues(
+        default_lang: &HashMap<TranslationKey, TranslationEntry>,
+        entries_by_language: &HashMap<
+            TranslationLanguage,
+            HashMap<TranslationKey, TranslationEntry>,
+        >,
+    ) -> Vec<Self> {
+        let default_lang_keys: HashSet<_> = default_lang.keys().collect();
+        Self::find_keys_not_in_default_language_issues(&default_lang_keys, entries_by_language)
+            .chain(Self::find_mismatched_placeables(
+                default_lang,
+                entries_by_language,
+            ))
+            .chain(Self::find_missing_translation_issues(
+                &default_lang_keys,
+                entries_by_language,
+            ))
+            .collect()
+    }
 
-    // Check for missing translations and keys not in default language
-    errors.extend(map.iter().flat_map(|(lang_id, translations)| {
-        let translation_keys: HashSet<_> = translations.keys().collect();
+    fn find_keys_not_in_default_language_issues(
+        default_lang_keys: &HashSet<&TranslationKey>,
+        map: &HashMap<TranslationLanguage, HashMap<TranslationKey, TranslationEntry>>,
+    ) -> impl Iterator<Item = Self> {
+        map.iter().map(|(lang_id, translations)| {
+            let translation_keys: HashSet<_> = translations.keys().collect();
 
-        // Find keys that exist in this language but not in the default language
-        let keys_not_in_default = translation_keys
-            .difference(&default_keys)
-            .cloned()
-            .cloned()
-            .collect();
+            // Find keys that exist in this language but not in the default language
+            let keys_not_in_default = translation_keys
+                .difference(default_lang_keys)
+                .cloned()
+                .cloned()
+                .collect();
 
-        // Find keys that exist in the default language but are missing in this language
-        let missing_keys = default_keys
-            .difference(&translation_keys)
-            .cloned()
-            .cloned()
-            .collect();
-
-        [
             ValidationError::KeyNotInDefault {
                 keys: keys_not_in_default,
                 lang_id: lang_id.clone(),
-            },
+            }
+        })
+    }
+
+    fn find_mismatched_placeables(
+        default_lang: &HashMap<TranslationKey, TranslationEntry>,
+        entries_by_languages: &HashMap<
+            TranslationLanguage,
+            HashMap<TranslationKey, TranslationEntry>,
+        >,
+    ) -> impl Iterator<Item = Self> {
+        entries_by_languages
+            .iter()
+            .flat_map(|(lang_id, translations)| {
+                translations.iter().filter_map(|(key, entry)| {
+                    default_lang.get(key).and_then(|default_entry| {
+                        let default_placeables: HashSet<_> =
+                            default_entry.placeables.iter().collect();
+                        let current_placeables: HashSet<_> = entry.placeables.iter().collect();
+
+                        if default_placeables != current_placeables {
+                            let mut expected: Vec<_> =
+                                default_placeables.iter().map(|s| s.0.clone()).collect();
+                            expected.sort();
+                            let mut found: Vec<_> =
+                                current_placeables.iter().map(|s| s.0.clone()).collect();
+                            found.sort();
+                            Some(ValidationError::MismatchedPlaceables {
+                                key: key.clone(),
+                                lang_id: lang_id.clone(),
+                                expected: expected.join(", "),
+                                found: found.join(", "),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                })
+            })
+    }
+
+    fn find_missing_translation_issues(
+        default_lang_keys: &HashSet<&TranslationKey>,
+        entries_by_languages: &HashMap<
+            TranslationLanguage,
+            HashMap<TranslationKey, TranslationEntry>,
+        >,
+    ) -> impl Iterator<Item = Self> {
+        entries_by_languages.iter().map(|(lang_id, translations)| {
+            let translation_keys: HashSet<_> = translations.keys().collect();
+
+            // Find keys that exist in the default language but are missing in this language
+            let missing_keys = default_lang_keys
+                .difference(&translation_keys)
+                .cloned()
+                .cloned()
+                .collect();
+
             ValidationError::MissingTranslations {
                 keys: missing_keys,
                 lang_id: lang_id.clone(),
-            },
-        ]
-    }));
-
-    // Check for mismatched placeables
-    errors.extend(map.iter().flat_map(|(lang_id, translations)| {
-        translations.iter().filter_map(|(key, entry)| {
-            default_lang.get(key).and_then(|default_entry| {
-                let default_placeables: HashSet<_> = default_entry.placeables.iter().collect();
-                let current_placeables: HashSet<_> = entry.placeables.iter().collect();
-
-                if default_placeables != current_placeables {
-                    let mut expected: Vec<_> =
-                        default_placeables.iter().map(|s| s.0.clone()).collect();
-                    expected.sort();
-                    let mut found: Vec<_> =
-                        current_placeables.iter().map(|s| s.0.clone()).collect();
-                    found.sort();
-                    Some(ValidationError::MismatchedPlaceables {
-                        key: key.clone(),
-                        lang_id: lang_id.clone(),
-                        expected: expected.join(", "),
-                        found: found.join(", "),
-                    })
-                } else {
-                    None
-                }
-            })
+            }
         })
-    }));
-
-    errors
+    }
 }
 
 #[must_use]
