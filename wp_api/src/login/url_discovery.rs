@@ -1,7 +1,8 @@
 use super::WpApiDetails;
 use crate::{
     ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
-    login::KnownApplicationPasswordBlockingPlugin, request::WpRedirect,
+    login::KnownApplicationPasswordBlockingPlugin,
+    request::{ResponseBodyType, WpRedirect},
 };
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -422,6 +423,8 @@ pub enum FetchAndParseApiRootFailure {
     },
     ParseApiRoot {
         parsing_error_message: String,
+        response_body: String,
+        response_body_type: ResponseBodyType,
     },
     WpError {
         error_code: WpErrorCode,
