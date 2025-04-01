@@ -9,8 +9,9 @@ use base64::Engine;
 use chrono::{DateTime, Utc};
 use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use http::{HeaderMap, HeaderName, HeaderValue};
+use regex::Regex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::str::FromStr;
+use std::str::{FromStr, Utf8Error};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use url::Url;
 use uuid::Uuid;
@@ -23,6 +24,7 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_MULTIPART: &str = "multipart/form-data";
 const HEADER_KEY_WP_TOTAL: &str = "X-WP-Total";
 const HEADER_KEY_WP_TOTAL_PAGES: &str = "X-WP-TotalPages";
+const MAYBE_HTML_REGEX: &str = r"<\/?[a-z][\s\S]*>";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -530,6 +532,29 @@ impl WpNetworkResponse {
 
         Ok(None)
     }
+
+    pub fn body_type(&self) -> Result<ResponseBodyType, Utf8Error> {
+        std::str::from_utf8(&self.body).map(ResponseBodyType::new)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
+pub enum ResponseBodyType {
+    ValidJson,
+    MaybeHtml,
+    Other,
+}
+
+impl ResponseBodyType {
+    pub fn new(body_as_string: impl AsRef<str>) -> Self {
+        if is_valid_json(&body_as_string) {
+            Self::ValidJson
+        } else if is_maybe_html(&body_as_string) {
+            Self::MaybeHtml
+        } else {
+            Self::Other
+        }
+    }
 }
 
 struct HttpRetryDuration {
@@ -728,6 +753,16 @@ impl WpRedirect {
     }
 }
 
+pub fn is_maybe_html(value: impl AsRef<str>) -> bool {
+    Regex::new(MAYBE_HTML_REGEX)
+        .expect("This is a valid regex")
+        .is_match(value.as_ref())
+}
+
+pub fn is_valid_json(value: impl AsRef<str>) -> bool {
+    serde_json::from_str::<serde_json::Value>(value.as_ref()).is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,6 +776,16 @@ mod tests {
             let value = header_value.parse().expect("Header Value must be ascii");
             self.inner.insert(header_name, value);
         }
+    }
+
+    #[rstest]
+    #[case(r#"<foo>"#, ResponseBodyType::MaybeHtml)]
+    #[case(r#"</foo>"#, ResponseBodyType::MaybeHtml)]
+    #[case(r#"{"foo": "bar"}"#, ResponseBodyType::ValidJson)]
+    #[case("foo", ResponseBodyType::Other)]
+    #[case("", ResponseBodyType::Other)]
+    fn test_response_body_type(#[case] input: &str, #[case] expected: ResponseBodyType) {
+        assert_eq!(ResponseBodyType::new(input), expected);
     }
 
     #[rstest]

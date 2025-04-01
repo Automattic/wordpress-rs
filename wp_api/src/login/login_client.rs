@@ -11,7 +11,8 @@ use crate::{
     ParsedUrl, RequestExecutionError, WpError,
     middleware::{PerformsRequests, WpApiMiddlewarePipeline},
     request::{
-        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        RequestExecutor, RequestMethod, ResponseBodyType, WpNetworkHeaderMap, WpNetworkRequest,
+        WpNetworkResponse,
         endpoint::{WP_JSON_PATH_SEGMENTS, WpEndpointUrl},
     },
 };
@@ -312,8 +313,12 @@ impl WpLoginClient {
                     status_code: fetch_api_details_response.status_code,
                 }
             } else {
+                let response_body = fetch_api_details_response.body_as_string();
+                let response_body_type = ResponseBodyType::new(&response_body);
                 FetchAndParseApiRootFailure::ParseApiRoot {
                     parsing_error_message: error.to_string(),
+                    response_body,
+                    response_body_type,
                 }
             }
         })
