@@ -269,6 +269,10 @@ setup-rust-android-targets:
 run-wp-cli-command:
 	@docker exec wordpress /bin/bash -c "wp --allow-root $(ARGS)"
 
+validate-localizations:
+	@# Help: Validate localization files using `wp_localization_validation` crate
+	$(rust_docker_run) /bin/bash -c "cargo run --bin wp_localization_validation -- --localization-folder ./wp_localization/localization/"
+
 help:
 	@printf "%-40s %s\n" "Target" "Description"
 	@printf "%-40s %s\n" "------" "-----------"

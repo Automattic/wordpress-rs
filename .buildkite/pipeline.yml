@@ -47,6 +47,10 @@ steps:
           make docs-archive
         artifact_paths:
           - docs.tar.gz
+      - label: ":rust: Validate Localization Files"
+        command: |
+          echo "--- :rust: Validate localization files"
+          make validate-localizations
 
   #
   # Swift Group

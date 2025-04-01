@@ -71,7 +71,7 @@ fn generate_function(entry: &TranslationEntry) -> TokenStream {
         }
     });
     let map_inserts = entry.placeables.iter().map(|placeable| {
-        let placeable_string = placeable.0;
+        let placeable_string = &placeable.0;
         let placeable_ident = format_ident!("{}", placeable_string);
         quote! {
             map.insert(std::borrow::Cow::Borrowed(#placeable_string), #placeable_ident.into());
