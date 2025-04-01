@@ -82,20 +82,23 @@ impl WpLoginClient {
         .into();
 
         match self.find_api_root_url(Arc::clone(&parsed_site_url)).await {
-            Ok(api_root_url) => AutoDiscoveryAttemptResult {
-                attempt_type: attempt.attempt_type,
-                attempt_site_url: attempt.attempt_site_url,
-                api_discovery_result: self
-                    .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url)
-                    .await
-                    .map_err(|fetch_and_parse_api_root_failure| {
-                        AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
-                            parsed_site_url,
-                            api_root_url.0,
-                            fetch_and_parse_api_root_failure,
-                        )
-                    }),
-            },
+            Ok(api_root_url) => {
+                println!("api root: {}", api_root_url.0.url());
+                AutoDiscoveryAttemptResult {
+                    attempt_type: attempt.attempt_type,
+                    attempt_site_url: attempt.attempt_site_url,
+                    api_discovery_result: self
+                        .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url)
+                        .await
+                        .map_err(|fetch_and_parse_api_root_failure| {
+                            AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
+                                parsed_site_url,
+                                api_root_url.0,
+                                fetch_and_parse_api_root_failure,
+                            )
+                        }),
+                }
+            }
             Err(find_api_root_failure) => {
                 let root_wp_json_url: Arc<ParsedUrl> =
                     match Self::root_wp_json_url((*parsed_site_url).clone()) {
@@ -304,6 +307,8 @@ impl WpLoginClient {
     fn parse_api_root(
         fetch_api_details_response: &WpNetworkResponse,
     ) -> Result<WpApiDetails, FetchAndParseApiRootFailure> {
+        println!("status_code: {}", fetch_api_details_response.status_code);
+        println!("{}", fetch_api_details_response.body_as_string());
         WpApiDetails::try_from(fetch_api_details_response.body.as_slice()).map_err(|error| {
             if let Some(wp_error) = WpError::try_parse(&fetch_api_details_response.body) {
                 FetchAndParseApiRootFailure::WpError {

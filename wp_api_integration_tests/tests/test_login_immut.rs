@@ -65,6 +65,20 @@ async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str
 }
 
 #[rstest]
+// `https://downrightltd.com/wp-json//wp-json` looks fine
+#[case("https://downrightltd.com", "")]
+// `https://greenbrush.fr/wp-json/` looks fine
+#[case("https://greenbrush.fr", "")]
+// `https://renaissancehairdesign.fr/wp-json/` looks fine
+#[case("https://renaissancehairdesign.fr", "")]
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn test_login_parsing_errors(#[case] site_url: &str, #[case] expected_auth_url: &str) {
+    login_flow_helper(site_url, expected_auth_url, vec![]).await;
+}
+
+#[rstest]
 #[case(
     "https://basic-auth.wpmt.co",
     "https://basic-auth.wpmt.co/wp-admin/authorize-application.php"
