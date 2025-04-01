@@ -39,6 +39,8 @@ Many of the project scripts are managed in a Makefile found in the root of the p
 make help
 ```
 
+See [this documentation](Documentation/debugging-from-xcode.md) if you want to debug Rust code from Xcode.
+
 ## Testing
 
 This project has several test suites. Integration tests require Docker, and you must run `make test-server` prior to the test invocation.
