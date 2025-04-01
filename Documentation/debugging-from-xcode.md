@@ -44,12 +44,12 @@ The LLDB configuration is taken from [this file in the Rust source code reposito
 > [!Note]
 > LLDB does not support Rust expressions, so you cannot run commands like `expression --language Rust -- api_root_url.as_str()` to execute functions and print the result.
 
-## Debugging from the WordPress app
+## Debugging from an app
 
-When debugging Rust code from the WordPress app, follow these additional steps:
+Your app should integrate this library via its releases, which is slightly different from developing the library within this repository. When debugging Rust code from your app, follow these additional steps:
 
 1. Ensure your local `wordpress-rs` working copy matches the app's version:
-   - Check the version used in the WordPress app
+   - Check the version used in your app
    - Go to your wordpress-rs repository and run `git checkout <version>` to switch to the correct version
 
 2. After hitting your breakpoint, you'll see an error message:
