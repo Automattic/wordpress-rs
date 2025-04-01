@@ -66,11 +66,17 @@ async fn test_login_flow(#[case] site_url: &str, #[case] expected_auth_url: &str
 
 #[rstest]
 // `https://downrightltd.com/wp-json//wp-json` looks fine
-#[case("https://downrightltd.com", "")]
+#[case(
+    "https://downrightltd.com",
+    "https://downrightltd.com/wp-admin/authorize-application.php"
+)]
 // `https://greenbrush.fr/wp-json/` looks fine
 #[case("https://greenbrush.fr", "")]
 // `https://renaissancehairdesign.fr/wp-json/` looks fine
-#[case("https://renaissancehairdesign.fr", "")]
+#[case(
+    "https://renaissancehairdesign.fr",
+    "https://renaissancehairdesign.fr/wp-admin/authorize-application.php"
+)]
 #[tokio::test]
 #[parallel]
 #[ignore]

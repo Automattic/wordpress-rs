@@ -307,8 +307,8 @@ impl WpLoginClient {
     fn parse_api_root(
         fetch_api_details_response: &WpNetworkResponse,
     ) -> Result<WpApiDetails, FetchAndParseApiRootFailure> {
-        println!("status_code: {}", fetch_api_details_response.status_code);
-        println!("{}", fetch_api_details_response.body_as_string());
+        //println!("status_code: {}", fetch_api_details_response.status_code);
+        //println!("{}", fetch_api_details_response.body_as_string());
         WpApiDetails::try_from(fetch_api_details_response.body.as_slice()).map_err(|error| {
             if let Some(wp_error) = WpError::try_parse(&fetch_api_details_response.body) {
                 FetchAndParseApiRootFailure::WpError {

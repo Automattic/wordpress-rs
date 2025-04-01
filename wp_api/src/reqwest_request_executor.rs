@@ -31,13 +31,16 @@ impl ReqwestRequestExecutor {
         &self,
         wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
+        let mut header_map = wp_request.header_map().to_header_map();
+        header_map.insert(http::header::USER_AGENT, HeaderValue::from_static("foo"));
+
         let mut request = self
             .client
             .request(
                 Self::request_method(wp_request.method()),
                 wp_request.url().0.as_str(),
             )
-            .headers(wp_request.header_map().to_header_map());
+            .headers(header_map);
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }
