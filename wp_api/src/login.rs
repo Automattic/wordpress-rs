@@ -167,7 +167,7 @@ impl KnownApplicationPasswordBlockingPlugin {
 
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct WpRestApiAuthenticationScheme {
-    pub endpoints: WpRestApiAuthenticationEndpoint,
+    pub endpoints: Option<WpRestApiAuthenticationEndpoint>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
@@ -232,7 +232,12 @@ impl WpApiDetailsAuthenticationMap {
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.0
             .get(KEY_APPLICATION_PASSWORDS)
-            .map(|auth_scheme| auth_scheme.endpoints.authorization.clone())
+            .and_then(|auth_scheme| {
+                auth_scheme
+                    .endpoints
+                    .as_ref()
+                    .map(|e| e.authorization.clone())
+            })
     }
 }
 
@@ -340,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_wp_api_details_authentication_map() {
+    fn test_parse_wp_api_details_authentication_map_only_application_passwords() {
         let json = r#"{
           "authentication": {
             "application-passwords": {
@@ -350,6 +355,30 @@ mod tests {
             }
           }
         }"#;
+        test_parse_wp_api_details_authentication_map_helper(json);
+    }
+
+    #[test]
+    fn test_parse_wp_api_details_authentication_map_application_passwords_and_oauth() {
+        let json = r#"{
+          "authentication": {
+            "oauth1": {
+              "request": "http://localhost/oauth1/request",
+              "authorize": "http://localhost/oauth1/authorize",
+              "access": "http://localhost/oauth1/access",
+              "version": "0.1"
+            },
+            "application-passwords": {
+              "endpoints": {
+                "authorization": "http://localhost/wp-admin/authorize-application.php"
+              }
+            }
+          }
+        }"#;
+        test_parse_wp_api_details_authentication_map_helper(json);
+    }
+
+    fn test_parse_wp_api_details_authentication_map_helper(json: &str) {
         let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json);
         assert!(
             result.is_ok(),
