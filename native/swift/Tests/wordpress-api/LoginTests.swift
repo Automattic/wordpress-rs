@@ -8,11 +8,7 @@ import FoundationNetworking
 #endif
 
 // swiftlint:disable line_length
-#if os(Linux)
-@Suite("Login Tests", .serialized)
-#else
-@Suite("Login Tests")
-#endif
+@Suite("Login Tests", .enabled(if: !isLinux()))
 class LoginTests {
 
     let client = WordPressLoginClient(urlSession: .shared)
