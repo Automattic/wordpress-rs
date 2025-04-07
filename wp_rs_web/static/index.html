@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="/assets/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+</head>
+<body>
+  <form method="POST" action="/test" class="bg-gray-900 py-16 sm:py-24">
+    <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+      <div class="relative isolate overflow-hidden px-6 py-24 shadow-2xl sm:rounded-3xl sm:px-24 xl:py-32">
+        <h2 class="mx-auto max-w-3xl text-center text-4xl font-semibold tracking-tight text-white sm:text-5xl">Application Password Tester</h2>
+        <p class="mx-auto mt-6 max-w-lg text-center text-lg text-gray-300">Check whether your site supports application passwords and the REST API.</p>
+        <form class="mx-auto mt-10 flex max-w-md gap-x-4">
+          <label for="site-url" class="sr-only">Site URL</label>
+          <input id="site-url" name="value" type="url" autocomplete="url" required class="min-w-0 flex-auto rounded-md bg-white/5 px-3.5 py-2 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-white sm:text-sm/6" placeholder="Your website URL">
+          <button type="submit" class="flex-none rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-xs hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Test</button>
+        </form>
+      </div>
+    </div>
+  </form>
+</body>
+</html>

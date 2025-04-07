@@ -1,0 +1,23 @@
+{{#*inline "page"}}
+
+<div class="bg-gray-900 py-16 sm:py-24">
+    <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="relative isolate overflow-hidden px-6 sm:rounded-3xl sm:px-24">
+            <h2 class="mx-auto max-w-3xl text-center text-4xl font-semibold tracking-tight text-white sm:text-5xl">Application Password Tester</h2>
+             <p class="mx-auto mt-6 max-w-lg text-center text-lg text-gray-300">Check whether your site supports application passwords and the REST API.</p>
+
+            {{#if is_error}}
+            {{> components/warning}}
+            {{else}}
+            {{> components/success}}
+            {{/if}}
+            
+            {{> components/form }}
+
+
+        </div>
+    </div>
+</div>
+
+{{/inline}}
+{{> layout}}
