@@ -11,15 +11,13 @@ class ApiUrlDiscoveryTest {
     fun testFindsCorrectApiUrls() = runTest {
         val apiDiscoveryResult =
             loginClient.apiDiscovery("https://automatticwidgets.wpcomstaging.com/")
-        assert(apiDiscoveryResult.isSuccessful)
         assertEquals(
             "https://automatticwidgets.wpcomstaging.com/wp-json/",
-            apiDiscoveryResult.successfulAttempt?.apiRootUrl()?.url()
+            apiDiscoveryResult.apiRootUrl.url()
         )
         assertEquals(
             "https://automatticwidgets.wpcomstaging.com/wp-admin/authorize-application.php",
-            apiDiscoveryResult.successfulAttempt?.apiDetails()
-                ?.findApplicationPasswordsAuthenticationUrl()
+            apiDiscoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl()
         )
     }
 }
