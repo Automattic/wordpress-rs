@@ -278,7 +278,6 @@ class ApiUrlDiscoveryTest {
         val httpClient = WpHttpClient.DefaultHttpClient()
         val executor = WpRequestExecutor(httpClient)
         httpClient.addAllowedHostname("wordpress-1315525-4803651.cloudwaysapps.com")
-        httpClient.addAllowedHostname("vanilla.wpmt.co")
 
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
