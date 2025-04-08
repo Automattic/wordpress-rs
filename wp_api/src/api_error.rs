@@ -483,7 +483,7 @@ pub enum RequestExecutionErrorReason {
     MisconfiguredHttpAuthenticationError {
         issue: HttpAuthMethodParsingError,
     },
-    MisconfiguredRateLimitError {},
+    MisconfiguredRateLimitError,
     DeviceIsOfflineError {
         error_message: String,
     },
