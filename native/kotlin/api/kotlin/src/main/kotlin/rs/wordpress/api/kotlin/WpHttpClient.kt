@@ -1,7 +1,6 @@
 package rs.wordpress.api.kotlin
 
 import okhttp3.OkHttpClient
-import okhttp3.tls.HandshakeCertificates
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLSession
 
@@ -11,25 +10,16 @@ sealed class WpHttpClient {
     class DefaultHttpClient : WpHttpClient() {
         private var client: OkHttpClient = OkHttpClient()
 
-        private var allowedHostnames: List<String> = emptyList()
+        private var allowedHostnames: Map<String, String> = emptyMap()
 
-        fun addAllowedHostname(hostname: String) {
-            allowedHostnames = allowedHostnames.plus(hostname)
+        fun addAllowedAlternativeNameForHostname(hostname: String, alternativeName: String) {
+            allowedHostnames = allowedHostnames.plus(Pair(hostname, alternativeName))
             updateClient()
         }
 
         private fun updateClient() {
-            val clientCertificates = HandshakeCertificates.Builder()
-                .addPlatformTrustedCertificates()
-                .addInsecureHost(allowedHostnames.first())
-                .build()
-
             client = client.newBuilder()
                 .hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
-                .sslSocketFactory(
-                    clientCertificates.sslSocketFactory(),
-                    clientCertificates.trustManager
-                )
                 .build()
         }
 
@@ -41,9 +31,11 @@ sealed class WpHttpClient {
     }
 }
 
-private class WpRequestExecutorHostnameVerifier(private val allowedHostnames: List<String>) :
+private class WpRequestExecutorHostnameVerifier(private val allowedHostnames: Map<String, String>) :
     HostnameVerifier {
-    override fun verify(hostname: String?, session: SSLSession?): Boolean {
-        return session?.isValid == true || hostname?.let { allowedHostnames.contains(it) } ?: false
-    }
+    override fun verify(hostname: String?, session: SSLSession?): Boolean =
+        session?.let {
+            val name = it.peerPrincipal.name.replace("CN=", "")
+            name == hostname || allowedHostnames[hostname]?.let { alternativeName -> name == alternativeName } ?: false
+        } ?: false
 }
