@@ -43,7 +43,7 @@ sealed class WpHttpClient {
 
 private class WpRequestExecutorHostnameVerifier(private val allowedHostnames: List<String>) :
     HostnameVerifier {
-    override fun verify(p0: String?, p1: SSLSession?): Boolean {
-        return p1?.isValid == true || allowedHostnames.contains(p0)
+    override fun verify(hostname: String?, session: SSLSession?): Boolean {
+        return session?.isValid == true || hostname?.let { allowedHostnames.contains(it) } ?: false
     }
 }
