@@ -9,8 +9,6 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import java.net.URI
 
-// Future improvement idea: This class could probably go in a Test Helpers package or something
-
 class Stub(val evaluator: (WpNetworkRequest) -> Boolean, val response: WpNetworkResponse) {
     companion object {
         fun forHost(host: String, response: WpNetworkResponse): Stub {
