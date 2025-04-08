@@ -52,31 +52,15 @@ public final class WordPressLoginClient {
     }
 
     public func loginURL(forSite proposedSiteUrl: String) async throws -> ParsedUrl {
+        let discoveryResult = try await client.apiDiscovery(siteUrl: proposedSiteUrl)
 
-//        do {
-            let discoveryResult = await client.apiDiscovery(siteUrl: proposedSiteUrl)
+        // All sites should have some form of authentication we can use
+        guard let passwordAuthenticationUrl = discoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl()
+        else {
+            abort() // TODO: Throw the right error type
+        }
 
-            guard let apiDetails = discoveryResult.successfulAttempt?.apiDetails() else {
-                debugPrint("Error: \(discoveryResult.userInputAttempt.errorMessage())")
-                throw CocoaError(.fileReadUnknown) // TODO: Throw a better error here
-            }
-
-            // All sites should have some form of authentication we can use
-            guard
-                let passwordAuthenticationUrl = apiDetails.findApplicationPasswordsAuthenticationUrl(),
-                let parsedLoginUrl = try? ParsedUrl.parse(input: passwordAuthenticationUrl)
-            else {
-                abort() // TODO: Throw the right error type
-//                throw WordPressLoginClientError.missingLoginUrl
-            }
-
-            return parsedLoginUrl
-
-//        } catch let error as UrlDiscoveryError {
-//            throw WordPressLoginClientError.invalidSiteAddress(error)
-//        } catch {
-//            throw WordPressLoginClientError.unknown(error)
-//        }
+        return try ParsedUrl.parse(input: passwordAuthenticationUrl)
     }
 
     private func handleAuthenticationCallback(
