@@ -1,6 +1,7 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
 import org.junit.jupiter.api.parallel.ExecutionMode
@@ -34,12 +35,26 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 2
     fun testLocalDevelopmentEnvironment() = runTest {
-        val executor = MockRequestExecutor(listOf(
-            Stub.forUrl("http://localhost/", WpNetworkResponse.withApiRoot("http://localhost/wp-json")),
-            Stub.forUrl("https://localhost/", WpNetworkResponse.withApiRoot("http://localhost/wp-json")),
-            Stub.forUrl("http://localhost/wp-json", WpNetworkResponse.jsonResponse("/localhost-json-root.json")),
-            Stub.forUrl("https://localhost/wp-json", WpNetworkResponse.jsonResponse("/localhost-json-root.json")),
-        ))
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "http://localhost/",
+                    WpNetworkResponse.withApiRoot("http://localhost/wp-json")
+                ),
+                Stub.forUrl(
+                    "https://localhost/",
+                    WpNetworkResponse.withApiRoot("http://localhost/wp-json")
+                ),
+                Stub.forUrl(
+                    "http://localhost/wp-json",
+                    WpNetworkResponse.jsonResponse("/localhost-json-root.json")
+                ),
+                Stub.forUrl(
+                    "https://localhost/wp-json",
+                    WpNetworkResponse.jsonResponse("/localhost-json-root.json")
+                ),
+            )
+        )
 
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
             val client = WpLoginClient(executor)
@@ -103,9 +118,13 @@ class ApiUrlDiscoveryTest {
             loginClient.loginUrl("https://wordfence.wpmt.co")
         }.let { e ->
             val reason = getApplicationPasswordsNotSupportedReason(e)
-            assertInstanceOf(ApplicationPasswordsNotSupportedReason.ApplicationPasswordBlockedByPlugin::class.java, reason)
+            assertInstanceOf(
+                ApplicationPasswordsNotSupportedReason.ApplicationPasswordBlockedByPlugin::class.java,
+                reason
+            )
 
-            val plugin = (reason as ApplicationPasswordsNotSupportedReason.ApplicationPasswordBlockedByPlugin).plugin
+            val plugin =
+                (reason as ApplicationPasswordsNotSupportedReason.ApplicationPasswordBlockedByPlugin).plugin
             assertEquals(plugin.name, "Wordfence")
         }
     }
@@ -150,32 +169,40 @@ class ApiUrlDiscoveryTest {
             loginClient.loginUrl("https://basic-auth.wpmt.co")
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
-            assertInstanceOf(RequestExecutionErrorReason.HttpAuthenticationRequiredError::class.java, reason)
+            assertInstanceOf(
+                RequestExecutionErrorReason.HttpAuthenticationRequiredError::class.java,
+                reason
+            )
         }
     }
 
     @Test // Spec Example 13 (with invalid credentials)
     fun testWordPressHttpBasicWithInvalidCredentials() = runTest {
-        val invalid = ApiDiscoveryAuthenticationMiddleware(username = "invalid", password = "invalid")
+        val invalid =
+            ApiDiscoveryAuthenticationMiddleware(username = "invalid", password = "invalid")
         val client = WpLoginClient(
-            WpRequestExecutor(),
-            WpApiMiddlewarePipeline(middlewares = listOf(invalid))
+            WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
         )
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
             client.loginUrl("https://basic-auth.wpmt.co")
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
-            assertInstanceOf(RequestExecutionErrorReason.HttpAuthenticationRejectedError::class.java, reason)
+            assertInstanceOf(
+                RequestExecutionErrorReason.HttpAuthenticationRejectedError::class.java,
+                reason
+            )
         }
     }
 
     @Test // Spec Example 13 (with valid credentials)
     fun testWordPressHttpBasicWithValidCredentials() = runTest {
-        val valid = ApiDiscoveryAuthenticationMiddleware(username = "test@example.com", password = "str0ngp4ssw0rd!")
+        val valid = ApiDiscoveryAuthenticationMiddleware(
+            username = "test@example.com",
+            password = "str0ngp4ssw0rd!"
+        )
 
         val client = WpLoginClient(
-            WpRequestExecutor(),
-            WpApiMiddlewarePipeline(middlewares = listOf(valid))
+            WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(valid))
         )
 
         assertEquals(
@@ -202,18 +229,27 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 15
     fun testWordPressHeavyRateLimitingThatNeverSucceeds() = runTest {
-        val executor = MockRequestExecutor(listOf(
-            Stub.forHost("aggressive-rate-limiting.wpmt.co", WpNetworkResponse.retryResponse(1u))
-        ))
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forHost(
+                    "aggressive-rate-limiting.wpmt.co",
+                    WpNetworkResponse.retryResponse(1u)
+                )
+            )
+        )
 
         val middleware = RetryAfterMiddleware(maxRetries = 3u, maxRetryWaitSeconds = 1u)
 
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            val client = WpLoginClient(executor, WpApiMiddlewarePipeline(middlewares = listOf(middleware)))
+            val client =
+                WpLoginClient(executor, WpApiMiddlewarePipeline(middlewares = listOf(middleware)))
             client.loginUrl("https://aggressive-rate-limiting.wpmt.co")
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
-            assertInstanceOf(RequestExecutionErrorReason.MisconfiguredRateLimitError::class.java, reason)
+            assertInstanceOf(
+                RequestExecutionErrorReason.MisconfiguredRateLimitError::class.java,
+                reason
+            )
         }
     }
 
@@ -239,8 +275,11 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 17 (with exception)
     fun testInvalidHttpsWithExceptionWorks() = runTest {
-        val executor = WpRequestExecutor()
-        executor.addAllowedAlternativeNameForHostname("wordpress-1315525-4803651.cloudwaysapps.com", "vanilla.wpmt.co")
+        val httpClient = WpHttpClient.DefaultHttpClient()
+        val executor = WpRequestExecutor(httpClient)
+        httpClient.addAllowedAlternativeNameForHostname(
+            "wordpress-1315525-4803651.cloudwaysapps.com", "vanilla.wpmt.co"
+        )
 
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
@@ -248,15 +287,25 @@ class ApiUrlDiscoveryTest {
         )
     }
 
+    @Test
+    fun testCustomOkHttpClient() = runTest {
+        val executor =
+            WpRequestExecutor(httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient()))
+        assertEquals(
+            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
+            WpLoginClient(requestExecutor = executor).loginUrl("https://vanilla.wpmt.co")
+        )
+    }
+
     private fun getApplicationPasswordsNotSupportedReason(error: AutoDiscoveryAttemptFailure): ApplicationPasswordsNotSupportedReason? {
-        return when(val failure = getFetchAndParseApiRootFailure(error)) {
+        return when (val failure = getFetchAndParseApiRootFailure(error)) {
             is FetchAndParseApiRootFailure.ApplicationPasswordsNotSupported -> failure.reason
             else -> null
         }
     }
 
     private fun getFetchAndParseApiRootFailure(error: AutoDiscoveryAttemptFailure): FetchAndParseApiRootFailure? {
-        return when(error) {
+        return when (error) {
             is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot -> error.fetchAndParseApiRootFailure
             else -> null
         }
@@ -270,12 +319,12 @@ class ApiUrlDiscoveryTest {
     }
 
     private fun getRequestExecutionErrorReason(error: AutoDiscoveryAttemptFailure): RequestExecutionErrorReason? {
-        when(val failure = getFindApiRootFailure(error)) {
+        when (val failure = getFindApiRootFailure(error)) {
             is FindApiRootFailure.FetchHomepage -> return extract(failure.error)
             else -> {}
         }
 
-        when(val failure = getFetchAndParseApiRootFailure(error)) {
+        when (val failure = getFetchAndParseApiRootFailure(error)) {
             is FetchAndParseApiRootFailure.FetchApiRoot -> return extract(failure.error)
             else -> {}
         }
@@ -284,7 +333,7 @@ class ApiUrlDiscoveryTest {
     }
 
     private fun extract(error: RequestExecutionException): RequestExecutionErrorReason? {
-        return when(error) {
+        return when (error) {
             is RequestExecutionException.RequestExecutionFailed -> error.reason
             else -> null
         }
