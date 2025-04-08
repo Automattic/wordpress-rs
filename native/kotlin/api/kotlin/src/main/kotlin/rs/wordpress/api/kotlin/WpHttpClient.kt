@@ -13,8 +13,8 @@ sealed class WpHttpClient {
 
         private var allowedHostnames: List<String> = emptyList()
 
-        fun addAllowedAlternativeNameForHostname(alternativeName: String, hostname: String) {
-            allowedHostnames = allowedHostnames.plus(alternativeName).plus(hostname)
+        fun addAllowedHostname(hostname: String) {
+            allowedHostnames = allowedHostnames.plus(hostname)
             updateClient()
         }
 
