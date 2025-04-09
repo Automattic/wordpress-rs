@@ -7,7 +7,7 @@ extension WordPressAPI {
         get async throws {
             let loginManager = await LoginManager()
 
-            guard let defaultSiteUrl = await loginManager.getDefaultSiteUrl() else {
+            guard let defaultSiteUrl = await loginManager.getApiRootUrl() else {
                 throw CocoaError(.validationMissingMandatoryProperty)
             }
 
