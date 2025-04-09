@@ -4,25 +4,30 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
+import uniffi.wp_api.RequestExecutionErrorReason
+import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
+import uniffi.wp_api.parseCertificate
 import java.io.File
+import java.net.UnknownHostException
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLPeerUnverifiedException
 
 class WpRequestExecutor(
-    private val okHttpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : RequestExecutor {
-
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
@@ -36,14 +41,24 @@ class WpRequestExecutor(
                 }
             }
 
-            okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
-                return@withContext WpNetworkResponse(
-                    body = response.body?.bytes() ?: ByteArray(0),
-                    statusCode = response.code.toUShort(),
-                    responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
-                    requestUrl = request.url(),
-                    requestHeaderMap = request.headerMap()
+            val urlRequest = requestBuilder.build()
+
+            try {
+                httpClient.getClient().newCall(urlRequest).execute().use { response ->
+                    return@withContext WpNetworkResponse(
+                        body = response.body?.bytes() ?: ByteArray(0),
+                        statusCode = response.code.toUShort(),
+                        responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
+                        requestUrl = request.url(),
+                        requestHeaderMap = request.headerMap()
+                    )
+                }
+            } catch (e: SSLPeerUnverifiedException) {
+                throw requestExecutionFailedWith(
+                    RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
                 )
+            } catch (e: UnknownHostException) {
+                throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
             }
         }
 
@@ -77,7 +92,7 @@ class WpRequestExecutor(
                 }
             }
 
-            okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
+            httpClient.getClient().newCall(requestBuilder.build()).execute().use { response ->
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
@@ -92,3 +107,41 @@ class WpRequestExecutor(
         delay(millis.toLong())
     }
 }
+
+private fun RequestExecutionErrorReason.Companion.unknownHost(e: UnknownHostException) =
+    RequestExecutionErrorReason.NonExistentSiteError(
+        errorMessage = e.localizedMessage,
+        suggestedAction = "Check that the URL is valid and try again"
+    )
+
+@Suppress("UNUSED_PARAMETER")
+private fun RequestExecutionErrorReason.Companion.invalidSSLError(
+    e: SSLPeerUnverifiedException, // To avoid `SwallowedException` from Detekt
+    requestUrl: HttpUrl
+): RequestExecutionErrorReason {
+    // It's kind of weird and annoying that we need to make a second request to get
+    // this data, but it doesn't seem like we can get it from the response or the
+    // `SSLPeerUnverifiedException` directly.
+    //
+    // We spin up a new connection that'll accept any certificate. The connection will then
+    // contain all the details we need for the error.
+    val newConnection = requestUrl.toUrl().openConnection() as HttpsURLConnection
+    newConnection.setHostnameVerifier { _, _ -> return@setHostnameVerifier true }
+    newConnection.connect()
+
+    // Certificate is parsed by the Rust shared implementation.
+    val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
+    return RequestExecutionErrorReason.InvalidSslError(
+        siteCertificate = certificates.firstOrNull(),
+        certificateChain = certificates.mapNotNull { it },
+        errorMessage = "Invalid certificate for domain",
+        suggestedAction = null
+    )
+}
+
+private fun requestExecutionFailedWith(reason: RequestExecutionErrorReason) =
+    RequestExecutionException.RequestExecutionFailed(
+        statusCode = null,
+        redirects = null,
+        reason = reason
+    )

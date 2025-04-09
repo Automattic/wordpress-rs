@@ -5,9 +5,7 @@ use wp_api::{
     RequestExecutionError, RequestExecutionErrorReason,
     login::{
         login_client::WpLoginClient,
-        url_discovery::{
-            AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptType, FindApiRootFailure,
-        },
+        url_discovery::{AutoDiscoveryAttemptFailure, FindApiRootFailure},
     },
     middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
     reqwest_request_executor::ReqwestRequestExecutor,
@@ -116,9 +114,7 @@ async fn login_flow_err_helper(
     )
     .api_discovery(site_url.to_string())
     .await
-    .attempts
-    .remove(&AutoDiscoveryAttemptType::UserInput)
-    .unwrap()
-    .api_discovery_result
+    .combined_result()
     .unwrap_err()
+    .clone()
 }

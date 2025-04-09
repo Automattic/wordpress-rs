@@ -40,6 +40,7 @@ testing {
                 implementation(project())
 
                 implementation(libs.okhttp)
+                implementation(libs.okhttp.tls)
                 implementation(rootProject.libs.kotlin.test)
                 implementation(rootProject.libs.kotlinx.coroutines.test)
                 implementation(libs.kotlinx.serialization)
@@ -69,6 +70,7 @@ tasks.named("check") {
 
 dependencies {
     implementation(libs.okhttp)
+    implementation(libs.okhttp.tls)
     implementation(libs.jna)
     implementation(libs.kotlinx.coroutines.core)
 }
@@ -122,6 +124,7 @@ tasks.named("processIntegrationTestResources").configure {
     dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
     dependsOn(rootProject.tasks.named("copyTestCredentials"))
     dependsOn(rootProject.tasks.named("copyTestMedia"))
+    dependsOn(rootProject.tasks.named("copySampleJSON"))
 }
 
 project.afterEvaluate {

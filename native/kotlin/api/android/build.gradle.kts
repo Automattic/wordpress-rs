@@ -56,6 +56,7 @@ dependencies {
         }
     }
     implementation(libs.okhttp)
+    implementation(libs.okhttp.tls)
     implementation(libs.jna) {
         artifact {
             type = "aar"

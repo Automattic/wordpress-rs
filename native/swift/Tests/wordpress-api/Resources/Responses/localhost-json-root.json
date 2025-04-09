@@ -1,0 +1,26 @@
+{
+  "name": "my-test-site",
+  "description": "",
+  "url": "http:\/\/localhost",
+  "home": "http:\/\/localhost",
+  "gmt_offset": -5,
+  "timezone_string": "America\/New_York",
+  "namespaces": [
+    "oembed\/1.0",
+    "wp\/v2",
+    "wp-site-health\/v1",
+    "wp-block-editor\/v1"
+  ],
+  "authentication": {},
+  "routes": {},
+  "site_logo": 0,
+  "site_icon": 0,
+  "site_icon_url": "",
+  "_links": {
+    "help": [
+      {
+        "href": "https:\/\/developer.wordpress.org\/rest-api\/"
+      }
+    ]
+  }
+}
