@@ -1,6 +1,6 @@
 use crate::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
-    api_error::InvalidSslError,
+    api_error::InvalidSslErrorReason,
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
         endpoint::media_endpoint::MediaUploadRequest,
@@ -250,7 +250,7 @@ impl From<&TlsError> for RequestExecutionErrorReason {
                 expected,
                 presented,
             }) => RequestExecutionErrorReason::InvalidSslError {
-                inner: InvalidSslError::CertificateNotValidForName {
+                reason: InvalidSslErrorReason::CertificateNotValidForName {
                     hostname: expected.to_str().to_string(),
                     presented_hostnames: presented.to_vec(),
                 },

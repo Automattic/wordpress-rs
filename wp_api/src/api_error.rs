@@ -449,7 +449,7 @@ impl WpSupportsLocalization for RequestExecutionError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum InvalidSslError {
+pub enum InvalidSslErrorReason {
     CertificateNotValidForName {
         hostname: String,
         presented_hostnames: Vec<String>,
@@ -460,7 +460,7 @@ pub enum InvalidSslError {
 pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
     InvalidSslError {
-        inner: InvalidSslError,
+        reason: InvalidSslErrorReason,
     },
     NonExistentSiteError {
         error_message: Option<String>,
