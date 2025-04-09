@@ -69,8 +69,8 @@ struct LoginView: View {
                     callbackUrl: "x-wordpress-app://login-callback"
                 )
 
-                let loginClient = WpLoginClient(urlSession: .shared)
-                let details = try await loginClient.apiDiscovery(siteUrl: url)
+                let loginClient = WordPressLoginClient(urlSession: .shared)
+                let details = try await loginClient.details(ofSite: url)
                 let loginUrl = try await details.loginURL(for: application)
 
                 let callbackUrl = try await self.webAuthenticationSession.authenticate(

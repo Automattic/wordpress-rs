@@ -25,6 +25,14 @@ public final class WordPressLoginClient {
         self.client = UniffiWpLoginClient(requestExecutor: requestExecutor, middlewarePipeline: middleware)
     }
 
+    /// Uses the proposed site URL to scan the website and return login related information about the site.
+    ///
+    public func details(
+        ofSite proposedSiteUrl: String
+    ) async throws -> AutoDiscoveryAttemptSuccess {
+        try await client.apiDiscovery(siteUrl: proposedSiteUrl)
+    }
+
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL
     ///
     public func findLoginUrl(
@@ -32,14 +40,7 @@ public final class WordPressLoginClient {
     ) async throws -> ParsedUrl {
         // All sites should have some form of authentication we can use
         let discoveryResult = try await client.apiDiscovery(siteUrl: proposedSiteUrl)
-
-        guard
-            let passwordAuthUrl = discoveryResult.apiDetails.findApplicationPasswordsAuthenticationUrl()
-        else {
-            preconditionFailure("No Auth URL Found")
-        }
-
-        return try ParsedUrl.parse(input: passwordAuthUrl)
+        return try discoveryResult.apiDetails.applicationPasswordAuthenticationUrl
     }
 
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL,
@@ -52,13 +53,7 @@ public final class WordPressLoginClient {
         forSite proposedSiteUrl: String,
         application: Application
     ) async throws -> URL {
-        createApplicationPasswordAuthenticationUrl(
-            loginUrl: try await findLoginUrl(forSite: proposedSiteUrl),
-            appName: application.name,
-            appId: application.id,
-            successUrl: application.successCallbackUrl,
-            rejectUrl: application.failureCallbackUrl
-        ).asURL()
+        try await client.apiDiscovery(siteUrl: proposedSiteUrl).loginURL(for: application)
     }
 
     /// Convert the callback URL into a set of authentication credentials
@@ -66,6 +61,34 @@ public final class WordPressLoginClient {
     public func credentials(from callbackUrl: URL) throws -> WpApiApplicationPasswordDetails {
         try extractLoginDetailsFromUrl(url: callbackUrl.absoluteString)
     }
+}
+
+public extension AutoDiscoveryAttemptSuccess {
+
+    func loginURL(for application: Application) async throws -> URL {
+        let loginUrl = try apiDetails.applicationPasswordAuthenticationUrl
+        return createApplicationPasswordAuthenticationUrl(
+            loginUrl: loginUrl,
+            appName: application.name,
+            appId: application.id,
+            successUrl: application.successCallbackUrl,
+            rejectUrl: application.failureCallbackUrl
+        ).asURL()
+    }
+
+}
+
+public extension WpApiDetails {
+
+    var applicationPasswordAuthenticationUrl: ParsedUrl {
+        get throws {
+            guard let passwordAuthUrl = findApplicationPasswordsAuthenticationUrl() else {
+                preconditionFailure("No Auth URL Found")
+            }
+            return try ParsedUrl.parse(input: passwordAuthUrl)
+        }
+    }
+
 }
 
 public struct Application {
