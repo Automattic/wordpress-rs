@@ -17,7 +17,7 @@ const TOKIO_STREAM_SIZE: usize = 100;
 
 fn wordpress_org_api_client() -> WordPressOrgApiClient {
     WordPressOrgApiClient::new(
-        Arc::new(ReqwestRequestExecutor::new(true)),
+        Arc::new(ReqwestRequestExecutor::default()),
         Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
