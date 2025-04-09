@@ -7,10 +7,6 @@ import FoundationNetworking
 
 public final class WordPressLoginClient {
 
-    public protocol AuthenticatorProtocol {
-        func authenticate(url: URL, callbackURL: URL) async throws -> URL
-    }
-
     private let requestExecutor: SafeRequestExecutor
     private let client: UniffiWpLoginClient
 
