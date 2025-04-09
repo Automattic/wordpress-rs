@@ -14,7 +14,8 @@ request_execution_failed = Failed to send HTTP.
 
 just = {$message}
 
-invalid_ssl_error = Invalid SSL certificate.
+invalid_ssl_error_certificate_not_valid_for_name = Invalid SSL certificate
+invalid_ssl_error_generic_ssl_error = Unable to establish a secure connection to the server
 
 non_existent_site_error = A server with the specified hostname could not be found.
 

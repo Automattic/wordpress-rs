@@ -454,8 +454,18 @@ pub enum InvalidSslErrorReason {
         hostname: String,
         presented_hostnames: Vec<String>,
     },
-    // Message: "Unable to establish a secure connection to the server"
-    GenericSslError {}
+    GenericSslError,
+}
+
+impl InvalidSslErrorReason {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            Self::CertificateNotValidForName { .. } => {
+                WpMessages::invalid_ssl_error_certificate_not_valid_for_name()
+            }
+            Self::GenericSslError => WpMessages::invalid_ssl_error_generic_ssl_error(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, WpDeriveLocalizable)]
@@ -545,7 +555,7 @@ impl RequestExecutionErrorReason {
 impl WpSupportsLocalization for RequestExecutionErrorReason {
     fn message_bundle(&self) -> MessageBundle {
         match self {
-            RequestExecutionErrorReason::InvalidSslError { .. } => WpMessages::invalid_ssl_error(),
+            RequestExecutionErrorReason::InvalidSslError { reason } => reason.message_bundle(),
             RequestExecutionErrorReason::NonExistentSiteError { .. } => {
                 WpMessages::non_existent_site_error()
             }
