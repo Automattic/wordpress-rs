@@ -1,7 +1,7 @@
 import Foundation
 import WordPressAPIInternal
 
-#if os(Linux)
+#if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
 
@@ -18,83 +18,42 @@ extension SafeRequestExecutor {
 
 final class WpRequestExecutor: SafeRequestExecutor {
     private let session: URLSession
-    private let redirectTracker = RedirectTracker()
+    private let executorDelegate: RequestExecutorDelegate
 
-    init(urlSession: URLSession) {
+    private let additionalHttpHeadersForAllRequests: [String: String]
+
+    init(
+        urlSession: URLSession,
+        additionalHttpHeadersForAllRequests: [String: String] = [:]
+    ) {
         self.session = urlSession
+        self.executorDelegate = RequestExecutorDelegate()
+        self.additionalHttpHeadersForAllRequests = additionalHttpHeadersForAllRequests
     }
 
-    // swiftlint:disable function_body_length
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
-
-        let (data, response): (Data, URLResponse)
-
         do {
-            let urlrequest = request.asURLRequest()
-            (data, response) = try await self.session.data(for: urlrequest, delegate: redirectTracker)
+            var urlrequest = request.asURLRequest()
 
-            do {
-                return .success(
-                    try WpNetworkResponse(
-                        data: data,
-                        request: request,
-                        response: response
-                    )
-                )
-            } catch is WpNetworkHeaderMapError {
-                let error = RequestExecutionError.RequestExecutionFailed(
-                    statusCode: nil,
-                    redirects: redirectTracker.redirects(for: request.requestId()),
-                    reason: RequestExecutionErrorReason.genericError(errorMessage: "Invalid Headers")
-                )
-
-                return .failure(error)
-
-            } catch {
-                return .failure(
-                    .RequestExecutionFailed(
-                        statusCode: nil,
-                        redirects: redirectTracker.redirects(for: request.requestId()),
-                        reason: .genericError(errorMessage: "Unknown error: \(error)")
-                    )
-                )
+            for (key, value) in additionalHttpHeadersForAllRequests {
+                urlrequest.addValue(value, forHTTPHeaderField: key)
             }
+
+            let (data, response) = try await self.fetch(request: urlrequest)
+
+            return .success(try WpNetworkResponse(data: data, request: request, response: response))
         } catch {
-           if (try? errorIsHttpsError(error)) == true {
-               guard var peerCertificateChain = try? getPeerCertificateChain(error) else {
-                   abort() // TODO
-               }
+            if errorIsHttpsError(error) {
+                return handleHttpsError(error, for: request)
+            }
 
-               if peerCertificateChain.isEmpty {
-                   return .failure(
-                    .RequestExecutionFailed(
-                        statusCode: nil,
-                        redirects: redirectTracker.redirects(for: request.requestId()),
-                        reason: .invalidSslError(
-                            siteCertificate: nil,
-                            certificateChain: [],
-                            errorMessage: error.localizedDescription,
-                            suggestedAction: (error as NSError).localizedRecoverySuggestion
-                        )
-                    )
-                   )
-               }
+            if errorIsNonExistentSiteError(error) {
+                return handleNonExistentSiteError(error, for: request)
+            }
 
-               let siteCertificate = peerCertificateChain.remove(at: 0)
-
-               return .failure(
-                .RequestExecutionFailed(
-                    statusCode: nil,
-                    redirects: redirectTracker.redirects(for: request.requestId()),
-                    reason: RequestExecutionErrorReason.invalidSslError(
-                            siteCertificate: siteCertificate,
-                            certificateChain: peerCertificateChain,
-                            errorMessage: nil,
-                            suggestedAction: nil
-                        )
-                    )
-                )
-           }
+            if errorIsDeviceIsOffline(error) {
+                return handleDeviceIsOfflineError(error)
+            }
 
             return .failure(.RequestExecutionFailed(
                 statusCode: nil,
@@ -103,80 +62,149 @@ final class WpRequestExecutor: SafeRequestExecutor {
             ))
        }
     }
-    // swiftlint:enable function_body_length
+
+    private func fetch(request: URLRequest) async throws -> (Data, URLResponse) {
+        #if os(Linux)
+        return try await session.data(for: request)
+        #else
+        return try await session.data(for: request, delegate: executorDelegate)
+        #endif
+    }
+
+    private func handleHttpsError(
+        _ error: Error,
+        for request: WpNetworkRequest
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+
+        guard
+            var peerCertificateChain = getPeerCertificateChain(error),
+            !peerCertificateChain.isEmpty
+        else {
+            return .failure(.RequestExecutionFailed(
+                 statusCode: nil,
+                 redirects: executorDelegate.redirects(for: request.requestId()),
+                 reason: .invalidSslError(
+                     siteCertificate: nil,
+                     certificateChain: [],
+                     errorMessage: error.localizedDescription,
+                     suggestedAction: (error as NSError).localizedRecoverySuggestion
+                 )
+            ))
+        }
+
+        let siteCertificate = peerCertificateChain.remove(at: 0)
+
+        return .failure(
+         .RequestExecutionFailed(
+             statusCode: nil,
+             redirects: executorDelegate.redirects(for: request.requestId()),
+             reason: RequestExecutionErrorReason.invalidSslError(
+                     siteCertificate: siteCertificate,
+                     certificateChain: peerCertificateChain,
+                     errorMessage: error.localizedDescription,
+                     suggestedAction: (error as NSError).localizedRecoverySuggestion
+                 )
+             )
+         )
+    }
+
+    func handleNonExistentSiteError(
+        _ error: Error,
+        for request: WpNetworkRequest
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        .failure(
+            .RequestExecutionFailed(
+                statusCode: nil,
+                redirects: executorDelegate.redirects(for: request.requestId()),
+                reason: .nonExistentSiteError(
+                    errorMessage: error.localizedDescription,
+                    suggestedAction: (error as NSError).localizedRecoverySuggestion
+                )
+            )
+        )
+    }
 
     func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        abort() // TODO: This is implemented in a different branch, we'll sync it later
+        preconditionFailure("Not implemented yet")
     }
 
-    // swiftlint:disable force_cast
-    private func errorIsHttpsError(_ error: Error) throws -> Bool {
-        let nserror = error as NSError
-
-        return nserror.domain == NSURLErrorDomain && [
-            NSURLErrorServerCertificateUntrusted,
-            NSURLErrorSecureConnectionFailed,
-            NSURLErrorServerCertificateHasBadDate,
-            NSURLErrorServerCertificateNotYetValid
-        ].contains(nserror.code)
+    func sleep(millis: UInt64) async {
+        // swiftlint:disable:next force_try
+        try! await Task.sleep(nanoseconds: millis * 1000)
     }
 
-    private func getPeerCertificateChain(_ error: Error) throws -> [SSLCertificateInfo] {
+    private func errorIsHttpsError(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else {
+            return false
+        }
+
+        return [
+            .secureConnectionFailed,
+            .serverCertificateUntrusted,
+            .serverCertificateHasBadDate,
+            .serverCertificateNotYetValid,
+            .serverCertificateHasUnknownRoot
+        ].contains(urlError.code)
+    }
+
+    private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
+        [
+            .badURL,
+            .cannotConnectToHost,
+            .cannotFindHost,
+            .dnsLookupFailed
+        ].contains((error as? URLError)?.code)
+    }
+
+    private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
+        [
+            .networkConnectionLost,
+            .notConnectedToInternet
+        ].contains((error as? URLError)?.code)
+    }
+
+    private func handleDeviceIsOfflineError(
+        _ error: Error
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        .failure(
+            .RequestExecutionFailed(
+                statusCode: nil,
+                redirects: nil,
+                reason: .deviceIsOfflineError(
+                    errorMessage: error.localizedDescription
+                )
+            )
+        )
+    }
+
+    private func getPeerCertificateChain(_ error: Error) -> [SSLCertificateInfo]? {
         let nserror = error as NSError
         let info = nserror.userInfo
 
-        guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? NSArray else {
-            return []
-        }
-
-        return try parseCertificateChain(certChainArray).compactMap { data in
-            parseCertificate(data: data)
-        }
-    }
-
-    private func parseCertificateChain(_ chain: NSArray) throws -> [Data] {
-        chain.compactMap { cert in
-
-            #if os(Linux)
+        #if os(Linux) // Linux doesn't support `SecCertificate`
+        return []
+        #else
+        guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? [SecCertificate] else {
             return nil
-            #else
-            // CFGetTypeID validates the type in a way the type system can't
-            let typeCert = cert as! SecCertificate
-            guard CFGetTypeID(typeCert) == SecCertificateGetTypeID() else {
-                return nil
-            }
-
-            return SecCertificateCopyData(cert as! SecCertificate) as Data
-            #endif
         }
-    }
-    // swiftlint:enable force_cast
 
-    // swiftlint:disable force_try
-    func sleep(millis: UInt64) async {
-        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
-            try! await Task.sleep(for: .milliseconds(millis))
-        } else {
-            try! await Task.sleep(nanoseconds: millis * 1000)
-        }
+        return certChainArray.compactMap { parseCertificate(data: SecCertificateCopyData($0) as Data) }
+        #endif
     }
-    // swiftlint:enable force_try
 }
 
-final class RedirectTracker: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
 
+    init(redirects: [String: [WpRedirect]] = [:]) {
+        self.redirects = redirects
+    }
+
     func redirects(for taskID: String) -> [WpRedirect]? {
         lock.withLock {
             redirects[taskID]
-        }
-    }
-
-    func removeRedirects(for taskID: String) {
-        lock.withLock {
-            redirects[taskID] = nil
         }
     }
 

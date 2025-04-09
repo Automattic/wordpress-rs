@@ -17,12 +17,18 @@ extension WpNetworkResponse {
             preconditionFailure("We should never wind up here")
         }
 
-        self =  WpNetworkResponse(
+        self = WpNetworkResponse(
             body: data,
             statusCode: UInt16(response.statusCode),
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
             requestUrl: request.url(),
             requestHeaderMap: request.headerMap()
         )
+    }
+}
+
+extension MiddlewarePipeline {
+    convenience init(middlewares: Middleware...) {
+        self.init(middlewares: middlewares)
     }
 }

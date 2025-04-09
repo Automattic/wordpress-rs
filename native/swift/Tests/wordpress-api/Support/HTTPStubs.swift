@@ -1,6 +1,10 @@
 import Foundation
 import WordPressAPI
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 final class HTTPStubs: SafeRequestExecutor {
     typealias Stub = (condition: @Sendable (WpNetworkRequest) -> Bool, response: WpNetworkResponse)
 
@@ -10,6 +14,10 @@ final class HTTPStubs: SafeRequestExecutor {
     init(stubs: [Stub] = [], missingStub: Result<WpNetworkResponse, Error>? = nil) {
         self.stubs = stubs
         self.missingStub = missingStub
+    }
+
+    func withCredential(_ credential: URLCredential) -> Self {
+        self
     }
 
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -81,4 +89,43 @@ extension WpNetworkResponse {
         )
     }
 
+    static func jsonResponse(named name: String, statusCode: UInt16 = 200) throws -> WpNetworkResponse {
+
+        guard let resourceUrl = Bundle
+            .module
+            .url(forResource: name, withExtension: "json", subdirectory: "Responses")
+        else {
+            preconditionFailure("Could not find \(name).json")
+        }
+
+        return WpNetworkResponse(
+            body: try Data(contentsOf: resourceUrl),
+            statusCode: statusCode,
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"]),
+            requestUrl: "https://example.com",
+            requestHeaderMap: .empty
+        )
+    }
+
+    static func retryResponse(after: TimeInterval) throws -> WpNetworkResponse {
+        return WpNetworkResponse(
+            body: Data(),
+            statusCode: 429,
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Retry-After": String(Int(after))]),
+            requestUrl: "https://example.com",
+            requestHeaderMap: .empty
+        )
+    }
+
+    static func withApiRoot(_ url: String) throws -> WpNetworkResponse {
+        return WpNetworkResponse(
+            body: Data(),
+            statusCode: 200,
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: [
+                "Link": "<\(url)>; rel=\"https://api.w.org/\""
+            ]),
+            requestUrl: url,
+            requestHeaderMap: .empty
+        )
+    }
 }
