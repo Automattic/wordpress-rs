@@ -24,6 +24,7 @@ public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddlewar
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias SSLCertificateInfo = WordPressAPIInternal.SslCertificateInfo
+public typealias WpLoginClient = WordPressAPIInternal.WpLoginClient
 
 // MARK: - Errors
 public typealias AutoDiscoveryAttemptFailure = WordPressAPIInternal.AutoDiscoveryAttemptFailure
