@@ -36,9 +36,9 @@ class LoginManager: NSObject, ObservableObject {
         }
     }
 
-    public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails) async throws {
-        setDefaultSiteUrl(to: newValue.siteUrl)
-        try Keychain.store(username: newValue.userLogin, password: newValue.password, for: newValue.siteUrl)
+    public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) async throws {
+        setDefaultSiteUrl(to: apiRootURL.absoluteString)
+        try Keychain.store(username: newValue.userLogin, password: newValue.password, for: apiRootURL.absoluteString)
 
         isLoggedIn = true
     }

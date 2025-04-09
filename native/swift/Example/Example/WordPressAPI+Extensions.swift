@@ -11,13 +11,7 @@ extension WordPressAPI {
                 throw CocoaError(.validationMissingMandatoryProperty)
             }
 
-            let parsedUrl = try ParsedUrl.parse(input: defaultSiteUrl)
-            let apiRootUrl = try ParsedUrl.parse(
-                input: parsedUrl
-                    .asURL()
-                    .appendingPathComponent("wp-json")
-                    .absoluteString
-            )
+            let apiRootUrl = try ParsedUrl.parse(input: defaultSiteUrl)
 
             guard let loginCredentials = try await loginManager.getLoginCredentials() else {
                 throw CocoaError(.xpcConnectionInvalid)
