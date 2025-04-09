@@ -167,9 +167,7 @@ impl From<reqwest::Error> for RequestExecutionError {
             return RequestExecutionError::RequestExecutionFailed {
                 status_code,
                 redirects: None,
-                reason: RequestExecutionErrorReason::HttpTimeoutError {
-                    hostname: "hostname".to_string(),
-                },
+                reason: RequestExecutionErrorReason::HttpTimeoutError,
             };
         }
 

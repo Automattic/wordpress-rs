@@ -477,9 +477,7 @@ pub enum RequestExecutionErrorReason {
     HttpForbiddenError {
         hostname: String,
     },
-    HttpTimeoutError {
-        hostname: String,
-    },
+    HttpTimeoutError,
     MisconfiguredHttpAuthenticationError {
         issue: HttpAuthMethodParsingError,
     },
@@ -570,9 +568,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             RequestExecutionErrorReason::GenericError { error_message } => {
                 WpMessages::just(error_message)
             }
-            RequestExecutionErrorReason::HttpTimeoutError { hostname } => {
-                WpMessages::just(hostname)
-            }
+            RequestExecutionErrorReason::HttpTimeoutError => WpMessages::http_timeout_error(),
         }
     }
 }
