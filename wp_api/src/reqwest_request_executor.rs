@@ -162,9 +162,10 @@ impl RequestExecutor for ReqwestRequestExecutor {
 
 impl From<reqwest::Error> for RequestExecutionError {
     fn from(error: reqwest::Error) -> Self {
+        let status_code = error.status().map(|s| s.as_u16());
         if error.is_timeout() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: error.status().map(|s| s.as_u16()),
+                status_code,
                 redirects: None,
                 reason: RequestExecutionErrorReason::HttpTimeoutError {
                     hostname: "hostname".to_string(),
@@ -174,7 +175,7 @@ impl From<reqwest::Error> for RequestExecutionError {
 
         if let Some(tls_error) = error.as_tls_error() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
+                status_code,
                 redirects: None,
                 reason: tls_error.into(),
             };
@@ -184,7 +185,7 @@ impl From<reqwest::Error> for RequestExecutionError {
             match io_error.kind() {
                 std::io::ErrorKind::ConnectionRefused => {
                     return RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
+                        status_code,
                         redirects: None,
                         reason: RequestExecutionErrorReason::NonExistentSiteError {
                             error_message: Some("Connection refused".to_string()),
@@ -195,7 +196,7 @@ impl From<reqwest::Error> for RequestExecutionError {
                 std::io::ErrorKind::UnexpectedEof => {
                     // Server terminated the connection unexpectedly
                     return RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
+                        status_code,
                         redirects: None,
                         reason: RequestExecutionErrorReason::NonExistentSiteError {
                             error_message: Some(
@@ -207,7 +208,7 @@ impl From<reqwest::Error> for RequestExecutionError {
                 }
                 _ => {
                     return RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
+                        status_code,
                         redirects: None,
                         reason: RequestExecutionErrorReason::GenericError {
                             error_message: error.to_string(),
@@ -219,7 +220,7 @@ impl From<reqwest::Error> for RequestExecutionError {
 
         if let Some(hyper_error) = error.as_hyper_error() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
+                status_code,
                 redirects: None,
                 reason: hyper_error.into(),
             };
@@ -227,14 +228,14 @@ impl From<reqwest::Error> for RequestExecutionError {
 
         if let Some(dns_error) = error.as_dns_error() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
+                status_code,
                 redirects: None,
                 reason: dns_error.into(),
             };
         }
 
         RequestExecutionError::RequestExecutionFailed {
-            status_code: None,
+            status_code,
             redirects: None,
             reason: RequestExecutionErrorReason::GenericError {
                 error_message: error.to_string(),
