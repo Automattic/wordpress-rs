@@ -11,7 +11,7 @@ import FoundationNetworking
 @Suite("Login Tests", .enabled(if: !isLinux()))
 class LoginTests {
 
-    let client = WpLoginClient(urlSession: .shared)
+    let client = WordPressLoginClient(urlSession: .shared)
 
     @Test("Login Spec Example 1: Valid URL")
     func testValidURL() async throws {
@@ -29,7 +29,7 @@ class LoginTests {
             try HTTPStubs.stub(url: "https://localhost/wp-json", with: .jsonResponse(named: "localhost-json-root"))
         ])
 
-        let client = WpLoginClient(requestExecutor: stubs, middlewarePipeline: .default)
+        let client = WordPressLoginClient(requestExecutor: stubs)
 
         await #expect(performing: {
             _ = try await client.findLoginUrl(forSite: "http://localhost")
@@ -171,7 +171,7 @@ class LoginTests {
         let invalid = ApiDiscoveryAuthenticationMiddleware(username: "invalid", password: "invalid")
 
         await #expect(performing: {
-            _ = try await WpLoginClient(
+            _ = try await WordPressLoginClient(
                 urlSession: .shared,
                 middleware: MiddlewarePipeline(middlewares: invalid)
             ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
@@ -195,7 +195,7 @@ class LoginTests {
     func testWordPressHttpBasicWithValidCredentials() async throws {
         let valid = ApiDiscoveryAuthenticationMiddleware(username: "test@example.com", password: "str0ngp4ssw0rd!")
 
-        let parsedUrl = try await WpLoginClient(
+        let parsedUrl = try await WordPressLoginClient(
             urlSession: .shared,
             middleware: MiddlewarePipeline(middlewares: valid)
         ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
@@ -223,7 +223,7 @@ class LoginTests {
 
         await #expect(performing: {
             let retryMiddleware = RetryAfterMiddleware(maxRetries: 3, maxRetryWaitSeconds: 1)
-            let client = WpLoginClient(requestExecutor: stubs, middlewarePipeline: MiddlewarePipeline(middlewares: [retryMiddleware]))
+            let client = WordPressLoginClient(requestExecutor: stubs, middleware: MiddlewarePipeline(middlewares: [retryMiddleware]))
             _ = try await client.findLoginUrl(forSite: "https://aggressive-rate-limiting.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
@@ -279,7 +279,7 @@ class LoginTests {
             ),
             delegateQueue: nil
         )
-        let client = WpLoginClient(urlSession: session)
+        let client = WordPressLoginClient(urlSession: session)
         _ = try await client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
     }
 
@@ -366,12 +366,6 @@ class LoginTests {
         Issue.record("Failed to find a request execution error reason")
 
         return nil
-    }
-}
-
-private extension WpLoginClient {
-    func findLoginUrl(forSite site: String) async throws -> ParsedUrl {
-        try await apiDiscovery(siteUrl: site).apiDetails.applicationPasswordAuthenticationUrl
     }
 }
 

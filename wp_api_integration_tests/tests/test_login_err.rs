@@ -112,7 +112,7 @@ async fn login_flow_err_helper(
         Arc::new(ReqwestRequestExecutor::new(true)),
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     )
-    .perform_api_discovery(site_url.to_string())
+    .api_discovery(site_url.to_string())
     .await
     .combined_result()
     .unwrap_err()
