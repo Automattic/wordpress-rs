@@ -64,11 +64,11 @@ final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func fetch(request: URLRequest) async throws -> (Data, URLResponse) {
-        if #available(macOS 12.0, *) {
-            return try await self.session.data(for: request, delegate: executorDelegate)
-        } else {
-            return try await self.session.data(for: request)
-        }
+        #if os(Linux)
+        return try await session.data(for: request)
+        #else
+        return try await session.data(for: request, delegate: executorDelegate)
+        #endif
     }
 
     private func handleHttpsError(
