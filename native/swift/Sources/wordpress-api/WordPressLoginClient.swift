@@ -7,14 +7,27 @@ import FoundationNetworking
 
 public extension WpLoginClient {
 
-    convenience init(urlSession: URLSession) {
-        self.init(requestExecutor: WpRequestExecutor(urlSession: urlSession), middlewarePipeline: .default)
+    convenience init(urlSession: URLSession, middleware: WpApiMiddlewarePipeline = .default) {
+        self.init(requestExecutor: WpRequestExecutor(urlSession: urlSession), middlewarePipeline: middleware)
     }
 
     /// Convert the callback URL into a set of authentication credentials
     ///
-    public func credentials(from callbackUrl: URL) throws -> WpApiApplicationPasswordDetails {
+    func credentials(from callbackUrl: URL) throws -> WpApiApplicationPasswordDetails {
         try extractLoginDetailsFromUrl(url: callbackUrl.absoluteString)
+    }
+
+}
+
+extension WpApiDetails {
+
+    var applicationPasswordAuthenticationUrl: ParsedUrl {
+        get throws {
+            guard let passwordAuthUrl = findApplicationPasswordsAuthenticationUrl() else {
+                preconditionFailure("No Auth URL Found")
+            }
+            return try ParsedUrl.parse(input: passwordAuthUrl)
+        }
     }
 
 }
@@ -24,12 +37,8 @@ public extension AutoDiscoveryAttemptSuccess {
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL,
     /// then creates a URL that can be displayed by `ASWebAuthenticationSession`.
     ///
-    public func loginURL(for application: Application) async throws -> URL {
-        guard let passwordAuthUrl = apiDetails.findApplicationPasswordsAuthenticationUrl() else {
-            preconditionFailure("No Auth URL Found")
-        }
-
-        let loginUrl = try ParsedUrl.parse(input: passwordAuthUrl)
+    func loginURL(for application: Application) async throws -> URL {
+        let loginUrl = try apiDetails.applicationPasswordAuthenticationUrl
         return createApplicationPasswordAuthenticationUrl(
             loginUrl: loginUrl,
             appName: application.name,
