@@ -10,10 +10,12 @@ sealed class WpHttpClient {
     class DefaultHttpClient : WpHttpClient() {
         private var client: OkHttpClient = OkHttpClient()
 
-        private var allowedHostnames: Map<String, String> = emptyMap()
+        private var allowedHostnames: Map<String, List<String>> = emptyMap()
 
-        fun addAllowedAlternativeNameForHostname(hostname: String, alternativeName: String) {
-            allowedHostnames = allowedHostnames.plus(Pair(hostname, alternativeName))
+        fun addAllowedAlternativeNamesForHostname(hostname: String, allowedNames: List<String>) {
+            // Preserve the previous records for this key
+            val previousList = allowedHostnames[hostname].orEmpty()
+            allowedHostnames = allowedHostnames.plus(Pair(hostname, allowedNames.plus(previousList)))
             updateClient()
         }
 
@@ -31,11 +33,11 @@ sealed class WpHttpClient {
     }
 }
 
-private class WpRequestExecutorHostnameVerifier(private val allowedHostnames: Map<String, String>) :
+private class WpRequestExecutorHostnameVerifier(private val allowedHostnames: Map<String, List<String>>) :
     HostnameVerifier {
     override fun verify(hostname: String?, session: SSLSession?): Boolean =
         session?.let {
-            val name = it.peerPrincipal.name.replace("CN=", "")
-            name == hostname || allowedHostnames[hostname]?.let { alternativeName -> name == alternativeName } ?: false
+            val peerPrincipalName = it.peerPrincipal.name.replace("CN=", "")
+            peerPrincipalName == hostname || allowedHostnames[peerPrincipalName]?.contains(hostname) ?: false
         } ?: false
 }

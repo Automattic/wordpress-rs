@@ -277,9 +277,9 @@ class ApiUrlDiscoveryTest {
     fun testInvalidHttpsWithExceptionWorks() = runTest {
         val httpClient = WpHttpClient.DefaultHttpClient()
         val executor = WpRequestExecutor(httpClient)
-        httpClient.addAllowedAlternativeNameForHostname(
-            "wordpress-1315525-4803651.cloudwaysapps.com",
-            "vanilla.wpmt.co"
+        httpClient.addAllowedAlternativeNamesForHostname(
+            "vanilla.wpmt.co",
+            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
         )
 
         assertEquals(
