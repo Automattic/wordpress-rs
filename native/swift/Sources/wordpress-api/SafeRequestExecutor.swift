@@ -181,11 +181,15 @@ final class WpRequestExecutor: SafeRequestExecutor {
         let nserror = error as NSError
         let info = nserror.userInfo
 
+        #if os(Linux) // Linux doesn't support `SecCertificate`
+        return []
+        #else
         guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? [SecCertificate] else {
             return nil
         }
 
         return certChainArray.compactMap { parseCertificate(data: SecCertificateCopyData($0) as Data) }
+        #endif
     }
 }
 
