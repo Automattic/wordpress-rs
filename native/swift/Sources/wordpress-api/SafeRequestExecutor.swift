@@ -181,33 +181,12 @@ final class WpRequestExecutor: SafeRequestExecutor {
         let nserror = error as NSError
         let info = nserror.userInfo
 
-        guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? NSArray else {
+        guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? [SecCertificate] else {
             return nil
         }
 
-        return parseCertificateChain(certChainArray).compactMap { data in
-            parseCertificate(data: data)
-        }
+        return certChainArray.compactMap { parseCertificate(data: SecCertificateCopyData($0) as Data) }
     }
-
-    // swiftlint:disable force_cast
-    private func parseCertificateChain(_ chain: NSArray) -> [Data] {
-        #if os(Linux) // Linux doesn't know about the types here, so we'll fast-path our way out of it
-        return []
-        #else
-        return chain.compactMap { cert in
-
-            // CFGetTypeID validates the type in a way the type system can't
-            let typeCert = cert as! SecCertificate
-            guard CFGetTypeID(typeCert) == SecCertificateGetTypeID() else {
-                return nil
-            }
-
-            return SecCertificateCopyData(cert as! SecCertificate) as Data
-        }
-        #endif
-    }
-    // swiftlint:enable force_cast
 }
 
 final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
