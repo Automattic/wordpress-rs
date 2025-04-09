@@ -454,6 +454,8 @@ pub enum InvalidSslErrorReason {
         hostname: String,
         presented_hostnames: Vec<String>,
     },
+    // Message: "Unable to establish a secure connection to the server"
+    GenericSslError {}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, WpDeriveLocalizable)]
