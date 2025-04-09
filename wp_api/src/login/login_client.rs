@@ -20,42 +20,14 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, uniffi::Object)]
-struct UniffiWpLoginClient {
-    inner: Arc<WpLoginClient>,
-}
-
-#[uniffi::export]
-impl UniffiWpLoginClient {
-    #[uniffi::constructor]
-    fn new(
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
-        Self {
-            inner: WpLoginClient::new(request_executor, middleware_pipeline).into(),
-        }
-    }
-
-    async fn api_discovery(
-        &self,
-        site_url: String,
-    ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
-        self.inner
-            .api_discovery(site_url)
-            .await
-            .combined_result()
-            .cloned()
-            .map_err(|e| e.clone())
-    }
-}
-
-#[derive(Debug)]
 pub struct WpLoginClient {
     request_executor: Arc<dyn RequestExecutor>,
     middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
 }
 
+#[uniffi::export]
 impl WpLoginClient {
+    #[uniffi::constructor]
     pub fn new(
         request_executor: Arc<dyn RequestExecutor>,
         middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
@@ -66,7 +38,20 @@ impl WpLoginClient {
         }
     }
 
-    pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
+    async fn api_discovery(
+        &self,
+        site_url: String,
+    ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
+        self.perform_api_discovery(site_url)
+            .await
+            .combined_result()
+            .cloned()
+            .map_err(|e| e.clone())
+    }
+}
+
+impl WpLoginClient {
+    pub async fn perform_api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
         let attempts = futures::future::join_all(
             url_discovery::construct_attempts(site_url)
                 .into_iter()
