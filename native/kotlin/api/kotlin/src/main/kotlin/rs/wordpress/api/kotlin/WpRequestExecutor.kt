@@ -135,7 +135,7 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     return RequestExecutionErrorReason.InvalidSslError(
         reason = InvalidSslErrorReason.CertificateNotValidForName(
             hostname = requestUrl.host,
-            presentedHostnames = listOf(certificates.first()?.let { it.commonName() }).mapNotNull { it }
+            presentedHostnames = listOfNotNull(certificates.first()?.commonName())
         )
     )
 }

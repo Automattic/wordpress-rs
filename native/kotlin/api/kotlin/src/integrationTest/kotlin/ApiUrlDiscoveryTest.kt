@@ -282,8 +282,6 @@ class ApiUrlDiscoveryTest {
             val hostname = (sslError as InvalidSslErrorReason.CertificateNotValidForName).hostname
             val presentedHostnames = sslError.presentedHostnames
 
-            print(presentedHostnames)
-
             assertEquals(hostname, "wordpress-1315525-4803651.cloudwaysapps.com")
             assertContains(presentedHostnames, "vanilla.wpmt.co")
         }
