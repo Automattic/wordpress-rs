@@ -97,7 +97,7 @@ async fn login_flow_helper(
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     );
 
-    let result = client.api_discovery(site_url.to_string()).await;
+    let result = client.perform_api_discovery(site_url.to_string()).await;
     assert!(
         result.is_successful(),
         "Auto discovery failed: {:#?}",
