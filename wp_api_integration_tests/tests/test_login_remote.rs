@@ -1,0 +1,394 @@
+use serial_test::parallel;
+use std::sync::Arc;
+use wp_api::{
+    InvalidSslErrorReason, RequestExecutionError, RequestExecutionErrorReason,
+    login::{
+        login_client::WpLoginClient,
+        url_discovery::{
+            ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttemptFailure,
+            FetchAndParseApiRootFailure, FindApiRootFailure,
+        },
+    },
+    middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
+    reqwest_request_executor::ReqwestRequestExecutor,
+};
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_1_valid_site_works_correctly() {
+    // Spec Example 1
+    assert_eq!(
+        login_url("https://vanilla.wpmt.co").await,
+        "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+//#[tokio::test]
+//#[parallel]
+//async fn login_spec_2_local_development_environment() {
+//    // Spec Example 2
+//
+//    // Until we have a mock server, this is just testing that we can examine underlying errors
+//    let result = login_url("http://localhost").await;
+//    let error = result.unwrap_err();
+//    assert!(is_wp_api_error(&error));
+//    assert_eq!(
+//        error.to_string(),
+//        "A server with the specified hostname could not be found."
+//    );
+//}
+//
+#[tokio::test]
+#[parallel]
+async fn login_spec_3_admin_url_provided() {
+    // Spec Example 3
+    assert_eq!(
+        login_url("https://vanilla.wpmt.co/wp-login.php").await,
+        "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    );
+    assert_eq!(
+        login_url("https://vanilla.wpmt.co/wp-admin").await,
+        "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_4_auth_https_support() {
+    // Spec Example 4
+    assert_eq!(
+        login_url("http://vanilla.wpmt.co").await,
+        "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_5_http_only_site() {
+    // Spec Example 5
+    let error = fetch_and_parse_api_root_failure("http://no-https.wpmt.co").await;
+    if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } = error {
+        assert_eq!(
+            reason,
+            Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordsDisabledForHttpSite)
+        );
+    } else {
+        panic!(
+            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {:?}",
+            error
+        );
+    }
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_6_http_only_site_with_application_passwords_enabled() {
+    // Spec Example 6
+    assert_eq!(
+        login_url("http://no-https-with-application-passwords.wpmt.co").await,
+        "http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_7_aggressively_cached_site_with_no_link_header() {
+    // Spec Example 7
+    assert_eq!(
+        login_url("https://aggressive-caching.wpmt.co").await,
+        "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
+    // Spec Example 8
+    let error = fetch_and_parse_api_root_failure("https://wordfence.wpmt.co").await;
+    if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
+        reason:
+            Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
+                ref plugin,
+            }),
+        ..
+    } = error
+    {
+        assert_eq!(plugin.name, "Wordfence");
+    } else {
+        panic!(
+            "Expected ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin, got: {:?}",
+            error
+        );
+    }
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_9_not_a_wordpress_site() {
+    // Spec Example 9
+    assert_eq!(
+        login_err("google.com").await.to_api_root_failure(),
+        FindApiRootFailure::ProbablyNotAWordPressSite
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_10_wordpress_subdirectory_with_link_header() {
+    // Spec Example 10
+    assert_eq!(
+        login_url("https://subdirectory.wpmt.co/index.php?link_header=true").await,
+        "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_11_wordpress_subdirectory_with_link_tag() {
+    // Spec Example 11
+    assert_eq!(
+        login_url("https://subdirectory.wpmt.co/index.php?link_tag=true").await,
+        "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_12_wordpress_subdirectory_with_redirect() {
+    // Spec Example 12
+    assert_eq!(
+        login_url("https://subdirectory.wpmt.co/index.php?redirect=true").await,
+        "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
+    // Spec Example 13 (with missing credentials)
+    let expected_hostname = "https://basic-auth.wpmt.co/";
+    let reason = login_err(expected_hostname)
+        .await
+        .to_fetch_home_page_reason();
+    if let RequestExecutionErrorReason::HttpAuthenticationRequiredError { hostname, .. } = reason {
+        assert_eq!(hostname, expected_hostname);
+    } else {
+        panic!(
+            "Expected RequestExecutionErrorReason::HttpAuthenticationRequiredError, got: {:?}",
+            reason
+        );
+    }
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
+    // Spec Example 13 (with invalid credentials)
+    let expected_hostname = "https://basic-auth.wpmt.co/";
+    let reason = discovery_helper(
+        ReqwestRequestExecutor::default(),
+        vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
+            "invalid".to_string(),
+            "invalid".to_string(),
+        ))],
+        expected_hostname,
+    )
+    .await
+    .expect_err("Expected api discovery to fail")
+    .to_fetch_home_page_reason();
+    if let RequestExecutionErrorReason::HttpAuthenticationRejectedError { hostname, .. } = reason {
+        assert_eq!(hostname, expected_hostname);
+    } else {
+        panic!(
+            "Expected RequestExecutionErrorReason::HttpAuthenticationRejectedError, got: {:?}",
+            reason
+        );
+    }
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
+    // Spec Example 13 (with valid credentials)
+    let login_url = discovery_helper(
+        ReqwestRequestExecutor::default(),
+        vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
+            "test@example.com".to_string(),
+            "str0ngp4ssw0rd!".to_string(),
+        ))],
+        "https://basic-auth.wpmt.co/",
+    )
+    .await
+    .expect("Expected api discovery to fail");
+    assert_eq!(
+        login_url,
+        "https://basic-auth.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_14_wordpress_custom_rest_api_prefix() {
+    // Spec Example 14
+    assert_eq!(
+        login_url("https://custom-rest-prefix.wpmt.co").await,
+        "https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_15_wordpress_heavy_rate_limiting() {
+    // Spec Example 15
+    assert_eq!(
+        login_url("https://aggressive-rate-limiting.wpmt.co").await,
+        "https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+//
+//#[tokio::test]
+//#[parallel]
+//async fn login_spec_15_wordpress_heavy_rate_limiting_that_never_succeeds() {
+//    todo!("We need mocking for this");
+//    // Spec Example 15
+//}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_16_invalid_url() {
+    // Spec Example 16
+    assert!(matches!(
+        login_err("https://valid-looking-url-but-not-actually.foo")
+            .await
+            .to_api_root_failure(),
+        FindApiRootFailure::FetchHomepage { .. }
+    ));
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_17_invalid_https_fails() {
+    // Spec Example 17
+    let request_execution_error_reason =
+        login_err("https://wordpress-1315525-4803651.cloudwaysapps.com")
+            .await
+            .to_fetch_home_page_reason();
+    assert!(
+        matches!(
+            request_execution_error_reason,
+            RequestExecutionErrorReason::InvalidSslError {
+                reason: InvalidSslErrorReason::CertificateNotValidForName { .. }
+            }
+        ),
+        "Expected RequestExecutionErrorReason::InvalidSslError, got: {:?}",
+        request_execution_error_reason
+    );
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_17_invalid_https_with_exception_works() {
+    // Spec Example 17 (with exception)
+    assert_eq!(
+        login_url_with_executor(
+            ReqwestRequestExecutor::new_with_default_timeout(true),
+            "https://wordpress-1315525-4803651.cloudwaysapps.com"
+        )
+        .await,
+        "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    );
+}
+
+async fn login_url(site_url: &str) -> String {
+    login_url_with_executor(ReqwestRequestExecutor::default(), site_url).await
+}
+
+async fn login_url_with_executor(
+    request_executor: ReqwestRequestExecutor,
+    site_url: &str,
+) -> String {
+    discovery_helper(request_executor, vec![], site_url)
+        .await
+        .expect("Expected api discovery to be successful")
+}
+
+async fn fetch_and_parse_api_root_failure(site_url: &str) -> FetchAndParseApiRootFailure {
+    let error = login_err(site_url).await;
+    if let AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+        fetch_and_parse_api_root_failure,
+        ..
+    } = error
+    {
+        fetch_and_parse_api_root_failure
+    } else {
+        panic!(
+            "Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {:?}",
+            error
+        );
+    }
+}
+
+trait AutoDiscoveryAttemptFailureExtension {
+    fn to_api_root_failure(self) -> FindApiRootFailure;
+    fn to_fetch_home_page_reason(self) -> RequestExecutionErrorReason;
+}
+
+impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
+    fn to_api_root_failure(self) -> FindApiRootFailure {
+        if let AutoDiscoveryAttemptFailure::FindApiRoot {
+            find_api_root_failure,
+            ..
+        } = self
+        {
+            find_api_root_failure.clone()
+        } else {
+            panic!(
+                "Expected AutoDiscoveryAttemptFailure::FindApiRoot, got: {:?}",
+                self
+            );
+        }
+    }
+
+    fn to_fetch_home_page_reason(self) -> RequestExecutionErrorReason {
+        let error = self.to_api_root_failure();
+        if let FindApiRootFailure::FetchHomepage {
+            error: RequestExecutionError::RequestExecutionFailed { reason, .. },
+        } = error
+        {
+            reason
+        } else {
+            panic!(
+                "Expected FindApiRootFailure::FetchHomepage, got: {:?}",
+                error
+            );
+        }
+    }
+}
+
+async fn login_err(site_url: &str) -> AutoDiscoveryAttemptFailure {
+    discovery_helper(ReqwestRequestExecutor::default(), vec![], site_url)
+        .await
+        .expect_err("Expected api discovery to fail")
+}
+
+async fn discovery_helper(
+    request_executor: ReqwestRequestExecutor,
+    middlewares: Vec<Arc<dyn WpApiMiddleware>>,
+    site_url: &str,
+) -> Result<String, AutoDiscoveryAttemptFailure> {
+    let client = WpLoginClient::new(
+        Arc::new(request_executor),
+        Arc::new(WpApiMiddlewarePipeline { middlewares }),
+    );
+    client
+        .api_discovery(site_url.to_string())
+        .await
+        .combined_result()
+        .map(|success| {
+            success
+                .api_details
+                .find_application_passwords_authentication_url()
+                .expect("If the discovery is successful, authentication url has to be `Some`")
+        })
+        .map_err(|e| e.clone())
+}
