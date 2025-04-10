@@ -260,9 +260,14 @@ class LoginTests {
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
             guard case .invalidSslError(let underlyingReason) = reason else {
                 Issue.record("The transport error must be `invalidSslError`")
+                return false
+            }
+
+            #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
+            guard case .genericSslError = underlyingReason else {
+                Issue.record("The underlying error must be `genericSslError`")
                 return false
             }
             #else
