@@ -70,7 +70,8 @@ struct LoginView: View {
                 )
 
                 let loginClient = WordPressLoginClient(urlSession: .shared)
-                let loginUrl = try await loginClient.loginURL(forSite: url, application: application)
+                let details = try await loginClient.details(ofSite: url)
+                let loginUrl = try await details.loginURL(for: application)
 
                 let callbackUrl = try await self.webAuthenticationSession.authenticate(
                     using: loginUrl,
@@ -78,7 +79,7 @@ struct LoginView: View {
                 )
 
                 let loginDetails = try loginClient.credentials(from: callbackUrl)
-                try await loginManager.setLoginCredentials(to: loginDetails)
+                try await loginManager.setLoginCredentials(to: loginDetails, apiRootURL: details.apiRootUrl.asURL())
             } catch let err {
                 handleLoginError(err)
             }

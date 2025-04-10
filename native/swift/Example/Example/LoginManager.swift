@@ -12,20 +12,20 @@ class LoginManager: NSObject, ObservableObject {
         self.isLoggedIn = hasStoredLoginCredentials()
     }
 
-    public func getDefaultSiteUrl() -> String? {
-        guard let string = UserDefaults.standard.string(forKey: "default-site-url") else {
+    public func getApiRootUrl() -> String? {
+        guard let string = UserDefaults.standard.string(forKey: "api-root-url") else {
             return nil
         }
 
         return string
     }
 
-    func setDefaultSiteUrl(to newValue: String) {
-        UserDefaults.standard.setValue(newValue, forKey: "default-site-url")
+    func setApiRootUrl(to newValue: String) {
+        UserDefaults.standard.setValue(newValue, forKey: "api-root-url")
     }
 
     public func hasStoredLoginCredentials() -> Bool {
-        guard let siteUrl = getDefaultSiteUrl() else {
+        guard let siteUrl = getApiRootUrl() else {
             return false
         }
 
@@ -36,9 +36,9 @@ class LoginManager: NSObject, ObservableObject {
         }
     }
 
-    public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails) async throws {
-        setDefaultSiteUrl(to: newValue.siteUrl)
-        try Keychain.store(username: newValue.userLogin, password: newValue.password, for: newValue.siteUrl)
+    public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) async throws {
+        setApiRootUrl(to: apiRootURL.absoluteString)
+        try Keychain.store(username: newValue.userLogin, password: newValue.password, for: apiRootURL.absoluteString)
 
         isLoggedIn = true
     }
@@ -46,7 +46,7 @@ class LoginManager: NSObject, ObservableObject {
     public func getLoginCredentials() throws -> WpAuthentication? {
 
         guard
-            let siteUrl = getDefaultSiteUrl(),
+            let siteUrl = getApiRootUrl(),
             let keychainItem = try Keychain.lookup(for: siteUrl)
         else {
             return nil
@@ -56,7 +56,7 @@ class LoginManager: NSObject, ObservableObject {
     }
 
     public func logout() async {
-        UserDefaults.standard.removeObject(forKey: "default-site-url")
+        UserDefaults.standard.removeObject(forKey: "api-root-url")
 
         await MainActor.run {
             self.objectWillChange.send()
