@@ -5,7 +5,7 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
-public final class WordPressLoginClient {
+public final class WordPressLoginClient: @unchecked Sendable {
 
     private let requestExecutor: SafeRequestExecutor
     private let client: UniffiWpLoginClient
@@ -65,7 +65,7 @@ public final class WordPressLoginClient {
 
 extension AutoDiscoveryAttemptSuccess {
 
-    public func loginURL(for application: Application) async throws -> URL {
+    public func loginURL(for application: Application) throws -> URL {
         let loginUrl = try applicationPasswordAuthenticationUrl
         return createApplicationPasswordAuthenticationUrl(
             loginUrl: loginUrl,
