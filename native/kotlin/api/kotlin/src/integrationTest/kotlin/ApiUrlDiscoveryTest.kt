@@ -18,8 +18,10 @@ import uniffi.wp_api.ApplicationPasswordsNotSupportedReason.SiteIsLocalDevelopme
 import uniffi.wp_api.AutoDiscoveryAttemptFailure
 import uniffi.wp_api.FetchAndParseApiRootFailure
 import uniffi.wp_api.FindApiRootFailure
+import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
+import kotlin.test.assertContains
 
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
@@ -270,6 +272,18 @@ class ApiUrlDiscoveryTest {
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
             assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
+
+            val sslError = (reason as RequestExecutionErrorReason.InvalidSslError).reason
+            assertInstanceOf(
+                InvalidSslErrorReason.CertificateNotValidForName::class.java,
+                sslError
+            )
+
+            val hostname = (sslError as InvalidSslErrorReason.CertificateNotValidForName).hostname
+            val presentedHostnames = sslError.presentedHostnames
+
+            assertEquals(hostname, "wordpress-1315525-4803651.cloudwaysapps.com")
+            assertContains(presentedHostnames, "vanilla.wpmt.co")
         }
     }
 

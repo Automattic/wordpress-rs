@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 integration-tests = []
-reqwest-request-executor = ["dep:reqwest", "dep:tokio"]
+reqwest-request-executor = ["dep:reqwest", "dep:tokio", "dep:hyper-util", "dep:rustls", "dep:hickory-resolver", "dep:hyper", "dep:h2"]
 
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
@@ -16,14 +16,19 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = [ "serde" ] }
 futures = { workspace = true }
+h2 = { workspace = true, optional = true }
+hickory-resolver = { workspace = true, optional = true }
 http = { workspace = true }
+hyper = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate" ], optional = true }
+reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls-tls", "hickory-dns" ], optional = true }
+rustls = { workspace = true, optional = true }
 scraper = { workspace = true }
 serde = { workspace = true, features = [ "derive", "rc" ] }
 serde_json = { workspace = true }

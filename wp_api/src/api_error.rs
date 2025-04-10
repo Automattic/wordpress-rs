@@ -1,7 +1,6 @@
+use crate::request::WpRedirect;
 use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError, WpNetworkResponse};
-use crate::{request::WpRedirect, ssl::SSLCertificateInfo};
 use serde::Deserialize;
-use std::sync::Arc;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -449,21 +448,31 @@ impl WpSupportsLocalization for RequestExecutionError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum InvalidSslErrorReason {
+    CertificateNotValidForName {
+        hostname: String,
+        presented_hostnames: Vec<String>,
+    },
+    GenericSslError,
+}
+
+impl InvalidSslErrorReason {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            Self::CertificateNotValidForName { .. } => {
+                WpMessages::invalid_ssl_error_certificate_not_valid_for_name()
+            }
+            Self::GenericSslError => WpMessages::invalid_ssl_error_generic_ssl_error(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, WpDeriveLocalizable)]
 pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
     InvalidSslError {
-        // The SSL certificate for the site we're trying to contact
-        site_certificate: Option<Arc<SSLCertificateInfo>>,
-
-        // Any other certificates in the trust chain
-        certificate_chain: Vec<Arc<SSLCertificateInfo>>,
-
-        // The error message provided by the HTTP stack
-        error_message: Option<String>,
-
-        // Any suggested action provided by the HTTP stack
-        suggested_action: Option<String>,
+        reason: InvalidSslErrorReason,
     },
     NonExistentSiteError {
         error_message: Option<String>,
@@ -480,6 +489,7 @@ pub enum RequestExecutionErrorReason {
     HttpForbiddenError {
         hostname: String,
     },
+    HttpTimeoutError,
     MisconfiguredHttpAuthenticationError {
         issue: HttpAuthMethodParsingError,
     },
@@ -545,7 +555,7 @@ impl RequestExecutionErrorReason {
 impl WpSupportsLocalization for RequestExecutionErrorReason {
     fn message_bundle(&self) -> MessageBundle {
         match self {
-            RequestExecutionErrorReason::InvalidSslError { .. } => WpMessages::invalid_ssl_error(),
+            RequestExecutionErrorReason::InvalidSslError { reason } => reason.message_bundle(),
             RequestExecutionErrorReason::NonExistentSiteError { .. } => {
                 WpMessages::non_existent_site_error()
             }
@@ -570,6 +580,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             RequestExecutionErrorReason::GenericError { error_message } => {
                 WpMessages::just(error_message)
             }
+            RequestExecutionErrorReason::HttpTimeoutError => WpMessages::http_timeout_error(),
         }
     }
 }

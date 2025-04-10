@@ -83,29 +83,22 @@ final class WpRequestExecutor: SafeRequestExecutor {
             return .failure(.RequestExecutionFailed(
                  statusCode: nil,
                  redirects: executorDelegate.redirects(for: request.requestId()),
-                 reason: .invalidSslError(
-                     siteCertificate: nil,
-                     certificateChain: [],
-                     errorMessage: error.localizedDescription,
-                     suggestedAction: (error as NSError).localizedRecoverySuggestion
-                 )
+                 reason: .invalidSslError(reason: InvalidSslErrorReason.genericSslError)
             ))
         }
 
         let siteCertificate = peerCertificateChain.remove(at: 0)
 
-        return .failure(
-         .RequestExecutionFailed(
+        return .failure(.RequestExecutionFailed(
              statusCode: nil,
              redirects: executorDelegate.redirects(for: request.requestId()),
              reason: RequestExecutionErrorReason.invalidSslError(
-                     siteCertificate: siteCertificate,
-                     certificateChain: peerCertificateChain,
-                     errorMessage: error.localizedDescription,
-                     suggestedAction: (error as NSError).localizedRecoverySuggestion
-                 )
+                reason: .certificateNotValidForName(
+                    hostname: request.asURLRequest().url?.host ?? "unknown host",
+                    presentedHostnames: [siteCertificate.commonName()]
+                )
              )
-         )
+         ))
     }
 
     func handleNonExistentSiteError(

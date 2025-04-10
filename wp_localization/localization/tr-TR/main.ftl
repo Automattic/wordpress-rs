@@ -14,7 +14,7 @@ request_execution_failed = HTTP gönderimi başarısız oldu.
 
 just = {$message}
 
-invalid_ssl_error = Geçersiz SSL sertifikası.
+invalid_ssl_error_certificate_not_valid_for_name = Geçersiz SSL sertifikası
 
 non_existent_site_error = Belirtilen bilgisayar adına sahip bir sunucu bulunamadı.
 

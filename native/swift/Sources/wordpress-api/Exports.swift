@@ -8,6 +8,7 @@ import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
 public typealias RequestExecutionError = WordPressAPIInternal.RequestExecutionError
+public typealias InvalidSslErrorReason = WordPressAPIInternal.InvalidSslErrorReason
 public typealias ParsedUrl = WordPressAPIInternal.ParsedUrl
 public typealias WpUuid = WordPressAPIInternal.WpUuid
 public typealias WpNetworkRequest = WordPressAPIInternal.WpNetworkRequest

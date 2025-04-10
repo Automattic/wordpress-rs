@@ -10,6 +10,7 @@ import okhttp3.MultipartBody
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestExecutionErrorReason
@@ -132,10 +133,10 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     // Certificate is parsed by the Rust shared implementation.
     val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
     return RequestExecutionErrorReason.InvalidSslError(
-        siteCertificate = certificates.firstOrNull(),
-        certificateChain = certificates.mapNotNull { it },
-        errorMessage = "Invalid certificate for domain",
-        suggestedAction = null
+        reason = InvalidSslErrorReason.CertificateNotValidForName(
+            hostname = requestUrl.host,
+            presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+        )
     )
 }
 

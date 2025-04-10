@@ -5,6 +5,8 @@ use x509_cert::{
     ext::pkix::{SubjectAltName, name::GeneralName::DnsName},
 };
 
+use crate::date::WpGmtDateTime;
+
 // Parse a DER-encoded certificate into a Struct we can use to get better
 // information about a site's SSL certificate.
 //
@@ -12,10 +14,12 @@ use x509_cert::{
 #[uniffi::export]
 pub fn parse_certificate(data: &[u8]) -> Option<Arc<SSLCertificateInfo>> {
     let certificate = Certificate::from_der(data).ok()?;
-    let certificate = certificate.tbs_certificate();
+    let certificate: &x509_cert::certificate::TbsCertificateInner = certificate.tbs_certificate();
 
     Some(
         SSLCertificateInfo {
+            valid_at: certificate.validity().not_before.into(),
+            expires_at: certificate.validity().not_after.into(),
             common_name: extract_data_as_string(certificate.subject().common_name())?,
             alternative_names: extract_alternative_names(certificate),
             issuer: SSLCertificateIssuer {
@@ -49,7 +53,7 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, uniffi::Object)]
+#[derive(Debug, PartialEq, Eq, Hash, uniffi::Object)]
 #[uniffi::export(Eq, Hash)]
 pub struct SSLCertificateInfo {
     /// The domain this certificate is valid for (or the signer's name, if this is an intermediate or root certificate)
@@ -58,6 +62,10 @@ pub struct SSLCertificateInfo {
     pub alternative_names: Vec<String>,
     /// Information about whomever signed this certificate
     pub issuer: SSLCertificateIssuer,
+    /// The date this certificate was issued
+    pub valid_at: WpGmtDateTime,
+    /// The date this certificate expires
+    pub expires_at: WpGmtDateTime,
 }
 
 #[uniffi::export]
@@ -80,4 +88,10 @@ pub struct SSLCertificateIssuer {
     pub common_name: String,
     pub organization: Option<String>,
     pub country: Option<String>,
+}
+
+impl From<x509_cert::time::Time> for WpGmtDateTime {
+    fn from(date_time: x509_cert::time::Time) -> Self {
+        WpGmtDateTime::from_timestamp(date_time.to_unix_duration().as_secs() as i64)
+    }
 }

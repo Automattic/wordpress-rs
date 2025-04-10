@@ -31,15 +31,6 @@ extension $error_type: LocalizedError {
 }
 EOF
     done
-
-    cat <<'EOF' >> "$swift_binding"
-
-// Some types in the bindings do not get `Hashable & Equatable` implemented
-// by the uniffi-rs codegen. We implement them manually here.
-
-extension WpApiError: Hashable, Equatable {}
-extension RequestExecutionErrorReason: Hashable, Equatable {}
-EOF
 }
 
 for swift_binding in "$output_dir"/*.swift; do

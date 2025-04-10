@@ -260,10 +260,25 @@ class LoginTests {
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            guard case .invalidSslError = reason else {
+            guard case .invalidSslError(let underlyingReason) = reason else {
                 Issue.record("The transport error must be `invalidSslError`")
                 return false
             }
+
+            #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
+            guard case .genericSslError = underlyingReason else {
+                Issue.record("The underlying error must be `genericSslError`")
+                return false
+            }
+            #else
+            guard case .certificateNotValidForName(let hostname, let presentedHostnames) = underlyingReason else {
+                Issue.record("The underlying error must be `certificateNotValidForName`")
+                return false
+            }
+
+            #expect(hostname == "wordpress-1315525-4803651.cloudwaysapps.com")
+            #expect(presentedHostnames == ["vanilla.wpmt.co"])
+            #endif
 
             return true
         })
