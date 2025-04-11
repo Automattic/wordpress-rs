@@ -1,5 +1,6 @@
+use mock_request_executor::MockRequestExecutor;
 use serial_test::parallel;
-use std::sync::Arc;
+use std::{collections::HashMap, path::Path, sync::Arc};
 use wp_api::{
     InvalidSslErrorReason, RequestExecutionError, RequestExecutionErrorReason,
     login::{
@@ -24,29 +25,48 @@ async fn login_spec_1_valid_site_works_correctly() {
     );
 }
 
-//#[tokio::test]
-//#[parallel]
-//async fn login_spec_2_local_development_environment() {
-//    // Spec Example 2
-//
-//    // Until we have a mock server, this is just testing that we can examine underlying errors
-//    let request_executor = Arc::new(MockRequestExecutor);
-//    let error = discovery_helper(request_executor, vec![], "http://localhost")
-//        .await
-//        .expect_err("Expected api discovery to fail")
-//        .to_find_api_root_failure();
-//    if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } = error {
-//        assert_eq!(
-//            reason,
-//            Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordsDisabledForHttpSite)
-//        );
-//    } else {
-//        panic!(
-//            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {:?}",
-//            error
-//        );
-//    }
-//}
+#[tokio::test]
+#[parallel]
+async fn login_spec_2_local_development_environment() {
+    // Spec Example 2
+    let mut mocks = HashMap::new();
+    mocks.insert(
+        "http://localhost/".to_string(),
+        response_helpers::with_api_root("http://localhost/wp-json"),
+    );
+    mocks.insert(
+        "https://localhost/".to_string(),
+        response_helpers::with_api_root("http://localhost/wp-json"),
+    );
+    mocks.insert(
+        "http://localhost/wp-json".to_string(),
+        response_helpers::json_response_from_path(Path::new(
+            "../native/swift/Tests/wordpress-api/Resources/Responses/localhost-json-root.json",
+        )),
+    );
+    mocks.insert(
+        "https://localhost/wp-json".to_string(),
+        response_helpers::json_response_from_path(Path::new(
+            "../native/swift/Tests/wordpress-api/Resources/Responses/localhost-json-root.json",
+        )),
+    );
+    let request_executor = Arc::new(MockRequestExecutor::new(mocks));
+    let error = discovery_helper(request_executor, vec![], "http://localhost/")
+        .await
+        .expect_err("Expected api discovery to fail")
+        .to_fetch_and_parse_api_root_failure();
+    if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } = error {
+        assert_eq!(
+            reason,
+            Some(ApplicationPasswordsNotSupportedReason::SiteIsLocalDevelopmentEnvironment)
+        );
+    } else {
+        panic!(
+            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {:?}",
+            error
+        );
+    }
+}
 
 #[tokio::test]
 #[parallel]
@@ -409,4 +429,128 @@ async fn discovery_helper(
                 .expect("If the discovery is successful, authentication url has to be `Some`")
         })
         .map_err(|e| e.clone())
+}
+
+mod mock_request_executor {
+    use std::{collections::HashMap, sync::Arc};
+    use wp_api::{
+        MediaUploadRequestExecutionError, RequestExecutionError,
+        request::{
+            RequestExecutor, WpNetworkRequest, WpNetworkResponse,
+            endpoint::media_endpoint::MediaUploadRequest,
+        },
+    };
+
+    #[derive(Debug)]
+    pub struct MockRequestExecutor {
+        mocks: HashMap<String, WpNetworkResponse>,
+    }
+
+    impl MockRequestExecutor {
+        pub fn new(mocks: HashMap<String, WpNetworkResponse>) -> Self {
+            Self { mocks }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl RequestExecutor for MockRequestExecutor {
+        async fn execute(
+            &self,
+            request: Arc<WpNetworkRequest>,
+        ) -> Result<WpNetworkResponse, RequestExecutionError> {
+            let response = self
+                .mocks
+                .iter()
+                .find_map(|(url, response)| {
+                    if url == &request.url().0 {
+                        Some(response)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| {
+                    panic!(
+                        "No mock response found for the request URL: {}",
+                        request.url().0
+                    )
+                });
+            // `WpNetworkResponse` doesn't implement `Clone` because it may be expensive, but we
+            // can clone it manually when it makes sense
+            Ok(WpNetworkResponse {
+                body: response.body.clone(),
+                status_code: response.status_code,
+                response_header_map: response.response_header_map.clone(),
+                request_url: response.request_url.clone(),
+                request_header_map: response.request_header_map.clone(),
+            })
+        }
+
+        async fn upload_media(
+            &self,
+            _: Arc<MediaUploadRequest>,
+        ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+            panic!("Upload media is not necessary for these tests");
+        }
+
+        async fn sleep(&self, _: u64) {}
+    }
+}
+
+mod response_helpers {
+    use http::{HeaderMap, header::HeaderValue};
+    use std::{fs, path::Path, sync::Arc};
+    use wp_api::request::{WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl};
+
+    pub fn with_api_root(url: &str) -> WpNetworkResponse {
+        let mut map = HeaderMap::new();
+        let link_header_value = format!("<{url}>; rel=\"https://api.w.org/\"");
+        map.insert(
+            http::header::LINK,
+            HeaderValue::from_str(&link_header_value).expect("Failed to create Link header"),
+        );
+        WpNetworkResponse {
+            body: vec![],
+            status_code: 200,
+            response_header_map: Arc::new(map.into()),
+            request_url: WpEndpointUrl("".to_string()),
+            request_header_map: WpNetworkHeaderMap::default().into(),
+        }
+    }
+
+    pub fn json_response_from_path(json_file_path: &Path) -> WpNetworkResponse {
+        let json = fs::read_to_string(json_file_path).unwrap_or_else(|_| {
+            panic!(
+                "Should have been able to read the json file at: '{:#?}'",
+                json_file_path
+            )
+        });
+        let mut map = HeaderMap::new();
+        map.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        WpNetworkResponse {
+            body: json.as_bytes().to_vec(),
+            status_code: 200,
+            response_header_map: Arc::new(map.into()),
+            request_url: WpEndpointUrl("".to_string()),
+            request_header_map: WpNetworkHeaderMap::default().into(),
+        }
+    }
+
+    pub fn retry_response(delay: usize) -> WpNetworkResponse {
+        let mut map = HeaderMap::new();
+        map.insert(
+            http::header::RETRY_AFTER,
+            HeaderValue::from_str(format!("{delay}").as_str())
+                .expect("Failed to create Retry-After header"),
+        );
+        WpNetworkResponse {
+            body: vec![],
+            status_code: 429,
+            response_header_map: Arc::new(map.into()),
+            request_url: WpEndpointUrl("".to_string()),
+            request_header_map: WpNetworkHeaderMap::default().into(),
+        }
+    }
 }
