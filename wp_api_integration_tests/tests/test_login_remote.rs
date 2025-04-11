@@ -10,6 +10,7 @@ use wp_api::{
         },
     },
     middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
+    request::RequestExecutor,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 
@@ -29,15 +30,24 @@ async fn login_spec_1_valid_site_works_correctly() {
 //    // Spec Example 2
 //
 //    // Until we have a mock server, this is just testing that we can examine underlying errors
-//    let result = login_url("http://localhost").await;
-//    let error = result.unwrap_err();
-//    assert!(is_wp_api_error(&error));
-//    assert_eq!(
-//        error.to_string(),
-//        "A server with the specified hostname could not be found."
-//    );
+//    let request_executor = Arc::new(MockRequestExecutor);
+//    let error = discovery_helper(request_executor, vec![], "http://localhost")
+//        .await
+//        .expect_err("Expected api discovery to fail")
+//        .to_find_api_root_failure();
+//    if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } = error {
+//        assert_eq!(
+//            reason,
+//            Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordsDisabledForHttpSite)
+//        );
+//    } else {
+//        panic!(
+//            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {:?}",
+//            error
+//        );
+//    }
 //}
-//
+
 #[tokio::test]
 #[parallel]
 async fn login_spec_3_admin_url_provided() {
@@ -66,7 +76,9 @@ async fn login_spec_4_auth_https_support() {
 #[parallel]
 async fn login_spec_5_http_only_site() {
     // Spec Example 5
-    let error = fetch_and_parse_api_root_failure("http://no-https.wpmt.co").await;
+    let error = login_err("http://no-https.wpmt.co")
+        .await
+        .to_fetch_and_parse_api_root_failure();
     if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } = error {
         assert_eq!(
             reason,
@@ -104,7 +116,9 @@ async fn login_spec_7_aggressively_cached_site_with_no_link_header() {
 #[parallel]
 async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
     // Spec Example 8
-    let error = fetch_and_parse_api_root_failure("https://wordfence.wpmt.co").await;
+    let error = login_err("https://wordfence.wpmt.co")
+        .await
+        .to_fetch_and_parse_api_root_failure();
     if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
         reason:
             Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
@@ -127,7 +141,7 @@ async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
 async fn login_spec_9_not_a_wordpress_site() {
     // Spec Example 9
     assert_eq!(
-        login_err("google.com").await.to_api_root_failure(),
+        login_err("google.com").await.to_find_api_root_failure(),
         FindApiRootFailure::ProbablyNotAWordPressSite
     );
 }
@@ -186,7 +200,7 @@ async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
     // Spec Example 13 (with invalid credentials)
     let expected_hostname = "https://basic-auth.wpmt.co/";
     let reason = discovery_helper(
-        ReqwestRequestExecutor::default(),
+        Arc::new(ReqwestRequestExecutor::default()),
         vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
             "invalid".to_string(),
             "invalid".to_string(),
@@ -211,7 +225,7 @@ async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
 async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
     // Spec Example 13 (with valid credentials)
     let login_url = discovery_helper(
-        ReqwestRequestExecutor::default(),
+        Arc::new(ReqwestRequestExecutor::default()),
         vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
             "test@example.com".to_string(),
             "str0ngp4ssw0rd!".to_string(),
@@ -260,7 +274,7 @@ async fn login_spec_16_invalid_url() {
     assert!(matches!(
         login_err("https://valid-looking-url-but-not-actually.foo")
             .await
-            .to_api_root_failure(),
+            .to_find_api_root_failure(),
         FindApiRootFailure::FetchHomepage { .. }
     ));
 }
@@ -291,7 +305,7 @@ async fn login_spec_17_invalid_https_with_exception_works() {
     // Spec Example 17 (with exception)
     assert_eq!(
         login_url_with_executor(
-            ReqwestRequestExecutor::new_with_default_timeout(true),
+            Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
             "https://wordpress-1315525-4803651.cloudwaysapps.com"
         )
         .await,
@@ -300,11 +314,11 @@ async fn login_spec_17_invalid_https_with_exception_works() {
 }
 
 async fn login_url(site_url: &str) -> String {
-    login_url_with_executor(ReqwestRequestExecutor::default(), site_url).await
+    login_url_with_executor(Arc::new(ReqwestRequestExecutor::default()), site_url).await
 }
 
 async fn login_url_with_executor(
-    request_executor: ReqwestRequestExecutor,
+    request_executor: Arc<dyn RequestExecutor>,
     site_url: &str,
 ) -> String {
     discovery_helper(request_executor, vec![], site_url)
@@ -312,29 +326,14 @@ async fn login_url_with_executor(
         .expect("Expected api discovery to be successful")
 }
 
-async fn fetch_and_parse_api_root_failure(site_url: &str) -> FetchAndParseApiRootFailure {
-    let error = login_err(site_url).await;
-    if let AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
-        fetch_and_parse_api_root_failure,
-        ..
-    } = error
-    {
-        fetch_and_parse_api_root_failure
-    } else {
-        panic!(
-            "Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {:?}",
-            error
-        );
-    }
-}
-
 trait AutoDiscoveryAttemptFailureExtension {
-    fn to_api_root_failure(self) -> FindApiRootFailure;
+    fn to_find_api_root_failure(self) -> FindApiRootFailure;
     fn to_fetch_home_page_reason(self) -> RequestExecutionErrorReason;
+    fn to_fetch_and_parse_api_root_failure(self) -> FetchAndParseApiRootFailure;
 }
 
 impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
-    fn to_api_root_failure(self) -> FindApiRootFailure {
+    fn to_find_api_root_failure(self) -> FindApiRootFailure {
         if let AutoDiscoveryAttemptFailure::FindApiRoot {
             find_api_root_failure,
             ..
@@ -350,7 +349,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
     }
 
     fn to_fetch_home_page_reason(self) -> RequestExecutionErrorReason {
-        let error = self.to_api_root_failure();
+        let error = self.to_find_api_root_failure();
         if let FindApiRootFailure::FetchHomepage {
             error: RequestExecutionError::RequestExecutionFailed { reason, .. },
         } = error
@@ -363,21 +362,40 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
             );
         }
     }
+
+    fn to_fetch_and_parse_api_root_failure(self) -> FetchAndParseApiRootFailure {
+        if let AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+            fetch_and_parse_api_root_failure,
+            ..
+        } = self
+        {
+            fetch_and_parse_api_root_failure
+        } else {
+            panic!(
+                "Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {:?}",
+                self
+            );
+        }
+    }
 }
 
 async fn login_err(site_url: &str) -> AutoDiscoveryAttemptFailure {
-    discovery_helper(ReqwestRequestExecutor::default(), vec![], site_url)
-        .await
-        .expect_err("Expected api discovery to fail")
+    discovery_helper(
+        Arc::new(ReqwestRequestExecutor::default()),
+        vec![],
+        site_url,
+    )
+    .await
+    .expect_err("Expected api discovery to fail")
 }
 
 async fn discovery_helper(
-    request_executor: ReqwestRequestExecutor,
+    request_executor: Arc<dyn RequestExecutor>,
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
     site_url: &str,
 ) -> Result<String, AutoDiscoveryAttemptFailure> {
     let client = WpLoginClient::new(
-        Arc::new(request_executor),
+        request_executor,
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     );
     client
