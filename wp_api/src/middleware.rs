@@ -114,7 +114,7 @@ pub trait PerformsRequests {
 // MARK: - RetryAfterMiddleware
 
 #[derive(Debug, uniffi::Object)]
-struct RetryAfterMiddleware {
+pub struct RetryAfterMiddleware {
     max_retries: u8,
     max_retry_wait_seconds: u64,
 }
@@ -122,7 +122,7 @@ struct RetryAfterMiddleware {
 #[uniffi::export]
 impl RetryAfterMiddleware {
     #[uniffi::constructor]
-    fn new(max_retries: u8, max_retry_wait_seconds: u64) -> Self {
+    pub fn new(max_retries: u8, max_retry_wait_seconds: u64) -> Self {
         println!("Creating retry middleware");
         Self {
             max_retries,

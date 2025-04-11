@@ -9,7 +9,10 @@ use wp_api::{
             FetchAndParseApiRootFailure, FindApiRootFailure,
         },
     },
-    middleware::{ApiDiscoveryAuthenticationMiddleware, WpApiMiddleware, WpApiMiddlewarePipeline},
+    middleware::{
+        ApiDiscoveryAuthenticationMiddleware, RetryAfterMiddleware, WpApiMiddleware,
+        WpApiMiddlewarePipeline,
+    },
     request::RequestExecutor,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
@@ -268,13 +271,32 @@ async fn login_spec_15_wordpress_heavy_rate_limiting() {
         "https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php"
     );
 }
-//
-//#[tokio::test]
-//#[parallel]
-//async fn login_spec_15_wordpress_heavy_rate_limiting_that_never_succeeds() {
-//    todo!("We need mocking for this");
-//    // Spec Example 15
-//}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_15_wordpress_heavy_rate_limiting_that_never_succeeds() {
+    // Spec Example 15
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://aggressive-rate-limiting.wpmt.co/" => Ok(response_helpers::retry_response(1)),
+        "https://aggressive-rate-limiting.wpmt.co/wp-json" => {
+            Ok(response_helpers::empty_response(200))
+        }
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let retry_middleware = RetryAfterMiddleware::new(3, 1);
+    let request_execution_error_reason = discovery_helper(
+        Arc::new(executor),
+        vec![Arc::new(retry_middleware)],
+        "https://aggressive-rate-limiting.wpmt.co",
+    )
+    .await
+    .expect_err("Expected api discovery to fail")
+    .to_fetch_home_page_reason();
+    assert_eq!(
+        request_execution_error_reason,
+        RequestExecutionErrorReason::MisconfiguredRateLimitError,
+    );
+}
 
 #[tokio::test]
 #[parallel]

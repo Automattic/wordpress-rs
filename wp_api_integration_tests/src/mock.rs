@@ -104,4 +104,14 @@ pub mod response_helpers {
             request_header_map: WpNetworkHeaderMap::default().into(),
         }
     }
+
+    pub fn empty_response(status_code: u16) -> WpNetworkResponse {
+        WpNetworkResponse {
+            body: vec![],
+            status_code,
+            response_header_map: WpNetworkHeaderMap::default().into(),
+            request_url: WpEndpointUrl("".to_string()),
+            request_header_map: WpNetworkHeaderMap::default().into(),
+        }
+    }
 }
