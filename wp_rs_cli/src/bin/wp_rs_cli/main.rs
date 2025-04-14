@@ -166,12 +166,10 @@ impl SimplifiedDiscoveryResult {
     fn log_result(&self) {
         match &self.result {
             Ok(login_url) => {
-                let success = format!("Login URL found: {login_url}").green();
-                println!("{}", success);
+                println!("{}", format!("Login URL found: {login_url}").green());
             }
             Err(error) => {
-                let error = format!("Error: {}", error).red();
-                println!("{}", error);
+                println!("{}", format!("Error: {}", error).red());
             }
         }
     }
