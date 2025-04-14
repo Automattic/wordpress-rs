@@ -302,12 +302,21 @@ async fn login_spec_15_wordpress_heavy_rate_limiting_that_never_succeeds() {
 #[parallel]
 async fn login_spec_16_invalid_url() {
     // Spec Example 16
-    assert!(matches!(
-        login_err("https://valid-looking-url-but-not-actually.foo")
-            .await
-            .to_find_api_root_failure(),
-        FindApiRootFailure::FetchHomepage { .. }
-    ));
+
+    let request_execution_error_reason =
+    login_err("https://valid-looking-url-but-not-actually.foo")
+        .await
+        .to_fetch_home_page_reason();
+
+        assert!(
+            matches!(
+                request_execution_error_reason,
+                RequestExecutionErrorReason::NonExistentSiteError { .. }
+            ),
+            "Expected RequestExecutionErrorReason::NonExistentSiteError, got: {:?}",
+            request_execution_error_reason
+        );
+    
 }
 
 #[tokio::test]
