@@ -4,9 +4,11 @@ use colored::Colorize;
 use csv::Writer;
 use futures::stream::{self, StreamExt};
 use std::sync::Arc;
-use wp_api::login::url_discovery::AutoDiscoveryAttemptType;
 use wp_api::{
-    login::{login_client::WpLoginClient, url_discovery::AutoDiscoveryResult},
+    login::{
+        login_client::WpLoginClient,
+        url_discovery::{AutoDiscoveryAttemptType, AutoDiscoveryResult},
+    },
     middleware::WpApiMiddlewarePipeline,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
@@ -14,17 +16,6 @@ use wp_api::{
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    // /// WordPress site URL
-    // #[arg(short, long)]
-    // site: Option<String>,
-
-    // /// Username for authentication
-    // #[arg(short, long)]
-    // username: Option<String>,
-
-    // /// Password for authentication
-    // #[arg(short, long)]
-    // password: Option<String>,
     #[command(subcommand)]
     command: Commands,
 }
@@ -130,8 +121,8 @@ async fn batch_test_autodiscovery(input_file: String, output_file: String) -> Re
                     continue;
                 }
             }
-            
-            let attempt= result.user_input_attempt();
+
+            let attempt = result.user_input_attempt();
             if let Some(error) = attempt.api_discovery_result.as_ref().err() {
                 writer.write_record(&[outcome, site_url, rewrite_error(error.to_string())])?;
             }
