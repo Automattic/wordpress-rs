@@ -34,27 +34,28 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let login_client = build_login_client();
 
     match cli.command {
         Commands::DiscoverLoginUrl { site } => {
-            discover_login_url(site).await?;
+            discover_login_url(&login_client, site).await?;
         }
         Commands::BatchTestAutodiscovery {
             input_file,
             output_file,
         } => {
-            batch_test_autodiscovery(input_file, output_file).await?;
+            batch_test_autodiscovery(&login_client, input_file, output_file).await?;
         }
     }
 
     Ok(())
 }
 
-async fn discover_login_url(site: String) -> Result<()> {
+async fn discover_login_url(login_client: &WpLoginClient, site: String) -> Result<()> {
     let intro = format!("Discovering login URL for {}", site).blue();
-    println!("{}", intro);
+    println!("{intro}");
 
-    let result = test_url(site).await;
+    let result = perform_api_discovery(login_client, site).await;
 
     if let Some(attempt) = result.find_successful() {
         let login_url = attempt
@@ -90,7 +91,11 @@ struct BatchTestRow {
     url: String,
 }
 
-async fn batch_test_autodiscovery(input_file: String, output_file: String) -> Result<()> {
+async fn batch_test_autodiscovery(
+    login_client: &WpLoginClient,
+    input_file: String,
+    output_file: String,
+) -> Result<()> {
     let intro = format!("Batch testing autodiscovery for {}", input_file).blue();
     println!("{}", intro);
     let mut writer = Writer::from_path(output_file)?;
@@ -98,7 +103,7 @@ async fn batch_test_autodiscovery(input_file: String, output_file: String) -> Re
     let mut s = stream::FuturesUnordered::new();
 
     for row in parse_input_file(input_file)? {
-        s.push(test_url(row.url.clone()));
+        s.push(perform_api_discovery(login_client, row.url.clone()));
     }
 
     let count = format!("Scheduled {} URLs to test", s.len()).blue();
@@ -150,15 +155,17 @@ fn parse_input_file(input_file: String) -> Result<Vec<BatchTestRow>> {
     Ok(rows)
 }
 
-async fn test_url(url: String) -> AutoDiscoveryResult {
-    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_default_timeout(false));
-    let login_client = WpLoginClient::new(
+async fn perform_api_discovery(login_client: &WpLoginClient, url: String) -> AutoDiscoveryResult {
+    println!("Testing {}", url);
+    login_client.api_discovery(url).await
+}
+
+fn build_login_client() -> WpLoginClient {
+    let request_executor = Arc::new(ReqwestRequestExecutor::default());
+    WpLoginClient::new(
         request_executor,
         Arc::new(WpApiMiddlewarePipeline {
             middlewares: vec![],
         }),
-    );
-
-    println!("Testing {}", url);
-    login_client.api_discovery(url).await
+    )
 }
