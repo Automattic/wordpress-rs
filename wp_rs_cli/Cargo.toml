@@ -13,6 +13,7 @@ futures = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true }
 wp_api = { path = "../wp_api", features = [ "reqwest-request-executor" ] }
 
 [[bin]]
