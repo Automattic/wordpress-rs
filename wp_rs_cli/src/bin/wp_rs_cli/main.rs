@@ -122,14 +122,14 @@ async fn batch_test_autodiscovery(
                 .get(&AutoDiscoveryAttemptType::AutoStrippedHttps)
             {
                 if let Some(error) = attempt.api_discovery_result.as_ref().err() {
-                    writer.write_record(&[outcome, site_url, rewrite_error(error.to_string())])?;
+                    writer.write_record(&[outcome, site_url, error.to_string()])?;
                     continue;
                 }
             }
 
             let attempt = result.user_input_attempt();
             if let Some(error) = attempt.api_discovery_result.as_ref().err() {
-                writer.write_record(&[outcome, site_url, rewrite_error(error.to_string())])?;
+                writer.write_record(&[outcome, site_url, error.to_string()])?;
             }
         }
         writer.flush()?;
@@ -138,21 +138,11 @@ async fn batch_test_autodiscovery(
     Ok(())
 }
 
-fn rewrite_error(error: String) -> String {
-    if error.contains("Api root link header not found") {
-        "Unhelpful error".to_string()
-    } else {
-        error.to_string()
-    }
-}
-
 fn parse_input_file(input_file: String) -> Result<Vec<BatchTestRow>> {
-    let mut rdr = csv::Reader::from_path(input_file)?;
-    let rows: Vec<BatchTestRow> = rdr
+    Ok(csv::Reader::from_path(input_file)?
         .deserialize::<BatchTestRow>()
         .filter_map(|r| r.ok())
-        .collect::<Vec<BatchTestRow>>();
-    Ok(rows)
+        .collect::<Vec<BatchTestRow>>())
 }
 
 async fn perform_api_discovery(login_client: &WpLoginClient, url: String) -> AutoDiscoveryResult {
