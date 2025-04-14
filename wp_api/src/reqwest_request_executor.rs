@@ -8,7 +8,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use h2::Error as Http2Error;
-use hickory_resolver::ResolveError;
+use hickory_resolver::error::ResolveError;
 use http::{HeaderMap, HeaderValue};
 use hyper::Error as HyperError;
 use reqwest::multipart::Part;

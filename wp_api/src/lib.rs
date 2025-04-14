@@ -1,7 +1,7 @@
 pub use api_client::{WpApiClient, WpApiRequestBuilder};
 pub use api_error::{
-    MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,
-    RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
+    InvalidSslErrorReason, MediaUploadRequestExecutionError, ParsedRequestError,
+    RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
