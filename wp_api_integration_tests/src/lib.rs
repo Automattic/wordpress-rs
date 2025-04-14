@@ -77,7 +77,7 @@ pub fn api_client() -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
         authentication,
-        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
+        Arc::new(ReqwestRequestExecutor::default()),
     )
 }
 
@@ -89,7 +89,7 @@ pub fn api_client_as_author() -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
         authentication,
-        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
+        Arc::new(ReqwestRequestExecutor::default()),
     )
 }
 
@@ -101,7 +101,7 @@ pub fn api_client_as_subscriber() -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
         authentication,
-        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
+        Arc::new(ReqwestRequestExecutor::default()),
     )
 }
 
@@ -109,7 +109,7 @@ pub fn api_client_as_unauthenticated() -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
         WpAuthentication::None,
-        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
+        Arc::new(ReqwestRequestExecutor::default()),
     )
 }
 

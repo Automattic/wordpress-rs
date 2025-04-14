@@ -161,6 +161,12 @@ impl From<Url> for ParsedUrl {
     }
 }
 
+impl From<ParsedUrl> for String {
+    fn from(input: ParsedUrl) -> Self {
+        input.url()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

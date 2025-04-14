@@ -4,9 +4,15 @@ use crate::{
     login::KnownApplicationPasswordBlockingPlugin,
     request::{ResponseBodyType, WpRedirect},
 };
+use itertools::Itertools;
 use scraper::{Html, Selector};
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    num::{NonZero, NonZeroUsize},
+    sync::Arc,
+};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -65,32 +71,6 @@ impl AutoDiscoveryAttempt {
     }
 }
 
-#[derive(Debug, uniffi::Record)]
-pub struct AutoDiscoveryUniffiResult {
-    pub user_input_attempt: Arc<AutoDiscoveryAttemptResult>,
-    pub successful_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
-    pub auto_stripped_https_attempt: Option<Arc<AutoDiscoveryAttemptResult>>,
-    pub is_successful: bool,
-}
-
-impl From<AutoDiscoveryResult> for AutoDiscoveryUniffiResult {
-    fn from(value: AutoDiscoveryResult) -> Self {
-        let get_attempt_result = |attempt_type| {
-            value
-                .get_attempt(&attempt_type)
-                .map(|a| Arc::new(a.clone()))
-        };
-        Self {
-            user_input_attempt: Arc::new(value.user_input_attempt().clone()),
-            successful_attempt: value.find_successful().map(|a| Arc::new(a.clone())),
-            auto_stripped_https_attempt: get_attempt_result(
-                AutoDiscoveryAttemptType::AutoStrippedHttps,
-            ),
-            is_successful: value.is_successful(),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct AutoDiscoveryResult {
     pub attempts: HashMap<AutoDiscoveryAttemptType, AutoDiscoveryAttemptResult>,
@@ -128,6 +108,24 @@ impl AutoDiscoveryResult {
         attempt_type: &AutoDiscoveryAttemptType,
     ) -> Option<&AutoDiscoveryAttemptResult> {
         self.attempts.get(attempt_type)
+    }
+
+    /// Returns either the successful attempt or the most relevant failure
+    pub fn combined_result(
+        &self,
+    ) -> Result<&AutoDiscoveryAttemptSuccess, &AutoDiscoveryAttemptFailure> {
+        if let Some(success) = self.find_successful() {
+            success.api_discovery_result.as_ref()
+        } else {
+            Err(self
+                .attempts
+                .iter()
+                .flat_map(|(_, a)| a.api_discovery_result.as_ref().err())
+                // Sort in descending order so the most important error is returned
+                .sorted_by(|a, b| b.compare_importance(a))
+                .next()
+                .expect("If the discovery was unsuccessful, there is at least one error"))
+        }
     }
 }
 
@@ -193,7 +191,7 @@ impl AutoDiscoveryAttemptResult {
 
     fn api_details(&self) -> Option<Arc<WpApiDetails>> {
         match &self.api_discovery_result {
-            Ok(success) => Some(Arc::new(success.api_details.clone())),
+            Ok(success) => Some(success.api_details.clone()),
             Err(_) => None,
         }
     }
@@ -357,11 +355,11 @@ pub enum FetchWpJsonFailure {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, uniffi::Record)]
 pub struct AutoDiscoveryAttemptSuccess {
     pub parsed_site_url: Arc<ParsedUrl>,
     pub api_root_url: Arc<ParsedUrl>,
-    pub api_details: WpApiDetails,
+    pub api_details: Arc<WpApiDetails>,
 }
 
 #[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
@@ -378,6 +376,38 @@ pub enum AutoDiscoveryAttemptFailure {
         api_root_url: Arc<ParsedUrl>,
         fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure,
     },
+}
+
+impl AutoDiscoveryAttemptFailure {
+    /// Numerical value to indicate the importance of each error variant. It's closely related
+    /// to how how much progress was made into api discovery before this failure happened.
+    ///
+    /// The numbers are for comparison only and otherwise meaningless.
+    pub(in crate::login::url_discovery) fn importance(&self) -> usize {
+        let parse_site_url_multipler = 1;
+        let find_api_root_failure_multipler = 10;
+        let fetch_and_parse_api_root_failure_multiplier = 1000;
+        match self {
+            AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => parse_site_url_multipler,
+            AutoDiscoveryAttemptFailure::FindApiRoot {
+                find_api_root_failure,
+                ..
+            } => find_api_root_failure_multipler * find_api_root_failure.importance().get(),
+            AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                fetch_and_parse_api_root_failure,
+                ..
+            } => {
+                fetch_and_parse_api_root_failure_multiplier
+                    * fetch_and_parse_api_root_failure.importance().get()
+            }
+        }
+    }
+
+    /// Compares the importance of each failure. It's closely related to how how much progress was
+    /// made into api discovery before this failure happened.
+    pub fn compare_importance(&self, other: &Self) -> Ordering {
+        self.importance().cmp(&other.importance())
+    }
 }
 
 impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
@@ -414,6 +444,21 @@ impl FindApiRootFailure {
             Self::RestApiDisabled => WpMessages::rest_api_disabled(),
         }
     }
+
+    /// Numerical value to indicate the importance of each error variant and it's closely related
+    /// to how how much progress was made into api discovery before this failure happened.
+    ///
+    /// The numbers are for comparison only and otherwise meaningless.
+    pub(in crate::login::url_discovery) fn importance(&self) -> NonZeroUsize {
+        match self {
+            FindApiRootFailure::FetchHomepage { .. } => NonZero::new(1),
+            // `ProbablyNotAWordPressSite` & `RestApiDisabled` results from the same step and
+            // only one of them will be picked for the failure reason.
+            FindApiRootFailure::ProbablyNotAWordPressSite => NonZero::new(2),
+            FindApiRootFailure::RestApiDisabled => NonZero::new(2),
+        }
+        .expect("All values are valid")
+    }
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]
@@ -448,6 +493,20 @@ impl FetchAndParseApiRootFailure {
                 .map(|r| r.message_bundle(parsed_site_url))
                 .unwrap_or(WpMessages::application_passwords_not_supported()),
         }
+    }
+
+    /// Numerical value to indicate the importance of each error variant. It's closely related
+    /// to how how much progress was made into api discovery before this failure happened.
+    ///
+    /// The numbers are for comparison only and otherwise meaningless.
+    pub(in crate::login::url_discovery) fn importance(&self) -> NonZeroUsize {
+        match self {
+            FetchAndParseApiRootFailure::FetchApiRoot { .. } => NonZero::new(1),
+            FetchAndParseApiRootFailure::ParseApiRoot { .. } => NonZero::new(2),
+            FetchAndParseApiRootFailure::WpError { .. } => NonZero::new(3),
+            FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { .. } => NonZero::new(4),
+        }
+        .expect("All values are valid")
     }
 }
 
@@ -673,5 +732,189 @@ mod tests {
     fn test_is_local_dev_environment_url(#[case] url: &str, #[case] expected: bool) {
         let parsed_url = ParsedUrl::parse(url).unwrap();
         assert_eq!(is_local_dev_environment_url(&parsed_url), expected);
+    }
+
+    #[test]
+    fn test_combined_result() {
+        let mut attempts = HashMap::new();
+        attempts.insert(
+            AutoDiscoveryAttemptType::AutoStrippedHttps,
+            AutoDiscoveryAttemptResult {
+                attempt_type: AutoDiscoveryAttemptType::AutoStrippedHttps,
+                attempt_site_url: "".to_string(),
+                api_discovery_result: Err(
+                    adaf_helpers::find_api_root_probably_not_a_wordpress_site(),
+                ),
+            },
+        );
+        attempts.insert(
+            AutoDiscoveryAttemptType::UserInput,
+            AutoDiscoveryAttemptResult {
+                attempt_type: AutoDiscoveryAttemptType::UserInput,
+                attempt_site_url: "".to_string(),
+                api_discovery_result: Err(
+                    adaf_helpers::fetch_and_parse_api_root_application_passwords_not_supported(),
+                ),
+            },
+        );
+        let auto_discovery_result = AutoDiscoveryResult { attempts };
+
+        assert!(matches!(
+            auto_discovery_result.combined_result(),
+            Err(AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                fetch_and_parse_api_root_failure:
+                    FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { .. },
+                ..
+            })
+        ));
+    }
+
+    #[rstest]
+    #[case(
+        AutoDiscoveryAttemptFailure::ParseSiteUrl { error: ParseUrlError::EmptyHost },
+        adaf_helpers::find_api_root_fetch_home_page(),
+        Ordering::Less
+    )]
+    #[case(
+        adaf_helpers::find_api_root_fetch_home_page(),
+        adaf_helpers::find_api_root_probably_not_a_wordpress_site(),
+        Ordering::Less
+    )]
+    #[case(
+        adaf_helpers::find_api_root_fetch_home_page(),
+        adaf_helpers::find_api_root_rest_api_disabled(),
+        Ordering::Less
+    )]
+    #[case(
+        adaf_helpers::find_api_root_probably_not_a_wordpress_site(),
+        adaf_helpers::fetch_and_parse_api_root_fetch_api_root(),
+        Ordering::Less
+    )]
+    #[case(
+        adaf_helpers::fetch_and_parse_api_root_fetch_api_root(),
+        adaf_helpers::fetch_and_parse_api_root_parse_api_root(),
+        Ordering::Less
+    )]
+    #[case(
+        adaf_helpers::fetch_and_parse_api_root_parse_api_root(),
+        adaf_helpers::fetch_and_parse_api_root_wp_error(),
+        Ordering::Less
+    )]
+    #[case(
+        adaf_helpers::fetch_and_parse_api_root_wp_error(),
+        adaf_helpers::fetch_and_parse_api_root_application_passwords_not_supported(),
+        Ordering::Less
+    )]
+    fn test_auto_discovery_attempt_failure_compare_importance(
+        #[case] first: AutoDiscoveryAttemptFailure,
+        #[case] second: AutoDiscoveryAttemptFailure,
+        #[case] expected: Ordering,
+    ) {
+        assert_eq!(first.compare_importance(&second), expected);
+    }
+
+    // `adaf` refers to `AutoDiscoveryAttemptFailure`
+    mod adaf_helpers {
+        use crate::login::WpApiDetailsAuthenticationMap;
+
+        use super::*;
+
+        pub fn find_api_root_fetch_home_page() -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FindApiRoot {
+                parsed_site_url: example_parsed_url(),
+                find_api_root_failure: FindApiRootFailure::FetchHomepage {
+                    error: example_request_execution_failure(),
+                },
+            }
+        }
+
+        pub fn find_api_root_probably_not_a_wordpress_site() -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FindApiRoot {
+                parsed_site_url: example_parsed_url(),
+                find_api_root_failure: FindApiRootFailure::ProbablyNotAWordPressSite,
+            }
+        }
+
+        pub fn find_api_root_rest_api_disabled() -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FindApiRoot {
+                parsed_site_url: example_parsed_url(),
+                find_api_root_failure: FindApiRootFailure::RestApiDisabled,
+            }
+        }
+
+        pub fn fetch_and_parse_api_root_fetch_api_root() -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                parsed_site_url: example_parsed_url(),
+                api_root_url: example_parsed_url(),
+                fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure::FetchApiRoot {
+                    error: example_request_execution_failure(),
+                },
+            }
+        }
+
+        pub fn fetch_and_parse_api_root_parse_api_root() -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                parsed_site_url: example_parsed_url(),
+                api_root_url: example_parsed_url(),
+                fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure::ParseApiRoot {
+                    parsing_error_message: "".to_string(),
+                    response_body: "".to_string(),
+                    response_body_type: ResponseBodyType::MaybeHtml,
+                },
+            }
+        }
+
+        pub fn fetch_and_parse_api_root_wp_error() -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                parsed_site_url: example_parsed_url(),
+                api_root_url: example_parsed_url(),
+                fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure::WpError {
+                    error_code: WpErrorCode::Forbidden,
+                    error_message: "".to_string(),
+                    status_code: 403,
+                },
+            }
+        }
+
+        pub fn fetch_and_parse_api_root_application_passwords_not_supported()
+        -> AutoDiscoveryAttemptFailure {
+            AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                parsed_site_url: example_parsed_url(),
+                api_root_url: example_parsed_url(),
+                fetch_and_parse_api_root_failure:
+                    FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
+                        api_details: example_wp_api_details().into(),
+                        reason: None,
+                    },
+            }
+        }
+
+        fn example_parsed_url() -> Arc<ParsedUrl> {
+            ParsedUrl::parse("https://example.com")
+                .expect("valid url")
+                .into()
+        }
+
+        fn example_request_execution_failure() -> RequestExecutionError {
+            RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: RequestExecutionErrorReason::MisconfiguredRateLimitError,
+            }
+        }
+
+        fn example_wp_api_details() -> WpApiDetails {
+            WpApiDetails {
+                name: "".to_string(),
+                description: "".to_string(),
+                url: "".to_string(),
+                home: "".to_string(),
+                gmt_offset: 0.0,
+                timezone_string: "".to_string(),
+                namespaces: vec![],
+                authentication: WpApiDetailsAuthenticationMap(HashMap::new()),
+                site_icon_url: None,
+            }
+        }
     }
 }

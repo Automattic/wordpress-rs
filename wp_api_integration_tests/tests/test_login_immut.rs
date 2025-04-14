@@ -51,10 +51,6 @@ const VANILLA_WP_AUTH_URL: &str = "https://vanilla.wpmt.co/wp-admin/authorize-ap
     "https://jetpack.wpmt.co/wp-admin/authorize-application.php"
 )]
 #[case(
-    "http://wordpress-1315525-4803651.cloudwaysapps.com",
-    VANILLA_WP_AUTH_URL
-)]
-#[case(
     "https://aggressive-caching.wpmt.co",
     "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php"
 )] // Returns gzip responses, may not always include Link header
@@ -87,13 +83,48 @@ async fn test_login_flow_with_authentication_middleware(
     .await;
 }
 
+#[rstest]
+#[case(
+    "http://wordpress-1315525-4803651.cloudwaysapps.com",
+    VANILLA_WP_AUTH_URL
+)]
+#[tokio::test]
+#[parallel]
+async fn test_login_flow_accept_dangerous_certificates(
+    #[case] site_url: &str,
+    #[case] expected_auth_url: &str,
+) {
+    login_flow_helper_with_executor(
+        ReqwestRequestExecutor::new_with_default_timeout(true),
+        site_url,
+        expected_auth_url,
+        vec![],
+    )
+    .await;
+}
+
 async fn login_flow_helper(
     site_url: &str,
     expected_auth_url: &str,
     middlewares: Vec<Arc<dyn WpApiMiddleware>>,
 ) {
+    login_flow_helper_with_executor(
+        ReqwestRequestExecutor::default(),
+        site_url,
+        expected_auth_url,
+        middlewares,
+    )
+    .await;
+}
+
+async fn login_flow_helper_with_executor(
+    request_executor: ReqwestRequestExecutor,
+    site_url: &str,
+    expected_auth_url: &str,
+    middlewares: Vec<Arc<dyn WpApiMiddleware>>,
+) {
     let client = WpLoginClient::new(
-        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
+        Arc::new(request_executor),
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     );
 

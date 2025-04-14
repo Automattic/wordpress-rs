@@ -48,6 +48,7 @@ navigation-compose = { group = "androidx.navigation", name = "navigation-compose
 navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigation" }
 navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigation" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okHttp" }
+okhttp-tls = { group = "com.squareup.okhttp3", name = "okhttp-tls", version.ref = "okHttp" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

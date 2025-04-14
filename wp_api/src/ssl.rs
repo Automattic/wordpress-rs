@@ -53,7 +53,7 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, uniffi::Object)]
+#[derive(Debug, PartialEq, Eq, Hash, uniffi::Object)]
 #[uniffi::export(Eq, Hash)]
 pub struct SSLCertificateInfo {
     /// The domain this certificate is valid for (or the signer's name, if this is an intermediate or root certificate)
@@ -92,6 +92,6 @@ pub struct SSLCertificateIssuer {
 
 impl From<x509_cert::time::Time> for WpGmtDateTime {
     fn from(date_time: x509_cert::time::Time) -> Self {
-        WpGmtDateTime::from_utimestamp(date_time.to_unix_duration().as_secs())
+        WpGmtDateTime::from_timestamp(date_time.to_unix_duration().as_secs() as i64)
     }
 }

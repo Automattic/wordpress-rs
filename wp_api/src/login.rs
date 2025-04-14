@@ -27,7 +27,14 @@ pub struct WpRestApiUrls {
 // embedded as query params. This function parses that URL and extracts the login details as an object.
 #[uniffi::export]
 pub fn extract_login_details_from_url(
-    url: Arc<ParsedUrl>,
+    url: String,
+) -> Result<WpApiApplicationPasswordDetails, OAuthResponseUrlError> {
+    let url = ParsedUrl::parse(&url).map_err(|_| OAuthResponseUrlError::InvalidUrl)?;
+    extract_login_details_from_parsed_url(url)
+}
+
+pub fn extract_login_details_from_parsed_url(
+    url: ParsedUrl,
 ) -> Result<WpApiApplicationPasswordDetails, OAuthResponseUrlError> {
     let f = |key| {
         url.inner
@@ -186,6 +193,7 @@ pub struct WpApiApplicationPasswordDetails {
     Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error, WpDeriveLocalizable,
 )]
 pub enum OAuthResponseUrlError {
+    InvalidUrl,
     MissingSiteUrl,
     MissingUsername,
     MissingPassword,
@@ -203,6 +211,7 @@ impl WpSupportsLocalization for OAuthResponseUrlError {
             OAuthResponseUrlError::UnsuccessfulLogin => {
                 WpMessages::oauth_response_url_error_unsuccessful_login()
             }
+            OAuthResponseUrlError::InvalidUrl => WpMessages::oauth_response_url_error_url_invalid(),
         }
     }
 }

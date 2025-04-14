@@ -1,25 +1,29 @@
 use crate::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
+    api_error::InvalidSslErrorReason,
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
         endpoint::media_endpoint::MediaUploadRequest,
     },
 };
 use async_trait::async_trait;
-use http::{HeaderMap, HeaderValue};
-use reqwest::multipart::Part;
-use std::{error::{Error}};
-use std::{sync::Arc, time::Duration};
-use hickory_resolver::error::ResolveError;
-use rustls::CertificateError;
-use rustls::Error as TlsError;
-use crate::api_error::InvalidSslError;
-use hyper::Error as HyperError;
 use h2::Error as Http2Error;
+use hickory_resolver::ResolveError;
+use http::{HeaderMap, HeaderValue};
+use hyper::Error as HyperError;
+use reqwest::multipart::Part;
+use rustls::{CertificateError, Error as TlsError};
+use std::{error::Error, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub struct ReqwestRequestExecutor {
     client: reqwest::Client,
+}
+
+impl Default for ReqwestRequestExecutor {
+    fn default() -> Self {
+        Self::new_with_default_timeout(false)
+    }
 }
 
 impl ReqwestRequestExecutor {
@@ -157,59 +161,52 @@ impl RequestExecutor for ReqwestRequestExecutor {
 }
 
 impl From<reqwest::Error> for RequestExecutionError {
-    fn from(error: reqwest::Error) -> Self {        
-        
-        // let Some(url) = error.url() else {
-        //     panic!("The request URL should be valid: {:?}", error.url());
-        // };
-
-        // let Some(hostname) = url.host_str() else {
-        //     panic!("The request URL should have a valid hostname: {:?}", error.url());
-        // };
-
+    fn from(error: reqwest::Error) -> Self {
+        let status_code = error.status().map(|s| s.as_u16());
         if error.is_timeout() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: error.status().map(|s| s.as_u16()),
+                status_code,
                 redirects: None,
-                reason: RequestExecutionErrorReason::HttpTimeoutError { hostname: "hostname".to_string() },
+                reason: RequestExecutionErrorReason::HttpTimeoutError,
             };
         }
 
         if let Some(tls_error) = error.as_tls_error() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
+                status_code,
                 redirects: None,
                 reason: tls_error.into(),
             };
         }
 
         if let Some(io_error) = error.as_io_error() {
-
             match io_error.kind() {
                 std::io::ErrorKind::ConnectionRefused => {
                     return RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
+                        status_code,
                         redirects: None,
                         reason: RequestExecutionErrorReason::NonExistentSiteError {
                             error_message: Some("Connection refused".to_string()),
                             suggested_action: None,
                         },
                     };
-                },
-                std::io::ErrorKind::UnexpectedEof => { // Server terminated the connection unexpectedly
+                }
+                std::io::ErrorKind::UnexpectedEof => {
+                    // Server terminated the connection unexpectedly
                     return RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
+                        status_code,
                         redirects: None,
                         reason: RequestExecutionErrorReason::NonExistentSiteError {
-                            error_message: Some("The server terminated the connection unexpectedly".to_string()),
+                            error_message: Some(
+                                "The server terminated the connection unexpectedly".to_string(),
+                            ),
                             suggested_action: None,
                         },
                     };
-
-                },
+                }
                 _ => {
                     return RequestExecutionError::RequestExecutionFailed {
-                        status_code: None,
+                        status_code,
                         redirects: None,
                         reason: RequestExecutionErrorReason::GenericError {
                             error_message: error.to_string(),
@@ -221,7 +218,7 @@ impl From<reqwest::Error> for RequestExecutionError {
 
         if let Some(hyper_error) = error.as_hyper_error() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
+                status_code,
                 redirects: None,
                 reason: hyper_error.into(),
             };
@@ -229,16 +226,19 @@ impl From<reqwest::Error> for RequestExecutionError {
 
         if let Some(dns_error) = error.as_dns_error() {
             return RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
+                status_code,
                 redirects: None,
-                reason: dns_error.into()
+                reason: dns_error.into(),
             };
         }
 
-        println!("================================================");
-        println!("Error: {:?}", error);
-        println!("Error: {:?}", error.source());
-        todo!("Unhandled error – aborting");
+        RequestExecutionError::RequestExecutionFailed {
+            status_code,
+            redirects: None,
+            reason: RequestExecutionErrorReason::GenericError {
+                error_message: error.to_string(),
+            },
+        }
     }
 }
 
@@ -246,20 +246,13 @@ impl From<reqwest::Error> for RequestExecutionError {
 impl From<&TlsError> for RequestExecutionErrorReason {
     fn from(error: &TlsError) -> Self {
         match error {
-            TlsError::InvalidCertificate(certificate_error) => match certificate_error {
-                CertificateError::NotValidForNameContext {
-                    expected,
-                    presented,
-                } => {
-                    crate::RequestExecutionErrorReason::InvalidSslError {
-                        inner: InvalidSslError::CertificateNotValidForName {
-                            hostname: expected.to_str().to_string(),
-                            presented_hostnames: presented.to_vec(),
-                        },
-                    }
-                }
-                _ => RequestExecutionErrorReason::GenericError {
-                    error_message: error.to_string(),
+            TlsError::InvalidCertificate(CertificateError::NotValidForNameContext {
+                expected,
+                presented,
+            }) => RequestExecutionErrorReason::InvalidSslError {
+                reason: InvalidSslErrorReason::CertificateNotValidForName {
+                    hostname: expected.to_str().to_string(),
+                    presented_hostnames: presented.to_vec(),
                 },
             },
             _ => RequestExecutionErrorReason::GenericError {
@@ -272,13 +265,12 @@ impl From<&TlsError> for RequestExecutionErrorReason {
 /// Converts all DNS errors to a RequestExecutionErrorReason
 impl From<&ResolveError> for RequestExecutionErrorReason {
     fn from(error: &ResolveError) -> Self {
-
         // Future improvement: We could probably detect when the domain is valid, but
         // there's no DNS record for the provided hostname
 
         RequestExecutionErrorReason::NonExistentSiteError {
-                error_message: Some(error.to_string()),
-                suggested_action: None,
+            error_message: Some(error.to_string()),
+            suggested_action: None,
         }
     }
 }
@@ -286,7 +278,6 @@ impl From<&ResolveError> for RequestExecutionErrorReason {
 /// Converts from the Hyper frameworks underlying errors to a RequestExecutionErrorReason
 impl From<&HyperError> for RequestExecutionErrorReason {
     fn from(error: &HyperError) -> Self {
-
         if let Some(http2_error) = error.find::<Http2Error>() {
             // TODO: We can probably handle more cases here, such as:
             // - Connection reset
@@ -309,9 +300,12 @@ impl From<&HyperError> for RequestExecutionErrorReason {
             };
         }
 
-        todo!("Unhandled hyper error: {:?}", error);
+        RequestExecutionErrorReason::GenericError {
+            error_message: error.to_string(),
+        }
     }
 }
+
 trait ExaminableError {
     fn as_io_error(&self) -> Option<&std::io::Error>;
     fn as_dns_error(&self) -> Option<&ResolveError>;
@@ -335,11 +329,7 @@ impl ExaminableError for reqwest::Error {
                 return None;
             };
 
-            let Some(io_error) = inner_error.downcast_ref::<std::io::Error>() else {
-                return None;
-            };
-
-            let Some(io_error) = io_error.get_ref() else {
+            let Some(io_error) = inner_error.downcast_ref::<std::io::Error>()?.get_ref() else {
                 println!("No inner error found for {:?}", self.url());
                 return None;
             };
@@ -360,24 +350,23 @@ impl ExaminableError for reqwest::Error {
     }
 }
 
-
 // It's probably possible to have a single implementation for all of these, but we can do that later
 trait FindsError {
-    fn find<'a, E: Error + 'static>(&self) -> Option<&E>;
+    fn find<E: Error + 'static>(&self) -> Option<&E>;
 }
 
 impl FindsError for reqwest::Error {
-    fn find<'a, E: Error + 'static>(&self) -> Option<&E> {
+    fn find<E: Error + 'static>(&self) -> Option<&E> {
         find_error::<E>(self)
     }
 }
-impl FindsError for HyperError{
-    fn find<'a, E: Error + 'static>(&self) -> Option<&E> {
+impl FindsError for HyperError {
+    fn find<E: Error + 'static>(&self) -> Option<&E> {
         find_error::<E>(self)
     }
 }
-impl FindsError for Http2Error{
-    fn find<'a, E: Error + 'static>(&self) -> Option<&E> {
+impl FindsError for Http2Error {
+    fn find<E: Error + 'static>(&self) -> Option<&E> {
         find_error::<E>(self)
     }
 }

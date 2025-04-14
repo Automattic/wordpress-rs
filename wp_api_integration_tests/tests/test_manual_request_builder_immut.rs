@@ -23,7 +23,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
         TestCredentials::instance().admin_username.to_string(),
         TestCredentials::instance().admin_password.to_string(),
     );
-    let request_executor = ReqwestRequestExecutor::new_with_default_timeout(true);
+    let request_executor = ReqwestRequestExecutor::default();
 
     let request_builder = WpApiRequestBuilder::new(test_site_url(), authentication);
     let wp_request = request_builder.users().list_with_edit_context(&params);

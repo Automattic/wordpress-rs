@@ -10,6 +10,7 @@ pub struct PluginInformation {
     pub slug: PluginWpOrgDirectorySlug,
     pub version: String,
     pub author: String,
+    pub short_description: Option<String>,
     #[serde(deserialize_with = "deserialize_default_values")]
     pub author_profile: String,
     #[serde(deserialize_with = "deserialize_default_values")]
@@ -324,6 +325,21 @@ mod tests {
         let json_string = include_str!("../../tests/plugin-directory/plugin-query-result.json");
         let parsed = serde_json::from_str::<QueryPluginResponse>(json_string);
         assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+    }
+
+    #[test]
+    fn test_plugin_query_result_short_description() {
+        let json_string = include_str!("../../tests/plugin-directory/plugin-query-result.json");
+        let parsed = serde_json::from_str::<QueryPluginResponse>(json_string);
+        assert!(parsed.is_ok(), "Failed to parse JSON: {:?}", parsed.err());
+
+        parsed.unwrap().plugins.iter().for_each(|plugin| {
+            assert!(
+                plugin.short_description.is_some(),
+                "Short description is None for plugin: {}",
+                plugin.name
+            );
+        });
     }
 
     #[test]
