@@ -109,14 +109,23 @@ impl WpApiDetails {
 
     /// Does the site use a plugin that disables application passwords?
     pub fn has_application_password_blocking_plugin(&self) -> bool {
-        KnownAuthenticationBlockingPlugin::all()
+        KnownAuthenticationBlockingPlugin::application_passwords()
             .iter()
             .any(|plugin| self.namespaces.contains(&plugin.namespace))
     }
 
     /// Returns a list of plugins that might be responsible for disabling application passwords.
     pub fn application_password_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
-        KnownAuthenticationBlockingPlugin::all()
+        KnownAuthenticationBlockingPlugin::application_passwords()
+            .iter()
+            .filter(|plugin| self.namespaces.contains(&plugin.namespace))
+            .cloned()
+            .collect()
+    }
+
+    /// Returns a list of plugins that might be responsible for disabling XML-RPC.
+    pub fn xmlrpc_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
+        KnownAuthenticationBlockingPlugin::xmlrpc()
             .iter()
             .filter(|plugin| self.namespaces.contains(&plugin.namespace))
             .cloned()
@@ -167,6 +176,14 @@ impl KnownAuthenticationBlockingPlugin {
                 support_url: "https://wordpress.org/support/plugin/fluent-security/".to_string(),
             },
         ]
+    }
+
+    fn application_passwords() -> Vec<Self> {
+        Self::all()
+    }
+
+    fn xmlrpc() -> Vec<Self> {
+        Self::all()
     }
 }
 
