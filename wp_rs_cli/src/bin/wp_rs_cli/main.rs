@@ -5,7 +5,13 @@ use csv::Writer;
 use futures::stream::StreamExt;
 use std::{fmt::Display, fs::File, sync::Arc};
 use wp_api::{
-    login::login_client::WpLoginClient, middleware::WpApiMiddlewarePipeline,
+    login::{
+        login_client::WpLoginClient,
+        url_discovery::{
+            AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
+        },
+    },
+    middleware::WpApiMiddlewarePipeline,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 
@@ -71,7 +77,7 @@ async fn batch_test_autodiscovery(
     println!("{}", count);
 
     for r in batch_perform_autodiscovery(login_client, rows.iter()).await {
-        DiscoveryResultAsCsvRecord::from(r).write(&mut writer)?;
+        r.write_as_csv_record(&mut writer)?;
     }
     writer.flush()?;
 
@@ -115,7 +121,7 @@ async fn perform_api_discovery(
                 .expect("Already confirmed auto discovery was successful");
             SimplifiedDiscoveryResult::success(url, LoginUrl(login_url))
         }
-        Err(e) => SimplifiedDiscoveryResult::failure(url, e.to_string()),
+        Err(e) => SimplifiedDiscoveryResult::failure(url, e.clone()),
     }
 }
 
@@ -145,7 +151,7 @@ struct BatchTestRow {
 #[derive(Debug)]
 struct SimplifiedDiscoveryResult {
     attempt_site_url: String,
-    result: Result<LoginUrl, String>,
+    result: Result<LoginUrl, AutoDiscoveryAttemptFailure>,
 }
 
 impl SimplifiedDiscoveryResult {
@@ -156,11 +162,26 @@ impl SimplifiedDiscoveryResult {
         }
     }
 
-    fn failure(attempt_site_url: String, error_message: String) -> Self {
+    fn failure(attempt_site_url: String, error: AutoDiscoveryAttemptFailure) -> Self {
         Self {
             attempt_site_url,
-            result: Err(error_message),
+            result: Err(error),
         }
+    }
+
+    fn write_as_csv_record(self, writer: &mut csv::Writer<File>) -> Result<()> {
+        let (error_type, error_message) = self
+            .result
+            .as_ref()
+            .err()
+            .map(|e| (csv_error_type(e), e.to_string()))
+            .unwrap_or(("".to_string(), "".to_string()));
+        Ok(writer.write_record(&[
+            self.result.is_ok().to_string(),
+            self.attempt_site_url,
+            error_type,
+            error_message,
+        ])?)
     }
 
     fn log_result(&self) {
@@ -184,29 +205,31 @@ impl Display for LoginUrl {
     }
 }
 
-#[derive(Debug)]
-struct DiscoveryResultAsCsvRecord {
-    is_successful: bool,
-    attempt_site_url: String,
-    error_message: String,
-}
-
-impl DiscoveryResultAsCsvRecord {
-    fn write(self, writer: &mut csv::Writer<File>) -> Result<()> {
-        Ok(writer.write_record(&[
-            self.is_successful.to_string(),
-            self.attempt_site_url,
-            self.error_message,
-        ])?)
-    }
-}
-
-impl From<SimplifiedDiscoveryResult> for DiscoveryResultAsCsvRecord {
-    fn from(value: SimplifiedDiscoveryResult) -> Self {
-        Self {
-            is_successful: value.result.is_ok(),
-            attempt_site_url: value.attempt_site_url,
-            error_message: value.result.err().unwrap_or("".to_string()),
-        }
+fn csv_error_type(failure: &AutoDiscoveryAttemptFailure) -> String {
+    match failure {
+        AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => "ParseSiteUrl".to_string(),
+        AutoDiscoveryAttemptFailure::FindApiRoot {
+            find_api_root_failure,
+            ..
+        } => match find_api_root_failure {
+            FindApiRootFailure::FetchHomepage { .. } => "FetchHomepage".to_string(),
+            FindApiRootFailure::ProbablyNotAWordPressSite => {
+                "ProbablyNotAWordPressSite".to_string()
+            }
+            FindApiRootFailure::RestApiDisabled => "RestApiDisabled".to_string(),
+        },
+        AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+            fetch_and_parse_api_root_failure,
+            ..
+        } => match fetch_and_parse_api_root_failure {
+            FetchAndParseApiRootFailure::FetchApiRoot { .. } => "FetchApiRoot".to_string(),
+            FetchAndParseApiRootFailure::ParseApiRoot { .. } => "ParseApiRoot".to_string(),
+            FetchAndParseApiRootFailure::WpError { error_code, .. } => {
+                format!("WpError-{:#?}", error_code)
+            }
+            FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } => {
+                format!("ApplicationPasswordsNotSupported-{:#?}", reason)
+            }
+        },
     }
 }
