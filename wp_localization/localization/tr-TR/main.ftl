@@ -54,6 +54,11 @@ probably_not_wordpress_site = Site bir WordPress sitesi gibi görünmüyor.
 
 rest_api_disabled = Sitenin REST API'si devre dışı. Lütfen REST API'yi etkinleştirmek için site ayarlarınızı güncelleyin.
 
+xmlrpc_disabled_by_host = Sitenin XML-RPC özelliği devre dışı bırakılmış. Lütfen bu sorunu çözmek için barındırma sağlayıcınızla iletişime geçin.
+xmlrpc_disabled_by_plugin = Sitenin XML-RPC özelliği devre dışı – {$plugin} eklentisi XML-RPC'yi devre dışı bırakmış olabilir. Daha fazla bilgi için {$support_url} adresini ziyaret edin.
+xmlrpc_disabled_by_multiple_plugins = Sitenin XML-RPC özelliği devre dışı – XML-RPC'yi devre dışı bırakmış olabilecek birden fazla eklenti yüklü. Lütfen bu eklentileri devre dışı bırakıp tekrar deneyin.
+xmlrpc_endpoint_not_found = Sitenin XML-RPC uç noktası bulunamadı. Lütfen site ayarlarınızı kontrol edip tekrar deneyin.
+
 application_password_blocked_by_plugin = {$url} adresine giriş yapılamıyor – {$plugin} eklentisi Uygulama Şifrelerini devre dışı bırakmış olabilir. Daha fazla bilgi için lütfen {$support_url} adresini ziyaret edin.
 
 application_password_blocked_by_multiple_plugins = {$url} adresine giriş yapılamıyor – Uygulama Şifrelerini devre dışı bırakmış olabilecek birden fazla eklenti yüklü. Lütfen bunları devre dışı bırakın ve tekrar deneyin.

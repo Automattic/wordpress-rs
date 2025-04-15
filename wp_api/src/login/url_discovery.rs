@@ -689,6 +689,80 @@ impl WpSupportsLocalization for FetchApiDetailsError {
     }
 }
 
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
+pub enum XMLRPCDiscoveryError {
+    FetchHomepage { error: RequestExecutionError },
+    EndpointNotFound,
+    Disabled { reason: XMLRPCDisabledReason },
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum XMLRPCDisabledReason {
+    ByHost,
+    ByPlugin {
+        plugin: KnownAuthenticationBlockingPlugin,
+    },
+    ByMultiplePlugins,
+}
+
+impl WpSupportsLocalization for XMLRPCDiscoveryError {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            XMLRPCDiscoveryError::FetchHomepage { error } => error.message_bundle(),
+            XMLRPCDiscoveryError::EndpointNotFound => WpMessages::xmlrpc_endpoint_not_found(),
+            XMLRPCDiscoveryError::Disabled { reason } => match reason {
+                XMLRPCDisabledReason::ByHost => WpMessages::xmlrpc_disabled_by_host(),
+                XMLRPCDisabledReason::ByPlugin { plugin } => WpMessages::xmlrpc_disabled_by_plugin(
+                    plugin.name.clone(),
+                    plugin.namespace.clone(),
+                ),
+                XMLRPCDisabledReason::ByMultiplePlugins => {
+                    WpMessages::xmlrpc_disabled_by_multiple_plugins()
+                }
+            },
+        }
+    }
+}
+
+impl XMLRPCDiscoveryError {
+    pub(crate) fn importance(&self) -> NonZeroUsize {
+        match self {
+            XMLRPCDiscoveryError::FetchHomepage { .. } => NonZero::new(1),
+            XMLRPCDiscoveryError::EndpointNotFound => NonZero::new(2),
+            XMLRPCDiscoveryError::Disabled { .. } => NonZero::new(3),
+        }
+        .expect("All values are valid")
+    }
+}
+
+pub(crate) fn extract_rsd_url(html: &str) -> Option<String> {
+    let selector =
+        Selector::parse("link[rel='EditURI'][type='application/rsd+xml'][title='RSD']").ok()?;
+    Html::parse_document(html)
+        .select(&selector)
+        .next()?
+        .value()
+        .attr("href")
+        .map(String::from)
+}
+
+pub(crate) fn parse_rsd_for_xmlrpc(rsd_xml: &str) -> Option<ParsedUrl> {
+    // The `rsd_xml` is typically from `<site-url>/xmlrpc.php?rsd`
+
+    roxmltree::Document::parse(rsd_xml)
+        .ok()?
+        .descendants()
+        .find(|n| n.has_tag_name("api") && n.attribute("name") == Some("WordPress"))?
+        .attribute("apiLink")
+        .and_then(|s| ParsedUrl::parse(s).ok())
+}
+
+pub(crate) fn is_xmlrpc_response(body: &str) -> bool {
+    roxmltree::Document::parse(body)
+        .map(|doc| doc.root_element().has_tag_name("methodResponse"))
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::AutoDiscoveryAttempt as A;
@@ -811,6 +885,96 @@ mod tests {
         #[case] expected: Ordering,
     ) {
         assert_eq!(first.compare_importance(&second), expected);
+    }
+
+    #[test]
+    fn test_parse_rsd_content() {
+        let content = r#"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
+            <service>
+                <engineName>WordPress</engineName>
+                <engineLink>https://wordpress.org/</engineLink>
+                <homePageLink>https://example.com</homePageLink>
+                <apis>
+                    <api name="WordPress" blogID="1" preferred="true" apiLink="https://example.com/xmlrpc.php" />
+                    <api name="Movable Type" blogID="1" preferred="false" apiLink="https://example.com/xmlrpc.php" />
+                    <api name="MetaWeblog" blogID="1" preferred="false" apiLink="https://example.com/xmlrpc.php" />
+                    <api name="Blogger" blogID="1" preferred="false" apiLink="https://example.com/xmlrpc.php" />
+                    <api name="WP-API" blogID="1" preferred="false" apiLink="https://example.com/wp-json/" />
+                </apis>
+            </service>
+        </rsd>
+        "#.trim();
+        let parsed_url = parse_rsd_for_xmlrpc(content);
+        assert_eq!(
+            parsed_url,
+            Some(ParsedUrl::parse("https://example.com/xmlrpc.php").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_xmlrpc_response_success() {
+        let body = r#"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <methodResponse>
+            <params>
+                <param>
+                    <value>
+                        <array>
+                            <data>
+                                <value><string>system.multicall</string></value>
+                                <value><string>system.listMethods</string></value>
+                                <value><string>system.getCapabilities</string></value>
+                            </data>
+                        </array>
+                    </value>
+                </param>
+            </params>
+        </methodResponse>
+        "#
+        .trim();
+        assert!(is_xmlrpc_response(body));
+    }
+
+    #[test]
+    fn test_xmlrpc_response_fault() {
+        let body = r#"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <methodResponse>
+        <fault>
+            <value>
+            <struct>
+                <member>
+                <name>faultCode</name>
+                <value><int>-32601</int></value>
+                </member>
+                <member>
+                <name>faultString</name>
+                <value><string>server error. requested method system.listMethos does not exist.</string></value>
+                </member>
+            </struct>
+            </value>
+        </fault>
+        </methodResponse>
+        "#.trim();
+        assert!(is_xmlrpc_response(body));
+    }
+
+    #[test]
+    fn test_xmlrpc_response_not_xml() {
+        let body = r#"
+        <html>
+            <head>
+                <title>Not XML</title>
+            </head>
+            <body>
+                <p>This is not an XML-RPC response.</p>
+            </body>
+        </html>
+        "#
+        .trim();
+        assert!(!is_xmlrpc_response(body));
     }
 
     // `adaf` refers to `AutoDiscoveryAttemptFailure`
