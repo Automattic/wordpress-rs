@@ -362,7 +362,7 @@ pub struct AutoDiscoveryAttemptSuccess {
     pub api_details: Arc<WpApiDetails>,
 }
 
-#[derive(Debug, Clone, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum AutoDiscoveryAttemptFailure {
     ParseSiteUrl {
         error: ParseUrlError,
@@ -427,7 +427,7 @@ impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
 pub enum FindApiRootFailure {
     FetchHomepage { error: RequestExecutionError },
     // if no WP mentions
@@ -461,7 +461,7 @@ impl FindApiRootFailure {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
 pub enum FetchAndParseApiRootFailure {
     FetchApiRoot {
         error: RequestExecutionError,
@@ -510,7 +510,7 @@ impl FetchAndParseApiRootFailure {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
 pub enum ApplicationPasswordsNotSupportedReason {
     ApplicationPasswordBlockedByPlugin {
         plugin: KnownApplicationPasswordBlockingPlugin,

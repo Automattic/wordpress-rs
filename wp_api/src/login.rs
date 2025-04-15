@@ -56,7 +56,7 @@ pub fn extract_login_details_from_parsed_url(
     })
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Object)]
 pub struct WpApiDetails {
     pub name: String,
     pub description: String,
@@ -137,7 +137,7 @@ impl WpApiDetails {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct KnownApplicationPasswordBlockingPlugin {
     /// The name of the plugin.
     pub name: String,
@@ -172,12 +172,12 @@ impl KnownApplicationPasswordBlockingPlugin {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct WpRestApiAuthenticationScheme {
     pub endpoints: Option<WpRestApiAuthenticationEndpoint>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct WpRestApiAuthenticationEndpoint {
     pub authorization: String,
 }
@@ -216,7 +216,7 @@ impl WpSupportsLocalization for OAuthResponseUrlError {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct WpApiDetailsAuthenticationMap(HashMap<String, WpRestApiAuthenticationScheme>);
 
 // If the response is `[]`, default to an empty `HashMap`
