@@ -63,7 +63,11 @@ impl ReqwestRequestExecutor {
             request = request.body(body.contents());
         }
         let mut response = request.send().await?;
-        let header_map = std::mem::take(response.headers_mut());
+        let mut header_map = std::mem::take(response.headers_mut());
+        header_map.insert(
+            http::header::USER_AGENT,
+            HeaderValue::from_str("wordpress-rs").expect("`wordpress-rs` is a valid header value"),
+        );
 
         let status = response.status();
         let body = response.bytes().await?;
