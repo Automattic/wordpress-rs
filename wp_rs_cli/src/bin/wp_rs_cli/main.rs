@@ -15,7 +15,7 @@ use wp_api::{
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 
-const TOKIO_STREAM_SIZE: usize = 100;
+const TOKIO_STREAM_SIZE: usize = 5;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
