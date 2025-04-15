@@ -109,16 +109,14 @@ impl WpApiDetails {
 
     /// Does the site use a plugin that disables application passwords?
     pub fn has_application_password_blocking_plugin(&self) -> bool {
-        KnownApplicationPasswordBlockingPlugin::all()
+        KnownAuthenticationBlockingPlugin::all()
             .iter()
             .any(|plugin| self.namespaces.contains(&plugin.namespace))
     }
 
     /// Returns a list of plugins that might be responsible for disabling application passwords.
-    pub fn application_password_blocking_plugins(
-        &self,
-    ) -> Vec<KnownApplicationPasswordBlockingPlugin> {
-        KnownApplicationPasswordBlockingPlugin::all()
+    pub fn application_password_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
+        KnownAuthenticationBlockingPlugin::all()
             .iter()
             .filter(|plugin| self.namespaces.contains(&plugin.namespace))
             .cloned()
@@ -138,7 +136,7 @@ impl WpApiDetails {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
-pub struct KnownApplicationPasswordBlockingPlugin {
+pub struct KnownAuthenticationBlockingPlugin {
     /// The name of the plugin.
     pub name: String,
     /// The plugin's REST API namespace.
@@ -147,7 +145,7 @@ pub struct KnownApplicationPasswordBlockingPlugin {
     pub support_url: String,
 }
 
-impl KnownApplicationPasswordBlockingPlugin {
+impl KnownAuthenticationBlockingPlugin {
     fn all() -> Vec<Self> {
         vec![
             Self {

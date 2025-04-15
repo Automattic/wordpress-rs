@@ -1,7 +1,7 @@
 use super::WpApiDetails;
 use crate::{
     ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
-    login::KnownApplicationPasswordBlockingPlugin,
+    login::KnownAuthenticationBlockingPlugin,
     request::{ResponseBodyType, WpRedirect},
 };
 use itertools::Itertools;
@@ -513,7 +513,7 @@ impl FetchAndParseApiRootFailure {
 #[derive(Debug, Clone, PartialEq, uniffi::Enum)]
 pub enum ApplicationPasswordsNotSupportedReason {
     ApplicationPasswordBlockedByPlugin {
-        plugin: KnownApplicationPasswordBlockingPlugin,
+        plugin: KnownAuthenticationBlockingPlugin,
     },
     ApplicationPasswordBlockedByMultiplePlugins,
     SiteIsLocalDevelopmentEnvironment,
