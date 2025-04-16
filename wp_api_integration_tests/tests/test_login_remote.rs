@@ -355,7 +355,7 @@ async fn login_spec_17_invalid_https_with_exception_works() {
 
 #[tokio::test]
 #[parallel]
-async fn login_spec_18_xmlrpc_disabled() {
+async fn login_spec_18_xmlrpc_disabled_by_host() {
     // The xmlrpc endpoint does not return a valid HTTP response:
     // $ curl https://xmlrpc-disabled.wpmt.co/xmlrpc.php
     // curl: (92) HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)
@@ -365,6 +365,19 @@ async fn login_spec_18_xmlrpc_disabled() {
         result.unwrap_err(),
         XMLRPCDiscoveryError::Disabled {
             reason: XMLRPCDisabledReason::ByHost
+        }
+    ));
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_18_xmlrpc_disabled_by_plugin() {
+    let result = xmlrpc_url("https://xmlrpc-disabled-by-plugin.wpmt.co").await;
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        XMLRPCDiscoveryError::Disabled {
+            reason: XMLRPCDisabledReason::ByPlugin { .. }
         }
     ));
 }
