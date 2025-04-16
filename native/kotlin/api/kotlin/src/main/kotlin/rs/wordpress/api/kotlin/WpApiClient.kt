@@ -7,6 +7,7 @@ import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpApiClient
 import uniffi.wp_api.WpApiException
+import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthentication
 
 class WpApiClient
@@ -19,7 +20,7 @@ constructor(
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
-        UniffiWpApiClient(apiRootUrl, authentication, requestExecutor)
+        UniffiWpApiClient(apiRootUrl, authentication, requestExecutor, WpApiMiddlewarePipeline(emptyList()))
     }
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
