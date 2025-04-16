@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use wp_api::{
     ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    request::RequestExecutor,
+    middleware::WpApiMiddlewarePipeline, request::RequestExecutor,
 };
 
 use super::endpoint::connection_endpoint::{ConnectionRequestBuilder, ConnectionRequestExecutor};
@@ -47,9 +47,15 @@ impl UniffiJetpackApiClient {
         site_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         Self {
-            inner: JetpackApiClient::new(site_url, authentication, request_executor),
+            inner: JetpackApiClient::new(
+                site_url,
+                authentication,
+                request_executor,
+                middleware_pipeline,
+            ),
         }
     }
 }
@@ -64,11 +70,13 @@ impl JetpackApiClient {
         api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         api_client_generate_api_client!(
             api_root_url,
             authentication,
-            request_executor;
+            request_executor,
+            middleware_pipeline;
             connection
         )
     }

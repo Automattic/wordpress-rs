@@ -2,8 +2,8 @@ use std::sync::Arc;
 use url::Url;
 use wp_api::{
     ParsedUrl, WpApiClient, WpApiError, WpAuthentication, WpErrorCode, categories::CategoryId,
-    comments::CommentId, date::WpGmtDateTime, media::MediaId, posts::PostId,
-    reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
+    comments::CommentId, date::WpGmtDateTime, media::MediaId, middleware::WpApiMiddlewarePipeline,
+    posts::PostId, reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
 };
 
 pub mod mock;
@@ -80,6 +80,7 @@ pub fn api_client() -> WpApiClient {
         test_site_url(),
         authentication,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
 
@@ -92,6 +93,7 @@ pub fn api_client_as_author() -> WpApiClient {
         test_site_url(),
         authentication,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
 
@@ -104,6 +106,7 @@ pub fn api_client_as_subscriber() -> WpApiClient {
         test_site_url(),
         authentication,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
 
@@ -112,6 +115,7 @@ pub fn api_client_as_unauthenticated() -> WpApiClient {
         test_site_url(),
         WpAuthentication::None,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
 
