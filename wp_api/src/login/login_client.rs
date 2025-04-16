@@ -4,7 +4,7 @@ use super::{
         self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
         AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, FetchAndParseApiRootFailure,
-        FindApiRootFailure, ParseHomepageResult, XMLRPCDisabledReason, XMLRPCDiscoveryError,
+        FindApiRootFailure, ParseHomepageResult, XmlrpcDisabledReason, XmlrpcDiscoveryError,
         extract_rsd_url, is_xmlrpc_response, parse_rsd_for_xmlrpc,
     },
 };
@@ -337,7 +337,7 @@ impl WpLoginClient {
     pub async fn xmlrpc_discovery(
         &self,
         details: AutoDiscoveryAttemptSuccess,
-    ) -> Result<ParsedUrl, XMLRPCDiscoveryError> {
+    ) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
         let mut candidates: Vec<ParsedUrl> = vec![];
         // Prioritize discovered XML-RPC URL if it's available from the site.
         if let Ok(url) = self.xmlrpc_from_rsd(&details.parsed_site_url).await {
@@ -352,7 +352,7 @@ impl WpLoginClient {
         );
         candidates.dedup();
 
-        let mut failures: Vec<XMLRPCDiscoveryError> = vec![];
+        let mut failures: Vec<XmlrpcDiscoveryError> = vec![];
         for candidate in candidates {
             match self
                 .validate_xmlrpc_url(&candidate, &details.api_details)
@@ -376,7 +376,7 @@ impl WpLoginClient {
         &self,
         url: &ParsedUrl,
         api_details: &WpApiDetails,
-    ) -> Result<(), XMLRPCDiscoveryError> {
+    ) -> Result<(), XmlrpcDiscoveryError> {
         let response = self.perform(
             WpNetworkRequest {
                 uuid: Uuid::new_v4().into(),
@@ -391,7 +391,7 @@ impl WpLoginClient {
         .await
         // It's very likely xml-rpc is blocked by the hosting provider (the request has not reached to WordPress),
         // if the site does not send any valid HTTP response.
-        .map_err(|_| XMLRPCDiscoveryError::Disabled { reason: XMLRPCDisabledReason::ByHost })?;
+        .map_err(|_| XmlrpcDiscoveryError::Disabled { reason: XmlrpcDisabledReason::ByHost })?;
 
         // 200 status code and a valid XML-RPC response indicates that XML-RPC is enabled.
         // All other responses indicate that XML-RPC is disabled.
@@ -401,19 +401,19 @@ impl WpLoginClient {
 
         let mut plugins = api_details.xmlrpc_blocking_plugins();
         let reason = match plugins.len() {
-            0 => XMLRPCDisabledReason::ByHost,
-            1 => XMLRPCDisabledReason::ByPlugin {
+            0 => XmlrpcDisabledReason::ByHost,
+            1 => XmlrpcDisabledReason::ByPlugin {
                 plugin: plugins.pop().expect("Already verified there is one plugin"),
             },
-            _ => XMLRPCDisabledReason::ByMultiplePlugins,
+            _ => XmlrpcDisabledReason::ByMultiplePlugins,
         };
-        Err(XMLRPCDiscoveryError::Disabled { reason })
+        Err(XmlrpcDiscoveryError::Disabled { reason })
     }
 
     async fn xmlrpc_from_rsd(
         &self,
         parsed_site_url: &ParsedUrl,
-    ) -> Result<ParsedUrl, XMLRPCDiscoveryError> {
+    ) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
         let response = self
             .perform(
                 WpNetworkRequest {
@@ -427,10 +427,10 @@ impl WpLoginClient {
                 .into(),
             )
             .await
-            .map_err(|error| XMLRPCDiscoveryError::FetchHomepage { error })?;
+            .map_err(|error| XmlrpcDiscoveryError::FetchHomepage { error })?;
 
         let rsd_url = extract_rsd_url(&response.body_as_string())
-            .ok_or(XMLRPCDiscoveryError::EndpointNotFound)?;
+            .ok_or(XmlrpcDiscoveryError::EndpointNotFound)?;
 
         let rsd_response = self
             .perform(
@@ -445,12 +445,12 @@ impl WpLoginClient {
                 .into(),
             )
             .await
-            .map_err(|_| XMLRPCDiscoveryError::Disabled {
-                reason: XMLRPCDisabledReason::ByHost,
+            .map_err(|_| XmlrpcDiscoveryError::Disabled {
+                reason: XmlrpcDisabledReason::ByHost,
             })?;
 
         parse_rsd_for_xmlrpc(&rsd_response.body_as_string())
-            .ok_or(XMLRPCDiscoveryError::EndpointNotFound)
+            .ok_or(XmlrpcDiscoveryError::EndpointNotFound)
     }
 }
 

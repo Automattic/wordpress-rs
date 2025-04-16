@@ -690,14 +690,14 @@ impl WpSupportsLocalization for FetchApiDetailsError {
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
-pub enum XMLRPCDiscoveryError {
+pub enum XmlrpcDiscoveryError {
     FetchHomepage { error: RequestExecutionError },
     EndpointNotFound,
-    Disabled { reason: XMLRPCDisabledReason },
+    Disabled { reason: XmlrpcDisabledReason },
 }
 
 #[derive(Debug, uniffi::Enum)]
-pub enum XMLRPCDisabledReason {
+pub enum XmlrpcDisabledReason {
     ByHost,
     ByPlugin {
         plugin: KnownAuthenticationBlockingPlugin,
@@ -705,18 +705,18 @@ pub enum XMLRPCDisabledReason {
     ByMultiplePlugins,
 }
 
-impl WpSupportsLocalization for XMLRPCDiscoveryError {
+impl WpSupportsLocalization for XmlrpcDiscoveryError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
-            XMLRPCDiscoveryError::FetchHomepage { error } => error.message_bundle(),
-            XMLRPCDiscoveryError::EndpointNotFound => WpMessages::xmlrpc_endpoint_not_found(),
-            XMLRPCDiscoveryError::Disabled { reason } => match reason {
-                XMLRPCDisabledReason::ByHost => WpMessages::xmlrpc_disabled_by_host(),
-                XMLRPCDisabledReason::ByPlugin { plugin } => WpMessages::xmlrpc_disabled_by_plugin(
+            XmlrpcDiscoveryError::FetchHomepage { error } => error.message_bundle(),
+            XmlrpcDiscoveryError::EndpointNotFound => WpMessages::xmlrpc_endpoint_not_found(),
+            XmlrpcDiscoveryError::Disabled { reason } => match reason {
+                XmlrpcDisabledReason::ByHost => WpMessages::xmlrpc_disabled_by_host(),
+                XmlrpcDisabledReason::ByPlugin { plugin } => WpMessages::xmlrpc_disabled_by_plugin(
                     plugin.name.clone(),
                     plugin.namespace.clone(),
                 ),
-                XMLRPCDisabledReason::ByMultiplePlugins => {
+                XmlrpcDisabledReason::ByMultiplePlugins => {
                     WpMessages::xmlrpc_disabled_by_multiple_plugins()
                 }
             },
@@ -724,12 +724,12 @@ impl WpSupportsLocalization for XMLRPCDiscoveryError {
     }
 }
 
-impl XMLRPCDiscoveryError {
+impl XmlrpcDiscoveryError {
     pub(crate) fn importance(&self) -> NonZeroUsize {
         match self {
-            XMLRPCDiscoveryError::FetchHomepage { .. } => NonZero::new(1),
-            XMLRPCDiscoveryError::EndpointNotFound => NonZero::new(2),
-            XMLRPCDiscoveryError::Disabled { .. } => NonZero::new(3),
+            XmlrpcDiscoveryError::FetchHomepage { .. } => NonZero::new(1),
+            XmlrpcDiscoveryError::EndpointNotFound => NonZero::new(2),
+            XmlrpcDiscoveryError::Disabled { .. } => NonZero::new(3),
         }
         .expect("All values are valid")
     }

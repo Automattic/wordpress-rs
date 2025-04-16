@@ -6,8 +6,8 @@ use wp_api::{
         login_client::WpLoginClient,
         url_discovery::{
             ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttemptFailure,
-            FetchAndParseApiRootFailure, FindApiRootFailure, XMLRPCDisabledReason,
-            XMLRPCDiscoveryError,
+            FetchAndParseApiRootFailure, FindApiRootFailure, XmlrpcDisabledReason,
+            XmlrpcDiscoveryError,
         },
     },
     middleware::{
@@ -363,8 +363,8 @@ async fn login_spec_18_xmlrpc_disabled_by_host() {
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
-        XMLRPCDiscoveryError::Disabled {
-            reason: XMLRPCDisabledReason::ByHost
+        XmlrpcDiscoveryError::Disabled {
+            reason: XmlrpcDisabledReason::ByHost
         }
     ));
 }
@@ -376,8 +376,8 @@ async fn login_spec_18_xmlrpc_disabled_by_plugin() {
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
-        XMLRPCDiscoveryError::Disabled {
-            reason: XMLRPCDisabledReason::ByPlugin { .. }
+        XmlrpcDiscoveryError::Disabled {
+            reason: XmlrpcDisabledReason::ByPlugin { .. }
         }
     ));
 }
@@ -488,7 +488,7 @@ async fn discovery_helper(
         .map_err(|e| e.clone())
 }
 
-async fn xmlrpc_url(site_url: &str) -> Result<ParsedUrl, XMLRPCDiscoveryError> {
+async fn xmlrpc_url(site_url: &str) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
     let client = WpLoginClient::new(
         Arc::new(ReqwestRequestExecutor::default()),
         Arc::new(WpApiMiddlewarePipeline {
