@@ -3,7 +3,7 @@ use crate::{
     api_error::InvalidSslErrorReason,
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-        endpoint::media_endpoint::MediaUploadRequest,
+        endpoint::media_endpoint::MediaUploadRequest, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -66,7 +66,7 @@ impl ReqwestRequestExecutor {
         let mut header_map = std::mem::take(response.headers_mut());
         header_map.insert(
             http::header::USER_AGENT,
-            HeaderValue::from_str("wordpress-rs").expect("`wordpress-rs` is a valid header value"),
+            user_agent::reqwest::user_agent_for_reqwest_request_executor(),
         );
 
         let status = response.status();

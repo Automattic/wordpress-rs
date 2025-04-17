@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
+import okhttp3.OkHttp
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -25,6 +26,8 @@ import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
 
+const val USER_AGENT_HEADER_NAME = "User-Agent"
+
 class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -41,6 +44,10 @@ class WpRequestExecutor(
                     requestBuilder.addHeader(key, value)
                 }
             }
+            requestBuilder.addHeader(
+                USER_AGENT_HEADER_NAME,
+                uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
+            )
 
             val urlRequest = requestBuilder.build()
 

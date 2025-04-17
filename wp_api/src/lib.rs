@@ -47,6 +47,8 @@ pub mod reqwest_request_executor;
 #[cfg(test)]
 mod unit_test_common;
 
+pub const WORDPRESS_RS_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpContext {
     Edit,
