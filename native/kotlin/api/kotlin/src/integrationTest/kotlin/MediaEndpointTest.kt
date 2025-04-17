@@ -72,7 +72,7 @@ class MediaEndpointTest {
             requestBuilder.media().create(
                 params = MediaCreateParams(title = title),
                 "test_media.jpg",
-                "image/jpg"
+                "image/jpeg"
             )
         }.assertSuccessAndRetrieveData().data
         assertEquals(title, response.title.rendered)
