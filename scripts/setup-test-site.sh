@@ -133,7 +133,7 @@ create_test_credentials () {
     password_protected_comment_author="$PASSWORD_PROTECTED_COMMENT_AUTHOR" \
     trashed_post_id="$TRASHED_POST_ID" \
     first_post_date_gmt="$FIRST_POST_DATE_GMT" \
-    wordpress_core_version="$WORDPRESS_VERSION" \
+    wordpress_core_version="\"$WORDPRESS_VERSION\"" \
     > /app/test_credentials.json
 }
 create_test_credentials
