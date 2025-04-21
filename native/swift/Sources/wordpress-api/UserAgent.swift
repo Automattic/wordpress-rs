@@ -3,7 +3,11 @@ import Foundation
 public struct UserAgent {
     public static var postfix: String {
         #if canImport(Darwin)
-        "\(bundleName)/\(bundleVersion) \(cfNetworkVersion) \(darwinVersion) \(architecture)"
+        if let bundleName = bundleName, let bundleVersion = bundleVersion {
+            return "\(bundleName)/\(bundleVersion) \(cfNetworkVersion) \(darwinVersion) \(architecture)"
+        } else {
+            return "\(cfNetworkVersion) \(darwinVersion) \(architecture)"
+        }
         #elseif os(Linux)
         "Linux/URLSession \(architecture)"
         #else
@@ -12,12 +16,12 @@ public struct UserAgent {
     }
 
     #if canImport(Darwin)
-    static var bundleName: String {
-        Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "application"
+    static var bundleName: String? {
+        Bundle.main.infoDictionary?["CFBundleName"] as? String
     }
 
-    static var bundleVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    static var bundleVersion: String? {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
     }
 
     static var cfNetworkVersion: String {
@@ -35,8 +39,10 @@ public struct UserAgent {
     static var darwinVersion: String {
         var systemInfo = utsname()
         uname(&systemInfo)
-        let bytes = Data(bytes: &systemInfo.release, count: Int(_SYS_NAMELEN))
-        guard let string = String(bytes: bytes, encoding: .ascii) else {
+
+        let bytes = Data(bytes: &systemInfo.release, count: Int(_SYS_NAMELEN)).filter { $0 != 0 }
+
+        guard let string = String(data: bytes, encoding: .ascii) else {
             return "Darwin/unknown"
         }
 

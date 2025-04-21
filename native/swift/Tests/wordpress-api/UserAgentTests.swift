@@ -5,12 +5,12 @@ import WordPressAPI
 @Suite("User Agent Tests")
 struct UserAgentTests {
     #if canImport(Darwin)
-    @Test("User agent contains bundle name and version")
+    @Test("User agent contains bundle name and version", .enabled(if: isXCTest))
     func testThatDefaultUserAgentContainsBundleNameAndVersion() throws {
         #expect(UserAgent.postfix.contains(/xctest\/(\d+.\d+)/))
     }
 
-    @Test("User agent contains CFNetwork version")
+    @Test("User agent contains CFNetwork version", .enabled(if: isXCTest))
     func testThatDefaultUserAgentContainsCFNetworkVersion() throws {
         #expect(UserAgent.postfix.contains(/CFNetwork\/(\d+.\d+.\d+)/))
     }
