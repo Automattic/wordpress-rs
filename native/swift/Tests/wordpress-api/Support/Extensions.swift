@@ -9,7 +9,7 @@ extension WpNetworkHeaderMap {
 
     static func withLinkHeader(_ value: String) -> WpNetworkHeaderMap {
         // swiftlint:disable:next force_try
-        try! WpNetworkHeaderMap.fromMap(hashMap: ["Link": value])
+            try! WpNetworkHeaderMap.fromMap(hashMap: ["Link": value])
     }
 }
 
@@ -41,3 +41,5 @@ func isLinux() -> Bool {
     return false
     #endif
 }
+
+let isXCTest: Bool = Bundle.main.infoDictionary?["CFBundleName"] as? String == "xctest"

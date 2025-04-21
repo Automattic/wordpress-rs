@@ -68,13 +68,6 @@ public actor WordPressAPI {
         self.requestBuilder.siteSettings()
     }
 
-    public struct Helpers {
-        public static func extractLoginDetails(from url: URL) throws -> WpApiApplicationPasswordDetails? {
-            let parsedUrl = try ParsedUrl.from(url: url)
-            return try extractLoginDetailsFromUrl(url: parsedUrl)
-        }
-    }
-
     enum ParseError: Error {
         case invalidUrl
         case invalidHtml

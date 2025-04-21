@@ -20,8 +20,6 @@ struct LoginView: View {
     @Environment(\.webAuthenticationSession)
     private var webAuthenticationSession
 
-    private let authenticationHelper = AuthenticationHelper()
-
     @EnvironmentObject
     var loginManager: LoginManager
 
@@ -64,14 +62,24 @@ struct LoginView: View {
 
         self.loginTask = Task {
             do {
-                let loginClient = WordPressLoginClient(urlSession: .shared)
-                let loginDetails = try await loginClient.login(
-                    site: url,
-                    appName: "WordPress SDK Example App",
-                    appId: nil
+                let application = Application(
+                    // swiftlint:disable:next force_try
+                    id: try! WpUuid.parse(input: "DBD2ADE9-3047-4C0B-AC66-F390F3EAA525"),
+                    name: "WordPress-rs Example App for iOS",
+                    callbackUrl: "x-wordpress-app://login-callback"
                 )
-                debugPrint(loginDetails)
-                try await loginManager.setLoginCredentials(to: loginDetails)
+
+                let loginClient = WordPressLoginClient(urlSession: .shared)
+                let details = try await loginClient.details(ofSite: url)
+                let loginUrl = try await details.loginURL(for: application)
+
+                let callbackUrl = try await self.webAuthenticationSession.authenticate(
+                    using: loginUrl,
+                    callbackURLScheme: "x-wordpress-app"
+                )
+
+                let loginDetails = try loginClient.credentials(from: callbackUrl)
+                try await loginManager.setLoginCredentials(to: loginDetails, apiRootURL: details.apiRootUrl.asURL())
             } catch let err {
                 handleLoginError(err)
             }
@@ -81,11 +89,5 @@ struct LoginView: View {
     private func handleLoginError(_ error: Error) {
         self.isLoggingIn = false
         self.loginError = error.localizedDescription
-    }
-}
-
-class AuthenticationHelper: NSObject, ASWebAuthenticationPresentationContextProviding {
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        ASPresentationAnchor()
     }
 }

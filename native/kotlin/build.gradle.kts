@@ -94,6 +94,12 @@ fun setupJniAndBindings() {
         from("$cargoProjectRoot/test_media.jpg")
         into(generatedTestResourcesPath)
     }
+
+    tasks.register<Copy>("copySampleJSON") {
+        dependsOn(tasks.named("deleteTestResources"))
+        from("$cargoProjectRoot/native/swift/Tests/wordpress-api/Resources/Responses/localhost-json-root.json")
+        into(generatedTestResourcesPath)
+    }
 }
 
 fun getNativeLibraryExtension(): String {

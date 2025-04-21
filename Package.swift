@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 
 import Foundation
 import PackageDescription
@@ -17,10 +17,10 @@ let libwordpressFFI: Target = libwordpressFFIVersion.target
 var package = Package(
     name: "WordPressAPI",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v11),
-        .tvOS(.v15),
-        .watchOS(.v8)
+        .iOS(.v16),
+        .macOS(.v12),
+        .tvOS(.v16),
+        .watchOS(.v9)
     ],
     products: [
         .library(
@@ -119,16 +119,5 @@ func enableSwiftLint() throws {
     }
 
     package.dependencies.append(.package(url: "https://github.com/realm/SwiftLint", exact: .init(version)!))
-
-    var platforms = package.platforms ?? []
-    if let mac = platforms.firstIndex(where: { $0 == .macOS(.v11) }) {
-        platforms.remove(at: mac)
-        platforms.append(.macOS(.v12))
-    }
-    package.platforms = platforms
-
-    if let target = package.targets.first(where: { $0.name == "WordPressAPI" }) {
-        target.plugins = (target.plugins ?? []) + [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint")]
-    }
 #endif
 }

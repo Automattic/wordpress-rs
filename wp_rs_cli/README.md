@@ -1,6 +1,6 @@
 # WordPress-rs CLI
 
-A command-line interface for interacting with WordPress sites built with Rust.
+A command-line interface for interacting with WordPress sites.
 
 ## Features
 
@@ -25,7 +25,7 @@ The binary will be available at `target/release/wp_rs_cli`.
 wp_rs_cli discover-login-url https://example.com 
 
 # Get help
-wordpress-cli --help
+wp_rs_cli --help
 ```
 
 

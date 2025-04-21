@@ -3,8 +3,8 @@ use super::{
     url_discovery::{
         self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
         AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
-        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, AutoDiscoveryUniffiResult,
-        FetchAndParseApiRootFailure, FindApiRootFailure, ParseHomepageResult,
+        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, FetchAndParseApiRootFailure,
+        FindApiRootFailure, ParseHomepageResult,
     },
 };
 use crate::{
@@ -36,8 +36,16 @@ impl UniffiWpLoginClient {
         }
     }
 
-    async fn api_discovery(&self, site_url: String) -> AutoDiscoveryUniffiResult {
-        self.inner.api_discovery(site_url).await.into()
+    async fn api_discovery(
+        &self,
+        site_url: String,
+    ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
+        self.inner
+            .api_discovery(site_url)
+            .await
+            .combined_result()
+            .cloned()
+            .map_err(|e| e.clone())
     }
 }
 
@@ -215,7 +223,7 @@ impl WpLoginClient {
             Ok(AutoDiscoveryAttemptSuccess {
                 parsed_site_url,
                 api_root_url: Arc::clone(&api_root_url.0),
-                api_details,
+                api_details: Arc::new(api_details),
             })
         }
     }

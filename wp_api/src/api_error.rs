@@ -1,5 +1,5 @@
+use crate::request::WpRedirect;
 use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError, WpNetworkResponse};
-use crate::{request::WpRedirect};
 use serde::Deserialize;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
@@ -449,18 +449,30 @@ impl WpSupportsLocalization for RequestExecutionError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum InvalidSslError {
+pub enum InvalidSslErrorReason {
     CertificateNotValidForName {
         hostname: String,
         presented_hostnames: Vec<String>,
     },
+    GenericSslError,
+}
+
+impl InvalidSslErrorReason {
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            Self::CertificateNotValidForName { .. } => {
+                WpMessages::invalid_ssl_error_certificate_not_valid_for_name()
+            }
+            Self::GenericSslError => WpMessages::invalid_ssl_error_generic_ssl_error(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum, WpDeriveLocalizable)]
 pub enum RequestExecutionErrorReason {
     // A case where there's an SSL certificate present, but it's untrusted (maybe it's self-signed, expired, or for the wrong domain)
     InvalidSslError {
-        inner: InvalidSslError,
+        reason: InvalidSslErrorReason,
     },
     NonExistentSiteError {
         error_message: Option<String>,
@@ -477,13 +489,11 @@ pub enum RequestExecutionErrorReason {
     HttpForbiddenError {
         hostname: String,
     },
-    HttpTimeoutError {
-        hostname: String,
-    },
+    HttpTimeoutError,
     MisconfiguredHttpAuthenticationError {
         issue: HttpAuthMethodParsingError,
     },
-    MisconfiguredRateLimitError {},
+    MisconfiguredRateLimitError,
     DeviceIsOfflineError {
         error_message: String,
     },
@@ -545,7 +555,7 @@ impl RequestExecutionErrorReason {
 impl WpSupportsLocalization for RequestExecutionErrorReason {
     fn message_bundle(&self) -> MessageBundle {
         match self {
-            RequestExecutionErrorReason::InvalidSslError { .. } => WpMessages::invalid_ssl_error(),
+            RequestExecutionErrorReason::InvalidSslError { reason } => reason.message_bundle(),
             RequestExecutionErrorReason::NonExistentSiteError { .. } => {
                 WpMessages::non_existent_site_error()
             }
@@ -570,9 +580,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             RequestExecutionErrorReason::GenericError { error_message } => {
                 WpMessages::just(error_message)
             }
-            RequestExecutionErrorReason::HttpTimeoutError { hostname } => {
-                WpMessages::just(hostname)
-            }
+            RequestExecutionErrorReason::HttpTimeoutError => WpMessages::http_timeout_error(),
         }
     }
 }

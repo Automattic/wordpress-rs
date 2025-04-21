@@ -8,11 +8,13 @@ import WordPressAPIInternal
 
 public typealias WpApiError = WordPressAPIInternal.WpApiError
 public typealias RequestExecutionError = WordPressAPIInternal.RequestExecutionError
+public typealias InvalidSslErrorReason = WordPressAPIInternal.InvalidSslErrorReason
 public typealias ParsedUrl = WordPressAPIInternal.ParsedUrl
 public typealias WpUuid = WordPressAPIInternal.WpUuid
 public typealias WpNetworkRequest = WordPressAPIInternal.WpNetworkRequest
 public typealias WpNetworkResponse = WordPressAPIInternal.WpNetworkResponse
 public typealias WpNetworkHeaderMap = WordPressAPIInternal.WpNetworkHeaderMap
+public typealias Middleware = WordPressAPIInternal.WpApiMiddleware
 public typealias MiddlewarePipeline = WordPressAPIInternal.WpApiMiddlewarePipeline
 public typealias MiddlewarePipelineBuilder = WordPressAPIInternal.WpApiMiddlewarePipelineBuilder
 public typealias ApiDiscoveryAuthenticationMiddleware = WordPressAPIInternal.ApiDiscoveryAuthenticationMiddleware
@@ -23,6 +25,14 @@ public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddlewar
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias SSLCertificateInfo = WordPressAPIInternal.SslCertificateInfo
+public typealias AutoDiscoveryAttemptSuccess = WordPressAPIInternal.AutoDiscoveryAttemptSuccess
+
+// MARK: - Errors
+public typealias AutoDiscoveryAttemptFailure = WordPressAPIInternal.AutoDiscoveryAttemptFailure
+public typealias FindApiRootFailure = WordPressAPIInternal.FindApiRootFailure
+public typealias FetchAndParseApiRootFailure = WordPressAPIInternal.FetchAndParseApiRootFailure
+public typealias ApplicationPasswordsNotSupportedReason = WordPressAPIInternal.ApplicationPasswordsNotSupportedReason
+public typealias RequestExecutionErrorReason = WordPressAPIInternal.RequestExecutionErrorReason
 
 // MARK: - Users
 

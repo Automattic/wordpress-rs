@@ -27,7 +27,14 @@ pub struct WpRestApiUrls {
 // embedded as query params. This function parses that URL and extracts the login details as an object.
 #[uniffi::export]
 pub fn extract_login_details_from_url(
-    url: Arc<ParsedUrl>,
+    url: String,
+) -> Result<WpApiApplicationPasswordDetails, OAuthResponseUrlError> {
+    let url = ParsedUrl::parse(&url).map_err(|_| OAuthResponseUrlError::InvalidUrl)?;
+    extract_login_details_from_parsed_url(url)
+}
+
+pub fn extract_login_details_from_parsed_url(
+    url: ParsedUrl,
 ) -> Result<WpApiApplicationPasswordDetails, OAuthResponseUrlError> {
     let f = |key| {
         url.inner
@@ -49,7 +56,7 @@ pub fn extract_login_details_from_url(
     })
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Object)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Object)]
 pub struct WpApiDetails {
     pub name: String,
     pub description: String,
@@ -130,7 +137,7 @@ impl WpApiDetails {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct KnownApplicationPasswordBlockingPlugin {
     /// The name of the plugin.
     pub name: String,
@@ -165,12 +172,12 @@ impl KnownApplicationPasswordBlockingPlugin {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct WpRestApiAuthenticationScheme {
     pub endpoints: Option<WpRestApiAuthenticationEndpoint>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct WpRestApiAuthenticationEndpoint {
     pub authorization: String,
 }
@@ -186,6 +193,7 @@ pub struct WpApiApplicationPasswordDetails {
     Debug, PartialEq, Eq, PartialOrd, Ord, thiserror::Error, uniffi::Error, WpDeriveLocalizable,
 )]
 pub enum OAuthResponseUrlError {
+    InvalidUrl,
     MissingSiteUrl,
     MissingUsername,
     MissingPassword,
@@ -203,11 +211,12 @@ impl WpSupportsLocalization for OAuthResponseUrlError {
             OAuthResponseUrlError::UnsuccessfulLogin => {
                 WpMessages::oauth_response_url_error_unsuccessful_login()
             }
+            OAuthResponseUrlError::InvalidUrl => WpMessages::oauth_response_url_error_url_invalid(),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct WpApiDetailsAuthenticationMap(HashMap<String, WpRestApiAuthenticationScheme>);
 
 // If the response is `[]`, default to an empty `HashMap`

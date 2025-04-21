@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/swift:6.0
+FROM public.ecr.aws/docker/library/swift:6.1
 
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     && apt-get update \

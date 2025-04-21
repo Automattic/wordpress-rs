@@ -3,7 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import uniffi.wp_api.AutoDiscoveryUniffiResult
+import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpLoginClient
 import uniffi.wp_api.WpApiMiddlewarePipeline
@@ -16,7 +16,11 @@ class WpLoginClient(
     private val internalClient: UniffiWpLoginClient =
         UniffiWpLoginClient(requestExecutor, middlewarePipeline)
 
-    suspend fun apiDiscovery(siteUrl: String): AutoDiscoveryUniffiResult = withContext(dispatcher) {
+    suspend fun apiDiscovery(siteUrl: String): AutoDiscoveryAttemptSuccess = withContext(dispatcher) {
         internalClient.apiDiscovery(siteUrl)
+    }
+
+    suspend fun loginUrl(siteUrl: String): String? = withContext(dispatcher) {
+        internalClient.apiDiscovery(siteUrl).apiDetails.findApplicationPasswordsAuthenticationUrl()
     }
 }
