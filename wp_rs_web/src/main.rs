@@ -44,7 +44,6 @@ async fn test(form: Form<TestForm<'_>>) -> Template {
                 "results",
                 context! {
                     value: form.value,
-                    result: true.to_string(),
                     application_passwords_authentication_url,
                     is_error: false
                 },
