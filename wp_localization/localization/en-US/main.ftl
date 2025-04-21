@@ -66,3 +66,4 @@ application_passwords_not_supported = The site does not support Application Pass
 
 parse_api_root = Failed to parse the the site's WordPress REST API root response.
 parse_api_root_failure_reason_server_fatal_error = Your server encountered an unrecoverable error and couldn't process the request.
+parse_api_root_failure_reason_wordfence_blocking_access = Wordfence is blocking access.
