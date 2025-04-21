@@ -27,7 +27,7 @@ struct UserAgentTests {
     #elseif os(Linux)
     @Test("User agent contains architecture")
     func testThatUserAgentContainsArchitecture() throws {
-        #expect(UserAgent.postfix.contains("aarch64"))
+        #expect(UserAgent.postfix.contains("aarch64") || UserAgent.postfix.contains("x86_64")) // CI is `x86_64`
     }
     #endif
 }

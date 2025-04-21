@@ -1,6 +1,6 @@
 import Foundation
 
-public struct UserAgent{
+public struct UserAgent {
     public static var postfix: String {
         #if canImport(Darwin)
         "\(bundleName)/\(bundleVersion) \(cfNetworkVersion) \(darwinVersion) \(architecture)"
@@ -50,7 +50,7 @@ public struct UserAgent{
     static func systemInfo(for key: String) -> String? {
         var size = 0
         sysctlbyname(key, nil, &size, nil, 0)
-        var value = [CChar](repeating: 0,  count: size)
+        var value = [CChar](repeating: 0, count: size)
         sysctlbyname(key, &value, &size, nil, 0)
         guard let string = String(cString: value, encoding: .ascii) else {
             return nil
@@ -69,7 +69,7 @@ public struct UserAgent{
             process.arguments = ["-m"]
 
             try process.run()
-            
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
 
             guard let string = String(data: data, encoding: .ascii) else {
