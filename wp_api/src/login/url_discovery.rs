@@ -470,6 +470,7 @@ pub enum FetchAndParseApiRootFailure {
         parsing_error_message: String,
         response_body: String,
         response_body_type: ResponseBodyType,
+        reason: Option<ParseApiRootFailureReason>,
     },
     WpError {
         error_code: WpErrorCode,
@@ -486,7 +487,13 @@ impl FetchAndParseApiRootFailure {
     fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
         match self {
             Self::FetchApiRoot { error } => error.message_bundle(),
-            Self::ParseApiRoot { .. } => WpMessages::parse_api_root(),
+            Self::ParseApiRoot { reason, .. } => {
+                if let Some(reason) = reason {
+                    reason.message_bundle()
+                } else {
+                    WpMessages::parse_api_root()
+                }
+            }
             Self::WpError { error_message, .. } => WpMessages::site_error_message(error_message),
             Self::ApplicationPasswordsNotSupported { reason, .. } => reason
                 .as_ref()
@@ -763,6 +770,28 @@ pub(crate) fn is_xmlrpc_response(body: &str) -> bool {
         .unwrap_or(false)
 }
 
+#[derive(Debug, Clone, PartialEq, uniffi::Enum)]
+pub enum ParseApiRootFailureReason {
+    ServerFatalError,
+}
+
+impl ParseApiRootFailureReason {
+    pub fn from_maybe_html_response_body(response_body: &str) -> Option<Self> {
+        if response_body.contains("<b>Fatal error</b>") {
+            Some(Self::ServerFatalError)
+        } else {
+            None
+        }
+    }
+
+    fn message_bundle(&self) -> MessageBundle {
+        match self {
+            Self::ServerFatalError => {
+                WpMessages::parse_api_root_failure_reason_server_fatal_error()
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::AutoDiscoveryAttempt as A;
@@ -977,6 +1006,16 @@ mod tests {
         assert!(!is_xmlrpc_response(body));
     }
 
+    #[test]
+    fn test_parse_api_root_failure_reason_server_fatal_error() {
+        assert_eq!(
+            ParseApiRootFailureReason::from_maybe_html_response_body(
+                r#"<br />\n<b>Fatal error</b>:  Unknown: Cannot use output buffering in output buffering display handlers in <b>Unknown</b> on line <b>0</b><br />\n"#
+            ),
+            Some(ParseApiRootFailureReason::ServerFatalError)
+        );
+    }
+
     // `adaf` refers to `AutoDiscoveryAttemptFailure`
     mod adaf_helpers {
         use crate::login::WpApiDetailsAuthenticationMap;
@@ -1024,6 +1063,7 @@ mod tests {
                     parsing_error_message: "".to_string(),
                     response_body: "".to_string(),
                     response_body_type: ResponseBodyType::MaybeHtml,
+                    reason: None,
                 },
             }
         }
