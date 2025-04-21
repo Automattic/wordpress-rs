@@ -1,30 +1,33 @@
-use crate::request::{
-    RequestExecutor,
-    endpoint::{
-        application_passwords_endpoint::{
-            ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
-        },
-        categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
-        comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
-        media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
-        plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
-        post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
-        posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
-        search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
-        site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
-        tags_endpoint::{TagsRequestBuilder, TagsRequestExecutor},
-        taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
-        templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
-        themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
-        users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
-        wp_site_health_tests_endpoint::{
-            WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
-        },
-    },
-};
 use crate::{
     ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
     api_client_generate_request_builder,
+};
+use crate::{
+    middleware::WpApiMiddlewarePipeline,
+    request::{
+        RequestExecutor,
+        endpoint::{
+            application_passwords_endpoint::{
+                ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
+            },
+            categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
+            comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
+            media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
+            plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
+            post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
+            posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
+            search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
+            site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
+            tags_endpoint::{TagsRequestBuilder, TagsRequestExecutor},
+            taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
+            templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
+            themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
+            users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
+            wp_site_health_tests_endpoint::{
+                WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
+            },
+        },
+    },
 };
 use std::sync::Arc;
 
@@ -98,9 +101,15 @@ impl UniffiWpApiClient {
         api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         Self {
-            inner: WpApiClient::new(api_root_url, authentication, request_executor),
+            inner: WpApiClient::new(
+                api_root_url,
+                authentication,
+                request_executor,
+                middleware_pipeline,
+            ),
         }
     }
 }
@@ -129,11 +138,13 @@ impl WpApiClient {
         api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         api_client_generate_api_client!(
             api_root_url,
             authentication,
-            request_executor;
+            request_executor,
+            middleware_pipeline;
             application_passwords,
             categories,
             comments,
@@ -220,13 +231,14 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_root_url:ident, $authentication:ident, $request_executor:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $authentication:ident, $request_executor:ident, $middleware_pipeline:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
                     $api_root_url.clone(),
                     $authentication.clone(),
                     $request_executor.clone(),
+                    $middleware_pipeline.clone(),
                 )
                 .into(),)*
             }
