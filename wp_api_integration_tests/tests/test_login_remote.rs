@@ -1,12 +1,13 @@
 use serial_test::parallel;
 use std::{path::Path, sync::Arc};
 use wp_api::{
-    InvalidSslErrorReason, RequestExecutionError, RequestExecutionErrorReason,
+    InvalidSslErrorReason, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason,
     login::{
         login_client::WpLoginClient,
         url_discovery::{
             ApplicationPasswordsNotSupportedReason, AutoDiscoveryAttemptFailure,
-            FetchAndParseApiRootFailure, FindApiRootFailure,
+            FetchAndParseApiRootFailure, FindApiRootFailure, XmlrpcDisabledReason,
+            XmlrpcDiscoveryError,
         },
     },
     middleware::{
@@ -352,6 +353,43 @@ async fn login_spec_17_invalid_https_with_exception_works() {
     );
 }
 
+#[tokio::test]
+#[parallel]
+async fn login_spec_18_xmlrpc_disabled_by_host() {
+    // The xmlrpc endpoint does not return a valid HTTP response:
+    // $ curl https://xmlrpc-disabled.wpmt.co/xmlrpc.php
+    // curl: (92) HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)
+    let result = xmlrpc_url("https://xmlrpc-disabled.wpmt.co").await;
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        XmlrpcDiscoveryError::Disabled {
+            reason: XmlrpcDisabledReason::ByHost
+        }
+    ));
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_18_xmlrpc_disabled_by_plugin() {
+    let result = xmlrpc_url("https://xmlrpc-disabled-by-plugin.wpmt.co").await;
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        XmlrpcDiscoveryError::Disabled {
+            reason: XmlrpcDisabledReason::ByPlugin { .. }
+        }
+    ));
+}
+
+#[tokio::test]
+#[parallel]
+async fn login_spec_18_xmlrpc_found() {
+    let result = xmlrpc_url("https://vanilla.wpmt.co").await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().url(), "https://vanilla.wpmt.co/xmlrpc.php");
+}
+
 async fn login_url(site_url: &str) -> String {
     login_url_with_executor(Arc::new(ReqwestRequestExecutor::default()), site_url).await
 }
@@ -448,4 +486,16 @@ async fn discovery_helper(
                 .expect("If the discovery is successful, authentication url has to be `Some`")
         })
         .map_err(|e| e.clone())
+}
+
+async fn xmlrpc_url(site_url: &str) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
+    let client = WpLoginClient::new(
+        Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(WpApiMiddlewarePipeline {
+            middlewares: vec![],
+        }),
+    );
+    let result = client.api_discovery(site_url.to_string()).await;
+    let success = result.combined_result().unwrap();
+    client.xmlrpc_discovery(success.clone()).await
 }
