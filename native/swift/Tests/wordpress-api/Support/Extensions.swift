@@ -41,3 +41,5 @@ func isLinux() -> Bool {
     return false
     #endif
 }
+
+let isXCTest: Bool = Bundle.main.infoDictionary?["CFBundleName"] as? String == "xctest"

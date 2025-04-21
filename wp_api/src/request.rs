@@ -763,6 +763,74 @@ pub fn is_valid_json(value: impl AsRef<str>) -> bool {
     serde_json::from_str::<serde_json::Value>(value.as_ref()).is_ok()
 }
 
+pub mod user_agent {
+    #[uniffi::export]
+    pub fn default_user_agent(client_specific_postfix: &str) -> String {
+        default_user_agent_with_version(client_specific_postfix, version())
+    }
+
+    fn default_user_agent_with_version(client_specific_postfix: &str, version: &str) -> String {
+        format!(
+            "wordpress-rs/{version} (https://github.com/automattic/wordpress-rs);{client_specific_postfix}"
+        )
+    }
+
+    fn version() -> &'static str {
+        crate::WORDPRESS_RS_VERSION
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_default_user_agent() {
+            assert_eq!(
+                default_user_agent_with_version("reqwest", "1.0"),
+                "wordpress-rs/1.0 (https://github.com/automattic/wordpress-rs);reqwest"
+            );
+        }
+    }
+
+    #[cfg(feature = "reqwest-request-executor")]
+    pub mod reqwest {
+        use super::*;
+        use http::HeaderValue;
+
+        const REQWEST_REQUEST_EXECUTOR_USER_AGENT_POST_FIX: &str = "reqwest";
+
+        pub fn user_agent_for_reqwest_request_executor() -> HeaderValue {
+            user_agent_for_reqwest_request_executor_with_version(version())
+        }
+
+        fn user_agent_for_reqwest_request_executor_with_version(version: &str) -> HeaderValue {
+            HeaderValue::from_str(
+                default_user_agent_with_version(
+                    REQWEST_REQUEST_EXECUTOR_USER_AGENT_POST_FIX,
+                    version,
+                )
+                .as_str(),
+            )
+            .expect("Reqwest user agent is a valid header value as proven by its unit test")
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            #[test]
+            fn test_reqwest_user_agent() {
+                assert_eq!(
+                    user_agent_for_reqwest_request_executor_with_version("1.0")
+                        .to_str()
+                        .expect("Reqwest user agent header value can be converted to str"),
+                    "wordpress-rs/1.0 (https://github.com/automattic/wordpress-rs);reqwest"
+                );
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
