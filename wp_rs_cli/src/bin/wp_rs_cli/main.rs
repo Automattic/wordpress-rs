@@ -127,12 +127,7 @@ async fn perform_api_discovery(
 
 fn build_login_client() -> WpLoginClient {
     let request_executor = Arc::new(ReqwestRequestExecutor::default());
-    WpLoginClient::new(
-        request_executor,
-        Arc::new(WpApiMiddlewarePipeline {
-            middlewares: vec![],
-        }),
-    )
+    WpLoginClient::new_with_default_middleware_pipeline(request_executor)
 }
 
 fn parse_input_file(input_file: &str) -> Result<Vec<BatchTestRow>> {
