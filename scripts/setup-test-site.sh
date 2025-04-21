@@ -116,7 +116,7 @@ create_test_credentials () {
   wp post delete "$TRASHED_POST_ID"
 
   rm -rf /app/test_credentials.json
-  jo -p -- \
+  jo -p \
     site_url="$SITE_URL" \
     admin_username="$ADMIN_USERNAME" \
     admin_password="$ADMIN_PASSWORD" \
@@ -133,7 +133,7 @@ create_test_credentials () {
     password_protected_comment_author="$PASSWORD_PROTECTED_COMMENT_AUTHOR" \
     trashed_post_id="$TRASHED_POST_ID" \
     first_post_date_gmt="$FIRST_POST_DATE_GMT" \
-    -s wordpress_core_version="$WORDPRESS_VERSION" \
+    wordpress_core_version="\"$WORDPRESS_VERSION\"" \
     > /app/test_credentials.json
 }
 create_test_credentials

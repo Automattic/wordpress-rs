@@ -16,24 +16,31 @@ extension SafeRequestExecutor {
     }
 }
 
-final class WpRequestExecutor: SafeRequestExecutor {
+public final class WpRequestExecutor: SafeRequestExecutor {
     private let session: URLSession
     private let executorDelegate: RequestExecutorDelegate
 
     private let additionalHttpHeadersForAllRequests: [String: String]
 
-    init(
+    private let userAgent: String
+
+    public init(
         urlSession: URLSession,
-        additionalHttpHeadersForAllRequests: [String: String] = [:]
+        additionalHttpHeadersForAllRequests: [String: String] = [:],
+        userAgent: String = defaultUserAgent(clientSpecificPostfix: UserAgent.postfix)
     ) {
         self.session = urlSession
         self.executorDelegate = RequestExecutorDelegate()
+        self.userAgent = userAgent
         self.additionalHttpHeadersForAllRequests = additionalHttpHeadersForAllRequests
     }
 
-    func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
             var urlrequest = request.asURLRequest()
+
+            // Set the user agent before `additionalHttpHeadersForAllRequests` so that it can be overridden that way
+            urlrequest.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
 
             for (key, value) in additionalHttpHeadersForAllRequests {
                 urlrequest.addValue(value, forHTTPHeaderField: key)
@@ -117,11 +124,11 @@ final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
-    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
         preconditionFailure("Not implemented yet")
     }
 
-    func sleep(millis: UInt64) async {
+    public func sleep(millis: UInt64) async {
         // swiftlint:disable:next force_try
         try! await Task.sleep(nanoseconds: millis * 1000)
     }

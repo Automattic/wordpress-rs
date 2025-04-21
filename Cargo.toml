@@ -4,6 +4,7 @@ members = [
   "wp_api_integration_tests",
   "wp_api_integration_tests_backend",
   "wp_cli",
+  "wp_rs_cli",
   "wp_contextual",
   "wp_derive",
   "wp_derive_request_builder",
@@ -25,12 +26,14 @@ async-trait = "0.1"
 base64 = "0.22"
 chrono = "0.4"
 clap = "4.5"
+colored = "3.0"
 convert_case = "0.7"
-futures = "0.3"
+csv = "1.3"
 fluent-bundle = "0.15"
 fluent-langneg = "0.13"
 fluent-syntax = "0.11"
 fluent-templates = "0.13"
+futures = "0.3"
 h2 = "0.4"
 hickory-resolver = "0.24" # 0.25 breaks the ability to detect DNS Errors, so we shouldn't update until that's fixed
 http = "1.3"

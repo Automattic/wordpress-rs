@@ -3,7 +3,7 @@ use crate::{
     api_error::InvalidSslErrorReason,
     request::{
         RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-        endpoint::media_endpoint::MediaUploadRequest,
+        endpoint::media_endpoint::MediaUploadRequest, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -52,18 +52,23 @@ impl ReqwestRequestExecutor {
         &self,
         wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
+        let mut request_header_map = wp_request.header_map().to_header_map();
+        request_header_map.insert(
+            http::header::USER_AGENT,
+            user_agent::reqwest::user_agent_for_reqwest_request_executor(),
+        );
         let mut request = self
             .client
             .request(
                 Self::request_method(wp_request.method()),
                 wp_request.url().0.as_str(),
             )
-            .headers(wp_request.header_map().to_header_map());
+            .headers(request_header_map);
         if let Some(body) = wp_request.body() {
             request = request.body(body.contents());
         }
         let mut response = request.send().await?;
-        let header_map = std::mem::take(response.headers_mut());
+        let response_header_map = std::mem::take(response.headers_mut());
 
         let status = response.status();
         let body = response.bytes().await?;
@@ -71,7 +76,7 @@ impl ReqwestRequestExecutor {
         Ok(WpNetworkResponse {
             status_code: status.as_u16(),
             body: body.to_vec(),
-            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            response_header_map: Arc::new(WpNetworkHeaderMap::new(response_header_map)),
             request_url: wp_request.url(),
             request_header_map: wp_request.header_map(),
         })
