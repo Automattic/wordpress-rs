@@ -35,7 +35,7 @@ async fn test(form: Form<TestForm<'_>>) -> Template {
         .combined_result()
     {
         Ok(success) => {
-            let application_passwords_authentication_url = success
+            let auth_url = success
                 .api_details
                 .find_application_passwords_authentication_url()
                 .expect("Already confirmed auto discovery was successful");
@@ -44,7 +44,7 @@ async fn test(form: Form<TestForm<'_>>) -> Template {
                 "results",
                 context! {
                     value: form.value,
-                    application_passwords_authentication_url,
+                    application_passwords_authentication_url: linkify_text(&auth_url, false),
                     is_error: false
                 },
             )
