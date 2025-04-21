@@ -40,7 +40,11 @@ public struct UserAgent {
         var systemInfo = utsname()
         uname(&systemInfo)
 
-        let bytes = Data(bytes: &systemInfo.release, count: Int(_SYS_NAMELEN)).filter { $0 != 0 }
+        // Picking a sensible buffer size manually means the value might be truncated. 8 bytes is enough for a very long
+        // version string – right now we only need 6 bytes for a three-segment code (ex: `24.3.0` ~> 6 bytes). We can
+        // use something like `_SYS_NAMELEN` as a buffer size but that's 256 bytes and it's a big waste of CPU
+        // to `.filter` over.
+        let bytes = Data(bytes: &systemInfo.release, count: 8).filter { $0 != 0 }
 
         guard let string = String(data: bytes, encoding: .ascii) else {
             return "Darwin/unknown"
