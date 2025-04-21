@@ -2,8 +2,6 @@
 name = "wp_rs_web"
 version = "0.1.0"
 edition = "2024"
-workspace = "../"
-
 
 [dependencies]
 wp_api = { path = "../wp_api", features = ["reqwest-request-executor"] }
