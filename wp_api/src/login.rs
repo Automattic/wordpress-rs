@@ -62,13 +62,12 @@ pub struct WpApiDetails {
     pub description: String,
     pub url: String,
     pub home: String,
-    #[serde(deserialize_with = "deserialize_offset")]
-    pub gmt_offset: f64,
-    pub timezone_string: String,
+    #[serde(default, deserialize_with = "deserialize_offset")]
+    pub gmt_offset: Option<f64>,
+    pub timezone_string: Option<String>,
     pub namespaces: Vec<String>,
     pub authentication: WpApiDetailsAuthenticationMap,
-    #[serde(deserialize_with = "deserialize_false_or_string")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_false_or_string")]
     pub site_icon_url: Option<String>,
 }
 

@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use csv::Writer;
 use futures::stream::StreamExt;
-use std::{fmt::Display, fs::File, sync::Arc};
+use std::{fmt::Display, fs::File, sync::Arc, time::Duration};
 use wp_api::{
     login::{
         login_client::WpLoginClient,
@@ -126,7 +126,10 @@ async fn perform_api_discovery(
 }
 
 fn build_login_client() -> WpLoginClient {
-    let request_executor = Arc::new(ReqwestRequestExecutor::default());
+    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_timeout(
+        false,
+        Duration::from_secs(60),
+    ));
     WpLoginClient::new(
         request_executor,
         Arc::new(WpApiMiddlewarePipeline {
