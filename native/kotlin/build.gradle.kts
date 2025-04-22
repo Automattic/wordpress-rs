@@ -97,7 +97,7 @@ fun setupJniAndBindings() {
 
     tasks.register<Copy>("copySampleJSON") {
         dependsOn(tasks.named("deleteGeneratedTestResources"))
-        from("$cargoProjectRoot/native/swift/Tests/wordpress-api/Resources/Responses/localhost-json-root.json")
+        from("$cargoProjectRoot/test-data/integration-test-responses/localhost-json-root.json")
         into(generatedTestResourcesPath)
     }
 }

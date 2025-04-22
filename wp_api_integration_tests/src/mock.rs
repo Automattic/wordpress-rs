@@ -49,7 +49,7 @@ impl RequestExecutor for MockExecutor {
 
 pub mod response_helpers {
     use http::{HeaderMap, header::HeaderValue};
-    use std::{fs, path::Path, sync::Arc};
+    use std::{fs, path::PathBuf, sync::Arc};
     use wp_api::request::{WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl};
 
     pub fn with_api_root(url: &str) -> WpNetworkResponse {
@@ -68,7 +68,15 @@ pub mod response_helpers {
         }
     }
 
-    pub fn json_response_from_path(json_file_path: &Path) -> WpNetworkResponse {
+    pub fn json_response_from_integration_test_responses(file_name: &str) -> WpNetworkResponse {
+        let mut json_file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+        json_file_path.push("test-data");
+        json_file_path.push("integration-test-responses");
+        json_file_path.push(file_name);
+        json_response_from_path(&json_file_path)
+    }
+
+    pub fn json_response_from_path(json_file_path: &PathBuf) -> WpNetworkResponse {
         let json = fs::read_to_string(json_file_path).unwrap_or_else(|_| {
             panic!(
                 "Should have been able to read the json file at: '{:#?}'",
