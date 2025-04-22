@@ -6,6 +6,7 @@ use wp_api::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
     WpApiClient, WpAuthentication, WpErrorCode,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
+    middleware::WpApiMiddlewarePipeline,
     posts::WpApiParamPostsOrderBy,
     request::{
         RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
@@ -176,6 +177,7 @@ fn api_client_with_medir_err_networking(test_type: MediaErrNetworkingTestType) -
             TestCredentials::instance().admin_password.to_string(),
         ),
         Arc::new(MediaErrNetworking::new(test_type)),
+        Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
 

@@ -28,6 +28,7 @@ parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls-tls", "hickory-dns" ], optional = true }
+roxmltree = { workspace = true }
 rustls = { workspace = true, optional = true }
 scraper = { workspace = true }
 serde = { workspace = true, features = [ "derive", "rc" ] }

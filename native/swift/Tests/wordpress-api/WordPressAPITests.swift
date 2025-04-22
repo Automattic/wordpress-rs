@@ -1,11 +1,11 @@
 import Foundation
 import Testing
 @testable import WordPressAPI
+@testable import WordPressAPIInternal
 
 struct WordPressAPITests {
 
-    @Test
-    func testExample() async throws {
+    func createStubs() throws -> HTTPStubs {
         let response = """
           {
             "id": 1,
@@ -34,10 +34,14 @@ struct WordPressAPITests {
             }
           }
         """
-        let stubs = HTTPStubs(stubs: [
+        return HTTPStubs(stubs: [
             HTTPStubs.stub(path: "/wp-json/wp/v2/users/1", with: try .json(response))
         ])
+    }
 
+    @Test
+    func testExample() async throws {
+        let stubs = try createStubs()
         let api = try WordPressAPI(
             apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
             authenticationStategy: .none,
@@ -45,5 +49,32 @@ struct WordPressAPITests {
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
         #expect(user.data.name == "User Name")
+    }
+
+    @Test
+    func testPipeline() async throws {
+        let stubs = try createStubs()
+        let counter = CounterMiddleware()
+        let api = try WordPressAPI(
+            apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
+            authenticationStategy: .none,
+            executor: stubs,
+            middlewarePipeline: .init(middlewares: [counter])
+        )
+        _ = try await api.users.retrieveWithViewContext(userId: 1)
+        await #expect(counter.count == 1)
+    }
+}
+
+private actor CounterMiddleware: Middleware {
+    var count = 0
+
+    func process(
+        requestExecutor: RequestExecutor,
+        response: WpNetworkResponse,
+        request: WpNetworkRequest
+    ) async throws -> WpNetworkResponse {
+        count += 1
+        return response
     }
 }

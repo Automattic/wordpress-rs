@@ -62,13 +62,12 @@ pub struct WpApiDetails {
     pub description: String,
     pub url: String,
     pub home: String,
-    #[serde(deserialize_with = "deserialize_offset")]
-    pub gmt_offset: f64,
-    pub timezone_string: String,
+    #[serde(default, deserialize_with = "deserialize_offset")]
+    pub gmt_offset: Option<f64>,
+    pub timezone_string: Option<String>,
     pub namespaces: Vec<String>,
     pub authentication: WpApiDetailsAuthenticationMap,
-    #[serde(deserialize_with = "deserialize_false_or_string")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_false_or_string")]
     pub site_icon_url: Option<String>,
 }
 
@@ -109,16 +108,23 @@ impl WpApiDetails {
 
     /// Does the site use a plugin that disables application passwords?
     pub fn has_application_password_blocking_plugin(&self) -> bool {
-        KnownApplicationPasswordBlockingPlugin::all()
+        KnownAuthenticationBlockingPlugin::application_passwords()
             .iter()
             .any(|plugin| self.namespaces.contains(&plugin.namespace))
     }
 
     /// Returns a list of plugins that might be responsible for disabling application passwords.
-    pub fn application_password_blocking_plugins(
-        &self,
-    ) -> Vec<KnownApplicationPasswordBlockingPlugin> {
-        KnownApplicationPasswordBlockingPlugin::all()
+    pub fn application_password_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
+        KnownAuthenticationBlockingPlugin::application_passwords()
+            .iter()
+            .filter(|plugin| self.namespaces.contains(&plugin.namespace))
+            .cloned()
+            .collect()
+    }
+
+    /// Returns a list of plugins that might be responsible for disabling XML-RPC.
+    pub fn xmlrpc_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
+        KnownAuthenticationBlockingPlugin::xmlrpc()
             .iter()
             .filter(|plugin| self.namespaces.contains(&plugin.namespace))
             .cloned()
@@ -138,7 +144,7 @@ impl WpApiDetails {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
-pub struct KnownApplicationPasswordBlockingPlugin {
+pub struct KnownAuthenticationBlockingPlugin {
     /// The name of the plugin.
     pub name: String,
     /// The plugin's REST API namespace.
@@ -147,7 +153,7 @@ pub struct KnownApplicationPasswordBlockingPlugin {
     pub support_url: String,
 }
 
-impl KnownApplicationPasswordBlockingPlugin {
+impl KnownAuthenticationBlockingPlugin {
     fn all() -> Vec<Self> {
         vec![
             Self {
@@ -169,6 +175,14 @@ impl KnownApplicationPasswordBlockingPlugin {
                 support_url: "https://wordpress.org/support/plugin/fluent-security/".to_string(),
             },
         ]
+    }
+
+    fn application_passwords() -> Vec<Self> {
+        Self::all()
+    }
+
+    fn xmlrpc() -> Vec<Self> {
+        Self::all()
     }
 }
 

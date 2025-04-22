@@ -25,14 +25,16 @@ public actor WordPressAPI {
     init(
         apiRootUrl: ParsedUrl,
         authenticationStategy: WpAuthentication,
-        executor: SafeRequestExecutor
+        executor: SafeRequestExecutor,
+        middlewarePipeline: MiddlewarePipeline = .default
     ) {
         self.internalExecutor = executor
 
         self.requestBuilder = UniffiWpApiClient(
             apiRootUrl: apiRootUrl,
             authentication: authenticationStategy,
-            requestExecutor: executor
+            requestExecutor: executor,
+            middlewarePipeline: middlewarePipeline
         )
     }
 

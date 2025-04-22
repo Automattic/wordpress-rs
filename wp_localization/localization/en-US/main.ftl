@@ -53,6 +53,10 @@ wordpress_org_api_client_error_request_encoding = Failed to encode request. Reas
 
 probably_not_wordpress_site = The site does not appear to be a WordPress site.
 rest_api_disabled = The site's REST API is disabled. Please update your site settings to enable REST API.
+xmlrpc_disabled_by_host = The site's XML-RPC is disabled. Please contact your hosting provider to solve this problem.
+xmlrpc_disabled_by_plugin = The site's XML-RPC is disabled – the {$plugin} plugin might have disabled XML-RPC. Please visit {$support_url} to learn more.
+xmlrpc_disabled_by_multiple_plugins = The site's XML-RPC is disabled – there are multiple installed plugins that might have disabled XML-RPC. Please disable them and try again.
+xmlrpc_endpoint_not_found = The site's XML-RPC endpoint could not be found. Please check your site settings and try again.
 
 application_password_blocked_by_plugin = Unable to login to {$url} – the {$plugin} plugin might have disabled Application Passwords. Please visit {$support_url} to learn more.
 application_password_blocked_by_multiple_plugins = Unable to login to {$url} – there are multiple installed plugins that might have disabled Application Passwords. Please disable them and try again.
