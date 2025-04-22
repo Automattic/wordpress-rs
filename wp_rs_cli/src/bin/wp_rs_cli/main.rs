@@ -126,10 +126,7 @@ async fn perform_api_discovery(
 }
 
 fn build_login_client() -> WpLoginClient {
-    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_timeout(
-        false,
-        Duration::from_secs(60),
-    ));
+    let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
     WpLoginClient::new(
         request_executor,
         Arc::new(WpApiMiddlewarePipeline {

@@ -15,6 +15,8 @@ use reqwest::multipart::Part;
 use rustls::{CertificateError, Error as TlsError};
 use std::{error::Error, sync::Arc, time::Duration};
 
+const DEFAULT_TIMEOUT: u64 = 10;
+
 #[derive(Debug)]
 pub struct ReqwestRequestExecutor {
     client: reqwest::Client,
@@ -27,23 +29,22 @@ impl Default for ReqwestRequestExecutor {
 }
 
 impl ReqwestRequestExecutor {
-    pub fn new(danger_accept_invalid_certs: bool, timeout: Option<Duration>) -> Self {
+    pub fn new(danger_accept_invalid_certs: bool, timeout: Duration) -> Self {
         Self {
             client: reqwest::Client::builder()
                 .danger_accept_invalid_certs(danger_accept_invalid_certs)
-                .timeout(timeout.unwrap_or(Duration::from_secs(10)))
+                .timeout(timeout)
                 .use_rustls_tls()
                 .build()
                 .expect("We should be able to build the reqwest client with this configuration"),
         }
     }
 
-    pub fn new_with_timeout(danger_accept_invalid_certs: bool, timeout: Duration) -> Self {
-        Self::new(danger_accept_invalid_certs, Some(timeout))
-    }
-
     pub fn new_with_default_timeout(danger_accept_invalid_certs: bool) -> Self {
-        Self::new(danger_accept_invalid_certs, None)
+        Self::new(
+            danger_accept_invalid_certs,
+            Duration::from_secs(DEFAULT_TIMEOUT),
+        )
     }
 }
 
