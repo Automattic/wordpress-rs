@@ -76,15 +76,6 @@ extension AutoDiscoveryAttemptSuccess {
         ).asURL()
     }
 
-    var applicationPasswordAuthenticationUrl: ParsedUrl {
-        get throws {
-            guard let passwordAuthUrl = apiDetails.findApplicationPasswordsAuthenticationUrl() else {
-                preconditionFailure("No Auth URL Found")
-            }
-            return try ParsedUrl.parse(input: passwordAuthUrl)
-        }
-    }
-
 }
 
 public struct Application {
