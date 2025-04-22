@@ -11,7 +11,6 @@ use wp_api::{
             AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
         },
     },
-    middleware::WpApiMiddlewarePipeline,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 
