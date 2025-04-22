@@ -79,24 +79,24 @@ fun setupJniAndBindings() {
         into(jniLibsPath)
     }
 
-    tasks.register<Delete>("deleteTestResources") {
+    tasks.register<Delete>("deleteGeneratedTestResources") {
         delete = setOf(generatedTestResourcesPath)
     }
 
     tasks.register<Copy>("copyTestCredentials") {
-        dependsOn(tasks.named("deleteTestResources"))
+        dependsOn(tasks.named("deleteGeneratedTestResources"))
         from("$cargoProjectRoot/test_credentials.json")
         into(generatedTestResourcesPath)
     }
 
     tasks.register<Copy>("copyTestMedia") {
-        dependsOn(tasks.named("deleteTestResources"))
-        from("$cargoProjectRoot/test_media.jpg")
+        dependsOn(tasks.named("deleteGeneratedTestResources"))
+        from("$cargoProjectRoot/test-data/test_media.jpg")
         into(generatedTestResourcesPath)
     }
 
     tasks.register<Copy>("copySampleJSON") {
-        dependsOn(tasks.named("deleteTestResources"))
+        dependsOn(tasks.named("deleteGeneratedTestResources"))
         from("$cargoProjectRoot/native/swift/Tests/wordpress-api/Resources/Responses/localhost-json-root.json")
         into(generatedTestResourcesPath)
     }
