@@ -191,7 +191,22 @@ impl WpLoginClient {
         };
         let api_details = Self::parse_api_root(&fetch_api_details_response)?;
 
-        if !api_details.has_application_passwords_authentication_url() {
+        if let Some(application_passwords_authentication_url) =
+            api_details.find_application_passwords_authentication_url()
+        {
+            let application_passwords_authentication_url =
+                ParsedUrl::parse(application_passwords_authentication_url.as_str())
+                    .expect(
+                        "Application passwords url returned from the server should be a valid url",
+                    )
+                    .into();
+            Ok(AutoDiscoveryAttemptSuccess {
+                parsed_site_url,
+                api_root_url: Arc::clone(&api_root_url.0),
+                api_details: Arc::new(api_details),
+                application_passwords_authentication_url,
+            })
+        } else {
             let reason = if api_details.has_application_password_blocking_plugin() {
                 let plugins = api_details.application_password_blocking_plugins();
 
@@ -221,12 +236,6 @@ impl WpLoginClient {
                     reason,
                 },
             )
-        } else {
-            Ok(AutoDiscoveryAttemptSuccess {
-                parsed_site_url,
-                api_root_url: Arc::clone(&api_root_url.0),
-                api_details: Arc::new(api_details),
-            })
         }
     }
 

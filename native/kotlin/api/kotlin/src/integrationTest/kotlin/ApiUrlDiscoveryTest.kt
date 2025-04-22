@@ -31,7 +31,7 @@ class ApiUrlDiscoveryTest {
     fun testValidSiteWorksCorrectly() = runTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://vanilla.wpmt.co")
+            loginClient.apiDiscovery("https://vanilla.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -60,7 +60,7 @@ class ApiUrlDiscoveryTest {
 
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
             val client = WpLoginClient(executor)
-            client.loginUrl("http://localhost")
+            client.apiDiscovery("http://localhost").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getApplicationPasswordsNotSupportedReason(e)
             assertInstanceOf(SiteIsLocalDevelopmentEnvironment::class.java, reason)
@@ -71,12 +71,12 @@ class ApiUrlDiscoveryTest {
     fun testAdminUrlProvided() = runTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://vanilla.wpmt.co/wp-login.php")
+            loginClient.apiDiscovery("https://vanilla.wpmt.co/wp-login.php").applicationPasswordsAuthenticationUrl.url()
         )
 
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://vanilla.wpmt.co/wp-admin")
+            loginClient.apiDiscovery("https://vanilla.wpmt.co/wp-admin").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -84,14 +84,14 @@ class ApiUrlDiscoveryTest {
     fun testAutoHttpsSupport() = runTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("http://vanilla.wpmt.co")
+            loginClient.apiDiscovery("http://vanilla.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 5
     fun testHttpOnlySite() = runTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            loginClient.loginUrl("http://no-https.wpmt.co")
+            loginClient.apiDiscovery("http://no-https.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getApplicationPasswordsNotSupportedReason(e)
             assertInstanceOf(ApplicationPasswordsDisabledForHttpSite::class.java, reason)
@@ -102,7 +102,7 @@ class ApiUrlDiscoveryTest {
     fun testHttpOnlySiteWithApplicationPasswordsEnabled() = runTest {
         assertEquals(
             "http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("http://no-https-with-application-passwords.wpmt.co")
+            loginClient.apiDiscovery("http://no-https-with-application-passwords.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -110,14 +110,14 @@ class ApiUrlDiscoveryTest {
     fun testAggressivelyCachedSiteWithNoLinkHeader() = runTest {
         assertEquals(
             "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://aggressive-caching.wpmt.co")
+            loginClient.apiDiscovery("https://aggressive-caching.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 8
     fun testSiteWithApplicationPasswordsDisabledByWordFence() = runTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            loginClient.loginUrl("https://wordfence.wpmt.co")
+            loginClient.apiDiscovery("https://wordfence.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getApplicationPasswordsNotSupportedReason(e)
             assertInstanceOf(
@@ -134,7 +134,7 @@ class ApiUrlDiscoveryTest {
     @Test // Spec Example 9
     fun testNotWordPressSite() = runTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            loginClient.loginUrl("https://google.com")
+            loginClient.apiDiscovery("https://google.com").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getFindApiRootFailure(e)
             assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
@@ -145,7 +145,7 @@ class ApiUrlDiscoveryTest {
     fun testWordPressSubdirectoryWithLinkHeader() = runTest {
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://subdirectory.wpmt.co/index.php?link_header=true")
+            loginClient.apiDiscovery("https://subdirectory.wpmt.co/index.php?link_header=true").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -153,7 +153,7 @@ class ApiUrlDiscoveryTest {
     fun testWordPressSubdirectoryWithLinkTag() = runTest {
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://subdirectory.wpmt.co?link_tag=true")
+            loginClient.apiDiscovery("https://subdirectory.wpmt.co?link_tag=true").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -161,14 +161,14 @@ class ApiUrlDiscoveryTest {
     fun testWordPressSubdirectoryWithRedirect() = runTest {
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://subdirectory.wpmt.co/index.php?redirect=true")
+            loginClient.apiDiscovery("https://subdirectory.wpmt.co/index.php?redirect=true").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 13 (with no credentials)
     fun testWordPressHttpBasicWithMissingCredentials() = runTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            loginClient.loginUrl("https://basic-auth.wpmt.co")
+            loginClient.apiDiscovery("https://basic-auth.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
             assertInstanceOf(
@@ -186,7 +186,7 @@ class ApiUrlDiscoveryTest {
             WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
         )
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            client.loginUrl("https://basic-auth.wpmt.co")
+            client.apiDiscovery("https://basic-auth.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
             assertInstanceOf(
@@ -209,7 +209,7 @@ class ApiUrlDiscoveryTest {
 
         assertEquals(
             "https://basic-auth.wpmt.co/wp-admin/authorize-application.php",
-            client.loginUrl("https://basic-auth.wpmt.co")
+            client.apiDiscovery("https://basic-auth.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -217,7 +217,7 @@ class ApiUrlDiscoveryTest {
     fun testWordPressCustomRestApiPrefix() = runTest {
         assertEquals(
             "https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://custom-rest-prefix.wpmt.co")
+            loginClient.apiDiscovery("https://custom-rest-prefix.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -225,7 +225,7 @@ class ApiUrlDiscoveryTest {
     fun testWordPressHeavyRateLimiting() = runTest {
         assertEquals(
             "https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.loginUrl("https://aggressive-rate-limiting.wpmt.co")
+            loginClient.apiDiscovery("https://aggressive-rate-limiting.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -245,7 +245,7 @@ class ApiUrlDiscoveryTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
             val client =
                 WpLoginClient(executor, WpApiMiddlewarePipeline(middlewares = listOf(middleware)))
-            client.loginUrl("https://aggressive-rate-limiting.wpmt.co")
+            client.apiDiscovery("https://aggressive-rate-limiting.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
             assertInstanceOf(
@@ -258,7 +258,7 @@ class ApiUrlDiscoveryTest {
     @Test // Spec Example 16
     fun testInvalidUrl() = runTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            loginClient.loginUrl("https://valid-looking-url-but-not-actually.foo")
+            loginClient.apiDiscovery("https://valid-looking-url-but-not-actually.foo").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
             assertInstanceOf(RequestExecutionErrorReason.NonExistentSiteError::class.java, reason)
@@ -268,7 +268,7 @@ class ApiUrlDiscoveryTest {
     @Test // Spec Example 17
     fun testInvalidHTTPsFails() = runTest {
         assertFailsWith<AutoDiscoveryAttemptFailure>() {
-            loginClient.loginUrl("https://wordpress-1315525-4803651.cloudwaysapps.com")
+            loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com").applicationPasswordsAuthenticationUrl.url()
         }.let { e ->
             val reason = getRequestExecutionErrorReason(e)
             assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
@@ -298,7 +298,7 @@ class ApiUrlDiscoveryTest {
 
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            WpLoginClient(requestExecutor = executor).loginUrl("https://wordpress-1315525-4803651.cloudwaysapps.com")
+            WpLoginClient(requestExecutor = executor).apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
@@ -308,7 +308,7 @@ class ApiUrlDiscoveryTest {
             WpRequestExecutor(httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient()))
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            WpLoginClient(requestExecutor = executor).loginUrl("https://vanilla.wpmt.co")
+            WpLoginClient(requestExecutor = executor).apiDiscovery("https://vanilla.wpmt.co").applicationPasswordsAuthenticationUrl.url()
         )
     }
 
