@@ -7,6 +7,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
     steps:
     - uses: actions/checkout@v4
 
@@ -28,4 +35,6 @@ jobs:
       with:
         file: ./wp_rs_web/Dockerfile
         push: true
-        tags: automattic/wordpress-rs-web:latest
+        tags: | 
+          ghcr.io/automattic/wordpress-rs-web:latest
+        labels: ${{ steps.meta.outputs.labels }}
