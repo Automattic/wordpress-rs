@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build:css": "npx @tailwindcss/cli -i static/style.css -o assets/style.css --watch"
+    "build:css": "npx @tailwindcss/cli -i static/style.css -o assets/style.css"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.3",

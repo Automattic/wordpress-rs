@@ -29,9 +29,9 @@ RUN cargo build -p wp_rs_web --bin wp_rs_web --release
 FROM debian:bookworm-slim
 
 RUN apt update && apt install -y openssl && rm -rf /var/lib/apt/lists/*
-RUN mkdir -p /app/wp_rs_web
+RUN mkdir -p /app/wp_rs_web/assets
 COPY --from=builder /app/target/release/wp_rs_web /app/wp_rs_web/wp_rs_web
-COPY --from=builder /app/wp_rs_web/assets /app/wp_rs_web/assets
+COPY --from=builder /app/wp_rs_web/assets/style.css /app/wp_rs_web/assets/style.css
 COPY --from=builder /app/wp_rs_web/templates /app/wp_rs_web/templates
 
 # Run as "app" user
