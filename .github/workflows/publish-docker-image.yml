@@ -26,6 +26,6 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v6
       with:
-        context: "{{defaultContext}}:wp_rs_web"
+        file: ./wp_rs_web/Dockerfile
         push: true
         tags: automattic/wordpress-rs-web:latest
