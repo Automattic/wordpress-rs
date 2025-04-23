@@ -33,8 +33,7 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v6
       with:
+        platforms: linux/amd64,linux/arm64
         file: ./wp_rs_web/Dockerfile
         push: true
-        tags: | 
-          ghcr.io/automattic/wordpress-rs-web:latest
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ghcr.io/automattic/wordpress-rs-web:latest
