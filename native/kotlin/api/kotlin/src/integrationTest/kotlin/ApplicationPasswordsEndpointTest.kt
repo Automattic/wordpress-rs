@@ -36,7 +36,7 @@ class ApplicationPasswordsEndpointTest {
     @Test
     fun testApplicationPasswordRetrieveCurrentRequest() = runTest {
         val applicationPasswordList = client.request { requestBuilder ->
-            requestBuilder.applicationPasswords().retrieveCurrentWithEditContext(FIRST_USER_ID)
+            requestBuilder.applicationPasswords().retrieveCurrentWithEditContext()
         }.assertSuccessAndRetrieveData().data
         assertEquals(
             ApplicationPasswordUuid(testCredentials.adminPasswordUuid),
