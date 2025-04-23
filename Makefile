@@ -273,6 +273,10 @@ validate-localizations:
 	@# Help: Validate localization files using `wp_localization_validation` crate
 	$(rust_docker_run) /bin/bash -c "cargo run --bin wp_localization_validation -- --localization-folder ./wp_localization/localization/"
 
+format-swift:
+	@# Help: Format the Swift binding code
+	xcrun swift format -i -r native/swift/Sources/wordpress-api-wrapper
+
 help:
 	@printf "%-40s %s\n" "Target" "Description"
 	@printf "%-40s %s\n" "------" "-----------"
