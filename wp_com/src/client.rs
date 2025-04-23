@@ -1,7 +1,8 @@
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    middleware::WpApiMiddlewarePipeline, request::RequestExecutor,
+    ParsedUrl, WpAppNotifier, WpAuthentication, api_client_generate_api_client,
+    api_client_generate_endpoint_impl, middleware::WpApiMiddlewarePipeline,
+    request::RequestExecutor,
 };
 
 use super::endpoint::jetpack_connection_endpoint::{
@@ -51,10 +52,16 @@ impl UniffiWpComApiClient {
     fn new(
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        app_notifier: Arc<dyn WpAppNotifier>,
         middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         Self {
-            inner: WpComApiClient::new(authentication, request_executor, middleware_pipeline),
+            inner: WpComApiClient::new(
+                authentication,
+                request_executor,
+                app_notifier,
+                middleware_pipeline,
+            ),
         }
     }
 }
@@ -68,6 +75,7 @@ impl WpComApiClient {
     pub fn new(
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        app_notifier: Arc<dyn WpAppNotifier>,
         middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         let url = url::Url::parse("https://public-api.wordpress.com").expect("This is a valid URL");
@@ -77,6 +85,7 @@ impl WpComApiClient {
             api_root_url,
             authentication,
             request_executor,
+            app_notifier,
             middleware_pipeline;
             jetpack_connection
         )

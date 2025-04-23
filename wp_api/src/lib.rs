@@ -212,6 +212,17 @@ pub enum IntegerOrString {
     String(String),
 }
 
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
+    async fn notify(&self, notification: AppNotification);
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum AppNotification {
+    RequiresReauthentication,
+}
+
 #[macro_export]
 macro_rules! generate {
     ($type_name:ident) => {

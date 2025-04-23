@@ -35,10 +35,12 @@ fn generate_async_request_executor(
     let static_api_root_url_type = &config.static_types.api_root_url;
     let static_wp_authentication_type = &config.static_types.wp_authentication;
     let static_request_executor_type = &crate_config.request_executor;
+    let static_app_notifier_type = &config.static_types.app_notifier;
     let static_middleware_pipeline_type = &config.static_types.middleware_pipeline;
     let static_request_executor_type = quote! { std::sync::Arc<dyn #static_request_executor_type> };
     let static_middleware_pipeline_type =
         quote! { std::sync::Arc<#static_middleware_pipeline_type> };
+    let static_app_notifier_type = quote! { std::sync::Arc<dyn #static_app_notifier_type> };
     let error_type = &crate_config.error_type;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
     let generated_request_executor_ident = &config.generated_idents.request_executor;
@@ -170,13 +172,15 @@ fn generate_async_request_executor(
         pub struct #generated_request_executor_ident {
             request_builder: #generated_request_builder_ident,
             request_executor: #static_request_executor_type,
+            app_notifier: #static_app_notifier_type,
             middleware_pipeline: #static_middleware_pipeline_type,
         }
         impl #generated_request_executor_ident {
-            pub fn new(api_root_url: #static_api_root_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type, middleware_pipeline: #static_middleware_pipeline_type) -> Self {
+            pub fn new(api_root_url: #static_api_root_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type, app_notifier: #static_app_notifier_type, middleware_pipeline: #static_middleware_pipeline_type) -> Self {
                 Self {
                     request_builder: #generated_request_builder_ident::new(api_root_url, authentication),
                     request_executor,
+                    app_notifier,
                     middleware_pipeline,
                 }
             }
@@ -455,6 +459,7 @@ pub struct ConfigStaticTypes {
     pub wp_authentication: TokenStream,
     pub wp_network_request: TokenStream,
     pub middleware_pipeline: TokenStream,
+    pub app_notifier: TokenStream,
 }
 
 impl ConfigStaticTypes {
@@ -466,6 +471,7 @@ impl ConfigStaticTypes {
             wp_authentication: quote! { #crate_ident::WpAuthentication },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
             middleware_pipeline: quote! { #crate_ident::middleware::WpApiMiddlewarePipeline },
+            app_notifier: quote! { #crate_ident::WpAppNotifier },
         }
     }
 }

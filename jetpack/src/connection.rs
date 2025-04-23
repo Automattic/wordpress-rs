@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpApiError, WpAuthentication, WpErrorCode, middleware::WpApiMiddlewarePipeline,
-    request::RequestExecutor, users::UserId,
+    ParsedUrl, WpApiError, WpAppNotifier, WpAuthentication, WpErrorCode,
+    middleware::WpApiMiddlewarePipeline, request::RequestExecutor, users::UserId,
 };
 use wp_com::{
     WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,
@@ -88,6 +88,7 @@ pub struct JetpackConnectionCheck {
 #[derive(Debug, uniffi::Object)]
 pub struct JetpackConnectionClient {
     request_executor: Arc<dyn RequestExecutor>,
+    app_notifier: Arc<dyn WpAppNotifier>,
     middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     jetpack_client: JetpackApiClient,
 }
@@ -98,16 +99,19 @@ impl JetpackConnectionClient {
     pub fn new(
         api_root_url: Arc<ParsedUrl>,
         request_executor: Arc<dyn RequestExecutor>,
+        app_notifier: Arc<dyn WpAppNotifier>,
         middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
         site_authentication: WpAuthentication,
     ) -> Self {
         Self {
             request_executor: request_executor.clone(),
             middleware_pipeline: middleware_pipeline.clone(),
+            app_notifier: app_notifier.clone(),
             jetpack_client: JetpackApiClient::new(
                 api_root_url,
                 site_authentication,
                 request_executor,
+                app_notifier,
                 middleware_pipeline,
             ),
         }
@@ -195,6 +199,7 @@ impl JetpackConnectionClient {
         let wp_com_client = WpComApiClient::new(
             wp_com_authentication,
             self.request_executor.clone(),
+            self.app_notifier.clone(),
             self.middleware_pipeline.clone(),
         );
         let params = JetpackRemoteConnectionParams {

@@ -1,6 +1,6 @@
 use crate::{
-    ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    api_client_generate_request_builder,
+    ParsedUrl, WpAppNotifier, WpAuthentication, api_client_generate_api_client,
+    api_client_generate_endpoint_impl, api_client_generate_request_builder,
 };
 use crate::{
     middleware::WpApiMiddlewarePipeline,
@@ -101,6 +101,7 @@ impl UniffiWpApiClient {
         api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        app_notifier: Arc<dyn WpAppNotifier>,
         middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         Self {
@@ -108,6 +109,7 @@ impl UniffiWpApiClient {
                 api_root_url,
                 authentication,
                 request_executor,
+                app_notifier,
                 middleware_pipeline,
             ),
         }
@@ -138,12 +140,14 @@ impl WpApiClient {
         api_root_url: Arc<ParsedUrl>,
         authentication: WpAuthentication,
         request_executor: Arc<dyn RequestExecutor>,
+        app_notifier: Arc<dyn WpAppNotifier>,
         middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     ) -> Self {
         api_client_generate_api_client!(
             api_root_url,
             authentication,
             request_executor,
+            app_notifier,
             middleware_pipeline;
             application_passwords,
             categories,
@@ -231,13 +235,14 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_root_url:ident, $authentication:ident, $request_executor:ident, $middleware_pipeline:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $authentication:ident, $request_executor:ident, $app_notifier: ident, $middleware_pipeline:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
                     $api_root_url.clone(),
                     $authentication.clone(),
                     $request_executor.clone(),
+                    $app_notifier.clone(),
                     $middleware_pipeline.clone(),
                 )
                 .into(),)*

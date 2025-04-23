@@ -1,9 +1,11 @@
+use async_trait::async_trait;
 use std::sync::Arc;
 use url::Url;
 use wp_api::{
-    ParsedUrl, WpApiClient, WpApiError, WpAuthentication, WpErrorCode, categories::CategoryId,
-    comments::CommentId, date::WpGmtDateTime, media::MediaId, middleware::WpApiMiddlewarePipeline,
-    posts::PostId, reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
+    AppNotification, ParsedUrl, WpApiClient, WpApiError, WpAppNotifier, WpAuthentication,
+    WpErrorCode, categories::CategoryId, comments::CommentId, date::WpGmtDateTime, media::MediaId,
+    middleware::WpApiMiddlewarePipeline, posts::PostId,
+    reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
 };
 
 pub mod mock;
@@ -80,6 +82,7 @@ pub fn api_client() -> WpApiClient {
         test_site_url(),
         authentication,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(EmptyAppNotifier),
         Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
@@ -93,6 +96,7 @@ pub fn api_client_as_author() -> WpApiClient {
         test_site_url(),
         authentication,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(EmptyAppNotifier),
         Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
@@ -106,6 +110,7 @@ pub fn api_client_as_subscriber() -> WpApiClient {
         test_site_url(),
         authentication,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(EmptyAppNotifier),
         Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
@@ -115,6 +120,7 @@ pub fn api_client_as_unauthenticated() -> WpApiClient {
         test_site_url(),
         WpAuthentication::None,
         Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(EmptyAppNotifier),
         Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
@@ -169,4 +175,14 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
 
 pub fn unwrapped_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
     s.parse::<WpGmtDateTime>().expect("Expected a valid date")
+}
+
+#[derive(Debug)]
+pub struct EmptyAppNotifier;
+
+#[async_trait]
+impl WpAppNotifier for EmptyAppNotifier {
+    async fn notify(&self, _notification: AppNotification) {
+        // no-op
+    }
 }
