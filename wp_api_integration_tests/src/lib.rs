@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use url::Url;
 use wp_api::{
-    AppNotification, ParsedUrl, WpApiClient, WpApiError, WpAppNotifier, WpAuthentication,
+    ParsedUrl, WpApiClient, WpApiError, WpAppNotification, WpAppNotifier, WpAuthentication,
     WpErrorCode, categories::CategoryId, comments::CommentId, date::WpGmtDateTime, media::MediaId,
     middleware::WpApiMiddlewarePipeline, posts::PostId,
     reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
@@ -182,7 +182,7 @@ pub struct EmptyAppNotifier;
 
 #[async_trait]
 impl WpAppNotifier for EmptyAppNotifier {
-    async fn notify(&self, _notification: AppNotification) {
+    async fn notify(&self, _notification: WpAppNotification) {
         // no-op
     }
 }

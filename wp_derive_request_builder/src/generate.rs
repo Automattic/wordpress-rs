@@ -80,7 +80,11 @@ fn generate_async_request_executor(
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
                     use #crate_ident::middleware::PerformsRequests;
                     #request_from_request_builder
-                    self.perform(std::sync::Arc::new(request)).await?.parse()
+                    let wp_network_response = self.perform(std::sync::Arc::new(request)).await?;
+                    if let Some(notification) = #crate_ident::WpAppNotification::from_wp_network_response(&wp_network_response) {
+                        self.app_notifier.notify(notification).await;
+                    }
+                    wp_network_response.parse()
                }
             }
         })

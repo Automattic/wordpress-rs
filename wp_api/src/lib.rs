@@ -5,6 +5,7 @@ pub use api_error::{
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
+use request::WpNetworkResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use users::*;
@@ -215,12 +216,22 @@ pub enum IntegerOrString {
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
-    async fn notify(&self, notification: AppNotification);
+    async fn notify(&self, notification: WpAppNotification);
 }
 
 #[derive(Debug, uniffi::Enum)]
-pub enum AppNotification {
-    RequiresReauthentication,
+pub enum WpAppNotification {
+    UnauthorizedRequest,
+}
+
+impl WpAppNotification {
+    pub fn from_wp_network_response(response: &WpNetworkResponse) -> Option<Self> {
+        if response.status_code == 401 {
+            Some(Self::UnauthorizedRequest)
+        } else {
+            None
+        }
+    }
 }
 
 #[macro_export]
