@@ -93,7 +93,7 @@ extension WpNetworkResponse {
 
         guard let resourceUrl = Bundle
             .module
-            .url(forResource: name, withExtension: "json", subdirectory: "Responses")
+            .url(forResource: name, withExtension: "json", subdirectory: "integration-test-responses")
         else {
             preconditionFailure("Could not find \(name).json")
         }

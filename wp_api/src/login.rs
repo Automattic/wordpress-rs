@@ -449,7 +449,7 @@ mod tests {
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
-        let mut file_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
         file_path.push("test-data");
         file_path.push(input);
 

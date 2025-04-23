@@ -45,5 +45,8 @@ test_credentials.json
 dump.sql
 
 # CI Cache
-.cargo
+.cargo/*
 /vendor
+
+# Cargo config
+!.cargo/config.toml
