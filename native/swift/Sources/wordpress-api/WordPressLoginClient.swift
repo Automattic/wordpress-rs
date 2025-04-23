@@ -39,8 +39,7 @@ public final class WordPressLoginClient: @unchecked Sendable {
         forSite proposedSiteUrl: String
     ) async throws -> ParsedUrl {
         // All sites should have some form of authentication we can use
-        let discoveryResult = try await client.apiDiscovery(siteUrl: proposedSiteUrl)
-        return try discoveryResult.applicationPasswordAuthenticationUrl
+        try await client.apiDiscovery(siteUrl: proposedSiteUrl).applicationPasswordsAuthenticationUrl
     }
 
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL,
@@ -65,26 +64,15 @@ public final class WordPressLoginClient: @unchecked Sendable {
 
 extension AutoDiscoveryAttemptSuccess {
 
-    public func loginURL(for application: Application) throws -> URL {
-        let loginUrl = try applicationPasswordAuthenticationUrl
-        return createApplicationPasswordAuthenticationUrl(
-            loginUrl: loginUrl,
+    public func loginURL(for application: Application) -> URL {
+        createApplicationPasswordAuthenticationUrl(
+            loginUrl: applicationPasswordsAuthenticationUrl,
             appName: application.name,
             appId: application.id,
             successUrl: application.successCallbackUrl,
             rejectUrl: application.failureCallbackUrl
         ).asURL()
     }
-
-    var applicationPasswordAuthenticationUrl: ParsedUrl {
-        get throws {
-            guard let passwordAuthUrl = apiDetails.findApplicationPasswordsAuthenticationUrl() else {
-                preconditionFailure("No Auth URL Found")
-            }
-            return try ParsedUrl.parse(input: passwordAuthUrl)
-        }
-    }
-
 }
 
 public struct Application {

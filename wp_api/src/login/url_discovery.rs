@@ -360,6 +360,7 @@ pub struct AutoDiscoveryAttemptSuccess {
     pub parsed_site_url: Arc<ParsedUrl>,
     pub api_root_url: Arc<ParsedUrl>,
     pub api_details: Arc<WpApiDetails>,
+    pub application_passwords_authentication_url: Arc<ParsedUrl>,
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
