@@ -15,6 +15,7 @@ rm -rf "$output_dir" && mkdir "$output_dir"
 cargo run --release --quiet --bin wp_uniffi_bindgen generate \
     --library "$library_path" \
     --out-dir "$output_dir" \
+    --no-format \
     --language swift
 
 function patch_wp_api {
