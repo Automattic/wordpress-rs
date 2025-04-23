@@ -1,5 +1,5 @@
 use serial_test::parallel;
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 use wp_api::{
     InvalidSslErrorReason, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason,
     login::{
@@ -37,11 +37,11 @@ async fn login_spec_2_local_development_environment() {
         "http://localhost/" | "https://localhost/" => {
             Ok(response_helpers::with_api_root("http://localhost/wp-json"))
         }
-        "http://localhost/wp-json" | "https://localhost/wp-json" => {
-            Ok(response_helpers::json_response_from_path(Path::new(
-                "../native/swift/Tests/wordpress-api/Resources/Responses/localhost-json-root.json",
-            )))
-        }
+        "http://localhost/wp-json" | "https://localhost/wp-json" => Ok(
+            response_helpers::json_response_from_integration_test_responses(
+                "localhost-json-root.json",
+            ),
+        ),
         _ => panic!("Unexpected request URL: {:#?}", request.url()),
     });
     let error = discovery_helper(Arc::new(executor), vec![], "http://localhost/")

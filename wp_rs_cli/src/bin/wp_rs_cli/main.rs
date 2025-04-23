@@ -5,6 +5,7 @@ use csv::Writer;
 use futures::stream::StreamExt;
 use std::{fmt::Display, fs::File, sync::Arc, time::Duration};
 use wp_api::{
+    ParsedUrl,
     login::{
         login_client::WpLoginClient,
         url_discovery::{
@@ -113,22 +114,16 @@ async fn perform_api_discovery(
         .await
         .combined_result()
     {
-        Ok(s) => {
-            let login_url = s
-                .api_details
-                .find_application_passwords_authentication_url()
-                .expect("Already confirmed auto discovery was successful");
-            SimplifiedDiscoveryResult::success(url, LoginUrl(login_url))
-        }
+        Ok(s) => SimplifiedDiscoveryResult::success(
+            url,
+            LoginUrl(s.application_passwords_authentication_url.clone()),
+        ),
         Err(e) => SimplifiedDiscoveryResult::failure(url, e.clone()),
     }
 }
 
 fn build_login_client() -> WpLoginClient {
-    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_timeout(
-        false,
-        Duration::from_secs(60),
-    ));
+    let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
     WpLoginClient::new_with_default_middleware_pipeline(request_executor)
 }
 
@@ -194,7 +189,7 @@ impl SimplifiedDiscoveryResult {
 }
 
 #[derive(Debug)]
-struct LoginUrl(String);
+struct LoginUrl(Arc<ParsedUrl>);
 
 impl Display for LoginUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

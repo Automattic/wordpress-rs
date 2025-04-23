@@ -27,7 +27,7 @@ class WelcomeActivity : ComponentActivity() {
     private fun authenticateSite(url: String) {
         val authenticationUrl = runBlocking {
             WpLoginClient().apiDiscovery(url)
-                .getOrThrow().apiDetails.findApplicationPasswordsAuthenticationUrl()
+                .getOrThrow().applicationPasswordsAuthenticationUrl.url()
         }
         val uriBuilder = Uri.parse(authenticationUrl).buildUpon()
 

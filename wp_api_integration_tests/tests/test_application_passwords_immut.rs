@@ -71,7 +71,7 @@ async fn list_application_passwords_ensure_last_ip() {
 async fn retrieve_current_application_passwords_with_edit_context() {
     let a = api_client()
         .application_passwords()
-        .retrieve_current_with_edit_context(&FIRST_USER_ID)
+        .retrieve_current_with_edit_context()
         .await
         .assert_response()
         .data;
@@ -88,7 +88,7 @@ async fn retrieve_current_application_passwords_with_edit_context() {
 async fn retrieve_current_application_passwords_with_embed_context() {
     let a = api_client_as_subscriber()
         .application_passwords()
-        .retrieve_current_with_embed_context(&SECOND_USER_ID)
+        .retrieve_current_with_embed_context()
         .await
         .assert_response()
         .data;
@@ -107,7 +107,7 @@ async fn retrieve_current_application_passwords_with_embed_context() {
 async fn retrieve_current_application_passwords_with_view_context() {
     let a = api_client()
         .application_passwords()
-        .retrieve_current_with_view_context(&FIRST_USER_ID)
+        .retrieve_current_with_view_context()
         .await
         .assert_response()
         .data;
@@ -222,7 +222,7 @@ mod filter {
     ) {
         let p = api_client()
             .application_passwords()
-            .filter_retrieve_current_with_edit_context(&FIRST_USER_ID, fields)
+            .filter_retrieve_current_with_edit_context(fields)
             .await
             .assert_response()
             .data;
@@ -275,7 +275,7 @@ mod filter {
     ) {
         let p = api_client()
             .application_passwords()
-            .filter_retrieve_current_with_embed_context(&FIRST_USER_ID, fields)
+            .filter_retrieve_current_with_embed_context(fields)
             .await
             .assert_response()
             .data;
@@ -328,7 +328,7 @@ mod filter {
     ) {
         let p = api_client()
             .application_passwords()
-            .filter_retrieve_current_with_view_context(&FIRST_USER_ID, fields)
+            .filter_retrieve_current_with_view_context(fields)
             .await
             .assert_response()
             .data;

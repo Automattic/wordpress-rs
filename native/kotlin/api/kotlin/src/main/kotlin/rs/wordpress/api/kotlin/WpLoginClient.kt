@@ -19,8 +19,4 @@ class WpLoginClient(
     suspend fun apiDiscovery(siteUrl: String): AutoDiscoveryAttemptSuccess = withContext(dispatcher) {
         internalClient.apiDiscovery(siteUrl)
     }
-
-    suspend fun loginUrl(siteUrl: String): String? = withContext(dispatcher) {
-        internalClient.apiDiscovery(siteUrl).apiDetails.findApplicationPasswordsAuthenticationUrl()
-    }
 }

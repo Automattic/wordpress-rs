@@ -63,7 +63,7 @@ var package = Package(
                 .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api",
-            resources: [.copy("Resources/Responses/")]
+            resources: [.copy("../../../../test-data/integration-test-responses/")]
         )
     ]
 )

@@ -6,8 +6,8 @@ use wp_api::application_passwords::{
 };
 
 use wp_api_integration_tests::{
-    AssertWpError, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
-    api_client_as_subscriber, api_client_as_unauthenticated,
+    AssertWpError, FIRST_USER_ID, TestCredentials, api_client, api_client_as_subscriber,
+    api_client_as_unauthenticated,
 };
 
 pub mod reusable_test_cases;
@@ -117,21 +117,9 @@ async fn retrieve_application_password_err_cannot_introspect_app_password_for_no
     // Unauthenticated user can not retrieve the current application password for the second user
     api_client_as_unauthenticated()
         .application_passwords()
-        .retrieve_current_with_edit_context(&SECOND_USER_ID)
+        .retrieve_current_with_edit_context()
         .await
-        .assert_wp_error(WpErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
-}
-
-#[rstest]
-#[tokio::test]
-#[parallel]
-async fn retrieve_application_password_err_cannot_introspect_app_password_for_another_user_403() {
-    // First user can not retrieve the current application password for the second user
-    api_client()
-        .application_passwords()
-        .retrieve_current_with_edit_context(&SECOND_USER_ID)
-        .await
-        .assert_wp_error(WpErrorCode::CannotIntrospectAppPasswordForNonAuthenticatedUser);
+        .assert_wp_error(WpErrorCode::Unauthorized);
 }
 
 #[rstest]

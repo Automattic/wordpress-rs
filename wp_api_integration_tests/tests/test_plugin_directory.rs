@@ -1,5 +1,5 @@
 use futures::{FutureExt, StreamExt};
-use std::{env, sync::Arc};
+use std::{env, sync::Arc, time::Duration};
 use wp_api::{
     middleware::WpApiMiddlewarePipeline,
     reqwest_request_executor::ReqwestRequestExecutor,
@@ -17,7 +17,7 @@ const TOKIO_STREAM_SIZE: usize = 100;
 
 fn wordpress_org_api_client() -> WordPressOrgApiClient {
     WordPressOrgApiClient::new(
-        Arc::new(ReqwestRequestExecutor::new(false, None)),
+        Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(120))),
         Arc::new(WpApiMiddlewarePipeline::default()),
     )
 }
