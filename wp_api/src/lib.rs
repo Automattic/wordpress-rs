@@ -219,7 +219,7 @@ pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
     async fn notify(&self, notification: WpAppNotification);
 }
 
-#[derive(Debug, uniffi::Enum)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
 pub enum WpAppNotification {
     UnauthorizedRequest,
 }
