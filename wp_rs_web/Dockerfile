@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY . .
 
+RUN ls -la
+
 # Set up NVM
 ENV BASH_ENV=/root/.bash_env
 RUN touch "${BASH_ENV}"
