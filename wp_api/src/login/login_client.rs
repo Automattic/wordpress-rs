@@ -68,6 +68,15 @@ impl WpLoginClient {
         }
     }
 
+    pub fn new_with_default_middleware_pipeline(
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Self {
+        Self::new(
+            request_executor,
+            Arc::new(WpApiMiddlewarePipeline::default()),
+        )
+    }
+
     pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
         let attempts = futures::future::join_all(
             url_discovery::construct_attempts(site_url)

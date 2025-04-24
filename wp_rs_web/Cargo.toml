@@ -1,0 +1,13 @@
+[package]
+name = "wp_rs_web"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+linkify = { workspace = true }
+rocket = { workspace = true }
+rocket_dyn_templates = { workspace = true, features = ["handlebars"] }
+wp_api = { path = "../wp_api", features = ["reqwest-request-executor"] }
+
+[[bin]]
+name = "wp_rs_web"

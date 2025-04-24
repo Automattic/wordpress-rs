@@ -141,6 +141,9 @@ xcframework-package-checksum:
 docker-image-swift:
 	docker build -t wordpress-rs-swift -f Dockerfile.swift .
 
+docker-image-web:
+	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
+
 swift-linux-library:
 	cargo build --release --package jetpack
 	./scripts/swift-bindings.sh target/release/libjetpack.a
