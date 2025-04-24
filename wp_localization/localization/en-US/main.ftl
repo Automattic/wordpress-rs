@@ -65,3 +65,5 @@ application_passwords_disabled_for_http_site = Application Passwords is not enab
 application_passwords_not_supported = The site does not support Application Passwords.
 
 parse_api_root = Failed to parse the the site's WordPress REST API root response.
+parse_api_root_failure_reason_server_fatal_error = Your server encountered an unrecoverable error and couldn't process the request. Please check your server error logs for details.
+parse_api_root_failure_reason_wordfence_blocking_access = Wordfence is blocking access to the site's API. Please check your Wordfence configuration.
