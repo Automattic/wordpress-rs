@@ -1,5 +1,5 @@
 use http::HeaderValue;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WpAuthentication {
@@ -30,6 +30,31 @@ impl WpAuthentication {
     }
 }
 
+#[derive(uniffi::Object)]
+pub struct ModifiableAuthenticationProvider {
+    auth: Mutex<WpAuthentication>,
+}
+
+#[uniffi::export]
+impl ModifiableAuthenticationProvider {
+    #[uniffi::constructor]
+    pub fn new(authentication: WpAuthentication) -> Self {
+        Self {
+            auth: Mutex::new(authentication),
+        }
+    }
+
+    pub fn set_authentication(&self, new_authentication: WpAuthentication) {
+        *self.auth.lock().unwrap() = new_authentication;
+    }
+}
+
+impl ModifiableAuthenticationProvider {
+    pub fn header_value(&self) -> Option<HeaderValue> {
+        self.auth.lock().unwrap().header_value()
+    }
+}
+
 #[uniffi::export(with_foreign)]
 pub trait WpDynamicAuthenticationProvider: Send + Sync {
     fn auth(&self) -> WpAuthentication;
@@ -42,6 +67,9 @@ pub enum WpAuthenticationProvider {
     },
     DynamicAuthenticationProvider {
         inner: Arc<dyn WpDynamicAuthenticationProvider>,
+    },
+    Modifiable {
+        inner: Arc<ModifiableAuthenticationProvider>,
     },
 }
 
@@ -60,6 +88,13 @@ impl WpAuthenticationProvider {
             auth: WpAuthentication::None,
         }
     }
+
+    #[uniffi::constructor]
+    pub fn modifiable(modifiable_auth: Arc<ModifiableAuthenticationProvider>) -> Self {
+        Self::Modifiable {
+            inner: modifiable_auth,
+        }
+    }
 }
 
 impl WpAuthenticationProvider {
@@ -69,6 +104,7 @@ impl WpAuthenticationProvider {
             WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => {
                 inner.auth().header_value()
             }
+            WpAuthenticationProvider::Modifiable { inner } => inner.header_value(),
         }
     }
 }
