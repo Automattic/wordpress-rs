@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    middleware::WpApiMiddlewarePipeline, request::RequestExecutor,
+    ParsedUrl, WpApiClientDelegate, WpAuthentication, api_client_generate_api_client,
+    api_client_generate_endpoint_impl,
 };
 
 use super::endpoint::connection_endpoint::{ConnectionRequestBuilder, ConnectionRequestExecutor};
@@ -43,19 +43,9 @@ struct UniffiJetpackApiClient {
 #[uniffi::export]
 impl UniffiJetpackApiClient {
     #[uniffi::constructor]
-    fn new(
-        site_url: Arc<ParsedUrl>,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    fn new(site_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         Self {
-            inner: JetpackApiClient::new(
-                site_url,
-                authentication,
-                request_executor,
-                middleware_pipeline,
-            ),
+            inner: JetpackApiClient::new(site_url, delegate),
         }
     }
 }
@@ -66,17 +56,10 @@ pub struct JetpackApiClient {
 }
 
 impl JetpackApiClient {
-    pub fn new(
-        api_root_url: Arc<ParsedUrl>,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         api_client_generate_api_client!(
             api_root_url,
-            authentication,
-            request_executor,
-            middleware_pipeline;
+            delegate;
             connection
         )
     }

@@ -4,7 +4,7 @@ use serial_test::parallel;
 use std::sync::Arc;
 use wp_api::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
-    WpApiClient, WpAuthentication, WpErrorCode,
+    WpApiClient, WpApiClientDelegate, WpAuthentication, WpErrorCode,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     middleware::WpApiMiddlewarePipeline,
     posts::WpApiParamPostsOrderBy,
@@ -172,12 +172,14 @@ async fn update_media_err_post_invalid_id() {
 fn api_client_with_medir_err_networking(test_type: MediaErrNetworkingTestType) -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
-        WpAuthentication::from_username_and_password(
-            TestCredentials::instance().admin_username.to_string(),
-            TestCredentials::instance().admin_password.to_string(),
-        ),
-        Arc::new(MediaErrNetworking::new(test_type)),
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        WpApiClientDelegate {
+            authentication: WpAuthentication::from_username_and_password(
+                TestCredentials::instance().admin_username.to_string(),
+                TestCredentials::instance().admin_password.to_string(),
+            ),
+            request_executor: Arc::new(MediaErrNetworking::new(test_type)),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        },
     )
 }
 

@@ -97,19 +97,9 @@ struct UniffiWpApiClient {
 #[uniffi::export]
 impl UniffiWpApiClient {
     #[uniffi::constructor]
-    fn new(
-        api_root_url: Arc<ParsedUrl>,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         Self {
-            inner: WpApiClient::new(
-                api_root_url,
-                authentication,
-                request_executor,
-                middleware_pipeline,
-            ),
+            inner: WpApiClient::new(api_root_url, delegate),
         }
     }
 }
@@ -134,17 +124,10 @@ pub struct WpApiClient {
 }
 
 impl WpApiClient {
-    pub fn new(
-        api_root_url: Arc<ParsedUrl>,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         api_client_generate_api_client!(
             api_root_url,
-            authentication,
-            request_executor,
-            middleware_pipeline;
+            delegate;
             application_passwords,
             categories,
             comments,
@@ -162,6 +145,18 @@ impl WpApiClient {
             wp_site_health_tests
         )
     }
+}
+
+// IMPORTANT: This type may be aggressively cloned, so all of its fields must be cheap to clone!
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct WpApiClientDelegate {
+    pub authentication: WpAuthentication,
+    pub request_executor: Arc<dyn RequestExecutor>,
+    pub middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+}
+
+pub trait IsRequestExecutor {
+    fn get_delegate(&self) -> &WpApiClientDelegate;
 }
 
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
@@ -231,14 +226,12 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_root_url:ident, $authentication:ident, $request_executor:ident, $middleware_pipeline:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $delegate:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
                     $api_root_url.clone(),
-                    $authentication.clone(),
-                    $request_executor.clone(),
-                    $middleware_pipeline.clone(),
+                    $delegate.clone(),
                 )
                 .into(),)*
             }
