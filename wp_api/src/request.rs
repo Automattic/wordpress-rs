@@ -107,19 +107,9 @@ impl InnerRequestBuilder {
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        match self.authentication {
-            WpAuthentication::None => (),
-            WpAuthentication::AuthorizationHeader { ref token } => {
-                let hv = HeaderValue::from_str(&format!("Basic {}", token));
-                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
-                header_map.insert(http::header::AUTHORIZATION, hv);
-            }
-            WpAuthentication::Bearer { ref token } => {
-                let hv = HeaderValue::from_str(&format!("Bearer {}", token));
-                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token");
-                header_map.insert(http::header::AUTHORIZATION, hv);
-            }
-        };
+        if let Some(hv) = self.authentication.header_value() {
+            header_map.insert(http::header::AUTHORIZATION, hv);
+        }
         header_map.into()
     }
 
