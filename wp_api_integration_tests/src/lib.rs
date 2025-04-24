@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use url::Url;
 use wp_api::{
-    ParsedUrl, WpApiClient, WpApiClientDelegate, WpApiError, WpAuthentication, WpErrorCode,
-    categories::CategoryId, comments::CommentId, date::WpGmtDateTime, media::MediaId,
-    middleware::WpApiMiddlewarePipeline, posts::PostId,
+    ParsedUrl, WpApiClient, WpApiClientDelegate, WpApiError, WpErrorCode,
+    auth::WpAuthenticationProvider, categories::CategoryId, comments::CommentId,
+    date::WpGmtDateTime, media::MediaId, middleware::WpApiMiddlewarePipeline, posts::PostId,
     reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
 };
 
@@ -73,14 +73,13 @@ pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
 
 pub fn api_client() -> WpApiClient {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().admin_username.to_string(),
-        TestCredentials::instance().admin_password.to_string(),
-    );
     WpApiClient::new(
         test_site_url(),
         WpApiClientDelegate {
-            authentication,
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().admin_username.to_string(),
+                TestCredentials::instance().admin_password.to_string(),
+            )),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         },
@@ -88,14 +87,13 @@ pub fn api_client() -> WpApiClient {
 }
 
 pub fn api_client_as_author() -> WpApiClient {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().author_username.to_string(),
-        TestCredentials::instance().author_password.to_string(),
-    );
     WpApiClient::new(
         test_site_url(),
         WpApiClientDelegate {
-            authentication,
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().author_username.to_string(),
+                TestCredentials::instance().author_password.to_string(),
+            )),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         },
@@ -103,14 +101,13 @@ pub fn api_client_as_author() -> WpApiClient {
 }
 
 pub fn api_client_as_subscriber() -> WpApiClient {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().subscriber_username.to_string(),
-        TestCredentials::instance().subscriber_password.to_string(),
-    );
     WpApiClient::new(
         test_site_url(),
         WpApiClientDelegate {
-            authentication,
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().subscriber_username.to_string(),
+                TestCredentials::instance().subscriber_password.to_string(),
+            )),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         },
@@ -121,7 +118,7 @@ pub fn api_client_as_unauthenticated() -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
         WpApiClientDelegate {
-            authentication: WpAuthentication::None,
+            auth_provider: Arc::new(WpAuthenticationProvider::none()),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         },

@@ -1,4 +1,5 @@
 use http::HeaderValue;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WpAuthentication {
@@ -29,10 +30,45 @@ impl WpAuthentication {
     }
 }
 
+#[uniffi::export(with_foreign)]
+pub trait WpDynamicAuthenticationProvider: Send + Sync {
+    fn auth(&self) -> WpAuthentication;
+}
+
+#[derive(uniffi::Object)]
+pub enum WpAuthenticationProvider {
+    StaticAuthenticationProvider {
+        auth: WpAuthentication,
+    },
+    DynamicAuthenticationProvider {
+        inner: Arc<dyn WpDynamicAuthenticationProvider>,
+    },
+}
+
 #[uniffi::export]
-fn wp_authentication_from_username_and_password(
-    username: String,
-    password: String,
-) -> WpAuthentication {
-    WpAuthentication::from_username_and_password(username, password)
+impl WpAuthenticationProvider {
+    #[uniffi::constructor]
+    pub fn static_with_username_and_password(username: String, password: String) -> Self {
+        Self::StaticAuthenticationProvider {
+            auth: WpAuthentication::from_username_and_password(username, password),
+        }
+    }
+
+    #[uniffi::constructor]
+    pub fn none() -> Self {
+        Self::StaticAuthenticationProvider {
+            auth: WpAuthentication::None,
+        }
+    }
+}
+
+impl WpAuthenticationProvider {
+    pub fn auth_header_value(&self) -> Option<HeaderValue> {
+        match self {
+            WpAuthenticationProvider::StaticAuthenticationProvider { auth } => auth.header_value(),
+            WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => {
+                inner.auth().header_value()
+            }
+        }
+    }
 }

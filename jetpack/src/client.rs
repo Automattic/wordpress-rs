@@ -1,12 +1,12 @@
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpApiClientDelegate, WpAuthentication, api_client_generate_api_client,
-    api_client_generate_endpoint_impl,
+    ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
+    api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
 };
 
 use super::endpoint::connection_endpoint::{ConnectionRequestBuilder, ConnectionRequestExecutor};
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiJetpackApiRequestBuilder {
     inner: JetpackApiRequestBuilder,
 }
@@ -14,28 +14,26 @@ struct UniffiJetpackApiRequestBuilder {
 #[uniffi::export]
 impl UniffiJetpackApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            inner: JetpackApiRequestBuilder::new(api_root_url, authentication),
+            inner: JetpackApiRequestBuilder::new(api_root_url, auth_provider),
         }
     }
 }
 
-#[derive(Debug)]
 pub struct JetpackApiRequestBuilder {
     connection: Arc<ConnectionRequestBuilder>,
 }
 
 impl JetpackApiRequestBuilder {
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            connection: ConnectionRequestBuilder::new(api_root_url.clone(), authentication.clone())
-                .into(),
+            connection: ConnectionRequestBuilder::new(api_root_url, auth_provider).into(),
         }
     }
 }
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiJetpackApiClient {
     inner: JetpackApiClient,
 }
@@ -50,7 +48,6 @@ impl UniffiJetpackApiClient {
     }
 }
 
-#[derive(Debug)]
 pub struct JetpackApiClient {
     pub connection: Arc<ConnectionRequestExecutor>,
 }

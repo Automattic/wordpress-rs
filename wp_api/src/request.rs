@@ -1,7 +1,8 @@
 use self::endpoint::WpEndpointUrl;
 use crate::RequestExecutionErrorReason;
+use crate::auth::WpAuthenticationProvider;
 use crate::{
-    WpApiError, WpAuthentication,
+    WpApiError,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
@@ -53,14 +54,13 @@ impl PaginationHeaderKey {
     }
 }
 
-#[derive(Debug)]
 pub struct InnerRequestBuilder {
-    authentication: WpAuthentication,
+    auth_provider: Arc<WpAuthenticationProvider>,
 }
 
 impl InnerRequestBuilder {
-    pub fn new(authentication: WpAuthentication) -> Self {
-        Self { authentication }
+    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+        Self { auth_provider }
     }
 
     pub fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
@@ -107,7 +107,7 @@ impl InnerRequestBuilder {
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        if let Some(hv) = self.authentication.header_value() {
+        if let Some(hv) = self.auth_provider.auth_header_value() {
             header_map.insert(http::header::AUTHORIZATION, hv);
         }
         header_map.into()

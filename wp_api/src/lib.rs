@@ -3,7 +3,6 @@ pub use api_error::{
     InvalidSslErrorReason, MediaUploadRequestExecutionError, ParsedRequestError,
     RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
-pub use auth::WpAuthentication;
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};

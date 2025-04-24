@@ -2,7 +2,8 @@ use crate::client::JetpackApiClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpApiClientDelegate, WpApiError, WpAuthentication, WpErrorCode, users::UserId,
+    ParsedUrl, WpApiClientDelegate, WpApiError, WpErrorCode, auth::WpAuthenticationProvider,
+    users::UserId,
 };
 use wp_com::{
     WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,
@@ -83,7 +84,7 @@ pub struct JetpackConnectionCheck {
 /// Connect a WordPress site to Jetpack.
 ///
 /// Please note, the endpoints used are available on Jetpack 14.2 and above.
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 pub struct JetpackConnectionClient {
     delegate: WpApiClientDelegate,
     jetpack_client: JetpackApiClient,
@@ -165,7 +166,7 @@ impl JetpackConnectionClient {
 
     pub async fn connect_user(
         &self,
-        wp_com_authentication: WpAuthentication,
+        auth_provider: Arc<WpAuthenticationProvider>,
         from: String,
     ) -> Result<WpComSiteId, JetpackConnectionClientError> {
         let blog_id = self.connect_site(from).await?;
@@ -179,7 +180,7 @@ impl JetpackConnectionClient {
             .data;
 
         let wp_com_client = WpComApiClient::new(wp_api::WpApiClientDelegate {
-            authentication: wp_com_authentication,
+            auth_provider,
             request_executor: self.delegate.request_executor.clone(),
             middleware_pipeline: self.delegate.middleware_pipeline.clone(),
         });

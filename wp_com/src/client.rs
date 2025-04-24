@@ -1,14 +1,14 @@
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpApiClientDelegate, WpAuthentication, api_client_generate_api_client,
-    api_client_generate_endpoint_impl,
+    ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
+    api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
 };
 
 use super::endpoint::jetpack_connection_endpoint::{
     JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
 };
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpComApiRequestBuilder {
     inner: WpComApiRequestBuilder,
 }
@@ -16,31 +16,27 @@ struct UniffiWpComApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpComApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            inner: WpComApiRequestBuilder::new(api_root_url, authentication),
+            inner: WpComApiRequestBuilder::new(api_root_url, auth_provider),
         }
     }
 }
 
-#[derive(Debug)]
 pub struct WpComApiRequestBuilder {
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
 }
 
 impl WpComApiRequestBuilder {
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            jetpack_connection: JetpackConnectionRequestBuilder::new(
-                api_root_url.clone(),
-                authentication.clone(),
-            )
-            .into(),
+            jetpack_connection: JetpackConnectionRequestBuilder::new(api_root_url, auth_provider)
+                .into(),
         }
     }
 }
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpComApiClient {
     inner: WpComApiClient,
 }
@@ -55,7 +51,6 @@ impl UniffiWpComApiClient {
     }
 }
 
-#[derive(Debug)]
 pub struct WpComApiClient {
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
 }
