@@ -6,21 +6,29 @@ import kotlinx.coroutines.withContext
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpApiClient
+import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiMiddlewarePipeline
-import uniffi.wp_api.WpAuthentication
+import uniffi.wp_api.WpAuthenticationProvider
 
 class WpApiClient
 @Throws(WpApiException::class)
 constructor(
     apiRootUrl: ParsedUrl,
-    authentication: WpAuthentication,
+    authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
-        UniffiWpApiClient(apiRootUrl, authentication, requestExecutor, WpApiMiddlewarePipeline(emptyList()))
+        UniffiWpApiClient(
+            apiRootUrl,
+            WpApiClientDelegate(
+                authProvider,
+                requestExecutor = requestExecutor,
+                middlewarePipeline = WpApiMiddlewarePipeline(emptyList())
+            )
+        )
     }
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.

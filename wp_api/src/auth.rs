@@ -83,6 +83,11 @@ impl WpAuthenticationProvider {
     }
 
     #[uniffi::constructor]
+    pub fn static_with_auth(auth: WpAuthentication) -> Self {
+        Self::StaticAuthenticationProvider { auth }
+    }
+
+    #[uniffi::constructor]
     pub fn none() -> Self {
         Self::StaticAuthenticationProvider {
             auth: WpAuthentication::None,

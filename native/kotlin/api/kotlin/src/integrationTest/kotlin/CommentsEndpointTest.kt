@@ -10,17 +10,17 @@ import uniffi.wp_api.CommentRetrieveParams
 import uniffi.wp_api.CommentStatus
 import uniffi.wp_api.CommentUpdateParams
 import uniffi.wp_api.SparseCommentFieldWithEditContext
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import uniffi.wp_api.WpAuthenticationProvider
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class CommentsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val authentication = wpAuthenticationFromUsernameAndPassword(
+    private val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
+    private val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
 
     @Test
     fun testCommentListRequest() = runTest {

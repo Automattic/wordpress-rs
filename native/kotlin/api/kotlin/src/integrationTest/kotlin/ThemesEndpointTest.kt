@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseThemeFieldWithEditContext
 import uniffi.wp_api.ThemeListParams
 import uniffi.wp_api.ThemeStylesheet
+import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -14,10 +14,10 @@ private const val THEME_TWENTY_TWENTY_FIVE: String = "twentytwentyfive"
 
 class ThemesEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val authentication = wpAuthenticationFromUsernameAndPassword(
+    private val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
+    private val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
 
     @Test
     fun testThemeListRequest() = runTest {

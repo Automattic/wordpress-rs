@@ -2,16 +2,15 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import uniffi.wp_api.WpAuthenticationProvider
 import kotlin.test.assertEquals
 
 class SiteSettingsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val client = WpApiClient(
-        testCredentials.apiRootUrl, wpAuthenticationFromUsernameAndPassword(
-            username = testCredentials.adminUsername, password = testCredentials.adminPassword
-        )
+    private val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
+        username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
+    private val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
 
     @Test
     fun testRetrieveSiteSettings() = runTest {
