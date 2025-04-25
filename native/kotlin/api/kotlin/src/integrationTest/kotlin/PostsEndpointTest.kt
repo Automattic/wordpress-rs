@@ -6,17 +6,13 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.PostListParams
 import uniffi.wp_api.PostRetrieveParams
 import uniffi.wp_api.SparsePostFieldWithEditContext
-import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class PostsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
-        username = testCredentials.adminUsername, password = testCredentials.adminPassword
-    )
-    private val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
+    private val client = defaultApiClient()
 
     @Test
     fun testPostListRequest() = runTest {

@@ -5,18 +5,13 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.PostType
 import uniffi.wp_api.PostTypeCapabilities
 import uniffi.wp_api.PostTypeSupports
-import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class PostTypesEndpointTest {
-    private val testCredentials = TestCredentials.INSTANCE
-    private val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
-        username = testCredentials.adminUsername, password = testCredentials.adminPassword
-    )
-    private val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
+    private val client = defaultApiClient()
 
     @Test
     fun testPostTypesListRequest() = runTest {
