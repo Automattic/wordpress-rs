@@ -8,6 +8,14 @@ pub enum WpAuthentication {
     None,
 }
 
+#[uniffi::export]
+fn wp_authentication_from_username_and_password(
+    username: String,
+    password: String,
+) -> WpAuthentication {
+    WpAuthentication::from_username_and_password(username, password)
+}
+
 impl WpAuthentication {
     pub fn from_username_and_password(username: String, password: String) -> Self {
         use base64::prelude::*;
@@ -85,6 +93,15 @@ impl WpAuthenticationProvider {
     #[uniffi::constructor]
     pub fn static_with_auth(auth: WpAuthentication) -> Self {
         Self::StaticAuthenticationProvider { auth }
+    }
+
+    #[uniffi::constructor]
+    pub fn dynamic(
+        dynamic_authentication_provider: Arc<dyn WpDynamicAuthenticationProvider>,
+    ) -> Self {
+        Self::DynamicAuthenticationProvider {
+            inner: dynamic_authentication_provider,
+        }
     }
 
     #[uniffi::constructor]

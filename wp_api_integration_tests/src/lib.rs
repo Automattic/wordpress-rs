@@ -125,6 +125,17 @@ pub fn api_client_as_unauthenticated() -> WpApiClient {
     )
 }
 
+pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider>) -> WpApiClient {
+    WpApiClient::new(
+        test_site_url(),
+        WpApiClientDelegate {
+            auth_provider,
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        },
+    )
+}
+
 pub fn test_site_url() -> Arc<ParsedUrl> {
     let mut url: Url = TestCredentials::instance()
         .site_url
