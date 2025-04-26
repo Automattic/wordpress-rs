@@ -5,8 +5,11 @@ pub use api_error::{
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
+use request::{
+    RequestExecutor, endpoint::application_passwords_endpoint::ApplicationPasswordsRequestBuilder,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
@@ -218,10 +221,24 @@ pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
     async fn unauthorized_request(&self);
 }
 
-pub fn is_unauthorized_request(status_code: u16, wp_error_code: &WpErrorCode) -> bool {
-    status_code == 401
+pub async fn is_unauthorized_request(
+    status_code: u16,
+    wp_error_code: &WpErrorCode,
+    request_executor: Arc<dyn RequestExecutor>,
+    api_root_url: std::sync::Arc<crate::ParsedUrl>,
+    authentication: crate::WpAuthentication,
+) -> bool {
+    if status_code == 401
         && (wp_error_code == &WpErrorCode::Unauthorized
             || wp_error_code == &WpErrorCode::ForbiddenContext)
+    {
+        let r = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication)
+            .retrieve_current_with_edit_context()
+            .into();
+        request_executor.execute(r).await.is_ok()
+    } else {
+        false
+    }
 }
 
 #[macro_export]

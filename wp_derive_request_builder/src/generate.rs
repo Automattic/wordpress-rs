@@ -85,7 +85,7 @@ fn generate_async_request_executor(
                     let parsed_result: Result<#response_type_ident, #error_type> = response.parse();
                     if let Err(ref err) = parsed_result {
                         if let Some(wp_error_code) = err.wp_error_code() {
-                            if #crate_ident::is_unauthorized_request(response_status_code, wp_error_code) {
+                            if #crate_ident::is_unauthorized_request(response_status_code, wp_error_code, self.request_executor.clone(), self.api_root_url.clone(), self.authentication.clone()).await {
                                 self.app_notifier.unauthorized_request().await;
                             }
                         }
@@ -180,6 +180,8 @@ fn generate_async_request_executor(
 
         #[derive(Debug, uniffi::Object)]
         pub struct #generated_request_executor_ident {
+            api_root_url: #static_api_root_url_type,
+            authentication: #static_wp_authentication_type,
             request_builder: #generated_request_builder_ident,
             request_executor: #static_request_executor_type,
             app_notifier: #static_app_notifier_type,
@@ -188,6 +190,8 @@ fn generate_async_request_executor(
         impl #generated_request_executor_ident {
             pub fn new(api_root_url: #static_api_root_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type, app_notifier: #static_app_notifier_type, middleware_pipeline: #static_middleware_pipeline_type) -> Self {
                 Self {
+                    api_root_url: api_root_url.clone(),
+                    authentication: authentication.clone(),
                     request_builder: #generated_request_builder_ident::new(api_root_url, authentication),
                     request_executor,
                     app_notifier,
