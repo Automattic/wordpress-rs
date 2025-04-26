@@ -5,18 +5,15 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use wp_api::{
-    WpApiClient, WpAppNotification, WpAppNotifier, WpAuthentication, WpErrorCode,
-    middleware::WpApiMiddlewarePipeline, reqwest_request_executor::ReqwestRequestExecutor,
-    users::UserListParams,
+    WpApiClient, WpAppNotifier, WpAuthentication, WpErrorCode, middleware::WpApiMiddlewarePipeline,
+    reqwest_request_executor::ReqwestRequestExecutor, users::UserListParams,
 };
 use wp_api_integration_tests::{AssertWpError, TestCredentials, test_site_url};
 
 #[tokio::test]
 #[parallel]
 async fn test_notification_unauthorized_request() {
-    let notifier: Arc<FooAppNotifier> =
-        FooAppNotifier::new(|notification| notification == WpAppNotification::UnauthorizedRequest)
-            .into();
+    let notifier: Arc<FooAppNotifier> = FooAppNotifier::new(|| true).into();
     api_client_as_unauthenticated_with_notifier(notifier.clone())
         .users()
         // Edit context requires authentication
@@ -25,7 +22,7 @@ async fn test_notification_unauthorized_request() {
         .assert_wp_error(WpErrorCode::ForbiddenContext);
     assert!(
         notifier.assertion.load(Ordering::Relaxed),
-        "Failed to notify with `WpAppNotification::UnauthorizedRequest`"
+        "Failed to notify with `unauthorized_request`"
     );
 }
 
@@ -44,14 +41,14 @@ fn api_client_as_unauthenticated_with_notifier(notifier: Arc<FooAppNotifier>) ->
 
 #[derive(Debug)]
 pub struct FooAppNotifier {
-    notify_fn: fn(WpAppNotification) -> bool,
+    unauthorized_request_fn: fn() -> bool,
     assertion: AtomicBool,
 }
 
 impl FooAppNotifier {
-    pub fn new(notify_fn: fn(WpAppNotification) -> bool) -> Self {
+    pub fn new(unauthorized_request_fn: fn() -> bool) -> Self {
         Self {
-            notify_fn,
+            unauthorized_request_fn,
             assertion: AtomicBool::new(false),
         }
     }
@@ -59,8 +56,8 @@ impl FooAppNotifier {
 
 #[async_trait]
 impl WpAppNotifier for FooAppNotifier {
-    async fn notify(&self, notification: WpAppNotification) {
-        let result = (self.notify_fn)(notification);
+    async fn unauthorized_request(&self) {
+        let result = (self.unauthorized_request_fn)();
         self.assertion.store(result, Ordering::Relaxed);
     }
 }

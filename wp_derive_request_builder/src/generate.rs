@@ -80,11 +80,17 @@ fn generate_async_request_executor(
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
                     use #crate_ident::middleware::PerformsRequests;
                     #request_from_request_builder
-                    let wp_network_response = self.perform(std::sync::Arc::new(request)).await?;
-                    if let Some(notification) = #crate_ident::WpAppNotification::from_wp_network_response(&wp_network_response) {
-                        self.app_notifier.notify(notification).await;
+                    let response = self.perform(std::sync::Arc::new(request)).await?;
+                    let response_status_code = response.status_code;
+                    let parsed_result: Result<#response_type_ident, #error_type> = response.parse();
+                    if let Err(ref err) = parsed_result {
+                        if let Some(wp_error_code) = err.wp_error_code() {
+                            if #crate_ident::is_unauthorized_request(response_status_code, wp_error_code) {
+                                self.app_notifier.unauthorized_request().await;
+                            }
+                        }
                     }
-                    wp_network_response.parse()
+                    parsed_result
                }
             }
         })

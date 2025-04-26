@@ -5,7 +5,6 @@ pub use api_error::{
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
-use request::WpNetworkResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use users::*;
@@ -216,22 +215,13 @@ pub enum IntegerOrString {
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
-    async fn notify(&self, notification: WpAppNotification);
+    async fn unauthorized_request(&self);
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
-pub enum WpAppNotification {
-    UnauthorizedRequest,
-}
-
-impl WpAppNotification {
-    pub fn from_wp_network_response(response: &WpNetworkResponse) -> Option<Self> {
-        if response.status_code == 401 {
-            Some(Self::UnauthorizedRequest)
-        } else {
-            None
-        }
-    }
+pub fn is_unauthorized_request(status_code: u16, wp_error_code: &WpErrorCode) -> bool {
+    status_code == 401
+        && (wp_error_code == &WpErrorCode::Unauthorized
+            || wp_error_code == &WpErrorCode::ForbiddenContext)
 }
 
 #[macro_export]

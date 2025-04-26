@@ -44,6 +44,15 @@ pub enum WpApiError {
     },
 }
 
+impl WpApiError {
+    pub fn wp_error_code(&self) -> Option<&WpErrorCode> {
+        match self {
+            WpApiError::WpError { error_code, .. } => Some(error_code),
+            _ => None,
+        }
+    }
+}
+
 impl WpSupportsLocalization for WpApiError {
     fn message_bundle(&self) -> MessageBundle {
         match self {
