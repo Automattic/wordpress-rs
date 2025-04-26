@@ -9,7 +9,7 @@ use wp_api::{
     middleware::WpApiMiddlewarePipeline, reqwest_request_executor::ReqwestRequestExecutor,
     users::UserListParams,
 };
-use wp_api_integration_tests::{AssertWpError, test_site_url};
+use wp_api_integration_tests::{AssertWpError, TestCredentials, test_site_url};
 
 #[tokio::test]
 #[parallel]
@@ -32,7 +32,10 @@ async fn test_notification_unauthorized_request() {
 fn api_client_as_unauthenticated_with_notifier(notifier: Arc<FooAppNotifier>) -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
-        WpAuthentication::None,
+        WpAuthentication::from_username_and_password(
+            TestCredentials::instance().admin_username.to_string(),
+            "invalid".to_string(),
+        ),
         Arc::new(ReqwestRequestExecutor::default()),
         notifier,
         Arc::new(WpApiMiddlewarePipeline::default()),
