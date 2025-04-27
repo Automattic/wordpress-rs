@@ -32,9 +32,11 @@ public actor WordPressAPI {
 
         self.requestBuilder = UniffiWpApiClient(
             apiRootUrl: apiRootUrl,
-            authentication: authenticationStategy,
-            requestExecutor: executor,
-            middlewarePipeline: middlewarePipeline
+            delegate: .init(
+                authProvider: .staticWithAuth(auth: authenticationStategy),
+                requestExecutor: executor,
+                middlewarePipeline: middlewarePipeline
+            )
         )
     }
 
