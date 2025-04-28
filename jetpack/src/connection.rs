@@ -167,7 +167,7 @@ impl JetpackConnectionClient {
 
     pub async fn connect_user(
         &self,
-        auth: WpAuthentication,
+        wp_com_authentication: WpAuthentication,
         from: String,
     ) -> Result<WpComSiteId, JetpackConnectionClientError> {
         let blog_id = self.connect_site(from).await?;
@@ -181,7 +181,7 @@ impl JetpackConnectionClient {
             .data;
 
         let wp_com_client = WpComApiClient::new(wp_api::WpApiClientDelegate {
-            auth_provider: WpAuthenticationProvider::static_with_auth(auth).into(),
+            auth_provider: WpAuthenticationProvider::static_with_auth(wp_com_authentication).into(),
             request_executor: self.delegate.request_executor.clone(),
             middleware_pipeline: self.delegate.middleware_pipeline.clone(),
         });
