@@ -1,5 +1,5 @@
 use http::HeaderValue;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WpAuthentication {
@@ -40,7 +40,7 @@ impl WpAuthentication {
 
 #[derive(uniffi::Object)]
 pub struct ModifiableAuthenticationProvider {
-    auth: Mutex<WpAuthentication>,
+    auth: RwLock<WpAuthentication>,
 }
 
 #[uniffi::export]
@@ -48,21 +48,24 @@ impl ModifiableAuthenticationProvider {
     #[uniffi::constructor]
     pub fn new(authentication: WpAuthentication) -> Self {
         Self {
-            auth: Mutex::new(authentication),
+            auth: RwLock::new(authentication),
         }
     }
 
     pub fn set_authentication(&self, new_authentication: WpAuthentication) {
         *self
             .auth
-            .lock()
+            .write()
             .expect("If the lock is poisoned, there isn't much we can do") = new_authentication;
     }
 }
 
 impl ModifiableAuthenticationProvider {
     pub fn header_value(&self) -> Option<HeaderValue> {
-        self.auth.lock().unwrap().header_value()
+        self.auth
+            .read()
+            .expect("If the lock is poisoned, there isn't much we can do")
+            .header_value()
     }
 }
 
