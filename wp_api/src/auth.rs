@@ -53,7 +53,10 @@ impl ModifiableAuthenticationProvider {
     }
 
     pub fn set_authentication(&self, new_authentication: WpAuthentication) {
-        *self.auth.lock().unwrap() = new_authentication;
+        *self
+            .auth
+            .lock()
+            .expect("If the lock is poisoned, there isn't much we can do") = new_authentication;
     }
 }
 
