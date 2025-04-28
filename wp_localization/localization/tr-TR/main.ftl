@@ -22,6 +22,8 @@ http_authentication_required_error = {$url} adresindeki sunucu kimlik doğrulama
 
 http_authentication_rejected_error = {$url} adresindeki sunucu giriş bilgilerinizi reddetti. Lütfen geçerli bir kullanıcı adı ve şifre girin.
 
+http_server_error = Unable to connect to server: {$reason}. Please contact your server provider.
+
 misconfigured_http_authentication_error = Sunucu geçersiz HTTP kimlik doğrulama bilgileri gönderiyor. Lütfen sitenizin HTTP kimlik doğrulama yapılandırmasını kontrol edin.
 
 misconfigured_rate_limit_error = Sunucu istekleri asla başarılı olmayacak şekilde sınırlıyor. Lütfen sitenizin hız sınırı yapılandırmasını kontrol edin.
