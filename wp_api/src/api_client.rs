@@ -154,7 +154,7 @@ pub struct WpApiClientDelegate {
     pub middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
 }
 
-pub trait IsRequestExecutor {
+pub trait IsWpApiClientDelegate {
     fn get_delegate(&self) -> &WpApiClientDelegate;
 }
 

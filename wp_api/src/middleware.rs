@@ -1,5 +1,5 @@
 use crate::{
-    IsRequestExecutor, RequestExecutionError, RequestExecutionErrorReason,
+    IsWpApiClientDelegate, RequestExecutionError, RequestExecutionErrorReason,
     request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
@@ -113,7 +113,7 @@ pub trait PerformsRequests {
 
 impl<T> PerformsRequests for T
 where
-    T: IsRequestExecutor,
+    T: IsWpApiClientDelegate,
 {
     fn get_middleware_pipeline(&self) -> Arc<WpApiMiddlewarePipeline> {
         self.get_delegate().middleware_pipeline.clone()

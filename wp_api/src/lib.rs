@@ -1,4 +1,6 @@
-pub use api_client::{IsRequestExecutor, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder};
+pub use api_client::{
+    IsWpApiClientDelegate, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder,
+};
 pub use api_error::{
     InvalidSslErrorReason, MediaUploadRequestExecutionError, ParsedRequestError,
     RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
