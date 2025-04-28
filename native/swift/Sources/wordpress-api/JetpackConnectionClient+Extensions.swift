@@ -14,9 +14,11 @@ extension JetpackConnectionClient {
     ) {
         self.init(
             apiRootUrl: apiRootUrl,
-            requestExecutor: WpRequestExecutor(urlSession: urlSession),
-            middlewarePipeline: middlewarePipeline,
-            siteAuthentication: authentication
+            delegate: .init(
+                authProvider: .staticWithAuth(auth: authentication),
+                requestExecutor: WpRequestExecutor(urlSession: urlSession),
+                middlewarePipeline: middlewarePipeline
+            )
         )
     }
 }

@@ -6,12 +6,12 @@ import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserListParams
-import uniffi.wp_api.WpAuthentication
+import uniffi.wp_api.WpAuthenticationProvider
 
 class UsersEndpointAndroidTest {
     // https://developer.android.com/studio/run/emulator-networking
     private val siteUrl = "http://10.0.2.2"
-    private val client = WpApiClient(ParsedUrl.parse(siteUrl), WpAuthentication.None)
+    private val client = WpApiClient(ParsedUrl.parse(siteUrl), WpAuthenticationProvider.none())
 
     @Test
     fun testUserListRequest() = runTest {

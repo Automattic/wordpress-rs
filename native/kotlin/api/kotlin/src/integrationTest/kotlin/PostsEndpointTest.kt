@@ -7,16 +7,12 @@ import uniffi.wp_api.PostListParams
 import uniffi.wp_api.PostRetrieveParams
 import uniffi.wp_api.SparsePostFieldWithEditContext
 import uniffi.wp_api.WpErrorCode
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class PostsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val authentication = wpAuthenticationFromUsernameAndPassword(
-        username = testCredentials.adminUsername, password = testCredentials.adminPassword
-    )
-    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
+    private val client = defaultApiClient()
 
     @Test
     fun testPostListRequest() = runTest {

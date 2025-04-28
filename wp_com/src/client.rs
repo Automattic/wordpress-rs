@@ -1,14 +1,14 @@
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpAuthentication, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    middleware::WpApiMiddlewarePipeline, request::RequestExecutor,
+    ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
+    api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
 };
 
 use super::endpoint::jetpack_connection_endpoint::{
     JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
 };
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpComApiRequestBuilder {
     inner: WpComApiRequestBuilder,
 }
@@ -16,31 +16,27 @@ struct UniffiWpComApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpComApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            inner: WpComApiRequestBuilder::new(api_root_url, authentication),
+            inner: WpComApiRequestBuilder::new(api_root_url, auth_provider),
         }
     }
 }
 
-#[derive(Debug)]
 pub struct WpComApiRequestBuilder {
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
 }
 
 impl WpComApiRequestBuilder {
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            jetpack_connection: JetpackConnectionRequestBuilder::new(
-                api_root_url.clone(),
-                authentication.clone(),
-            )
-            .into(),
+            jetpack_connection: JetpackConnectionRequestBuilder::new(api_root_url, auth_provider)
+                .into(),
         }
     }
 }
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpComApiClient {
     inner: WpComApiClient,
 }
@@ -48,36 +44,25 @@ struct UniffiWpComApiClient {
 #[uniffi::export]
 impl UniffiWpComApiClient {
     #[uniffi::constructor]
-    fn new(
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    fn new(delegate: WpApiClientDelegate) -> Self {
         Self {
-            inner: WpComApiClient::new(authentication, request_executor, middleware_pipeline),
+            inner: WpComApiClient::new(delegate),
         }
     }
 }
 
-#[derive(Debug)]
 pub struct WpComApiClient {
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
 }
 
 impl WpComApiClient {
-    pub fn new(
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    pub fn new(delegate: WpApiClientDelegate) -> Self {
         let url = url::Url::parse("https://public-api.wordpress.com").expect("This is a valid URL");
         let api_root_url: Arc<ParsedUrl> = ParsedUrl::new(url).into();
 
         api_client_generate_api_client!(
             api_root_url,
-            authentication,
-            request_executor,
-            middleware_pipeline;
+            delegate;
             jetpack_connection
         )
     }

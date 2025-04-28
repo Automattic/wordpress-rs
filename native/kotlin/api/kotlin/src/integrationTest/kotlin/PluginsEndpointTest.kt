@@ -8,8 +8,8 @@ import uniffi.wp_api.PluginSlug
 import uniffi.wp_api.PluginStatus
 import uniffi.wp_api.PluginWpOrgDirectorySlug
 import uniffi.wp_api.SparsePluginFieldWithEditContext
+import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -17,12 +17,14 @@ import kotlin.test.assertNull
 class PluginsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
     private val client = WpApiClient(
-        testCredentials.apiRootUrl, wpAuthenticationFromUsernameAndPassword(
-            username = testCredentials.adminUsername, password = testCredentials.adminPassword
+        testCredentials.apiRootUrl, WpAuthenticationProvider.staticWithUsernameAndPassword(
+            username = testCredentials.adminUsername,
+            password = testCredentials.adminPassword
         )
     )
     private val clientAsSubscriber = WpApiClient(
-        testCredentials.apiRootUrl, wpAuthenticationFromUsernameAndPassword(
+        testCredentials.apiRootUrl,
+        WpAuthenticationProvider.staticWithUsernameAndPassword(
             username = testCredentials.subscriberUsername,
             password = testCredentials.subscriberPassword
         )

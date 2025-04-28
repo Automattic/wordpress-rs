@@ -2,8 +2,11 @@ use reusable_test_cases::list_users_cases;
 use rstest::*;
 use rstest_reuse::{self, apply};
 use serial_test::parallel;
+use std::sync::Arc;
 use wp_api::{
-    WpApiError, WpApiParamOrder, WpApiRequestBuilder, WpAuthentication, generate,
+    WpApiError, WpApiParamOrder, WpApiRequestBuilder,
+    auth::WpAuthenticationProvider,
+    generate,
     request::endpoint::users_endpoint::UsersRequestListWithEditContextResponse,
     reqwest_request_executor::ReqwestRequestExecutor,
     users::{
@@ -19,13 +22,15 @@ pub mod reusable_test_cases;
 #[tokio::test]
 #[parallel]
 async fn list_users_with_edit_context(#[case] params: UserListParams) {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().admin_username.to_string(),
-        TestCredentials::instance().admin_password.to_string(),
-    );
     let request_executor = ReqwestRequestExecutor::default();
 
-    let request_builder = WpApiRequestBuilder::new(test_site_url(), authentication);
+    let request_builder = WpApiRequestBuilder::new(
+        test_site_url(),
+        Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+            TestCredentials::instance().admin_username.to_string(),
+            TestCredentials::instance().admin_password.to_string(),
+        )),
+    );
     let wp_request = request_builder.users().list_with_edit_context(&params);
     let response = request_executor.async_request(wp_request.into()).await;
     let result: Result<UsersRequestListWithEditContextResponse, WpApiError> =

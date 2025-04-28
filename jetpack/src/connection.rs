@@ -1,14 +1,14 @@
+use crate::client::JetpackApiClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpApiError, WpAuthentication, WpErrorCode, middleware::WpApiMiddlewarePipeline,
-    request::RequestExecutor, users::UserId,
+    ParsedUrl, WpApiClientDelegate, WpApiError, WpErrorCode,
+    auth::{WpAuthentication, WpAuthenticationProvider},
+    users::UserId,
 };
 use wp_com::{
     WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,
 };
-
-use crate::client::JetpackApiClient;
 
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct JetpackConnectionParams {
@@ -85,31 +85,19 @@ pub struct JetpackConnectionCheck {
 /// Connect a WordPress site to Jetpack.
 ///
 /// Please note, the endpoints used are available on Jetpack 14.2 and above.
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 pub struct JetpackConnectionClient {
-    request_executor: Arc<dyn RequestExecutor>,
-    middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    delegate: WpApiClientDelegate,
     jetpack_client: JetpackApiClient,
 }
 
 #[uniffi::export]
 impl JetpackConnectionClient {
     #[uniffi::constructor]
-    pub fn new(
-        api_root_url: Arc<ParsedUrl>,
-        request_executor: Arc<dyn RequestExecutor>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-        site_authentication: WpAuthentication,
-    ) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         Self {
-            request_executor: request_executor.clone(),
-            middleware_pipeline: middleware_pipeline.clone(),
-            jetpack_client: JetpackApiClient::new(
-                api_root_url,
-                site_authentication,
-                request_executor,
-                middleware_pipeline,
-            ),
+            delegate: delegate.clone(),
+            jetpack_client: JetpackApiClient::new(api_root_url, delegate),
         }
     }
 
@@ -192,11 +180,11 @@ impl JetpackConnectionClient {
             .map_err(JetpackConnectionClientError::Unhandled)?
             .data;
 
-        let wp_com_client = WpComApiClient::new(
-            wp_com_authentication,
-            self.request_executor.clone(),
-            self.middleware_pipeline.clone(),
-        );
+        let wp_com_client = WpComApiClient::new(wp_api::WpApiClientDelegate {
+            auth_provider: WpAuthenticationProvider::static_with_auth(wp_com_authentication).into(),
+            request_executor: self.delegate.request_executor.clone(),
+            middleware_pipeline: self.delegate.middleware_pipeline.clone(),
+        });
         let params = JetpackRemoteConnectionParams {
             secret: provision_info.secret,
             scope: provision_info.scope,

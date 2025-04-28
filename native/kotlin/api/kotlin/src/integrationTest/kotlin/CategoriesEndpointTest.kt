@@ -7,7 +7,6 @@ import uniffi.wp_api.CategoryCreateParams
 import uniffi.wp_api.CategoryListParams
 import uniffi.wp_api.CategoryUpdateParams
 import uniffi.wp_api.WpErrorCode
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -16,11 +15,7 @@ private const val CATEGORY_ID_48: Long = 48
 private const val CATEGORY_ID_59: Long = 59
 
 class CategoriesEndpointTest {
-    private val testCredentials = TestCredentials.INSTANCE
-    private val authentication = wpAuthenticationFromUsernameAndPassword(
-        username = testCredentials.adminUsername, password = testCredentials.adminPassword
-    )
-    private val client = WpApiClient(testCredentials.apiRootUrl, authentication)
+    private val client = defaultApiClient()
 
     @Test
     fun testCategoryListRequest() = runTest {
