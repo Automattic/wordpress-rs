@@ -1,12 +1,12 @@
 use self::endpoint::WpEndpointUrl;
-use crate::RequestExecutionErrorReason;
 use crate::{
-    WpApiError, WpAuthentication,
+    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpAuthentication,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
 use chrono::{DateTime, Utc};
+use endpoint::application_passwords_endpoint::ApplicationPasswordsRequestBuilder;
 use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
@@ -761,6 +761,18 @@ pub fn is_maybe_html(value: impl AsRef<str>) -> bool {
 
 pub fn is_valid_json(value: impl AsRef<str>) -> bool {
     serde_json::from_str::<serde_json::Value>(value.as_ref()).is_ok()
+}
+
+#[uniffi::export]
+pub async fn is_valid_authentication(
+    request_executor: Arc<dyn RequestExecutor>,
+    api_root_url: Arc<ParsedUrl>,
+    authentication: WpAuthentication,
+) -> bool {
+    let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication)
+        .retrieve_current_with_edit_context()
+        .into();
+    request_executor.execute(request).await.is_ok()
 }
 
 pub mod user_agent {

@@ -81,7 +81,7 @@ fn generate_async_request_executor(
                     use #crate_ident::middleware::PerformsRequests;
                     #request_from_request_builder
                     let response = self.perform(std::sync::Arc::new(request)).await?;
-                    if #crate_ident::is_unauthorized_request(response.status_code, self.request_executor.clone(), self.api_root_url.clone(), self.authentication.clone()).await {
+                    if response.status_code == 401 && !self.has_valid_authentication().await {
                         self.app_notifier.authentication_becomes_invalid().await;
                     }
                     response.parse()
@@ -205,6 +205,12 @@ fn generate_async_request_executor(
         #[uniffi::export]
         impl #generated_request_executor_ident {
             #(#functions)*
+        }
+
+        impl #generated_request_executor_ident {
+            pub async fn has_valid_authentication(&self) -> bool {
+                #crate_ident::request::is_valid_authentication(self.request_executor.clone(), self.api_root_url.clone(), self.authentication.clone()).await
+            }
         }
     }
 }
