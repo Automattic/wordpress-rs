@@ -223,15 +223,11 @@ pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
 
 pub async fn is_unauthorized_request(
     status_code: u16,
-    wp_error_code: &WpErrorCode,
     request_executor: Arc<dyn RequestExecutor>,
     api_root_url: std::sync::Arc<crate::ParsedUrl>,
     authentication: crate::WpAuthentication,
 ) -> bool {
-    if status_code == 401
-        && (wp_error_code == &WpErrorCode::Unauthorized
-            || wp_error_code == &WpErrorCode::ForbiddenContext)
-    {
+    if status_code == 401 {
         let r = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication)
             .retrieve_current_with_edit_context()
             .into();
