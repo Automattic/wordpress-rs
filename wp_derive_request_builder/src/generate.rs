@@ -175,7 +175,7 @@ fn generate_async_request_executor(
                 }
             }
         }
-        impl #crate_ident::IsRequestExecutor for #generated_request_executor_ident {
+        impl #crate_ident::IsWpApiClientDelegate for #generated_request_executor_ident {
             fn get_delegate(&self) -> &#crate_ident::WpApiClientDelegate {
                 &self.delegate
             }
