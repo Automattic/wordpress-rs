@@ -1,12 +1,15 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpAuthentication,
+    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpAuthentication, WpErrorCode,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
 use chrono::{DateTime, Utc};
-use endpoint::application_passwords_endpoint::ApplicationPasswordsRequestBuilder;
+use endpoint::application_passwords_endpoint::{
+    ApplicationPasswordsRequestBuilder,
+    ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+};
 use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
@@ -768,11 +771,53 @@ pub async fn is_valid_authentication(
     request_executor: Arc<dyn RequestExecutor>,
     api_root_url: Arc<ParsedUrl>,
     authentication: WpAuthentication,
-) -> bool {
+) -> IsValidAuthenticationResult {
     let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication)
         .retrieve_current_with_edit_context()
         .into();
-    request_executor.execute(request).await.is_ok()
+    match request_executor.execute(request).await {
+        Ok(response) => {
+            let parsed_res: Result<
+                ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+                WpApiError,
+            > = response.parse();
+            match parsed_res {
+                Ok(_) => IsValidAuthenticationResult::Authenticated,
+                Err(wp_api_error) => {
+                    if let WpApiError::WpError {
+                        error_code: WpErrorCode::Unauthorized,
+                        ..
+                    } = wp_api_error
+                    {
+                        IsValidAuthenticationResult::Unauthorized
+                    } else {
+                        IsValidAuthenticationResult::WpApiError { wp_api_error }
+                    }
+                }
+            }
+        }
+        Err(request_execution_error) => IsValidAuthenticationResult::RequestExecutionError {
+            request_execution_error,
+        },
+    }
+}
+
+#[derive(Debug, uniffi::Enum)]
+pub enum IsValidAuthenticationResult {
+    Authenticated,
+    Unauthorized,
+    WpApiError {
+        wp_api_error: WpApiError,
+    },
+    RequestExecutionError {
+        request_execution_error: RequestExecutionError,
+    },
+}
+
+impl IsValidAuthenticationResult {
+    pub fn is_unauthorized(&self) -> bool {
+        matches!(self, Self::Unauthorized)
+    }
 }
 
 pub mod user_agent {
