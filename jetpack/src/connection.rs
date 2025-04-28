@@ -2,7 +2,8 @@ use crate::client::JetpackApiClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_api::{
-    ParsedUrl, WpApiClientDelegate, WpApiError, WpErrorCode, auth::WpAuthenticationProvider,
+    ParsedUrl, WpApiClientDelegate, WpApiError, WpErrorCode,
+    auth::{WpAuthentication, WpAuthenticationProvider},
     users::UserId,
 };
 use wp_com::{
@@ -166,7 +167,7 @@ impl JetpackConnectionClient {
 
     pub async fn connect_user(
         &self,
-        auth_provider: Arc<WpAuthenticationProvider>,
+        auth: WpAuthentication,
         from: String,
     ) -> Result<WpComSiteId, JetpackConnectionClientError> {
         let blog_id = self.connect_site(from).await?;
@@ -180,7 +181,7 @@ impl JetpackConnectionClient {
             .data;
 
         let wp_com_client = WpComApiClient::new(wp_api::WpApiClientDelegate {
-            auth_provider,
+            auth_provider: WpAuthenticationProvider::static_with_auth(auth).into(),
             request_executor: self.delegate.request_executor.clone(),
             middleware_pipeline: self.delegate.middleware_pipeline.clone(),
         });
