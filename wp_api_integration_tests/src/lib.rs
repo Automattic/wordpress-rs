@@ -182,7 +182,7 @@ pub struct EmptyAppNotifier;
 
 #[async_trait]
 impl WpAppNotifier for EmptyAppNotifier {
-    async fn unauthorized_request(&self) {
+    async fn authentication_becomes_invalid(&self) {
         // no-op
     }
 }

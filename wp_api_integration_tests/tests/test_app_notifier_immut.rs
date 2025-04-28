@@ -56,7 +56,7 @@ impl FooAppNotifier {
 
 #[async_trait]
 impl WpAppNotifier for FooAppNotifier {
-    async fn unauthorized_request(&self) {
+    async fn authentication_becomes_invalid(&self) {
         let result = (self.unauthorized_request_fn)();
         self.assertion.store(result, Ordering::Relaxed);
     }
