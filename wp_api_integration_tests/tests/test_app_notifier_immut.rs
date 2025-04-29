@@ -5,8 +5,9 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use wp_api::{
-    WpApiClient, WpAppNotifier, WpAuthentication, WpErrorCode, middleware::WpApiMiddlewarePipeline,
-    reqwest_request_executor::ReqwestRequestExecutor, users::UserListParams,
+    WpApiClient, WpApiClientDelegate, WpAppNotifier, WpErrorCode, auth::WpAuthenticationProvider,
+    middleware::WpApiMiddlewarePipeline, reqwest_request_executor::ReqwestRequestExecutor,
+    users::UserListParams,
 };
 use wp_api_integration_tests::{AssertWpError, TestCredentials, test_site_url};
 
@@ -26,16 +27,18 @@ async fn test_notification_unauthorized_request() {
     );
 }
 
-fn api_client_as_unauthenticated_with_notifier(notifier: Arc<FooAppNotifier>) -> WpApiClient {
+fn api_client_as_unauthenticated_with_notifier(app_notifier: Arc<FooAppNotifier>) -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
-        WpAuthentication::from_username_and_password(
-            TestCredentials::instance().admin_username.to_string(),
-            "invalid".to_string(),
-        ),
-        Arc::new(ReqwestRequestExecutor::default()),
-        notifier,
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().admin_username.to_string(),
+                "invalid".to_string(),
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier,
+        },
     )
 }
 

@@ -33,14 +33,8 @@ fn generate_async_request_executor(
 ) -> TokenStream {
     let crate_ident = &config.crate_ident;
     let static_api_root_url_type = &config.static_types.api_root_url;
-    let static_wp_authentication_type = &config.static_types.wp_authentication;
-    let static_request_executor_type = &crate_config.request_executor;
-    let static_app_notifier_type = &config.static_types.app_notifier;
-    let static_middleware_pipeline_type = &config.static_types.middleware_pipeline;
-    let static_request_executor_type = quote! { std::sync::Arc<dyn #static_request_executor_type> };
-    let static_middleware_pipeline_type =
-        quote! { std::sync::Arc<#static_middleware_pipeline_type> };
-    let static_app_notifier_type = quote! { std::sync::Arc<dyn #static_app_notifier_type> };
+    let static_delegate_type = &crate_config.delegate_type;
+    let static_delegate_type = quote! { #static_delegate_type };
     let error_type = &crate_config.error_type;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
     let generated_request_executor_ident = &config.generated_idents.request_executor;
@@ -82,7 +76,7 @@ fn generate_async_request_executor(
                     #request_from_request_builder
                     let response = self.perform(std::sync::Arc::new(request)).await?;
                     if response.status_code == 401 && self.has_valid_authentication().await.is_unauthorized() {
-                        self.app_notifier.authentication_becomes_invalid().await;
+                        self.delegate.app_notifier.authentication_becomes_invalid().await;
                     }
                     response.parse()
                }
@@ -172,34 +166,24 @@ fn generate_async_request_executor(
     quote! {
         #(#generated_return_types)*
 
-        #[derive(Debug, uniffi::Object)]
+        #[derive(uniffi::Object)]
         pub struct #generated_request_executor_ident {
             api_root_url: #static_api_root_url_type,
-            authentication: #static_wp_authentication_type,
             request_builder: #generated_request_builder_ident,
-            request_executor: #static_request_executor_type,
-            app_notifier: #static_app_notifier_type,
-            middleware_pipeline: #static_middleware_pipeline_type,
+            delegate: #static_delegate_type,
         }
         impl #generated_request_executor_ident {
-            pub fn new(api_root_url: #static_api_root_url_type, authentication: #static_wp_authentication_type, request_executor: #static_request_executor_type, app_notifier: #static_app_notifier_type, middleware_pipeline: #static_middleware_pipeline_type) -> Self {
+            pub fn new(api_root_url: #static_api_root_url_type, delegate: #static_delegate_type) -> Self {
                 Self {
                     api_root_url: api_root_url.clone(),
-                    authentication: authentication.clone(),
-                    request_builder: #generated_request_builder_ident::new(api_root_url, authentication),
-                    request_executor,
-                    app_notifier,
-                    middleware_pipeline,
+                    request_builder: #generated_request_builder_ident::new(api_root_url, delegate.auth_provider.clone()),
+                    delegate,
                 }
             }
         }
-        impl #crate_ident::middleware::PerformsRequests for #generated_request_executor_ident {
-            fn get_middleware_pipeline(&self) -> #static_middleware_pipeline_type {
-                self.middleware_pipeline.clone()
-            }
-
-            fn get_request_executor(&self) -> #static_request_executor_type {
-                self.request_executor.clone()
+        impl #crate_ident::IsWpApiClientDelegate for #generated_request_executor_ident {
+            fn get_delegate(&self) -> &#crate_ident::WpApiClientDelegate {
+                &self.delegate
             }
         }
         #[uniffi::export]
@@ -207,7 +191,7 @@ fn generate_async_request_executor(
             #(#functions)*
 
             pub async fn has_valid_authentication(&self) -> #crate_ident::request::IsValidAuthenticationResult {
-                #crate_ident::request::is_valid_authentication(self.request_executor.clone(), self.api_root_url.clone(), self.authentication.clone()).await
+                #crate_ident::request::is_valid_authentication(self.delegate.request_executor.clone(), self.api_root_url.clone(), self.delegate.auth_provider.clone()).await
             }
         }
     }
@@ -216,7 +200,7 @@ fn generate_async_request_executor(
 fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
     let static_api_root_url_type = &config.static_types.api_root_url;
     let static_inner_request_builder_type = &config.static_types.inner_request_builder;
-    let static_wp_authentication_type = &config.static_types.wp_authentication;
+    let static_auth_provider_type = &config.static_types.auth_provider;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
@@ -260,16 +244,16 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     });
 
     quote! {
-        #[derive(Debug, uniffi::Object)]
+        #[derive(uniffi::Object)]
         pub struct #generated_request_builder_ident {
             endpoint: #generated_endpoint_ident,
             inner: #static_inner_request_builder_type,
         }
         impl #generated_request_builder_ident {
-            pub fn new(api_root_url: #static_api_root_url_type, authentication: #static_wp_authentication_type) -> Self {
+            pub fn new(api_root_url: #static_api_root_url_type, auth_provider: #static_auth_provider_type) -> Self {
                 Self {
                     endpoint: #generated_endpoint_ident::new(api_root_url),
-                    inner: #static_inner_request_builder_type::new(authentication),
+                    inner: #static_inner_request_builder_type::new(auth_provider),
                 }
             }
         }
@@ -424,7 +408,7 @@ pub struct CrateConfig {
     #[serde(deserialize_with = "from_string_to_token_stream")]
     error_type: TokenStream,
     #[serde(deserialize_with = "from_string_to_token_stream")]
-    request_executor: TokenStream,
+    delegate_type: TokenStream,
 }
 
 fn from_string_to_token_stream<'de, D>(deserializer: D) -> Result<TokenStream, D::Error>
@@ -468,10 +452,8 @@ pub struct ConfigStaticTypes {
     pub api_root_url: TokenStream,
     pub api_endpoint_url: TokenStream,
     pub inner_request_builder: TokenStream,
-    pub wp_authentication: TokenStream,
+    pub auth_provider: TokenStream,
     pub wp_network_request: TokenStream,
-    pub middleware_pipeline: TokenStream,
-    pub app_notifier: TokenStream,
 }
 
 impl ConfigStaticTypes {
@@ -480,10 +462,8 @@ impl ConfigStaticTypes {
             api_root_url: quote! { std::sync::Arc<#crate_ident::ParsedUrl> },
             api_endpoint_url: quote! { #crate_ident::request::endpoint::ApiEndpointUrl },
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
-            wp_authentication: quote! { #crate_ident::WpAuthentication },
+            auth_provider: quote! { std::sync::Arc<#crate_ident::auth::WpAuthenticationProvider> },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
-            middleware_pipeline: quote! { #crate_ident::middleware::WpApiMiddlewarePipeline },
-            app_notifier: quote! { #crate_ident::WpAppNotifier },
         }
     }
 }

@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use url::Url;
 use wp_api::{
-    ParsedUrl, WpApiClient, WpApiError, WpAppNotifier, WpAuthentication, WpErrorCode,
-    categories::CategoryId, comments::CommentId, date::WpGmtDateTime, media::MediaId,
-    middleware::WpApiMiddlewarePipeline, posts::PostId,
+    ParsedUrl, WpApiClient, WpApiClientDelegate, WpApiError, WpAppNotifier, WpErrorCode,
+    auth::WpAuthenticationProvider, categories::CategoryId, comments::CommentId,
+    date::WpGmtDateTime, media::MediaId, middleware::WpApiMiddlewarePipeline, posts::PostId,
     reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
 };
 
@@ -74,54 +74,59 @@ pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
 
 pub fn api_client() -> WpApiClient {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().admin_username.to_string(),
-        TestCredentials::instance().admin_password.to_string(),
-    );
     WpApiClient::new(
         test_site_url(),
-        authentication,
-        Arc::new(ReqwestRequestExecutor::default()),
-        Arc::new(EmptyAppNotifier),
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().admin_username.to_string(),
+                TestCredentials::instance().admin_password.to_string(),
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
     )
 }
 
 pub fn api_client_as_author() -> WpApiClient {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().author_username.to_string(),
-        TestCredentials::instance().author_password.to_string(),
-    );
     WpApiClient::new(
         test_site_url(),
-        authentication,
-        Arc::new(ReqwestRequestExecutor::default()),
-        Arc::new(EmptyAppNotifier),
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().author_username.to_string(),
+                TestCredentials::instance().author_password.to_string(),
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
     )
 }
 
 pub fn api_client_as_subscriber() -> WpApiClient {
-    let authentication = WpAuthentication::from_username_and_password(
-        TestCredentials::instance().subscriber_username.to_string(),
-        TestCredentials::instance().subscriber_password.to_string(),
-    );
     WpApiClient::new(
         test_site_url(),
-        authentication,
-        Arc::new(ReqwestRequestExecutor::default()),
-        Arc::new(EmptyAppNotifier),
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                TestCredentials::instance().subscriber_username.to_string(),
+                TestCredentials::instance().subscriber_password.to_string(),
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
     )
 }
 
-pub fn api_client_as_unauthenticated() -> WpApiClient {
+pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider>) -> WpApiClient {
     WpApiClient::new(
         test_site_url(),
-        WpAuthentication::None,
-        Arc::new(ReqwestRequestExecutor::default()),
-        Arc::new(EmptyAppNotifier),
-        Arc::new(WpApiMiddlewarePipeline::default()),
+        WpApiClientDelegate {
+            auth_provider,
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
     )
 }
 

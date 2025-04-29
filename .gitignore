@@ -47,6 +47,8 @@ dump.sql
 # CI Cache
 .cargo/*
 /vendor
+/wp_rs_web/assets
+/wp_rs_web/node_modules
 
 # Cargo config
 !.cargo/config.toml

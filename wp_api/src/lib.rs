@@ -1,15 +1,14 @@
-pub use api_client::{WpApiClient, WpApiRequestBuilder};
+pub use api_client::{
+    IsWpApiClientDelegate, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder,
+};
 pub use api_error::{
     InvalidSslErrorReason, MediaUploadRequestExecutionError, ParsedRequestError,
     RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
-use request::{
-    RequestExecutor, endpoint::application_passwords_endpoint::ApplicationPasswordsRequestBuilder,
-};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 use users::*;
 pub use uuid::{WpUuid, WpUuidParseError};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
@@ -23,6 +22,7 @@ mod uniffi_serde;
 mod uuid; // re-exported relevant types
 
 pub mod application_passwords;
+pub mod auth;
 pub mod categories;
 pub mod comments;
 pub mod date;
@@ -68,30 +68,6 @@ impl WpContext {
             Self::View => "view",
         }
     }
-}
-
-#[derive(Debug, Clone, uniffi::Enum)]
-pub enum WpAuthentication {
-    AuthorizationHeader { token: String },
-    Bearer { token: String },
-    None,
-}
-
-impl WpAuthentication {
-    pub fn from_username_and_password(username: String, password: String) -> Self {
-        use base64::prelude::*;
-        WpAuthentication::AuthorizationHeader {
-            token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
-        }
-    }
-}
-
-#[uniffi::export]
-fn wp_authentication_from_username_and_password(
-    username: String,
-    password: String,
-) -> WpAuthentication {
-    WpAuthentication::from_username_and_password(username, password)
 }
 
 #[derive(
@@ -219,22 +195,6 @@ pub enum IntegerOrString {
 #[async_trait::async_trait]
 pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
     async fn authentication_becomes_invalid(&self);
-}
-
-pub async fn is_unauthorized_request(
-    status_code: u16,
-    request_executor: Arc<dyn RequestExecutor>,
-    api_root_url: std::sync::Arc<crate::ParsedUrl>,
-    authentication: crate::WpAuthentication,
-) -> bool {
-    if status_code == 401 {
-        let r = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication)
-            .retrieve_current_with_edit_context()
-            .into();
-        request_executor.execute(r).await.is_ok()
-    } else {
-        false
-    }
 }
 
 #[macro_export]

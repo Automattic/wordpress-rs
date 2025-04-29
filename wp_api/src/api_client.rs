@@ -1,8 +1,7 @@
 use crate::{
-    ParsedUrl, WpAppNotifier, WpAuthentication, api_client_generate_api_client,
-    api_client_generate_endpoint_impl, api_client_generate_request_builder,
-};
-use crate::{
+    ParsedUrl, WpAppNotifier, api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder,
+    auth::WpAuthenticationProvider,
     middleware::WpApiMiddlewarePipeline,
     request::{
         RequestExecutor,
@@ -31,7 +30,7 @@ use crate::{
 };
 use std::sync::Arc;
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpApiRequestBuilder {
     inner: WpApiRequestBuilder,
 }
@@ -39,14 +38,13 @@ struct UniffiWpApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            inner: WpApiRequestBuilder::new(api_root_url, authentication),
+            inner: WpApiRequestBuilder::new(api_root_url, auth_provider),
         }
     }
 }
 
-#[derive(Debug)]
 pub struct WpApiRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     categories: Arc<CategoriesRequestBuilder>,
@@ -66,10 +64,10 @@ pub struct WpApiRequestBuilder {
 }
 
 impl WpApiRequestBuilder {
-    pub fn new(api_root_url: Arc<ParsedUrl>, authentication: WpAuthentication) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         api_client_generate_request_builder!(
             api_root_url,
-            authentication;
+            auth_provider;
             application_passwords,
             categories,
             comments,
@@ -89,7 +87,7 @@ impl WpApiRequestBuilder {
     }
 }
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpApiClient {
     inner: WpApiClient,
 }
@@ -97,26 +95,13 @@ struct UniffiWpApiClient {
 #[uniffi::export]
 impl UniffiWpApiClient {
     #[uniffi::constructor]
-    fn new(
-        api_root_url: Arc<ParsedUrl>,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        app_notifier: Arc<dyn WpAppNotifier>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         Self {
-            inner: WpApiClient::new(
-                api_root_url,
-                authentication,
-                request_executor,
-                app_notifier,
-                middleware_pipeline,
-            ),
+            inner: WpApiClient::new(api_root_url, delegate),
         }
     }
 }
 
-#[derive(Debug)]
 pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     categories: Arc<CategoriesRequestExecutor>,
@@ -136,19 +121,10 @@ pub struct WpApiClient {
 }
 
 impl WpApiClient {
-    pub fn new(
-        api_root_url: Arc<ParsedUrl>,
-        authentication: WpAuthentication,
-        request_executor: Arc<dyn RequestExecutor>,
-        app_notifier: Arc<dyn WpAppNotifier>,
-        middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
-    ) -> Self {
+    pub fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         api_client_generate_api_client!(
             api_root_url,
-            authentication,
-            request_executor,
-            app_notifier,
-            middleware_pipeline;
+            delegate;
             application_passwords,
             categories,
             comments,
@@ -166,6 +142,19 @@ impl WpApiClient {
             wp_site_health_tests
         )
     }
+}
+
+// IMPORTANT: This type may be aggressively cloned, so all of its fields must be cheap to clone!
+#[derive(Clone, uniffi::Record)]
+pub struct WpApiClientDelegate {
+    pub auth_provider: Arc<WpAuthenticationProvider>,
+    pub request_executor: Arc<dyn RequestExecutor>,
+    pub middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    pub app_notifier: Arc<dyn WpAppNotifier>,
+}
+
+pub trait IsWpApiClientDelegate {
+    fn get_delegate(&self) -> &WpApiClientDelegate;
 }
 
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
@@ -235,15 +224,12 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_root_url:ident, $authentication:ident, $request_executor:ident, $app_notifier: ident, $middleware_pipeline:ident; $($element:expr),*) => {
+    ($api_root_url:ident, $delegate:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
                     $api_root_url.clone(),
-                    $authentication.clone(),
-                    $request_executor.clone(),
-                    $app_notifier.clone(),
-                    $middleware_pipeline.clone(),
+                    $delegate.clone(),
                 )
                 .into(),)*
             }

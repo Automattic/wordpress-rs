@@ -4,8 +4,8 @@ use super::{
         self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
         AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, FetchAndParseApiRootFailure,
-        FindApiRootFailure, ParseHomepageResult, XmlrpcDisabledReason, XmlrpcDiscoveryError,
-        extract_rsd_url, is_xmlrpc_response, parse_rsd_for_xmlrpc,
+        FindApiRootFailure, ParseApiRootFailureReason, ParseHomepageResult, XmlrpcDisabledReason,
+        XmlrpcDiscoveryError, extract_rsd_url, is_xmlrpc_response, parse_rsd_for_xmlrpc,
     },
 };
 use crate::{
@@ -66,6 +66,15 @@ impl WpLoginClient {
             request_executor,
             middleware_pipeline,
         }
+    }
+
+    pub fn new_with_default_middleware_pipeline(
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Self {
+        Self::new(
+            request_executor,
+            Arc::new(WpApiMiddlewarePipeline::default()),
+        )
     }
 
     pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
@@ -334,10 +343,16 @@ impl WpLoginClient {
             } else {
                 let response_body = fetch_api_details_response.body_as_string();
                 let response_body_type = ResponseBodyType::new(&response_body);
+                let reason = if let ResponseBodyType::MaybeHtml = response_body_type {
+                    ParseApiRootFailureReason::from_maybe_html_response_body(response_body.as_str())
+                } else {
+                    None
+                };
                 FetchAndParseApiRootFailure::ParseApiRoot {
                     parsing_error_message: error.to_string(),
                     response_body,
                     response_body_type,
+                    reason,
                 }
             }
         })

@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import uniffi.wp_api.UserId
+import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
 
 const val FIRST_USER_ID: UserId = 1
@@ -14,6 +15,14 @@ const val NUMBER_OF_USERS = 4
 const val NUMBER_OF_PLUGINS = 4
 const val HELLO_DOLLY_PLUGIN_SLUG = "hello-dolly/hello"
 const val WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS = "classic-widgets"
+
+fun defaultApiClient(): WpApiClient {
+    val testCredentials = TestCredentials.INSTANCE
+    val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
+        username = testCredentials.adminUsername, password = testCredentials.adminPassword
+    )
+    return WpApiClient(testCredentials.apiRootUrl, authProvider)
+}
 
 fun <T> WpRequestResult<T>.assertSuccess() {
     assert(this is WpRequestResult.WpRequestSuccess)

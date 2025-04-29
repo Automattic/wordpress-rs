@@ -1,7 +1,8 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpAuthentication, WpErrorCode,
+    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpErrorCode,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
+    auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
@@ -56,14 +57,13 @@ impl PaginationHeaderKey {
     }
 }
 
-#[derive(Debug)]
 pub struct InnerRequestBuilder {
-    authentication: WpAuthentication,
+    auth_provider: Arc<WpAuthenticationProvider>,
 }
 
 impl InnerRequestBuilder {
-    pub fn new(authentication: WpAuthentication) -> Self {
-        Self { authentication }
+    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+        Self { auth_provider }
     }
 
     pub fn get(&self, url: ApiEndpointUrl) -> WpNetworkRequest {
@@ -110,19 +110,9 @@ impl InnerRequestBuilder {
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        match self.authentication {
-            WpAuthentication::None => (),
-            WpAuthentication::AuthorizationHeader { ref token } => {
-                let hv = HeaderValue::from_str(&format!("Basic {}", token));
-                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
-                header_map.insert(http::header::AUTHORIZATION, hv);
-            }
-            WpAuthentication::Bearer { ref token } => {
-                let hv = HeaderValue::from_str(&format!("Bearer {}", token));
-                let hv = hv.expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token");
-                header_map.insert(http::header::AUTHORIZATION, hv);
-            }
-        };
+        if let Some(hv) = self.auth_provider.auth_header_value() {
+            header_map.insert(http::header::AUTHORIZATION, hv);
+        }
         header_map.into()
     }
 
@@ -770,9 +760,9 @@ pub fn is_valid_json(value: impl AsRef<str>) -> bool {
 pub async fn is_valid_authentication(
     request_executor: Arc<dyn RequestExecutor>,
     api_root_url: Arc<ParsedUrl>,
-    authentication: WpAuthentication,
+    authentication_provider: Arc<WpAuthenticationProvider>,
 ) -> IsValidAuthenticationResult {
-    let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication)
+    let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication_provider)
         .retrieve_current_with_edit_context()
         .into();
     match request_executor.execute(request).await {

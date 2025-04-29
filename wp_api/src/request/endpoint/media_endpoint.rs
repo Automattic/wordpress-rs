@@ -214,7 +214,8 @@ impl MediaRequestExecutor {
         let request = self
             .request_builder
             .create(params, file_path, file_content_type);
-        self.request_executor
+        self.delegate
+            .request_executor
             .upload_media(Arc::new(request))
             .await?
             .parse()

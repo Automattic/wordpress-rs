@@ -12,7 +12,6 @@ use wp_api::{
             AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
         },
     },
-    middleware::WpApiMiddlewarePipeline,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 
@@ -125,12 +124,7 @@ async fn perform_api_discovery(
 
 fn build_login_client() -> WpLoginClient {
     let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
-    WpLoginClient::new(
-        request_executor,
-        Arc::new(WpApiMiddlewarePipeline {
-            middlewares: vec![],
-        }),
-    )
+    WpLoginClient::new_with_default_middleware_pipeline(request_executor)
 }
 
 fn parse_input_file(input_file: &str) -> Result<Vec<BatchTestRow>> {

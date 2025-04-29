@@ -4,20 +4,20 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.UniffiWpApiRequestBuilder
 import uniffi.wp_api.UserListParams
+import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.parseAsUsersRequestListWithEditContextResponse
-import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import kotlin.test.assertEquals
 
 class ManualParserTest {
     private val testCredentials = TestCredentials.INSTANCE
-    private val authentication = wpAuthenticationFromUsernameAndPassword(
+    private val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
     private val requestExecutor by lazy { WpRequestExecutor() }
 
     @Test
     fun testUserListManualRequestAndParsing() = runTest {
-        val requestBuilder = UniffiWpApiRequestBuilder(testCredentials.apiRootUrl, authentication)
+        val requestBuilder = UniffiWpApiRequestBuilder(testCredentials.apiRootUrl, authProvider)
         val userListRequest = requestBuilder.users().listWithEditContext(UserListParams())
         val userListResponse = requestExecutor.execute(userListRequest)
         val userList = parseAsUsersRequestListWithEditContextResponse(userListResponse).data
