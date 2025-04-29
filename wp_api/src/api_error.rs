@@ -571,7 +571,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError { .. } => {
                 WpMessages::misconfigured_http_authentication_error()
             }
-            RequestExecutionErrorReason::MisconfiguredRateLimitError { .. } => {
+            RequestExecutionErrorReason::MisconfiguredRateLimitError => {
                 WpMessages::misconfigured_rate_limit_error()
             }
             RequestExecutionErrorReason::HttpForbiddenError { hostname } => {
