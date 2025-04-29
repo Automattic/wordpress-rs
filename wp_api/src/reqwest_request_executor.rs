@@ -285,12 +285,15 @@ impl From<&ResolveError> for RequestExecutionErrorReason {
 impl From<&HyperError> for RequestExecutionErrorReason {
     fn from(error: &HyperError) -> Self {
         if let Some(http2_error) = error.find::<Http2Error>() {
-            // TODO: We can probably handle more cases here, such as:
-            // - Connection reset
-
-            return RequestExecutionErrorReason::GenericError {
-                error_message: http2_error.to_string(),
-            };
+            if let Some(reason) = http2_error.reason() {
+                return RequestExecutionErrorReason::HttpError {
+                    reason: reason.description().to_string(),
+                };
+            } else {
+                return RequestExecutionErrorReason::GenericError {
+                    error_message: http2_error.to_string(),
+                };
+            }
         }
 
         if error.is_closed() {
