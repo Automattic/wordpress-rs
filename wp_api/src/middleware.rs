@@ -442,7 +442,7 @@ mod tests {
                 Err(RequestExecutionError::RequestExecutionFailed {
                     status_code: Some(429),
                     redirects: None,
-                    reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
+                    reason: RequestExecutionErrorReason::MisconfiguredRateLimitError,
                 })
             ));
         }
