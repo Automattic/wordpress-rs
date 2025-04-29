@@ -35,7 +35,8 @@ public actor WordPressAPI {
             delegate: .init(
                 authProvider: .staticWithAuth(auth: authenticationStategy),
                 requestExecutor: executor,
-                middlewarePipeline: middlewarePipeline
+                middlewarePipeline: middlewarePipeline,
+                appNotifier: NoopAppNotifier()
             )
         )
     }
@@ -167,5 +168,11 @@ extension RequestMethod {
 public extension ParsedUrl {
     static func from(url: URL) throws -> ParsedUrl {
         try parse(input: url.absoluteString)
+    }
+}
+
+class NoopAppNotifier: @unchecked Sendable, WpAppNotifier {
+    func requestedWithInvalidAuthentication() async {
+        // Do nothing.
     }
 }
