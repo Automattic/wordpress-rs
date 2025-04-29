@@ -13,7 +13,7 @@ use wp_api_integration_tests::{AssertWpError, TestCredentials, test_site_url};
 
 #[tokio::test]
 #[parallel]
-async fn test_notification_unauthorized_request() {
+async fn test_notification_requested_with_invalid_authentication() {
     let notifier: Arc<FooAppNotifier> = FooAppNotifier::new(|| true).into();
     api_client_as_unauthenticated_with_notifier(notifier.clone())
         .users()
@@ -23,7 +23,7 @@ async fn test_notification_unauthorized_request() {
         .assert_wp_error(WpErrorCode::ForbiddenContext);
     assert!(
         notifier.assertion.load(Ordering::Relaxed),
-        "Failed to notify with `unauthorized_request`"
+        "Failed to notify with `requested_with_invalid_authentication`"
     );
 }
 
@@ -44,14 +44,14 @@ fn api_client_as_unauthenticated_with_notifier(app_notifier: Arc<FooAppNotifier>
 
 #[derive(Debug)]
 pub struct FooAppNotifier {
-    unauthorized_request_fn: fn() -> bool,
+    requested_with_invalid_authentication_fn: fn() -> bool,
     assertion: AtomicBool,
 }
 
 impl FooAppNotifier {
-    pub fn new(unauthorized_request_fn: fn() -> bool) -> Self {
+    pub fn new(requested_with_invalid_authentication_fn: fn() -> bool) -> Self {
         Self {
-            unauthorized_request_fn,
+            requested_with_invalid_authentication_fn,
             assertion: AtomicBool::new(false),
         }
     }
@@ -59,8 +59,8 @@ impl FooAppNotifier {
 
 #[async_trait]
 impl WpAppNotifier for FooAppNotifier {
-    async fn authentication_becomes_invalid(&self) {
-        let result = (self.unauthorized_request_fn)();
+    async fn requested_with_invalid_authentication(&self) {
+        let result = (self.requested_with_invalid_authentication_fn)();
         self.assertion.store(result, Ordering::Relaxed);
     }
 }

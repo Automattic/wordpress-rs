@@ -76,7 +76,7 @@ fn generate_async_request_executor(
                     #request_from_request_builder
                     let response = self.perform(std::sync::Arc::new(request)).await?;
                     if response.status_code == 401 && self.has_valid_authentication().await.is_unauthorized() {
-                        self.delegate.app_notifier.authentication_becomes_invalid().await;
+                        self.delegate.app_notifier.requested_with_invalid_authentication().await;
                     }
                     response.parse()
                }

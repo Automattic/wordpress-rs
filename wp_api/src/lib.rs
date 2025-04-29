@@ -194,7 +194,7 @@ pub enum IntegerOrString {
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
-    async fn authentication_becomes_invalid(&self);
+    async fn requested_with_invalid_authentication(&self);
 }
 
 #[macro_export]
