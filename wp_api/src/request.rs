@@ -781,12 +781,12 @@ pub async fn is_valid_authentication(
                     {
                         IsValidAuthenticationResult::Unauthorized
                     } else {
-                        IsValidAuthenticationResult::WpApiError { wp_api_error }
+                        IsValidAuthenticationResult::ErrWpApiError { wp_api_error }
                     }
                 }
             }
         }
-        Err(request_execution_error) => IsValidAuthenticationResult::RequestExecutionError {
+        Err(request_execution_error) => IsValidAuthenticationResult::ErrRequestExecutionError {
             request_execution_error,
         },
     }
@@ -796,10 +796,12 @@ pub async fn is_valid_authentication(
 pub enum IsValidAuthenticationResult {
     Authenticated,
     Unauthorized,
-    WpApiError {
+    // uniffi doesn't allow the variant to be named `WpApiError` since it's also the name of the
+    // type
+    ErrWpApiError {
         wp_api_error: WpApiError,
     },
-    RequestExecutionError {
+    ErrRequestExecutionError {
         request_execution_error: RequestExecutionError,
     },
 }
