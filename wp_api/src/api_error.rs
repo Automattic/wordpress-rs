@@ -506,6 +506,9 @@ pub enum RequestExecutionErrorReason {
     DeviceIsOfflineError {
         error_message: String,
     },
+    HttpError {
+        reason: String,
+    },
     GenericError {
         error_message: String,
     },
@@ -585,6 +588,9 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             }
             RequestExecutionErrorReason::DeviceIsOfflineError { error_message } => {
                 WpMessages::just(error_message)
+            }
+            RequestExecutionErrorReason::HttpError { reason } => {
+                WpMessages::http_server_error(reason)
             }
             RequestExecutionErrorReason::GenericError { error_message } => {
                 WpMessages::just(error_message)

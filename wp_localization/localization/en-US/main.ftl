@@ -25,6 +25,8 @@ http_timeout_error = The connection timed out
 
 http_authentication_rejected_error = The server at {$url} rejected your credentials. Please provide a valid username and password.
 
+http_server_error = Unable to connect to server: {$reason}. Please contact your server provider.
+
 misconfigured_http_authentication_error = The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.
 
 misconfigured_rate_limit_error = The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.

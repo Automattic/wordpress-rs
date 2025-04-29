@@ -22,6 +22,7 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseCertificate
 import java.io.File
+import java.net.NoRouteToHostException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
@@ -67,6 +68,8 @@ class WpRequestExecutor(
                 )
             } catch (e: UnknownHostException) {
                 throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
+            } catch (e: NoRouteToHostException) {
+                throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
             }
         }
 
@@ -120,6 +123,11 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(e: UnknownHostExce
     RequestExecutionErrorReason.NonExistentSiteError(
         errorMessage = e.localizedMessage,
         suggestedAction = "Check that the URL is valid and try again"
+    )
+
+private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHostException) =
+    RequestExecutionErrorReason.HttpError(
+        reason = e.localizedMessage
     )
 
 @Suppress("UNUSED_PARAMETER")
