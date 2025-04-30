@@ -78,7 +78,7 @@ fn generate_async_request_executor(
                     let response = self.perform(std::sync::Arc::new(request)).await?;
                     let response_status_code = response.status_code;
                     let parsed_response = response.parse();
-                    if parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.has_valid_authentication().await.is_unauthorized()) {
+                    if parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default()) {
                         self.delegate.app_notifier.requested_with_invalid_authentication().await;
                     }
                     parsed_response
@@ -193,8 +193,8 @@ fn generate_async_request_executor(
         impl #generated_request_executor_ident {
             #(#functions)*
 
-            pub async fn has_valid_authentication(&self) -> #crate_ident::request::IsValidAuthenticationResult {
-                #crate_ident::request::is_valid_authentication(self.delegate.request_executor.clone(), self.api_root_url.clone(), self.delegate.auth_provider.clone()).await
+            pub async fn fetch_authentication_state(&self) -> Result<#crate_ident::request::AuthenticationState, #error_type> {
+                #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_root_url.clone(), self.delegate.auth_provider.clone()).await
             }
         }
     }

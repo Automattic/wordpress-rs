@@ -757,58 +757,44 @@ pub fn is_valid_json(value: impl AsRef<str>) -> bool {
 }
 
 #[uniffi::export]
-pub async fn is_valid_authentication(
+pub async fn fetch_authentication_state(
     request_executor: Arc<dyn RequestExecutor>,
     api_root_url: Arc<ParsedUrl>,
     authentication_provider: Arc<WpAuthenticationProvider>,
-) -> IsValidAuthenticationResult {
+) -> Result<AuthenticationState, WpApiError> {
     let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication_provider)
         .retrieve_current_with_edit_context()
         .into();
-    match request_executor.execute(request).await {
-        Ok(response) => {
-            let parsed_res: Result<
-                ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
-                WpApiError,
-            > = response.parse();
-            match parsed_res {
-                Ok(_) => IsValidAuthenticationResult::Authenticated,
-                Err(wp_api_error) => {
-                    if let WpApiError::WpError {
-                        error_code: WpErrorCode::Unauthorized,
-                        ..
-                    } = wp_api_error
-                    {
-                        IsValidAuthenticationResult::Unauthorized
-                    } else {
-                        IsValidAuthenticationResult::ErrWpApiError { wp_api_error }
-                    }
-                }
+    let response = request_executor.execute(request).await?;
+    let parsed_res: Result<
+        ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+        WpApiError,
+    > = response.parse();
+    match parsed_res {
+        Ok(_) => Ok(AuthenticationState::Authenticated),
+        Err(wp_api_error) => {
+            if let WpApiError::WpError {
+                error_code: WpErrorCode::Unauthorized,
+                ..
+            } = wp_api_error
+            {
+                Ok(AuthenticationState::Unauthorized)
+            } else {
+                Err(wp_api_error)
             }
         }
-        Err(request_execution_error) => IsValidAuthenticationResult::ErrRequestExecutionError {
-            request_execution_error,
-        },
     }
 }
 
-#[derive(Debug, uniffi::Enum)]
-pub enum IsValidAuthenticationResult {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
+pub enum AuthenticationState {
     Authenticated,
     Unauthorized,
-    // uniffi doesn't allow the variant to be named `WpApiError` since it's also the name of the
-    // type
-    ErrWpApiError {
-        wp_api_error: WpApiError,
-    },
-    ErrRequestExecutionError {
-        request_execution_error: RequestExecutionError,
-    },
 }
 
-impl IsValidAuthenticationResult {
+impl AuthenticationState {
     pub fn is_unauthorized(&self) -> bool {
-        matches!(self, Self::Unauthorized)
+        self == &Self::Unauthorized
     }
 }
 
