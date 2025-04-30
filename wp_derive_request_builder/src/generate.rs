@@ -72,13 +72,16 @@ fn generate_async_request_executor(
             );
             quote! {
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
+                    use #crate_ident::MaybeWpError;
                     use #crate_ident::middleware::PerformsRequests;
                     #request_from_request_builder
                     let response = self.perform(std::sync::Arc::new(request)).await?;
-                    if response.status_code == 401 && self.has_valid_authentication().await.is_unauthorized() {
+                    let response_status_code = response.status_code;
+                    let parsed_response = response.parse();
+                    if parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.has_valid_authentication().await.is_unauthorized()) {
                         self.delegate.app_notifier.requested_with_invalid_authentication().await;
                     }
-                    response.parse()
+                    parsed_response
                }
             }
         })

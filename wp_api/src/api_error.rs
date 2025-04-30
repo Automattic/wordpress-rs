@@ -12,6 +12,12 @@ where
     fn as_parse_error(reason: String, response: String) -> Self;
 }
 
+pub trait MaybeWpError {
+    fn wp_error_code(&self) -> Option<&WpErrorCode>;
+
+    fn is_unauthorized_error(&self) -> Option<bool>;
+}
+
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiError {
     InvalidHttpStatusCode {
@@ -44,12 +50,33 @@ pub enum WpApiError {
     },
 }
 
-impl WpApiError {
-    pub fn wp_error_code(&self) -> Option<&WpErrorCode> {
+impl MaybeWpError for WpApiError {
+    fn wp_error_code(&self) -> Option<&WpErrorCode> {
         match self {
             WpApiError::WpError { error_code, .. } => Some(error_code),
             _ => None,
         }
+    }
+
+    fn is_unauthorized_error(&self) -> Option<bool> {
+        self.wp_error_code().map(|e| e.is_unauthorized())
+    }
+}
+
+impl<T, E> MaybeWpError for Result<T, E>
+where
+    E: MaybeWpError,
+{
+    fn wp_error_code(&self) -> Option<&WpErrorCode> {
+        if let Err(e) = self {
+            e.wp_error_code()
+        } else {
+            None
+        }
+    }
+
+    fn is_unauthorized_error(&self) -> Option<bool> {
+        self.wp_error_code().map(|e| e.is_unauthorized())
     }
 }
 
@@ -438,6 +465,12 @@ pub enum WpErrorCode {
     // ------------------------------------------------------------------------------------
     #[serde(untagged)]
     CustomError(String),
+}
+
+impl WpErrorCode {
+    fn is_unauthorized(&self) -> bool {
+        self == &Self::Unauthorized
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]

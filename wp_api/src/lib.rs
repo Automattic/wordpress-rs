@@ -2,7 +2,7 @@ pub use api_client::{
     IsWpApiClientDelegate, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder,
 };
 pub use api_error::{
-    InvalidSslErrorReason, MediaUploadRequestExecutionError, ParsedRequestError,
+    InvalidSslErrorReason, MaybeWpError, MediaUploadRequestExecutionError, ParsedRequestError,
     RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
