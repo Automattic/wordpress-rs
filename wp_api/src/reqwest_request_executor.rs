@@ -187,26 +187,13 @@ impl From<reqwest::Error> for RequestExecutionError {
 
         if let Some(io_error) = error.as_io_error() {
             match io_error.kind() {
-                std::io::ErrorKind::ConnectionRefused => {
-                    return RequestExecutionError::RequestExecutionFailed {
-                        status_code,
-                        redirects: None,
-                        reason: RequestExecutionErrorReason::NonExistentSiteError {
-                            error_message: Some("Connection refused".to_string()),
-                            suggested_action: None,
-                        },
-                    };
-                }
                 std::io::ErrorKind::UnexpectedEof => {
                     // Server terminated the connection unexpectedly
                     return RequestExecutionError::RequestExecutionFailed {
                         status_code,
                         redirects: None,
-                        reason: RequestExecutionErrorReason::NonExistentSiteError {
-                            error_message: Some(
-                                "The server terminated the connection unexpectedly".to_string(),
-                            ),
-                            suggested_action: None,
+                        reason: RequestExecutionErrorReason::HttpError {
+                            reason: "The server terminated the connection unexpectedly".to_string(),
                         },
                     };
                 }
@@ -214,8 +201,8 @@ impl From<reqwest::Error> for RequestExecutionError {
                     return RequestExecutionError::RequestExecutionFailed {
                         status_code,
                         redirects: None,
-                        reason: RequestExecutionErrorReason::GenericError {
-                            error_message: error.to_string(),
+                        reason: RequestExecutionErrorReason::HttpError {
+                            reason: io_error.to_string(),
                         },
                     };
                 }
