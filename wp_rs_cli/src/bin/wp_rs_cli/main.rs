@@ -182,7 +182,7 @@ impl SimplifiedDiscoveryResult {
                 println!("{}", format!("Login URL found: {login_url}").green());
             }
             Err(error) => {
-                println!("{}", format!("Error: {}", error).red());
+                println!("{}", error.to_string().red());
             }
         }
     }
