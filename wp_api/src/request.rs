@@ -299,10 +299,6 @@ impl WpNetworkHeaderMap {
         Self { inner: header_map }
     }
 
-    pub fn wp_total(&self) -> Option<u32> {
-        self.header_value_as_u32(HEADER_KEY_WP_TOTAL)
-    }
-
     pub fn wp_total_pages(&self) -> Option<u32> {
         self.header_value_as_u32(HEADER_KEY_WP_TOTAL_PAGES)
     }
@@ -393,6 +389,10 @@ impl WpNetworkHeaderMap {
                 .push(v)
         });
         header_hashmap
+    }
+
+    pub fn wp_total(&self) -> Option<u32> {
+        self.header_value_as_u32(HEADER_KEY_WP_TOTAL)
     }
 }
 

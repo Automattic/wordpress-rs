@@ -58,8 +58,8 @@ impl UrlExtension for Url {
         I::Item: AsRef<str>,
     {
         // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
-        if let Some(segments) = self.path_segments() {
-            if segments.last() == Some("") {
+        if let Some(mut segments) = self.path_segments() {
+            if segments.next_back() == Some("") {
                 self.path_segments_mut()?.pop();
             }
         }
