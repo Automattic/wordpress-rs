@@ -18,7 +18,7 @@ extension JetpackConnectionClient {
                 authProvider: .staticWithAuth(auth: authentication),
                 requestExecutor: WpRequestExecutor(urlSession: urlSession),
                 middlewarePipeline: middlewarePipeline,
-                appNotifier: NoopAppNotifier()
+                appNotifier: AppNotifier()
             )
         )
     }
