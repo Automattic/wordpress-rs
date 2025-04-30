@@ -1,13 +1,16 @@
 use self::endpoint::WpEndpointUrl;
-use crate::RequestExecutionErrorReason;
-use crate::auth::WpAuthenticationProvider;
 use crate::{
-    WpApiError,
+    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpErrorCode,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
+    auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
 use chrono::{DateTime, Utc};
+use endpoint::application_passwords_endpoint::{
+    ApplicationPasswordsRequestBuilder,
+    ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+};
 use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
@@ -751,6 +754,48 @@ pub fn is_maybe_html(value: impl AsRef<str>) -> bool {
 
 pub fn is_valid_json(value: impl AsRef<str>) -> bool {
     serde_json::from_str::<serde_json::Value>(value.as_ref()).is_ok()
+}
+
+#[uniffi::export]
+pub async fn fetch_authentication_state(
+    request_executor: Arc<dyn RequestExecutor>,
+    api_root_url: Arc<ParsedUrl>,
+    authentication_provider: Arc<WpAuthenticationProvider>,
+) -> Result<AuthenticationState, WpApiError> {
+    let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication_provider)
+        .retrieve_current_with_edit_context()
+        .into();
+    let response = request_executor.execute(request).await?;
+    let parsed_res: Result<
+        ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+        WpApiError,
+    > = response.parse();
+    match parsed_res {
+        Ok(_) => Ok(AuthenticationState::Authenticated),
+        Err(wp_api_error) => {
+            if let WpApiError::WpError {
+                error_code: WpErrorCode::Unauthorized,
+                ..
+            } = wp_api_error
+            {
+                Ok(AuthenticationState::Unauthorized)
+            } else {
+                Err(wp_api_error)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
+pub enum AuthenticationState {
+    Authenticated,
+    Unauthorized,
+}
+
+impl AuthenticationState {
+    pub fn is_unauthorized(&self) -> bool {
+        self == &Self::Unauthorized
+    }
 }
 
 pub mod user_agent {

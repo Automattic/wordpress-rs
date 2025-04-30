@@ -72,9 +72,16 @@ fn generate_async_request_executor(
             );
             quote! {
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
+                    use #crate_ident::MaybeWpError;
                     use #crate_ident::middleware::PerformsRequests;
                     #request_from_request_builder
-                    self.perform(std::sync::Arc::new(request)).await?.parse()
+                    let response = self.perform(std::sync::Arc::new(request)).await?;
+                    let response_status_code = response.status_code;
+                    let parsed_response = response.parse();
+                    if parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default()) {
+                        self.delegate.app_notifier.requested_with_invalid_authentication().await;
+                    }
+                    parsed_response
                }
             }
         })
@@ -164,12 +171,14 @@ fn generate_async_request_executor(
 
         #[derive(uniffi::Object)]
         pub struct #generated_request_executor_ident {
+            api_root_url: #static_api_root_url_type,
             request_builder: #generated_request_builder_ident,
             delegate: #static_delegate_type,
         }
         impl #generated_request_executor_ident {
             pub fn new(api_root_url: #static_api_root_url_type, delegate: #static_delegate_type) -> Self {
                 Self {
+                    api_root_url: api_root_url.clone(),
                     request_builder: #generated_request_builder_ident::new(api_root_url, delegate.auth_provider.clone()),
                     delegate,
                 }
@@ -183,6 +192,10 @@ fn generate_async_request_executor(
         #[uniffi::export]
         impl #generated_request_executor_ident {
             #(#functions)*
+
+            pub async fn fetch_authentication_state(&self) -> Result<#crate_ident::request::AuthenticationState, #error_type> {
+                #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_root_url.clone(), self.delegate.auth_provider.clone()).await
+            }
         }
     }
 }

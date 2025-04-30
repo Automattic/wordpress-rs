@@ -9,6 +9,7 @@ import uniffi.wp_api.UniffiWpApiClient
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiMiddlewarePipeline
+import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
 
 class WpApiClient
@@ -17,6 +18,7 @@ constructor(
     apiRootUrl: ParsedUrl,
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
+    private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
@@ -26,7 +28,8 @@ constructor(
             WpApiClientDelegate(
                 authProvider,
                 requestExecutor = requestExecutor,
-                middlewarePipeline = WpApiMiddlewarePipeline(emptyList())
+                middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
+                appNotifier
             )
         )
     }
@@ -74,5 +77,11 @@ constructor(
                 )
             }
         }
+    }
+}
+
+class EmptyAppNotifier : WpAppNotifier {
+    override suspend fun requestedWithInvalidAuthentication() {
+        // no-op
     }
 }

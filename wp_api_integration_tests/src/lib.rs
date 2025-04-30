@@ -1,7 +1,8 @@
+use async_trait::async_trait;
 use std::sync::Arc;
 use url::Url;
 use wp_api::{
-    ParsedUrl, WpApiClient, WpApiClientDelegate, WpApiError, WpErrorCode,
+    ParsedUrl, WpApiClient, WpApiClientDelegate, WpApiError, WpAppNotifier, WpErrorCode,
     auth::WpAuthenticationProvider, categories::CategoryId, comments::CommentId,
     date::WpGmtDateTime, media::MediaId, middleware::WpApiMiddlewarePipeline, posts::PostId,
     reqwest_request_executor::ReqwestRequestExecutor, tags::TagId, users::UserId,
@@ -82,6 +83,7 @@ pub fn api_client() -> WpApiClient {
             )),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
 }
@@ -96,6 +98,7 @@ pub fn api_client_as_author() -> WpApiClient {
             )),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
 }
@@ -110,17 +113,7 @@ pub fn api_client_as_subscriber() -> WpApiClient {
             )),
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
-        },
-    )
-}
-
-pub fn api_client_as_unauthenticated() -> WpApiClient {
-    WpApiClient::new(
-        test_site_url(),
-        WpApiClientDelegate {
-            auth_provider: Arc::new(WpAuthenticationProvider::none()),
-            request_executor: Arc::new(ReqwestRequestExecutor::default()),
-            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
 }
@@ -132,6 +125,7 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
             auth_provider,
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
 }
@@ -186,4 +180,14 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
 
 pub fn unwrapped_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
     s.parse::<WpGmtDateTime>().expect("Expected a valid date")
+}
+
+#[derive(Debug)]
+pub struct EmptyAppNotifier;
+
+#[async_trait]
+impl WpAppNotifier for EmptyAppNotifier {
+    async fn requested_with_invalid_authentication(&self) {
+        // no-op
+    }
 }

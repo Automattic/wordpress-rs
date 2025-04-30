@@ -2,7 +2,7 @@ pub use api_client::{
     IsWpApiClientDelegate, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder,
 };
 pub use api_error::{
-    InvalidSslErrorReason, MediaUploadRequestExecutionError, ParsedRequestError,
+    InvalidSslErrorReason, MaybeWpError, MediaUploadRequestExecutionError, ParsedRequestError,
     RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
 };
 pub use parsed_url::{ParseUrlError, ParsedUrl};
@@ -189,6 +189,12 @@ pub enum BoolOrVecString {
 pub enum IntegerOrString {
     Integer(i64),
     String(String),
+}
+
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
+    async fn requested_with_invalid_authentication(&self);
 }
 
 #[macro_export]

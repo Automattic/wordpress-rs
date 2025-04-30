@@ -17,8 +17,9 @@ use wp_api::{
     users::UserId,
 };
 use wp_api_integration_tests::{
-    AssertWpError, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE, MEDIA_TEST_FILE_PATH,
-    TestCredentials, api_client, api_client_as_author, api_client_as_subscriber, test_site_url,
+    AssertWpError, EmptyAppNotifier, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
+    MEDIA_TEST_FILE_PATH, TestCredentials, api_client, api_client_as_author,
+    api_client_as_subscriber, test_site_url,
 };
 
 #[tokio::test]
@@ -180,6 +181,7 @@ fn api_client_with_medir_err_networking(test_type: MediaErrNetworkingTestType) -
             )),
             request_executor: Arc::new(MediaErrNetworking::new(test_type)),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
 }

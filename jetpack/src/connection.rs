@@ -180,10 +180,11 @@ impl JetpackConnectionClient {
             .map_err(JetpackConnectionClientError::Unhandled)?
             .data;
 
-        let wp_com_client = WpComApiClient::new(wp_api::WpApiClientDelegate {
+        let wp_com_client = WpComApiClient::new(WpApiClientDelegate {
             auth_provider: WpAuthenticationProvider::static_with_auth(wp_com_authentication).into(),
             request_executor: self.delegate.request_executor.clone(),
             middleware_pipeline: self.delegate.middleware_pipeline.clone(),
+            app_notifier: self.delegate.app_notifier.clone(),
         });
         let params = JetpackRemoteConnectionParams {
             secret: provision_info.secret,

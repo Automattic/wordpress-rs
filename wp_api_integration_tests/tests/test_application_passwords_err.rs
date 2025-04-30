@@ -4,10 +4,11 @@ use wp_api::WpErrorCode;
 use wp_api::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
 };
+use wp_api::auth::WpAuthenticationProvider;
 
 use wp_api_integration_tests::{
     AssertWpError, FIRST_USER_ID, TestCredentials, api_client, api_client_as_subscriber,
-    api_client_as_unauthenticated,
+    api_client_with_auth_provider,
 };
 
 pub mod reusable_test_cases;
@@ -115,7 +116,7 @@ async fn delete_application_passwords_err_cannot_delete_application_passwords() 
 async fn retrieve_application_password_err_cannot_introspect_app_password_for_non_authenticated_user_401()
  {
     // Unauthenticated user can not retrieve the current application password for the second user
-    api_client_as_unauthenticated()
+    api_client_with_auth_provider(WpAuthenticationProvider::none().into())
         .application_passwords()
         .retrieve_current_with_edit_context()
         .await

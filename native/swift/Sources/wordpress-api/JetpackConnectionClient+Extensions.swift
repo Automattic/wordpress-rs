@@ -17,7 +17,8 @@ extension JetpackConnectionClient {
             delegate: .init(
                 authProvider: .staticWithAuth(auth: authentication),
                 requestExecutor: WpRequestExecutor(urlSession: urlSession),
-                middlewarePipeline: middlewarePipeline
+                middlewarePipeline: middlewarePipeline,
+                appNotifier: NoopAppNotifier()
             )
         )
     }

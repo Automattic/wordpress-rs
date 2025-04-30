@@ -1,9 +1,7 @@
-use crate::auth::WpAuthenticationProvider;
 use crate::{
-    ParsedUrl, api_client_generate_api_client, api_client_generate_endpoint_impl,
+    ParsedUrl, WpAppNotifier, api_client_generate_api_client, api_client_generate_endpoint_impl,
     api_client_generate_request_builder,
-};
-use crate::{
+    auth::WpAuthenticationProvider,
     middleware::WpApiMiddlewarePipeline,
     request::{
         RequestExecutor,
@@ -152,6 +150,7 @@ pub struct WpApiClientDelegate {
     pub auth_provider: Arc<WpAuthenticationProvider>,
     pub request_executor: Arc<dyn RequestExecutor>,
     pub middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
+    pub app_notifier: Arc<dyn WpAppNotifier>,
 }
 
 pub trait IsWpApiClientDelegate {

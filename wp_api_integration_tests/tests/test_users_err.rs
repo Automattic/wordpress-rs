@@ -1,6 +1,7 @@
 use serial_test::parallel;
 use wp_api::{
     WpErrorCode,
+    auth::WpAuthenticationProvider,
     users::{
         UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
         WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
@@ -8,7 +9,7 @@ use wp_api::{
 };
 use wp_api_integration_tests::{
     AssertWpError, FIRST_USER_ID, SECOND_USER_EMAIL, SECOND_USER_ID, SECOND_USER_SLUG, api_client,
-    api_client_as_subscriber, api_client_as_unauthenticated,
+    api_client_as_subscriber, api_client_with_auth_provider,
 };
 
 #[tokio::test]
@@ -171,7 +172,7 @@ async fn retrieve_user_err_user_invalid_id() {
 #[tokio::test]
 #[parallel]
 async fn retrieve_user_err_unauthorized() {
-    api_client_as_unauthenticated()
+    api_client_with_auth_provider(WpAuthenticationProvider::none().into())
         .users()
         .retrieve_me_with_edit_context()
         .await
