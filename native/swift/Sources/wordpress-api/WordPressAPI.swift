@@ -7,8 +7,6 @@ import FoundationNetworking
 
 public actor WordPressAPI {
 
-    public static let requestedWithInvalidAuthenticationNotification = Notification.Name(rawValue: "WordPressAPI.requestedWithInvalidAuthentication")
-
     enum Errors: Error {
         case unableToParseResponse
     }
