@@ -44,8 +44,9 @@ struct WordPressAPITests {
         let stubs = try createStubs()
         let api = try WordPressAPI(
             apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
-            authenticationStategy: .none,
-            executor: stubs
+            authenticationProvider: .none(),
+            executor: stubs,
+            middlewarePipeline: .default
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
         #expect(user.data.name == "User Name")
@@ -57,7 +58,7 @@ struct WordPressAPITests {
         let counter = CounterMiddleware()
         let api = try WordPressAPI(
             apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
-            authenticationStategy: .none,
+            authenticationProvider: .none(),
             executor: stubs,
             middlewarePipeline: .init(middlewares: [counter])
         )

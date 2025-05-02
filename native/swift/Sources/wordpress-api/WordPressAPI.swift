@@ -11,33 +11,54 @@ public actor WordPressAPI {
         case unableToParseResponse
     }
 
-    private let internalExecutor: SafeRequestExecutor
+    private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 
-    public init(urlSession: URLSession, apiRootUrl: ParsedUrl, authenticationStategy: WpAuthentication) {
+    public init(
+        urlSession: URLSession,
+        apiRootUrl: ParsedUrl,
+        authentication: WpAuthentication,
+        middlewarePipeline: MiddlewarePipeline = .default
+    ) {
         self.init(
             apiRootUrl: apiRootUrl,
-            authenticationStategy: authenticationStategy,
-            executor: WpRequestExecutor(urlSession: urlSession)
+            authenticationProvider: .staticWithAuth(auth: authentication),
+            executor: WpRequestExecutor(urlSession: urlSession),
+            middlewarePipeline: middlewarePipeline
+        )
+    }
+
+    public init(
+        urlSession: URLSession,
+        apiRootUrl: ParsedUrl,
+        authenticationProvider: WpAuthenticationProvider,
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
+    ) {
+        self.init(
+            apiRootUrl: apiRootUrl,
+            authenticationProvider: authenticationProvider,
+            executor: WpRequestExecutor(urlSession: urlSession),
+            middlewarePipeline: middlewarePipeline
         )
     }
 
     init(
         apiRootUrl: ParsedUrl,
-        authenticationStategy: WpAuthentication,
+        authenticationProvider: WpAuthenticationProvider,
         executor: SafeRequestExecutor,
-        middlewarePipeline: MiddlewarePipeline = .default
+        middlewarePipeline: MiddlewarePipeline,
+        appNotifier: WpAppNotifier? = nil
     ) {
-        self.internalExecutor = executor
-
+        self.apiClientDelegate = WpApiClientDelegate(
+            authProvider: authenticationProvider,
+            requestExecutor: executor,
+            middlewarePipeline: middlewarePipeline,
+            appNotifier: appNotifier ?? EmptyAppNotifier()
+        )
         self.requestBuilder = UniffiWpApiClient(
             apiRootUrl: apiRootUrl,
-            delegate: .init(
-                authProvider: .staticWithAuth(auth: authenticationStategy),
-                requestExecutor: executor,
-                middlewarePipeline: middlewarePipeline,
-                appNotifier: NoopAppNotifier()
-            )
+            delegate: self.apiClientDelegate
         )
     }
 
@@ -168,11 +189,5 @@ extension RequestMethod {
 public extension ParsedUrl {
     static func from(url: URL) throws -> ParsedUrl {
         try parse(input: url.absoluteString)
-    }
-}
-
-class NoopAppNotifier: @unchecked Sendable, WpAppNotifier {
-    func requestedWithInvalidAuthentication() async {
-        // Do nothing.
     }
 }

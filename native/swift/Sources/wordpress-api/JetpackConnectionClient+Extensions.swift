@@ -10,7 +10,8 @@ extension JetpackConnectionClient {
         apiRootUrl: ParsedUrl,
         urlSession: URLSession,
         authentication: WpAuthentication,
-        middlewarePipeline: MiddlewarePipeline = .default
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
     ) {
         self.init(
             apiRootUrl: apiRootUrl,
@@ -18,7 +19,7 @@ extension JetpackConnectionClient {
                 authProvider: .staticWithAuth(auth: authentication),
                 requestExecutor: WpRequestExecutor(urlSession: urlSession),
                 middlewarePipeline: middlewarePipeline,
-                appNotifier: NoopAppNotifier()
+                appNotifier: appNotifier ?? EmptyAppNotifier()
             )
         )
     }
