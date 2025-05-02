@@ -34,7 +34,8 @@ public actor WordPressAPI {
         urlSession: URLSession,
         apiRootUrl: ParsedUrl,
         authenticationProvider: WpAuthenticationProvider,
-        middlewarePipeline: MiddlewarePipeline = .default
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
     ) {
         self.init(
             apiRootUrl: apiRootUrl,
@@ -48,21 +49,19 @@ public actor WordPressAPI {
         apiRootUrl: ParsedUrl,
         authenticationProvider: WpAuthenticationProvider,
         executor: SafeRequestExecutor,
-        middlewarePipeline: MiddlewarePipeline
+        middlewarePipeline: MiddlewarePipeline,
+        appNotifier: WpAppNotifier? = nil
     ) {
-        let notifier = AppNotifier()
         self.apiClientDelegate = WpApiClientDelegate(
             authProvider: authenticationProvider,
             requestExecutor: executor,
             middlewarePipeline: middlewarePipeline,
-            appNotifier: notifier
+            appNotifier: appNotifier ?? EmptyAppNotifier()
         )
         self.requestBuilder = UniffiWpApiClient(
             apiRootUrl: apiRootUrl,
             delegate: self.apiClientDelegate
         )
-
-        notifier.api = self
     }
 
     public var users: UsersRequestExecutor {
