@@ -20,7 +20,7 @@ extension WordPressAPI {
             return WordPressAPI(
                urlSession: .shared,
                apiRootUrl: apiRootUrl,
-               authenticationStategy: loginCredentials
+               authentication: loginCredentials
            )
         }
     }
