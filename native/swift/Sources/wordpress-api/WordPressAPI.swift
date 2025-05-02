@@ -18,13 +18,15 @@ public actor WordPressAPI {
         urlSession: URLSession,
         apiRootUrl: ParsedUrl,
         authentication: WpAuthentication,
-        middlewarePipeline: MiddlewarePipeline = .default
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
     ) {
         self.init(
             apiRootUrl: apiRootUrl,
             authenticationProvider: .staticWithAuth(auth: authentication),
             executor: WpRequestExecutor(urlSession: urlSession),
-            middlewarePipeline: middlewarePipeline
+            middlewarePipeline: middlewarePipeline,
+            appNotifier: appNotifier
         )
     }
 
@@ -39,7 +41,8 @@ public actor WordPressAPI {
             apiRootUrl: apiRootUrl,
             authenticationProvider: authenticationProvider,
             executor: WpRequestExecutor(urlSession: urlSession),
-            middlewarePipeline: middlewarePipeline
+            middlewarePipeline: middlewarePipeline,
+            appNotifier: appNotifier
         )
     }
 
@@ -48,7 +51,7 @@ public actor WordPressAPI {
         authenticationProvider: WpAuthenticationProvider,
         executor: SafeRequestExecutor,
         middlewarePipeline: MiddlewarePipeline,
-        appNotifier: WpAppNotifier? = nil
+        appNotifier: WpAppNotifier?
     ) {
         self.apiClientDelegate = WpApiClientDelegate(
             authProvider: authenticationProvider,
