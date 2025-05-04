@@ -42,7 +42,8 @@ struct UsersTests {
             apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
             authenticationProvider: .none(),
             executor: stubs,
-            middlewarePipeline: .default
+            middlewarePipeline: .default,
+            appNotifier: nil
         )
         let user = try await api.users.retrieveWithViewContext(userId: 1)
         #expect(user.data.name == "User Name")
