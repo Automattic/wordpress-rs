@@ -37,45 +37,56 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
-            var urlrequest = request.asURLRequest()
-
-            // Set the user agent before `additionalHttpHeadersForAllRequests` so that it can be overridden that way
-            urlrequest.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
-
-            for (key, value) in additionalHttpHeadersForAllRequests {
-                urlrequest.addValue(value, forHTTPHeaderField: key)
-            }
-
-            let (data, response) = try await self.fetch(request: urlrequest)
-
+            let (data, response) = try await self.fetch(request: self.preflight(request.asURLRequest()))
             return .success(try WpNetworkResponse(data: data, request: request, response: response))
         } catch {
-            if errorIsHttpsError(error) {
-                return handleHttpsError(error, for: request)
-            }
-
-            if errorIsNonExistentSiteError(error) {
-                return handleNonExistentSiteError(error, for: request)
-            }
-
-            if errorIsDeviceIsOffline(error) {
-                return handleDeviceIsOfflineError(error)
-            }
-
-            return .failure(.RequestExecutionFailed(
-                statusCode: nil,
-                redirects: nil,
-                reason: .genericError(errorMessage: error.localizedDescription)
-            ))
-       }
+            return self.handleRequestError(error, request: request)
+        }
     }
 
-    private func fetch(request: URLRequest) async throws -> (Data, URLResponse) {
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+        let urlrequest = try await mediaUploadRequest.asUrlRequest()
+        let (_, response) = try await self.fetch(request: self.preflight(urlrequest))
+        return try WpNetworkResponse(mediaUploadRequest: mediaUploadRequest, response: response)
+    }
+
+    private func fetch(request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         #if os(Linux)
-        return try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            preconditionFailure("Unable to convert URLSession response to HTTPURLResponse")
+        }
+        return (data, httpResponse)
         #else
-        return try await session.data(for: request, delegate: executorDelegate)
+        let (data, response) = try await session.data(for: request, delegate: executorDelegate)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            preconditionFailure("Unable to convert URLSession response to HTTPURLResponse")
+        }
+        return (data, httpResponse)
         #endif
+    }
+
+    private func handleRequestError(
+        _ error: Error,
+        request: WpNetworkRequest
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        if errorIsHttpsError(error) {
+            return handleHttpsError(error, for: request)
+        }
+
+        if errorIsNonExistentSiteError(error) {
+            return handleNonExistentSiteError(error, for: request)
+        }
+
+        if errorIsDeviceIsOffline(error) {
+            return handleDeviceIsOfflineError(error)
+        }
+
+        return .failure(.RequestExecutionFailed(
+            statusCode: nil,
+            redirects: nil,
+            reason: .genericError(errorMessage: error.localizedDescription)
+        ))
     }
 
     private func handleHttpsError(
@@ -124,8 +135,17 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
-    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        preconditionFailure("Not implemented yet")
+    private func preflight(_ request: URLRequest) -> URLRequest {
+        var mutableCopy = request
+
+        // Set the user agent before `additionalHttpHeadersForAllRequests` so that it can be overridden that way
+        mutableCopy.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
+
+        for (key, value) in additionalHttpHeadersForAllRequests {
+            mutableCopy.addValue(value, forHTTPHeaderField: key)
+        }
+
+        return mutableCopy
     }
 
     public func sleep(millis: UInt64) async {
