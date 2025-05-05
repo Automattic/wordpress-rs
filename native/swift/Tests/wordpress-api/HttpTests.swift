@@ -12,7 +12,8 @@ class HTTPErrorTests {
             apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
             authenticationProvider: .none(),
             executor: stubs,
-            middlewarePipeline: .default
+            middlewarePipeline: .default,
+            appNotifier: nil
         )
 
         await #expect(throws: WpApiError.self, performing: {
