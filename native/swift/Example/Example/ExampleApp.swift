@@ -58,6 +58,9 @@ struct ExampleApp: App {
         })
     ]
 
+    @State
+    var isFileImporterDisplayed: Bool = false
+
     var body: some Scene {
         WindowGroup {
             if loginManager.isLoggedIn {
@@ -72,6 +75,17 @@ struct ExampleApp: App {
                     Text("Select a category of settings in the sidebar.")
                 }.toolbar(content: {
                     #if os(macOS)
+                    ToolbarItem {
+                        Menu {
+                            Button("Create Media") {
+                                self.isFileImporterDisplayed = true
+                            }
+                        } label: {
+                            Button("Add", systemImage: "plus") { }
+                        }
+                    }
+
+
                     ToolbarItem {
                         Button("Log Out") {
                             Task {
@@ -89,10 +103,42 @@ struct ExampleApp: App {
                     }
                     #endif
                 })
+                .fileImporter(isPresented: $isFileImporterDisplayed, allowedContentTypes: [
+                    .image
+                ], onCompletion: self.uploadMedia)
             } else {
                 LoginView()
             }
         }
         .environmentObject(loginManager)
+        
+    }
+
+    private func uploadMedia(_ result: Result<URL, Error>) {
+
+        Task {
+            do {
+                let url = try result.get()
+                let mediaId = UUID().uuidString
+                let params = MediaCreateParams(dateGmt: .now, slug: mediaId, status: .publish, title: mediaId, altText: "Alt Text", caption: "caption", description: "description!")
+
+                let securityScope = url.startAccessingSecurityScopedResource()
+
+                defer {
+                    if securityScope {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                let uploadRequest = try await WordPressAPI.globalInstance
+                    .media
+                    .create(params: params, filePath: url.path, fileContentType: "image/png")
+
+                //                debugPrint(uploadRequest.data)
+
+            } catch {
+                debugPrint(error.localizedDescription)
+            }
+        }
     }
 }

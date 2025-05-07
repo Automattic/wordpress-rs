@@ -22,9 +22,9 @@ extension WpNetworkResponse {
         )
     }
 
-    init(mediaUploadRequest: MediaUploadRequest, response: HTTPURLResponse) throws {
+    init(mediaUploadRequest: MediaUploadRequest, data: Data, response: HTTPURLResponse) throws {
         self = WpNetworkResponse(
-            body: Data(),
+            body: data,
             statusCode: UInt16(response.statusCode),
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
             requestUrl: mediaUploadRequest.url(),
@@ -51,19 +51,39 @@ extension MediaUploadRequest {
 
     func asUrlRequest() async throws -> URLRequest {
         let multipartRequestBody = try await MultipartRequestBody(parts: [
+            HttpPart.formData(data: self.mediaParams()),
             HttpPart.file(name: filename, filePath: filePath, mimeType: self.fileContentType())
         ]).build()
 
-        var request = try URLRequest(url: self.url().asUrl())
-        request.allHTTPHeaderFields = self.headerMap().toFlatMap()
-        request.httpBodyStream = InputStream(url: multipartRequestBody)
+        var fileRequest = try URLRequest(url: self.url().asUrl())
+        fileRequest.httpMethod = self.method().rawValue
+        fileRequest.httpBodyStream = InputStream(url: filePath)
 
-        return request
+        fileRequest.setHeaders(self.headerMap().toFlatMap())
+        fileRequest.setValue("attachment; filename=test-1.jpg", forHTTPHeaderField: "Content-Disposition")
+        if let fileSize = try? self.calculateFileSize(for: filePath) {
+            fileRequest.setValue(String(fileSize), forHTTPHeaderField: "Content-Length")
+        }
+        fileRequest.setValue("foo", forHTTPHeaderField: "X-REQUEST-ID") // TODO: There should be a requestID for this
+
+        return fileRequest
+    }
+
+    private func calculateFileSize(for url: URL) throws -> Int? {
+        try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
     }
 }
 
 enum WpEndpointUrlError: Error {
     case invalidUrlString
+}
+
+extension URLRequest {
+    mutating func setHeaders(_ headers: [String: String]) {
+        for (key, value) in headers {
+            setValue(value, forHTTPHeaderField: key)
+        }
+    }
 }
 
 extension WpEndpointUrl {

@@ -61,13 +61,13 @@ struct MultipartRequestBody {
 
 enum HttpPart {
 
-    case formData(name: String, data: [String: String])
+    case formData(data: [String: String])
     case file(name: String, filePath: URL, mimeType: String)
 
     var httpHeaders: [String: String] {
         return switch self {
-        case .formData(let name, _): [
-            "Content-Disposition": "form-data; name=\"\(name)\""
+        case .formData(_): [
+            "Content-Disposition": "form-data;"
         ]
         case .file(let name, let fileName, let mimeType): [
             "Content-Disposition": "form-data; name=\"\(name)\"; filename=\"\(fileName.lastPathComponent)\"",
@@ -90,7 +90,7 @@ enum HttpPart {
 
     func readData() -> AsyncThrowingStream<Data, Error> {
         switch self {
-        case .formData(name: _, data: let data):
+        case .formData(data: let data):
                 return AsyncThrowingStream {
                     $0.yield(convertToFormData(data))
                     $0.finish()

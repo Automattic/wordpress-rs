@@ -45,9 +45,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        let urlrequest = try await mediaUploadRequest.asUrlRequest()
-        let (_, response) = try await self.fetch(request: self.preflight(urlrequest))
-        return try WpNetworkResponse(mediaUploadRequest: mediaUploadRequest, response: response)
+        do {
+            let request = try await mediaUploadRequest.asUrlRequest()
+            let (data, response) = try await self.fetch(request: self.preflight(request))
+            return try WpNetworkResponse(mediaUploadRequest: mediaUploadRequest, data: data, response: response)
+        } catch {
+            debugPrint(error)
+            throw error
+        }
     }
 
     private func fetch(request: URLRequest) async throws -> (Data, HTTPURLResponse) {
@@ -217,6 +222,7 @@ final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecke
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
+    private var uploadProgress: [String: Double] = [:]
 
     init(redirects: [String: [WpRedirect]] = [:]) {
         self.redirects = redirects
@@ -255,6 +261,26 @@ final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecke
         }
 
         return request
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        guard let requestID = task.originalRequest?.requestId else {
+            return
+        }
+
+        lock.withLock {
+            self.uploadProgress[requestID] = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        guard let requestID = task.originalRequest?.requestId else {
+            return
+        }
+
+        lock.withLock {
+            self.uploadProgress[requestID] = 1.0
+        }
     }
 }
 

@@ -104,10 +104,12 @@ public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal
 // MARK: - Media
 public typealias SparseMedia = WordPressAPIInternal.SparseMedia
 public typealias MediaUploadRequest = WordPressAPIInternal.MediaUploadRequest
+public typealias MediaRequestCreateResponse = WordPressAPIInternal.MediaRequestCreateResponse
 public typealias MediaWithEditContext = WordPressAPIInternal.MediaWithEditContext
 public typealias MediaWithViewContext = WordPressAPIInternal.MediaWithViewContext
 public typealias MediaWithEmbedContext = WordPressAPIInternal.MediaWithEmbedContext
 public typealias MediaListParams = WordPressAPIInternal.MediaListParams
+public typealias MediaCreateParams = WordPressAPIInternal.MediaCreateParams
 public typealias MediaRequestExecutor = WordPressAPIInternal.MediaRequestExecutor
 
 public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.MediaRequestListWithEditContextResponse
