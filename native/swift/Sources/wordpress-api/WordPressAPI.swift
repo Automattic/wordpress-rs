@@ -130,6 +130,8 @@ public actor WordPressAPI {
 
         let cancellable = requestExecutor.progress(forRequestWithId: requestId.uuidString())
             .flatMap { $0.publisher(for: \.fractionCompleted, options: .new) }
+            // The apps expect progress to be updated on the main thread. We probably should look into
+            // refactoring this part (starting from the app side).
             .receive(on: DispatchQueue.main)
             .sink { [weak progress] fraction in
                 guard let progress else { return }
