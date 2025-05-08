@@ -111,16 +111,6 @@ public extension WpNetworkHeaderMap {
 
 public extension WpNetworkRequest {
 
-    func asURLRequest() -> URLRequest {
-        let url = URL(string: self.url())!
-        var request = URLRequest(url: url)
-        request.httpMethod = self.method().rawValue
-        request.allHTTPHeaderFields = self.headerMap().toFlatMap()
-        request.allHTTPHeaderFields?["X-REQUEST-ID"] = self.requestId()
-        request.httpBody = self.body()?.contents()
-        return request
-    }
-
     #if DEBUG
     func debugPrint() {
         print("\(method().rawValue) \(self.url())")

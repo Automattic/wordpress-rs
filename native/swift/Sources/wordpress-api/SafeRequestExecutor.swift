@@ -7,11 +7,17 @@ import FoundationNetworking
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
+    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 }
 
 extension SafeRequestExecutor {
     public func execute(request: WpNetworkRequest) async throws -> WpNetworkResponse {
         let result = await execute(request)
+        return try result.get()
+    }
+
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+        let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest)
         return try result.get()
     }
 }
@@ -36,8 +42,16 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+        await perform(request)
+    }
+
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+        await perform(mediaUploadRequest)
+    }
+
+    func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
-            var urlrequest = request.asURLRequest()
+            var urlrequest = try request.buildURLRequest()
 
             // Set the user agent before `additionalHttpHeadersForAllRequests` so that it can be overridden that way
             urlrequest.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
@@ -80,7 +94,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     private func handleHttpsError(
         _ error: Error,
-        for request: WpNetworkRequest
+        for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
 
         guard
@@ -101,7 +115,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
              redirects: executorDelegate.redirects(for: request.requestId()),
              reason: RequestExecutionErrorReason.invalidSslError(
                 reason: .certificateNotValidForName(
-                    hostname: request.asURLRequest().url?.host ?? "unknown host",
+                    hostname: URL(string: request.url())?.host ?? "unknown host",
                     presentedHostnames: [siteCertificate.commonName()]
                 )
              )
@@ -110,7 +124,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     func handleNonExistentSiteError(
         _ error: Error,
-        for request: WpNetworkRequest
+        for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         .failure(
             .RequestExecutionFailed(
@@ -122,10 +136,6 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 )
             )
         )
-    }
-
-    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        preconditionFailure("Not implemented yet")
     }
 
     public func sleep(millis: UInt64) async {
@@ -242,4 +252,52 @@ extension URLRequest {
     var requestId: String? {
         allHTTPHeaderFields?["X-REQUEST-ID"]
     }
+}
+
+protocol NetworkRequestContent {
+    func requestId() -> String
+    func method() -> RequestMethod
+    func url() -> WpEndpointUrl
+    func headerMap() -> WpNetworkHeaderMap
+    func encodeBody(into request: inout URLRequest) throws
+}
+
+extension NetworkRequestContent {
+    func buildURLRequest() throws -> URLRequest {
+        let url = URL(string: self.url())!
+        var request = URLRequest(url: url)
+        request.httpMethod = self.method().rawValue
+        request.allHTTPHeaderFields = self.headerMap().toFlatMap()
+        request.allHTTPHeaderFields?["X-REQUEST-ID"] = self.requestId()
+        try self.encodeBody(into: &request)
+        return request
+    }
+}
+
+extension WpNetworkRequest: NetworkRequestContent {
+
+    func encodeBody(into request: inout URLRequest) throws {
+        if let body = self.body()?.contents() {
+            request.httpBody = body
+        }
+    }
+
+}
+
+extension MediaUploadRequest: NetworkRequestContent {
+
+    func encodeBody(into request: inout URLRequest) throws {
+        var form = [MultipartFormField]()
+        for (name, value) in mediaParams() {
+            form.append(.init(text: value, name: name))
+        }
+        try form.append(.init(fileAtPath: filePath(), name: "file"))
+
+        let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
+        request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
+        request.httpBodyStream = try form
+            .multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+            .asInputStream()
+    }
+
 }
