@@ -10,7 +10,7 @@ use wp_api::{
     auth::WpAuthenticationProvider,
     middleware::WpApiMiddlewarePipeline,
     request::{
-        NetworkRequestDescriptor, RequestExecutor, WpNetworkRequest, WpNetworkResponse,
+        NetworkRequestAccessor, RequestExecutor, WpNetworkRequest, WpNetworkResponse,
         endpoint::media_endpoint::MediaUploadRequest,
     },
     reqwest_request_executor::ReqwestRequestExecutor,

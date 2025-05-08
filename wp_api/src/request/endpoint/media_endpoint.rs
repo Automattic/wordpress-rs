@@ -9,7 +9,7 @@ use crate::{
         SparseMediaFieldWithViewContext,
     },
     request::{
-        CONTENT_TYPE_MULTIPART, NetworkRequestDescriptor, ParsedResponse, RequestMethod,
+        CONTENT_TYPE_MULTIPART, NetworkRequestAccessor, ParsedResponse, RequestMethod,
         WpNetworkHeaderMap, WpNetworkResponse,
     },
 };
@@ -170,7 +170,7 @@ impl std::fmt::Debug for MediaUploadRequest {
 }
 
 #[uniffi::export]
-impl NetworkRequestDescriptor for MediaUploadRequest {
+impl NetworkRequestAccessor for MediaUploadRequest {
     fn request_id(&self) -> String {
         self.uuid.clone()
     }

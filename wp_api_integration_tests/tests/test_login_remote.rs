@@ -14,7 +14,7 @@ use wp_api::{
         ApiDiscoveryAuthenticationMiddleware, RetryAfterMiddleware, WpApiMiddleware,
         WpApiMiddlewarePipeline,
     },
-    request::{NetworkRequestDescriptor, RequestExecutor},
+    request::{NetworkRequestAccessor, RequestExecutor},
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 use wp_api_integration_tests::mock::{MockExecutor, response_helpers};

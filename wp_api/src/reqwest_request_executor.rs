@@ -2,7 +2,7 @@ use crate::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
     api_error::InvalidSslErrorReason,
     request::{
-        NetworkRequestDescriptor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
+        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
         user_agent,
     },

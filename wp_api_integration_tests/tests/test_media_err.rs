@@ -10,7 +10,7 @@ use wp_api::{
     middleware::WpApiMiddlewarePipeline,
     posts::WpApiParamPostsOrderBy,
     request::{
-        NetworkRequestDescriptor, RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest,
+        NetworkRequestAccessor, RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest,
         WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
     },
     reqwest_request_executor::ReqwestRequestExecutor,

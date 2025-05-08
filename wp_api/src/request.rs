@@ -264,7 +264,7 @@ impl Debug for WpNetworkRequest {
 
 /// Unique identifier for this request – used for external record-keeping
 #[uniffi::export(with_foreign)]
-pub trait NetworkRequestDescriptor: Send + Sync {
+pub trait NetworkRequestAccessor: Send + Sync {
     fn request_id(&self) -> String;
     fn method(&self) -> RequestMethod;
     fn url(&self) -> WpEndpointUrl;
@@ -272,7 +272,7 @@ pub trait NetworkRequestDescriptor: Send + Sync {
 }
 
 #[uniffi::export]
-impl NetworkRequestDescriptor for WpNetworkRequest {
+impl NetworkRequestAccessor for WpNetworkRequest {
     fn request_id(&self) -> String {
         self.uuid.clone()
     }
