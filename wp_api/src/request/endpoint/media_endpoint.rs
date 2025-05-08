@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
-    SparseField,
+    SparseField, WpUuid,
     media::{
         MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
@@ -14,7 +14,6 @@ use crate::{
     },
 };
 use http::HeaderValue;
-use uuid::Uuid;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -195,6 +194,7 @@ impl MediaRequestBuilder {
         params: MediaCreateParams,
         file_path: String,
         file_content_type: String,
+        request_id: Option<Arc<WpUuid>>,
     ) -> MediaUploadRequest {
         let mut header_map = self.inner.header_map();
         header_map.inner.insert(
@@ -202,7 +202,7 @@ impl MediaRequestBuilder {
             HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
         );
         MediaUploadRequest {
-            uuid: Uuid::new_v4().into(),
+            uuid: request_id.unwrap_or_default().uuid_string(),
             method: RequestMethod::POST,
             url: self.endpoint.create().into(),
             header_map: header_map.into(),
@@ -220,10 +220,11 @@ impl MediaRequestExecutor {
         params: MediaCreateParams,
         file_path: String,
         file_content_type: String,
+        request_id: Option<Arc<WpUuid>>,
     ) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
         let request = self
             .request_builder
-            .create(params, file_path, file_content_type);
+            .create(params, file_path, file_content_type, request_id);
         self.delegate
             .request_executor
             .upload_media(Arc::new(request))
