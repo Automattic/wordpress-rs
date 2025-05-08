@@ -891,7 +891,7 @@ dependencies = [
  "atomic 0.6.0",
  "pear",
  "serde",
- "toml 0.8.20",
+ "toml 0.8.22",
  "uncased",
  "version_check",
 ]
@@ -3838,9 +3838,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.20"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd87a5cdd6ffab733b2f74bc4fd7ee5fff6634124999ac278c35fc78c6120148"
+checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -3984,7 +3984,7 @@ dependencies = [
  "serde_json",
  "target-triple",
  "termcolor",
- "toml 0.8.20",
+ "toml 0.8.22",
 ]
 
 [[package]]
@@ -4966,7 +4966,7 @@ dependencies = [
  "strum_macros",
  "syn",
  "thiserror 2.0.12",
- "toml 0.8.20",
+ "toml 0.8.22",
  "trybuild",
  "uniffi",
  "url",
