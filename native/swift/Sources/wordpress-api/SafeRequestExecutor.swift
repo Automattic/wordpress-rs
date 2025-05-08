@@ -253,6 +253,10 @@ final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecke
         }
     }
 
+    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+        NotificationCenter.default.post(name: RequestExecutorDelegate.didCreateTaskNotification, object: task)
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
