@@ -5,11 +5,20 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
+#if canImport(Combine)
+import Combine
+#endif
+
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
     func uploadMedia(
         mediaUploadRequest: MediaUploadRequest
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
+
+#if PROGRESS_REPORTING_ENABLED
+    /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task for the given `requestId`.
+    func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never>
+#endif
 }
 
 extension SafeRequestExecutor {
@@ -105,6 +114,16 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         return try await session.data(for: request, delegate: executorDelegate)
         #endif
     }
+
+#if PROGRESS_REPORTING_ENABLED
+    public func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never> {
+        NotificationCenter.default.publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
+            .compactMap { $0.object as? URLSessionTask }
+            .first { $0.originalRequest?.requestId == requestId }
+            .map { $0.progress }
+            .eraseToAnyPublisher()
+    }
+#endif
 
     private func handleHttpsError(
         _ error: Error,
@@ -219,6 +238,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
 final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
+    fileprivate static let didCreateTaskNotification = Notification.Name("RequestExecutorDelegate.didCreateTaskNotification")
+
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
 
@@ -262,9 +283,11 @@ final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecke
     }
 }
 
+private let requestIdHeaderName = "X-REQUEST-ID"
+
 extension URLRequest {
     var requestId: String? {
-        allHTTPHeaderFields?["X-REQUEST-ID"]
+        allHTTPHeaderFields?[requestIdHeaderName]
     }
 }
 
@@ -282,7 +305,7 @@ extension NetworkRequestContent {
         var request = URLRequest(url: url)
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
-        request.allHTTPHeaderFields?["X-REQUEST-ID"] = self.requestId()
+        request.allHTTPHeaderFields?[requestIdHeaderName] = self.requestId()
         try self.encodeBody(into: &request)
         return request
     }

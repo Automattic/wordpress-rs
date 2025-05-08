@@ -40,6 +40,7 @@ var package = Package(
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
@@ -63,7 +64,10 @@ var package = Package(
                 .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api",
-            resources: [.copy("../../../../test-data/integration-test-responses/")]
+            resources: [.copy("../../../../test-data/integration-test-responses/")],
+            swiftSettings: [
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+            ]
         )
     ]
 )
