@@ -142,7 +142,12 @@ public actor WordPressAPI {
         }
 
         let uploadTask = Task {
-            try await media.create(params: params, filePath: localFileURL.path, fileContentType: fileContentType, requestId: requestId)
+            try await media.create(
+                params: params,
+                filePath: localFileURL.path,
+                fileContentType: fileContentType,
+                requestId: requestId
+            )
         }
 
         if progress.cancellationHandler == nil {

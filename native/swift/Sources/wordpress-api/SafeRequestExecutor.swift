@@ -16,7 +16,8 @@ public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
 
 #if PROGRESS_REPORTING_ENABLED
-    /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task for the given `requestId`.
+    /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task
+    /// for the given `requestId`.
     func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never>
 #endif
 }
@@ -233,9 +234,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 }
 
-final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
 
-    fileprivate static let didCreateTaskNotification = Notification.Name("RequestExecutorDelegate.didCreateTaskNotification")
+    static let didCreateTaskNotification = Notification.Name("RequestExecutorDelegate.didCreateTaskNotification")
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
@@ -366,7 +367,6 @@ extension MediaUploadRequest: NetworkRequestContent {
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
         let body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
-
 
         #if os(Linux)
         switch body {
