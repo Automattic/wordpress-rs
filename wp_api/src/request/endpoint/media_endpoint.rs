@@ -9,11 +9,12 @@ use crate::{
         SparseMediaFieldWithViewContext,
     },
     request::{
-        CONTENT_TYPE_MULTIPART, ParsedResponse, RequestMethod, WpNetworkHeaderMap,
-        WpNetworkResponse,
+        CONTENT_TYPE_MULTIPART, HasNetworkRequestId, ParsedResponse, RequestMethod,
+        WpNetworkHeaderMap, WpNetworkResponse,
     },
 };
 use http::HeaderValue;
+use uuid::Uuid;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -119,6 +120,7 @@ fn parse_as_media_request_create_response(
 
 #[derive(uniffi::Object)]
 pub struct MediaUploadRequest {
+    pub(crate) uuid: String,
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
@@ -180,6 +182,13 @@ impl std::fmt::Debug for MediaUploadRequest {
 }
 
 #[uniffi::export]
+impl HasNetworkRequestId for MediaUploadRequest {
+    fn request_id(&self) -> String {
+        self.uuid.clone()
+    }
+}
+
+#[uniffi::export]
 impl MediaRequestBuilder {
     pub fn create(
         &self,
@@ -193,6 +202,7 @@ impl MediaRequestBuilder {
             HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
         );
         MediaUploadRequest {
+            uuid: Uuid::new_v4().into(),
             method: RequestMethod::POST,
             url: self.endpoint.create().into(),
             header_map: header_map.into(),

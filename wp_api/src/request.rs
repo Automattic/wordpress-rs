@@ -173,11 +173,6 @@ pub struct WpNetworkRequest {
 
 #[uniffi::export]
 impl WpNetworkRequest {
-    /// Unique identifier for this request – used for external record-keeping
-    pub fn request_id(&self) -> String {
-        self.uuid.clone()
-    }
-
     /// Clones the request and increments the retry count
     pub fn clone_with_incremented_retry_count(&self) -> Self {
         Self {
@@ -276,6 +271,19 @@ impl Debug for WpNetworkRequest {
         );
         s.pop(); // Remove the new line at the end
         write!(f, "{}", s)
+    }
+}
+
+/// Unique identifier for this request – used for external record-keeping
+#[uniffi::export(with_foreign)]
+pub trait HasNetworkRequestId: Send + Sync {
+    fn request_id(&self) -> String;
+}
+
+#[uniffi::export]
+impl HasNetworkRequestId for WpNetworkRequest {
+    fn request_id(&self) -> String {
+        self.uuid.clone()
     }
 }
 
