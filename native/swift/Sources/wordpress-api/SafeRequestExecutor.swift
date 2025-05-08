@@ -45,7 +45,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         await perform(request)
     }
 
-    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    public func uploadMedia(
+        mediaUploadRequest: MediaUploadRequest
+    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         await perform(mediaUploadRequest)
     }
 
