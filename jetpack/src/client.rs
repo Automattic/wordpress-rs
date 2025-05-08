@@ -1,4 +1,6 @@
-use super::endpoint::connection_endpoint::{ConnectionRequestBuilder, ConnectionRequestExecutor};
+use super::endpoint::connection_endpoint::{
+    JpConnectionRequestBuilder, JpConnectionRequestExecutor,
+};
 use std::sync::Arc;
 use wp_api::{
     ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
@@ -21,13 +23,13 @@ impl UniffiJetpackApiRequestBuilder {
 }
 
 pub struct JetpackApiRequestBuilder {
-    connection: Arc<ConnectionRequestBuilder>,
+    jp_connection: Arc<JpConnectionRequestBuilder>,
 }
 
 impl JetpackApiRequestBuilder {
     pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            connection: ConnectionRequestBuilder::new(api_root_url, auth_provider).into(),
+            jp_connection: JpConnectionRequestBuilder::new(api_root_url, auth_provider).into(),
         }
     }
 }
@@ -48,7 +50,7 @@ impl UniffiJetpackApiClient {
 }
 
 pub struct JetpackApiClient {
-    pub connection: Arc<ConnectionRequestExecutor>,
+    pub jp_connection: Arc<JpConnectionRequestExecutor>,
 }
 
 impl JetpackApiClient {
@@ -56,8 +58,8 @@ impl JetpackApiClient {
         api_client_generate_api_client!(
             api_root_url,
             delegate;
-            connection
+            jp_connection
         )
     }
 }
-api_client_generate_endpoint_impl!(JetpackApi, connection);
+api_client_generate_endpoint_impl!(JetpackApi, jp_connection);

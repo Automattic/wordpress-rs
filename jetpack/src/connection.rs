@@ -104,8 +104,8 @@ impl JetpackConnectionClient {
     pub async fn status(&self) -> Result<JetpackConnectionStatus, JetpackConnectionClientError> {
         let info = self
             .jetpack_client
-            .connection()
-            .connection()
+            .jp_connection()
+            .jp_connection()
             .await
             .map_err(JetpackConnectionClientError::Unhandled)?;
         if !info.data.is_active {
@@ -114,7 +114,7 @@ impl JetpackConnectionClient {
 
         let status = self
             .jetpack_client
-            .connection()
+            .jp_connection()
             .connection_data()
             .await
             .map_err(JetpackConnectionClientError::Unhandled)?;
@@ -150,7 +150,7 @@ impl JetpackConnectionClient {
         };
         let result = self
             .jetpack_client
-            .connection()
+            .jp_connection()
             .register(&params)
             .await
             .map_err(JetpackConnectionClientError::Unhandled)?;
@@ -174,7 +174,7 @@ impl JetpackConnectionClient {
 
         let provision_info = self
             .jetpack_client
-            .connection()
+            .jp_connection()
             .remote_provision(&JetpackRemoteProvisionParams {})
             .await
             .map_err(JetpackConnectionClientError::Unhandled)?
@@ -216,7 +216,7 @@ impl JetpackConnectionClient {
             Ok(blog_id)
         } else {
             Err(JetpackConnectionClientError::UserConnectionFailed {
-                message: result.message,
+                err_message: result.message,
             })
         }
     }
@@ -238,8 +238,8 @@ pub enum JetpackConnectionStatus {
 pub enum JetpackConnectionClientError {
     #[error("Can't find blog id")]
     BlogIdMissing { url: String },
-    #[error("Failed to connect to WordPress.com: {message}")]
-    UserConnectionFailed { message: String },
+    #[error("Failed to connect to WordPress.com: {err_message}")]
+    UserConnectionFailed { err_message: String },
     #[error("Unhandled error: {0}")]
     Unhandled(WpApiError),
 }
