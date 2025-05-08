@@ -73,17 +73,21 @@ struct MultipartFormField {
 }
 
 extension Array where Element == MultipartFormField {
-    private func multipartFormDestination(forceWriteToFile: Bool) throws -> (outputStream: OutputStream, tempFilePath: String?) {
+    private func multipartFormDestination(
+        forceWriteToFile: Bool
+    ) throws -> (outputStream: OutputStream, tempFilePath: String?) {
         let dest: OutputStream
         let tempFilePath: String?
 
-        // Build the form data in memory if the content is estimated to be less than 10 MB. Otherwise, use a temporary file.
+        // Build the form data in memory if the content is estimated to be less than 10 MB.
+        // Otherwise, use a temporary file.
         let thresholdBytesForUsingTmpFile = 10_000_000
         let estimatedFormDataBytes = reduce(0) { $0 + $1.bytes }
         if forceWriteToFile || estimatedFormDataBytes > thresholdBytesForUsingTmpFile {
             let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
             guard let stream = OutputStream(toFileAtPath: tempFile, append: false) else {
-                // This error should never occurr, because the `tempFile` is in a temporary directory and is guranteed to be writable.
+                // This error should never occurr, because the `tempFile` is in a temporary directory
+                // and is guranteed to be writable.
                 throw MultipartFormError.impossible
             }
             dest = stream
