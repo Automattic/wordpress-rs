@@ -39,8 +39,6 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     private let additionalHttpHeadersForAllRequests: [String: String]
 
-    private let userAgent: String
-
     public init(
         urlSession: URLSession,
         additionalHttpHeadersForAllRequests: [String: String] = [:],
@@ -48,8 +46,12 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     ) {
         self.session = urlSession
         self.executorDelegate = RequestExecutorDelegate()
-        self.userAgent = userAgent
-        self.additionalHttpHeadersForAllRequests = additionalHttpHeadersForAllRequests
+
+        var headers = additionalHttpHeadersForAllRequests
+        if !headers.contains(where: { $0.key.caseInsensitiveCompare("User-Agent") == .orderedSame }) {
+            headers["User-Agent"] = userAgent
+        }
+        self.additionalHttpHeadersForAllRequests = headers
     }
 
     public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -74,16 +76,11 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
-            var urlrequest = try request.buildURLRequest()
-
-            // Set the user agent before `additionalHttpHeadersForAllRequests` so that it can be overridden that way
-            urlrequest.setValue(self.userAgent, forHTTPHeaderField: "User-Agent")
-
-            for (key, value) in additionalHttpHeadersForAllRequests {
-                urlrequest.addValue(value, forHTTPHeaderField: key)
-            }
-
-            let (data, response) = try await self.fetch(request: urlrequest)
+            let (data, response) = try await request.perform(
+                in: session,
+                withAdditionalHeaders: self.additionalHttpHeadersForAllRequests,
+                delegate: executorDelegate
+            )
 
             return .success(try WpNetworkResponse(data: data, request: request, response: response))
         } catch {
@@ -301,15 +298,24 @@ protocol NetworkRequestContent {
     func url() -> WpEndpointUrl
     func headerMap() -> WpNetworkHeaderMap
     func encodeBody(into request: inout URLRequest) throws
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders: [String: String],
+        delegate: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse)
 }
 
 extension NetworkRequestContent {
-    func buildURLRequest() throws -> URLRequest {
+    func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
         let url = URL(string: self.url())!
         var request = URLRequest(url: url)
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
         request.allHTTPHeaderFields?[requestIdHeaderName] = self.requestId()
+        for (name, value) in additionalHeaders {
+            request.addValue(value, forHTTPHeaderField: name)
+        }
         try self.encodeBody(into: &request)
         return request
     }
@@ -323,11 +329,34 @@ extension WpNetworkRequest: NetworkRequestContent {
         }
     }
 
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders headers: [String: String],
+        delegate: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        let request = try buildURLRequest(additionalHeaders: headers)
+        #if os(Linux)
+        return try await session.data(for: request)
+        #else
+        return try await session.data(for: request, delegate: delegate)
+        #endif
+    }
+
 }
 
 extension MediaUploadRequest: NetworkRequestContent {
 
     func encodeBody(into request: inout URLRequest) throws {
+        // Do nothing.
+    }
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders headers: [String: String],
+        delegate: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        var request = try buildURLRequest(additionalHeaders: headers)
+
         var form = [MultipartFormField]()
         for (name, value) in mediaParams() {
             form.append(.init(text: value, name: name))
@@ -336,9 +365,24 @@ extension MediaUploadRequest: NetworkRequestContent {
 
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
-        request.httpBodyStream = try form
-            .multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
-            .asInputStream()
+        let body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+
+
+        #if os(Linux)
+        switch body {
+        case let .inMemory(data):
+            return try await session.upload(for: request, from: data)
+        case let .onDisk(file):
+            return try await session.upload(for: request, fromFile: file)
+        }
+        #else
+        switch body {
+        case let .inMemory(data):
+            return try await session.upload(for: request, from: data, delegate: delegate)
+        case let .onDisk(file):
+            return try await session.upload(for: request, fromFile: file, delegate: delegate)
+        }
+        #endif
     }
 
 }
