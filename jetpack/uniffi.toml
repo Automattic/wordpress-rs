@@ -4,3 +4,9 @@ ffi_module_filename = "jetpack_uniffi"
 generate_module_map = false
 generate_immutable_records = true
 experimental_sendable_value_types = true
+
+[bindings.kotlin]
+android = false
+android_cleaner = false
+cdylib_name = "jetpack"
+generate_immutable_records = true

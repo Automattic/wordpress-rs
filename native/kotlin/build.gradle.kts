@@ -31,7 +31,7 @@ allprojects {
         }
 
         // Exclude generated bindings
-        exclude("**/wp_api.kt")
+        exclude("**/jetpack.kt")
         exclude("**/wp_localization.kt")
     }
 
@@ -39,7 +39,7 @@ allprojects {
         jvmTarget = "1.8"
 
         // Exclude generated bindings
-        exclude("**/wp_api.kt")
+        exclude("**/jetpack.kt")
         exclude("**/wp_localization.kt")
     }
 
@@ -51,7 +51,7 @@ allprojects {
 val cargoProjectRoot = "${project.rootDir}/../.."
 val jniLibsPath = "${layout.buildDirectory.get()}/jniLibs/"
 val generatedTestResourcesPath = "${layout.buildDirectory.get()}/generatedTestResources/"
-val rustModuleName = "wp_api"
+val rustModuleName = "jetpack"
 val nativeLibraryPath =
     "$cargoProjectRoot/target/release/lib${rustModuleName}${getNativeLibraryExtension()}"
 rootProject.ext.set("cargoProjectRoot", cargoProjectRoot)
