@@ -2,8 +2,9 @@ use crate::{
     MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
     api_error::InvalidSslErrorReason,
     request::{
-        RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-        endpoint::media_endpoint::MediaUploadRequest, user_agent,
+        NetworkRequestDescriptor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
+        WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
+        user_agent,
     },
 };
 use async_trait::async_trait;

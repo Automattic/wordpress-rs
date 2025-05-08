@@ -9,7 +9,7 @@ use crate::{
         SparseMediaFieldWithViewContext,
     },
     request::{
-        CONTENT_TYPE_MULTIPART, HasNetworkRequestId, ParsedResponse, RequestMethod,
+        CONTENT_TYPE_MULTIPART, NetworkRequestDescriptor, ParsedResponse, RequestMethod,
         WpNetworkHeaderMap, WpNetworkResponse,
     },
 };
@@ -131,18 +131,6 @@ pub struct MediaUploadRequest {
 
 #[uniffi::export]
 impl MediaUploadRequest {
-    pub fn method(&self) -> RequestMethod {
-        self.method.clone()
-    }
-
-    pub fn url(&self) -> WpEndpointUrl {
-        self.url.clone()
-    }
-
-    pub fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
-        self.header_map.clone()
-    }
-
     pub fn file_path(&self) -> String {
         self.file_path.clone()
     }
@@ -182,9 +170,21 @@ impl std::fmt::Debug for MediaUploadRequest {
 }
 
 #[uniffi::export]
-impl HasNetworkRequestId for MediaUploadRequest {
+impl NetworkRequestDescriptor for MediaUploadRequest {
     fn request_id(&self) -> String {
         self.uuid.clone()
+    }
+
+    fn method(&self) -> RequestMethod {
+        self.method.clone()
+    }
+
+    fn url(&self) -> WpEndpointUrl {
+        self.url.clone()
+    }
+
+    fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+        self.header_map.clone()
     }
 }
 
