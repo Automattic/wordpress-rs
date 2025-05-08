@@ -167,7 +167,7 @@ private extension OutputStream {
         guard count > 0 else { return }
 
         _ = data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
-            write(ptr.bindMemory(to: Int8.self).baseAddress!, maxLength: count)
+            write(ptr.bindMemory(to: UInt8.self).baseAddress!, maxLength: count)
         }
     }
 
