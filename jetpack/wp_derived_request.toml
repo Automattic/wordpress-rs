@@ -1,2 +1,0 @@
-error_type = "wp_api::WpApiError"
-delegate_type = "wp_api::WpApiClientDelegate"

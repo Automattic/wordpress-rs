@@ -1,14 +1,14 @@
-use crate::client::JetpackApiClient;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use wp_api::{
+use crate::{
     ParsedUrl, WpApiClientDelegate, WpApiError, WpErrorCode,
     auth::{WpAuthentication, WpAuthenticationProvider},
+    jetpack::client::JetpackApiClient,
     users::UserId,
+    wp_com::{
+        WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,
+    },
 };
-use wp_com::{
-    WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,
-};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct JetpackConnectionParams {

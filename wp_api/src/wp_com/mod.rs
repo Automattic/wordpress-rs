@@ -1,6 +1,6 @@
+use crate::{impl_as_query_value_for_new_type, request::endpoint::AsNamespace};
 use serde::{Deserialize, Serialize};
 use std::{num::ParseIntError, str::FromStr};
-use wp_api::{impl_as_query_value_for_new_type, request::endpoint::AsNamespace};
 
 pub mod client;
 pub mod endpoint;
@@ -36,5 +36,3 @@ impl AsNamespace for WpComNamespace {
         }
     }
 }
-
-uniffi::setup_scaffolding!();

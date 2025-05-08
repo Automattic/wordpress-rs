@@ -1,4 +1,4 @@
-use wp_api::request::endpoint::AsNamespace;
+use crate::request::endpoint::AsNamespace;
 
 pub mod client;
 pub mod connection;
@@ -11,5 +11,3 @@ impl AsNamespace for JetpackNamespace {
         "/jetpack/v4"
     }
 }
-
-uniffi::setup_scaffolding!();
