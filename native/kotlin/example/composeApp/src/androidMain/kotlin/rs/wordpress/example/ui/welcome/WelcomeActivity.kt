@@ -9,9 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
+import rs.wordpress.api.kotlin.ApiDiscoveryResult
 import rs.wordpress.api.kotlin.WpLoginClient
 import rs.wordpress.example.shared.App
 import rs.wordpress.example.shared.repository.AuthenticationRepository
+import androidx.core.net.toUri
 
 class WelcomeActivity : ComponentActivity() {
     private val authRepository: AuthenticationRepository by inject()
@@ -26,10 +28,12 @@ class WelcomeActivity : ComponentActivity() {
 
     private fun authenticateSite(url: String) {
         val authenticationUrl = runBlocking {
-            WpLoginClient().apiDiscovery(url)
-                .getOrThrow().applicationPasswordsAuthenticationUrl.url()
+            when (val apiDiscoveryResult = WpLoginClient().apiDiscovery(url)) {
+                is ApiDiscoveryResult.Success -> apiDiscoveryResult.success.applicationPasswordsAuthenticationUrl.url()
+                else -> throw IllegalStateException("Api discovery should succeed for the example app")
+            }
         }
-        val uriBuilder = Uri.parse(authenticationUrl).buildUpon()
+        val uriBuilder = authenticationUrl.toUri().buildUpon()
 
         uriBuilder
             .appendQueryParameter("app_name", "WordPressRsAndroidExample")

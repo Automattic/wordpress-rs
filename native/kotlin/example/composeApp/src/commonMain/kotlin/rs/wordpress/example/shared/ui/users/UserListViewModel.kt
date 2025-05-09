@@ -7,6 +7,7 @@ import rs.wordpress.example.shared.domain.AuthenticatedSite
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserWithEditContext
+import uniffi.wp_api.WpAuthenticationProvider
 
 class UserListViewModel(private val authRepository: AuthenticationRepository) {
     private var apiClient: WpApiClient? = null
@@ -14,7 +15,10 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
     fun setAuthenticatedSite(authenticatedSite: AuthenticatedSite) {
         apiClient = null
         authRepository.authenticationForSite(authenticatedSite)?.let {
-            apiClient = WpApiClient(apiRootUrl = authenticatedSite.url, authentication = it)
+            apiClient = WpApiClient(
+                apiRootUrl = authenticatedSite.url,
+                authProvider = WpAuthenticationProvider.staticWithAuth(it)
+            )
         }
     }
 
@@ -26,8 +30,8 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
                 }
             }
             return when (usersResult) {
-                is WpRequestResult.WpRequestSuccess -> usersResult.data
-                else -> listOf()
+                is WpRequestResult.WpRequestSuccess -> usersResult.data.data
+                else -> throw IllegalStateException("User list request should succeed: $usersResult")
             }
         }
         return listOf()

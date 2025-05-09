@@ -7,6 +7,7 @@ import rs.wordpress.example.shared.domain.AuthenticatedSite
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import uniffi.wp_api.PluginListParams
 import uniffi.wp_api.PluginWithEditContext
+import uniffi.wp_api.WpAuthenticationProvider
 
 class PluginListViewModel(private val authRepository: AuthenticationRepository) {
     private var apiClient: WpApiClient? = null
@@ -14,7 +15,10 @@ class PluginListViewModel(private val authRepository: AuthenticationRepository) 
     fun setAuthenticatedSite(authenticatedSite: AuthenticatedSite) {
         apiClient = null
         authRepository.authenticationForSite(authenticatedSite)?.let {
-            apiClient = WpApiClient(apiRootUrl = authenticatedSite.url, authentication = it)
+            apiClient = WpApiClient(
+                apiRootUrl = authenticatedSite.url,
+                authProvider = WpAuthenticationProvider.staticWithAuth(it)
+            )
         }
     }
 
@@ -26,7 +30,7 @@ class PluginListViewModel(private val authRepository: AuthenticationRepository) 
                 }
             }
             return when (pluginsResult) {
-                is WpRequestResult.WpRequestSuccess -> pluginsResult.data
+                is WpRequestResult.WpRequestSuccess -> pluginsResult.data.data
                 else -> listOf()
             }
         }
