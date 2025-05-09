@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Assertions.assertInstanceOf
 import uniffi.wp_api.ApplicationPasswordsNotSupportedReason
 import uniffi.wp_api.ApplicationPasswordsNotSupportedReason.ApplicationPasswordsDisabledForHttpSite
 import uniffi.wp_api.ApplicationPasswordsNotSupportedReason.SiteIsLocalDevelopmentEnvironment
-import uniffi.wp_api.AutoDiscoveryAttemptFailure
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.FetchAndParseApiRootFailure
 import uniffi.wp_api.FindApiRootFailure
