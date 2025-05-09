@@ -216,7 +216,7 @@ impl JetpackConnectionClient {
             Ok(blog_id)
         } else {
             Err(JetpackConnectionClientError::UserConnectionFailed {
-                message: result.message,
+                err_message: result.message,
             })
         }
     }
@@ -238,8 +238,8 @@ pub enum JetpackConnectionStatus {
 pub enum JetpackConnectionClientError {
     #[error("Can't find blog id")]
     BlogIdMissing { url: String },
-    #[error("Failed to connect to WordPress.com: {message}")]
-    UserConnectionFailed { message: String },
+    #[error("Failed to connect to WordPress.com: {err_message}")]
+    UserConnectionFailed { err_message: String },
     #[error("Unhandled error: {0}")]
     Unhandled(WpApiError),
 }
