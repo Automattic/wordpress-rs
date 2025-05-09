@@ -9,11 +9,12 @@ use crate::{
         SparseMediaFieldWithViewContext,
     },
     request::{
-        CONTENT_TYPE_MULTIPART, ParsedResponse, RequestMethod, WpNetworkHeaderMap,
-        WpNetworkResponse,
+        CONTENT_TYPE_MULTIPART, NetworkRequestAccessor, ParsedResponse, RequestMethod,
+        WpNetworkHeaderMap, WpNetworkResponse,
     },
 };
 use http::HeaderValue;
+use uuid::Uuid;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -119,6 +120,7 @@ fn parse_as_media_request_create_response(
 
 #[derive(uniffi::Object)]
 pub struct MediaUploadRequest {
+    pub(crate) uuid: String,
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
@@ -129,18 +131,6 @@ pub struct MediaUploadRequest {
 
 #[uniffi::export]
 impl MediaUploadRequest {
-    pub fn method(&self) -> RequestMethod {
-        self.method.clone()
-    }
-
-    pub fn url(&self) -> WpEndpointUrl {
-        self.url.clone()
-    }
-
-    pub fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
-        self.header_map.clone()
-    }
-
     pub fn file_path(&self) -> String {
         self.file_path.clone()
     }
@@ -180,6 +170,25 @@ impl std::fmt::Debug for MediaUploadRequest {
 }
 
 #[uniffi::export]
+impl NetworkRequestAccessor for MediaUploadRequest {
+    fn request_id(&self) -> String {
+        self.uuid.clone()
+    }
+
+    fn method(&self) -> RequestMethod {
+        self.method.clone()
+    }
+
+    fn url(&self) -> WpEndpointUrl {
+        self.url.clone()
+    }
+
+    fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+        self.header_map.clone()
+    }
+}
+
+#[uniffi::export]
 impl MediaRequestBuilder {
     pub fn create(
         &self,
@@ -193,6 +202,7 @@ impl MediaRequestBuilder {
             HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
         );
         MediaUploadRequest {
+            uuid: Uuid::new_v4().into(),
             method: RequestMethod::POST,
             url: self.endpoint.create().into(),
             header_map: header_map.into(),

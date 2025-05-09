@@ -173,11 +173,6 @@ pub struct WpNetworkRequest {
 
 #[uniffi::export]
 impl WpNetworkRequest {
-    /// Unique identifier for this request – used for external record-keeping
-    pub fn request_id(&self) -> String {
-        self.uuid.clone()
-    }
-
     /// Clones the request and increments the retry count
     pub fn clone_with_incremented_retry_count(&self) -> Self {
         Self {
@@ -193,18 +188,6 @@ impl WpNetworkRequest {
     /// How many times this request has this request been attempted?
     pub fn retry_count(&self) -> u8 {
         self.retry_count
-    }
-
-    pub fn method(&self) -> RequestMethod {
-        self.method.clone()
-    }
-
-    pub fn url(&self) -> WpEndpointUrl {
-        self.url.clone()
-    }
-
-    pub fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
-        self.header_map.clone()
     }
 
     pub fn body(&self) -> Option<Arc<WpNetworkRequestBody>> {
@@ -276,6 +259,34 @@ impl Debug for WpNetworkRequest {
         );
         s.pop(); // Remove the new line at the end
         write!(f, "{}", s)
+    }
+}
+
+/// Unique identifier for this request – used for external record-keeping
+#[uniffi::export(with_foreign)]
+pub trait NetworkRequestAccessor: Send + Sync {
+    fn request_id(&self) -> String;
+    fn method(&self) -> RequestMethod;
+    fn url(&self) -> WpEndpointUrl;
+    fn header_map(&self) -> Arc<WpNetworkHeaderMap>;
+}
+
+#[uniffi::export]
+impl NetworkRequestAccessor for WpNetworkRequest {
+    fn request_id(&self) -> String {
+        self.uuid.clone()
+    }
+
+    fn method(&self) -> RequestMethod {
+        self.method.clone()
+    }
+
+    fn url(&self) -> WpEndpointUrl {
+        self.url.clone()
+    }
+
+    fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+        self.header_map.clone()
     }
 }
 
