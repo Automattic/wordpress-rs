@@ -1,11 +1,11 @@
-use wp_derive_request_builder::WpDerivedRequest;
-
-use wp_api::request::endpoint::{AsNamespace, DerivedRequest};
-
 use crate::{
-    WpComNamespace, WpComSiteId,
-    jetpack_connection::{JetpackRemoteConnectionParams, JetpackRemoteConnectionResult},
+    request::endpoint::{AsNamespace, DerivedRequest},
+    wp_com::{
+        WpComNamespace, WpComSiteId,
+        jetpack_connection::{JetpackRemoteConnectionParams, JetpackRemoteConnectionResult},
+    },
 };
+use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum JetpackConnectionRequest {

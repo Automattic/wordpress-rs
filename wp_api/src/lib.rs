@@ -21,6 +21,9 @@ mod ssl; // re-exported relevant types
 mod uniffi_serde;
 mod uuid; // re-exported relevant types
 
+pub mod jetpack;
+pub mod wp_com;
+
 pub mod application_passwords;
 pub mod auth;
 pub mod categories;
