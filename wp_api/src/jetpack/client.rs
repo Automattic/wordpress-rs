@@ -1,9 +1,9 @@
 use super::endpoint::connection_endpoint::{ConnectionRequestBuilder, ConnectionRequestExecutor};
-use std::sync::Arc;
-use wp_api::{
+use crate::{
     ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
     api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
 };
+use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 struct UniffiJetpackApiRequestBuilder {

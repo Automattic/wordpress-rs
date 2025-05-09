@@ -102,8 +102,8 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 
 # Build the library for a specific target
 _build-apple-%:
-	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package jetpack --profile $(CARGO_PROFILE)
-	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libjetpack.a
+	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE)
+	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libwp_api.a
 
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
@@ -145,11 +145,11 @@ docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
 
 swift-linux-library:
-	cargo build --release --package jetpack
-	./scripts/swift-bindings.sh target/release/libjetpack.a
+	cargo build --release --package wp_api
+	./scripts/swift-bindings.sh target/release/libwp_api.a
 	mkdir -p target/release/libwordpressFFI-linux
 	cp target/release/swift-bindings/Headers/* target/release/libwordpressFFI-linux/
-	cp target/release/libjetpack.a target/release/libwordpressFFI-linux/
+	cp target/release/libwp_api.a target/release/libwordpressFFI-linux/
 
 swift-example-app: swift-example-app-mac swift-example-app-ios
 
@@ -166,7 +166,7 @@ test-swift-linux: docker-image-swift
 	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
-	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -ljetpack
+	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_api
 
 test-swift-darwin: xcframework
 	swift test

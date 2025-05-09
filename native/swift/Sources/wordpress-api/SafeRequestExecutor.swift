@@ -15,11 +15,11 @@ public protocol SafeRequestExecutor: RequestExecutor, Sendable {
         mediaUploadRequest: MediaUploadRequest
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
 
-#if PROGRESS_REPORTING_ENABLED
+    #if PROGRESS_REPORTING_ENABLED
     /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task
     /// for the given `requestId`.
     func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never>
-#endif
+    #endif
 }
 
 extension SafeRequestExecutor {
@@ -342,7 +342,6 @@ extension WpNetworkRequest: NetworkRequestContent {
         return try await session.data(for: request, delegate: delegate)
         #endif
     }
-
 }
 
 extension MediaUploadRequest: NetworkRequestContent {
