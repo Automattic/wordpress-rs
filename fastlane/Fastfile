@@ -119,7 +119,7 @@ end
 
 def xcframework_bindings_file_path
   dir = File.join(PROJECT_ROOT, 'native', 'swift', 'Sources', 'wordpress-api-wrapper')
-  %w[wp_api.swift wp_localization.swift wp_com.swift jetpack.swift]
+  %w[wp_api.swift wp_localization.swift]
     .map { |file| File.join(dir, file) }
 end
 
