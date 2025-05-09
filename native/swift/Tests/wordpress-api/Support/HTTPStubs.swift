@@ -1,5 +1,6 @@
 import Foundation
 import WordPressAPI
+import WordPressAPIInternal
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -41,7 +42,9 @@ final class HTTPStubs: SafeRequestExecutor {
         }
     }
 
-    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+    func uploadMedia(
+        mediaUploadRequest: MediaUploadRequest
+    ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         preconditionFailure("This method is not yet implemented")
     }
 
