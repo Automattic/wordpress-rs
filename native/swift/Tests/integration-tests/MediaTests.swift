@@ -1,7 +1,6 @@
 import Foundation
 import WordPressAPI
 import Testing
-import AppKit
 
 @Suite
 struct MediaTests {
