@@ -251,7 +251,7 @@ impl Slice {
     }
 
     fn built_libraries(&self) -> Vec<PathBuf> {
-        vec![self.built_product_dir().join("libjetpack.a")]
+        vec![self.built_product_dir().join("libwp_api.a")]
     }
 }
 

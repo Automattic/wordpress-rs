@@ -46,6 +46,7 @@ for swift_binding in "$output_dir"/*.swift; do
     fi
 done
 
+rm native/swift/Sources/wordpress-api-wrapper/*.swift
 mv "$output_dir"/*.swift native/swift/Sources/wordpress-api-wrapper/
 
 header_dir="$output_dir/Headers"
