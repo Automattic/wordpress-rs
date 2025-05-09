@@ -7,7 +7,9 @@ import FoundationNetworking
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
-    func uploadMedia(mediaUploadRequest: MediaUploadRequest) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
+    func uploadMedia(
+        mediaUploadRequest: MediaUploadRequest
+    ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
 }
 
 extension SafeRequestExecutor {
@@ -52,7 +54,11 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .mapError { error in
                 switch error {
                 case let .RequestExecutionFailed(statusCode, redirects, reason):
-                    MediaUploadRequestExecutionError.RequestExecutionFailed(statusCode: statusCode, redirects: redirects, reason: reason)
+                    MediaUploadRequestExecutionError.RequestExecutionFailed(
+                        statusCode: statusCode,
+                        redirects: redirects,
+                        reason: reason
+                    )
                 }
             }
     }
