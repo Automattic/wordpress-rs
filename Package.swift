@@ -69,7 +69,7 @@ var package = Package(
                 .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]
         )
-    ]
+    ].addingIntegrationTests()
 )
 
 // MARK: - Enable local development toolings
@@ -124,4 +124,21 @@ func enableSwiftLint() throws {
 
     package.dependencies.append(.package(url: "https://github.com/realm/SwiftLint", exact: .init(version)!))
 #endif
+}
+
+extension Array where Element == Target {
+    func addingIntegrationTests() -> Self {
+        #if os(macOS)
+        return self + [.testTarget(
+            name: "IntegrationTests",
+            dependencies: [
+                .target(name: "WordPressAPI"),
+            ],
+            path: "native/swift/Tests/integration-tests",
+            resources: [.copy("../../../../test-data/")]
+        )]
+        #else
+        return self
+        #endif
+    }
 }
