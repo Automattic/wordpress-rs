@@ -13,12 +13,17 @@ class AuthenticationRepository(
     private val authenticatedSites = mutableMapOf<AuthenticatedSite, WpAuthentication>()
 
     init {
-        addAuthenticatedSite(localTestSiteUrl, localTestSiteUsername, localTestSitePassword)
+        addAuthenticatedSite(
+            ParsedUrl.parse(localTestSiteUrl),
+            ParsedUrl.parse("$localTestSiteUrl/wp-json"),
+            localTestSiteUsername,
+            localTestSitePassword
+        )
     }
 
-    fun addAuthenticatedSite(siteUrl: String, username: String, password: String): Boolean {
-        if (siteUrl.isNotEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-            authenticatedSites[AuthenticatedSite(name = siteUrl, url = ParsedUrl.parse(siteUrl))] =
+    fun addAuthenticatedSite(siteUrl: ParsedUrl, apiRootUrl: ParsedUrl, username: String, password: String): Boolean {
+        if (username.isNotEmpty() && password.isNotEmpty()) {
+            authenticatedSites[AuthenticatedSite(name = siteUrl.url(), apiRootUrl)] =
                 wpAuthenticationFromUsernameAndPassword(username, password)
             return true
         }
