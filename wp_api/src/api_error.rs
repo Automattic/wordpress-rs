@@ -278,6 +278,8 @@ pub enum WpErrorCode {
     TaxonomyInvalid,
     #[serde(rename = "rest_template_already_trashed")]
     TemplateAlreadyTrashed,
+    #[serde(rename = "rest_template_insert_error")]
+    TemplateInsertError,
     #[serde(rename = "rest_template_not_found")]
     TemplateNotFound,
     #[serde(rename = "rest_term_invalid")]

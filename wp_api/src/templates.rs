@@ -232,3 +232,53 @@ pub struct TemplateUpdateParams {
     // don't seem to take place when they are included in the request. So, we decided not to
     // include them until we figure out under which conditions they'll be allowed to update.
 }
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct TemplateCreateParams {
+    // Unique slug identifying the template.
+    pub slug: String,
+    // Theme identifier for the template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    // Type of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_type: Option<String>,
+    // Content of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // Title of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // Description of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // Status of template.
+    // One of: publish, future, draft, pending, private
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<TemplateStatus>,
+    // The ID for the author of the template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+}
+
+impl TemplateCreateParams {
+    pub fn new(slug: String) -> Self {
+        Self {
+            slug,
+            theme: None,
+            template_type: None,
+            content: None,
+            title: None,
+            description: None,
+            status: None,
+            author: None,
+        }
+    }
+}

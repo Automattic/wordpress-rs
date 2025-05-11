@@ -2,12 +2,110 @@ use macro_helper::generate_update_test;
 use serial_test::serial;
 use wp_api::templates::{
     SparseTemplateContent, SparseTemplateContentWrapper, SparseTemplateTitle,
-    SparseTemplateTitleWrapper, TemplateId, TemplateStatus, TemplateUpdateParams,
-    TemplateWithEditContext,
+    SparseTemplateTitleWrapper, TemplateCreateParams, TemplateId, TemplateStatus,
+    TemplateUpdateParams, TemplateWithEditContext,
 };
 use wp_api_integration_tests::{
     AssertResponse, SECOND_USER_ID, TestCredentials, api_client, backend::RestoreServer,
 };
+
+const TEST_SLUG: &str = "foo_template_slug";
+const TEST_TITLE: &str = "foo template title";
+
+#[tokio::test]
+#[serial]
+async fn create_template_with_slug_and_content() {
+    let content = "foo template content";
+    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
+    params.content = Some(content.to_string());
+    test_create_template(&params, |created_template| {
+        assert_slug(&created_template);
+        assert_eq!(
+            created_template.content,
+            SparseTemplateContentWrapper::Object(SparseTemplateContent {
+                raw: Some(content.to_string()),
+                rendered: None,
+                protected: None,
+                block_version: None
+            })
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_template_with_slug_and_title() {
+    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
+    params.title = Some(TEST_TITLE.to_string());
+    test_create_template(&params, |created_template| {
+        assert_slug(&created_template);
+        assert_title(&created_template);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_template_with_slug_title_and_theme() {
+    let theme = "foo template theme";
+    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
+    params.title = Some(TEST_TITLE.to_string());
+    params.theme = Some(theme.to_string());
+    test_create_template(&params, |created_template| {
+        assert_slug(&created_template);
+        assert_title(&created_template);
+        assert_eq!(created_template.theme, theme);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_template_with_slug_title_and_author() {
+    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
+    params.title = Some(TEST_TITLE.to_string());
+    params.author = Some(SECOND_USER_ID);
+    test_create_template(&params, |created_template| {
+        assert_title(&created_template);
+        assert_eq!(created_template.author, SECOND_USER_ID);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+// TODO: `template_type` parameter doesn't seem to be working. It either requires the template type
+// to be set up in advance or the parameter is always ignored.
+#[ignore]
+async fn create_template_with_slug_title_and_template_type() {
+    let template_type = "foo template type";
+    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
+    params.title = Some(TEST_TITLE.to_string());
+    params.template_type = Some(template_type.to_string());
+    test_create_template(&params, |created_template| {
+        assert_title(&created_template);
+        assert_eq!(created_template.template_type, template_type);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+// TODO: `status` parameter seems to be ignored as the server is always responding with
+// `TemplateStatus::Publish`
+#[ignore]
+async fn create_template_with_slug_title_and_template_status_future() {
+    let status = TemplateStatus::Future;
+    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
+    params.title = Some(TEST_TITLE.to_string());
+    params.status = Some(status.clone());
+    test_create_template(&params, |created_template| {
+        assert_title(&created_template);
+        assert_eq!(created_template.status, status);
+    })
+    .await;
+}
 
 #[tokio::test]
 #[serial]
@@ -73,15 +171,9 @@ generate_update_test!(
 generate_update_test!(
     update_title,
     title,
-    "new_title".to_string(),
+    TEST_TITLE.to_string(),
     |updated_template| {
-        assert_eq!(
-            updated_template.title,
-            SparseTemplateTitleWrapper::Object(SparseTemplateTitle {
-                raw: Some("new_title".to_string()),
-                rendered: Some("new_title".to_string())
-            })
-        );
+        assert_title(&updated_template);
     }
 );
 generate_update_test!(
@@ -114,6 +206,33 @@ where
         .assert_response();
     assert(response.data);
     RestoreServer::db().await;
+}
+
+async fn test_create_template<F>(params: &TemplateCreateParams, assert: F)
+where
+    F: Fn(TemplateWithEditContext),
+{
+    let response = api_client()
+        .templates()
+        .create(params)
+        .await
+        .assert_response();
+    assert(response.data);
+    RestoreServer::db().await;
+}
+
+fn assert_slug(template: &TemplateWithEditContext) {
+    assert_eq!(template.slug, TEST_SLUG);
+}
+
+fn assert_title(template: &TemplateWithEditContext) {
+    assert_eq!(
+        template.title,
+        SparseTemplateTitleWrapper::Object(SparseTemplateTitle {
+            raw: Some(TEST_TITLE.to_string()),
+            rendered: Some(TEST_TITLE.to_string())
+        })
+    );
 }
 
 mod macro_helper {
