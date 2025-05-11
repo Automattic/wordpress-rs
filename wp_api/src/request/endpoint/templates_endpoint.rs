@@ -12,9 +12,21 @@ enum TemplatesRequest {
     List,
     #[contextual_get(url = "/templates/<template_id>", output = crate::templates::SparseTemplate, filter_by = crate::templates::SparseTemplateField)]
     Retrieve,
+    #[delete(url = "/templates/<template_id>", output = crate::templates::TemplateDeleteResponse)]
+    Delete,
+    #[delete(url = "/templates/<template_id>", output = crate::templates::TemplateWithEditContext)]
+    Trash,
 }
 
 impl DerivedRequest for TemplatesRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            TemplatesRequest::Delete => vec![("force", true.to_string())],
+            TemplatesRequest::Trash => vec![("force", false.to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -160,6 +172,22 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.filter_retrieve_with_view_context(&TemplateId("foo".to_string()), fields),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn delete_template(endpoint: TemplatesRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.delete(&TemplateId("foo".to_string())),
+            "/templates/foo?force=true",
+        );
+    }
+
+    #[rstest]
+    fn trash_template(endpoint: TemplatesRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.trash(&TemplateId("foo".to_string())),
+            "/templates/foo?force=false",
         );
     }
 

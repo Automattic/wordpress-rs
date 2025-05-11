@@ -196,3 +196,9 @@ pub struct SparseTemplateTitle {
     pub raw: Option<String>,
     pub rendered: Option<String>,
 }
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct TemplateDeleteResponse {
+    pub deleted: bool,
+    pub previous: TemplateWithEditContext,
+}

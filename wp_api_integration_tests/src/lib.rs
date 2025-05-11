@@ -80,6 +80,7 @@ pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
+pub const TEMPLATE_CUSTOM: &str = "CustomTemplateToBeUsedInIntegrationTests";
 
 pub fn api_client() -> WpApiClient {
     WpApiClient::new(
