@@ -127,18 +127,32 @@ func enableSwiftLint() throws {
 }
 
 extension Array where Element == Target {
+
+    // Run `make test-server` before running integration tests.
     func addingIntegrationTests() -> Self {
-        #if os(macOS)
-        return self + [.testTarget(
-            name: "IntegrationTests",
-            dependencies: [
-                .target(name: "WordPressAPI"),
-            ],
-            path: "native/swift/Tests/integration-tests",
-            resources: [.copy("../../../../test-data/")]
-        )]
-        #else
-        return self
-        #endif
+        var enabled = false
+
+        if Context.environment["BUILDKITE"] != nil {
+            // When running on CI, only enable integration tests on Linux, since macOS CI agent does not have docker.
+            #if os(Linux)
+            enabled = true
+            #endif
+        } else {
+            // Enable integration tests during local development, since we can easily install docker env on our macOS.
+            enabled = true
+        }
+
+        if enabled {
+            return self + [.testTarget(
+                name: "IntegrationTests",
+                dependencies: [
+                    .target(name: "WordPressAPI"),
+                ],
+                path: "native/swift/Tests/integration-tests",
+                resources: [.copy("../../../../test-data/")]
+            )]
+        } else {
+            return self
+        }
     }
 }

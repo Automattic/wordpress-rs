@@ -137,10 +137,6 @@ xcframework-package: xcframework-all
 xcframework-package-checksum:
 	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
 
-
-docker-image-swift:
-	docker build -t wordpress-rs-swift -f Dockerfile.swift .
-
 docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
 
@@ -162,8 +158,8 @@ swift-example-app-ios:
 test-swift:
 	$(MAKE) test-swift-$(uname)
 
-test-swift-linux: docker-image-swift
-	docker run $(docker_opts_shared) -it wordpress-rs-swift make test-swift-linux-in-docker
+test-swift-linux:
+	docker compose run --rm -P swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
 	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_api

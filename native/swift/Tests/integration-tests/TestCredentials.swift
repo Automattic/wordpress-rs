@@ -1,23 +1,23 @@
 import Foundation
 
 struct TestCredentials: Decodable {
-    let siteUrl: String
-    let adminUsername: String
-    let adminPassword: String
-    let adminPasswordUuid: String
-    let subscriberUsername: String
-    let subscriberPassword: String
-    let subscriberPasswordUuid: String
-    let authorUsername: String
-    let authorPassword: String
-    let passwordProtectedPostId: Int
-    let passwordProtectedPostPassword: String
-    let passwordProtectedPostTitle: String
-    let passwordProtectedCommentId: Int
-    let passwordProtectedCommentAuthor: String
-    let trashedPostId: Int
-    let firstPostDateGmt: String
-    let wordpressCoreVersion: String
+    var siteUrl: String
+    var adminUsername: String
+    var adminPassword: String
+    var adminPasswordUuid: String
+    var subscriberUsername: String
+    var subscriberPassword: String
+    var subscriberPasswordUuid: String
+    var authorUsername: String
+    var authorPassword: String
+    var passwordProtectedPostId: Int
+    var passwordProtectedPostPassword: String
+    var passwordProtectedPostTitle: String
+    var passwordProtectedCommentId: Int
+    var passwordProtectedCommentAuthor: String
+    var trashedPostId: Int
+    var firstPostDateGmt: String
+    var wordpressCoreVersion: String
 
     enum CodingKeys: String, CodingKey {
         case siteUrl = "site_url"
@@ -40,7 +40,18 @@ struct TestCredentials: Decodable {
     }
 
     static func instance() -> Self {
-        let url = URL(string: "../../../../test_credentials.json", relativeTo: URL(fileURLWithPath: #filePath))!.absoluteURL
-        return try! JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
+        let json = URL(
+                string: "../../../../test_credentials.json",
+                relativeTo: URL(fileURLWithPath: #filePath)
+            )!
+            .absoluteURL
+        // swiftlint:disable:next force_try
+        var result = try! JSONDecoder().decode(Self.self, from: Data(contentsOf: json))
+        #if os(Linux)
+        // Integration tests are run in a Docker container, where the test site
+        // hostname is 'wordpress'.
+        result.siteUrl = "http://wordpress"
+        #endif
+        return result
     }
 }

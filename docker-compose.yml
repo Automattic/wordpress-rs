@@ -28,6 +28,17 @@ services:
             timeout: 1s
             retries: 30
 
+    swift:
+        build:
+            context: .
+            dockerfile: swift.Dockerfile
+        volumes:
+            - ./:/app
+        working_dir: /app
+        environment:
+            - TEST_ALL_PLUGINS
+            - CARGO_HOME=/app/.cargo
+
     database:
         image: 'public.ecr.aws/docker/library/mariadb:11.2'
         ports:
