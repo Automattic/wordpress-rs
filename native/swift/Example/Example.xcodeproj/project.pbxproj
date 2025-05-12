@@ -20,6 +20,7 @@
 		24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C32E2BA8F96F00162AD1 /* LoginView.swift */; };
 		24A3C3362BAA874C00162AD1 /* LoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A3C3352BAA874C00162AD1 /* LoginManager.swift */; };
 		24E77D032CE44DD900F6998C /* WordPressAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 24E77D022CE44DD900F6998C /* WordPressAPI */; };
+		4A0CD45C2DD15C280046FE28 /* UploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A0CD45B2DD15C280046FE28 /* UploadView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		24A3C32E2BA8F96F00162AD1 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		24A3C3342BAA45B800162AD1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		24A3C3352BAA874C00162AD1 /* LoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginManager.swift; sourceTree = "<group>"; };
+		4A0CD45B2DD15C280046FE28 /* UploadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +61,7 @@
 				242D64932C3608C6007CA96C /* ListView.swift */,
 				242D64912C360687007CA96C /* RootListView.swift */,
 				24A3C32E2BA8F96F00162AD1 /* LoginView.swift */,
+				4A0CD45B2DD15C280046FE28 /* UploadView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -189,6 +192,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4A0CD45C2DD15C280046FE28 /* UploadView.swift in Sources */,
 				242D64922C360687007CA96C /* RootListView.swift in Sources */,
 				2479BF812B621CB60014A01D /* ExampleApp.swift in Sources */,
 				24A3C32F2BA8F96F00162AD1 /* LoginView.swift in Sources */,
