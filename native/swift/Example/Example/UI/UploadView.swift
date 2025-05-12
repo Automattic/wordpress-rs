@@ -79,7 +79,7 @@ struct UploadView: View {
                             }
                         ),
                         maxSelectionCount: 10,
-                        matching: .images
+                        matching: .any(of: [.images, .videos])
                     ) {
                         Label("Photos", systemImage: "photo.on.rectangle")
                     }
@@ -116,6 +116,25 @@ enum MediaItem: Hashable {
     case file(URL)
 }
 
+struct TransferableImage: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .data) { image in
+            SentTransferredFile(image.url)
+        } importing: { received in
+            let copy = URL.temporaryDirectory.appending(path: received.file.lastPathComponent)
+
+            if FileManager.default.fileExists(atPath: copy.path()) {
+                try FileManager.default.removeItem(at: copy)
+            }
+
+            try FileManager.default.copyItem(at: received.file, to: copy)
+            return Self.init(url: copy)
+        }
+    }
+}
+
 @MainActor
 private class UploadViewModel: ObservableObject {
     @Published var error: String?
@@ -146,11 +165,27 @@ private class UploadViewModel: ObservableObject {
             case let .file(url):
                 file = url
             case let .photo(photo):
-                file = FileManager.default.temporaryDirectory.appendingPathComponent("photo_\(UUID().uuidString).jpg")
+                let localPath = try await withCheckedThrowingContinuation { continuation in
+                    photo.loadTransferable(type: TransferableImage.self) { result in
+                        do {
+                            continuation.resume(returning: try result.get())
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                }
 
-                NSLog("Exporting photo to \(file)")
-                let data = try await photo.loadTransferable(type: Data.self)!
-                try data.write(to: file)
+                guard let localPath else {
+                    preconditionFailure("Unable to obtain local file path")
+                }
+
+                file = localPath.url
+            }
+
+            let isAccessingFileOutsideSandbox = file.startAccessingSecurityScopedResource()
+
+            guard try file.checkPromisedItemIsReachable() else {
+                preconditionFailure("Item is not reachable")
             }
 
             NSLog("Uploading \(item)")
@@ -159,6 +194,12 @@ private class UploadViewModel: ObservableObject {
                 fromLocalFileURL: file,
                 fulfilling: child
             )
+
+            defer {
+                if isAccessingFileOutsideSandbox {
+                    file.stopAccessingSecurityScopedResource()
+                }
+            }
 
             if case .photo = item {
                 try? FileManager.default.removeItem(at: file)
