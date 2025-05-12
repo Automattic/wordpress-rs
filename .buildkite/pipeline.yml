@@ -103,12 +103,7 @@ steps:
         agents:
           queue: mac
       - label: ":swift: :linux: Build and Test"
-        command: |
-          echo "--- :docker: Setting up Test Server"
-          make test-server
-
-          echo "--- :swift: Building + Testing"
-          make test-swift-linux
+        command: ".buildkite/commands/run-swift-tests-linux.sh"
       - label: ":swift: Lint"
         command: |
           .buildkite/download-xcframework.sh
