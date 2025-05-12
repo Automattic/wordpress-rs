@@ -33,7 +33,7 @@ ENV PATH="//usr/lib/android-sdk/cmdline-tools/latest/bin:${PATH}"
 RUN yes | sdkmanager --licenses
 
 RUN sdkmanager --install \
-  "ndk;25.1.8937393"
+  "ndk;27.0.12077973"
 
 # Cache Gradle 8.7
 RUN mkdir gradle-cache-tmp \
