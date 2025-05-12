@@ -38,10 +38,10 @@ RUN sdkmanager --install \
 # Cache Gradle 8.7
 RUN mkdir gradle-cache-tmp \
         && cd gradle-cache-tmp \
-        && wget https://services.gradle.org/distributions/gradle-8.7-bin.zip \
-        && unzip gradle-8.7-bin.zip \
+        && wget https://services.gradle.org/distributions/gradle-8.14-all.zip \
+        && unzip gradle-8.14-all.zip \
         && touch settings.gradle \
-        && gradle-8.7/bin/gradle wrapper --gradle-version 8.7 --distribution-type all \
+        && gradle-8.14/bin/gradle wrapper --gradle-version 8.14 --distribution-type all \
         && ./gradlew \
         && cd .. \
         && rm -rf ./gradle-cache-tmp
