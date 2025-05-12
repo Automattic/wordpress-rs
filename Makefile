@@ -159,7 +159,7 @@ test-swift:
 	$(MAKE) test-swift-$(uname)
 
 test-swift-linux:
-	docker compose run --rm -P swift make test-swift-linux-in-docker
+	docker compose run --rm swift make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
 	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_api
