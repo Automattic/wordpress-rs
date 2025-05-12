@@ -63,9 +63,18 @@ struct UploadView: View {
                 ToolbarItem(placement: .automatic) {
                     PhotosPicker(
                         selection: Binding(
-                            get: { selectedItems.compactMap { if case .photo(let item) = $0 { return item } else { return nil } } },
+                            get: {
+                                selectedItems.compactMap {
+                                    if case .photo(let item) = $0 {
+                                        return item
+                                    } else {
+                                        return nil
+                                    }
+                                }
+                            },
                             set: { newPhotos in
                                 let newItems = newPhotos.map { MediaItem.photo($0) }
+                                selectedItems.removeAll(where: newItems.contains(_:))
                                 selectedItems.append(contentsOf: newItems)
                             }
                         ),
@@ -77,9 +86,9 @@ struct UploadView: View {
                 }
 
                 ToolbarItem(placement: .automatic) {
-                    Button(action: {
+                    Button {
                         isFilePickerPresented = true
-                    }) {
+                    } label: {
                         Label("Files", systemImage: "folder")
                     }
                 }
