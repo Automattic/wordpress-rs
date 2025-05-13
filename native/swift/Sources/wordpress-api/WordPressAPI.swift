@@ -5,12 +5,21 @@ import Foundation
 import FoundationNetworking
 #endif
 
+#if canImport(Combine)
+import Combine
+#endif
+
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
+
 public actor WordPressAPI {
 
     enum Errors: Error {
         case unableToParseResponse
     }
 
+    private let requestExecutor: SafeRequestExecutor
     private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 
@@ -63,6 +72,7 @@ public actor WordPressAPI {
             apiRootUrl: apiRootUrl,
             delegate: self.apiClientDelegate
         )
+        self.requestExecutor = executor
     }
 
     public var users: UsersRequestExecutor {
@@ -96,6 +106,55 @@ public actor WordPressAPI {
     public var siteSettings: SiteSettingsRequestExecutor {
         self.requestBuilder.siteSettings()
     }
+
+#if PROGRESS_REPORTING_ENABLED
+    public func uploadMedia(
+        params: MediaCreateParams,
+        fromLocalFileURL localFileURL: URL,
+        fulfilling progress: Progress,
+        mimeType: String? = nil,
+    ) async throws -> MediaRequestCreateResponse {
+        precondition(localFileURL.isFileURL)
+        precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
+
+        let requestId = WpUuid()
+
+        let fileContentType: String
+        if let mimeType {
+            fileContentType = mimeType
+        } else if let mimeType = UTType(filenameExtension: localFileURL.pathExtension)?.preferredMIMEType {
+            fileContentType = mimeType
+        } else {
+            fileContentType = "application/octet-stream"
+        }
+
+        let cancellable = requestExecutor
+            .progress(forRequestWithId: requestId.uuidString())
+            .sink {
+                progress.addChild($0, withPendingUnitCount: progress.totalUnitCount - progress.completedUnitCount)
+            }
+        defer {
+            cancellable.cancel()
+        }
+
+        let uploadTask = Task {
+            try await media.create(
+                params: params,
+                filePath: localFileURL.path,
+                fileContentType: fileContentType,
+                requestId: requestId
+            )
+        }
+
+        if progress.cancellationHandler == nil {
+            progress.cancellationHandler = {
+                uploadTask.cancel()
+            }
+        }
+
+        return try await uploadTask.value
+    }
+#endif
 
     enum ParseError: Error {
         case invalidUrl

@@ -12,6 +12,8 @@ struct ExampleApp: App {
     @StateObject
     var loginManager = LoginManager()
 
+    @State var showUploadView = false
+
     let rootListItems = [
         RootListData(name: "Application Passwords", callback: {
             try await WordPressAPI.globalInstance.applicationPasswords.listWithEditContext(userId: 1)
@@ -70,29 +72,36 @@ struct ExampleApp: App {
 
                     // Initial content for the third column.
                     Text("Select a category of settings in the sidebar.")
-                }.toolbar(content: {
-                    #if os(macOS)
-                    ToolbarItem {
+                }
+                .sheet(isPresented: $showUploadView) {
+                    UploadView()
+                }
+                .toolbar(content: {
+                    ToolbarItem(placement: toolbarItemPlacement) {
                         Button("Log Out") {
                             Task {
                                 await loginManager.logout()
                             }
                         }
                     }
-                    #else
-                    ToolbarItem(placement: .bottomBar) {
-                        Button("Log Out") {
-                            Task {
-                                await loginManager.logout()
-                            }
+                    ToolbarItem(placement: toolbarItemPlacement) {
+                        Button("Add Media File") {
+                            showUploadView = true
                         }
                     }
-                    #endif
                 })
             } else {
                 LoginView()
             }
         }
         .environmentObject(loginManager)
+    }
+
+    var toolbarItemPlacement: ToolbarItemPlacement {
+        #if os(macOS)
+        .automatic
+        #else
+        .bottomBar
+        #endif
     }
 }

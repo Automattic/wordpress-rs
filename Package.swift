@@ -40,6 +40,7 @@ var package = Package(
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
@@ -63,9 +64,12 @@ var package = Package(
                 .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api",
-            resources: [.copy("../../../../test-data/integration-test-responses/")]
+            resources: [.copy("../../../../test-data/integration-test-responses/")],
+            swiftSettings: [
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+            ]
         )
-    ]
+    ].addingIntegrationTests()
 )
 
 // MARK: - Enable local development toolings
@@ -120,4 +124,35 @@ func enableSwiftLint() throws {
 
     package.dependencies.append(.package(url: "https://github.com/realm/SwiftLint", exact: .init(version)!))
 #endif
+}
+
+extension Array where Element == Target {
+
+    // Run `make test-server` before running integration tests.
+    func addingIntegrationTests() -> Self {
+        var enabled = false
+
+        if Context.environment["BUILDKITE"] != nil {
+            // When running on CI, only enable integration tests on Linux, since macOS CI agent does not have docker.
+            #if os(Linux)
+            enabled = true
+            #endif
+        } else {
+            // Enable integration tests during local development, since we can easily install docker env on our macOS.
+            enabled = true
+        }
+
+        if enabled {
+            return self + [.testTarget(
+                name: "IntegrationTests",
+                dependencies: [
+                    .target(name: "WordPressAPI"),
+                ],
+                path: "native/swift/Tests/integration-tests",
+                resources: [.copy("../../../../test-data/")]
+            )]
+        } else {
+            return self
+        }
+    }
 }

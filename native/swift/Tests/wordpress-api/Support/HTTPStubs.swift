@@ -6,6 +6,10 @@ import WordPressAPIInternal
 import FoundationNetworking
 #endif
 
+#if canImport(Combine)
+import Combine
+#endif
+
 final class HTTPStubs: SafeRequestExecutor {
     typealias Stub = (condition: @Sendable (WpNetworkRequest) -> Bool, response: WpNetworkResponse)
 
@@ -47,6 +51,12 @@ final class HTTPStubs: SafeRequestExecutor {
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         preconditionFailure("This method is not yet implemented")
     }
+
+#if PROGRESS_REPORTING_ENABLED
+    func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never> {
+        Record(output: [], completion: .finished).eraseToAnyPublisher()
+    }
+#endif
 
     private func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
         stubs.first { stub in stub.condition(request) }?

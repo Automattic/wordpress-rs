@@ -31,6 +31,7 @@ async fn create_media_err_cannot_create() {
             MediaCreateParams::default(),
             MEDIA_TEST_FILE_PATH.to_string(),
             MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
+            None,
         )
         .await
         .assert_wp_error(WpErrorCode::CannotCreate)
@@ -45,6 +46,7 @@ async fn create_media_err_upload_no_data() {
             MediaCreateParams::default(),
             MEDIA_TEST_FILE_PATH.to_string(),
             MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
+            None,
         )
         .await
         .assert_wp_error(WpErrorCode::UploadNoData)

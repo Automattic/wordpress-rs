@@ -6,7 +6,7 @@ public final class DebugMiddleware: WpApiMiddleware {
         response: WordPressAPIInternal.WpNetworkResponse,
         request: WordPressAPIInternal.WpNetworkRequest
     ) async throws -> WordPressAPIInternal.WpNetworkResponse {
-        debugPrint("Performed request: \(String(describing: try? request.buildURLRequest()))")
+        debugPrint("Performed request: \(String(describing: try? request.buildURLRequest(additionalHeaders: [:])))")
         debugPrint("Received response: \(response)")
         return response
     }

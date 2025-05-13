@@ -22,6 +22,7 @@ async fn upload_media() {
             },
             MEDIA_TEST_FILE_PATH.to_string(),
             MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
+            None,
         )
         .await
         .assert_response();
