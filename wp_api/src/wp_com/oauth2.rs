@@ -29,8 +29,7 @@ pub struct TokenValidationResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-    use url::{Url, UrlQuery};
+    use url::Url;
 
     #[test]
     fn test_token_validation_parameters_append_query_pairs() {
