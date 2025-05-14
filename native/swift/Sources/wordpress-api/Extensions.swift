@@ -38,7 +38,7 @@ public extension CommentStatus {
         self = commentStatusFromString(value: status)
     }
 
-    func status() -> String {
+    var status: String {
         commentStatusToString(status: self)
     }
 }
@@ -48,7 +48,7 @@ public extension CommentType {
         self = commentTypeFromString(value: type)
     }
 
-    func type() -> String {
+    var type: String {
         commentTypeToString(commentType: self)
     }
 }
