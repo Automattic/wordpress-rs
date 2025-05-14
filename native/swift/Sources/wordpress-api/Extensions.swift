@@ -32,3 +32,23 @@ extension MiddlewarePipeline {
         self.init(middlewares: middlewares)
     }
 }
+
+public extension CommentStatus {
+    init(status: String) {
+        self = commentStatusFromString(value: status)
+    }
+
+    func status() -> String {
+        commentStatusToString(status: self)
+    }
+}
+
+public extension CommentType {
+    init(type: String) {
+        self = commentTypeFromString(value: type)
+    }
+
+    func type() -> String {
+        commentTypeToString(commentType: self)
+    }
+}

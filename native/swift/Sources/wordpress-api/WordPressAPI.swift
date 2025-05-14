@@ -99,6 +99,10 @@ public actor WordPressAPI {
         self.requestBuilder.posts()
     }
 
+    public var comments: CommentsRequestExecutor {
+        self.requestBuilder.comments()
+    }
+
     public var media: MediaRequestExecutor {
         self.requestBuilder.media()
     }
