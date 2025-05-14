@@ -154,6 +154,10 @@ impl WpError {
     pub fn try_parse(response_body: &[u8]) -> Option<Self> {
         serde_json::from_slice::<WpError>(response_body).ok()
     }
+
+    pub fn try_parse_from_file(file: std::fs::File) -> Option<Self> {
+        serde_json::from_reader(file).ok()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, uniffi::Error)]

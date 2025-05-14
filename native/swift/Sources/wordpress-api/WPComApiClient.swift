@@ -17,4 +17,8 @@ public class WPComApiClient {
     public var jetpackConnection: JetpackConnectionRequestExecutor {
         internalClient.jetpackConnection()
     }
+
+    public var subscriptions: SubscribersRequestExecutor {
+        internalClient.subscribers()
+    }
 }

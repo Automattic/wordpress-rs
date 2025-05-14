@@ -1,0 +1,34 @@
+[
+    {
+      "id": 1474805,
+      "categories": [],
+      "status": "imported",
+      "scheduled_at": "2025-05-14 12:39:06",
+      "timestamp": "1747247945",
+      "email_count": "1",
+      "subscribed_count": "0",
+      "already_subscribed_count": "0",
+      "failed_subscribed_count": 1,
+      "paid_subscribers_count": "0",
+      "platform": null,
+      "paid_subscribed_count": 0,
+      "paid_already_subscribed_count": 0,
+      "paid_failed_subscribed_count": 0
+    },
+    {
+      "id": 1474803,
+      "categories": [],
+      "status": "imported",
+      "scheduled_at": "2025-05-14 12:37:31",
+      "timestamp": "1747247849",
+      "email_count": "1",
+      "subscribed_count": "0",
+      "already_subscribed_count": "0",
+      "failed_subscribed_count": 1,
+      "paid_subscribers_count": "0",
+      "platform": null,
+      "paid_subscribed_count": 0,
+      "paid_already_subscribed_count": 0,
+      "paid_failed_subscribed_count": 0
+    }
+  ]
