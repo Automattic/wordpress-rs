@@ -133,5 +133,4 @@ public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteH
 public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
 
 // MARK: - WordPress.com
-public typealias WPComApiClient = WordPressAPIInternal.UniffiWpComApiClient
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters

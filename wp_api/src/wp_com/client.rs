@@ -2,12 +2,11 @@ use super::endpoint::jetpack_connection_endpoint::{
     JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
 };
 use super::endpoint::oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor};
-use super::oauth2::{TokenValidationParameters, TokenValidationResponse};
 use crate::{
     ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
     api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
 };
-use crate::{WpApiError, api_client_generate_request_builder};
+use crate::{api_client_generate_request_builder};
 use std::sync::Arc;
 
 #[derive(uniffi::Object)]
