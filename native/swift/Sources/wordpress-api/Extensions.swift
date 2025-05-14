@@ -43,6 +43,12 @@ public extension CommentStatus {
     }
 }
 
+extension CommentStatus: ExpressibleByStringLiteral {
+    public init(stringLiteral: String) {
+        self.init(status: stringLiteral)
+    }
+}
+
 public extension CommentType {
     init(type: String) {
         self = commentTypeFromString(value: type)
@@ -50,5 +56,11 @@ public extension CommentType {
 
     var type: String {
         commentTypeToString(commentType: self)
+    }
+}
+
+extension CommentType: ExpressibleByStringLiteral {
+    public init(stringLiteral: String) {
+        self.init(type: stringLiteral)
     }
 }
