@@ -5,6 +5,7 @@ use std::{num::ParseIntError, str::FromStr};
 pub mod client;
 pub mod endpoint;
 pub mod jetpack_connection;
+pub mod oauth2;
 
 impl_as_query_value_for_new_type!(WpComSiteId);
 uniffi::custom_newtype!(WpComSiteId, u64);
@@ -26,12 +27,14 @@ impl std::fmt::Display for WpComSiteId {
 }
 
 pub(crate) enum WpComNamespace {
+    Oauth2,
     V2,
 }
 
 impl AsNamespace for WpComNamespace {
     fn as_str(&self) -> &str {
         match self {
+            WpComNamespace::Oauth2 => "/oauth2",
             WpComNamespace::V2 => "/wpcom/v2",
         }
     }

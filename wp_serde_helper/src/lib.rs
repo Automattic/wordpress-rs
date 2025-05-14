@@ -89,6 +89,37 @@ where
     deserializer.deserialize_any(DeserializeI64OrStringVisitor)
 }
 
+pub fn deserialize_u64_or_string<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeU64OrStringVisitor)
+}
+
+struct DeserializeU64OrStringVisitor;
+
+impl de::Visitor<'_> for DeserializeU64OrStringVisitor {
+    type Value = u64;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("u64 or a string")
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(v)
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        v.parse::<u64>()
+            .map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+    }
+}
 pub struct DeserializeOffsetVisitor;
 
 impl de::Visitor<'_> for DeserializeOffsetVisitor {
