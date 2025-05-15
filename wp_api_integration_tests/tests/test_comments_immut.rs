@@ -232,7 +232,7 @@ async fn list_comments_with_edit_context_parse_author_avatar_urls(
 #[case::parent_exclude(generate!(CommentListParams, (parent, vec![CommentId(1), CommentId(2)])))]
 #[case::post(generate!(CommentListParams, (post, vec![PostId(1), PostId(2)])))]
 #[case::status_hold(generate!(CommentListParams, (status, Some(CommentStatus::Hold))))]
-#[case::status_approve(generate!(CommentListParams, (status, Some(CommentStatus::Approve))))]
+#[case::status_approve(generate!(CommentListParams, (status, Some(CommentStatus::Approved))))]
 #[case::status_spam(generate!(CommentListParams, (status, Some(CommentStatus::Spam))))]
 #[case::status_trash(generate!(CommentListParams, (status, Some(CommentStatus::Trash))))]
 #[case::comment_type_comment(generate!(CommentListParams, (comment_type, Some(CommentType::Comment))))]
@@ -381,5 +381,22 @@ mod filter {
             .assert_response()
             .data;
         comment.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
+    #[rstest]
+    #[case(1, CommentStatus::Approved)]
+    #[case(6, CommentStatus::Hold)]
+    #[case(22, CommentStatus::Trash)]
+    #[case(23, CommentStatus::Spam)]
+    #[tokio::test]
+    #[parallel]
+    async fn parse_status(#[case] id: i64, #[case] status: CommentStatus) {
+        let comment = api_client()
+            .comments()
+            .retrieve_with_edit_context(&CommentId(id), &CommentRetrieveParams::default())
+            .await
+            .assert_response()
+            .data;
+        assert_eq!(comment.status, status);
     }
 }

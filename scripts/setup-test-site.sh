@@ -78,6 +78,9 @@ wp user create test_author test_author@example.com --role=author
 # This is used in `/posts` integration tests that updates the `template` field
 wp theme activate twentytwentyfour
 
+wp comment trash 22
+wp comment spam 23
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME

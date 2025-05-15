@@ -187,7 +187,7 @@ async fn create_err_comment_invalid_post_id() {
 #[parallel]
 async fn create_err_comment_invalid_status(
     #[values(
-        CommentStatus::Approve,
+        CommentStatus::Approved,
         CommentStatus::Hold,
         CommentStatus::Spam,
         CommentStatus::Trash
