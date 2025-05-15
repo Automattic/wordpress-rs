@@ -569,7 +569,7 @@ pub enum CommentAuthorAvatarUrlSize {
 pub enum CommentStatus {
     Hold,
     #[default]
-    Approve,
+    Approved,
     Spam,
     Trash,
     #[serde(untagged)]
@@ -640,7 +640,7 @@ mod tests {
     #[case(generate!(CommentListParams, (parent_exclude, vec![CommentId(55555), CommentId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(CommentListParams, (post, vec![PostId(66666), PostId(66667)])), "post=66666%2C66667")]
     #[case(generate!(CommentListParams, (status, Some(CommentStatus::Hold))), "status=hold")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Approve))), "status=approve")]
+    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Approved))), "status=approved")]
     #[case(generate!(CommentListParams, (status, Some(CommentStatus::Spam))), "status=spam")]
     #[case(generate!(CommentListParams, (status, Some(CommentStatus::Trash))), "status=trash")]
     #[case(generate!(CommentListParams, (status, Some(CommentStatus::Custom("foo".to_string())))), "status=foo")]
