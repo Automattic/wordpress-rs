@@ -34,7 +34,7 @@ extension MiddlewarePipeline {
 }
 
 public extension CommentStatus {
-    init(status: String) {
+    init(_ status: String) {
         self = commentStatusFromString(value: status)
     }
 
@@ -45,12 +45,12 @@ public extension CommentStatus {
 
 extension CommentStatus: ExpressibleByStringLiteral {
     public init(stringLiteral: String) {
-        self.init(status: stringLiteral)
+        self.init(stringLiteral)
     }
 }
 
 public extension CommentType {
-    init(type: String) {
+    init(_ type: String) {
         self = commentTypeFromString(value: type)
     }
 
@@ -61,6 +61,6 @@ public extension CommentType {
 
 extension CommentType: ExpressibleByStringLiteral {
     public init(stringLiteral: String) {
-        self.init(type: stringLiteral)
+        self.init(stringLiteral)
     }
 }
