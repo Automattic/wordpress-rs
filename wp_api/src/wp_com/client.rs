@@ -1,6 +1,8 @@
 use super::endpoint::jetpack_connection_endpoint::{
     JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
 };
+use super::endpoint::oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor};
+use crate::api_client_generate_request_builder;
 use crate::{
     ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
     api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
@@ -24,14 +26,17 @@ impl UniffiWpComApiRequestBuilder {
 
 pub struct WpComApiRequestBuilder {
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
+    oauth2: Arc<Oauth2RequestBuilder>,
 }
 
 impl WpComApiRequestBuilder {
     pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
-        Self {
-            jetpack_connection: JetpackConnectionRequestBuilder::new(api_root_url, auth_provider)
-                .into(),
-        }
+        api_client_generate_request_builder!(
+            api_root_url,
+            auth_provider;
+            jetpack_connection,
+            oauth2
+        )
     }
 }
 
@@ -52,6 +57,7 @@ impl UniffiWpComApiClient {
 
 pub struct WpComApiClient {
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
+    oauth2: Arc<Oauth2RequestExecutor>,
 }
 
 impl WpComApiClient {
@@ -62,8 +68,10 @@ impl WpComApiClient {
         api_client_generate_api_client!(
             api_root_url,
             delegate;
-            jetpack_connection
+            jetpack_connection,
+            oauth2
         )
     }
 }
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
+api_client_generate_endpoint_impl!(WpComApi, oauth2);

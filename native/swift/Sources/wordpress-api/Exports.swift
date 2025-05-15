@@ -19,6 +19,8 @@ public typealias MiddlewarePipeline = WordPressAPIInternal.WpApiMiddlewarePipeli
 public typealias MiddlewarePipelineBuilder = WordPressAPIInternal.WpApiMiddlewarePipelineBuilder
 public typealias ApiDiscoveryAuthenticationMiddleware = WordPressAPIInternal.ApiDiscoveryAuthenticationMiddleware
 public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddleware
+public typealias WpApiClientDelegate = WordPressAPIInternal.WpApiClientDelegate
+public typealias WpAppNotifier = WordPressAPIInternal.WpAppNotifier
 
 // MARK: - Login
 
@@ -129,3 +131,6 @@ public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteH
 
 // MARK: - WordPress.org
 public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
+
+// MARK: - WordPress.com
+public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
