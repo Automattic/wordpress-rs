@@ -1,12 +1,14 @@
 use crate::{
     WpApiParamOrder,
     date::WpGmtDateTime,
-    impl_as_query_value_for_new_type,
-    url_query::{AppendUrlQueryPairs, QueryPairs},
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
+
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not};
 use wp_serde_helper::deserialize_u64_or_string;
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
     pub user_id: u64,
@@ -18,7 +20,17 @@ pub struct Subscriber {
     pub avatar: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum SubscriberType {
     All,
     WpCom,
@@ -29,31 +41,31 @@ pub enum SubscriberType {
     ReaderSubscriber,
     UnconfirmedSubscriber,
     BlockedSubscriber,
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
 }
 
-impl std::fmt::Display for SubscriberType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string: String = match self {
-            SubscriberType::All => "all".to_string(),
-            SubscriberType::WpCom => "wpcom".to_string(),
-            SubscriberType::Email => "email".to_string(),
-            SubscriberType::Paid => "paid".to_string(),
-            SubscriberType::Free => "free".to_string(),
-            SubscriberType::EmailSubscriber => "email_subscriber".to_string(),
-            SubscriberType::ReaderSubscriber => "reader_subscriber".to_string(),
-            SubscriberType::UnconfirmedSubscriber => "unconfirmed_subscriber".to_string(),
-            SubscriberType::BlockedSubscriber => "blocked_subscriber".to_string(),
-        };
-        write!(f, "{}", string)
-    }
-}
+impl_as_query_value_from_to_string!(SubscriberType);
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
 pub enum SubscriptionStatus {
     Active,
     Pending,
     Unsubscribed,
     Spam,
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -89,21 +101,13 @@ pub struct ListSubscribersParams {
 
 impl AppendUrlQueryPairs for ListSubscribersParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        if let Some(page) = self.page {
-            query_pairs_mut.append_pair("page", &page.to_string());
-        }
-        if let Some(per_page) = self.per_page {
-            query_pairs_mut.append_pair("per_page", &per_page.to_string());
-        }
-        if let Some(search) = &self.search {
-            query_pairs_mut.append_pair("search", search);
-        }
-        if let Some(sort) = &self.sort {
-            query_pairs_mut.append_pair("sort", &sort.to_string());
-        }
-        if let Some(sort_order) = &self.sort_order {
-            query_pairs_mut.append_pair("sort_order", &sort_order.to_string());
-        }
+        query_pairs_mut
+            .append_option_query_value_pair("page", self.page.as_ref())
+            .append_option_query_value_pair("per_page", self.per_page.as_ref())
+            .append_option_query_value_pair("search", self.search.as_ref())
+            .append_option_query_value_pair("sort", self.sort.as_ref())
+            .append_option_query_value_pair("sort_order", self.sort_order.as_ref());
+
         if let Some(filters) = &self.filters {
             query_pairs_mut.append_pair(
                 "filters",
@@ -119,7 +123,17 @@ impl AppendUrlQueryPairs for ListSubscribersParams {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum ListSubscribersSortField {
     DateSubscribed,
     EmailAddress,
@@ -128,19 +142,7 @@ pub enum ListSubscribersSortField {
     SubscriptionStatus,
 }
 
-impl std::fmt::Display for ListSubscribersSortField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string: String = match self {
-            ListSubscribersSortField::DateSubscribed => "date_subscribed".to_string(),
-            ListSubscribersSortField::EmailAddress => "email_address".to_string(),
-            ListSubscribersSortField::DisplayName => "display_name".to_string(),
-            ListSubscribersSortField::Plan => "plan".to_string(),
-            ListSubscribersSortField::SubscriptionStatus => "subscription_status".to_string(),
-        };
-
-        write!(f, "{}", string)
-    }
-}
+impl_as_query_value_from_to_string!(ListSubscribersSortField);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct ListSubscribersResponse {
@@ -199,7 +201,17 @@ pub struct AddSubscribersResponse {
 
 // MARK: - List Subscriber Import Jobs
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, uniffi::Enum)]
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
 pub enum SubscriberImportJobStatus {
     // We added the emails.
     #[serde(rename = "pending")]
@@ -220,6 +232,8 @@ pub enum SubscriberImportJobStatus {
     #[serde(rename = "cancelled")]
     Cancelled,
 }
+
+impl_as_query_value_from_to_string!(SubscriberImportJobStatus);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SubscriberImportJob {
@@ -258,21 +272,6 @@ impl AppendUrlQueryPairs for ListSubscriberImportJobsParams {
         if let Some(status) = &self.status {
             query_pairs_mut.append_pair("status", &status.to_string());
         }
-    }
-}
-
-impl std::fmt::Display for SubscriberImportJobStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string: String = match self {
-            SubscriberImportJobStatus::Pending => "pending".to_string(),
-            SubscriberImportJobStatus::Awaiting => "awaiting".to_string(),
-            SubscriberImportJobStatus::Imported => "imported".to_string(),
-            SubscriberImportJobStatus::Importing => "importing".to_string(),
-            SubscriberImportJobStatus::Failed => "failed".to_string(),
-            SubscriberImportJobStatus::Cancelled => "cancelled".to_string(),
-        };
-
-        write!(f, "{}", string)
     }
 }
 
