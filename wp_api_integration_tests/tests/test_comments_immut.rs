@@ -382,4 +382,21 @@ mod filter {
             .data;
         comment.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
+
+    #[rstest]
+    #[case(1, CommentStatus::Approve)]
+    #[case(6, CommentStatus::Hold)]
+    #[case(22, CommentStatus::Trash)]
+    #[case(23, CommentStatus::Spam)]
+    #[tokio::test]
+    #[parallel]
+    async fn parse_status(#[case] id: i64, #[case] status: CommentStatus) {
+        let comment = api_client()
+            .comments()
+            .retrieve_with_edit_context(&CommentId(id), &CommentRetrieveParams::default())
+            .await
+            .assert_response()
+            .data;
+        assert_eq!(comment.status, status);
+    }
 }
