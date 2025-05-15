@@ -3,6 +3,7 @@ use crate::{
     date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    users::UserId,
 };
 
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ use wp_serde_helper::deserialize_u64_or_string;
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
-    pub user_id: u64,
+    pub user_id: UserId,
     pub display_name: String,
     pub email_address: String,
     pub email_subscription_id: Option<u64>,
