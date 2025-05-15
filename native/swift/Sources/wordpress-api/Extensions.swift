@@ -32,3 +32,35 @@ extension MiddlewarePipeline {
         self.init(middlewares: middlewares)
     }
 }
+
+public extension CommentStatus {
+    init(_ status: String) {
+        self = commentStatusFromString(value: status)
+    }
+
+    var status: String {
+        commentStatusToString(status: self)
+    }
+}
+
+extension CommentStatus: ExpressibleByStringLiteral {
+    public init(stringLiteral: String) {
+        self.init(stringLiteral)
+    }
+}
+
+public extension CommentType {
+    init(_ type: String) {
+        self = commentTypeFromString(value: type)
+    }
+
+    var type: String {
+        commentTypeToString(commentType: self)
+    }
+}
+
+extension CommentType: ExpressibleByStringLiteral {
+    public init(stringLiteral: String) {
+        self.init(stringLiteral)
+    }
+}

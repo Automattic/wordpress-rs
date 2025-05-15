@@ -14,6 +14,7 @@ public typealias WpUuid = WordPressAPIInternal.WpUuid
 public typealias WpNetworkRequest = WordPressAPIInternal.WpNetworkRequest
 public typealias WpNetworkResponse = WordPressAPIInternal.WpNetworkResponse
 public typealias WpNetworkHeaderMap = WordPressAPIInternal.WpNetworkHeaderMap
+public typealias WpResponseString = WordPressAPIInternal.WpResponseString
 public typealias Middleware = WordPressAPIInternal.WpApiMiddleware
 public typealias MiddlewarePipeline = WordPressAPIInternal.WpApiMiddlewarePipeline
 public typealias MiddlewarePipelineBuilder = WordPressAPIInternal.WpApiMiddlewarePipelineBuilder
@@ -21,6 +22,7 @@ public typealias ApiDiscoveryAuthenticationMiddleware = WordPressAPIInternal.Api
 public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddleware
 public typealias WpApiClientDelegate = WordPressAPIInternal.WpApiClientDelegate
 public typealias WpAppNotifier = WordPressAPIInternal.WpAppNotifier
+public typealias UserAvatarSize = WordPressAPIInternal.UserAvatarSize
 
 // MARK: - Login
 

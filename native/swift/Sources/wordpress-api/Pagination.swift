@@ -248,3 +248,25 @@ extension UsersRequestExecutor: PaginationAwareExecutor {
     public typealias ViewContextResponseType = UsersRequestListWithViewContextResponse
     public typealias EmbedContextResponseType = UsersRequestListWithEmbedContextResponse
 }
+
+// MARK: - Comments
+extension CommentsRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = CommentListParams
+    public typealias DataType = CommentWithEditContext
+}
+
+extension CommentsRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = CommentListParams
+    public typealias DataType = CommentWithViewContext
+}
+
+extension CommentsRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = CommentListParams
+    public typealias DataType = CommentWithEmbedContext
+}
+
+extension CommentsRequestExecutor: PaginationAwareExecutor {
+    public typealias EditContextResponseType = CommentsRequestListWithEditContextResponse
+    public typealias ViewContextResponseType = CommentsRequestListWithViewContextResponse
+    public typealias EmbedContextResponseType = CommentsRequestListWithEmbedContextResponse
+}

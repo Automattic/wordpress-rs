@@ -579,6 +579,26 @@ pub enum CommentStatus {
 
 impl_as_query_value_from_to_string!(CommentStatus);
 
+#[uniffi::export]
+fn comment_status_from_string(value: String) -> CommentStatus {
+    CommentStatus::from_str(value.as_str()).unwrap_or(CommentStatus::Custom(value))
+}
+
+#[uniffi::export]
+fn comment_status_to_string(status: CommentStatus) -> String {
+    status.to_string()
+}
+
+#[uniffi::export]
+fn comment_type_from_string(value: String) -> CommentType {
+    CommentType::from_str(value.as_str()).unwrap_or(CommentType::Custom(value))
+}
+
+#[uniffi::export]
+fn comment_type_to_string(comment_type: CommentType) -> String {
+    comment_type.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
