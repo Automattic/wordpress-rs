@@ -215,26 +215,25 @@ pub struct AddSubscribersResponse {
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum SubscriberImportJobStatus {
     // We added the emails.
-    #[serde(rename = "pending")]
     Pending,
     // Enqueued but the import job hasn't picked it up yet.
-    #[serde(rename = "awaiting")]
     Awaiting,
     // Import complete and successful.
-    #[serde(rename = "imported")]
     Imported,
     // Job started.
-    #[serde(rename = "importing")]
     Importing,
     // Import failed.
-    #[serde(rename = "failed")]
     Failed,
     // Job cancelled.
-    #[serde(rename = "cancelled")]
     Cancelled,
+    // Handles future status codes that the server might return.
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
 }
 
 impl_as_query_value_from_to_string!(SubscriberImportJobStatus);
