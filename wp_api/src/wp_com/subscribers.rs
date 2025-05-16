@@ -70,7 +70,7 @@ pub enum SubscriptionStatus {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
-pub struct ListSubscribersParams {
+pub struct SubscribersListParams {
     // The current page.
     #[uniffi(default = None)]
     page: Option<u64>,
@@ -100,7 +100,7 @@ pub struct ListSubscribersParams {
     filters: Option<Vec<SubscriberType>>,
 }
 
-impl AppendUrlQueryPairs for ListSubscribersParams {
+impl AppendUrlQueryPairs for SubscribersListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
             .append_option_query_value_pair("page", self.page.as_ref())
@@ -263,12 +263,12 @@ pub struct SubscriberImportJob {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct ListSubscriberImportJobsParams {
+pub struct SubscriberImportJobsListParams {
     #[uniffi(default = None)]
     status: Option<SubscriberImportJobStatus>,
 }
 
-impl AppendUrlQueryPairs for ListSubscriberImportJobsParams {
+impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         if let Some(status) = &self.status {
             query_pairs_mut.append_pair("status", &status.to_string());
@@ -328,7 +328,7 @@ mod tests {
             url::Url::parse("https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers")
                 .expect("Failed to parse url");
 
-        let params = ListSubscribersParams {
+        let params = SubscribersListParams {
             page: Some(1),
             per_page: Some(100),
             search: Some("test".to_string()),
@@ -353,7 +353,7 @@ mod tests {
             url::Url::parse("https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers")
                 .expect("Failed to parse url");
 
-        let params = ListSubscribersParams {
+        let params = SubscribersListParams {
             page: Some(1),
             per_page: Some(100),
             search: Some("test".to_string()),
@@ -487,7 +487,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        ListSubscriberImportJobsParams {
+        SubscriberImportJobsListParams {
             status: Some(SubscriberImportJobStatus::Pending),
         }
         .append_query_pairs(&mut query_pairs);

@@ -140,6 +140,6 @@ public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiCli
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
 
 // MARK: Subscribers
-public typealias ListSubscribersParams = WordPressAPIInternal.ListSubscribersParams
-public typealias ListSubscriberImportJobsParams = WordPressAPIInternal.ListSubscriberImportJobsParams
+public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
+public typealias ListSubscriberImportSubscriberImportJobsListParamsJobsParams = WordPressAPIInternal.SubscriberImportJobsListParams
 public typealias AddSubscribersParams = WordPressAPIInternal.AddSubscribersParams
