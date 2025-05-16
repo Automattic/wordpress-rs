@@ -135,4 +135,11 @@ public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteH
 public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
 
 // MARK: - WordPress.com
+
+// MARK: OAuth2
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
+
+// MARK: Subscribers
+public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
+public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams
+public typealias AddSubscribersParams = WordPressAPIInternal.AddSubscribersParams
