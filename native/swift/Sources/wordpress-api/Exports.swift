@@ -141,5 +141,5 @@ public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidatio
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
-public typealias ListSubscriberImportSubscriberImportJobsListParamsJobsParams = WordPressAPIInternal.SubscriberImportJobsListParams
+public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams
 public typealias AddSubscribersParams = WordPressAPIInternal.AddSubscribersParams
