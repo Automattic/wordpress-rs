@@ -1,7 +1,6 @@
 package rs.wordpress.example.ui.welcome
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,12 +8,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
+import rs.wordpress.api.kotlin.ApiDiscoveryResult
 import rs.wordpress.api.kotlin.WpLoginClient
 import rs.wordpress.example.shared.App
 import rs.wordpress.example.shared.repository.AuthenticationRepository
+import androidx.core.net.toUri
+import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 
 class WelcomeActivity : ComponentActivity() {
     private val authRepository: AuthenticationRepository by inject()
+    private var apiDiscoverySuccess: AutoDiscoveryAttemptSuccess? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,11 +28,14 @@ class WelcomeActivity : ComponentActivity() {
     }
 
     private fun authenticateSite(url: String) {
-        val authenticationUrl = runBlocking {
-            WpLoginClient().apiDiscovery(url)
-                .getOrThrow().applicationPasswordsAuthenticationUrl.url()
+        val success = runBlocking {
+            when (val apiDiscoveryResult = WpLoginClient().apiDiscovery(url)) {
+                is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
+                else -> throw IllegalStateException("Api discovery should succeed for the example app")
+            }
         }
-        val uriBuilder = Uri.parse(authenticationUrl).buildUpon()
+        val uriBuilder = success.applicationPasswordsAuthenticationUrl.url().toUri().buildUpon()
+        apiDiscoverySuccess = success
 
         uriBuilder
             .appendQueryParameter("app_name", "WordPressRsAndroidExample")
@@ -51,7 +57,14 @@ class WelcomeActivity : ComponentActivity() {
             val password = it.getQueryParameter("password")
 
             if (siteUrl != null && username != null && password != null) {
-                authRepository.addAuthenticatedSite(siteUrl, username, password)
+                val discoverySuccess = apiDiscoverySuccess
+                    ?: throw IllegalStateException("Api discovery has to be successful before authentication")
+                authRepository.addAuthenticatedSite(
+                    discoverySuccess.parsedSiteUrl,
+                    discoverySuccess.apiRootUrl,
+                    username,
+                    password
+                )
                 onBackPressedDispatcher.onBackPressed()
             }
         }

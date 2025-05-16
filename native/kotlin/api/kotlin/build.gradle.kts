@@ -23,8 +23,6 @@ testing {
         }
 
         register<JvmTestSuite>("integrationTest") {
-            testType = TestSuiteType.INTEGRATION_TEST
-
             sources {
                 resources {
                     setSrcDirs(

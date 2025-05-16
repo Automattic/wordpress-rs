@@ -33,15 +33,15 @@ ENV PATH="//usr/lib/android-sdk/cmdline-tools/latest/bin:${PATH}"
 RUN yes | sdkmanager --licenses
 
 RUN sdkmanager --install \
-  "ndk;25.1.8937393"
+  "ndk;27.0.12077973"
 
 # Cache Gradle 8.7
 RUN mkdir gradle-cache-tmp \
         && cd gradle-cache-tmp \
-        && wget https://services.gradle.org/distributions/gradle-8.7-bin.zip \
-        && unzip gradle-8.7-bin.zip \
+        && wget https://services.gradle.org/distributions/gradle-8.14-all.zip \
+        && unzip gradle-8.14-all.zip \
         && touch settings.gradle \
-        && gradle-8.7/bin/gradle wrapper --gradle-version 8.7 --distribution-type all \
+        && gradle-8.14/bin/gradle wrapper --gradle-version 8.14 --distribution-type all \
         && ./gradlew \
         && cd .. \
         && rm -rf ./gradle-cache-tmp

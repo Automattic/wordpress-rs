@@ -1,22 +1,25 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsCompose)
-    // TODO (Kotlin-2.0) - re-enable
-    // alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.compose.compiler)
+}
+
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+
+tasks.withType<KotlinJvmCompile>().configureEach {
+  compilerOptions {
+    jvmTarget.set(JvmTarget.JVM_11)
+    freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
+  }
 }
 
 kotlin {
-    androidTarget {
-        // TODO (Kotlin-2.0) - re-enable
-        // @OptIn(ExperimentalKotlinGradlePluginApi::class)
-        // compilerOptions {
-        //     jvmTarget.set(JvmTarget.JVM_11)
-        // }
-    }
-
+    androidTarget()
     jvm("desktop")
 
     sourceSets {
@@ -88,21 +91,14 @@ android {
         }
     }
     compileOptions {
-        // TODO (Kotlin-2.0) - Revert back to VERSION_11
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
         compose = true
     }
     dependencies {
         debugImplementation(compose.uiTooling)
-    }
-    // TODO (Kotlin-2.0) - Remove `composeOptions`
-    composeOptions {
-        // Once Kotlin is upgraded to >=2.0, this should be replaced with compose compiler plugin
-        // https://developer.android.com/develop/ui/compose/compiler
-        kotlinCompilerExtensionVersion = "1.5.14"
     }
 }
 
