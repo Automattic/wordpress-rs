@@ -158,7 +158,10 @@ pub struct ListSubscribersResponse {
 
 #[derive(Debug, uniffi::Enum)]
 pub enum GetSubscriberQuery {
+    // Return subscribers that receive notifications via WordPress.com for new posts.
     WpCom(u64),
+
+    // Return subscribers that receive notifications via email for new posts.
     Email(u64),
 }
 
