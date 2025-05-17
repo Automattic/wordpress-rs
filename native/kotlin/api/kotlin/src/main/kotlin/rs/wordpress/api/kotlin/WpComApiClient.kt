@@ -6,14 +6,14 @@ import kotlinx.coroutines.withContext
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpApiClient
+import uniffi.wp_api.UniffiWpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
 
-class WpApiClient(
-    apiRootUrl: ParsedUrl,
+class WpComApiClient(
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
@@ -21,8 +21,7 @@ class WpApiClient(
 ) {
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
-        UniffiWpApiClient(
-            apiRootUrl,
+        UniffiWpComApiClient(
             WpApiClientDelegate(
                 authProvider,
                 requestExecutor = requestExecutor,
@@ -39,7 +38,7 @@ class WpApiClient(
     //
     // It'll also help make sure any breaking changes to the API will end up as a compiler error.
     suspend fun <T> request(
-        executeRequest: suspend (UniffiWpApiClient) -> T
+        executeRequest: suspend (UniffiWpComApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
             WpRequestResult.WpRequestSuccess(data = executeRequest(requestBuilder))
@@ -48,4 +47,3 @@ class WpApiClient(
         }
     }
 }
-

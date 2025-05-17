@@ -40,9 +40,9 @@ struct UniffiJetpackApiClient {
 #[uniffi::export]
 impl UniffiJetpackApiClient {
     #[uniffi::constructor]
-    fn new(site_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
+    fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         Self {
-            inner: JetpackApiClient::new(site_url, delegate),
+            inner: JetpackApiClient::new(api_root_url, delegate),
         }
     }
 }
