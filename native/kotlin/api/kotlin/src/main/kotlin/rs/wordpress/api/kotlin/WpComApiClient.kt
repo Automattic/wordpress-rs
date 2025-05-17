@@ -3,9 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
-import uniffi.wp_api.UniffiWpApiClient
 import uniffi.wp_api.UniffiWpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiException

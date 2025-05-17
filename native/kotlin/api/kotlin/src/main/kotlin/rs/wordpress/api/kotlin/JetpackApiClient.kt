@@ -6,8 +6,6 @@ import kotlinx.coroutines.withContext
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiJetpackApiClient
-import uniffi.wp_api.UniffiWpApiClient
-import uniffi.wp_api.UniffiWpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiMiddlewarePipeline
