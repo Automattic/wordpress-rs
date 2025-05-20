@@ -114,9 +114,8 @@ mod tests {
     #[case("42.78")] // invalid timestamp
     fn test_invalid_date(#[case] date_string: &str) {
         let json_str = format!("{{\"wp_utc_date_time\": {}}}", date_string);
-        assert_eq!(
+        assert!(
             serde_json::from_str::<Foo>(&json_str).is_err(),
-            true,
             "Expected error for invalid date"
         );
     }
