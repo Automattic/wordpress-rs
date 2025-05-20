@@ -1,5 +1,6 @@
 use crate::{
     date::WpGmtDateTime,
+    impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
 };
@@ -144,6 +145,56 @@ pub struct CreateBotConversationFeedbackParams {
 pub enum FeedbackRating {
     Positive = 1,
     Negative = 0,
+}
+
+impl_as_query_value_for_new_type!(BotId);
+uniffi::custom_newtype!(BotId, String);
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct BotId(pub String);
+
+impl std::fmt::Display for BotId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl_as_query_value_for_new_type!(ChatId);
+uniffi::custom_newtype!(ChatId, u64);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChatId(pub u64);
+
+impl std::str::FromStr for ChatId {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+impl std::fmt::Display for ChatId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl_as_query_value_for_new_type!(MessageId);
+uniffi::custom_newtype!(MessageId, u64);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageId(pub u64);
+
+impl std::str::FromStr for MessageId {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+impl std::fmt::Display for MessageId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[cfg(test)]
