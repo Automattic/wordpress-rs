@@ -18,59 +18,59 @@ pub mod wp_utc_date_format {
     where
         D: Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
+        match DateRepresentation::deserialize(deserializer)? {
+            DateRepresentation::Int(timestamp) => {
+                if let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0) {
+                    return Ok(dt);
+                }
 
-        // Try to parse as integer first
-        if let Some(timestamp) = value.as_u64() {
-            return Ok(DateTime::<Utc>::from_timestamp(timestamp as i64, 0).unwrap());
-        }
+                Err(serde::de::Error::custom(format!(
+                    "Invalid date : {}",
+                    timestamp
+                )))
+            }
+            DateRepresentation::String(s) => {
+                // WP.org REST API Format
+                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, WP_DATE_FORMAT) {
+                    return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+                }
 
-        let s = value.as_str().ok_or(serde::de::Error::custom(format!(
-            "Invalid date format: {}",
-            value
-        )))?;
+                // ISO-8601
+                if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
+                    return Ok(dt.with_timezone(&Utc));
+                }
 
-        // First, try parsing the WP REST API format
-        if let Ok(dt) = NaiveDateTime::parse_from_str(s, WP_DATE_FORMAT) {
-            return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-        }
+                // Unix Timestamp (wrapped in a string)
+                if let Ok(timestamp) = s.parse::<i64>() {
+                    if let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0) {
+                        return Ok(dt);
+                    }
+                }
 
-        // If WordPress format fails, try ISO-8601 format
-        if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-            return Ok(dt.with_timezone(&Utc));
-        }
+                // MySQL format
+                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, MYSQL_DATE_FORMAT) {
+                    return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+                }
 
-        // First, try parsing the WP REST API format
-        if let Ok(dt) = NaiveDateTime::parse_from_str(s, WP_DATE_FORMAT) {
-            return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-        }
+                // WP format with sub-second precision
+                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, &format!("{}.%f", WP_DATE_FORMAT))
+                {
+                    return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+                }
 
-        // Try ISO-8601 format
-        if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-            return Ok(dt.with_timezone(&Utc));
-        }
-
-        // Try to parse as Unix timestamp
-        if let Ok(timestamp) = s.parse::<i64>() {
-            if let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0) {
-                return Ok(dt);
+                Err(serde::de::Error::custom(format!(
+                    "Invalid date format: {}",
+                    s
+                )))
             }
         }
+    }
 
-        // Try to parse as MySQL format
-        if let Ok(dt) = NaiveDateTime::parse_from_str(s, MYSQL_DATE_FORMAT) {
-            return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-        }
-
-        // Try to parse as WP format with sub-second precision
-        if let Ok(dt) = NaiveDateTime::parse_from_str(s, &format!("{}.%f", WP_DATE_FORMAT)) {
-            return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-        }
-
-        Err(serde::de::Error::custom(format!(
-            "Invalid date format: {}",
-            s
-        )))
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum DateRepresentation {
+        String(String),
+        Int(i64),
     }
 }
 
@@ -107,5 +107,17 @@ mod tests {
         if foo.wp_utc_date_time.nanosecond() != 0 {
             assert_eq!(foo.wp_utc_date_time.nanosecond(), 126769);
         }
+    }
+
+    #[rstest]
+    #[case(r#""invalid""#)] // invalid date string
+    #[case("42.78")] // invalid timestamp
+    fn test_invalid_date(#[case] date_string: &str) {
+        let json_str = format!("{{\"wp_utc_date_time\": {}}}", date_string);
+        assert_eq!(
+            serde_json::from_str::<Foo>(&json_str).is_err(),
+            true,
+            "Expected error for invalid date"
+        );
     }
 }
