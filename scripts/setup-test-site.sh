@@ -95,6 +95,7 @@ create_test_credentials () {
   local PASSWORD_PROTECTED_COMMENT_AUTHOR
   local FIRST_POST_DATE_GMT
   local WORDPRESS_VERSION
+  local INTEGRATION_TEST_CUSTOM_TEMPLATE_ID
   SITE_URL="http://localhost"
   ADMIN_USERNAME="test@example.com"
   ADMIN_PASSWORD="$(wp user application-password create test@example.com test --porcelain)"
@@ -115,8 +116,14 @@ create_test_credentials () {
 
   WORDPRESS_VERSION="$(wp core version)"
 
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_SLUG="integration_test_custom_template"
+
   # Trash the post
   wp post delete "$TRASHED_POST_ID"
+
+  # Create a custom template
+  curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_ID="twentytwentyfour//integration_test_custom_template"
 
   rm -rf /app/test_credentials.json
   jo -p \
@@ -137,6 +144,7 @@ create_test_credentials () {
     trashed_post_id="$TRASHED_POST_ID" \
     first_post_date_gmt="$FIRST_POST_DATE_GMT" \
     wordpress_core_version="\"$WORDPRESS_VERSION\"" \
+    integration_test_custom_template_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
