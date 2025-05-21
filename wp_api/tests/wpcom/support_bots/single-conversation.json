@@ -1,0 +1,58 @@
+{
+    "chat_id": 1965758,
+    "wpcom_user_id": 158350866,
+    "external_id": null,
+    "external_id_provider": null,
+    "session_id": "2da907bc-67dd-49f0-b8f8-09c47e63176b",
+    "bot_slug": "jetpack-chat-mobile",
+    "bot_version": "1.1.0",
+    "created_at": "2025-05-15 18:04:40",
+    "zendesk_ticket_id": null,
+    "messages": [
+      {
+        "message_id": 5529625,
+        "content": "Hello, does this work?",
+        "role": "user",
+        "created_at": "2025-05-15 18:04:41",
+        "context": {
+          "selectedSiteId": 1234567890,
+          "wpcom_user_id": 1234567890,
+          "wpcom_user_name": "example-user",
+          "user_paid_support_eligibility": {
+            "is_user_eligible": true,
+            "wapuu_assistant_enabled": true,
+            "support_level": "ecommerce",
+            "user_field_flow_name": null
+          },
+          "plan": {
+            "plan_name": "WordPress.com Free",
+            "is_free": true
+          },
+          "products": [],
+          "plan_interface": false
+        },
+        "ts": 1747332281
+      },
+      {
+        "message_id": 5529627,
+        "content": "Hi there! \ud83d\udc4b \n\nI'd be happy to help, but could you please provide more details about what you're trying to do? Are you referring to:\n\n- The Jetpack Mobile app?\n- The WordPress Mobile app?\n- A specific Jetpack feature?\n\nOnce you clarify, I'll be better able to assist you!",
+        "role": "bot",
+        "created_at": "2025-05-15 18:04:47",
+        "context": {
+          "question_tags": {
+            "inquiry_type": "other",
+            "product": "unknown",
+            "is_legal_inquiry": "false",
+            "is_ai_question": "false",
+            "language": "en"
+          },
+          "sources": [],
+          "flags": {
+            "forward_to_human_support": false,
+            "canned_response": false
+          }
+        },
+        "ts": 1747332287
+      }
+    ]
+  }

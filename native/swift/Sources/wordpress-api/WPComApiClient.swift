@@ -21,4 +21,8 @@ public class WPComApiClient {
     public var subscribers: SubscribersRequestExecutor {
         internalClient.subscribers()
     }
+
+    public var supportBots: SupportBotsRequestExecutor {
+        internalClient.supportBots()
+    }
 }
