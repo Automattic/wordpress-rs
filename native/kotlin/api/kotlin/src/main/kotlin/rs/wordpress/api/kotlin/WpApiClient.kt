@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import uniffi.wp_api.ApiUrlResolver
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpApiClient
@@ -11,18 +12,33 @@ import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.WpOrgSiteApiUrlResolver
 
 class WpApiClient(
-    apiRootUrl: ParsedUrl,
+    apiUrlResolver: ApiUrlResolver,
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor = WpRequestExecutor(),
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
+    constructor(
+        wpOrgSiteApiRootUrl: ParsedUrl,
+        authProvider: WpAuthenticationProvider,
+        requestExecutor: RequestExecutor = WpRequestExecutor(),
+        appNotifier: WpAppNotifier = EmptyAppNotifier(),
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ) : this(
+        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = wpOrgSiteApiRootUrl),
+        authProvider,
+        requestExecutor,
+        appNotifier,
+        dispatcher
+    )
+
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
         UniffiWpApiClient(
-            apiRootUrl,
+            apiUrlResolver,
             WpApiClientDelegate(
                 authProvider,
                 requestExecutor = requestExecutor,

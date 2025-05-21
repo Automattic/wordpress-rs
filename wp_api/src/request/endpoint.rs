@@ -104,17 +104,20 @@ pub trait ApiUrlResolver: Send + Sync {
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
 }
 
-#[derive(Debug, uniffi::Record)]
+#[derive(Debug, uniffi::Object)]
 pub struct WpOrgSiteApiUrlResolver {
     pub api_root_url: Arc<ParsedUrl>,
 }
 
+#[uniffi::export]
 impl WpOrgSiteApiUrlResolver {
+    #[uniffi::constructor]
     pub fn new(api_root_url: Arc<ParsedUrl>) -> Self {
         Self { api_root_url }
     }
 }
 
+#[uniffi::export]
 impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
         Arc::new(
