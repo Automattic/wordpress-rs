@@ -45,6 +45,7 @@ pub enum TemplateStatus {
     Private,
     #[default]
     Publish,
+    Trash,
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
