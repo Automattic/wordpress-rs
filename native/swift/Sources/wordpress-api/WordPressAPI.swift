@@ -69,7 +69,7 @@ public actor WordPressAPI {
             appNotifier: appNotifier ?? EmptyAppNotifier()
         )
         self.requestBuilder = UniffiWpApiClient(
-            apiRootUrl: apiRootUrl,
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
             delegate: self.apiClientDelegate
         )
         self.requestExecutor = executor
