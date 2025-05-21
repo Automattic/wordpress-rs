@@ -28,6 +28,7 @@ impl WpComDotOrgApiUrlResolver {
     }
 }
 
+#[uniffi::export]
 impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
         {
