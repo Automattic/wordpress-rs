@@ -19,6 +19,7 @@ public actor WordPressAPI {
         case unableToParseResponse
     }
 
+    private let apiUrlResolver: ApiUrlResolver
     private let requestExecutor: SafeRequestExecutor
     private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
@@ -31,7 +32,7 @@ public actor WordPressAPI {
         appNotifier: WpAppNotifier? = nil
     ) {
         self.init(
-            apiRootUrl: apiRootUrl,
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
             authenticationProvider: .staticWithAuth(auth: authentication),
             executor: WpRequestExecutor(urlSession: urlSession),
             middlewarePipeline: middlewarePipeline,
@@ -47,7 +48,23 @@ public actor WordPressAPI {
         appNotifier: WpAppNotifier? = nil
     ) {
         self.init(
-            apiRootUrl: apiRootUrl,
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
+            authenticationProvider: authenticationProvider,
+            executor: WpRequestExecutor(urlSession: urlSession),
+            middlewarePipeline: middlewarePipeline,
+            appNotifier: appNotifier
+        )
+    }
+
+    public init(
+        urlSession: URLSession,
+        apiUrlResolver: ApiUrlResolver,
+        authenticationProvider: WpAuthenticationProvider,
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
+    ) {
+        self.init(
+            apiUrlResolver: apiUrlResolver,
             authenticationProvider: authenticationProvider,
             executor: WpRequestExecutor(urlSession: urlSession),
             middlewarePipeline: middlewarePipeline,
@@ -56,12 +73,13 @@ public actor WordPressAPI {
     }
 
     init(
-        apiRootUrl: ParsedUrl,
+        apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,
         executor: SafeRequestExecutor,
         middlewarePipeline: MiddlewarePipeline,
         appNotifier: WpAppNotifier?
     ) {
+        self.apiUrlResolver = apiUrlResolver
         self.apiClientDelegate = WpApiClientDelegate(
             authProvider: authenticationProvider,
             requestExecutor: executor,
@@ -69,7 +87,7 @@ public actor WordPressAPI {
             appNotifier: appNotifier ?? EmptyAppNotifier()
         )
         self.requestBuilder = UniffiWpApiClient(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
+            apiUrlResolver: self.apiUrlResolver,
             delegate: self.apiClientDelegate
         )
         self.requestExecutor = executor
