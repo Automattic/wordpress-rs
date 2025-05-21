@@ -33,7 +33,7 @@ pub(crate) enum WpComNamespace {
 }
 
 impl AsNamespace for WpComNamespace {
-    fn as_str(&self) -> &str {
+    fn namespace_value(&self) -> &'static str {
         match self {
             WpComNamespace::Oauth2 => "/oauth2",
             WpComNamespace::V2 => "/wpcom/v2",

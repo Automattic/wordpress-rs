@@ -1,11 +1,12 @@
 use crate::{
-    ParsedUrl, WpAppNotifier, api_client_generate_api_client, api_client_generate_endpoint_impl,
+    WpAppNotifier, api_client_generate_api_client, api_client_generate_endpoint_impl,
     api_client_generate_request_builder,
     auth::WpAuthenticationProvider,
     middleware::WpApiMiddlewarePipeline,
     request::{
         RequestExecutor,
         endpoint::{
+            ApiUrlResolver,
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
@@ -38,9 +39,12 @@ struct UniffiWpApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+    pub fn new(
+        api_url_resolver: Arc<dyn ApiUrlResolver>,
+        auth_provider: Arc<WpAuthenticationProvider>,
+    ) -> Self {
         Self {
-            inner: WpApiRequestBuilder::new(api_root_url, auth_provider),
+            inner: WpApiRequestBuilder::new(api_url_resolver, auth_provider),
         }
     }
 }
@@ -64,9 +68,12 @@ pub struct WpApiRequestBuilder {
 }
 
 impl WpApiRequestBuilder {
-    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+    pub fn new(
+        api_url_resolver: Arc<dyn ApiUrlResolver>,
+        auth_provider: Arc<WpAuthenticationProvider>,
+    ) -> Self {
         api_client_generate_request_builder!(
-            api_root_url,
+            api_url_resolver,
             auth_provider;
             application_passwords,
             categories,
@@ -95,9 +102,9 @@ struct UniffiWpApiClient {
 #[uniffi::export]
 impl UniffiWpApiClient {
     #[uniffi::constructor]
-    fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
+    fn new(api_url_resolver: Arc<dyn ApiUrlResolver>, delegate: WpApiClientDelegate) -> Self {
         Self {
-            inner: WpApiClient::new(api_root_url, delegate),
+            inner: WpApiClient::new(api_url_resolver, delegate),
         }
     }
 }
@@ -121,9 +128,9 @@ pub struct WpApiClient {
 }
 
 impl WpApiClient {
-    pub fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
+    pub fn new(api_url_resolver: Arc<dyn ApiUrlResolver>, delegate: WpApiClientDelegate) -> Self {
         api_client_generate_api_client!(
-            api_root_url,
+            api_url_resolver,
             delegate;
             application_passwords,
             categories,
@@ -209,11 +216,11 @@ macro_rules! api_client_generate_endpoint_impl {
 
 #[macro_export]
 macro_rules! api_client_generate_request_builder {
-    ($api_root_url:ident, $authentication:ident; $($element:expr),*) => {
+    ($api_url_resolver:ident, $authentication:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestBuilder>]::new(
-                    $api_root_url.clone(),
+                    $api_url_resolver.clone(),
                     $authentication.clone(),
                 )
                 .into(),)*
@@ -224,11 +231,11 @@ macro_rules! api_client_generate_request_builder {
 
 #[macro_export]
 macro_rules! api_client_generate_api_client {
-    ($api_root_url:ident, $delegate:ident; $($element:expr),*) => {
+    ($api_url_resolver:ident, $delegate:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestExecutor>]::new(
-                    $api_root_url.clone(),
+                    $api_url_resolver.clone(),
                     $delegate.clone(),
                 )
                 .into(),)*

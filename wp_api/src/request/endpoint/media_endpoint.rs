@@ -74,12 +74,12 @@ impl SparseField for SparseMediaFieldWithViewContext {
 
 impl MediaRequestEndpoint {
     pub fn create(&self) -> crate::request::endpoint::ApiEndpointUrl {
-        self.api_root_url
-            .by_extending_and_splitting_by_forward_slash([
-                MediaRequest::namespace().as_str(),
-                "media",
-            ])
-            .into()
+        Arc::unwrap_or_clone(self.api_url_resolver.resolve(
+            MediaRequest::namespace().namespace_value().to_string(),
+            vec!["media".to_string()],
+        ))
+        .inner
+        .into()
     }
 }
 
@@ -237,10 +237,13 @@ impl MediaRequestExecutor {
 mod tests {
     use super::*;
     use crate::{
-        ParsedUrl, UserId, WpApiParamOrder, generate,
+        UserId, WpApiParamOrder, generate,
         media::{MediaId, MediaStatus, MediaTypeParam},
         posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
-        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
+        request::endpoint::{
+            ApiUrlResolver,
+            tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        },
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
@@ -547,7 +550,9 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> MediaRequestEndpoint {
-        MediaRequestEndpoint::new(fixture_api_root_url)
+    fn endpoint(
+        fixture_wp_org_site_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) -> MediaRequestEndpoint {
+        MediaRequestEndpoint::new(fixture_wp_org_site_api_url_resolver)
     }
 }

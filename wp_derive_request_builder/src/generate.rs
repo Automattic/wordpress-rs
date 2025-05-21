@@ -32,7 +32,7 @@ fn generate_async_request_executor(
     crate_config: &CrateConfig,
 ) -> TokenStream {
     let crate_ident = &config.crate_ident;
-    let static_api_root_url_type = &config.static_types.api_root_url;
+    let static_api_url_resolver = &config.static_types.api_url_resolver;
     let static_delegate_type = &crate_config.delegate_type;
     let static_delegate_type = quote! { #static_delegate_type };
     let error_type = &crate_config.error_type;
@@ -171,15 +171,15 @@ fn generate_async_request_executor(
 
         #[derive(uniffi::Object)]
         pub struct #generated_request_executor_ident {
-            api_root_url: #static_api_root_url_type,
+            api_url_resolver: #static_api_url_resolver,
             request_builder: #generated_request_builder_ident,
             delegate: #static_delegate_type,
         }
         impl #generated_request_executor_ident {
-            pub fn new(api_root_url: #static_api_root_url_type, delegate: #static_delegate_type) -> Self {
+            pub fn new(api_url_resolver: #static_api_url_resolver, delegate: #static_delegate_type) -> Self {
                 Self {
-                    api_root_url: api_root_url.clone(),
-                    request_builder: #generated_request_builder_ident::new(api_root_url, delegate.auth_provider.clone()),
+                    api_url_resolver: api_url_resolver.clone(),
+                    request_builder: #generated_request_builder_ident::new(api_url_resolver, delegate.auth_provider.clone()),
                     delegate,
                 }
             }
@@ -194,14 +194,14 @@ fn generate_async_request_executor(
             #(#functions)*
 
             pub async fn fetch_authentication_state(&self) -> Result<#crate_ident::request::AuthenticationState, #error_type> {
-                #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_root_url.clone(), self.delegate.auth_provider.clone()).await
+                #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_url_resolver.clone(), self.delegate.auth_provider.clone()).await
             }
         }
     }
 }
 
 fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
-    let static_api_root_url_type = &config.static_types.api_root_url;
+    let static_api_url_resolver = &config.static_types.api_url_resolver;
     let static_inner_request_builder_type = &config.static_types.inner_request_builder;
     let static_auth_provider_type = &config.static_types.auth_provider;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
@@ -253,9 +253,9 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
             inner: #static_inner_request_builder_type,
         }
         impl #generated_request_builder_ident {
-            pub fn new(api_root_url: #static_api_root_url_type, auth_provider: #static_auth_provider_type) -> Self {
+            pub fn new(api_url_resolver: #static_api_url_resolver, auth_provider: #static_auth_provider_type) -> Self {
                 Self {
-                    endpoint: #generated_endpoint_ident::new(api_root_url),
+                    endpoint: #generated_endpoint_ident::new(api_url_resolver),
                     inner: #static_inner_request_builder_type::new(auth_provider),
                 }
             }
@@ -268,7 +268,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
 }
 
 fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
-    let static_api_root_url_type = &config.static_types.api_root_url;
+    let static_api_url_resolver = &config.static_types.api_url_resolver;
     let static_api_endpoint_url_type = &config.static_types.api_endpoint_url;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
 
@@ -276,8 +276,8 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
         let request_type = variant.attr.request_type;
-        let url_from_api_root_url =
-            fn_body_get_url_from_api_root_url(&parsed_enum.enum_ident, url_parts);
+        let url_from_api_url_resolver =
+            fn_body_get_url_from_api_url_resolver(&parsed_enum.enum_ident, url_parts);
         let query_pairs =
             fn_body_query_pairs(&config.crate_ident, params_type.as_ref(), request_type);
         let additional_query_pairs =
@@ -304,7 +304,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
                 fn_body_fields_query_pairs(&config.crate_ident, &context_and_filter_handler);
             quote! {
                 pub #fn_signature -> #static_api_endpoint_url_type {
-                    #url_from_api_root_url
+                    #url_from_api_url_resolver
                     #context_query_pair
                     #query_pairs
                     #additional_query_pairs
@@ -317,14 +317,13 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
     });
 
     quote! {
-        #[derive(Debug)]
         pub struct #generated_endpoint_ident {
-            api_root_url: #static_api_root_url_type,
+            api_url_resolver: #static_api_url_resolver,
         }
 
         impl #generated_endpoint_ident {
-            pub fn new(api_root_url: #static_api_root_url_type) -> Self {
-                Self { api_root_url }
+            pub fn new(api_url_resolver: #static_api_url_resolver) -> Self {
+                Self { api_url_resolver }
             }
 
             #(#functions)*
@@ -452,7 +451,7 @@ impl Config {
 
 #[derive(Debug)]
 pub struct ConfigStaticTypes {
-    pub api_root_url: TokenStream,
+    pub api_url_resolver: TokenStream,
     pub api_endpoint_url: TokenStream,
     pub inner_request_builder: TokenStream,
     pub auth_provider: TokenStream,
@@ -462,7 +461,7 @@ pub struct ConfigStaticTypes {
 impl ConfigStaticTypes {
     fn new(crate_ident: &Ident) -> Self {
         Self {
-            api_root_url: quote! { std::sync::Arc<#crate_ident::ParsedUrl> },
+            api_url_resolver: quote! { std::sync::Arc<dyn #crate_ident::request::endpoint::ApiUrlResolver> },
             api_endpoint_url: quote! { #crate_ident::request::endpoint::ApiEndpointUrl },
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
             auth_provider: quote! { std::sync::Arc<#crate_ident::auth::WpAuthenticationProvider> },

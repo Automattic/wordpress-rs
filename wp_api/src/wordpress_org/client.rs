@@ -17,7 +17,7 @@ use wp_localization_macro::WpDeriveLocalizable;
 use super::plugin_directory::{PluginInformation, QueryPluginResponse};
 use super::update_check::UpdateCheckResponse;
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 pub struct WordPressOrgApiClient {
     pub(crate) request_executor: Arc<dyn RequestExecutor>,
     pub(crate) middleware_pipeline: Arc<WpApiMiddlewarePipeline>,

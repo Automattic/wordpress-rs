@@ -21,7 +21,7 @@ use itertools::Itertools;
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 struct UniffiWpLoginClient {
     inner: Arc<WpLoginClient>,
 }
@@ -51,7 +51,6 @@ impl UniffiWpLoginClient {
     }
 }
 
-#[derive(Debug)]
 pub struct WpLoginClient {
     request_executor: Arc<dyn RequestExecutor>,
     middleware_pipeline: Arc<WpApiMiddlewarePipeline>,

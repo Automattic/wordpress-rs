@@ -7,7 +7,7 @@ pub mod endpoint;
 pub(crate) struct JetpackNamespace();
 
 impl AsNamespace for JetpackNamespace {
-    fn as_str(&self) -> &str {
+    fn namespace_value(&self) -> &'static str {
         "/jetpack/v4"
     }
 }

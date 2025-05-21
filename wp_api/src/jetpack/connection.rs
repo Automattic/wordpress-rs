@@ -97,7 +97,7 @@ impl JetpackConnectionClient {
     pub fn new(api_root_url: Arc<ParsedUrl>, delegate: WpApiClientDelegate) -> Self {
         Self {
             delegate: delegate.clone(),
-            jetpack_client: JetpackApiClient::new(api_root_url, delegate),
+            jetpack_client: JetpackApiClient::with_api_root_url(api_root_url, delegate),
         }
     }
 

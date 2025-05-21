@@ -1,3 +1,6 @@
+use crate::ParsedUrl;
+use std::sync::Arc;
+use strum_macros::EnumIter;
 use url::Url;
 
 pub mod application_passwords_endpoint;
@@ -77,22 +80,50 @@ pub trait DerivedRequest {
     fn namespace() -> impl AsNamespace;
 }
 
-pub trait AsNamespace {
-    fn as_str(&self) -> &str;
+pub trait AsNamespace: Send + Sync {
+    fn namespace_value(&self) -> &'static str;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum WpNamespace {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
+pub enum WpNamespace {
     WpSiteHealthV1,
     WpV2,
 }
 
 impl AsNamespace for WpNamespace {
-    fn as_str(&self) -> &str {
+    fn namespace_value(&self) -> &'static str {
         match self {
             Self::WpSiteHealthV1 => "/wp-site-health/v1",
             Self::WpV2 => "/wp/v2",
         }
+    }
+}
+
+#[uniffi::export(with_foreign)]
+pub trait ApiUrlResolver: Send + Sync {
+    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct WpOrgSiteApiUrlResolver {
+    pub api_root_url: Arc<ParsedUrl>,
+}
+
+impl WpOrgSiteApiUrlResolver {
+    pub fn new(api_root_url: Arc<ParsedUrl>) -> Self {
+        Self { api_root_url }
+    }
+}
+
+impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
+    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
+        Arc::new(
+            self.api_root_url
+                .by_extending_and_splitting_by_forward_slash(
+                    [namespace].into_iter().chain(endpoint_segments),
+                )
+                .into(),
+        )
     }
 }
 
@@ -114,17 +145,20 @@ mod macros {
 
 #[cfg(test)]
 mod tests {
-    use crate::ParsedUrl;
-
     use super::*;
+    use crate::ParsedUrl;
     use rstest::*;
     use std::sync::Arc;
 
+    const EXAMPLE_WP_JSON_URL: &str = "https://example.com/wp-json";
+
     #[fixture]
-    pub fn fixture_api_root_url() -> Arc<ParsedUrl> {
-        ParsedUrl::try_from("https://example.com/wp-json")
-            .unwrap()
-            .into()
+    pub fn fixture_wp_org_site_api_url_resolver() -> Arc<dyn ApiUrlResolver> {
+        Arc::new(WpOrgSiteApiUrlResolver::new(
+            ParsedUrl::try_from(EXAMPLE_WP_JSON_URL)
+                .expect("Example wp json url is valid")
+                .into(),
+        ))
     }
 
     pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
@@ -140,8 +174,8 @@ mod tests {
             endpoint_url.as_str(),
             format!(
                 "{}{}{}",
-                fixture_api_root_url().as_str(),
-                namespace.as_str(),
+                EXAMPLE_WP_JSON_URL,
+                namespace.namespace_value(),
                 path
             )
         );

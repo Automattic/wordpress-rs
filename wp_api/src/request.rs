@@ -1,17 +1,20 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    ParsedUrl, RequestExecutionErrorReason, WpApiError, WpErrorCode,
+    RequestExecutionErrorReason, WpApiError, WpErrorCode,
     api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
     auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
 use chrono::{DateTime, Utc};
-use endpoint::application_passwords_endpoint::{
-    ApplicationPasswordsRequestBuilder,
-    ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
-};
 use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
+use endpoint::{
+    ApiUrlResolver,
+    application_passwords_endpoint::{
+        ApplicationPasswordsRequestBuilder,
+        ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+    },
+};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -128,7 +131,7 @@ impl InnerRequestBuilder {
 
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
-pub trait RequestExecutor: Send + Sync + Debug {
+pub trait RequestExecutor: Send + Sync {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
@@ -770,12 +773,13 @@ pub fn is_valid_json(value: impl AsRef<str>) -> bool {
 #[uniffi::export]
 pub async fn fetch_authentication_state(
     request_executor: Arc<dyn RequestExecutor>,
-    api_root_url: Arc<ParsedUrl>,
+    api_url_resolver: Arc<dyn ApiUrlResolver>,
     authentication_provider: Arc<WpAuthenticationProvider>,
 ) -> Result<AuthenticationState, WpApiError> {
-    let request = ApplicationPasswordsRequestBuilder::new(api_root_url, authentication_provider)
-        .retrieve_current_with_edit_context()
-        .into();
+    let request =
+        ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider)
+            .retrieve_current_with_edit_context()
+            .into();
     let response = request_executor.execute(request).await?;
     let parsed_res: Result<
         ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
