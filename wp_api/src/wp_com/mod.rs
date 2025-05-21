@@ -7,6 +7,7 @@ pub mod endpoint;
 pub mod jetpack_connection;
 pub mod oauth2;
 pub mod subscribers;
+pub mod support_bots;
 
 impl_as_query_value_for_new_type!(WpComSiteId);
 uniffi::custom_newtype!(WpComSiteId, u64);

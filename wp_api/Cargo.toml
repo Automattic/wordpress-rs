@@ -33,6 +33,7 @@ rustls = { workspace = true, optional = true }
 scraper = { workspace = true }
 serde = { workspace = true, features = [ "derive", "rc" ] }
 serde_json = { workspace = true }
+serde_repr = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }

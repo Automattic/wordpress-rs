@@ -143,3 +143,9 @@ public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidatio
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
 public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams
 public typealias AddSubscribersParams = WordPressAPIInternal.AddSubscribersParams
+
+// MARK: Support Bots
+public typealias CreateBotConversationParams = WordPressAPIInternal.CreateBotConversationParams
+public typealias AddMessageToBotConversationParams = WordPressAPIInternal.AddMessageToBotConversationParams
+public typealias GetBotConversationParams = WordPressAPIInternal.GetBotConversationParams
+public typealias CreateBotConversationFeedbackParams = WordPressAPIInternal.CreateBotConversationFeedbackParams
