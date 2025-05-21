@@ -53,12 +53,14 @@ impl SparseField for SparseTemplateFieldWithViewContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ParsedUrl;
     use crate::{
         generate,
         post_types::PostType,
         posts::PostId,
-        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
+        request::endpoint::{
+            ApiUrlResolver,
+            tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        },
         templates::{TemplateArea, TemplateListParams},
     };
     use rstest::*;
@@ -194,7 +196,9 @@ mod tests {
         ];
 
     #[fixture]
-    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> TemplatesRequestEndpoint {
-        TemplatesRequestEndpoint::new(fixture_api_root_url)
+    fn endpoint(
+        fixture_wp_org_site_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) -> TemplatesRequestEndpoint {
+        TemplatesRequestEndpoint::new(fixture_wp_org_site_api_url_resolver)
     }
 }

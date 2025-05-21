@@ -227,20 +227,22 @@ fn fn_arg_fields(context_and_filter_handler: &ContextAndFilterHandler) -> TokenS
     }
 }
 
-pub fn fn_body_get_url_from_api_root_url(enum_ident: &Ident, url_parts: &[UrlPart]) -> TokenStream {
+pub fn fn_body_get_url_from_api_url_resolver(
+    enum_ident: &Ident,
+    url_parts: &[UrlPart],
+) -> TokenStream {
     let url_parts = url_parts
         .iter()
         .map(|part| match part {
             UrlPart::Dynamic(dynamic_part) => {
                 let ident = format_ident!("{}", dynamic_part);
-                quote! { &#ident.to_string() }
+                quote! { #ident.to_string() }
             }
-            UrlPart::Static(static_part) => quote! { #static_part },
+            UrlPart::Static(static_part) => quote! { #static_part.to_string() },
         })
         .collect::<Vec<TokenStream>>();
     quote! {
-        let mut url = self.api_root_url
-            .by_extending_and_splitting_by_forward_slash([ #enum_ident::namespace().as_str() , #(#url_parts,)* ]);
+        let mut url = std::sync::Arc::unwrap_or_clone(self.api_url_resolver.resolve( #enum_ident::namespace().namespace_value().to_string() , vec![#(#url_parts,)*])).inner;
     }
 }
 
@@ -938,34 +940,34 @@ mod tests {
     #[rstest]
     #[case(
         url_static_users(),
-        "let mut url = self . api_root_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" ,]) ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () ,])) . inner ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = self . api_root_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , & user_id . to_string () ,]) ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () ,])) . inner ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = self . api_root_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , & user_id . to_string () ,]) ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () ,])) . inner ;"
     )]
     #[case(
         vec![UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())],
-        "let mut url = self . api_root_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [user_id . to_string () , user_type . to_string () ,])) . inner ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = self . api_root_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () , user_type . to_string () ,])) . inner ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Static("me".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = self . api_root_url . by_extending_and_splitting_by_forward_slash ([Foo :: namespace () . as_str () , \"users\" , \"me\" , & user_id . to_string () , & user_type . to_string () ,]) ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , \"me\" . to_string () , user_id . to_string () , user_type . to_string () ,])) . inner ;"
     )]
     fn test_fn_body_get_url_from_api_root_url(
         #[case] url_parts: Vec<UrlPart>,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_get_url_from_api_root_url(&format_ident!("Foo"), &url_parts).to_string(),
+            fn_body_get_url_from_api_url_resolver(&format_ident!("Foo"), &url_parts).to_string(),
             expected_str
         );
     }

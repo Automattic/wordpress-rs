@@ -26,7 +26,7 @@ async fn plugins_update_check() {
             TestCredentials::instance()
                 .wordpress_core_version
                 .to_string(),
-            test_site_url(),
+            Arc::new(test_site_url()),
             plugins,
         )
         .await

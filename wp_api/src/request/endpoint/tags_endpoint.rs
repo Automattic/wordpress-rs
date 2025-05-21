@@ -44,11 +44,13 @@ super::macros::default_sparse_field_implementation_from_field_name!(SparseTagFie
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ParsedUrl;
     use crate::{
         WpApiParamOrder, generate,
         posts::PostId,
-        request::endpoint::tests::{fixture_api_root_url, validate_wp_v2_endpoint},
+        request::endpoint::{
+            ApiUrlResolver,
+            tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        },
         tags::{TagId, WpApiParamTagsOrderBy},
     };
     use rstest::*;
@@ -254,7 +256,9 @@ mod tests {
     ];
 
     #[fixture]
-    fn endpoint(fixture_api_root_url: Arc<ParsedUrl>) -> TagsRequestEndpoint {
-        TagsRequestEndpoint::new(fixture_api_root_url)
+    fn endpoint(
+        fixture_wp_org_site_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) -> TagsRequestEndpoint {
+        TagsRequestEndpoint::new(fixture_wp_org_site_api_url_resolver)
     }
 }

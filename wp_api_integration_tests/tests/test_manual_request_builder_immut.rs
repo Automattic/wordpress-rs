@@ -14,7 +14,9 @@ use wp_api::{
         WpApiParamUsersWho,
     },
 };
-use wp_api_integration_tests::{FIRST_USER_ID, SECOND_USER_ID, TestCredentials, test_site_url};
+use wp_api_integration_tests::{
+    FIRST_USER_ID, SECOND_USER_ID, TestCredentials, test_site_api_url_resolver,
+};
 
 pub mod reusable_test_cases;
 
@@ -25,7 +27,7 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let request_executor = ReqwestRequestExecutor::default();
 
     let request_builder = WpApiRequestBuilder::new(
-        test_site_url(),
+        test_site_api_url_resolver(),
         Arc::new(WpAuthenticationProvider::static_with_username_and_password(
             TestCredentials::instance().admin_username.to_string(),
             TestCredentials::instance().admin_password.to_string(),

@@ -19,7 +19,7 @@ use wp_api::{
 use wp_api_integration_tests::{
     AssertWpError, EmptyAppNotifier, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
     MEDIA_TEST_FILE_PATH, TestCredentials, api_client, api_client_as_author,
-    api_client_as_subscriber, test_site_url,
+    api_client_as_subscriber, test_site_api_url_resolver,
 };
 
 #[tokio::test]
@@ -175,7 +175,7 @@ async fn update_media_err_post_invalid_id() {
 
 fn api_client_with_medir_err_networking(test_type: MediaErrNetworkingTestType) -> WpApiClient {
     WpApiClient::new(
-        test_site_url(),
+        test_site_api_url_resolver(),
         WpApiClientDelegate {
             auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
                 TestCredentials::instance().admin_username.to_string(),

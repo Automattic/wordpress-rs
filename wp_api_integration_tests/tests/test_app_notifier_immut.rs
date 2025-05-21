@@ -16,7 +16,7 @@ use wp_api::{
     reqwest_request_executor::ReqwestRequestExecutor,
     users::UserListParams,
 };
-use wp_api_integration_tests::{AssertWpError, TestCredentials, test_site_url};
+use wp_api_integration_tests::{AssertWpError, TestCredentials, test_site_api_url_resolver};
 
 #[tokio::test]
 #[parallel]
@@ -67,7 +67,7 @@ fn api_client(
     app_notifier: Arc<FooAppNotifier>,
 ) -> WpApiClient {
     WpApiClient::new(
-        test_site_url(),
+        test_site_api_url_resolver(),
         WpApiClientDelegate {
             auth_provider: Arc::new(WpAuthenticationProvider::static_with_username_and_password(
                 TestCredentials::instance().admin_username.to_string(),

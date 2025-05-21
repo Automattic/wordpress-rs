@@ -1,15 +1,15 @@
-use super::endpoint::jetpack_connection_endpoint::{
-    JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
+use super::endpoint::{
+    jetpack_connection_endpoint::{
+        JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
+    },
+    oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    subscribers::{SubscribersRequestBuilder, SubscribersRequestExecutor},
+    support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
 };
-use super::endpoint::oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor};
-use super::endpoint::subscribers::{SubscribersRequestBuilder, SubscribersRequestExecutor};
-use super::endpoint::support_bots_endpoint::{
-    SupportBotsRequestBuilder, SupportBotsRequestExecutor,
-};
-use crate::api_client_generate_request_builder;
 use crate::{
-    ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
-    api_client_generate_endpoint_impl, auth::WpAuthenticationProvider,
+    WpApiClientDelegate, api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder, auth::WpAuthenticationProvider,
+    request::endpoint::ApiUrlResolver, wp_com::endpoint::WpComApiClientInternalUrlResolver,
 };
 use std::sync::Arc;
 
@@ -21,9 +21,9 @@ struct UniffiWpComApiRequestBuilder {
 #[uniffi::export]
 impl UniffiWpComApiRequestBuilder {
     #[uniffi::constructor]
-    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
         Self {
-            inner: WpComApiRequestBuilder::new(api_root_url, auth_provider),
+            inner: WpComApiRequestBuilder::new(auth_provider),
         }
     }
 }
@@ -36,9 +36,11 @@ pub struct WpComApiRequestBuilder {
 }
 
 impl WpComApiRequestBuilder {
-    pub fn new(api_root_url: Arc<ParsedUrl>, auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+        let api_url_resolver: Arc<dyn ApiUrlResolver> =
+            Arc::new(WpComApiClientInternalUrlResolver::default());
         api_client_generate_request_builder!(
-            api_root_url,
+            api_url_resolver,
             auth_provider;
             jetpack_connection,
             oauth2,
@@ -72,11 +74,11 @@ pub struct WpComApiClient {
 
 impl WpComApiClient {
     pub fn new(delegate: WpApiClientDelegate) -> Self {
-        let url = url::Url::parse("https://public-api.wordpress.com").expect("This is a valid URL");
-        let api_root_url: Arc<ParsedUrl> = ParsedUrl::new(url).into();
+        let api_url_resolver: Arc<dyn ApiUrlResolver> =
+            Arc::new(WpComApiClientInternalUrlResolver::default());
 
         api_client_generate_api_client!(
-            api_root_url,
+            api_url_resolver,
             delegate;
             jetpack_connection,
             oauth2,
