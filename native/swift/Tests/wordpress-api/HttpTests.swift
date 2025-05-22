@@ -10,7 +10,9 @@ class HTTPErrorTests {
         let stubs = HTTPStubs(stubs: [], missingStub: .failure(URLError(.timedOut)))
 
         let api = try WordPressAPI(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")),
+            apiUrlResolver: WpOrgSiteApiUrlResolver(
+                apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
+            ),
             authenticationProvider: .none(),
             executor: stubs,
             middlewarePipeline: .default,
