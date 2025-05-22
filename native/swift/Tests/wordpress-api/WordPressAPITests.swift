@@ -43,7 +43,7 @@ struct WordPressAPITests {
     func testExample() async throws {
         let stubs = try createStubs()
         let api = try WordPressAPI(
-            apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")),
             authenticationProvider: .none(),
             executor: stubs,
             middlewarePipeline: .default,
@@ -58,7 +58,7 @@ struct WordPressAPITests {
         let stubs = try createStubs()
         let counter = CounterMiddleware()
         let api = try WordPressAPI(
-            apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json"),
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")),
             authenticationProvider: .none(),
             executor: stubs,
             middlewarePipeline: .init(middlewares: [counter]),
