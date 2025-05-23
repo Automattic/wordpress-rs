@@ -5,7 +5,7 @@ import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.WpRedirect
 
 sealed class WpRequestResult<T> {
-    data class WpRequestSuccess<T>(val data: T) : WpRequestResult<T>()
+    data class Success<T>(val response: T) : WpRequestResult<T>()
     data class WpError<T>(
         val errorCode: WpErrorCode,
         val errorMessage: String,

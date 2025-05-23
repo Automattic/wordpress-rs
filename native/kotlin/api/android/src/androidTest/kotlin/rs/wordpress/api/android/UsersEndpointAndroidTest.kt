@@ -18,6 +18,6 @@ class UsersEndpointAndroidTest {
         val result = client.request { requestBuilder ->
             requestBuilder.users().listWithViewContext(params = UserListParams())
         }
-        assert(result is WpRequestResult.WpRequestSuccess)
+        assert(result is WpRequestResult.Success)
     }
 }

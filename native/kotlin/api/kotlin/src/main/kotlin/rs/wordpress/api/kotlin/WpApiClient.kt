@@ -58,7 +58,7 @@ class WpApiClient(
         executeRequest: suspend (UniffiWpApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
-            WpRequestResult.WpRequestSuccess(data = executeRequest(requestBuilder))
+            WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
             mapWpApiExceptionToWpRequestResult(exception)
         }

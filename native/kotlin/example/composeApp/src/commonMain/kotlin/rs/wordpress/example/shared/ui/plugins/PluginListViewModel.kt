@@ -30,7 +30,7 @@ class PluginListViewModel(private val authRepository: AuthenticationRepository) 
                 }
             }
             return when (pluginsResult) {
-                is WpRequestResult.WpRequestSuccess -> pluginsResult.data.data
+                is WpRequestResult.Success -> pluginsResult.response.data
                 else -> listOf()
             }
         }
