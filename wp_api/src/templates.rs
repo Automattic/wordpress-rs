@@ -161,7 +161,12 @@ pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
     pub author: Option<UserId>,
     #[WpContext(edit, view)]
-    pub modified: Option<bool>,
+    #[WpContextualOption]
+    #[serde(
+        default,
+        deserialize_with = "wp_serde_helper::deserialize_false_or_string"
+    )]
+    pub modified: Option<String>,
     #[WpContext(edit, view, embed)]
     pub is_custom: Option<bool>,
     #[WpContext(edit, view, embed)]
