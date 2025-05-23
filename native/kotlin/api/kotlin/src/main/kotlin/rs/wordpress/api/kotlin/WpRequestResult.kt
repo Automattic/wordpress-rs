@@ -40,4 +40,10 @@ sealed class WpRequestResult<T> {
         val statusCode: UShort,
         val response: String,
     ) : WpRequestResult<T>()
+
+    fun successfulResponse(): T? =
+        when (this) {
+            is Success -> this.response
+            else -> null
+        }
 }
