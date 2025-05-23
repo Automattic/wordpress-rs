@@ -26,6 +26,10 @@ public class WPComApiClient {
         internalClient.supportBots()
     }
 
+    public var supportEligibility: SupportEligibilityRequestExecutor {
+        internalClient.supportEligibility()
+    }
+
     public var supportTickets: SupportTicketsRequestExecutor {
         internalClient.supportTickets()
     }
