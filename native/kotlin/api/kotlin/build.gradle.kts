@@ -8,6 +8,9 @@ plugins {
 }
 
 java {
+    withJavadocJar()
+    withSourcesJar()
+
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
     toolchain {
@@ -123,6 +126,9 @@ tasks.named("processIntegrationTestResources").configure {
     dependsOn(rootProject.tasks.named("copyTestCredentials"))
     dependsOn(rootProject.tasks.named("copyTestMedia"))
     dependsOn(rootProject.tasks.named("copySampleJSON"))
+}
+tasks.named("sourcesJar").configure {
+    dependsOn(generateUniFFIBindingsTask)
 }
 
 project.afterEvaluate {
