@@ -3,7 +3,11 @@ use rstest_reuse::{self, apply, template};
 use serial_test::parallel;
 use wp_api::{
     WpApiParamOrder, generate,
-    post_revisions::{PostRevisionId, PostRevisionListParams, WpApiParamPostRevisionsOrderBy},
+    post_revisions::{
+        PostRevisionId, PostRevisionListParams, SparsePostRevisionFieldWithEditContext,
+        SparsePostRevisionFieldWithEmbedContext, SparsePostRevisionFieldWithViewContext,
+        WpApiParamPostRevisionsOrderBy,
+    },
     posts::PostId,
 };
 use wp_api_integration_tests::{AssertResponse, TestCredentials, api_client};
@@ -58,3 +62,86 @@ fn revisioned_post_id() -> PostId {
 #[case::order(generate!(PostRevisionListParams, (order, Some(WpApiParamOrder::Asc))))]
 #[case::orderby(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Slug))))]
 fn list_cases(#[case] params: PostRevisionListParams) {}
+
+mod filter {
+    use super::*;
+
+    wp_api::generate_sparse_post_revision_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_post_revision_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_post_revision_field_with_view_context_test_cases!();
+
+    #[apply(sparse_post_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparsePostRevisionFieldWithEditContext::Id, SparsePostRevisionFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_list_with_edit_context(
+        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[values(
+            PostRevisionListParams::default(),
+            generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
+            generate!(PostRevisionListParams, (search, Some("foo".to_string())))
+        )]
+        params: PostRevisionListParams,
+    ) {
+        api_client()
+            .post_revisions()
+            .filter_list_with_edit_context(&revisioned_post_id(), &params, fields)
+            .await
+            .assert_response()
+            .data
+            .iter()
+            .for_each(|post| {
+                post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+            });
+    }
+
+    #[apply(sparse_post_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparsePostRevisionFieldWithEmbedContext::Id, SparsePostRevisionFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_list_with_embed_context(
+        #[case] fields: &[SparsePostRevisionFieldWithEmbedContext],
+        #[values(
+            PostRevisionListParams::default(),
+            generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
+            generate!(PostRevisionListParams, (search, Some("foo".to_string())))
+        )]
+        params: PostRevisionListParams,
+    ) {
+        api_client()
+            .post_revisions()
+            .filter_list_with_embed_context(&revisioned_post_id(), &params, fields)
+            .await
+            .assert_response()
+            .data
+            .iter()
+            .for_each(|post| {
+                post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+            });
+    }
+
+    #[apply(sparse_post_revision_field_with_view_context_test_cases)]
+    #[case(&[SparsePostRevisionFieldWithViewContext::Id, SparsePostRevisionFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_list_with_view_context(
+        #[case] fields: &[SparsePostRevisionFieldWithViewContext],
+        #[values(
+            PostRevisionListParams::default(),
+            generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
+            generate!(PostRevisionListParams, (search, Some("foo".to_string())))
+        )]
+        params: PostRevisionListParams,
+    ) {
+        api_client()
+            .post_revisions()
+            .filter_list_with_view_context(&revisioned_post_id(), &params, fields)
+            .await
+            .assert_response()
+            .data
+            .iter()
+            .for_each(|post| {
+                post.assert_that_instance_fields_nullability_match_provided_fields(fields)
+            });
+    }
+}
