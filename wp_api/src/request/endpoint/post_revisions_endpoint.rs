@@ -95,6 +95,22 @@ mod tests {
         );
     }
 
+    #[rstest]
+    #[case(PostRevisionListParams::default(), &[], "/posts/777/revisions?context=edit&_fields=")]
+    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Id))), &[SparsePostRevisionFieldWithEditContext::Date], "/posts/777/revisions?context=edit&orderby=id&_fields=date")]
+    #[case(post_revision_list_params_with_all_fields(), ALL_SPARSE_POST_REVISION_FIELDS_WITH_EDIT_CONTEXT, &format!("/posts/777/revisions?context=edit&{}&{}", expected_query_pairs_for_post_revision_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_REVISION_FIELDS_WITH_EDIT_CONTEXT))]
+    fn filter_list_post_revision_with_edit_context(
+        endpoint: PostRevisionsRequestEndpoint,
+        #[case] params: PostRevisionListParams,
+        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.filter_list_with_edit_context(&PostId(777), &params, fields),
+            expected_path,
+        );
+    }
+
     fn expected_query_pairs_for_post_revision_list_params_with_all_fields() -> String {
         "page=2&per_page=2&search=foo&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=id"
             .to_string()
@@ -112,6 +128,24 @@ mod tests {
             orderby: Some(WpApiParamPostRevisionsOrderBy::Id),
         }
     }
+
+    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_REVISION_FIELDS_WITH_EDIT_CONTEXT: &str = "_fields=id%2Cauthor%2Cdate%2Cdate_gmt%2Cmodified%2Cmodified_gmt%2Cparent%2Cslug%2Cguid%2Ctitle%2Ccontent%2Cexcerpt%2Cmeta";
+    const ALL_SPARSE_POST_REVISION_FIELDS_WITH_EDIT_CONTEXT: &[SparsePostRevisionFieldWithEditContext;
+         13] = &[
+        SparsePostRevisionFieldWithEditContext::Id,
+        SparsePostRevisionFieldWithEditContext::Author,
+        SparsePostRevisionFieldWithEditContext::Date,
+        SparsePostRevisionFieldWithEditContext::DateGmt,
+        SparsePostRevisionFieldWithEditContext::Modified,
+        SparsePostRevisionFieldWithEditContext::ModifiedGmt,
+        SparsePostRevisionFieldWithEditContext::Parent,
+        SparsePostRevisionFieldWithEditContext::Slug,
+        SparsePostRevisionFieldWithEditContext::Guid,
+        SparsePostRevisionFieldWithEditContext::Title,
+        SparsePostRevisionFieldWithEditContext::Content,
+        SparsePostRevisionFieldWithEditContext::Excerpt,
+        SparsePostRevisionFieldWithEditContext::Meta,
+    ];
 
     #[fixture]
     fn endpoint(
