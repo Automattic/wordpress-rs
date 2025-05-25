@@ -274,6 +274,10 @@ pub enum WpErrorCode {
     PostInvalidId,
     #[serde(rename = "rest_post_invalid_page_number")]
     PostInvalidPageNumber,
+    #[serde(rename = "rest_post_invalid_parent")]
+    PostInvalidParent,
+    #[serde(rename = "rest_revision_invalid_offset_number")]
+    RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
     #[serde(rename = "rest_template_already_trashed")]

@@ -33,6 +33,7 @@ pub mod login;
 pub mod media;
 pub mod middleware;
 pub mod plugins;
+pub mod post_revisions;
 pub mod post_types;
 pub mod posts;
 pub mod request;
