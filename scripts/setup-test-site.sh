@@ -93,6 +93,7 @@ create_test_credentials () {
   local PASSWORD_PROTECTED_POST_ID
   local PASSWORD_PROTECTED_COMMENT_ID
   local PASSWORD_PROTECTED_COMMENT_AUTHOR
+  local REVISIONED_POST_ID
   local FIRST_POST_DATE_GMT
   local WORDPRESS_VERSION
   local INTEGRATION_TEST_CUSTOM_TEMPLATE_ID
@@ -125,6 +126,16 @@ create_test_credentials () {
   curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates
   INTEGRATION_TEST_CUSTOM_TEMPLATE_ID="twentytwentyfour//integration_test_custom_template"
 
+  # Setup a post with post revisions for integration tests
+  REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
+  curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"content":"Add some content for first revision"}' "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID/autosaves"
+  # TODO: The following doesn't create multiple revisions, but instead updates the existing revisions which is not what we need
+  # # Create some exta revisions for testing
+  # for i in {1..10};
+  # do
+  #   curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\"}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID/autosaves"
+  # done
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -145,6 +156,7 @@ create_test_credentials () {
     first_post_date_gmt="$FIRST_POST_DATE_GMT" \
     wordpress_core_version="\"$WORDPRESS_VERSION\"" \
     integration_test_custom_template_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" \
+    revisioned_post_id="$REVISIONED_POST_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
