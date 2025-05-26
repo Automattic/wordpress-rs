@@ -16,6 +16,8 @@ enum TemplatesRequest {
     Delete,
     #[delete(url = "/templates/<template_id>", output = crate::templates::TemplateWithEditContext)]
     Trash,
+    #[post(url = "/templates/<template_id>", params = &crate::templates::TemplateUpdateParams, output = crate::templates::TemplateWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for TemplatesRequest {
@@ -188,6 +190,14 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.trash(&TemplateId("foo".to_string())),
             "/templates/foo?force=false",
+        );
+    }
+
+    #[rstest]
+    fn update_template(endpoint: TemplatesRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.update(&TemplateId("foo".to_string())),
+            "/templates/foo",
         );
     }
 

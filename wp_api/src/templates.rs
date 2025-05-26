@@ -175,14 +175,14 @@ pub struct SparseTemplate {
     pub original_source: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum SparseTemplateContentWrapper {
     Object(SparseTemplateContent),
     String(String),
 }
 
-#[derive(Debug, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
 pub struct SparseTemplateContent {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -190,14 +190,14 @@ pub struct SparseTemplateContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum SparseTemplateTitleWrapper {
     Object(SparseTemplateTitle),
     String(String),
 }
 
-#[derive(Debug, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
 pub struct SparseTemplateTitle {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -207,4 +207,28 @@ pub struct SparseTemplateTitle {
 pub struct TemplateDeleteResponse {
     pub deleted: bool,
     pub previous: TemplateWithEditContext,
+}
+
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct TemplateUpdateParams {
+    // Content of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // Title of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // Description of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // The ID for the author of the template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // https://developer.wordpress.org/rest-api/reference/wp_templates/#update-a-template
+    // The documentation includes `slug`, `status`, `theme` & `type` parameters, but the updates
+    // don't seem to take place when they are included in the request. So, we decided not to
+    // include them until we figure out under which conditions they'll be allowed to update.
 }
