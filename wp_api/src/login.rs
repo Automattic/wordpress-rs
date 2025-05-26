@@ -95,7 +95,7 @@ impl WpApiDetails {
     /// Returns the URL to be used in application password authentication.
     ///
     /// See the "Authorization Flow" section for details:
-    /// https://github.com/WordPress/wordpress-develop/blob/530493396b324f5bed518a494e2843e7fdb020f1/src/wp-includes/rest-api.php#L1099-L1119
+    /// <https://github.com/WordPress/wordpress-develop/blob/530493396b324f5bed518a494e2843e7fdb020f1/src/wp-includes/rest-api.php#L1099-L1119>
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
             .find_application_passwords_authentication_url()
@@ -267,7 +267,7 @@ impl WpApiDetailsAuthenticationMap {
 /// Return a URL to be used in application password authentication.
 ///
 /// See the "Authorization Flow" section for details:
-/// https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/
+/// <https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/>
 #[uniffi::export]
 pub fn create_application_password_authentication_url(
     login_url: Arc<ParsedUrl>,

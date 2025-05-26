@@ -84,7 +84,7 @@ pub struct Ratings {
     pub one_star: u32,
 }
 
-/// https://developer.wordpress.org/plugins/wordpress-org/plugin-assets/#screenshots
+/// <https://developer.wordpress.org/plugins/wordpress-org/plugin-assets/#screenshots>
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, uniffi::Enum)]
 #[serde(untagged)]
 pub enum Screenshots {
