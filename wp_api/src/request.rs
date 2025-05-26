@@ -647,8 +647,7 @@ impl WpSupportsLocalization for HttpAuthMethodParsingError {
     }
 }
 
-/// Parser based on https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
-///
+/// Parser based on <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate>
 impl FromStr for HttpAuthMethod {
     type Err = HttpAuthMethodParsingError;
 
