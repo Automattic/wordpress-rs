@@ -3,7 +3,7 @@ name: Documentation
 on:
   push:
     branches:
-      - trunk
+      - publish-wp_api-docs-to-github-pages
 
 permissions:
   contents: read
