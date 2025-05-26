@@ -45,6 +45,7 @@ pub enum TemplateStatus {
     Private,
     #[default]
     Publish,
+    Trash,
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
@@ -160,7 +161,12 @@ pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
     pub author: Option<UserId>,
     #[WpContext(edit, view)]
-    pub modified: Option<bool>,
+    #[WpContextualOption]
+    #[serde(
+        default,
+        deserialize_with = "wp_serde_helper::deserialize_false_or_string"
+    )]
+    pub modified: Option<String>,
     #[WpContext(edit, view, embed)]
     pub is_custom: Option<bool>,
     #[WpContext(edit, view, embed)]
@@ -195,4 +201,10 @@ pub enum SparseTemplateTitleWrapper {
 pub struct SparseTemplateTitle {
     pub raw: Option<String>,
     pub rendered: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct TemplateDeleteResponse {
+    pub deleted: bool,
+    pub previous: TemplateWithEditContext,
 }

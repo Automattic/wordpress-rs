@@ -40,6 +40,7 @@ pub struct TestCredentials {
     pub trashed_post_id: i64,
     pub first_post_date_gmt: &'static str,
     pub wordpress_core_version: &'static str,
+    pub integration_test_custom_template_id: &'static str,
 }
 
 impl TestCredentials {
