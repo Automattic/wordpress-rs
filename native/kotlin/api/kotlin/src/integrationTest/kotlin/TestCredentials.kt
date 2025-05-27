@@ -3,8 +3,8 @@ package rs.wordpress.api.kotlin
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import uniffi.wp_api.ParsedUrl
 import java.io.File
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.TimeZone
 
@@ -44,5 +44,5 @@ data class TestCredentials(
         }
     }
 
-    val apiRootUrl by lazy { ParsedUrl.parse("$siteUrl/wp-json") }
+    val apiRootUrl by lazy { URL("$siteUrl/wp-json") }
 }

@@ -4,7 +4,7 @@ import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.FetchAndParseApiRootFailure
 import uniffi.wp_api.FindApiRootFailure
 import uniffi.wp_api.ParseUrlException
-import uniffi.wp_api.ParsedUrl
+import java.net.URL
 
 sealed class ApiDiscoveryResult {
     data class Success(val success: AutoDiscoveryAttemptSuccess) : ApiDiscoveryResult()
@@ -12,12 +12,12 @@ sealed class ApiDiscoveryResult {
         val error: ParseUrlException
     ) : ApiDiscoveryResult()
     data class FailureFindApiRoot(
-        val parsedSiteUrl: ParsedUrl,
+        val parsedSiteUrl: URL,
         val findApiRootFailure: FindApiRootFailure
     ) : ApiDiscoveryResult()
     data class FailureFetchAndParseApiRoot(
-        val parsedSiteUrl: ParsedUrl,
-        val apiRootUrl: ParsedUrl,
+        val parsedSiteUrl: URL,
+        val apiRootUrl: URL,
         val fetchAndParseApiRootFailure: FetchAndParseApiRootFailure
     ) : ApiDiscoveryResult()
 }
