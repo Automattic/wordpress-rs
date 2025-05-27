@@ -75,40 +75,6 @@ async fn create_template_with_slug_title_and_author() {
 
 #[tokio::test]
 #[serial]
-// TODO: `template_type` parameter doesn't seem to be working. It either requires the template type
-// to be set up in advance or the parameter is always ignored.
-#[ignore]
-async fn create_template_with_slug_title_and_template_type() {
-    let template_type = "foo template type";
-    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
-    params.title = Some(TEST_TITLE.to_string());
-    params.template_type = Some(template_type.to_string());
-    test_create_template(&params, |created_template| {
-        assert_title(&created_template);
-        assert_eq!(created_template.template_type, template_type);
-    })
-    .await;
-}
-
-#[tokio::test]
-#[serial]
-// TODO: `status` parameter seems to be ignored as the server is always responding with
-// `TemplateStatus::Publish`
-#[ignore]
-async fn create_template_with_slug_title_and_template_status_future() {
-    let status = TemplateStatus::Future;
-    let mut params = TemplateCreateParams::new(TEST_SLUG.to_string());
-    params.title = Some(TEST_TITLE.to_string());
-    params.status = Some(status.clone());
-    test_create_template(&params, |created_template| {
-        assert_title(&created_template);
-        assert_eq!(created_template.status, status);
-    })
-    .await;
-}
-
-#[tokio::test]
-#[serial]
 async fn delete_template() {
     let template_delete_response = api_client()
         .templates()
