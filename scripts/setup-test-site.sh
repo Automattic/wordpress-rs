@@ -128,13 +128,10 @@ create_test_credentials () {
 
   # Setup a post with post revisions for integration tests
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
-  curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"content":"Add some content for first revision"}' "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID/autosaves"
-  # TODO: The following doesn't create multiple revisions, but instead updates the existing revisions which is not what we need
-  # # Create some exta revisions for testing
-  # for i in {1..10};
-  # do
-  #   curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\"}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID/autosaves"
-  # done
+  for i in {1..10};
+  do
+    curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\"}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID"
+  done
 
   rm -rf /app/test_credentials.json
   jo -p \
