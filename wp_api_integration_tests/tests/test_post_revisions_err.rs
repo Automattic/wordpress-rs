@@ -1,6 +1,5 @@
-use serial_test::parallel;
-use wp_api::{WpErrorCode, post_revisions::PostRevisionListParams, posts::PostId};
-use wp_api_integration_tests::{AssertWpError, TestCredentials, api_client};
+use wp_api::{post_revisions::PostRevisionListParams, posts::PostId};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

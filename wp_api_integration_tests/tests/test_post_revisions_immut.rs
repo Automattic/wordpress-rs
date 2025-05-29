@@ -1,8 +1,4 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::{
-    WpApiParamOrder, generate,
     post_revisions::{
         PostRevisionId, PostRevisionListParams, SparsePostRevisionFieldWithEditContext,
         SparsePostRevisionFieldWithEmbedContext, SparsePostRevisionFieldWithViewContext,
@@ -10,7 +6,7 @@ use wp_api::{
     },
     posts::PostId,
 };
-use wp_api_integration_tests::{AssertResponse, TestCredentials, api_client};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]
