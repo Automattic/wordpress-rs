@@ -1,12 +1,8 @@
-use serial_test::parallel;
 use wp_api::{
-    WpErrorCode,
+    prelude::*,
     tags::{TagCreateParams, TagListParams, TagUpdateParams},
 };
-use wp_api_integration_tests::{
-    AssertWpError, POST_ID_INVALID, TAG_ID_100, TAG_ID_INVALID, api_client,
-    api_client_as_subscriber,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

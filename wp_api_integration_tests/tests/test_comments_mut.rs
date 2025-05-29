@@ -1,15 +1,9 @@
 use macro_helper::generate_update_test;
-use serial_test::serial;
 use wp_api::comments::{
     CommentCreateParams, CommentCreateParamsBuilder, CommentDeleteParams, CommentStatus,
     CommentUpdateParams, CommentWithEditContext,
 };
-use wp_api_integration_tests::{
-    AssertResponse, FIRST_COMMENT_ID, FIRST_POST_ID, POST_ID_555, SECOND_COMMENT_ID,
-    SECOND_USER_ID, api_client,
-    backend::{Backend, RestoreServer},
-    unwrapped_wp_gmt_date_time,
-};
+use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliComment;
 
 #[tokio::test]

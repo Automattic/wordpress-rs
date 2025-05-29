@@ -1,11 +1,8 @@
-use rstest::*;
-use serial_test::parallel;
 use wp_api::wp_site_health_tests::{
     SparseWpSiteHealthDirectorySizes, SparseWpSiteHealthDirectorySizesField,
     SparseWpSiteHealthTest, SparseWpSiteHealthTestField,
 };
-
-use wp_api_integration_tests::{AssertResponse, api_client};
+use wp_api_integration_tests::prelude::*;
 
 macro_rules! generate_tests {
     ($ident:ident) => {

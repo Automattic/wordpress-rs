@@ -1,8 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
-
 use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
-    SparseField, WpUuid,
+    SparseField,
+    api_error::WpApiError,
     media::{
         MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
         SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
@@ -12,8 +11,10 @@ use crate::{
         CONTENT_TYPE_MULTIPART, NetworkRequestAccessor, ParsedResponse, RequestMethod,
         WpNetworkHeaderMap, WpNetworkResponse,
     },
+    uuid::WpUuid,
 };
 use http::HeaderValue;
+use std::{collections::HashMap, sync::Arc};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -113,7 +114,7 @@ impl From<ParsedResponse<MediaWithEditContext, ()>> for MediaRequestCreateRespon
 #[uniffi::export]
 fn parse_as_media_request_create_response(
     response: WpNetworkResponse,
-) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
+) -> Result<MediaRequestCreateResponse, WpApiError> {
     response.parse()
 }
 
@@ -221,7 +222,7 @@ impl MediaRequestExecutor {
         file_path: String,
         file_content_type: String,
         request_id: Option<Arc<WpUuid>>,
-    ) -> Result<MediaRequestCreateResponse, crate::WpApiError> {
+    ) -> Result<MediaRequestCreateResponse, WpApiError> {
         let request = self
             .request_builder
             .create(params, file_path, file_content_type, request_id);

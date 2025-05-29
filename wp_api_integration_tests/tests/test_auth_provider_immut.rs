@@ -1,18 +1,6 @@
-use serial_test::parallel;
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-use wp_api::{
-    WpApiClient, WpErrorCode,
-    auth::{
-        ModifiableAuthenticationProvider, WpAuthentication, WpAuthenticationProvider,
-        WpDynamicAuthenticationProvider,
-    },
-};
-use wp_api_integration_tests::{
-    AssertResponse, AssertWpError, FIRST_USER_ID, TestCredentials, api_client_with_auth_provider,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use wp_api::auth::{ModifiableAuthenticationProvider, WpDynamicAuthenticationProvider};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

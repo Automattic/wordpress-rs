@@ -1,12 +1,8 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
-use wp_api::generate;
 use wp_api::search_results::{
     SearchListParams, SearchResultSubtype, SearchResultType,
     SparseSearchResultFieldWithEmbedContext, SparseSearchResultFieldWithViewContext,
 };
-use wp_api_integration_tests::{AssertResponse, api_client};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]

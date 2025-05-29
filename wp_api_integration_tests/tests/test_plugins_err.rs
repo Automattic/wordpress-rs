@@ -1,11 +1,5 @@
-use serial_test::parallel;
-use wp_api::WpErrorCode;
 use wp_api::plugins::{PluginCreateParams, PluginListParams, PluginStatus, PluginUpdateParams};
-
-use wp_api_integration_tests::{
-    AssertWpError, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG,
-    WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS, api_client, api_client_as_subscriber,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

@@ -320,9 +320,8 @@ pub struct SubscriberSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use crate::WpError;
-
     use super::*;
+    use crate::api_error::WpError;
 
     #[test]
     fn test_list_subscribers_parameters_serialization() {

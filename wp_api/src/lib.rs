@@ -1,29 +1,15 @@
-pub use api_client::{
-    IsWpApiClientDelegate, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder,
-};
-pub use api_error::{
-    InvalidSslErrorReason, MaybeWpError, MediaUploadRequestExecutionError, ParsedRequestError,
-    RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
-};
-pub use parsed_url::{ParseUrlError, ParsedUrl};
 use plugins::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use users::*;
-pub use uuid::{WpUuid, WpUuidParseError};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
-
-mod api_client; // re-exported relevant types
-mod api_error; // re-exported relevant types
-mod parsed_url; // re-exported relevant types
-mod ssl; // re-exported relevant types
-mod uniffi_serde;
-mod uuid; // re-exported relevant types
 
 pub mod jetpack;
 pub mod wp_com;
 
+pub mod api_client;
+pub mod api_error;
 pub mod application_passwords;
 pub mod auth;
 pub mod categories;
@@ -32,21 +18,27 @@ pub mod date;
 pub mod login;
 pub mod media;
 pub mod middleware;
+pub mod parsed_url;
 pub mod plugins;
 pub mod post_revisions;
 pub mod post_types;
 pub mod posts;
+pub mod prelude;
 pub mod request;
 pub mod search_results;
 pub mod site_settings;
+pub mod ssl;
 pub mod tags;
 pub mod taxonomies;
 pub mod templates;
 pub mod themes;
 pub mod url_query;
 pub mod users;
+pub mod uuid;
 pub mod wordpress_org;
 pub mod wp_site_health_tests;
+
+mod uniffi_serde;
 
 #[cfg(feature = "reqwest-request-executor")]
 pub mod reqwest_request_executor;

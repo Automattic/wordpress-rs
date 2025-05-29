@@ -1,14 +1,10 @@
-use serial_test::serial;
 use wp_api::{
     application_passwords::{
         ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
     },
     users::UserId,
 };
-use wp_api_integration_tests::backend::{Backend, RestoreServer};
-use wp_api_integration_tests::{
-    AssertResponse, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
-};
+use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliUserMeta;
 
 #[tokio::test]
