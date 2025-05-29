@@ -1,12 +1,6 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use wp_api::{
-    MediaUploadRequestExecutionError, RequestExecutionError,
-    request::{
-        RequestExecutor, WpNetworkRequest, WpNetworkResponse,
-        endpoint::media_endpoint::MediaUploadRequest,
-    },
-};
+use wp_api::{prelude::*, request::endpoint::media_endpoint::MediaUploadRequest};
 
 #[derive(Debug)]
 pub struct MockExecutor {

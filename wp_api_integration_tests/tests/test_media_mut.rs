@@ -1,13 +1,9 @@
 use macro_helper::generate_update_test;
-use serial_test::serial;
 use wp_api::{
     media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
-use wp_api_integration_tests::{
-    AssertResponse, FIRST_POST_ID, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
-    MEDIA_TEST_FILE_PATH, api_client, backend::RestoreServer, unwrapped_wp_gmt_date_time,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[serial]

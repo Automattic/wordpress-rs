@@ -1,7 +1,8 @@
 use super::WpApiDetails;
 use crate::{
-    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
+    api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCode},
     login::KnownAuthenticationBlockingPlugin,
+    parsed_url::{ParseUrlError, ParsedUrl},
     request::{ResponseBodyType, WpRedirect},
 };
 use itertools::Itertools;

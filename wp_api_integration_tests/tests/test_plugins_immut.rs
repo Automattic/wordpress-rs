@@ -1,17 +1,8 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
-use wp_api::{
-    WpContext, generate,
-    plugins::{
-        PluginListParams, PluginSlug, PluginStatus, SparsePluginFieldWithEditContext,
-        SparsePluginFieldWithEmbedContext, SparsePluginFieldWithViewContext,
-    },
+use wp_api::plugins::{
+    PluginListParams, PluginSlug, PluginStatus, SparsePluginFieldWithEditContext,
+    SparsePluginFieldWithEmbedContext, SparsePluginFieldWithViewContext,
 };
-
-use wp_api_integration_tests::{
-    AssertResponse, CLASSIC_EDITOR_PLUGIN_SLUG, HELLO_DOLLY_PLUGIN_SLUG, api_client,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[rstest]
 #[case(PluginListParams::default())]

@@ -25,14 +25,14 @@ fun defaultApiClient(): WpApiClient {
 }
 
 fun <T> WpRequestResult<T>.assertSuccess() {
-    assert(this is WpRequestResult.WpRequestSuccess)
+    assert(this is WpRequestResult.Success)
 }
 
 fun <T> WpRequestResult<T>.assertSuccessAndRetrieveData(): T {
-    assert(this is WpRequestResult.WpRequestSuccess) {
+    assert(this is WpRequestResult.Success) {
         "Request wasn't successful: $this"
     }
-    return (this as WpRequestResult.WpRequestSuccess).data
+    return (this as WpRequestResult.Success).response
 }
 
 fun <T> WpRequestResult<T>.wpErrorCode(): WpErrorCode {

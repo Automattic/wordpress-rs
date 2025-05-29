@@ -9,8 +9,9 @@ use super::{
     },
 };
 use crate::{
-    ParsedUrl, RequestExecutionError, WpError,
+    api_error::{RequestExecutionError, WpError},
     middleware::{PerformsRequests, WpApiMiddlewarePipeline},
+    parsed_url::ParsedUrl,
     request::{
         RequestExecutor, RequestMethod, ResponseBodyType, WpNetworkHeaderMap, WpNetworkRequest,
         WpNetworkRequestBody, WpNetworkResponse,
@@ -490,7 +491,7 @@ impl PerformsRequests for WpLoginClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{WpErrorCode, unit_test_common::wp_network_response_from_json};
+    use crate::{api_error::WpErrorCode, unit_test_common::wp_network_response_from_json};
 
     #[test]
     fn test_parse_api_details_wp_error_rest_forbidden() {

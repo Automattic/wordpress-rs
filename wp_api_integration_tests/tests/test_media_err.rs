@@ -1,26 +1,12 @@
-use async_trait::async_trait;
-use http::{HeaderMap, HeaderValue};
-use serial_test::parallel;
-use std::sync::Arc;
 use wp_api::{
-    MediaUploadRequestExecutionError, RequestExecutionError, RequestExecutionErrorReason,
-    WpApiClient, WpApiClientDelegate, WpErrorCode,
     auth::WpAuthenticationProvider,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
-    middleware::WpApiMiddlewarePipeline,
     posts::WpApiParamPostsOrderBy,
-    request::{
-        NetworkRequestAccessor, RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest,
-        WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
-    },
-    reqwest_request_executor::ReqwestRequestExecutor,
+    prelude::*,
+    request::endpoint::media_endpoint::MediaUploadRequest,
     users::UserId,
 };
-use wp_api_integration_tests::{
-    AssertWpError, EmptyAppNotifier, MEDIA_ID_611, MEDIA_TEST_FILE_CONTENT_TYPE,
-    MEDIA_TEST_FILE_PATH, TestCredentials, api_client, api_client_as_author,
-    api_client_as_subscriber, test_site_api_url_resolver,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

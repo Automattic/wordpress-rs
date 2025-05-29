@@ -2,6 +2,7 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UniffiWpApiRequestBuilder
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpAuthenticationProvider
@@ -19,7 +20,7 @@ class ManualParserTest {
     @Test
     fun testUserListManualRequestAndParsing() = runTest {
         val requestBuilder = UniffiWpApiRequestBuilder(
-            apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = testCredentials.apiRootUrl),
+            apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl(testCredentials.apiRootUrl)),
             authProvider
         )
         val userListRequest = requestBuilder.users().listWithEditContext(UserListParams())

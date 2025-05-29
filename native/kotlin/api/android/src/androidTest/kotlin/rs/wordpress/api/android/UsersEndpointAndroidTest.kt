@@ -4,20 +4,20 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
-import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpAuthenticationProvider
+import java.net.URL
 
 class UsersEndpointAndroidTest {
     // https://developer.android.com/studio/run/emulator-networking
     private val siteUrl = "http://10.0.2.2"
-    private val client = WpApiClient(ParsedUrl.parse(siteUrl), WpAuthenticationProvider.none())
+    private val client = WpApiClient(URL(siteUrl), WpAuthenticationProvider.none())
 
     @Test
     fun testUserListRequest() = runTest {
         val result = client.request { requestBuilder ->
             requestBuilder.users().listWithViewContext(params = UserListParams())
         }
-        assert(result is WpRequestResult.WpRequestSuccess)
+        assert(result is WpRequestResult.Success)
     }
 }

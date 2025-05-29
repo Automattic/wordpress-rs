@@ -1,15 +1,7 @@
-use rstest::*;
-use serial_test::parallel;
-use wp_api::WpErrorCode;
 use wp_api::application_passwords::{
     ApplicationPasswordCreateParams, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
 };
-use wp_api::auth::WpAuthenticationProvider;
-
-use wp_api_integration_tests::{
-    AssertWpError, FIRST_USER_ID, TestCredentials, api_client, api_client_as_subscriber,
-    api_client_with_auth_provider,
-};
+use wp_api_integration_tests::prelude::*;
 
 pub mod reusable_test_cases;
 

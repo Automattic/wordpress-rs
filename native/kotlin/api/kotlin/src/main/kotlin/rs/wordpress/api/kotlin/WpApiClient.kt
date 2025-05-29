@@ -13,6 +13,7 @@ import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpOrgSiteApiUrlResolver
+import java.net.URL
 
 class WpApiClient(
     apiUrlResolver: ApiUrlResolver,
@@ -22,13 +23,13 @@ class WpApiClient(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     constructor(
-        wpOrgSiteApiRootUrl: ParsedUrl,
+        wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,
         requestExecutor: RequestExecutor = WpRequestExecutor(),
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
         dispatcher: CoroutineDispatcher = Dispatchers.IO
     ) : this(
-        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = wpOrgSiteApiRootUrl),
+        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(wpOrgSiteApiRootUrl.toString())),
         authProvider,
         requestExecutor,
         appNotifier,
@@ -58,7 +59,7 @@ class WpApiClient(
         executeRequest: suspend (UniffiWpApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         try {
-            WpRequestResult.WpRequestSuccess(data = executeRequest(requestBuilder))
+            WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
             mapWpApiExceptionToWpRequestResult(exception)
         }

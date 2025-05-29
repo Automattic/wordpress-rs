@@ -28,13 +28,13 @@ class WpLoginClient(
                     error = exception.error,
                 )
                 is AutoDiscoveryAttemptFailure.FindApiRoot -> ApiDiscoveryResult.FailureFindApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl,
+                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
                     findApiRootFailure = exception.findApiRootFailure,
                 )
 
                 is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot -> ApiDiscoveryResult.FailureFetchAndParseApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl,
-                    apiRootUrl = exception.apiRootUrl,
+                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
+                    apiRootUrl = exception.apiRootUrl.toURL(),
                     fetchAndParseApiRootFailure = exception.fetchAndParseApiRootFailure
                 )
             }

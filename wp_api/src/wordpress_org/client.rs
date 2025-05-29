@@ -1,8 +1,8 @@
-use crate::middleware::PerformsRequests;
-use crate::middleware::WpApiMiddlewarePipeline;
 use crate::{
-    ParsedUrl, PluginWithViewContext, PluginWpOrgDirectorySlug, RequestExecutionError,
-    api_error::RequestExecutionErrorReason,
+    PluginWithViewContext, PluginWpOrgDirectorySlug,
+    api_error::{RequestExecutionError, RequestExecutionErrorReason},
+    middleware::{PerformsRequests, WpApiMiddlewarePipeline},
+    parsed_url::ParsedUrl,
     request::{
         RequestExecutor, WpNetworkRequest, WpNetworkResponse, WpRedirect, endpoint::WpEndpointUrl,
     },

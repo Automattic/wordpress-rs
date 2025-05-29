@@ -1,8 +1,6 @@
 use macro_helper::generate_update_test;
-use serial_test::serial;
 use wp_api::categories::{CategoryCreateParams, CategoryUpdateParams, CategoryWithEditContext};
-use wp_api_integration_tests::backend::{Backend, RestoreServer};
-use wp_api_integration_tests::{AssertResponse, CATEGORY_ID_48, CATEGORY_ID_59, api_client};
+use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliCategory;
 
 #[tokio::test]

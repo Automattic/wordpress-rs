@@ -1,9 +1,5 @@
-use serial_test::parallel;
-use wp_api::{
-    WpErrorCode,
-    templates::{TemplateCreateParams, TemplateId, TemplateUpdateParams},
-};
-use wp_api_integration_tests::{AssertWpError, TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE, api_client};
+use wp_api::templates::{TemplateCreateParams, TemplateId, TemplateUpdateParams};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]
