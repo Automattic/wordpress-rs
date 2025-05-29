@@ -57,8 +57,7 @@ fn revisioned_post_id() -> PostId {
 #[case::search(generate!(PostRevisionListParams, (search, Some("foo".to_string()))))]
 #[case::exclude(generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(1), PostRevisionId(2)])))]
 #[case::include(generate!(PostRevisionListParams, (include, vec![PostRevisionId(1)])))]
-// TODO: Increase the offset after updating the test site setup to create multiple revisions
-#[case::offset(generate!(PostRevisionListParams, (offset, Some(0))))]
+#[case::offset(generate!(PostRevisionListParams, (offset, Some(5))))]
 #[case::order(generate!(PostRevisionListParams, (order, Some(WpApiParamOrder::Asc))))]
 #[case::orderby(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Slug))))]
 fn list_cases(#[case] params: PostRevisionListParams) {}
