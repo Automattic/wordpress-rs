@@ -139,7 +139,13 @@ extension PostWithEditContext: ListViewDataConvertable {
 
 extension MediaWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.title.raw, subtitle: String(describing: self.mediaDetails), fields: [:])
+        let details = self.mediaDetails.parseAsMimeType(mimeType: self.mimeType)
+        return ListViewData(
+            id: self.slug,
+            title: details.emoji + " " + (URL(string: self.sourceUrl)?.lastPathComponent ?? "<invalid-source-url>"),
+            subtitle: self.title.raw,
+            fields: details.fields
+        )
     }
 }
 
@@ -158,5 +164,45 @@ extension [MediaWithEditContext] {
 extension [ListViewDataConvertable] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }
+    }
+}
+
+private extension Optional<MediaDetailsPayload> {
+    var emoji: String {
+        switch self {
+        case .audio:
+            "🔊"
+        case .image(_):
+            "🌆"
+        case .video(_):
+            "🎥"
+        case .document(_):
+            "📁"
+        case nil:
+            "❓"
+        }
+    }
+
+    var fields: [String: String] {
+        var fields = [String: String]()
+
+        switch self {
+        case let .audio(audio):
+            fields["Duration"] = "\(audio.length) seconds"
+            fields["File size"] = "\(audio.fileSize) bytes"
+        case let .image(image):
+            fields["Size"] = "\(image.width)x\(image.height) pixels"
+            fields["File size"] = "\(image.fileSize) bytes"
+        case let .video(video):
+            fields["Size"] = "\(video.width)x\(video.height) pixels"
+            fields["Duration"] = "\(video.length) seconds"
+            fields["File size"] = "\(video.fileSize) bytes"
+        case let .document(doc):
+            fields["File size"] = "\(doc.fileSize) bytes"
+        case nil:
+            break;
+        }
+
+        return fields
     }
 }
