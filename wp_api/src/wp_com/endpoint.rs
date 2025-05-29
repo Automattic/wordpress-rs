@@ -14,16 +14,18 @@ pub mod support_bots_endpoint;
 #[derive(uniffi::Object)]
 pub struct WpComDotOrgApiUrlResolver {
     pub base_url: ParsedUrl,
-    pub site_url: String,
+    pub site_id: String,
 }
 
 #[uniffi::export]
 impl WpComDotOrgApiUrlResolver {
     #[uniffi::constructor]
-    pub fn new(site_url: String) -> Self {
+    pub fn new(base_url: Option<String>, site_id: String) -> Self {
         Self {
-            base_url: wp_com_base_url(),
-            site_url,
+            base_url: base_url
+                .and_then(|url| ParsedUrl::parse(&url).ok())
+                .unwrap_or_else(wp_com_base_url),
+            site_id,
         }
     }
 }
@@ -43,7 +45,7 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
         Arc::new(
             self.base_url
                 .by_extending_and_splitting_by_forward_slash(
-                    vec![namespace, "sites".to_string(), self.site_url.to_string()]
+                    vec![namespace, "sites".to_string(), self.site_id.to_string()]
                         .into_iter()
                         .chain(endpoint_segments),
                 )
@@ -109,7 +111,7 @@ mod tests {
         #[case] endpoint_segments: Vec<String>,
         #[case] expected_url: &str,
     ) {
-        let resolver = WpComDotOrgApiUrlResolver::new("example.wordpress.com".to_string());
+        let resolver = WpComDotOrgApiUrlResolver::new(None, "example.wordpress.com".to_string());
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)
