@@ -1,5 +1,5 @@
 use crate::{
-    JsonValue, UserId, WpApiParamOrder,
+    UserId, WpApiParamOrder,
     date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::{
@@ -11,6 +11,8 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
+use std::sync::Arc;
 use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
@@ -527,7 +529,7 @@ pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub mime_type: Option<String>,
     #[WpContext(edit, embed, view)]
-    pub media_details: Option<JsonValue>,
+    pub media_details: Option<Arc<MediaDetails>>,
     #[serde(rename = "post")]
     #[WpContext(edit, view)]
     #[WpContextualOption]
@@ -537,6 +539,107 @@ pub struct SparseMedia {
     #[WpContext(edit)]
     pub missing_image_sizes: Option<Vec<String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
+#[serde(transparent)]
+pub struct MediaDetails {
+    payload: Box<RawValue>,
+}
+
+#[uniffi::export]
+impl MediaDetails {
+    fn parse_as_mime_type(&self, mime_type: String) -> Option<MediaDetailsPayload> {
+        if mime_type.starts_with("image/") {
+            return serde_json::from_str::<ImageMediaDetails>(self.payload.get())
+                .ok()
+                .map(MediaDetailsPayload::Image);
+        } else if mime_type.starts_with("video/") || mime_type.starts_with("audio/") {
+            // Some audio files may be returned with a video MIME type, so we attempt to parse both.
+
+            if let Ok(details) = serde_json::from_str::<VideoMediaDetails>(self.payload.get()) {
+                return Some(MediaDetailsPayload::Video(details));
+            }
+
+            if let Ok(details) = serde_json::from_str::<AudioMediaDetails>(self.payload.get()) {
+                return Some(MediaDetailsPayload::Audio(details));
+            }
+        }
+
+        serde_json::from_str::<DocumentMediaDetails>(self.payload.get())
+            .ok()
+            .map(MediaDetailsPayload::Document)
+    }
+}
+
+#[derive(Debug, uniffi::Enum)]
+enum MediaDetailsPayload {
+    Audio(AudioMediaDetails),
+    Image(ImageMediaDetails),
+    Video(VideoMediaDetails),
+    Document(DocumentMediaDetails),
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct AudioMediaDetails {
+    #[serde(rename = "filesize")]
+    pub file_size: u64,
+    pub length: u64,
+    pub length_formatted: String,
+
+    #[serde(rename = "dataformat")]
+    pub data_format: Option<String>,
+    pub codec: Option<String>,
+    pub sample_rate: Option<u32>,
+    pub channels: Option<u8>,
+    pub bits_per_sample: Option<u8>,
+    pub lossless: Option<bool>,
+    #[serde(rename = "channelmode")]
+    pub channel_mode: Option<String>,
+    pub bitrate: Option<f64>,
+    pub compression_ratio: Option<f64>,
+    #[serde(rename = "fileformat")]
+    pub file_format: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct ImageMediaDetails {
+    #[serde(rename = "filesize")]
+    pub file_size: u64,
+
+    pub width: u32,
+    pub height: u32,
+    pub file: String,
+    pub sizes: Option<HashMap<String, ScaledImageDetails>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct ScaledImageDetails {
+    pub file: String,
+    pub width: u32,
+    pub height: u32,
+    pub source_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct VideoMediaDetails {
+    #[serde(rename = "filesize")]
+    pub file_size: u64,
+    pub length: u32,
+    pub width: u32,
+    pub height: u32,
+
+    #[serde(rename = "fileformat")]
+    pub file_format: Option<String>,
+    #[serde(rename = "dataformat")]
+    pub data_format: Option<String>,
+    pub created_timestamp: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct DocumentMediaDetails {
+    #[serde(rename = "filesize")]
+    pub file_size: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
@@ -649,5 +752,61 @@ mod tests {
         format!(
             "page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
         )
+    }
+
+    #[test]
+    fn media_details_round_trip() {
+        let original = r#"
+        {
+            "id": 11,
+            "date": "2025-05-29T03:15:55",
+            "date_gmt": "2025-05-29T03:15:55",
+            "guid": { "rendered": "https://example.com/dummy.docx" },
+            "modified": "2025-05-29T03:15:55",
+            "modified_gmt": "2025-05-29T03:15:55",
+            "slug": "dummy-slug",
+            "status": "dummy-status",
+            "type": "dummy-type",
+            "link": "https://example.com/dummy-link/",
+            "title": { "rendered": "Dummy Title" },
+            "author": 1,
+            "featured_media": 0,
+            "comment_status": "dummy-comment-status",
+            "ping_status": "dummy-ping-status",
+            "template": "dummy-template",
+            "meta": [],
+            "class_list": [
+                "dummy-class-1",
+                "dummy-class-2",
+                "dummy-class-3",
+                "dummy-class-4",
+                "dummy-class-5"
+            ],
+            "description": {
+                "rendered": "<p class=\"dummy-class\"><a href='https://example.com/dummy.docx'>Dummy Link</a></p>\n"
+            },
+            "caption": {
+                "rendered": "<p>Dummy Caption</p>\n"
+            },
+            "alt_text": "Dummy Alt Text",
+            "media_type": "dummy-media-type",
+            "mime_type": "dummy/mime-type",
+            "media_details": {
+                "filesize": 7378,
+                "sizes": {}
+            },
+            "post": null,
+            "source_url": "https://example.com/dummy.docx"
+            }
+        "#;
+
+        let media = serde_json::from_str::<MediaWithViewContext>(original).unwrap();
+        let serialized = serde_json::to_string(&media).unwrap();
+        let json = serde_json::from_str::<serde_json::Value>(serialized.as_str()).unwrap();
+        assert_eq!(json["media_details"]["filesize"], 7378);
+        assert_eq!(
+            json["media_details"]["sizes"],
+            serde_json::Value::Object(serde_json::Map::new())
+        );
     }
 }
