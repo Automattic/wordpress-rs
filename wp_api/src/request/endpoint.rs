@@ -1,4 +1,4 @@
-use crate::ParsedUrl;
+use crate::parsed_url::ParsedUrl;
 use std::sync::Arc;
 use strum_macros::EnumIter;
 use url::Url;
@@ -149,7 +149,7 @@ mod macros {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ParsedUrl;
+    use crate::parsed_url::ParsedUrl;
     use rstest::*;
     use std::sync::Arc;
 

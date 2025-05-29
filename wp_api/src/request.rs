@@ -1,25 +1,31 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    RequestExecutionErrorReason, WpApiError, WpErrorCode,
-    api_error::{MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError},
+    api_error::{
+        MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,
+        RequestExecutionErrorReason, WpApiError, WpErrorCode,
+    },
     auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
 use chrono::{DateTime, Utc};
-use endpoint::{ApiEndpointUrl, media_endpoint::MediaUploadRequest};
 use endpoint::{
-    ApiUrlResolver,
+    ApiEndpointUrl, ApiUrlResolver,
     application_passwords_endpoint::{
         ApplicationPasswordsRequestBuilder,
         ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
     },
+    media_endpoint::MediaUploadRequest,
 };
 use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::str::{FromStr, Utf8Error};
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    str::{FromStr, Utf8Error},
+    sync::Arc,
+};
 use url::Url;
 use uuid::Uuid;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};

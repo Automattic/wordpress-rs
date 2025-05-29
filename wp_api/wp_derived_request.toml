@@ -1,2 +1,2 @@
-error_type = "crate::WpApiError"
-delegate_type = "crate::WpApiClientDelegate"
+error_type = "crate::api_error::WpApiError"
+delegate_type = "crate::api_client::WpApiClientDelegate"

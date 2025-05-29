@@ -1,16 +1,20 @@
-use http::header::{CONTENT_TYPE, USER_AGENT};
-use http::{HeaderMap, HeaderValue};
+use super::{
+    de::deserialize_default_values,
+    plugin_directory::{Banners, Icons},
+};
+use crate::{
+    PluginSlug, PluginStatus, PluginWithViewContext, PluginWpOrgDirectorySlug,
+    parsed_url::ParsedUrl,
+    request::{RequestMethod, WpNetworkRequest, WpNetworkRequestBody},
+};
+use http::{
+    HeaderMap, HeaderValue,
+    header::{CONTENT_TYPE, USER_AGENT},
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use url::form_urlencoded::byte_serialize as url_encode;
 use uuid::Uuid;
-
-use crate::request::{RequestMethod, WpNetworkRequest, WpNetworkRequestBody};
-use crate::{ParsedUrl, PluginSlug, PluginStatus, PluginWithViewContext, PluginWpOrgDirectorySlug};
-
-use super::de::deserialize_default_values;
-use super::plugin_directory::{Banners, Icons};
 
 #[derive(Debug)]
 pub struct UpdateCheckRequest {
