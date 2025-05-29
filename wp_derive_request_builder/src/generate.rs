@@ -72,7 +72,7 @@ fn generate_async_request_executor(
             );
             quote! {
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
-                    use #crate_ident::MaybeWpError;
+                    use #crate_ident::api_error::MaybeWpError;
                     use #crate_ident::middleware::PerformsRequests;
                     #request_from_request_builder
                     let response = self.perform(std::sync::Arc::new(request)).await?;
@@ -184,8 +184,8 @@ fn generate_async_request_executor(
                 }
             }
         }
-        impl #crate_ident::IsWpApiClientDelegate for #generated_request_executor_ident {
-            fn get_delegate(&self) -> &#crate_ident::WpApiClientDelegate {
+        impl #crate_ident::api_client::IsWpApiClientDelegate for #generated_request_executor_ident {
+            fn get_delegate(&self) -> &#crate_ident::api_client::WpApiClientDelegate {
                 &self.delegate
             }
         }

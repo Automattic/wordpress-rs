@@ -1,5 +1,4 @@
-use crate::url_query::AppendUrlQueryPairs;
-use crate::url_query::QueryPairs;
+use crate::url_query::{AppendUrlQueryPairs, QueryPairs};
 use serde::{Deserialize, Serialize};
 use wp_serde_helper::deserialize_u64_or_string;
 

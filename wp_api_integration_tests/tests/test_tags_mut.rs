@@ -1,8 +1,6 @@
 use macro_helper::generate_update_test;
-use serial_test::serial;
 use wp_api::tags::{TagCreateParams, TagUpdateParams, TagWithEditContext};
-use wp_api_integration_tests::backend::{Backend, RestoreServer};
-use wp_api_integration_tests::{AssertResponse, TAG_ID_100, api_client};
+use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliTag;
 
 #[tokio::test]

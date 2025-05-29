@@ -1,5 +1,6 @@
 use crate::{
-    IsWpApiClientDelegate, RequestExecutionError, RequestExecutionErrorReason,
+    api_client::IsWpApiClientDelegate,
+    api_error::{RequestExecutionError, RequestExecutionErrorReason},
     request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
@@ -235,7 +236,7 @@ mod tests {
 
     mod api_discovery_authentication_middleware {
         use crate::{
-            MediaUploadRequestExecutionError,
+            api_error::MediaUploadRequestExecutionError,
             request::{
                 WpNetworkHeaderMap,
                 endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
@@ -371,7 +372,7 @@ mod tests {
     mod retry_after_middleware {
         use super::*;
         use crate::{
-            MediaUploadRequestExecutionError,
+            api_error::MediaUploadRequestExecutionError,
             request::{
                 WpNetworkHeaderMap,
                 endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},

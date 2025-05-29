@@ -1,7 +1,4 @@
-use serial_test::parallel;
-use std::sync::Arc;
 use wp_api::{
-    InvalidSslErrorReason, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason,
     login::{
         login_client::WpLoginClient,
         url_discovery::{
@@ -17,7 +14,7 @@ use wp_api::{
     request::{NetworkRequestAccessor, RequestExecutor},
     reqwest_request_executor::ReqwestRequestExecutor,
 };
-use wp_api_integration_tests::mock::{MockExecutor, response_helpers};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

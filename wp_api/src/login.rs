@@ -1,16 +1,11 @@
+use crate::{
+    login::url_discovery::is_local_dev_environment_url, parsed_url::ParsedUrl, uuid::WpUuid,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::str;
-use std::sync::Arc;
-use wp_localization::MessageBundle;
-use wp_localization::{WpMessages, WpSupportsLocalization};
+use std::{collections::HashMap, str, sync::Arc};
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
-use wp_serde_helper::deserialize_false_or_string;
-use wp_serde_helper::deserialize_offset;
-
-use crate::ParsedUrl;
-use crate::WpUuid;
-use crate::login::url_discovery::is_local_dev_environment_url;
+use wp_serde_helper::{deserialize_false_or_string, deserialize_offset};
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
