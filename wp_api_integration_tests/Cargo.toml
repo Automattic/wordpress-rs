@@ -14,8 +14,11 @@ clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 http = { workspace = true }
 reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate" ] }
+rstest = { workspace = true }
+rstest_reuse = { workspace = true }
 serde = { workspace = true, features = [ "derive" ] }
 serde_json = { workspace = true }
+serial_test = { workspace = true }
 tokio = { workspace = true, features = [ "full" ] }
 url = { workspace = true }
 wp_api = { path = "../wp_api", features = [ "integration-tests", "reqwest-request-executor" ] }
@@ -24,7 +27,4 @@ wp_cli = { path = "../wp_cli" }
 [dev-dependencies]
 chrono = { workspace = true }
 paste = { workspace = true }
-rstest = { workspace = true }
-rstest_reuse = { workspace = true }
-serial_test = { workspace = true }
 tokio-stream = { workspace = true }

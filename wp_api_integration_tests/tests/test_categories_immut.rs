@@ -1,12 +1,8 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::categories::{
     CategoryListParams, SparseCategoryFieldWithEditContext, SparseCategoryFieldWithEmbedContext,
     SparseCategoryFieldWithViewContext, WpApiParamCategoriesOrderBy,
 };
-use wp_api::{WpApiParamOrder, generate};
-use wp_api_integration_tests::{AssertResponse, CATEGORY_ID_59, FIRST_POST_ID, api_client};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]

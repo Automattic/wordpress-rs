@@ -1,10 +1,5 @@
-use serial_test::parallel;
-use std::sync::Arc;
-use wp_api::{
-    middleware::WpApiMiddlewarePipeline, reqwest_request_executor::ReqwestRequestExecutor,
-    wordpress_org::client::WordPressOrgApiClient,
-};
-use wp_api_integration_tests::{AssertResponse, TestCredentials, api_client, test_site_url};
+use wp_api::wordpress_org::client::WordPressOrgApiClient;
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

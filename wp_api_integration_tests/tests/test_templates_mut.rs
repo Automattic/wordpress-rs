@@ -1,13 +1,10 @@
 use macro_helper::generate_update_test;
-use serial_test::serial;
 use wp_api::templates::{
     SparseTemplateContent, SparseTemplateContentWrapper, SparseTemplateTitle,
     SparseTemplateTitleWrapper, TemplateId, TemplateStatus, TemplateUpdateParams,
     TemplateWithEditContext,
 };
-use wp_api_integration_tests::{
-    AssertResponse, SECOND_USER_ID, TestCredentials, api_client, backend::RestoreServer,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[serial]

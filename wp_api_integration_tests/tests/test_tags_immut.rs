@@ -1,12 +1,8 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::tags::{
     SparseTagFieldWithEditContext, SparseTagFieldWithEmbedContext, SparseTagFieldWithViewContext,
     TagListParams, WpApiParamTagsOrderBy,
 };
-use wp_api::{WpApiParamOrder, generate};
-use wp_api_integration_tests::{AssertResponse, FIRST_POST_ID, TAG_ID_100, api_client};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]

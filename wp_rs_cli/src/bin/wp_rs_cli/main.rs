@@ -5,14 +5,10 @@ use csv::Writer;
 use futures::stream::StreamExt;
 use std::{fmt::Display, fs::File, sync::Arc, time::Duration};
 use wp_api::{
-    ParsedUrl,
-    login::{
-        login_client::WpLoginClient,
-        url_discovery::{
-            AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
-        },
+    login::url_discovery::{
+        AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
     },
-    reqwest_request_executor::ReqwestRequestExecutor,
+    prelude::*,
 };
 
 const TOKIO_STREAM_SIZE: usize = 5;
