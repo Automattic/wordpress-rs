@@ -172,11 +172,11 @@ private extension Optional<MediaDetailsPayload> {
         switch self {
         case .audio:
             "🔊"
-        case .image(_):
+        case .image:
             "🌆"
-        case .video(_):
+        case .video:
             "🎥"
-        case .document(_):
+        case .document:
             "📁"
         case nil:
             "❓"
