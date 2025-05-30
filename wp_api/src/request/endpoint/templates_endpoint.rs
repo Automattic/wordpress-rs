@@ -12,6 +12,8 @@ enum TemplatesRequest {
     List,
     #[contextual_get(url = "/templates/<template_id>", output = crate::templates::SparseTemplate, filter_by = crate::templates::SparseTemplateField)]
     Retrieve,
+    #[post(url = "/templates", params = &crate::templates::TemplateCreateParams, output = crate::templates::TemplateWithEditContext)]
+    Create,
     #[delete(url = "/templates/<template_id>", output = crate::templates::TemplateDeleteResponse)]
     Delete,
     #[delete(url = "/templates/<template_id>", output = crate::templates::TemplateWithEditContext)]
@@ -79,6 +81,11 @@ mod tests {
     };
     use rstest::*;
     use std::sync::Arc;
+
+    #[rstest]
+    fn create_template(endpoint: TemplatesRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.create(), "/templates");
+    }
 
     #[rstest]
     #[case(TemplateListParams::default(), "")]

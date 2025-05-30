@@ -1,5 +1,16 @@
-use wp_api::templates::{TemplateId, TemplateUpdateParams};
+use wp_api::templates::{TemplateCreateParams, TemplateId, TemplateUpdateParams};
 use wp_api_integration_tests::prelude::*;
+
+#[tokio::test]
+#[parallel]
+async fn create_template_err_empty_content() {
+    // Creating a template requires `title` or `content`
+    api_client()
+        .templates()
+        .create(&TemplateCreateParams::new("foo".to_string()))
+        .await
+        .assert_wp_error(WpErrorCode::EmptyContent)
+}
 
 #[tokio::test]
 #[parallel]
