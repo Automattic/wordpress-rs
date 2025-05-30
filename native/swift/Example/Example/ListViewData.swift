@@ -200,7 +200,7 @@ private extension Optional<MediaDetailsPayload> {
         case let .document(doc):
             fields["File size"] = "\(doc.fileSize) bytes"
         case nil:
-            break;
+            break
         }
 
         return fields
