@@ -9,7 +9,7 @@ use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]
-async fn create_post_err() {
+async fn create_post_err_empty_content() {
     api_client()
         .posts()
         .create(&PostCreateParams::default())

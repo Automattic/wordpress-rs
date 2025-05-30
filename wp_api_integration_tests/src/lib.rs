@@ -26,6 +26,7 @@ pub struct TestCredentials {
     pub first_post_date_gmt: &'static str,
     pub wordpress_core_version: &'static str,
     pub integration_test_custom_template_id: &'static str,
+    pub revisioned_post_id: i64,
 }
 
 impl TestCredentials {

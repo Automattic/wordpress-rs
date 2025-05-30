@@ -551,8 +551,10 @@ pub struct SparsePostContent {
     #[WpContext(edit, view)]
     pub rendered: Option<String>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub protected: Option<bool>,
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub block_version: Option<u32>,
 }
 
@@ -563,6 +565,7 @@ pub struct SparsePostExcerpt {
     #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub protected: Option<bool>,
 }
 
