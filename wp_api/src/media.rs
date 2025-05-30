@@ -549,7 +549,7 @@ pub struct MediaDetails {
 
 #[uniffi::export]
 impl MediaDetails {
-    fn parse_as_mime_type(&self, mime_type: String) -> Option<MediaDetailsPayload> {
+    pub fn parse_as_mime_type(&self, mime_type: String) -> Option<MediaDetailsPayload> {
         if mime_type.starts_with("image/") {
             return serde_json::from_str::<ImageMediaDetails>(self.payload.get())
                 .ok()
@@ -573,7 +573,7 @@ impl MediaDetails {
 }
 
 #[derive(Debug, uniffi::Enum)]
-enum MediaDetailsPayload {
+pub enum MediaDetailsPayload {
     Audio(AudioMediaDetails),
     Image(ImageMediaDetails),
     Video(VideoMediaDetails),
