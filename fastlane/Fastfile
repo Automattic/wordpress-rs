@@ -11,6 +11,36 @@ LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH = 'WP_XCFRAMEWORK_CHECKSUM_PATH'
 GITHUB_REPO = 'automattic/wordpress-rs'
 GIT_REMOTE_NAME = 'origin'
 
+# Localization constants
+LOCALIZATION_FLUENT_FILES_DIR = File.join(PROJECT_ROOT, 'wp_localization', 'localization')
+LOCALIZATION_PO_SOURCE_FILE = File.join(PROJECT_ROOT, 'wp_localization', 'glotpress', 'en-US.pot')
+LOCALIZATION_PO_FILES_TMP_DIR = File.join(Dir.tmpdir, 'wordpress-rs', 'glotpress')
+MAIN_FLUENT_FILE_NAME = 'main.ftl'
+PROJECT_NAME = 'wordpress-rs'
+
+# GlotPress configuration
+GLOTPRESS_PROJECT_BASE_URL = 'https://translate.wordpress.com/projects/mobile/wordpress-rs'
+
+# Supported locales mapping between GlotPress and project locale codes
+SUPPORTED_LOCALES = [
+  { glotpress: 'ar',    project: 'ar'     },
+  { glotpress: 'de',    project: 'de'     },
+  { glotpress: 'es',    project: 'es'     },
+  { glotpress: 'fr',    project: 'fr'     },
+  { glotpress: 'he',    project: 'he'     },
+  { glotpress: 'id',    project: 'id'     },
+  { glotpress: 'it',    project: 'it'     },
+  { glotpress: 'ja',    project: 'ja'     },
+  { glotpress: 'ko',    project: 'ko'     },
+  { glotpress: 'nl',    project: 'nl'     },
+  { glotpress: 'pt-br', project: 'pt-BR'  },
+  { glotpress: 'ru',    project: 'ru'     },
+  { glotpress: 'sv',    project: 'sv'     },
+  { glotpress: 'tr',    project: 'tr-TR'  },
+  { glotpress: 'zh-cn', project: 'zh-CN'  },
+  { glotpress: 'zh-tw', project: 'zh-TW'  }
+].freeze
+
 lane :release do |options|
   version = options[:version] || UI.user_error!('version is required')
   lane_context[LANE_VALUE_VERSION] = version
@@ -105,6 +135,158 @@ lane :publish_to_s3 do
   )
 end
 
+# Converts the English Fluent localization file to PO format for translation
+#
+# The resulting PO file is saved as the source file (.pot) for translations and is synced to GlotPress.
+#
+# @param commit_and_push_changes [Boolean] Whether to commit and push the generated PO file (default: false)
+#
+lane :generate_source_po_file do |commit_and_push_changes: false|
+  project_version = get_version_from_cargo_toml
+
+  UI.header("🔄 Converting English Fluent file to PO format")
+
+  FileUtils.mkdir_p(File.dirname(LOCALIZATION_PO_SOURCE_FILE))
+
+  fluent_file = File.join(LOCALIZATION_FLUENT_FILES_DIR, 'en-US', MAIN_FLUENT_FILE_NAME)
+
+  unless File.exist?(fluent_file)
+    UI.user_error!("❌ English Fluent file not found: #{fluent_file}")
+  end
+
+  begin
+    fluent_to_po(
+      input_file: fluent_file,
+      output_file: LOCALIZATION_PO_SOURCE_FILE,
+      locale: 'en-US',
+      project_name: PROJECT_NAME,
+      project_version: project_version
+    )
+
+    UI.success("✅ #{File.basename(fluent_file)} → #{File.basename(LOCALIZATION_PO_SOURCE_FILE)}")
+  rescue => e
+    UI.error("❌ Failed to convert English Fluent file: #{e.message}")
+  end
+
+  commit_changed_files(
+    files: LOCALIZATION_PO_SOURCE_FILE,
+    message: 'Update source PO file (en-US.pot) to be synced to GlotPress'
+  ) if commit_and_push_changes
+end
+
+# Converts a PO file for a given locale back to Fluent format
+#
+# This lane takes a PO file and converts it to the corresponding Fluent format file.
+# The locale is extracted from the PO filename (e.g., 'fr-FR.po' becomes 'fr-FR').
+# The resulting Fluent file is saved in the appropriate locale directory.
+#
+# @param file_path [String] The PO file path to convert (e.g., 'path/to/fr-FR.po')
+# @return [String] The path to the generated Fluent file
+#
+lane :generate_fluent_file_from_po do |file_path:|
+  locale = File.basename(file_path, '.po')
+  fluent_file_path = File.join(LOCALIZATION_FLUENT_FILES_DIR, locale, MAIN_FLUENT_FILE_NAME)
+
+  UI.user_error!("❌ PO file not found: #{file_path}") unless File.exist?(file_path)
+
+  FileUtils.mkdir_p(File.dirname(fluent_file_path))
+
+  po_to_fluent(
+    input_file: file_path,
+    output_file: fluent_file_path
+  )
+
+  next if !File.exist?(fluent_file_path) || File.empty?(fluent_file_path)
+
+  UI.message("✅ #{File.basename(file_path)} → #{fluent_file_path}")
+
+  fluent_file_path
+end
+
+# Downloads the latest translations from GlotPress and updates Fluent files
+#
+# This lane fetches translated PO files from GlotPress for all supported locales,
+# converts them back to Fluent format, and optionally commits and pushes the changes.
+#
+# @param commit_and_push_changes [Boolean] Whether to commit and push the updated Fluent files (default: false)
+#
+lane :download_translations do |commit_and_push_changes: false|
+  UI.header("🌐 Downloading translations from GlotPress")
+
+  downloaded_files = download_po_files_from_glotpress
+  updated_fluent_files = []
+
+  # Convert PO files back to Fluent format
+  if downloaded_files.any?
+    UI.header("🔄 Converting PO files to Fluent format")
+
+    downloaded_files.each do |file_path|
+      begin
+        fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
+        updated_fluent_files << fluent_file_path if fluent_file_path
+      rescue => e
+        UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
+      end
+    end
+
+    UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
+  end
+
+  if commit_and_push_changes && updated_fluent_files.any?
+    commit_changed_files(
+      files: updated_fluent_files,
+      message: 'Update generated Fluent files based on latest GlotPress translations'
+    )
+  end
+
+  # Clean-up: remove temporary downloaded po files
+  FileUtils.rm_rf(LOCALIZATION_PO_FILES_TMP_DIR)
+end
+
+# Downloads PO files from GlotPress for existing project locales
+#
+# This lane fetches translated PO files from GlotPress for all supported locales
+# that exist in the project. It only downloads files for locales that have
+# directories in the source localization folder.
+#
+# @return [Array<String>] List of successfully downloaded files
+#
+lane :download_po_files_from_glotpress do |download_dir: LOCALIZATION_PO_FILES_TMP_DIR|
+  UI.header("🌐 Downloading PO files from GlotPress")
+
+  # Ensure PO output directory exists
+  FileUtils.mkdir_p(download_dir)
+
+  downloaded_files = []
+
+  SUPPORTED_LOCALES.each do |locale_mapping|
+    glotpress_locale = locale_mapping[:glotpress]
+    project_locale = locale_mapping[:project]
+
+    po_file_path = File.join(download_dir, "#{project_locale}.po")
+    download_url = "#{GLOTPRESS_PROJECT_BASE_URL}/#{glotpress_locale}/default/export-translations/?format=po"
+
+    begin
+      # Download PO file using curl
+      sh("curl -s -o '#{po_file_path}' '#{download_url}'")
+
+      if File.exist?(po_file_path) && !File.empty?(po_file_path)
+        downloaded_files << po_file_path
+      else
+        UI.error("❌ Failed to download #{project_locale}: empty response")
+      end
+    rescue => e
+      UI.error("❌ Failed to download #{project_locale}: #{e.message}")
+    end
+  end
+
+  UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
+
+  downloaded_files
+end
+
+# Utils
+
 def xcframework_checksum
   File.read(xcframework_checksum_file_path).strip!
 end
@@ -125,4 +307,35 @@ end
 
 def remove_lane_context_values(names)
   names.each { |name| lane_context.delete(name) }
+end
+
+# Helper method to extract version from Cargo.toml
+def get_version_from_cargo_toml
+  cargo_toml_path = File.join(PROJECT_ROOT, 'wp_api', 'Cargo.toml')
+  default_version = '1.0.0'
+
+  File.readlines(cargo_toml_path).each do |line|
+    if line.start_with?('version = ')
+      return line.split('=')[1].strip.gsub(/["']/, '')
+    end
+  end
+
+  default_version
+rescue
+  default_version
+end
+
+def commit_changed_files(files:, message:, push: true)
+  git_add(path: files)
+  result = git_commit(
+    path: files,
+    message: message,
+    allow_nothing_to_commit: true
+  )
+
+  if result.nil?
+    UI.important("⚠️ No changed files")
+  else
+    push_to_git_remote(set_upstream: true, tags: false) if push
+  end
 end
