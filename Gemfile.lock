@@ -1,15 +1,15 @@
 GIT
   remote: https://github.com/wordpress-mobile/release-toolkit.git
-  revision: 49e2c7284e38653fac12fa21ed3cce77c660b4b2
+  revision: 818752161b134d4e469e5437ec28fd9f243e31cb
   branch: iangmaia/fluent-po-conversion-actions
   specs:
     fastlane-plugin-wpmreleasetoolkit (13.2.0)
-      PoParser (~> 3.2)
       activesupport (>= 6.1.7.1)
       buildkit (~> 1.5)
       chroma (= 0.2.0)
       diffy (~> 3.3)
       fastlane (~> 2.213)
+      gettext (~> 3.4)
       git (~> 1.3)
       google-cloud-storage (~> 1.31)
       java-properties (~> 0.3.0)
@@ -33,8 +33,6 @@ GEM
       base64
       nkf
       rexml
-    PoParser (3.2.8)
-      simple_po_parser (~> 1.1.6)
     activesupport (8.0.2)
       base64
       benchmark (>= 0.3)
@@ -65,8 +63,8 @@ GEM
     aws-sdk-kms (1.102.0)
       aws-sdk-core (~> 3, >= 3.225.0)
       aws-sigv4 (~> 1.5)
-    aws-sdk-s3 (1.188.0)
-      aws-sdk-core (~> 3, >= 3.224.1)
+    aws-sdk-s3 (1.189.0)
+      aws-sdk-core (~> 3, >= 3.225.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.5)
     aws-sigv4 (1.12.0)
@@ -96,6 +94,7 @@ GEM
     dotenv (2.8.1)
     drb (2.2.3)
     emoji_regex (3.2.3)
+    erubi (1.13.1)
     excon (0.112.0)
     faraday (1.10.4)
       faraday-em_http (~> 1.0)
@@ -170,6 +169,13 @@ GEM
       xcpretty-travis-formatter (>= 0.0.3, < 2.0.0)
     fastlane-sirp (1.0.0)
       sysrandom (~> 1.0)
+    forwardable (1.3.3)
+    gettext (3.5.1)
+      erubi
+      locale (>= 2.0.5)
+      prime
+      racc
+      text (>= 1.3.0)
     gh_inspector (1.1.3)
     git (1.19.1)
       addressable (~> 2.8)
@@ -224,6 +230,7 @@ GEM
       base64
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
+    locale (2.1.4)
     logger (1.7.0)
     mini_magick (4.13.2)
     mini_mime (1.1.5)
@@ -249,6 +256,9 @@ GEM
       ast (~> 2.4.1)
       racc
     plist (3.7.2)
+    prime (0.1.3)
+      forwardable
+      singleton
     prism (1.4.0)
     progress_bar (1.3.4)
       highline (>= 1.6)
@@ -282,7 +292,7 @@ GEM
       rubocop-ast (>= 1.44.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
-    rubocop-ast (1.44.1)
+    rubocop-ast (1.45.0)
       parser (>= 3.3.7.2)
       prism (~> 1.4)
     ruby-progressbar (1.13.0)
@@ -301,11 +311,12 @@ GEM
     simctl (1.6.10)
       CFPropertyList
       naturally
-    simple_po_parser (1.1.6)
+    singleton (0.3.0)
     sysrandom (1.0.5)
     terminal-notifier (2.0.0)
     terminal-table (3.0.2)
       unicode-display_width (>= 1.1.1, < 3)
+    text (1.3.1)
     trailblazer-option (0.1.2)
     tty-cursor (0.7.1)
     tty-screen (0.8.2)
