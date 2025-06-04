@@ -144,15 +144,13 @@ end
 lane :generate_source_po_file do |commit_and_push_changes: false|
   project_version = get_version_from_cargo_toml
 
-  UI.header("🔄 Converting English Fluent file to PO format")
+  UI.header('🔄 Converting English Fluent file to PO format')
 
   FileUtils.mkdir_p(File.dirname(LOCALIZATION_PO_SOURCE_FILE))
 
   fluent_file = File.join(LOCALIZATION_FLUENT_FILES_DIR, 'en-US', MAIN_FLUENT_FILE_NAME)
 
-  unless File.exist?(fluent_file)
-    UI.user_error!("❌ English Fluent file not found: #{fluent_file}")
-  end
+  UI.user_error!("❌ English Fluent file not found: #{fluent_file}") unless File.exist?(fluent_file)
 
   begin
     fluent_to_po(
@@ -164,14 +162,16 @@ lane :generate_source_po_file do |commit_and_push_changes: false|
     )
 
     UI.success("✅ #{File.basename(fluent_file)} → #{File.basename(LOCALIZATION_PO_SOURCE_FILE)}")
-  rescue => e
+  rescue StandardError => e
     UI.error("❌ Failed to convert English Fluent file: #{e.message}")
   end
 
-  commit_changed_files(
-    files: LOCALIZATION_PO_SOURCE_FILE,
-    message: 'Update source PO file (en-US.pot) to be synced to GlotPress'
-  ) if commit_and_push_changes
+  if commit_and_push_changes
+    commit_changed_files(
+      files: LOCALIZATION_PO_SOURCE_FILE,
+      message: 'Update source PO file (en-US.pot) to be synced to GlotPress'
+    )
+  end
 end
 
 # Converts a PO file for a given locale back to Fluent format
@@ -211,22 +211,20 @@ end
 # @param commit_and_push_changes [Boolean] Whether to commit and push the updated Fluent files (default: false)
 #
 lane :download_translations do |commit_and_push_changes: false|
-  UI.header("🌐 Downloading translations from GlotPress")
+  UI.header('🌐 Downloading translations from GlotPress')
 
   downloaded_files = download_po_files_from_glotpress
   updated_fluent_files = []
 
   # Convert PO files back to Fluent format
   if downloaded_files.any?
-    UI.header("🔄 Converting PO files to Fluent format")
+    UI.header('🔄 Converting PO files to Fluent format')
 
     downloaded_files.each do |file_path|
-      begin
-        fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
-        updated_fluent_files << fluent_file_path if fluent_file_path
-      rescue => e
-        UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
-      end
+      fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
+      updated_fluent_files << fluent_file_path if fluent_file_path
+    rescue StandardError => e
+      UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
     end
 
     UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
@@ -252,7 +250,7 @@ end
 # @return [Array<String>] List of successfully downloaded files
 #
 lane :download_po_files_from_glotpress do |download_dir: LOCALIZATION_PO_FILES_TMP_DIR|
-  UI.header("🌐 Downloading PO files from GlotPress")
+  UI.header('🌐 Downloading PO files from GlotPress')
 
   # Ensure PO output directory exists
   FileUtils.mkdir_p(download_dir)
@@ -275,7 +273,7 @@ lane :download_po_files_from_glotpress do |download_dir: LOCALIZATION_PO_FILES_T
       else
         UI.error("❌ Failed to download #{project_locale}: empty response")
       end
-    rescue => e
+    rescue StandardError => e
       UI.error("❌ Failed to download #{project_locale}: #{e.message}")
     end
   end
@@ -315,13 +313,11 @@ def get_version_from_cargo_toml
   default_version = '1.0.0'
 
   File.readlines(cargo_toml_path).each do |line|
-    if line.start_with?('version = ')
-      return line.split('=')[1].strip.gsub(/["']/, '')
-    end
+    return line.split('=')[1].strip.gsub(/["']/, '') if line.start_with?('version = ')
   end
 
   default_version
-rescue
+rescue StandardError
   default_version
 end
 
@@ -334,8 +330,8 @@ def commit_changed_files(files:, message:, push: true)
   )
 
   if result.nil?
-    UI.important("⚠️ No changed files")
-  else
-    push_to_git_remote(set_upstream: true, tags: false) if push
+    UI.important('⚠️ No changed files')
+  elsif push
+    push_to_git_remote(set_upstream: true, tags: false)
   end
 end
