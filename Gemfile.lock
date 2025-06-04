@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/wordpress-mobile/release-toolkit.git
-  revision: 818752161b134d4e469e5437ec28fd9f243e31cb
+  revision: 552586996124e02ce189427e51d972d1cabcbea8
   branch: iangmaia/fluent-po-conversion-actions
   specs:
     fastlane-plugin-wpmreleasetoolkit (13.2.0)
@@ -72,7 +72,7 @@ GEM
     babosa (1.0.4)
     base64 (0.3.0)
     benchmark (0.4.1)
-    bigdecimal (3.2.1)
+    bigdecimal (3.2.2)
     buildkit (1.6.1)
       sawyer (>= 0.6)
     camertron-eprun (1.1.1)
@@ -281,7 +281,7 @@ GEM
       chunky_png (~> 1.0)
       rqrcode_core (~> 1.0)
     rqrcode_core (1.2.0)
-    rubocop (1.75.8)
+    rubocop (1.76.0)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
@@ -289,7 +289,7 @@ GEM
       parser (>= 3.3.0.2)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 2.9.3, < 3.0)
-      rubocop-ast (>= 1.44.0, < 2.0)
+      rubocop-ast (>= 1.45.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
     rubocop-ast (1.45.0)
