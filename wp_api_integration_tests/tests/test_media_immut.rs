@@ -1,18 +1,11 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::{
-    WpApiParamOrder, generate,
     media::{
         MediaId, MediaListParams, MediaStatus, MediaTypeParam, SparseMediaFieldWithEditContext,
         SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
     },
     posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
 };
-use wp_api_integration_tests::{
-    AssertResponse, FIRST_USER_ID, MEDIA_ID_611, SECOND_USER_ID, api_client,
-    unwrapped_wp_gmt_date_time,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]

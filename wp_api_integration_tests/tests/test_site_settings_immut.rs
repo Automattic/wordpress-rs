@@ -1,11 +1,8 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::site_settings::{
     SparseSiteSettingsFieldWithEditContext, SparseSiteSettingsFieldWithEmbedContext,
     SparseSiteSettingsFieldWithViewContext,
 };
-use wp_api_integration_tests::{AssertResponse, FIRST_USER_EMAIL, api_client};
+use wp_api_integration_tests::prelude::*;
 
 #[rstest]
 #[tokio::test]

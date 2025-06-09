@@ -1,16 +1,12 @@
 use futures::{FutureExt, StreamExt};
-use std::{env, sync::Arc, time::Duration};
-use wp_api::{
-    middleware::WpApiMiddlewarePipeline,
-    reqwest_request_executor::ReqwestRequestExecutor,
-    wordpress_org::{
-        client::{
-            WordPressOrgApiClient, WordPressOrgApiClientError,
-            WordPressOrgApiPluginDirectoryCategory,
-        },
-        plugin_directory::PluginInformation,
+use std::{env, time::Duration};
+use wp_api::wordpress_org::{
+    client::{
+        WordPressOrgApiClient, WordPressOrgApiClientError, WordPressOrgApiPluginDirectoryCategory,
     },
+    plugin_directory::PluginInformation,
 };
+use wp_api_integration_tests::prelude::*;
 
 const FETCH_PLUGIN_INFORMATION_RETRY_COUNT: usize = 5;
 const TOKIO_STREAM_SIZE: usize = 100;

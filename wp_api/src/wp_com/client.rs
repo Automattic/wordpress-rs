@@ -11,9 +11,10 @@ use super::endpoint::{
     support_tickets_endpoint::{SupportTicketsRequestBuilder, SupportTicketsRequestExecutor},
 };
 use crate::{
-    WpApiClientDelegate, api_client_generate_api_client, api_client_generate_endpoint_impl,
-    api_client_generate_request_builder, auth::WpAuthenticationProvider,
-    request::endpoint::ApiUrlResolver, wp_com::endpoint::WpComApiClientInternalUrlResolver,
+    api_client::WpApiClientDelegate, api_client_generate_api_client,
+    api_client_generate_endpoint_impl, api_client_generate_request_builder,
+    auth::WpAuthenticationProvider, request::endpoint::ApiUrlResolver,
+    wp_com::endpoint::WpComApiClientInternalUrlResolver,
 };
 use std::sync::Arc;
 

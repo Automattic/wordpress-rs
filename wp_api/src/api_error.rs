@@ -260,6 +260,8 @@ pub enum WpErrorCode {
     InvalidField,
     #[serde(rename = "rest_invalid_param")]
     InvalidParam,
+    #[serde(rename = "rest_invalid_template")]
+    InvalidTemplate,
     #[serde(rename = "rest_no_search_term_defined")]
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
@@ -272,8 +274,18 @@ pub enum WpErrorCode {
     PostInvalidId,
     #[serde(rename = "rest_post_invalid_page_number")]
     PostInvalidPageNumber,
+    #[serde(rename = "rest_post_invalid_parent")]
+    PostInvalidParent,
+    #[serde(rename = "rest_revision_invalid_offset_number")]
+    RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
+    #[serde(rename = "rest_template_already_trashed")]
+    TemplateAlreadyTrashed,
+    #[serde(rename = "rest_template_insert_error")]
+    TemplateInsertError,
+    #[serde(rename = "rest_template_not_found")]
+    TemplateNotFound,
     #[serde(rename = "rest_term_invalid")]
     TermInvalid,
     #[serde(rename = "rest_theme_not_found")]

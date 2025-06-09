@@ -1,7 +1,9 @@
 use crate::{
-    ParsedUrl, WpApiClientDelegate, WpApiError, WpErrorCode,
+    api_client::WpApiClientDelegate,
+    api_error::{WpApiError, WpErrorCode},
     auth::{WpAuthentication, WpAuthenticationProvider},
     jetpack::client::JetpackApiClient,
+    parsed_url::ParsedUrl,
     users::UserId,
     wp_com::{
         WpComSiteId, client::WpComApiClient, jetpack_connection::JetpackRemoteConnectionParams,

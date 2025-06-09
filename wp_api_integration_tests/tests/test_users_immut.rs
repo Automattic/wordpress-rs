@@ -1,16 +1,10 @@
 use reusable_test_cases::list_users_cases;
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
-use wp_api::{
-    WpApiParamOrder, generate,
-    users::{
-        SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
-        SparseUserFieldWithViewContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
-        WpApiParamUsersOrderBy, WpApiParamUsersWho,
-    },
+use wp_api::users::{
+    SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
+    SparseUserFieldWithViewContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
+    WpApiParamUsersOrderBy, WpApiParamUsersWho,
 };
-use wp_api_integration_tests::{AssertResponse, FIRST_USER_ID, SECOND_USER_ID, api_client};
+use wp_api_integration_tests::prelude::*;
 
 pub mod reusable_test_cases;
 

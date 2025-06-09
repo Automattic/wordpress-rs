@@ -1,8 +1,9 @@
 use super::endpoint::connection_endpoint::{ConnectionRequestBuilder, ConnectionRequestExecutor};
 use crate::{
-    ParsedUrl, WpApiClientDelegate, api_client_generate_api_client,
-    api_client_generate_endpoint_impl,
+    api_client::WpApiClientDelegate,
+    api_client_generate_api_client, api_client_generate_endpoint_impl,
     auth::WpAuthenticationProvider,
+    parsed_url::ParsedUrl,
     request::endpoint::{ApiUrlResolver, WpOrgSiteApiUrlResolver},
 };
 use std::sync::Arc;

@@ -1,10 +1,5 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::{
-    WpApiParamOrder,
     categories::CategoryId,
-    generate,
     posts::{
         PostId, PostListParams, PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
         SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
@@ -12,10 +7,7 @@ use wp_api::{
     },
     tags::TagId,
 };
-use wp_api_integration_tests::{
-    AssertResponse, FIRST_POST_ID, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
-    unwrapped_wp_gmt_date_time,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]

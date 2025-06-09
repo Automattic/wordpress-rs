@@ -1,16 +1,11 @@
+use crate::{
+    login::url_discovery::is_local_dev_environment_url, parsed_url::ParsedUrl, uuid::WpUuid,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::str;
-use std::sync::Arc;
-use wp_localization::MessageBundle;
-use wp_localization::{WpMessages, WpSupportsLocalization};
+use std::{collections::HashMap, str, sync::Arc};
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
-use wp_serde_helper::deserialize_false_or_string;
-use wp_serde_helper::deserialize_offset;
-
-use crate::ParsedUrl;
-use crate::WpUuid;
-use crate::login::url_discovery::is_local_dev_environment_url;
+use wp_serde_helper::{deserialize_false_or_string, deserialize_offset};
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
@@ -95,7 +90,7 @@ impl WpApiDetails {
     /// Returns the URL to be used in application password authentication.
     ///
     /// See the "Authorization Flow" section for details:
-    /// https://github.com/WordPress/wordpress-develop/blob/530493396b324f5bed518a494e2843e7fdb020f1/src/wp-includes/rest-api.php#L1099-L1119
+    /// <https://github.com/WordPress/wordpress-develop/blob/530493396b324f5bed518a494e2843e7fdb020f1/src/wp-includes/rest-api.php#L1099-L1119>
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.authentication
             .find_application_passwords_authentication_url()
@@ -267,7 +262,7 @@ impl WpApiDetailsAuthenticationMap {
 /// Return a URL to be used in application password authentication.
 ///
 /// See the "Authorization Flow" section for details:
-/// https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/
+/// <https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/>
 #[uniffi::export]
 pub fn create_application_password_authentication_url(
     login_url: Arc<ParsedUrl>,

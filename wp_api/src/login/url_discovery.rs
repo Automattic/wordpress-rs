@@ -1,7 +1,8 @@
 use super::WpApiDetails;
 use crate::{
-    ParseUrlError, ParsedUrl, RequestExecutionError, RequestExecutionErrorReason, WpErrorCode,
+    api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCode},
     login::KnownAuthenticationBlockingPlugin,
+    parsed_url::{ParseUrlError, ParsedUrl},
     request::{ResponseBodyType, WpRedirect},
 };
 use itertools::Itertools;
@@ -253,7 +254,7 @@ pub struct RootWpJson {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ParseHomepageResult {
-    /// `href` attribute of a link tag if it has `rel` attribute of "https://api.w.org/".
+    /// `href` attribute of a link tag if it has `rel` attribute of "<https://api.w.org/>".
     /// For example:
     /// <link href="http://localhost/wp-json/" rel="https://api.w.org/">
     pub api_root_url_from_link_tag: Option<Arc<ParsedUrl>>,

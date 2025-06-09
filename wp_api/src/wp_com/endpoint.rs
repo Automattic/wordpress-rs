@@ -1,5 +1,5 @@
 use crate::{
-    ParsedUrl,
+    parsed_url::ParsedUrl,
     request::endpoint::{ApiUrlResolver, AsNamespace, WpNamespace},
 };
 use std::sync::Arc;

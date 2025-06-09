@@ -30,7 +30,7 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
                 }
             }
             return when (usersResult) {
-                is WpRequestResult.WpRequestSuccess -> usersResult.data.data
+                is WpRequestResult.Success -> usersResult.response.data
                 else -> throw IllegalStateException("User list request should succeed: $usersResult")
             }
         }

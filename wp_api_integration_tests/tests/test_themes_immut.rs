@@ -1,15 +1,8 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
-use wp_api::generate;
 use wp_api::themes::{
     SparseThemeFieldWithEditContext, SparseThemeFieldWithEmbedContext,
     SparseThemeFieldWithViewContext, ThemeListParams, ThemeStatus, ThemeStylesheet, ThemeSupports,
 };
-use wp_api_integration_tests::{
-    AssertResponse, THEME_TWENTY_TWENTY_FIVE, THEME_TWENTY_TWENTY_FOUR, THEME_TWENTY_TWENTY_THREE,
-    api_client,
-};
+use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]

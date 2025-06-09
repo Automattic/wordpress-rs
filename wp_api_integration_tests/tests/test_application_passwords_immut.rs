@@ -1,15 +1,9 @@
-use rstest::*;
-use rstest_reuse::{self, apply, template};
-use serial_test::parallel;
 use wp_api::application_passwords::{
     ApplicationPasswordUuid, SparseApplicationPasswordFieldWithEditContext,
     SparseApplicationPasswordFieldWithEmbedContext, SparseApplicationPasswordFieldWithViewContext,
 };
 use wp_api::users::UserId;
-use wp_api_integration_tests::{
-    AssertResponse, FIRST_USER_ID, SECOND_USER_ID, TestCredentials, api_client,
-    api_client_as_subscriber,
-};
+use wp_api_integration_tests::prelude::*;
 
 pub mod reusable_test_cases;
 

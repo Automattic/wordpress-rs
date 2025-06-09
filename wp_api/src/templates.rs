@@ -45,6 +45,7 @@ pub enum TemplateStatus {
     Private,
     #[default]
     Publish,
+    Trash,
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
@@ -160,7 +161,12 @@ pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
     pub author: Option<UserId>,
     #[WpContext(edit, view)]
-    pub modified: Option<bool>,
+    #[WpContextualOption]
+    #[serde(
+        default,
+        deserialize_with = "wp_serde_helper::deserialize_false_or_string"
+    )]
+    pub modified: Option<String>,
     #[WpContext(edit, view, embed)]
     pub is_custom: Option<bool>,
     #[WpContext(edit, view, embed)]
@@ -169,14 +175,14 @@ pub struct SparseTemplate {
     pub original_source: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum SparseTemplateContentWrapper {
     Object(SparseTemplateContent),
     String(String),
 }
 
-#[derive(Debug, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
 pub struct SparseTemplateContent {
     pub raw: Option<String>,
     pub rendered: Option<String>,
@@ -184,15 +190,88 @@ pub struct SparseTemplateContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum SparseTemplateTitleWrapper {
     Object(SparseTemplateTitle),
     String(String),
 }
 
-#[derive(Debug, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
 pub struct SparseTemplateTitle {
     pub raw: Option<String>,
     pub rendered: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct TemplateDeleteResponse {
+    pub deleted: bool,
+    pub previous: TemplateWithEditContext,
+}
+
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct TemplateUpdateParams {
+    // Content of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // Title of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // Description of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // The ID for the author of the template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // https://developer.wordpress.org/rest-api/reference/wp_templates/#update-a-template
+    // The documentation includes `slug`, `status`, `theme` & `type` parameters, but the updates
+    // don't seem to take place when they are included in the request. So, we decided not to
+    // include them until we figure out under which conditions they'll be allowed to update.
+}
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct TemplateCreateParams {
+    // Unique slug identifying the template.
+    pub slug: String,
+    // Theme identifier for the template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    // Content of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // Title of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // Description of template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // The ID for the author of the template.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // https://developer.wordpress.org/rest-api/reference/wp_templates/#create-a-template
+    // The documentation includes `status` & `type` parameters, but the created templates don't
+    // seem to take these into account. So, we decided not to include them until we figure out
+    // under which conditions they'll be taken into account.
+}
+
+impl TemplateCreateParams {
+    pub fn new(slug: String) -> Self {
+        Self {
+            slug,
+            theme: None,
+            content: None,
+            title: None,
+            description: None,
+            author: None,
+        }
+    }
 }
