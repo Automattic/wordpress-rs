@@ -1,10 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use oauth2_tests::Oauth2Test;
 use std::sync::Arc;
-use support_eligibility_test::SupportEligibilityTest;
-use support_tickets_test::SupportTicketsTest;
 use wp_api::{
     WpApiClientDelegate, WpAppNotifier,
     auth::{WpAuthentication, WpAuthenticationProvider},
@@ -30,11 +27,6 @@ enum Commands {
         #[arg(short = 't', long = "token", env = "WP_COM_API_KEY")]
         token: String,
     },
-}
-
-#[async_trait]
-trait Testable {
-    async fn test(&self) -> Result<(), anyhow::Error>;
 }
 
 #[derive(Debug)]
@@ -67,14 +59,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
             let client = WpComApiClient::new(delegate);
 
-            Oauth2Test {
-                client: &client,
-                token: &token,
-            }
-            .test()
-            .await?;
-            SupportTicketsTest { client: &client }.test().await?;
-            SupportEligibilityTest { client: &client }.test().await?;
+            oauth2_tests::oauth2_test(&client, token.clone()).await?;
+            support_tickets_test::support_tickets_test(&client).await?;
+            support_eligibility_test::support_eligibility_test(&client).await?;
         }
     }
 
