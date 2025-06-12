@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'open-uri'
+
 PROJECT_ROOT = File.expand_path('..', __dir__)
 
 LANE_VALUE_VERSION = 'WP_VERSION'
@@ -14,7 +16,6 @@ GIT_REMOTE_NAME = 'origin'
 # Localization constants
 LOCALIZATION_FLUENT_FILES_DIR = File.join(PROJECT_ROOT, 'wp_localization', 'localization')
 LOCALIZATION_PO_SOURCE_FILE = File.join(PROJECT_ROOT, 'wp_localization', 'glotpress', 'en-US.pot')
-LOCALIZATION_PO_FILES_TMP_DIR = File.join(Dir.tmpdir, 'wordpress-rs', 'glotpress')
 MAIN_FLUENT_FILE_NAME = 'main.ftl'
 PROJECT_NAME = 'wordpress-rs'
 
@@ -236,9 +237,6 @@ lane :download_translations do |commit_and_push_changes: false|
       message: 'Update generated Fluent files based on latest GlotPress translations'
     )
   end
-
-  # Clean-up: remove temporary downloaded po files
-  FileUtils.rm_rf(LOCALIZATION_PO_FILES_TMP_DIR)
 end
 
 # Downloads PO files from GlotPress for existing project locales
@@ -249,38 +247,40 @@ end
 #
 # @return [Array<String>] List of successfully downloaded files
 #
-lane :download_po_files_from_glotpress do |download_dir: LOCALIZATION_PO_FILES_TMP_DIR|
+lane :download_po_files_from_glotpress do |download_dir: nil|
   UI.header('🌐 Downloading PO files from GlotPress')
 
-  # Ensure PO output directory exists
-  FileUtils.mkdir_p(download_dir)
+  Dir.mktmpdir do |temp_download_dir|
+    download_dir = temp_download_dir if download_dir.nil?
+    downloaded_files = []
 
-  downloaded_files = []
+    SUPPORTED_LOCALES.each do |locale_mapping|
+      glotpress_locale = locale_mapping[:glotpress]
+      project_locale = locale_mapping[:project]
 
-  SUPPORTED_LOCALES.each do |locale_mapping|
-    glotpress_locale = locale_mapping[:glotpress]
-    project_locale = locale_mapping[:project]
+      po_file_path = File.join(download_dir, "#{project_locale}.po")
+      download_url = "#{GLOTPRESS_PROJECT_BASE_URL}/#{glotpress_locale}/default/export-translations/?format=po"
 
-    po_file_path = File.join(download_dir, "#{project_locale}.po")
-    download_url = "#{GLOTPRESS_PROJECT_BASE_URL}/#{glotpress_locale}/default/export-translations/?format=po"
+      UI.message("⬇️ Downloading PO file for #{project_locale}...")
 
-    begin
-      # Download PO file using curl
-      sh("curl -s -o '#{po_file_path}' '#{download_url}'")
+      begin
+        # Download PO file using Ruby's URI.open
+        File.write(po_file_path, URI.open(download_url).read)
 
-      if File.exist?(po_file_path) && !File.empty?(po_file_path)
-        downloaded_files << po_file_path
-      else
-        UI.error("❌ Failed to download #{project_locale}: empty response")
+        if File.exist?(po_file_path) && !File.empty?(po_file_path)
+          downloaded_files << po_file_path
+        else
+          UI.error("❌ Failed to download #{project_locale}: empty response")
+        end
+      rescue StandardError => e
+        UI.error("❌ Failed to download #{project_locale}: #{e.message}")
       end
-    rescue StandardError => e
-      UI.error("❌ Failed to download #{project_locale}: #{e.message}")
     end
+
+    UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
+
+    downloaded_files
   end
-
-  UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
-
-  downloaded_files
 end
 
 # Utils
