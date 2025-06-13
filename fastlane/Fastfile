@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'open-uri'
+require 'fluent_tools'
 
 PROJECT_ROOT = File.expand_path('..', __dir__)
 
@@ -143,8 +144,6 @@ end
 # @param commit_and_push_changes [Boolean] Whether to commit and push the generated PO file (default: false)
 #
 lane :generate_source_po_file do |commit_and_push_changes: false|
-  project_version = get_version_from_cargo_toml
-
   UI.header('🔄 Converting English Fluent file to PO format')
 
   FileUtils.mkdir_p(File.dirname(LOCALIZATION_PO_SOURCE_FILE))
@@ -154,12 +153,10 @@ lane :generate_source_po_file do |commit_and_push_changes: false|
   UI.user_error!("❌ English Fluent file not found: #{fluent_file}") unless File.exist?(fluent_file)
 
   begin
-    fluent_to_po(
-      input_file: fluent_file,
-      output_file: LOCALIZATION_PO_SOURCE_FILE,
-      locale: 'en-US',
-      project_name: PROJECT_NAME,
-      project_version: project_version
+    FluentTools.fluent_to_po(
+      fluent_file,
+      LOCALIZATION_PO_SOURCE_FILE,
+      locale: 'en-US'
     )
 
     UI.success("✅ #{File.basename(fluent_file)} → #{File.basename(LOCALIZATION_PO_SOURCE_FILE)}")
@@ -192,9 +189,9 @@ lane :generate_fluent_file_from_po do |file_path:|
 
   FileUtils.mkdir_p(File.dirname(fluent_file_path))
 
-  po_to_fluent(
-    input_file: file_path,
-    output_file: fluent_file_path
+  FluentTools.po_to_fluent(
+    file_path,
+    fluent_file_path
   )
 
   next if !File.exist?(fluent_file_path) || File.empty?(fluent_file_path)
@@ -214,28 +211,30 @@ end
 lane :download_translations do |commit_and_push_changes: false|
   UI.header('🌐 Downloading translations from GlotPress')
 
-  downloaded_files = download_po_files_from_glotpress
-  updated_fluent_files = []
+  Dir.mktmpdir do |temp_download_dir|
+    downloaded_files = download_po_files_from_glotpress(download_dir: temp_download_dir)
+    updated_fluent_files = []
 
-  # Convert PO files back to Fluent format
-  if downloaded_files.any?
-    UI.header('🔄 Converting PO files to Fluent format')
+    # Convert PO files back to Fluent format
+    if downloaded_files.any?
+      UI.header('🔄 Converting PO files to Fluent format')
 
-    downloaded_files.each do |file_path|
-      fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
-      updated_fluent_files << fluent_file_path if fluent_file_path
-    rescue StandardError => e
-      UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
+      downloaded_files.each do |file_path|
+        fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
+        updated_fluent_files << fluent_file_path if fluent_file_path
+      rescue StandardError => e
+        UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
+      end
+
+      UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
     end
 
-    UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
-  end
-
-  if commit_and_push_changes && updated_fluent_files.any?
-    commit_changed_files(
-      files: updated_fluent_files,
-      message: 'Update generated Fluent files based on latest GlotPress translations'
-    )
+    if commit_and_push_changes && updated_fluent_files.any?
+      commit_changed_files(
+        files: updated_fluent_files,
+        message: 'Update generated Fluent files based on latest GlotPress translations'
+      )
+    end
   end
 end
 
@@ -247,40 +246,39 @@ end
 #
 # @return [Array<String>] List of successfully downloaded files
 #
-lane :download_po_files_from_glotpress do |download_dir: nil|
+lane :download_po_files_from_glotpress do |download_dir:|
   UI.header('🌐 Downloading PO files from GlotPress')
 
-  Dir.mktmpdir do |temp_download_dir|
-    download_dir = temp_download_dir if download_dir.nil?
-    downloaded_files = []
+  UI.user_error!("Download directory does not exist: #{download_dir}") unless Dir.exist?(download_dir)
 
-    SUPPORTED_LOCALES.each do |locale_mapping|
-      glotpress_locale = locale_mapping[:glotpress]
-      project_locale = locale_mapping[:project]
+  downloaded_files = []
 
-      po_file_path = File.join(download_dir, "#{project_locale}.po")
-      download_url = "#{GLOTPRESS_PROJECT_BASE_URL}/#{glotpress_locale}/default/export-translations/?format=po"
+  SUPPORTED_LOCALES.each do |locale_mapping|
+    glotpress_locale = locale_mapping[:glotpress]
+    project_locale = locale_mapping[:project]
 
-      UI.message("⬇️ Downloading PO file for #{project_locale}...")
+    po_file_path = File.join(download_dir, "#{project_locale}.po")
+    download_url = "#{GLOTPRESS_PROJECT_BASE_URL}/#{glotpress_locale}/default/export-translations/?format=po"
 
-      begin
-        # Download PO file using Ruby's URI.open
-        File.write(po_file_path, URI.open(download_url).read)
+    UI.message("⬇️ Downloading PO file for #{project_locale}...")
 
-        if File.exist?(po_file_path) && !File.empty?(po_file_path)
-          downloaded_files << po_file_path
-        else
-          UI.error("❌ Failed to download #{project_locale}: empty response")
-        end
-      rescue StandardError => e
-        UI.error("❌ Failed to download #{project_locale}: #{e.message}")
+    begin
+      # Download PO file using Ruby's URI.open
+      File.write(po_file_path, URI.open(download_url).read)
+
+      if File.exist?(po_file_path) && !File.empty?(po_file_path)
+        downloaded_files << po_file_path
+      else
+        UI.error("❌ Failed to download #{project_locale}: empty response")
       end
+    rescue StandardError => e
+      UI.error("❌ Failed to download #{project_locale}: #{e.message}")
     end
-
-    UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
-
-    downloaded_files
   end
+
+  UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
+
+  downloaded_files
 end
 
 # Utils
@@ -305,20 +303,6 @@ end
 
 def remove_lane_context_values(names)
   names.each { |name| lane_context.delete(name) }
-end
-
-# Helper method to extract version from Cargo.toml
-def get_version_from_cargo_toml
-  cargo_toml_path = File.join(PROJECT_ROOT, 'wp_api', 'Cargo.toml')
-  default_version = '1.0.0'
-
-  File.readlines(cargo_toml_path).each do |line|
-    return line.split('=')[1].strip.gsub(/["']/, '') if line.start_with?('version = ')
-  end
-
-  default_version
-rescue StandardError
-  default_version
 end
 
 def commit_changed_files(files:, message:, push: true)
