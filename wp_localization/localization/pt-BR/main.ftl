@@ -18,8 +18,6 @@ xmlrpc_endpoint_not_found = O endpoint XML-RPC do site não pôde ser encontrado
 
 xmlrpc_disabled_by_multiple_plugins = O XML-RPC do site está desabilitado – há múltiplos plugins instalados que podem ter desabilitado o XML-RPC. Por favor, desabilite-os e tente novamente.
 
-probably_not_wordpress_site = O site não parece ser um site WordPress.
-
 wordpress_org_api_client_error_request_encoding = Falha ao codificar solicitação. Motivo: {$reason}.
 
 uuid_parse_error_not_version_4 = Não é um UUID versão 4.
@@ -77,4 +75,6 @@ url_parsing_error = URL inválida.
 site_error_message = Seu site enviou uma mensagem de erro: {$error_message}.
 
 wp_api_error_generic_error = Algo deu errado.
+
+probably_not_wordpress_site = O site não parece ser um site WordPress.
 

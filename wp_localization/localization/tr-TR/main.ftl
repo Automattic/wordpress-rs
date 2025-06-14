@@ -16,8 +16,6 @@ xmlrpc_endpoint_not_found = Sitenin XML-RPC uç noktası bulunamadı. Lütfen si
 
 xmlrpc_disabled_by_multiple_plugins = Sitenin XML-RPC özelliği devre dışı – XML-RPC'yi devre dışı bırakmış olabilecek birden fazla eklenti yüklü. Lütfen bu eklentileri devre dışı bırakıp tekrar deneyin.
 
-probably_not_wordpress_site = Site bir WordPress sitesi gibi görünmüyor.
-
 wordpress_org_api_client_error_request_encoding = İstek kodlanamadı. Neden: {$reason}.
 
 uuid_parse_error_not_version_4 = Sürüm 4 UUID değil.
@@ -75,4 +73,6 @@ url_parsing_error = Geçersiz URL.
 site_error_message = Siteniz bir hata mesajı gönderdi: {$error_message}.
 
 wp_api_error_generic_error = Bir şeyler yanlış gitti.
+
+probably_not_wordpress_site = Site bir WordPress sitesi gibi görünmüyor.
 
