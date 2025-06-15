@@ -73,31 +73,25 @@ pub enum SubscriptionStatus {
 pub struct SubscribersListParams {
     // The current page.
     #[uniffi(default = None)]
-    page: Option<u64>,
-
+    pub page: Option<u64>,
     // The amount of items to show per page.
     #[uniffi(default = None)]
-    per_page: Option<u64>,
-
+    pub per_page: Option<u64>,
     // Search for subscribers
     #[uniffi(default = None)]
-    search: Option<String>,
-
+    pub search: Option<String>,
     // Sort subscribers by a specific field
     #[uniffi(default = None)]
-    sort: Option<ListSubscribersSortField>,
-
+    pub sort: Option<ListSubscribersSortField>,
     // Sort order
     #[uniffi(default = None)]
-    sort_order: Option<WpApiParamOrder>,
-
+    pub sort_order: Option<WpApiParamOrder>,
     // Filter subscribers by a specific subscriber type
     #[uniffi(default = None)]
-    filter: Option<SubscriberType>,
-
+    pub filter: Option<SubscriberType>,
     // Array of filters to apply (combined with AND logic). If provided, overrides the single filter parameter.
     #[uniffi(default = None)]
-    filters: Option<Vec<SubscriberType>>,
+    pub filters: Option<Vec<SubscriberType>>,
 }
 
 impl AppendUrlQueryPairs for SubscribersListParams {
@@ -186,12 +180,10 @@ impl AppendUrlQueryPairs for GetSubscriberQuery {
 pub struct AddSubscribersParams {
     // A list of emails to add as subscribers to the current site.
     pub emails: Vec<String>,
-
     // A list of category IDs the emails should be subscribed to.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub categories: Option<Vec<String>>,
-
     // If true, the import will only parse the file and return the number of subscribers that would be imported.
     #[uniffi(default = false)]
     #[serde(skip_serializing_if = "<&bool>::not")]
@@ -267,7 +259,7 @@ pub struct SubscriberImportJob {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SubscriberImportJobsListParams {
     #[uniffi(default = None)]
-    status: Option<SubscriberImportJobStatus>,
+    pub status: Option<SubscriberImportJobStatus>,
 }
 
 impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
