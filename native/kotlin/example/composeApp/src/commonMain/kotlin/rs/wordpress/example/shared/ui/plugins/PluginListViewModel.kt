@@ -16,7 +16,7 @@ class PluginListViewModel(private val authRepository: AuthenticationRepository) 
         apiClient = null
         authRepository.authenticationForSite(authenticatedSite)?.let {
             apiClient = WpApiClient(
-                apiRootUrl = authenticatedSite.apiRootUrl,
+                wpOrgSiteApiRootUrl = authenticatedSite.apiRootUrl,
                 authProvider = WpAuthenticationProvider.staticWithAuth(it)
             )
         }
