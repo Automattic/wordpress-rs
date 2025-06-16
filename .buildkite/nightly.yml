@@ -3,12 +3,22 @@ steps:
     command: |
       echo "--- :rust: Testing"
       make test-rust-integration-wordpress-org-api
+    notify:
+      - slack:
+          channels:
+            - "#wordpress-rs"
+          message: "Nightly build failed."
+        if: build.state == "failed"
     env:
       TEST_ALL_PLUGINS: true
 
-notify:
-  - slack:
-      channels:
-        - "#wordpress-rs"
-      message: "Nightly build."
-    if: build.state == "failed"
+  - label: ":globe_with_meridians: :arrow_up: :arrow_down: Sync localization"
+    command: .buildkite/commands/sync-localization.sh
+    notify:
+      - slack:
+          channels:
+            - "#wordpress-rs"
+          message: "Localization sync failed."
+        if: build.state == "failed"
+    agents:
+      queue: mac
