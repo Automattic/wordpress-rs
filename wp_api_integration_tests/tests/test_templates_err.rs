@@ -34,6 +34,43 @@ async fn delete_template_err_template_not_found() {
 
 #[tokio::test]
 #[parallel]
+async fn update_template_err_cannot_manage_templates() {
+    api_client_as_subscriber()
+        .templates()
+        .update(
+            &TemplateId(
+                TestCredentials::instance()
+                    .integration_test_custom_template_id
+                    .to_string(),
+            ),
+            &TemplateUpdateParams::default(),
+        )
+        .await
+        .assert_wp_error(WpErrorCode::CannotManageTemplates)
+}
+
+#[tokio::test]
+#[parallel]
+async fn update_template_err_invalid_author() {
+    api_client()
+        .templates()
+        .update(
+            &TemplateId(
+                TestCredentials::instance()
+                    .integration_test_custom_template_id
+                    .to_string(),
+            ),
+            &TemplateUpdateParams {
+                author: Some(UserId(99999999)),
+                ..Default::default()
+            },
+        )
+        .await
+        .assert_wp_error(WpErrorCode::InvalidAuthor);
+}
+
+#[tokio::test]
+#[parallel]
 async fn update_template_err_template_not_found() {
     api_client()
         .templates()
