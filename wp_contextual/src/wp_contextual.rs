@@ -157,7 +157,9 @@ fn parse_fields(
                                 .into_syn_error(attr.meta.span()))
                         }
                     } else {
-                        Ok(WpParsedAttr::ExternalAttr { attr: attr.clone() })
+                        Ok(WpParsedAttr::ExternalAttr {
+                            attr: Box::new(attr.clone()),
+                        })
                     }
                 })
                 .collect::<Result<Vec<WpParsedAttr>, syn::Error>>()?;
@@ -394,7 +396,7 @@ impl GeneratedContextualField {
                         .filter_map(|parsed_attr| {
                             // The generated field should only contain external attributes
                             if let WpParsedAttr::ExternalAttr { attr } = parsed_attr {
-                                Some(attr.to_owned())
+                                Some(*attr.clone())
                             } else {
                                 None
                             }
@@ -715,7 +717,7 @@ enum WpParsedAttr {
     ParsedWpContextualField,
     ParsedWpContextualOption,
     ParsedWpContext { contexts: Vec<WpContextAttr> },
-    ExternalAttr { attr: syn::Attribute },
+    ExternalAttr { attr: Box<syn::Attribute> },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
