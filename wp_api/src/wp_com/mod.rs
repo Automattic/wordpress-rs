@@ -1,6 +1,7 @@
+use crate::prelude::*;
 use crate::{impl_as_query_value_for_new_type, request::endpoint::AsNamespace};
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr};
+use std::{num::ParseIntError, str::FromStr, sync::Arc};
 
 pub mod client;
 pub mod endpoint;
@@ -38,6 +39,24 @@ impl AsNamespace for WpComNamespace {
         match self {
             WpComNamespace::Oauth2 => "/oauth2",
             WpComNamespace::V2 => "/wpcom/v2",
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Enum)]
+pub enum WpComBaseUrl {
+    #[default]
+    Production,
+    Custom(Arc<ParsedUrl>),
+}
+
+impl WpComBaseUrl {
+    pub fn parsed_url(&self) -> ParsedUrl {
+        match self {
+            WpComBaseUrl::Production => url::Url::parse("https://public-api.wordpress.com")
+                .expect("This is a valid URL")
+                .into(),
+            WpComBaseUrl::Custom(url) => (**url).clone(),
         }
     }
 }
