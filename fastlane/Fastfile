@@ -186,19 +186,21 @@ lane :download_translations do |commit_and_push_changes: false|
     downloaded_files = download_po_files_from_glotpress(download_dir: temp_download_dir)
     updated_fluent_files = []
 
-    # Convert PO files back to Fluent format
-    if downloaded_files.any?
-      UI.header('🔄 Converting PO files to Fluent format')
-
-      downloaded_files.each do |file_path|
-        fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
-        updated_fluent_files << fluent_file_path if fluent_file_path
-      rescue StandardError => e
-        UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
-      end
-
-      UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
+    if downloaded_files.empty?
+      UI.message("No .po files were downloaded from GlotPress")
+      next
     end
+
+    UI.header('🔄 Converting PO files to Fluent format')
+
+    downloaded_files.each do |file_path|
+      fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
+      updated_fluent_files << fluent_file_path if fluent_file_path
+    rescue StandardError => e
+      UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
+    end
+
+    UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
 
     if commit_and_push_changes && updated_fluent_files.any?
       commit_changed_files(
