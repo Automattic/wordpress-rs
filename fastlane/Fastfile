@@ -172,35 +172,6 @@ lane :generate_source_po_file do |commit_and_push_changes: false|
   end
 end
 
-# Converts a PO file for a given locale back to Fluent format
-#
-# This lane takes a PO file and converts it to the corresponding Fluent format file.
-# The locale is extracted from the PO filename (e.g., 'fr-FR.po' becomes 'fr-FR').
-# The resulting Fluent file is saved in the appropriate locale directory.
-#
-# @param file_path [String] The PO file path to convert (e.g., 'path/to/fr-FR.po')
-# @return [String] The path to the generated Fluent file
-#
-lane :generate_fluent_file_from_po do |file_path:|
-  locale = File.basename(file_path, '.po')
-  fluent_file_path = File.join(LOCALIZATION_FLUENT_FILES_DIR, locale, MAIN_FLUENT_FILE_NAME)
-
-  UI.user_error!("❌ PO file not found: #{file_path}") unless File.exist?(file_path)
-
-  FileUtils.mkdir_p(File.dirname(fluent_file_path))
-
-  FluentTools.po_to_fluent(
-    file_path,
-    fluent_file_path
-  )
-
-  next if !File.exist?(fluent_file_path) || File.empty?(fluent_file_path)
-
-  UI.message("✅ #{File.basename(file_path)} → #{fluent_file_path}")
-
-  fluent_file_path
-end
-
 # Downloads the latest translations from GlotPress and updates Fluent files
 #
 # This lane fetches translated PO files from GlotPress for all supported locales,
@@ -279,6 +250,35 @@ lane :download_po_files_from_glotpress do |download_dir:|
   UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
 
   downloaded_files
+end
+
+# Converts a PO file for a given locale back to Fluent format
+#
+# This lane takes a PO file and converts it to the corresponding Fluent format file.
+# The locale is extracted from the PO filename (e.g., 'fr-FR.po' becomes 'fr-FR').
+# The resulting Fluent file is saved in the appropriate locale directory.
+#
+# @param file_path [String] The PO file path to convert (e.g., 'path/to/fr-FR.po')
+# @return [String] The path to the generated Fluent file
+#
+lane :generate_fluent_file_from_po do |file_path:|
+  locale = File.basename(file_path, '.po')
+  fluent_file_path = File.join(LOCALIZATION_FLUENT_FILES_DIR, locale, MAIN_FLUENT_FILE_NAME)
+
+  UI.user_error!("❌ PO file not found: #{file_path}") unless File.exist?(file_path)
+
+  FileUtils.mkdir_p(File.dirname(fluent_file_path))
+
+  FluentTools.po_to_fluent(
+    file_path,
+    fluent_file_path
+  )
+
+  next if !File.exist?(fluent_file_path) || File.empty?(fluent_file_path)
+
+  UI.message("✅ #{File.basename(file_path)} → #{fluent_file_path}")
+
+  fluent_file_path
 end
 
 # Utils
