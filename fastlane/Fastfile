@@ -262,10 +262,10 @@ end
 # @return [String] The path to the generated Fluent file
 #
 lane :generate_fluent_file_from_po do |file_path:|
+  UI.user_error!("PO file not found: #{file_path}") unless File.exist?(file_path)
+
   locale = File.basename(file_path, '.po')
   fluent_file_path = File.join(LOCALIZATION_FLUENT_FILES_DIR, locale, MAIN_FLUENT_FILE_NAME)
-
-  UI.user_error!("❌ PO file not found: #{file_path}") unless File.exist?(file_path)
 
   FileUtils.mkdir_p(File.dirname(fluent_file_path))
 
