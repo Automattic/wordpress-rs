@@ -13,13 +13,13 @@ use wp_serde_helper::deserialize_u64_or_string;
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
     pub user_id: UserId,
-    pub subscription_id: u64,
+    pub subscription_id: SubscriptionId,
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
     pub email_subscription_id: Option<u64>,
     pub date_subscribed: WpGmtDateTime,
-    pub subscription_status: String,
+    pub subscription_status: Option<String>,
     pub avatar: String,
     pub url: Option<String>,
     pub country: Option<SubscriberCountry>,
@@ -165,10 +165,10 @@ pub struct ListSubscribersResponse {
 #[derive(Debug, uniffi::Enum)]
 pub enum GetSubscriberQuery {
     // Return subscribers that receive notifications via WordPress.com for new posts.
-    WpCom(u64),
+    WpCom(UserId),
 
     // Return subscribers that receive notifications via email for new posts.
-    Email(u64),
+    Email(SubscriptionId),
 }
 
 impl AppendUrlQueryPairs for GetSubscriberQuery {
@@ -279,6 +279,25 @@ impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
         if let Some(status) = &self.status {
             query_pairs_mut.append_pair("status", &status.to_string());
         }
+    }
+}
+
+impl_as_query_value_for_new_type!(SubscriptionId);
+uniffi::custom_newtype!(SubscriptionId, u64);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubscriptionId(pub u64);
+
+impl std::str::FromStr for SubscriptionId {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+impl std::fmt::Display for SubscriptionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
