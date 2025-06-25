@@ -134,7 +134,9 @@ impl AppendUrlQueryPairs for SubscribersListParams {
 #[strum(serialize_all = "snake_case")]
 pub enum ListSubscribersSortField {
     DateSubscribed,
+    #[strum(serialize = "email")]
     EmailAddress,
+    #[strum(serialize = "name")]
     DisplayName,
     Plan,
     SubscriptionStatus,
