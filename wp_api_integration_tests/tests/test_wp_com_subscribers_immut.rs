@@ -1,5 +1,11 @@
-use wp_api::wp_com::subscribers::{ListSubscribersSortField, SubscribersListParams};
+use wp_api::wp_com::subscribers::{
+    GetSubscriberQuery, ListSubscribersSortField, SubscribersListParams, SubscriptionId,
+};
 use wp_api_integration_tests::{WP_COM_SITE_ID, prelude::*, wp_com_client};
+
+// TODO: Update these for your test site
+const WP_COM_SUBSCRIBER_USER_ID: i64 = 0;
+const EMAIL_SUBSCRIBER_SUBSCRIPTION_ID: u64 = 0;
 
 #[tokio::test]
 #[apply(list_cases)]
@@ -17,6 +23,17 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
     );
 }
 
+#[tokio::test]
+#[apply(retrieve_cases)]
+#[parallel]
+async fn retrieve_subscriber(#[case] query: GetSubscriberQuery) {
+    wp_com_client()
+        .subscribers()
+        .get_subscriber(&WP_COM_SITE_ID, &query)
+        .await
+        .assert_response();
+}
+
 #[template]
 #[rstest]
 #[case::default(SubscribersListParams::default())]
@@ -26,3 +43,11 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
 #[case::sort_plan(generate!(SubscribersListParams, (sort, Some(ListSubscribersSortField::Plan))))]
 #[case::sort_subscription_status(generate!(SubscribersListParams, (sort, Some(ListSubscribersSortField::SubscriptionStatus))))]
 pub fn list_cases(#[case] params: SubscribersListParams) {}
+
+#[template]
+#[rstest]
+#[case::wp_com_subscriber(GetSubscriberQuery::WpCom(UserId(WP_COM_SUBSCRIBER_USER_ID)))]
+#[case::email_subscriber(GetSubscriberQuery::Email(SubscriptionId(
+    EMAIL_SUBSCRIBER_SUBSCRIPTION_ID
+)))]
+pub fn retrieve_cases(#[case] query: GetSubscriberQuery) {}
