@@ -13,12 +13,15 @@ use wp_serde_helper::deserialize_u64_or_string;
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
     pub user_id: UserId,
+    pub subscription_id: u64,
     pub display_name: String,
     pub email_address: String,
+    pub is_email_subscriber: bool,
     pub email_subscription_id: Option<u64>,
     pub date_subscribed: WpGmtDateTime,
     pub subscription_status: String,
     pub avatar: String,
+    pub url: Option<String>,
 }
 
 #[derive(
