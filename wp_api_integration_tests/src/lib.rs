@@ -1,3 +1,5 @@
+use wp_api::wp_com::{WpComSiteId, client::WpComApiClient};
+
 use crate::prelude::*;
 
 pub mod mock;
@@ -71,6 +73,14 @@ pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
 
+// We currently don't have the necessary infrastructure to test wp_com endpoints in CI. We are also
+// not separating the wp_com tests at the moment. So consider this to be temporary.
+//
+// If you need to test a wp_com endpoint, you can temporarily add your token, but do not check it
+// into the repo! Don't forget to change the site id as well!
+pub const WP_COM_BEARER_TOKEN: &str = "DON_T_CHECK_INTO_REPO!";
+pub const WP_COM_SITE_ID: WpComSiteId = WpComSiteId(0);
+
 pub fn api_client() -> WpApiClient {
     WpApiClient::new(
         test_site_api_url_resolver(),
@@ -126,6 +136,18 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
             app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
+}
+
+pub fn wp_com_client() -> WpComApiClient {
+    WpComApiClient::new(WpApiClientDelegate {
+        auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
+            token: WP_COM_BEARER_TOKEN.to_string(),
+        })
+        .into(),
+        request_executor: Arc::new(ReqwestRequestExecutor::default()),
+        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        app_notifier: Arc::new(EmptyAppNotifier),
+    })
 }
 
 pub fn test_site_url() -> ParsedUrl {
