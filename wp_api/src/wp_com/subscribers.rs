@@ -22,6 +22,7 @@ pub struct Subscriber {
     pub subscription_status: String,
     pub avatar: String,
     pub url: Option<String>,
+    pub country: Option<SubscriberCountry>,
 }
 
 #[derive(
@@ -70,6 +71,12 @@ pub enum SubscriptionStatus {
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SubscriberCountry {
+    code: String,
+    name: String,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
