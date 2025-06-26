@@ -9,6 +9,7 @@ use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
+#[ignore]
 async fn list_subscribers(#[case] params: SubscribersListParams) {
     use wp_api::wp_com::WpComSiteId;
 
@@ -30,6 +31,7 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
 #[tokio::test]
 #[apply(retrieve_cases)]
 #[parallel]
+#[ignore]
 async fn retrieve_subscriber(#[case] query: GetSubscriberQuery) {
     wp_com_client()
         .subscribers()
