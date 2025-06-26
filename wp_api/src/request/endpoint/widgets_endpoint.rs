@@ -20,13 +20,15 @@ enum WidgetsRequest {
     Update,
     #[delete(url = "/widgets/<widget_id>", output = crate::widgets::WidgetDeleteResponse)]
     Delete,
+    #[delete(url = "/widgets/<widget_id>", output = WidgetWithEditContext)]
+    Trash,
 }
 
 impl DerivedRequest for WidgetsRequest {
     fn additional_query_pairs(&self) -> Vec<(&str, String)> {
         match &self {
-            // TODO: Check if there should be a trash action
             Self::Delete => vec![("force", true.to_string())],
+            Self::Trash => vec![("force", false.to_string())],
             _ => vec![],
         }
     }
