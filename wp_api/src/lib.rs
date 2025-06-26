@@ -35,6 +35,7 @@ pub mod themes;
 pub mod url_query;
 pub mod users;
 pub mod uuid;
+pub mod widgets;
 pub mod wordpress_org;
 pub mod wp_site_health_tests;
 
