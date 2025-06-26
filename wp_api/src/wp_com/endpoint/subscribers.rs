@@ -4,9 +4,9 @@ use crate::{
         WpComNamespace, WpComSiteId,
         subscribers::{
             AddSubscribersParams, AddSubscribersResponse, GetSubscriberQuery,
-            ListSubscribersResponse, Subscriber, SubscriberImportJob,
-            SubscriberImportJobsListParams, SubscriberStatsResponse, SubscribersListParams,
-            UploadId,
+            IndividualSubscriberStats, IndividualSubscriberStatsParams, ListSubscribersResponse,
+            Subscriber, SubscriberImportJob, SubscriberImportJobsListParams,
+            SubscriberStatsResponse, SubscribersListParams, UploadId,
         },
     },
 };
@@ -18,6 +18,8 @@ enum SubscribersRequest {
     ListSubscribers,
     #[get(url = "/sites/<wp_com_site_id>/subscribers/individual", params = &GetSubscriberQuery, output = Subscriber)]
     GetSubscriber,
+    #[get(url = "/sites/<wp_com_site_id>/individual-subscriber-stats", params = &IndividualSubscriberStatsParams, output = IndividualSubscriberStats)]
+    IndividualSubscriberStats,
     #[get(url = "/sites/<wp_com_site_id>/subscribers/import", params = &SubscriberImportJobsListParams, output = Vec<SubscriberImportJob>)]
     ListSubscriberImportJobs,
     #[get(url = "/sites/<wp_com_site_id>/subscribers/import/<upload_id>", output = SubscriberImportJob)]

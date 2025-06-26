@@ -202,6 +202,27 @@ impl AppendUrlQueryPairs for GetSubscriberQuery {
     }
 }
 
+// MARK: - Individual Subscriber Stats
+
+#[derive(Debug, PartialEq, Eq, uniffi::Record)]
+pub struct IndividualSubscriberStatsParams {
+    pub subscription_id: SubscriptionId,
+}
+
+impl AppendUrlQueryPairs for IndividualSubscriberStatsParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_query_value_pair("subscription_id", &self.subscription_id);
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct IndividualSubscriberStats {
+    emails_sent: u64,
+    unique_opens: u64,
+    unique_clicks: u64,
+    blog_registration_date: WpGmtDateTime,
+}
+
 // MARK: - Add Subscribers
 
 #[derive(Debug, Serialize, Deserialize, Default, uniffi::Record)]
@@ -565,5 +586,14 @@ mod tests {
         let plans = subscriber.plans.expect("JSON file includes plans");
         assert_eq!(plans.len(), 2);
         assert_eq!(plans[0].start_date.to_string(), "2025-01-13T18:51:55+00:00");
+    }
+
+    #[test]
+    fn test_individual_subscriber_stats_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/individual-subscriber-stats.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let stats: IndividualSubscriberStats =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(stats.emails_sent, 2);
     }
 }

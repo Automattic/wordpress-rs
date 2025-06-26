@@ -1,7 +1,8 @@
 use wp_api::wp_com::{
     WpComSiteId,
     subscribers::{
-        GetSubscriberQuery, ListSubscribersSortField, SubscribersListParams, SubscriptionId,
+        GetSubscriberQuery, IndividualSubscriberStatsParams, ListSubscribersSortField,
+        SubscribersListParams, SubscriptionId,
     },
 };
 use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
@@ -36,6 +37,24 @@ async fn retrieve_subscriber(#[case] query: GetSubscriberQuery) {
         .get_subscriber(
             &WpComSiteId(WpComTestCredentials::instance().site_id),
             &query,
+        )
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn individual_subscriber_stats() {
+    wp_com_client()
+        .subscribers()
+        .individual_subscriber_stats(
+            &WpComSiteId(WpComTestCredentials::instance().site_id),
+            &IndividualSubscriberStatsParams {
+                subscription_id: SubscriptionId(
+                    WpComTestCredentials::instance().email_subscriber_subscription_id,
+                ),
+            },
         )
         .await
         .assert_response();
