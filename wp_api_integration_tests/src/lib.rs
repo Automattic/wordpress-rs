@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use wp_api::wp_com::client::WpComApiClient;
 
 pub mod mock;
 pub mod prelude;
@@ -33,6 +34,14 @@ impl TestCredentials {
     pub fn date_format() -> &'static str {
         "%Y-%m-%d %H:%M:%S"
     }
+}
+
+#[derive(Debug, Default)]
+pub struct WpComTestCredentials {
+    pub bearer_token: &'static str,
+    pub site_id: u64,
+    pub wp_com_subscriber_user_id: i64,
+    pub email_subscriber_subscription_id: u64,
 }
 
 pub mod backend;
@@ -126,6 +135,18 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
             app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
+}
+
+pub fn wp_com_client() -> WpComApiClient {
+    WpComApiClient::new(WpApiClientDelegate {
+        auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
+            token: WpComTestCredentials::instance().bearer_token.to_string(),
+        })
+        .into(),
+        request_executor: Arc::new(ReqwestRequestExecutor::default()),
+        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        app_notifier: Arc::new(EmptyAppNotifier),
+    })
 }
 
 pub fn test_site_url() -> ParsedUrl {

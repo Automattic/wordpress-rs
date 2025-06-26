@@ -13,12 +13,17 @@ use wp_serde_helper::deserialize_u64_or_string;
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
     pub user_id: UserId,
+    pub subscription_id: SubscriptionId,
     pub display_name: String,
     pub email_address: String,
+    pub is_email_subscriber: bool,
     pub email_subscription_id: Option<u64>,
     pub date_subscribed: WpGmtDateTime,
-    pub subscription_status: String,
+    pub subscription_status: Option<String>,
     pub avatar: String,
+    pub url: Option<String>,
+    pub country: Option<SubscriberCountry>,
+    pub plans: Option<Vec<SubscriptionPlan>>,
 }
 
 #[derive(
@@ -67,6 +72,27 @@ pub enum SubscriptionStatus {
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SubscriberCountry {
+    code: String,
+    name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SubscriptionPlan {
+    pub is_gift: bool,
+    pub gift_id: Option<u64>,
+    pub paid_subscription_id: Option<String>,
+    pub status: String,
+    pub title: String,
+    pub currency: String,
+    pub renew_interval: String,
+    pub inactive_renew_interval: Option<String>,
+    pub renewal_price: f64,
+    pub start_date: WpGmtDateTime,
+    pub end_date: WpGmtDateTime,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -131,7 +157,9 @@ impl AppendUrlQueryPairs for SubscribersListParams {
 #[strum(serialize_all = "snake_case")]
 pub enum ListSubscribersSortField {
     DateSubscribed,
+    #[strum(serialize = "email")]
     EmailAddress,
+    #[strum(serialize = "name")]
     DisplayName,
     Plan,
     SubscriptionStatus,
@@ -153,10 +181,10 @@ pub struct ListSubscribersResponse {
 #[derive(Debug, uniffi::Enum)]
 pub enum GetSubscriberQuery {
     // Return subscribers that receive notifications via WordPress.com for new posts.
-    WpCom(u64),
+    WpCom(UserId),
 
     // Return subscribers that receive notifications via email for new posts.
-    Email(u64),
+    Email(SubscriptionId),
 }
 
 impl AppendUrlQueryPairs for GetSubscriberQuery {
@@ -267,6 +295,25 @@ impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
         if let Some(status) = &self.status {
             query_pairs_mut.append_pair("status", &status.to_string());
         }
+    }
+}
+
+impl_as_query_value_for_new_type!(SubscriptionId);
+uniffi::custom_newtype!(SubscriptionId, u64);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubscriptionId(pub u64);
+
+impl std::str::FromStr for SubscriptionId {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+impl std::fmt::Display for SubscriptionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -398,7 +445,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::WpCom(123).append_query_pairs(&mut query_pairs);
+        GetSubscriberQuery::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?user_id=123&type=wpcom"
@@ -413,7 +460,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::Email(123).append_query_pairs(&mut query_pairs);
+        GetSubscriberQuery::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?subscription_id=123&type=email"
@@ -507,5 +554,16 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
         assert_eq!(response.counts.email_subscribers, 26);
         assert_eq!(response.aggregate.len(), 60);
+    }
+
+    #[test]
+    fn test_get_subscriber_with_paid_plans_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/subscriber-with-paid-plans.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let subscriber: Subscriber = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let plans = subscriber.plans.expect("JSON file includes plans");
+        assert_eq!(plans.len(), 2);
+        assert_eq!(plans[0].start_date.to_string(), "2025-01-13T18:51:55+00:00");
     }
 }
