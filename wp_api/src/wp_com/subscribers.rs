@@ -429,7 +429,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::WpCom(123).append_query_pairs(&mut query_pairs);
+        GetSubscriberQuery::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?user_id=123&type=wpcom"
@@ -444,7 +444,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::Email(123).append_query_pairs(&mut query_pairs);
+        GetSubscriberQuery::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?subscription_id=123&type=email"
