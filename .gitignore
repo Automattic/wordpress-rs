@@ -44,6 +44,9 @@ test_credentials.json
 /logs
 dump.sql
 
+# WP_COM Testing
+wp_com_test_credentials.json
+
 # CI Cache
 .cargo/*
 /vendor

@@ -1,19 +1,23 @@
-use wp_api::wp_com::subscribers::{
-    GetSubscriberQuery, ListSubscribersSortField, SubscribersListParams, SubscriptionId,
+use wp_api::wp_com::{
+    WpComSiteId,
+    subscribers::{
+        GetSubscriberQuery, ListSubscribersSortField, SubscribersListParams, SubscriptionId,
+    },
 };
-use wp_api_integration_tests::{WP_COM_SITE_ID, prelude::*, wp_com_client};
-
-// TODO: Update these for your test site
-const WP_COM_SUBSCRIBER_USER_ID: i64 = 0;
-const EMAIL_SUBSCRIBER_SUBSCRIPTION_ID: u64 = 0;
+use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
 async fn list_subscribers(#[case] params: SubscribersListParams) {
+    use wp_api::wp_com::WpComSiteId;
+
     let subscribers = wp_com_client()
         .subscribers()
-        .list_subscribers(&WP_COM_SITE_ID, &params)
+        .list_subscribers(
+            &WpComSiteId(WpComTestCredentials::instance().site_id),
+            &params,
+        )
         .await
         .assert_response();
     assert!(
@@ -29,7 +33,10 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
 async fn retrieve_subscriber(#[case] query: GetSubscriberQuery) {
     wp_com_client()
         .subscribers()
-        .get_subscriber(&WP_COM_SITE_ID, &query)
+        .get_subscriber(
+            &WpComSiteId(WpComTestCredentials::instance().site_id),
+            &query,
+        )
         .await
         .assert_response();
 }
@@ -46,8 +53,8 @@ pub fn list_cases(#[case] params: SubscribersListParams) {}
 
 #[template]
 #[rstest]
-#[case::wp_com_subscriber(GetSubscriberQuery::WpCom(UserId(WP_COM_SUBSCRIBER_USER_ID)))]
+#[case::wp_com_subscriber(GetSubscriberQuery::WpCom(UserId(WpComTestCredentials::instance().wp_com_subscriber_user_id)))]
 #[case::email_subscriber(GetSubscriberQuery::Email(SubscriptionId(
-    EMAIL_SUBSCRIBER_SUBSCRIPTION_ID
+    WpComTestCredentials::instance().email_subscriber_subscription_id
 )))]
 pub fn retrieve_cases(#[case] query: GetSubscriberQuery) {}

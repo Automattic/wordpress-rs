@@ -1,6 +1,5 @@
-use wp_api::wp_com::{WpComSiteId, client::WpComApiClient};
-
 use crate::prelude::*;
+use wp_api::wp_com::client::WpComApiClient;
 
 pub mod mock;
 pub mod prelude;
@@ -35,6 +34,14 @@ impl TestCredentials {
     pub fn date_format() -> &'static str {
         "%Y-%m-%d %H:%M:%S"
     }
+}
+
+#[derive(Debug, Default)]
+pub struct WpComTestCredentials {
+    pub bearer_token: &'static str,
+    pub site_id: u64,
+    pub wp_com_subscriber_user_id: i64,
+    pub email_subscriber_subscription_id: u64,
 }
 
 pub mod backend;
@@ -72,14 +79,6 @@ pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
-
-// We currently don't have the necessary infrastructure to test wp_com endpoints in CI. We are also
-// not separating the wp_com tests at the moment. So consider this to be temporary.
-//
-// If you need to test a wp_com endpoint, you can temporarily add your token, but do not check it
-// into the repo! Don't forget to change the site id as well!
-pub const WP_COM_BEARER_TOKEN: &str = "DON_T_CHECK_INTO_REPO!";
-pub const WP_COM_SITE_ID: WpComSiteId = WpComSiteId(0);
 
 pub fn api_client() -> WpApiClient {
     WpApiClient::new(
@@ -141,7 +140,7 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
 pub fn wp_com_client() -> WpComApiClient {
     WpComApiClient::new(WpApiClientDelegate {
         auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
-            token: WP_COM_BEARER_TOKEN.to_string(),
+            token: WpComTestCredentials::instance().bearer_token.to_string(),
         })
         .into(),
         request_executor: Arc::new(ReqwestRequestExecutor::default()),
