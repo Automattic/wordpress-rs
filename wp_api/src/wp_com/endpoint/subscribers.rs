@@ -3,7 +3,7 @@ use crate::{
     wp_com::{
         WpComNamespace, WpComSiteId,
         subscribers::{
-            AddSubscribersParams, AddSubscribersResponse, GetSubscriberQuery,
+            AddSubscribersParams, AddSubscribersResponse, GetSubscriberParams,
             IndividualSubscriberStats, IndividualSubscriberStatsParams, ListSubscribersResponse,
             Subscriber, SubscriberImportJob, SubscriberImportJobsListParams,
             SubscriberStatsResponse, SubscribersListParams, UploadId,
@@ -16,7 +16,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum SubscribersRequest {
     #[get(url = "/sites/<wp_com_site_id>/subscribers", params = &SubscribersListParams, output = ListSubscribersResponse)]
     ListSubscribers,
-    #[get(url = "/sites/<wp_com_site_id>/subscribers/individual", params = &GetSubscriberQuery, output = Subscriber)]
+    #[get(url = "/sites/<wp_com_site_id>/subscribers/individual", params = &GetSubscriberParams, output = Subscriber)]
     GetSubscriber,
     #[get(url = "/sites/<wp_com_site_id>/individual-subscriber-stats", params = &IndividualSubscriberStatsParams, output = IndividualSubscriberStats)]
     IndividualSubscriberStats,

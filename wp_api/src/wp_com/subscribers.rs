@@ -179,7 +179,7 @@ pub struct ListSubscribersResponse {
 // MARK: - Get Subscriber
 
 #[derive(Debug, uniffi::Enum)]
-pub enum GetSubscriberQuery {
+pub enum GetSubscriberParams {
     // Return subscribers that receive notifications via WordPress.com for new posts.
     WpCom(UserId),
 
@@ -187,14 +187,14 @@ pub enum GetSubscriberQuery {
     Email(SubscriptionId),
 }
 
-impl AppendUrlQueryPairs for GetSubscriberQuery {
+impl AppendUrlQueryPairs for GetSubscriberParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         match self {
-            GetSubscriberQuery::WpCom(user_id) => {
+            GetSubscriberParams::WpCom(user_id) => {
                 query_pairs_mut.append_pair("user_id", &user_id.to_string());
                 query_pairs_mut.append_pair("type", "wpcom");
             }
-            GetSubscriberQuery::Email(email) => {
+            GetSubscriberParams::Email(email) => {
                 query_pairs_mut.append_pair("subscription_id", &email.to_string());
                 query_pairs_mut.append_pair("type", "email");
             }
@@ -466,7 +466,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
+        GetSubscriberParams::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?user_id=123&type=wpcom"
@@ -481,7 +481,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
+        GetSubscriberParams::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?subscription_id=123&type=email"
