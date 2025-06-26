@@ -23,6 +23,7 @@ pub struct Subscriber {
     pub avatar: String,
     pub url: Option<String>,
     pub country: Option<SubscriberCountry>,
+    pub plans: Option<Vec<SubscriptionPlan>>,
 }
 
 #[derive(
@@ -77,6 +78,21 @@ pub enum SubscriptionStatus {
 pub struct SubscriberCountry {
     code: String,
     name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SubscriptionPlan {
+    pub is_gift: bool,
+    pub gift_id: Option<u64>,
+    pub paid_subscription_id: Option<String>,
+    pub status: String,
+    pub title: String,
+    pub currency: String,
+    pub renew_interval: String,
+    pub inactive_renew_interval: Option<String>,
+    pub renewal_price: f64,
+    pub start_date: WpGmtDateTime,
+    pub end_date: WpGmtDateTime,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -538,5 +554,16 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
         assert_eq!(response.counts.email_subscribers, 26);
         assert_eq!(response.aggregate.len(), 60);
+    }
+
+    #[test]
+    fn test_get_subscriber_with_paid_plans_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/subscriber-with-paid-plans.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let subscriber: Subscriber = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let plans = subscriber.plans.expect("JSON file includes plans");
+        assert_eq!(plans.len(), 2);
+        assert_eq!(plans[0].start_date.to_string(), "2025-01-13T18:51:55+00:00");
     }
 }
