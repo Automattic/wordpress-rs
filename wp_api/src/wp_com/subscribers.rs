@@ -220,7 +220,7 @@ pub struct IndividualSubscriberStats {
     emails_sent: u64,
     unique_opens: u64,
     unique_clicks: u64,
-    blog_registration_date: WpGmtDateTime,
+    blog_registration_date: String,
 }
 
 // MARK: - Add Subscribers
