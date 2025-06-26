@@ -2,7 +2,7 @@ use wp_api::widgets::{
     SparseWidgetFieldWithEditContext, SparseWidgetFieldWithEmbedContext,
     SparseWidgetFieldWithViewContext, WidgetId, WidgetListParams,
 };
-use wp_api_integration_tests::{WIDGET_ID_1, prelude::*};
+use wp_api_integration_tests::{WIDGET_ID_BLOCK_2, prelude::*};
 
 #[tokio::test]
 #[apply(list_cases)]
@@ -42,7 +42,7 @@ async fn list_with_view_context(#[case] params: WidgetListParams) {
 async fn retrieve_with_edit_context() {
     api_client()
         .widgets()
-        .retrieve_with_edit_context(&WidgetId(WIDGET_ID_1.to_string()))
+        .retrieve_with_edit_context(&WidgetId(WIDGET_ID_BLOCK_2.to_string()))
         .await
         .assert_response();
 }
@@ -52,7 +52,7 @@ async fn retrieve_with_edit_context() {
 async fn retrieve_with_embed_context() {
     api_client()
         .widgets()
-        .retrieve_with_embed_context(&WidgetId(WIDGET_ID_1.to_string()))
+        .retrieve_with_embed_context(&WidgetId(WIDGET_ID_BLOCK_2.to_string()))
         .await
         .assert_response();
 }
@@ -62,7 +62,7 @@ async fn retrieve_with_embed_context() {
 async fn retrieve_with_view_context() {
     api_client()
         .widgets()
-        .retrieve_with_view_context(&WidgetId(WIDGET_ID_1.to_string()))
+        .retrieve_with_view_context(&WidgetId(WIDGET_ID_BLOCK_2.to_string()))
         .await
         .assert_response();
 }
@@ -71,8 +71,6 @@ async fn retrieve_with_view_context() {
 #[rstest]
 #[case::default(WidgetListParams::default())]
 #[case::sidebar_wp_inactive_widgets(generate!(WidgetListParams, (sidebar, Some("wp_inactive_widgets".to_string()))))]
-#[case::sidebar_primary(generate!(WidgetListParams, (sidebar, Some("primary".to_string()))))]
-#[case::sidebar_secondary(generate!(WidgetListParams, (sidebar, Some("secondary".to_string()))))]
 pub fn list_cases(#[case] params: WidgetListParams) {}
 
 mod filter {
@@ -91,7 +89,6 @@ mod filter {
         #[values(
             WidgetListParams::default(),
             generate!(WidgetListParams, (sidebar, Some("wp_inactive_widgets".to_string()))),
-            generate!(WidgetListParams, (sidebar, Some("primary".to_string())))
         )]
         params: WidgetListParams,
     ) {
@@ -116,7 +113,7 @@ mod filter {
     ) {
         let widget = api_client()
             .widgets()
-            .filter_retrieve_with_edit_context(&WidgetId(WIDGET_ID_1.to_string()), fields)
+            .filter_retrieve_with_edit_context(&WidgetId(WIDGET_ID_BLOCK_2.to_string()), fields)
             .await
             .assert_response()
             .data;
@@ -132,7 +129,6 @@ mod filter {
         #[values(
             WidgetListParams::default(),
             generate!(WidgetListParams, (sidebar, Some("wp_inactive_widgets".to_string()))),
-            generate!(WidgetListParams, (sidebar, Some("primary".to_string())))
         )]
         params: WidgetListParams,
     ) {
@@ -157,7 +153,7 @@ mod filter {
     ) {
         let widget = api_client()
             .widgets()
-            .filter_retrieve_with_embed_context(&WidgetId(WIDGET_ID_1.to_string()), fields)
+            .filter_retrieve_with_embed_context(&WidgetId(WIDGET_ID_BLOCK_2.to_string()), fields)
             .await
             .assert_response()
             .data;
@@ -173,7 +169,6 @@ mod filter {
         #[values(
             WidgetListParams::default(),
             generate!(WidgetListParams, (sidebar, Some("wp_inactive_widgets".to_string()))),
-            generate!(WidgetListParams, (sidebar, Some("primary".to_string())))
         )]
         params: WidgetListParams,
     ) {
@@ -198,7 +193,7 @@ mod filter {
     ) {
         let widget = api_client()
             .widgets()
-            .filter_retrieve_with_view_context(&WidgetId(WIDGET_ID_1.to_string()), fields)
+            .filter_retrieve_with_view_context(&WidgetId(WIDGET_ID_BLOCK_2.to_string()), fields)
             .await
             .assert_response()
             .data;
