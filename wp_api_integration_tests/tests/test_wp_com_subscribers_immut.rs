@@ -11,8 +11,6 @@ use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
 #[parallel]
 #[ignore]
 async fn list_subscribers(#[case] params: SubscribersListParams) {
-    use wp_api::wp_com::WpComSiteId;
-
     let subscribers = wp_com_client()
         .subscribers()
         .list_subscribers(
