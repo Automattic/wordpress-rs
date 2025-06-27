@@ -17,7 +17,6 @@ pub struct Subscriber {
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
-    pub email_subscription_id: Option<u64>,
     pub date_subscribed: WpGmtDateTime,
     pub subscription_status: Option<String>,
     pub avatar: String,
