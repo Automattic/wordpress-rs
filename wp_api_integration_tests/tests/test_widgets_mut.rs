@@ -1,29 +1,36 @@
+use macro_helper::generate_update_test;
 use std::collections::HashMap;
 use wp_api::{
     JsonValue,
     widget_types::WidgetTypeId,
-    widgets::{WidgetCreateParams, WidgetId, WidgetInstanceCreateParams, WidgetWithEditContext},
+    widgets::{
+        WidgetCreateParams, WidgetId, WidgetInstanceParams, WidgetUpdateParams,
+        WidgetWithEditContext,
+    },
 };
 use wp_api_integration_tests::{WIDGET_ID_BLOCK_2, prelude::*};
 
-const TEST_SIDEBAR: &str = "wp_inactive_widgets";
-const TEST_WIDGET_TYPE: &str = "text";
+const INACTIVE_WIDGETS_SIDEBAR: &str = "wp_inactive_widgets";
+const WIDGET_TYPE_TEXT: &str = "text";
+const WIDGET_INSTANCE_ENCODED: &str =
+    "YTozOntzOjU6InRpdGxlIjtzOjM6ImZvbyI7czo0OiJ0ZXh0IjtzOjM6ImJhciI7czo2OiJmaWx0ZXIiO2I6MDt9";
+const WIDGET_INSTANCE_HASH: &str = "617122067917f65822b0f1db144ac92b";
 
 #[tokio::test]
 #[serial]
 async fn create_widget() {
     let params = WidgetCreateParams {
-        id_base: WidgetTypeId(TEST_WIDGET_TYPE.to_string()),
-        sidebar: TEST_SIDEBAR.to_string(),
+        id_base: WidgetTypeId(WIDGET_TYPE_TEXT.to_string()),
+        sidebar: INACTIVE_WIDGETS_SIDEBAR.to_string(),
         instance: None,
         form_data: None,
     };
     test_create_widget(&params, |created_widget| {
         assert_eq!(
             created_widget.id_base,
-            WidgetTypeId(TEST_WIDGET_TYPE.to_string())
+            WidgetTypeId(WIDGET_TYPE_TEXT.to_string())
         );
-        assert_eq!(created_widget.sidebar, TEST_SIDEBAR);
+        assert_eq!(created_widget.sidebar, INACTIVE_WIDGETS_SIDEBAR);
     })
     .await;
 }
@@ -31,31 +38,32 @@ async fn create_widget() {
 #[tokio::test]
 #[serial]
 async fn create_widget_with_raw_instance() {
+    let new_title = "foo_title";
     let mut raw = HashMap::new();
     raw.insert(
         "title".to_string(),
-        JsonValue::String("foo_title".to_string()),
+        JsonValue::String(new_title.to_string()),
     );
-    let instance = WidgetInstanceCreateParams::Raw { raw };
+    let instance = WidgetInstanceParams::Raw { raw };
     let params = WidgetCreateParams {
-        id_base: WidgetTypeId(TEST_WIDGET_TYPE.to_string()),
-        sidebar: TEST_SIDEBAR.to_string(),
+        id_base: WidgetTypeId(WIDGET_TYPE_TEXT.to_string()),
+        sidebar: INACTIVE_WIDGETS_SIDEBAR.to_string(),
         instance: Some(instance),
         form_data: None,
     };
     test_create_widget(&params, |created_widget| {
         assert_eq!(
             created_widget.id_base,
-            WidgetTypeId(TEST_WIDGET_TYPE.to_string())
+            WidgetTypeId(WIDGET_TYPE_TEXT.to_string())
         );
-        assert_eq!(created_widget.sidebar, TEST_SIDEBAR);
+        assert_eq!(created_widget.sidebar, INACTIVE_WIDGETS_SIDEBAR);
         assert_eq!(
             created_widget
                 .instance
                 .raw
                 .expect("raw instance expected for this test")
                 .get("title"),
-            Some(&JsonValue::String("foo_title".to_string()))
+            Some(&JsonValue::String(new_title.to_string()))
         );
     })
     .await;
@@ -64,25 +72,30 @@ async fn create_widget_with_raw_instance() {
 #[tokio::test]
 #[serial]
 async fn create_widget_with_encoded() {
-    let encoded =
-        "YTozOntzOjU6InRpdGxlIjtzOjM6ImZvbyI7czo0OiJ0ZXh0IjtzOjM6ImJhciI7czo2OiJmaWx0ZXIiO2I6MDt9";
-    let instance = WidgetInstanceCreateParams::Encoded {
-        encoded: encoded.to_string(),
-        hash: "617122067917f65822b0f1db144ac92b".to_string(),
+    let instance = WidgetInstanceParams::Encoded {
+        encoded: WIDGET_INSTANCE_ENCODED.to_string(),
+        hash: WIDGET_INSTANCE_HASH.to_string(),
     };
     let params = WidgetCreateParams {
-        id_base: WidgetTypeId(TEST_WIDGET_TYPE.to_string()),
-        sidebar: TEST_SIDEBAR.to_string(),
+        id_base: WidgetTypeId(WIDGET_TYPE_TEXT.to_string()),
+        sidebar: INACTIVE_WIDGETS_SIDEBAR.to_string(),
         instance: Some(instance),
         form_data: None,
     };
     test_create_widget(&params, |created_widget| {
         assert_eq!(
             created_widget.id_base,
-            WidgetTypeId(TEST_WIDGET_TYPE.to_string())
+            WidgetTypeId(WIDGET_TYPE_TEXT.to_string())
         );
-        assert_eq!(created_widget.sidebar, TEST_SIDEBAR);
-        assert_eq!(created_widget.instance.encoded, Some(encoded.to_string()));
+        assert_eq!(created_widget.sidebar, INACTIVE_WIDGETS_SIDEBAR);
+        assert_eq!(
+            created_widget.instance.encoded,
+            Some(WIDGET_INSTANCE_ENCODED.to_string())
+        );
+        assert_eq!(
+            created_widget.instance.hash,
+            Some(WIDGET_INSTANCE_HASH.to_string())
+        );
     })
     .await;
 }
@@ -104,6 +117,44 @@ async fn delete_widget() {
     RestoreServer::db().await;
 }
 
+generate_update_test!(
+    update_widget_sidebar,
+    sidebar,
+    "foo".to_string(),
+    |updated_widget| {
+        assert_eq!(updated_widget.sidebar, "foo".to_string());
+    }
+);
+
+#[tokio::test]
+#[serial]
+async fn update_widget_instance() {
+    let new_content = "foo_content";
+    let mut raw = HashMap::new();
+    raw.insert(
+        "content".to_string(),
+        JsonValue::String(new_content.to_string()),
+    );
+    let instance = WidgetInstanceParams::Raw { raw };
+    test_update_widget(
+        &WidgetUpdateParams {
+            instance: Some(instance),
+            ..Default::default()
+        },
+        |updated_widget| {
+            assert_eq!(
+                updated_widget
+                    .instance
+                    .raw
+                    .expect("raw instance expected for this test")
+                    .get("content"),
+                Some(&JsonValue::String(new_content.to_string()))
+            );
+        },
+    )
+    .await;
+}
+
 async fn test_create_widget<F>(params: &WidgetCreateParams, assert: F)
 where
     F: Fn(WidgetWithEditContext),
@@ -117,15 +168,37 @@ where
     RestoreServer::db().await;
 }
 
-// async fn test_update_widget<F>(widget_id: &WidgetId, params: &WidgetUpdateParams, assert: F)
-// where
-//     F: Fn(WidgetWithEditContext),
-// {
-//     let response = api_client()
-//         .widgets()
-//         .update(widget_id, params)
-//         .await
-//         .assert_response();
-//     assert(response.data);
-//     RestoreServer::db().await;
-// }
+async fn test_update_widget<F>(params: &WidgetUpdateParams, assert: F)
+where
+    F: Fn(WidgetWithEditContext),
+{
+    let response = api_client()
+        .widgets()
+        .update(&WidgetId(WIDGET_ID_BLOCK_2.to_string()), params)
+        .await
+        .assert_response();
+    assert(response.data);
+    RestoreServer::db().await;
+}
+
+mod macro_helper {
+    macro_rules! generate_update_test {
+        ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn $ident() {
+                    let updated_value = $new_value;
+                    test_update_widget(
+                        &WidgetUpdateParams {
+                            $field: Some(updated_value),
+                            ..Default::default()
+                        }, $assertion)
+                    .await;
+                }
+            }
+        };
+    }
+
+    pub(super) use generate_update_test;
+}

@@ -7,4 +7,4 @@ fi
 
 ADMIN_TOKEN=$(jq .admin_password test_credentials.json)
 
-curl --user test@example.com:"$ADMIN_TOKEN" "http://localhost/wp-json$1"
+curl --silent --user test@example.com:"$ADMIN_TOKEN" "http://localhost/wp-json$1" | jq .

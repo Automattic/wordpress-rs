@@ -81,28 +81,27 @@ pub struct WidgetCreateParams {
     pub id_base: WidgetTypeId,
     pub sidebar: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instance: Option<WidgetInstanceCreateParams>,
+    pub instance: Option<WidgetInstanceParams>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub form_data: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
-pub enum WidgetInstanceCreateParams {
+pub enum WidgetInstanceParams {
     Raw { raw: HashMap<String, JsonValue> },
     Encoded { encoded: String, hash: String },
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
 pub struct WidgetUpdateParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id_base: Option<WidgetTypeId>,
+    // Updating widget type's with `id_base` is not supported by the backend even though the field
+    // is listed in the documentation: https://developer.wordpress.org/rest-api/reference/widgets/#update-a-widget
+    // The field is omitted from the type to avoid confusion.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sidebar: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instance: Option<HashMap<String, String>>,
+    pub instance: Option<WidgetInstanceParams>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub form_data: Option<String>,
 }
