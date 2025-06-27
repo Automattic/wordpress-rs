@@ -174,6 +174,7 @@ pub struct ListSubscribersResponse {
     pub page: u64,
     pub per_page: u64,
     pub subscribers: Vec<Subscriber>,
+    pub is_owner_subscribed: bool,
 }
 
 // MARK: - Get Subscriber
@@ -440,11 +441,11 @@ mod tests {
         let response: ListSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.total, 8);
+        assert_eq!(response.total, 4);
         assert_eq!(response.pages, 1);
         assert_eq!(response.page, 1);
         assert_eq!(response.per_page, 100);
-        assert_eq!(response.subscribers.len(), 8);
+        assert_eq!(response.subscribers.len(), 4);
     }
 
     #[test]
