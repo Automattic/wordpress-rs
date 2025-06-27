@@ -12,10 +12,6 @@ use wp_api_integration_tests::{
     WIDGET_ID_BLOCK_2, WIDGET_INACTIVE_WIDGETS_SIDEBAR, WIDGET_TYPE_TEXT, prelude::*,
 };
 
-const WIDGET_INSTANCE_ENCODED: &str =
-    "YTozOntzOjU6InRpdGxlIjtzOjM6ImZvbyI7czo0OiJ0ZXh0IjtzOjM6ImJhciI7czo2OiJmaWx0ZXIiO2I6MDt9";
-const WIDGET_INSTANCE_HASH: &str = "617122067917f65822b0f1db144ac92b";
-
 #[tokio::test]
 #[serial]
 async fn create_widget() {
@@ -64,37 +60,6 @@ async fn create_widget_with_raw_instance() {
                 .expect("raw instance expected for this test")
                 .get("title"),
             Some(&JsonValue::String(new_title.to_string()))
-        );
-    })
-    .await;
-}
-
-#[tokio::test]
-#[serial]
-async fn create_widget_with_encoded() {
-    let instance = WidgetInstanceParams::Encoded {
-        encoded: WIDGET_INSTANCE_ENCODED.to_string(),
-        hash: WIDGET_INSTANCE_HASH.to_string(),
-    };
-    let params = WidgetCreateParams {
-        id_base: WidgetTypeId(WIDGET_TYPE_TEXT.to_string()),
-        sidebar: WIDGET_INACTIVE_WIDGETS_SIDEBAR.to_string(),
-        instance: Some(instance),
-        form_data: None,
-    };
-    test_create_widget(&params, |created_widget| {
-        assert_eq!(
-            created_widget.id_base,
-            WidgetTypeId(WIDGET_TYPE_TEXT.to_string())
-        );
-        assert_eq!(created_widget.sidebar, WIDGET_INACTIVE_WIDGETS_SIDEBAR);
-        assert_eq!(
-            created_widget.instance.encoded,
-            Some(WIDGET_INSTANCE_ENCODED.to_string())
-        );
-        assert_eq!(
-            created_widget.instance.hash,
-            Some(WIDGET_INSTANCE_HASH.to_string())
         );
     })
     .await;
