@@ -8,7 +8,7 @@ use strum::IntoEnumIterator;
 
 pub mod jetpack_connection_endpoint;
 pub mod oauth2;
-pub mod subscribers;
+pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
 
 #[derive(uniffi::Object)]
