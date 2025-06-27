@@ -1,7 +1,8 @@
 use wp_api::wp_com::{
     WpComSiteId,
     subscribers::{
-        GetSubscriberQuery, ListSubscribersSortField, SubscribersListParams, SubscriptionId,
+        GetSubscriberParams, IndividualSubscriberStatsParams, ListSubscribersSortField,
+        SubscribersListParams, SubscriptionId,
     },
 };
 use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
@@ -30,12 +31,30 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
 #[apply(retrieve_cases)]
 #[parallel]
 #[ignore]
-async fn retrieve_subscriber(#[case] query: GetSubscriberQuery) {
+async fn retrieve_subscriber(#[case] query: GetSubscriberParams) {
     wp_com_client()
         .subscribers()
         .get_subscriber(
             &WpComSiteId(WpComTestCredentials::instance().site_id),
             &query,
+        )
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn individual_subscriber_stats() {
+    wp_com_client()
+        .subscribers()
+        .individual_subscriber_stats(
+            &WpComSiteId(WpComTestCredentials::instance().site_id),
+            &IndividualSubscriberStatsParams {
+                subscription_id: SubscriptionId(
+                    WpComTestCredentials::instance().email_subscriber_subscription_id,
+                ),
+            },
         )
         .await
         .assert_response();
@@ -53,8 +72,8 @@ pub fn list_cases(#[case] params: SubscribersListParams) {}
 
 #[template]
 #[rstest]
-#[case::wp_com_subscriber(GetSubscriberQuery::WpCom(UserId(WpComTestCredentials::instance().wp_com_subscriber_user_id)))]
-#[case::email_subscriber(GetSubscriberQuery::Email(SubscriptionId(
+#[case::wp_com_subscriber(GetSubscriberParams::WpCom(UserId(WpComTestCredentials::instance().wp_com_subscriber_user_id)))]
+#[case::email_subscriber(GetSubscriberParams::Email(SubscriptionId(
     WpComTestCredentials::instance().email_subscriber_subscription_id
 )))]
-pub fn retrieve_cases(#[case] query: GetSubscriberQuery) {}
+pub fn retrieve_cases(#[case] query: GetSubscriberParams) {}

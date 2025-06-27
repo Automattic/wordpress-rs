@@ -179,7 +179,7 @@ pub struct ListSubscribersResponse {
 // MARK: - Get Subscriber
 
 #[derive(Debug, uniffi::Enum)]
-pub enum GetSubscriberQuery {
+pub enum GetSubscriberParams {
     // Return subscribers that receive notifications via WordPress.com for new posts.
     WpCom(UserId),
 
@@ -187,19 +187,40 @@ pub enum GetSubscriberQuery {
     Email(SubscriptionId),
 }
 
-impl AppendUrlQueryPairs for GetSubscriberQuery {
+impl AppendUrlQueryPairs for GetSubscriberParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         match self {
-            GetSubscriberQuery::WpCom(user_id) => {
+            GetSubscriberParams::WpCom(user_id) => {
                 query_pairs_mut.append_pair("user_id", &user_id.to_string());
                 query_pairs_mut.append_pair("type", "wpcom");
             }
-            GetSubscriberQuery::Email(email) => {
+            GetSubscriberParams::Email(email) => {
                 query_pairs_mut.append_pair("subscription_id", &email.to_string());
                 query_pairs_mut.append_pair("type", "email");
             }
         }
     }
+}
+
+// MARK: - Individual Subscriber Stats
+
+#[derive(Debug, PartialEq, Eq, uniffi::Record)]
+pub struct IndividualSubscriberStatsParams {
+    pub subscription_id: SubscriptionId,
+}
+
+impl AppendUrlQueryPairs for IndividualSubscriberStatsParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_query_value_pair("subscription_id", &self.subscription_id);
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct IndividualSubscriberStats {
+    emails_sent: u64,
+    unique_opens: u64,
+    unique_clicks: u64,
+    blog_registration_date: String,
 }
 
 // MARK: - Add Subscribers
@@ -445,7 +466,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
+        GetSubscriberParams::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?user_id=123&type=wpcom"
@@ -460,7 +481,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
+        GetSubscriberParams::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?subscription_id=123&type=email"
@@ -565,5 +586,14 @@ mod tests {
         let plans = subscriber.plans.expect("JSON file includes plans");
         assert_eq!(plans.len(), 2);
         assert_eq!(plans[0].start_date.to_string(), "2025-01-13T18:51:55+00:00");
+    }
+
+    #[test]
+    fn test_individual_subscriber_stats_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/individual-subscriber-stats.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let stats: IndividualSubscriberStats =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(stats.emails_sent, 2);
     }
 }
