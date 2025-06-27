@@ -196,6 +196,8 @@ pub enum WpErrorCode {
     CannotManagePlugins,
     #[serde(rename = "rest_cannot_manage_templates")]
     CannotManageTemplates,
+    #[serde(rename = "rest_cannot_manage_widgets")]
+    CannotManageWidgets,
     #[serde(rename = "rest_cannot_read_application_password")]
     CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_read")]
@@ -264,6 +266,8 @@ pub enum WpErrorCode {
     InvalidParam,
     #[serde(rename = "rest_invalid_template")]
     InvalidTemplate,
+    #[serde(rename = "rest_invalid_widget")]
+    InvalidWidget,
     #[serde(rename = "rest_no_search_term_defined")]
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
@@ -308,6 +312,8 @@ pub enum WpErrorCode {
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
+    #[serde(rename = "rest_widget_not_found")]
+    WidgetNotFound,
     // ------------------------------------------------------------------------------------
     // Untested, because we are unable to create the necessary conditions for them
     // ------------------------------------------------------------------------------------

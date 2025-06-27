@@ -64,6 +64,15 @@ Test credentials are configured in:
    - To implement new types, use `wp_api/src/posts.rs` as a reference and follow the same style
    - For a new endpoint, a set of JSONs should be provided to you for each context type, so you can compare them and figure out which field is returned for which contexts.
 
+2. **Error handling for an endpoint**:
+   - The server will return a `crate::WpErrorCode` instance for most error types.
+   - While implementing the errors for a new endpoint, if it's missing from the `crate::WpErrorCode` variants, it needs to be added there. If you need to do this, please add the new variants to the very top of the type and add a comment on top with `// Needs Triage`.
+   - Integration tests for error cases go into `wp_api_integration_tests/tests/test_{endpoint_name}_err.rs` file.
+   - The implementation should follow a similar approach to `wp_api_integration_tests/tests/test_users_err.rs`.
+   - There are several `api_client` helper functions available. The default `api_client` function is authenticated with an admin users. This should be the preferred client if creating the error case doesn't require an inauthenticated or a separate user. There is also `api_client_as_subscriber` function that is authenticated with a subscriber user. Most authentication error types can be triggered using this client type. Another possibility is `api_client_with_auth_provider(WpAuthenticationProvider::none().into())` which doesn't have any authentication headers, so it's useful in specific cases.
+   - Implementing these tests can be difficult without having a full understanding of how to trigger them. So, if you are not sure how to implement it, generate a test function following existing patterns, but leave the implementation empty. Instead, add a comment about what you can find from the implementation related to how one might be able to trigger this error.
+   - The existing tests don't have much documentation, because the test implementation can act as one. However, when you are implementing the test, please add a documentation. This is because we need some context about why you implemented a test in a specific way. If you include a documentation, we can check if what you are trying to do is correct, before reviewing the implementation.
+
 ## Important Files
 
 - `Makefile` - Build automation and platform-specific targets

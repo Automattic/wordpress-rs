@@ -80,6 +80,8 @@ pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
 pub const WIDGET_ID_BLOCK_2: &str = "block-2";
+pub const WIDGET_INACTIVE_WIDGETS_SIDEBAR: &str = "wp_inactive_widgets";
+pub const WIDGET_TYPE_TEXT: &str = "text";
 
 pub fn api_client() -> WpApiClient {
     WpApiClient::new(
