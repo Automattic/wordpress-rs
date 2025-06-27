@@ -35,6 +35,7 @@ pub mod themes;
 pub mod url_query;
 pub mod users;
 pub mod uuid;
+pub mod widget_types;
 pub mod widgets;
 pub mod wordpress_org;
 pub mod wp_site_health_tests;
@@ -105,7 +106,7 @@ pub enum EnumFromStrParsingError {
     UnknownVariant { value: String },
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum JsonValue {
     Null,

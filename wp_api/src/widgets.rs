@@ -1,6 +1,8 @@
+use crate::JsonValue;
 use crate::url_query::{
     AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
 };
+use crate::widget_types::WidgetTypeId;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};
 use strum_macros::IntoStaticStr;
@@ -21,7 +23,7 @@ pub struct SparseWidget {
     #[WpContext(edit, embed, view)]
     pub id: Option<WidgetId>,
     #[WpContext(edit, embed, view)]
-    pub id_base: Option<String>,
+    pub id_base: Option<WidgetTypeId>,
     #[WpContext(edit, embed, view)]
     pub sidebar: Option<String>,
     #[WpContext(edit, embed, view)]
@@ -42,7 +44,7 @@ pub struct WidgetInstance {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub raw: Option<HashMap<String, String>>,
+    pub raw: Option<HashMap<String, JsonValue>>,
 }
 
 #[derive(Debug, Clone, Default, uniffi::Record)]
@@ -74,18 +76,21 @@ impl FromUrlQueryPairs for WidgetListParams {
     }
 }
 
-#[derive(Debug, Clone, uniffi::Record, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WidgetCreateParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id_base: Option<String>,
+    pub id_base: WidgetTypeId,
     pub sidebar: String,
-    // TODO: What should this type be?
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub instance: Option<HashMap<String, String>>,
+    pub instance: Option<WidgetInstanceCreateParams>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub form_data: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[serde(untagged)]
+pub enum WidgetInstanceCreateParams {
+    Raw { raw: HashMap<String, JsonValue> },
+    Encoded { encoded: String, hash: String },
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -93,7 +98,7 @@ pub struct WidgetUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id_base: Option<String>,
+    pub id_base: Option<WidgetTypeId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sidebar: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
