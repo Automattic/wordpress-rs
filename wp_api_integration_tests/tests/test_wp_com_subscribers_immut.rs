@@ -1,7 +1,7 @@
 use wp_api::wp_com::{
     WpComSiteId,
     subscribers::{
-        GetSubscriberParams, IndividualSubscriberStatsParams, ListSubscribersSortField,
+        IndividualSubscriberParams, IndividualSubscriberStatsParams, ListSubscribersSortField,
         SubscribersListParams, SubscriptionId,
     },
 };
@@ -31,10 +31,10 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
 #[apply(retrieve_cases)]
 #[parallel]
 #[ignore]
-async fn retrieve_subscriber(#[case] query: GetSubscriberParams) {
+async fn retrieve_subscriber(#[case] query: IndividualSubscriberParams) {
     wp_com_client()
         .subscribers()
-        .get_subscriber(
+        .individual_subscriber(
             &WpComSiteId(WpComTestCredentials::instance().site_id),
             &query,
         )
@@ -72,8 +72,8 @@ pub fn list_cases(#[case] params: SubscribersListParams) {}
 
 #[template]
 #[rstest]
-#[case::wp_com_subscriber(GetSubscriberParams::WpCom(UserId(WpComTestCredentials::instance().wp_com_subscriber_user_id)))]
-#[case::email_subscriber(GetSubscriberParams::Email(SubscriptionId(
+#[case::wp_com_subscriber(IndividualSubscriberParams::WpCom(UserId(WpComTestCredentials::instance().wp_com_subscriber_user_id)))]
+#[case::email_subscriber(IndividualSubscriberParams::Email(SubscriptionId(
     WpComTestCredentials::instance().email_subscriber_subscription_id
 )))]
-pub fn retrieve_cases(#[case] query: GetSubscriberParams) {}
+pub fn retrieve_cases(#[case] query: IndividualSubscriberParams) {}

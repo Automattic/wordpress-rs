@@ -17,7 +17,6 @@ pub struct Subscriber {
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
-    pub email_subscription_id: Option<u64>,
     pub date_subscribed: WpGmtDateTime,
     pub subscription_status: Option<String>,
     pub avatar: String,
@@ -174,12 +173,13 @@ pub struct ListSubscribersResponse {
     pub page: u64,
     pub per_page: u64,
     pub subscribers: Vec<Subscriber>,
+    pub is_owner_subscribed: bool,
 }
 
 // MARK: - Get Subscriber
 
 #[derive(Debug, uniffi::Enum)]
-pub enum GetSubscriberParams {
+pub enum IndividualSubscriberParams {
     // Return subscribers that receive notifications via WordPress.com for new posts.
     WpCom(UserId),
 
@@ -187,14 +187,14 @@ pub enum GetSubscriberParams {
     Email(SubscriptionId),
 }
 
-impl AppendUrlQueryPairs for GetSubscriberParams {
+impl AppendUrlQueryPairs for IndividualSubscriberParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         match self {
-            GetSubscriberParams::WpCom(user_id) => {
+            IndividualSubscriberParams::WpCom(user_id) => {
                 query_pairs_mut.append_pair("user_id", &user_id.to_string());
                 query_pairs_mut.append_pair("type", "wpcom");
             }
-            GetSubscriberParams::Email(email) => {
+            IndividualSubscriberParams::Email(email) => {
                 query_pairs_mut.append_pair("subscription_id", &email.to_string());
                 query_pairs_mut.append_pair("type", "email");
             }
@@ -440,11 +440,11 @@ mod tests {
         let response: ListSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.total, 8);
+        assert_eq!(response.total, 4);
         assert_eq!(response.pages, 1);
         assert_eq!(response.page, 1);
         assert_eq!(response.per_page, 100);
-        assert_eq!(response.subscribers.len(), 8);
+        assert_eq!(response.subscribers.len(), 4);
     }
 
     #[test]
@@ -466,7 +466,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberParams::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
+        IndividualSubscriberParams::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?user_id=123&type=wpcom"
@@ -481,7 +481,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberParams::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
+        IndividualSubscriberParams::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?subscription_id=123&type=email"

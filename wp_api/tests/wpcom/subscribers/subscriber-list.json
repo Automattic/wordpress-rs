@@ -1,94 +1,94 @@
 {
-    "total": 8,
-    "pages": 1,
-    "page": 1,
-    "per_page": 100,
-    "subscribers": [
-      {
-        "user_id": 0,
-        "subscription_id": 123456789,
-        "email_address": "user1@example.com",
-        "date_subscribed": "2023-06-26T10:54:11+00:00",
-        "is_email_subscriber": true,
-        "subscription_status": "Subscribed",
-        "display_name": "user1@example.com",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g"
-      },
-      {
-        "user_id": 0,
-        "subscription_id": 987654321,
-        "email_address": "user2@example.com",
-        "date_subscribed": "2022-02-02T22:06:37+00:00",
-        "is_email_subscriber": true,
-        "subscription_status": "Subscribed",
-        "display_name": "user2@example.com",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g"
-      },
-      {
-        "user_id": 123456789,
-        "subscription_id": 456789123,
-        "email_address": "user3@example.com",
-        "date_subscribed": "2022-02-02T22:06:36+00:00",
-        "is_email_subscriber": false,
-        "subscription_status": "Not subscribed",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g",
-        "display_name": "user3",
-        "url": "http://user3.wordpress.com"
-      },
-      {
-        "user_id": 987654321,
-        "subscription_id": 789123456,
-        "email_address": "user4@example.com",
-        "date_subscribed": "2020-12-30T10:36:06+00:00",
-        "is_email_subscriber": true,
-        "subscription_status": "Subscribed",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g",
-        "display_name": "user4",
-        "url": "http://user4.wordpress.com"
-      },
-      {
-        "user_id": 456789123,
-        "subscription_id": 321654987,
-        "email_address": "user5@example.com",
-        "date_subscribed": "2020-10-01T14:24:33+00:00",
-        "is_email_subscriber": true,
-        "subscription_status": "Not sending",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g",
-        "display_name": "user5",
-        "url": "http://user5.wordpress.com"
-      },
-      {
-        "user_id": 789123456,
-        "subscription_id": 654987321,
-        "email_address": "user6@example.com",
-        "date_subscribed": "2020-10-01T11:41:51+00:00",
-        "is_email_subscriber": true,
-        "subscription_status": "Subscribed",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g",
-        "display_name": "user6",
-        "url": "http://user6.wordpress.com"
-      },
-      {
-        "user_id": 321654987,
-        "subscription_id": 987321654,
-        "email_address": "user7@example.com",
-        "date_subscribed": "2020-09-24T16:46:23+00:00",
-        "is_email_subscriber": false,
-        "subscription_status": "Not subscribed",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g",
-        "display_name": "user7"
-      },
-      {
-        "user_id": 654987321,
-        "subscription_id": 321987654,
-        "email_address": "user8@example.com",
-        "date_subscribed": "2019-05-05T08:16:05+00:00",
-        "is_email_subscriber": false,
-        "subscription_status": "Not subscribed",
-        "avatar": "https://secure.gravatar.com/avatar/00000000000000000000000000000000?s=128&d=mp&r=g",
-        "display_name": "user8",
-        "url": "http://user8.wordpress.com"
-      }
-    ],
-    "is_owner_subscribed": false
-  }
+  "total": 4,
+  "pages": 1,
+  "page": 1,
+  "per_page": 100,
+  "subscribers": [
+    {
+      "user_id": 123456789,
+      "subscription_id": 900000001,
+      "email_address": "user1@example.com",
+      "date_subscribed": "2025-02-03T09:09:12+00:00",
+      "is_email_subscriber": true,
+      "subscription_status": "Subscribed",
+      "avatar": "https://2.gravatar.com/avatar/placeholder1?s=128&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D128&amp;r=G",
+      "display_name": "Test User One",
+      "url": "http://testblog1.wordpress.com",
+      "plans": [
+        {
+          "is_gift": true,
+          "gift_id": 20,
+          "paid_subscription_id": null,
+          "status": "active",
+          "title": "Newsletter Tier",
+          "currency": "USD",
+          "renew_interval": "one-time",
+          "inactive_renew_interval": null,
+          "renewal_price": 0,
+          "start_date": "2025-06-27T17:18:28+00:00",
+          "end_date": "2025-07-27T17:18:28+00:00"
+        }
+      ]
+    },
+    {
+      "user_id": 0,
+      "subscription_id": 900000002,
+      "email_address": "user2@example.com",
+      "date_subscribed": "2025-01-31T14:11:54+00:00",
+      "is_email_subscriber": true,
+      "subscription_status": "Subscribed",
+      "display_name": "user2@example.com",
+      "avatar": "https://1.gravatar.com/avatar/placeholder2?s=128&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D128&amp;r=G"
+    },
+    {
+      "user_id": 234567890,
+      "subscription_id": 800000001,
+      "email_address": "user3@example.com",
+      "date_subscribed": "2025-01-31T12:53:03+00:00",
+      "is_email_subscriber": false,
+      "subscription_status": "Not subscribed",
+      "avatar": "https://2.gravatar.com/avatar/placeholder3?s=128&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D128&amp;r=G",
+      "display_name": "testuser123456"
+    },
+    {
+      "user_id": 345678901,
+      "subscription_id": 900000003,
+      "email_address": "user4@example.com",
+      "date_subscribed": "2025-01-21T12:55:45+00:00",
+      "is_email_subscriber": true,
+      "subscription_status": "Subscribed",
+      "avatar": "https://1.gravatar.com/avatar/placeholder4?s=128&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D128&amp;r=G",
+      "display_name": "testpaiduser4",
+      "url": "http://testblog2.wordpress.com",
+      "plans": [
+        {
+          "is_gift": false,
+          "gift_id": null,
+          "paid_subscription_id": "50000001",
+          "status": "active",
+          "title": "Newsletter Tier",
+          "currency": "USD",
+          "renew_interval": "1 year",
+          "inactive_renew_interval": null,
+          "renewal_price": 1,
+          "start_date": "2025-01-21T12:55:38+00:00",
+          "end_date": "2026-01-21T12:55:38+00:00"
+        },
+        {
+          "is_gift": true,
+          "gift_id": 21,
+          "paid_subscription_id": null,
+          "status": "active",
+          "title": "Newsletter Tier",
+          "currency": "USD",
+          "renew_interval": "one-time",
+          "inactive_renew_interval": null,
+          "renewal_price": 0,
+          "start_date": "2025-06-27T17:18:28+00:00",
+          "end_date": "2025-07-27T17:18:28+00:00"
+        }
+      ]
+    }
+  ],
+  "is_owner_subscribed": false
+}
