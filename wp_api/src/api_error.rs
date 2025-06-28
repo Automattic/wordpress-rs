@@ -314,6 +314,8 @@ pub enum WpErrorCode {
     UserInvalidSlug,
     #[serde(rename = "rest_widget_not_found")]
     WidgetNotFound,
+    #[serde(rename = "rest_widget_type_invalid")]
+    WidgetTypeInvalid,
     // ------------------------------------------------------------------------------------
     // Untested, because we are unable to create the necessary conditions for them
     // ------------------------------------------------------------------------------------

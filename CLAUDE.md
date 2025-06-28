@@ -199,7 +199,7 @@ WordPress REST API returns specific error codes that need to be handled and test
    - Use appropriate client helpers:
      - `api_client()` - Admin authenticated (default)
      - `api_client_as_subscriber()` - Limited permissions
-     - `api_client_with_auth_provider(WpAuthenticationProvider::none())` - Unauthenticated
+     - `api_client_with_auth_provider(WpAuthenticationProvider::none().into())` - Unauthenticated
 
 3. **Document test rationale**:
    - Add doc comments explaining why tests are implemented a specific way
