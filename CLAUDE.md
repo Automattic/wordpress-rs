@@ -154,11 +154,20 @@ Endpoints are implemented using a derive macro that generates the request builde
    - `#[delete]` - For `DELETE` operations
    - `filter_by` parameter enables `_fields` query parameter support
 
-3. **Handle special cases**:
+3. **Use appropriate `output` types**
+   - For lists with contextual types: `Vec<crate::{endpoint_name}::{sparse_endpoint_type}>`, i.e. `Vec<crate::posts::SparsePost>`
+   - For single items with contextual types: `crate::{endpoint_name}::{sparse_endpoint_type}`, i.e. `crate::posts::SparsePost`
+   - For non contextual types: `Vec<crate::{endpoint_name}::{return_type}>` & `crate::{endpoint_name}::{return_type}`
+
+4. **Use appropriate `filter_by` types**
+   - For lists with contextual types: `crate::{endpoint_name}::{sparse_field_type}`, i.e. `crate::posts::SparsePostField`
+   - Procedural macro will turn `SparsePostField` into `SparsePostFieldWithEditContext`, `SparsePostFieldWithEmbedContext` & `SparsePostFieldWithViewContext`
+
+5. **Handle special cases**:
    - **Delete vs Trash**: `Delete` requires `force=true`, `Trash` requires `force=false`
    - **URL parameters**: `<user_id>` becomes `UserId` parameter in generated functions
 
-4. **Implement DerivedRequest trait**:
+6. **Implement DerivedRequest trait**:
    ```rust
    impl DerivedRequest for UsersRequest {
        fn namespace() -> impl AsNamespace {
@@ -168,11 +177,13 @@ Endpoints are implemented using a derive macro that generates the request builde
    ```
    - Override `additional_query_pairs()` only for special cases (e.g., Delete/Trash)
 
-5. **Add comprehensive unit tests**:
+7. **Add comprehensive unit tests**:
    - Test every endpoint variant
    - Test with default parameters
    - Test with all parameters populated
    - Use `validate_wp_v2_endpoint()` helper
+
+8. **Add the new request builder & executor to `WpApiRequestBuilder` & `WpApiClient` in `wp_api/src/api_client.rs`**
 
 #### 3. Error handling and integration tests
 
@@ -204,6 +215,7 @@ WordPress REST API returns specific error codes that need to be handled and test
 - `Makefile` - Build automation and platform-specific targets
 - `wp_api/src/lib.rs` - Main library entry point
 - `wp_api/src/request.rs` - Core request/response handling
+- `wp_api/src/api_client.rs` - Request builder & executor wrapper API client types
 - `wp_api/src/api_error.rs` - Error types and handling
 - `wp_api_integration_tests/src/lib.rs` - Helpers for integration tests
 

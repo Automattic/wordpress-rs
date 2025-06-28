@@ -1,3 +1,4 @@
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
     SparseField,
     posts::{
@@ -7,8 +8,6 @@ use crate::{
     },
 };
 use wp_derive_request_builder::WpDerivedRequest;
-
-use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
 enum PostsRequest {
