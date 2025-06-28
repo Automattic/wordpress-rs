@@ -57,34 +57,147 @@ Test credentials are configured in:
 
 ### Common Development Tasks
 
-1. **Adding new types that uses WordPress REST API endpoint**:
-    - The API returns different fields depending on the `context` parameter which can be `edit`, `embed` or `view` and defaults to `view`. To support this, we use the `wp_contextual::WpContextual` derive macro and add `#[WpContext(edit, embed, view)]` attributes to each field, matching the available contexts.
-    - Each contextual type's name has to start with `Sparse` prefix and all of its fields has to be `Option<T>`. `wp_contextual::WpContextual` derive macro will generate new types from it with the `WithEditContext`, `WithEmbedContext` & `WithViewContext` suffices. These new types will remove the optional from each field - replaceing `Option<T>` with `T` - unless a field in the original `Sparse` type is marked with `#[WpContextualOption]` attribute.
-    - Most types should have the following derive macros `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. Please keep this order to remain consistent with the rest of the code base.
-    - To implement new types, use `wp_api/src/posts.rs` as a reference and follow the same style.
-    - For a new endpoint, the API documentation will be provided to you, so you can compare them and figure out which field is returned for which contexts.
-    - We wrap `id` fields as a new type to add some extra type safety to our code. Take a look at `crate::posts::PostId` in `src/wp_api/posts.rs` for how that's done.
-    - Please omit `_links` & `_meta` fields from the types. For `_meta` fields, add a comment in its place indicating that it'll be implemented at a later time.
-    - `{foo}Params` types need to implement `AppendUrlQueryPairs` & `FromUrlQueryPairs` traits. In most cases, you'll want to import all these helpers `crate::url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap}`. Follow a similar approach to `crate::posts::PostListParams` in `src/wp_api/posts.rs`. Note that in these trait implementations, a `{foo}ParamsField` `enum` type is used to add extra type safety. Make sure to create this type and add `#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]` to it. Don't reorder these to keep things consistent. Add `#[strum(serialize = "{query_name_from_documentation}")]` to each variant. Take a look at `crate::posts::PostListParamsField` in `wp_api/src/posts.rs` to see a sample of this. For extension helpers, take a look at `wp_api/src/url_query.rs`.
+This section explains how to add new WordPress REST API endpoints and types to this codebase. The implementation follows a specific pattern to handle WordPress's context-aware responses and maintain type safety.
 
-2. **Adding new WordPress REST API endpoints to the API client**
-   - The endpoints are implemented in `wp_api/src/request/endpoint/{endpoint_name}_endpoint.rs` files.
-   - We use `#[derive(wp_derive_request_builder::WpDerivedRequest)]` derive macro on an `enum` type to generate the functions. This type should be named as `{endpoint_name}Request`.
-   - In most cases the variants will be `List`, `Retrieve`, `Create`, `Delete`, `Trash` & `Update`. The difference between `Delete` & `Trash` is that `Delete` is a destructive action and requires `force=true` query parameter whereas `Trash` is non-destructive and requires `force=false` parameter. Not all endpoints support trashing and documentation is not always clear about this. The server side implementation can be used to figure out whether both actions are supported. `List` & `Retrieve` are `GET` requests where `Retrieve` takes an `id` of some kind to return an individual record and `List` returns a list of records.
-   - If the endpoint support contexts, and it's a list with pagination support, it should use the `#[contextual_paged(url = "/{endpoint_name}", params = &{endpoint_name}ListParams, output = Vec<crate::{endpoint_name}::Sparse{endpoint_name}>, filter_by = crate::{endpoint_name}::Sparse{endpoint_name}Field)]` attribute. `contextual_paged` means that the responses change depending on the `context` parameter of the request and it supports pagination. The `url` field matches the documentation. `params` is the type that has all the available fields for the request query parameters. `output` is the type that the response JSON will be parsed into and in most cases will match the `Schema` section of the documentation. The `filter_by` is optional and should be used if the endpoint supports filtering by field, using the `_fields` query parameter. This is not always clear from the documentation, but most WordPress REST API endpoints do support filtering and if in doubt, the source code for the endpoint should be consulted.
-   - If the endpoint supports contexts but it doesn't support pagination, such would be the case most of the time for `Retrieve` variants, then `#[contextual_get]` attribute should be used.
-   - If the `url` field includes a `<{something_id}>`, `WpDerivedRequest` derive macro will convert that to function parameter `SomethingId`. This `id` should have been implemented in `Adding new types that uses WordPress REST API endpoint` section and would need to be imported.
-   - `DerivedRequest` trait needs to be implemented for each `{endpoint_name}Request` type. `additional_query_pairs` function is usually empty because these are the parameters that are always included for this type of request. The general exception to this rule are `Delete` & `Trash` variants where the former requires `force=true` parameter, and the latter `force=false`. The `namespace` function should return `WpNamespace::WpV2` for most WordPress REST API endpoints. This translates to `/wp/v2` in the documentation. If the documentation states a different path, instead of implementing the function, add `todo!("")` comment with an explanation of what is different about this endpoint.
-   - In this file a set of unit tests should be implemented to test the generated `{endpoint_name}RequestEndpoint` implementation. The tests should every variant, at a least one case that uses every parameter field and one test that uses all fields. Please see how `wp_api/src/request/endpoint/posts_endpoint.rs` implements these tests using the parameter field types from `wp_api/src/posts.rs`.
+#### 1. Adding new types for WordPress REST API endpoints
 
-3. **Error handling for an endpoint**:
-    - The server will return a `crate::WpErrorCode` instance for most error types.
-    - While implementing the errors for a new endpoint, if it's missing from the `crate::WpErrorCode` variants, it needs to be added there. If you need to do this, please add the new variants to the very top of the type and add a comment on top with `// Needs Triage`.
-    - Integration tests for error cases go into `wp_api_integration_tests/tests/test_{endpoint_name}_err.rs` file.
-    - The implementation should follow a similar approach to `wp_api_integration_tests/tests/test_users_err.rs`.
-    - There are several `api_client` helper functions available. The default `api_client` function is authenticated with an admin users. This should be the preferred client if creating the error case doesn't require an inauthenticated or a separate user. There is also `api_client_as_subscriber` function that is authenticated with a subscriber user. Most authentication error types can be triggered using this client type. Another possibility is `api_client_with_auth_provider(WpAuthenticationProvider::none().into())` which doesn't have any authentication headers, so it's useful in specific cases.
-    - Implementing these tests can be difficult without having a full understanding of how to trigger them. So, if you are not sure how to implement it, generate a test function following existing patterns, but leave the implementation empty. Instead, add a comment about what you can find from the implementation related to how one might be able to trigger this error.
-    - The existing tests don't have much documentation, because the test implementation can act as one. However, when you are implementing the test, please add a documentation. This is because we need some context about why you implemented a test in a specific way. If you include a documentation, we can check if what you are trying to do is correct, before reviewing the implementation.
+WordPress REST API returns different fields depending on the `context` parameter (`view`, `edit`, or `embed`). We handle this using a procedural macro that generates context-specific types.
+
+**Core concepts:**
+- **Sparse types**: Base types with all fields as `Option<T>`, prefixed with `Sparse`
+- **Context-specific types**: Generated types with appropriate fields for each context
+- **Type safety**: New type wrappers for IDs and strongly-typed parameter enums
+
+**Implementation steps:**
+
+1. **Create the Sparse type** in `wp_api/src/{endpoint_name}.rs`:
+   ```rust
+   #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+   pub struct SparseUser {
+       #[WpContext(edit, embed, view)]
+       pub id: Option<UserId>,
+       #[WpContext(edit)]
+       pub username: Option<String>,
+       // ... other fields
+   }
+   ```
+   - Start type name with `Sparse` prefix
+   - All fields must be `Option<T>`
+   - Add `#[WpContext(...)]` attributes based on API documentation
+   - Fields marked with `#[WpContextualOption]` remain optional in generated types
+   - Omit `_links` and `_meta` fields (add a comment for `_meta`)
+
+2. **Create ID wrapper types** for type safety:
+   ```rust
+   impl_as_query_value_for_new_type!(UserId);
+   uniffi::custom_newtype!(UserId, i64);
+   #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+   pub struct UserId(pub i64);
+   ```
+
+3. **Define parameter types** for list/create/update operations:
+   ```rust
+   #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+   pub struct UserListParams {
+       #[uniffi(default = None)]
+       pub page: Option<u32>,
+       // ... other fields
+   }
+   ```
+
+4. **Implement query parameter handling**:
+   - Create a `{Type}ListParamsField` enum:
+     ```rust
+     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
+     enum UserListParamsField {
+         #[strum(serialize = "page")]
+         Page,
+         // ... other fields
+     }
+     ```
+   - Implement `AppendUrlQueryPairs` and `FromUrlQueryPairs` traits
+   - Import helpers: `crate::url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap}`
+
+**Special parameter types:**
+
+Some parameters require custom handling:
+- **Enum parameters with partial serialization**: Use `OptionFromStr` trait (see `WpApiParamUsersWho`)
+- **Complex parameters**: Implement custom `FromStr`/`Display` (see `WpApiParamUsersHasPublishedPosts`)
+- **Parameters with special serialization**: Use serde attributes (see `UserAvatarSize`)
+
+#### 2. Adding WordPress REST API endpoint implementations
+
+Endpoints are implemented using a derive macro that generates the request builder functions.
+
+**Implementation steps:**
+
+1. **Create endpoint file** `wp_api/src/request/endpoint/{endpoint_name}_endpoint.rs`:
+   ```rust
+   use crate::{/* imports */};
+   use wp_derive_request_builder::WpDerivedRequest;
+
+   #[derive(WpDerivedRequest)]
+   enum UsersRequest {
+       #[contextual_paged(url = "/users", params = &UserListParams, output = Vec<crate::SparseUser>, filter_by = crate::SparseUserField)]
+       List,
+       #[post(url = "/users", params = &UserCreateParams, output = UserWithEditContext)]
+       Create,
+       // ... other variants
+   }
+   ```
+
+2. **Choose appropriate attributes**:
+   - `#[contextual_paged]` - For lists with pagination and context support
+   - `#[contextual_get]` - For `GET` operations with context support
+   - `#[get]` - For `GET` operations without context support
+   - `#[post]` - For `POST` operations
+   - `#[delete]` - For `DELETE` operations
+   - `filter_by` parameter enables `_fields` query parameter support
+
+3. **Handle special cases**:
+   - **Delete vs Trash**: `Delete` requires `force=true`, `Trash` requires `force=false`
+   - **URL parameters**: `<user_id>` becomes `UserId` parameter in generated functions
+
+4. **Implement DerivedRequest trait**:
+   ```rust
+   impl DerivedRequest for UsersRequest {
+       fn namespace() -> impl AsNamespace {
+           WpNamespace::WpV2  // For /wp/v2 endpoints
+       }
+   }
+   ```
+   - Override `additional_query_pairs()` only for special cases (e.g., Delete/Trash)
+
+5. **Add comprehensive unit tests**:
+   - Test every endpoint variant
+   - Test with default parameters
+   - Test with all parameters populated
+   - Use `validate_wp_v2_endpoint()` helper
+
+#### 3. Error handling and integration tests
+
+WordPress REST API returns specific error codes that need to be handled and tested.
+
+**Implementation steps:**
+
+1. **Add missing error codes** to `crate::WpErrorCode`:
+   - Add new variants at the top with `// Needs Triage` comment for each one
+   - Match the error codes from API responses
+
+2. **Create error tests** in `wp_api_integration_tests/tests/test_{endpoint_name}_err.rs`:
+   - Use appropriate client helpers:
+     - `api_client()` - Admin authenticated (default)
+     - `api_client_as_subscriber()` - Limited permissions
+     - `api_client_with_auth_provider(WpAuthenticationProvider::none())` - Unauthenticated
+
+3. **Document test rationale**:
+   - Add doc comments explaining why tests are implemented a specific way
+   - If unsure how to trigger an error, leave implementation empty with explanation
+
+**Example references:**
+- Types: `wp_api/src/posts.rs`, `wp_api/src/categories.rs`
+- Endpoints: `wp_api/src/request/endpoint/posts_endpoint.rs`
+- Error tests: `wp_api_integration_tests/tests/test_posts_err.rs`
 
 ## Important Files
 
