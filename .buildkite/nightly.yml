@@ -20,5 +20,7 @@ steps:
             - "#wordpress-rs"
           message: "Localization sync failed."
         if: build.state == "failed"
+    env:
+      IMAGE_ID: $IMAGE_ID
     agents:
       queue: mac
