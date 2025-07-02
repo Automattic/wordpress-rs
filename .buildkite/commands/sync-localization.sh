@@ -1,5 +1,10 @@
 #!/bin/bash -euo pipefail
 
+echo "--- :git: Checking out the current branch"
+BRANCH="${BUILDKITE_BRANCH:-trunk}"
+git checkout "${BRANCH}"
+git pull origin "${BRANCH}"
+
 echo '--- :robot_face: Use bot for Git operations'
 source use-bot-for-git
 
