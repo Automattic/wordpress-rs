@@ -20,6 +20,11 @@ android {
     // to be manually installed: https://developer.android.com/build/releases/gradle-plugin#compatibility
     // Note that if the project's AGP version is not up to date, we need to find the correct release
     // notes from the list: https://developer.android.com/build/releases/past-releases (on the left side)
+    //
+    // TODO: The comment above is temporarily incorrect, as we are using a specific NDK version to
+    // test the 16kb page size changes. When we update AGP to a version that is packaged with NDK 
+    // version above `28`, we should remove this.
+    ndkVersion = "28.1.13356709"
 
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()

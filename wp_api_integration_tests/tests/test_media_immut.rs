@@ -126,6 +126,8 @@ async fn paginate_list_media_with_edit_context(#[case] params: MediaListParams) 
 pub fn list_cases(#[case] params: MediaListParams) {}
 
 mod filter {
+    use wp_api::media::MediaDetailsPayload;
+
     use super::*;
 
     wp_api::generate_sparse_media_field_with_edit_context_test_cases!();
@@ -253,5 +255,53 @@ mod filter {
             .assert_response()
             .data;
         media.assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[tokio::test]
+    #[parallel]
+    async fn parse_video_media_details() {
+        let media = api_client()
+            .media()
+            .retrieve_with_edit_context(&MEDIA_ID_VIDEO)
+            .await
+            .assert_response()
+            .data;
+
+        assert!(matches!(
+            media.media_details.parse_as_mime_type(media.mime_type),
+            Some(MediaDetailsPayload::Video { .. })
+        ));
+    }
+
+    #[tokio::test]
+    #[parallel]
+    async fn parse_audio_media_details() {
+        let media = api_client()
+            .media()
+            .retrieve_with_edit_context(&MEDIA_ID_AUDIO)
+            .await
+            .assert_response()
+            .data;
+
+        assert!(matches!(
+            media.media_details.parse_as_mime_type(media.mime_type),
+            Some(MediaDetailsPayload::Audio { .. })
+        ));
+    }
+
+    #[tokio::test]
+    #[parallel]
+    async fn parse_image_media_details() {
+        let media = api_client()
+            .media()
+            .retrieve_with_edit_context(&MEDIA_ID_IMAGE)
+            .await
+            .assert_response()
+            .data;
+
+        assert!(matches!(
+            media.media_details.parse_as_mime_type(media.mime_type),
+            Some(MediaDetailsPayload::Image { .. })
+        ));
     }
 }

@@ -24,22 +24,59 @@ PROJECT_NAME = 'wordpress-rs'
 GLOTPRESS_PROJECT_BASE_URL = 'https://translate.wordpress.com/projects/mobile/wordpress-rs'
 
 # Supported locales mapping between GlotPress and project locale codes
+# This list combines locales supported in the iOS and Android apps
 SUPPORTED_LOCALES = [
   { glotpress: 'ar',    project: 'ar'     },
+  { glotpress: 'az',    project: 'az'     },
+  { glotpress: 'bg',    project: 'bg'     },
+  { glotpress: 'cs',    project: 'cs'     },
+  { glotpress: 'cy',    project: 'cy'     },
+  { glotpress: 'da',    project: 'da'     },
   { glotpress: 'de',    project: 'de'     },
+  { glotpress: 'el',    project: 'el'     },
+  { glotpress: 'en-au', project: 'en-AU'  },
+  { glotpress: 'en-ca', project: 'en-CA'  },
+  { glotpress: 'en-gb', project: 'en-GB'  },
   { glotpress: 'es',    project: 'es'     },
+  { glotpress: 'es-cl', project: 'es-CL'  },
+  { glotpress: 'es-co', project: 'es-CO'  },
+  { glotpress: 'es-mx', project: 'es-MX'  },
+  { glotpress: 'es-ve', project: 'es-VE'  },
+  { glotpress: 'eu',    project: 'eu'     },
   { glotpress: 'fr',    project: 'fr'     },
+  { glotpress: 'fr-ca', project: 'fr-CA'  },
+  { glotpress: 'gd',    project: 'gd'     },
+  { glotpress: 'gl',    project: 'gl'     },
   { glotpress: 'he',    project: 'he'     },
+  { glotpress: 'hi',    project: 'hi'     },
+  { glotpress: 'hr',    project: 'hr'     },
+  { glotpress: 'hu',    project: 'hu'     },
   { glotpress: 'id',    project: 'id'     },
+  { glotpress: 'is',    project: 'is'     },
   { glotpress: 'it',    project: 'it'     },
   { glotpress: 'ja',    project: 'ja'     },
+  { glotpress: 'kmr',   project: 'kmr'    },
   { glotpress: 'ko',    project: 'ko'     },
+  { glotpress: 'lv',    project: 'lv'     },
+  { glotpress: 'mk',    project: 'mk'     },
+  { glotpress: 'ms',    project: 'ms'     },
+  { glotpress: 'nb',    project: 'nb'     },
   { glotpress: 'nl',    project: 'nl'     },
+  { glotpress: 'pl',    project: 'pl'     },
+  { glotpress: 'pt',    project: 'pt'     },
   { glotpress: 'pt-br', project: 'pt-BR'  },
+  { glotpress: 'ro',    project: 'ro'     },
   { glotpress: 'ru',    project: 'ru'     },
+  { glotpress: 'sk',    project: 'sk'     },
+  { glotpress: 'sq',    project: 'sq'     },
+  { glotpress: 'sr',    project: 'sr'     },
   { glotpress: 'sv',    project: 'sv'     },
+  { glotpress: 'th',    project: 'th'     },
   { glotpress: 'tr',    project: 'tr-TR'  },
+  { glotpress: 'uz',    project: 'uz'     },
+  { glotpress: 'vi',    project: 'vi'     },
   { glotpress: 'zh-cn', project: 'zh-CN'  },
+  { glotpress: 'zh-hk', project: 'zh-HK'  },
   { glotpress: 'zh-tw', project: 'zh-TW'  }
 ].freeze
 
@@ -172,35 +209,6 @@ lane :generate_source_po_file do |commit_changes: false|
   end
 end
 
-# Converts a PO file for a given locale back to Fluent format
-#
-# This lane takes a PO file and converts it to the corresponding Fluent format file.
-# The locale is extracted from the PO filename (e.g., 'fr-FR.po' becomes 'fr-FR').
-# The resulting Fluent file is saved in the appropriate locale directory.
-#
-# @param file_path [String] The PO file path to convert (e.g., 'path/to/fr-FR.po')
-# @return [String] The path to the generated Fluent file
-#
-lane :generate_fluent_file_from_po do |file_path:|
-  locale = File.basename(file_path, '.po')
-  fluent_file_path = File.join(LOCALIZATION_FLUENT_FILES_DIR, locale, MAIN_FLUENT_FILE_NAME)
-
-  UI.user_error!("❌ PO file not found: #{file_path}") unless File.exist?(file_path)
-
-  FileUtils.mkdir_p(File.dirname(fluent_file_path))
-
-  FluentTools.po_to_fluent(
-    file_path,
-    fluent_file_path
-  )
-
-  next if !File.exist?(fluent_file_path) || File.empty?(fluent_file_path)
-
-  UI.message("✅ #{File.basename(file_path)} → #{fluent_file_path}")
-
-  fluent_file_path
-end
-
 # Downloads the latest translations from GlotPress and updates Fluent files
 #
 # This lane fetches translated PO files from GlotPress for all supported locales,
@@ -215,19 +223,21 @@ lane :download_translations do |commit_changes: false|
     downloaded_files = download_po_files_from_glotpress(download_dir: temp_download_dir)
     updated_fluent_files = []
 
-    # Convert PO files back to Fluent format
-    if downloaded_files.any?
-      UI.header('🔄 Converting PO files to Fluent format')
-
-      downloaded_files.each do |file_path|
-        fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
-        updated_fluent_files << fluent_file_path if fluent_file_path
-      rescue StandardError => e
-        UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
-      end
-
-      UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
+    if downloaded_files.empty?
+      UI.message("No .po files were downloaded from GlotPress")
+      next
     end
+
+    UI.header('🔄 Converting PO files to Fluent format')
+
+    downloaded_files.each do |file_path|
+      fluent_file_path = generate_fluent_file_from_po(file_path: file_path)
+      updated_fluent_files << fluent_file_path if fluent_file_path
+    rescue StandardError => e
+      UI.error("❌ Failed to convert #{File.basename(file_path)}: #{e.message}")
+    end
+
+    UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
 
     if commit_changes && updated_fluent_files.any?
       commit_changed_files(
@@ -279,6 +289,35 @@ lane :download_po_files_from_glotpress do |download_dir:|
   UI.success("✅ Downloaded: #{downloaded_files.length} PO files") if downloaded_files.any?
 
   downloaded_files
+end
+
+# Converts a PO file for a given locale back to Fluent format
+#
+# This lane takes a PO file and converts it to the corresponding Fluent format file.
+# The locale is extracted from the PO filename (e.g., 'fr-FR.po' becomes 'fr-FR').
+# The resulting Fluent file is saved in the appropriate locale directory.
+#
+# @param file_path [String] The PO file path to convert (e.g., 'path/to/fr-FR.po')
+# @return [String] The path to the generated Fluent file
+#
+lane :generate_fluent_file_from_po do |file_path:|
+  UI.user_error!("PO file not found: #{file_path}") unless File.exist?(file_path)
+
+  locale = File.basename(file_path, '.po')
+  fluent_file_path = File.join(LOCALIZATION_FLUENT_FILES_DIR, locale, MAIN_FLUENT_FILE_NAME)
+
+  FileUtils.mkdir_p(File.dirname(fluent_file_path))
+
+  FluentTools.po_to_fluent(
+    file_path,
+    fluent_file_path
+  )
+
+  next if !File.exist?(fluent_file_path) || File.empty?(fluent_file_path)
+
+  UI.message("✅ #{File.basename(file_path)} → #{fluent_file_path}")
+
+  fluent_file_path
 end
 
 # Utils

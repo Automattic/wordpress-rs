@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use wp_api::wp_com::client::WpComApiClient;
 
 pub mod mock;
 pub mod prelude;
@@ -35,6 +36,14 @@ impl TestCredentials {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct WpComTestCredentials {
+    pub bearer_token: &'static str,
+    pub site_id: u64,
+    pub wp_com_subscriber_user_id: i64,
+    pub email_subscriber_subscription_id: u64,
+}
+
 pub mod backend;
 
 // The first user is also the current user
@@ -55,6 +64,9 @@ pub const POST_ID_555: PostId = PostId(555);
 pub const POST_ID_DRAFT: PostId = PostId(1164);
 pub const POST_ID_INVALID: PostId = PostId(99999999);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
+pub const MEDIA_ID_VIDEO: MediaId = MediaId(1690);
+pub const MEDIA_ID_AUDIO: MediaId = MediaId(821);
+pub const MEDIA_ID_IMAGE: MediaId = MediaId(1692);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test-data/test_media.jpg";
 pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
 pub const CATEGORY_ID_48: CategoryId = CategoryId(48);
@@ -123,6 +135,18 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
             app_notifier: Arc::new(EmptyAppNotifier),
         },
     )
+}
+
+pub fn wp_com_client() -> WpComApiClient {
+    WpComApiClient::new(WpApiClientDelegate {
+        auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
+            token: WpComTestCredentials::instance().bearer_token.to_string(),
+        })
+        .into(),
+        request_executor: Arc::new(ReqwestRequestExecutor::default()),
+        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        app_notifier: Arc::new(EmptyAppNotifier),
+    })
 }
 
 pub fn test_site_url() -> ParsedUrl {

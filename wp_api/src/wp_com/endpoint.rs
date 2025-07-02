@@ -1,29 +1,29 @@
 use crate::{
     parsed_url::ParsedUrl,
     request::endpoint::{ApiUrlResolver, AsNamespace, WpNamespace},
+    wp_com::WpComBaseUrl,
 };
 use std::sync::Arc;
 use strum::IntoEnumIterator;
-use url::Url;
 
 pub mod jetpack_connection_endpoint;
 pub mod oauth2;
-pub mod subscribers;
+pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
 
 #[derive(uniffi::Object)]
 pub struct WpComDotOrgApiUrlResolver {
     pub base_url: ParsedUrl,
-    pub site_url: String,
+    pub site_id: String,
 }
 
 #[uniffi::export]
 impl WpComDotOrgApiUrlResolver {
     #[uniffi::constructor]
-    pub fn new(site_url: String) -> Self {
+    pub fn new(site_id: String, base_url: WpComBaseUrl) -> Self {
         Self {
-            base_url: wp_com_base_url(),
-            site_url,
+            base_url: base_url.parsed_url(),
+            site_id,
         }
     }
 }
@@ -43,7 +43,7 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
         Arc::new(
             self.base_url
                 .by_extending_and_splitting_by_forward_slash(
-                    vec![namespace, "sites".to_string(), self.site_url.to_string()]
+                    vec![namespace, "sites".to_string(), self.site_id.to_string()]
                         .into_iter()
                         .chain(endpoint_segments),
                 )
@@ -60,7 +60,7 @@ pub(crate) struct WpComApiClientInternalUrlResolver {
 impl WpComApiClientInternalUrlResolver {
     fn new() -> Self {
         Self {
-            base_url: wp_com_base_url(),
+            base_url: WpComBaseUrl::Production.parsed_url(),
         }
     }
 }
@@ -91,12 +91,6 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
     }
 }
 
-fn wp_com_base_url() -> ParsedUrl {
-    Url::parse("https://public-api.wordpress.com")
-        .expect("This is a valid URL")
-        .into()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,7 +103,10 @@ mod tests {
         #[case] endpoint_segments: Vec<String>,
         #[case] expected_url: &str,
     ) {
-        let resolver = WpComDotOrgApiUrlResolver::new("example.wordpress.com".to_string());
+        let resolver = WpComDotOrgApiUrlResolver::new(
+            "example.wordpress.com".to_string(),
+            WpComBaseUrl::Production,
+        );
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)

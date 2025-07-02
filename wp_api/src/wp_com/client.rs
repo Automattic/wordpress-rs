@@ -3,7 +3,7 @@ use super::endpoint::{
         JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
     },
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
-    subscribers::{SubscribersRequestBuilder, SubscribersRequestExecutor},
+    subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
 };
 use crate::{

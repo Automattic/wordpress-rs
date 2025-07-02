@@ -2,7 +2,7 @@ parse_api_root_failure_reason_wordfence_blocking_access = Wordfence blockerar å
 
 application_passwords_not_supported = Webbplatsen stöder inte applikationslösenord.
 
-wordpress_org_api_client_error_request_encoding = Misslyckades att koda begäran. Orsak: {$reason}.
+wordpress_org_api_client_error_request_encoding = Misslyckades att koda begäran. Orsak: { $reason }.
 
 uuid_parse_error_not_version_4 = Inte en version 4 UUID.
 
@@ -22,19 +22,18 @@ invalid_ssl_error_generic_ssl_error = Kan inte etablera en säker anslutning til
 
 invalid_ssl_error_certificate_not_valid_for_name = Ogiltigt SSL-ceritfikat
 
-just = {$message}
+just = { $message }
 
 request_execution_failed = Misslyckades att skicka HTTP.
 
-invalid_http_status_code = Ogiltig HTTP-statuskod: {$status_code}.
+invalid_http_status_code = Ogiltig HTTP-statuskod: { $status_code }.
 
-media_file_not_found = Mediafil hittades inte på {$path}.
+media_file_not_found = Mediafil hittades inte på { $path }.
 
 url_parsing_error = URL är ogiltig.
 
-site_error_message = Din webbplats skickade ett felmeddelande: {$error_message}.
+site_error_message = Din webbplats skickade ett felmeddelande: { $error_message }.
 
 wp_api_error_generic_error = Något gick fel.
 
 probably_not_wordpress_site = Webbplatsen verkar inte vara en WordPress-webbplats.
-
