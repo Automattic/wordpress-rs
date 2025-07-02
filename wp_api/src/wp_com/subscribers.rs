@@ -5,7 +5,6 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
 };
-
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not};
 use wp_serde_helper::deserialize_u64_or_string;
