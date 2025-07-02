@@ -89,10 +89,10 @@ impl ParsedVariantAttribute {
         if let syn::Meta::List(meta_list) = attr.meta {
             Ok(meta_list)
         } else {
-            Err(
-                ItemVariantAttributeParseError::MetaInWrongFormat { meta: attr.meta }
-                    .into_syn_error(input.span()),
-            )
+            Err(ItemVariantAttributeParseError::MetaInWrongFormat {
+                meta: Box::new(attr.meta),
+            }
+            .into_syn_error(input.span()))
         }
     }
 
@@ -373,7 +373,7 @@ enum ItemVariantAttributeParseError {
     #[error("Only a single attribute is supported")]
     MoreThanOneOuterAttr,
     #[error("Expecting a syn::Meta::List found {:?}", meta)]
-    MetaInWrongFormat { meta: syn::Meta },
+    MetaInWrongFormat { meta: Box<syn::Meta> },
     #[error(
         "Expecting key value pairs (url = \"\", params = FooParam, output = FooOutput, filter_by = FooSparseField)"
     )]
