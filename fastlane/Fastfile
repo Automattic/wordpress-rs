@@ -178,9 +178,9 @@ end
 #
 # The resulting PO file is saved as the source file (.pot) for translations and is synced to GlotPress.
 #
-# @param commit_and_push_changes [Boolean] Whether to commit and push the generated PO file (default: false)
+# @param commit_changes [Boolean] Whether to commit the generated PO file (default: false)
 #
-lane :generate_source_po_file do |commit_and_push_changes: false|
+lane :generate_source_po_file do |commit_changes: false|
   UI.header('🔄 Converting English Fluent file to PO format')
 
   FileUtils.mkdir_p(File.dirname(LOCALIZATION_PO_SOURCE_FILE))
@@ -201,7 +201,7 @@ lane :generate_source_po_file do |commit_and_push_changes: false|
     UI.error("❌ Failed to convert English Fluent file: #{e.message}")
   end
 
-  if commit_and_push_changes
+  if commit_changes
     commit_changed_files(
       files: LOCALIZATION_PO_SOURCE_FILE,
       message: 'Update source PO file (en-US.pot) to be synced to GlotPress'
@@ -212,11 +212,11 @@ end
 # Downloads the latest translations from GlotPress and updates Fluent files
 #
 # This lane fetches translated PO files from GlotPress for all supported locales,
-# converts them back to Fluent format, and optionally commits and pushes the changes.
+# converts them back to Fluent format, and optionally commits the changes.
 #
-# @param commit_and_push_changes [Boolean] Whether to commit and push the updated Fluent files (default: false)
+# @param commit_changes [Boolean] Whether to commit the updated Fluent files (default: false)
 #
-lane :download_translations do |commit_and_push_changes: false|
+lane :download_translations do |commit_changes: false|
   UI.header('🌐 Downloading translations from GlotPress')
 
   Dir.mktmpdir do |temp_download_dir|
@@ -239,7 +239,7 @@ lane :download_translations do |commit_and_push_changes: false|
 
     UI.success("✅ Updated Fluent files: #{updated_fluent_files.length} locales")
 
-    if commit_and_push_changes && updated_fluent_files.any?
+    if commit_changes && updated_fluent_files.any?
       commit_changed_files(
         files: updated_fluent_files,
         message: 'Update generated Fluent files based on latest GlotPress translations'
@@ -344,7 +344,7 @@ def remove_lane_context_values(names)
   names.each { |name| lane_context.delete(name) }
 end
 
-def commit_changed_files(files:, message:, push: true)
+def commit_changed_files(files:, message:, push: false)
   git_add(path: files)
   result = git_commit(
     path: files,
