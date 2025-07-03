@@ -116,9 +116,7 @@ mod tests {
             if expected_additional_params.is_empty() {
                 format!("/templates?context={context}")
             } else {
-                format!(
-                    "/templates?context={context}&{expected_additional_params}"
-                )
+                format!("/templates?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(

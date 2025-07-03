@@ -72,9 +72,7 @@ pub mod response_helpers {
 
     pub fn json_response_from_path(json_file_path: &PathBuf) -> WpNetworkResponse {
         let json = fs::read_to_string(json_file_path).unwrap_or_else(|_| {
-            panic!(
-                "Should have been able to read the json file at: '{json_file_path:#?}'"
-            )
+            panic!("Should have been able to read the json file at: '{json_file_path:#?}'")
         });
         let mut map = HeaderMap::new();
         map.insert(

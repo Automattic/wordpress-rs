@@ -133,9 +133,7 @@ mod tests {
             if expected_additional_params.is_empty() {
                 format!("/comments?context={context}")
             } else {
-                format!(
-                    "/comments?context={context}&{expected_additional_params}"
-                )
+                format!("/comments?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(
@@ -245,9 +243,7 @@ mod tests {
             if expected_additional_params.is_empty() {
                 format!("/comments/54?context={context}")
             } else {
-                format!(
-                    "/comments/54?context={context}&{expected_additional_params}"
-                )
+                format!("/comments/54?context={context}&{expected_additional_params}")
             }
         };
         let params = CommentRetrieveParams {

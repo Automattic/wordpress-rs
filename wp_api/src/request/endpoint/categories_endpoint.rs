@@ -99,9 +99,7 @@ mod tests {
             if expected_additional_params.is_empty() {
                 format!("/categories?context={context}")
             } else {
-                format!(
-                    "/categories?context={context}&{expected_additional_params}"
-                )
+                format!("/categories?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(

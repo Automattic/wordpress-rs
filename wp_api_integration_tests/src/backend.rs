@@ -30,11 +30,9 @@ impl Backend {
         reqwest::get(url).await?.json().await
     }
     pub async fn category(category_id: &CategoryId) -> WpCliCategory {
-        Self::get(format!(
-            "{BACKEND_PATH_CATEGORY}?category_id={category_id}"
-        ))
-        .await
-        .expect("Failed to parse fetched category from wp_cli")
+        Self::get(format!("{BACKEND_PATH_CATEGORY}?category_id={category_id}"))
+            .await
+            .expect("Failed to parse fetched category from wp_cli")
     }
     pub async fn categories() -> Vec<WpCliCategory> {
         Self::get(BACKEND_PATH_CATEGORIES)
@@ -42,17 +40,13 @@ impl Backend {
             .expect("Failed to parse fetched categories from wp_cli")
     }
     pub async fn comment(comment_id: &CommentId) -> WpCliComment {
-        Self::get(format!(
-            "{BACKEND_PATH_COMMENT}?comment_id={comment_id}"
-        ))
-        .await
-        .expect("Failed to parse fetched comment from wp_cli")
+        Self::get(format!("{BACKEND_PATH_COMMENT}?comment_id={comment_id}"))
+            .await
+            .expect("Failed to parse fetched comment from wp_cli")
     }
     pub async fn comments(comment_status: Option<&str>) -> Vec<WpCliComment> {
         let url = if let Some(comment_status) = comment_status {
-            format!(
-                "{BACKEND_PATH_COMMENTS}?comment_status={comment_status}"
-            )
+            format!("{BACKEND_PATH_COMMENTS}?comment_status={comment_status}")
         } else {
             BACKEND_PATH_COMMENTS.to_string()
         };
@@ -104,14 +98,10 @@ impl Backend {
             .expect("Failed to parse fetched user meta from wp_cli")
     }
     async fn restore(db: bool, plugins: bool) {
-        let url = format!(
-            "{BACKEND_ADDRESS}{BACKEND_PATH_RESTORE}?db={db}&plugins={plugins}"
-        );
-        reqwest::get(url).await.unwrap_or_else(|_| {
-            panic!(
-                "Restoring server failed: (db({db}), plugins({plugins}))"
-            )
-        });
+        let url = format!("{BACKEND_ADDRESS}{BACKEND_PATH_RESTORE}?db={db}&plugins={plugins}");
+        reqwest::get(url)
+            .await
+            .unwrap_or_else(|_| panic!("Restoring server failed: (db({db}), plugins({plugins}))"));
     }
 }
 

@@ -408,9 +408,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
         {
             find_api_root_failure.clone()
         } else {
-            panic!(
-                "Expected AutoDiscoveryAttemptFailure::FindApiRoot, got: {self:?}"
-            );
+            panic!("Expected AutoDiscoveryAttemptFailure::FindApiRoot, got: {self:?}");
         }
     }
 
@@ -422,9 +420,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
         {
             reason
         } else {
-            panic!(
-                "Expected FindApiRootFailure::FetchHomepage, got: {error:?}"
-            );
+            panic!("Expected FindApiRootFailure::FetchHomepage, got: {error:?}");
         }
     }
 
@@ -436,9 +432,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
         {
             fetch_and_parse_api_root_failure
         } else {
-            panic!(
-                "Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {self:?}"
-            );
+            panic!("Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {self:?}");
         }
     }
 }

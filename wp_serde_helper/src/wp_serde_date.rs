@@ -52,8 +52,7 @@ pub mod wp_utc_date_format {
                 }
 
                 // WP format with sub-second precision
-                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, &format!("{WP_DATE_FORMAT}.%f"))
-                {
+                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, &format!("{WP_DATE_FORMAT}.%f")) {
                     return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
                 }
 

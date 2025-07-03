@@ -218,9 +218,7 @@ mod tests {
             if expected_additional_params.is_empty() {
                 format!("/posts/54?context={context}")
             } else {
-                format!(
-                    "/posts/54?context={context}&{expected_additional_params}"
-                )
+                format!("/posts/54?context={context}&{expected_additional_params}")
             }
         };
         let params = PostRetrieveParams {
