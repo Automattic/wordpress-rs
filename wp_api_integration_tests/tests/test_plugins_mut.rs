@@ -16,7 +16,7 @@ async fn create_plugin() {
         .assert_response()
         .data;
     assert_eq!(created_plugin.status, status);
-    println!("Created Plugin: {:?}", created_plugin);
+    println!("Created Plugin: {created_plugin:?}");
 
     RestoreServer::all().await;
 }
@@ -35,7 +35,7 @@ async fn update_plugin(#[case] slug: PluginSlug, #[case] new_status: PluginStatu
         .assert_response()
         .data;
     assert_eq!(updated_plugin.status, new_status);
-    println!("Updated Plugin: {:?}", updated_plugin);
+    println!("Updated Plugin: {updated_plugin:?}");
 
     RestoreServer::all().await;
 }
@@ -51,7 +51,7 @@ async fn delete_plugin() {
         .assert_response()
         .data;
     assert_eq!(slug, deleted_plugin.previous.plugin);
-    println!("Deleted Plugin: {:?}", deleted_plugin);
+    println!("Deleted Plugin: {deleted_plugin:?}");
 
     RestoreServer::all().await;
 }

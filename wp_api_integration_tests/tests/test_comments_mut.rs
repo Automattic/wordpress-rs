@@ -45,8 +45,7 @@ async fn delete_comment() {
         .await;
     assert!(
         comment_delete_response.is_ok(),
-        "{:#?}",
-        comment_delete_response
+        "{comment_delete_response:#?}"
     );
     assert!(comment_delete_response.unwrap().data.deleted);
 
@@ -72,8 +71,7 @@ async fn trash_comment() {
         .await;
     assert!(
         comment_trash_response.is_ok(),
-        "{:#?}",
-        comment_trash_response
+        "{comment_trash_response:#?}"
     );
 
     // Assert that the comment was trashed

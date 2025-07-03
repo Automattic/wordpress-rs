@@ -401,7 +401,7 @@ impl Display for WpContext {
             WpContext::Embed => "Embed",
             WpContext::View => "View",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -432,7 +432,7 @@ impl Config {
     fn new(parsed_enum: &ParsedEnum) -> Self {
         let crate_name = "wp_api";
         let found_crate = proc_macro_crate::crate_name(crate_name)
-            .unwrap_or_else(|_| panic!("{} is not present in `Cargo.toml`", crate_name));
+            .unwrap_or_else(|_| panic!("{crate_name} is not present in `Cargo.toml`"));
 
         let crate_ident = match found_crate {
             FoundCrate::Itself => format_ident!("crate"),

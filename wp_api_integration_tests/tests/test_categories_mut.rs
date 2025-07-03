@@ -106,8 +106,7 @@ async fn delete_category() {
     let category_delete_response = api_client().categories().delete(&CATEGORY_ID_59).await;
     assert!(
         category_delete_response.is_ok(),
-        "{:#?}",
-        category_delete_response
+        "{category_delete_response:#?}"
     );
     assert!(category_delete_response.unwrap().data.deleted);
 

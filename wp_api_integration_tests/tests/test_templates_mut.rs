@@ -83,8 +83,7 @@ async fn delete_template() {
         .await;
     assert!(
         template_delete_response.is_ok(),
-        "{:#?}",
-        template_delete_response
+        "{template_delete_response:#?}"
     );
     assert!(template_delete_response.unwrap().data.deleted);
 
@@ -104,8 +103,7 @@ async fn trash_template() {
         .await;
     assert!(
         template_trash_response.is_ok(),
-        "{:#?}",
-        template_trash_response
+        "{template_trash_response:#?}"
     );
     assert_eq!(
         template_trash_response.unwrap().data.status,

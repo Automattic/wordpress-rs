@@ -145,7 +145,7 @@ impl WordPressOrgApiClient {
         match response.status_code {
             200 => serde_json::from_slice(&response.body).map_err(|e| {
                 WordPressOrgApiClientError::ResponseParsingError {
-                    reason: format!("Failed to parse response body as JSON: {}", e),
+                    reason: format!("Failed to parse response body as JSON: {e}"),
                     response: String::from_utf8_lossy(&response.body).to_string(),
                 }
             }),
@@ -283,6 +283,6 @@ mod tests {
         #[case] expected: &str,
     ) {
         let request = WordPressOrgApiClient::browse_plugins_request(Some(category), 3, 24);
-        assert!(request.url.0.contains(&format!("browse={}", expected)));
+        assert!(request.url.0.contains(&format!("browse={expected}")));
     }
 }

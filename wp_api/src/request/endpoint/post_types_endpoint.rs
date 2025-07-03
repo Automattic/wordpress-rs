@@ -65,15 +65,15 @@ mod tests {
     ) {
         validate_wp_v2_endpoint(
             endpoint.retrieve_with_edit_context(&post_type),
-            format!("{}?context=edit", expected_path).as_str(),
+            format!("{expected_path}?context=edit").as_str(),
         );
         validate_wp_v2_endpoint(
             endpoint.retrieve_with_embed_context(&post_type),
-            format!("{}?context=embed", expected_path).as_str(),
+            format!("{expected_path}?context=embed").as_str(),
         );
         validate_wp_v2_endpoint(
             endpoint.retrieve_with_view_context(&post_type),
-            format!("{}?context=view", expected_path).as_str(),
+            format!("{expected_path}?context=view").as_str(),
         );
     }
 

@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
 }
 
 async fn discover_login_url(login_client: &WpLoginClient, site: String) {
-    let intro = format!("Discovering login URL for {}", site).blue();
+    let intro = format!("Discovering login URL for {site}").blue();
     println!("{intro}");
 
     perform_api_discovery(login_client, site).await.log_result();
@@ -63,14 +63,14 @@ async fn batch_test_autodiscovery(
     input_file: &str,
     output_file: String,
 ) -> Result<()> {
-    let intro = format!("Batch testing autodiscovery for {}", input_file).blue();
-    println!("{}", intro);
+    let intro = format!("Batch testing autodiscovery for {input_file}").blue();
+    println!("{intro}");
 
     let mut writer = Writer::from_path(output_file)?;
     let rows = parse_input_file(input_file)?;
 
     let count = format!("Scheduled {} URLs to test", rows.len()).blue();
-    println!("{}", count);
+    println!("{count}");
 
     for r in batch_perform_autodiscovery(login_client, rows.iter()).await {
         r.write_as_csv_record(&mut writer)?;
@@ -104,7 +104,7 @@ async fn perform_api_discovery(
     login_client: &WpLoginClient,
     url: String,
 ) -> SimplifiedDiscoveryResult {
-    println!("Testing {}", url);
+    println!("Testing {url}");
     match login_client
         .api_discovery(url.clone())
         .await
@@ -213,10 +213,10 @@ fn csv_error_type(failure: &AutoDiscoveryAttemptFailure) -> String {
             FetchAndParseApiRootFailure::FetchApiRoot { .. } => "FetchApiRoot".to_string(),
             FetchAndParseApiRootFailure::ParseApiRoot { .. } => "ParseApiRoot".to_string(),
             FetchAndParseApiRootFailure::WpError { error_code, .. } => {
-                format!("WpError-{:#?}", error_code)
+                format!("WpError-{error_code:#?}")
             }
             FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } => {
-                format!("ApplicationPasswordsNotSupported-{:#?}", reason)
+                format!("ApplicationPasswordsNotSupported-{reason:#?}")
             }
         },
     }

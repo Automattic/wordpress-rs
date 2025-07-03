@@ -77,8 +77,7 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
         {
             if WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
                 panic!(
-                    "`WpComApiClient` doesn't support the namespace `{}`. Try using `WpApiClient` instead.",
-                    namespace,
+                    "`WpComApiClient` doesn't support the namespace `{namespace}`. Try using `WpApiClient` instead.",
                 );
             }
         }

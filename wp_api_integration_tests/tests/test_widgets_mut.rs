@@ -74,8 +74,7 @@ async fn delete_widget() {
         .await;
     assert!(
         widget_delete_response.is_ok(),
-        "{:#?}",
-        widget_delete_response
+        "{widget_delete_response:#?}"
     );
     assert!(widget_delete_response.unwrap().data.deleted);
 

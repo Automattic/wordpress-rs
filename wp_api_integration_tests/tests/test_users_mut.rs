@@ -192,7 +192,7 @@ async fn update_user_slug() {
     test_update_user(params, |user, _| {
         assert_eq!(
             user.url_slug,
-            Some(format!("http://localhost/author/{}/", new_slug))
+            Some(format!("http://localhost/author/{new_slug}/"))
         );
     })
     .await;

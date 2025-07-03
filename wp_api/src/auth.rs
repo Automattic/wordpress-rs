@@ -20,7 +20,7 @@ impl WpAuthentication {
     pub fn from_username_and_password(username: String, password: String) -> Self {
         use base64::prelude::*;
         WpAuthentication::AuthorizationHeader {
-            token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
+            token: BASE64_STANDARD.encode(format!("{username}:{password}")),
         }
     }
 
@@ -28,11 +28,11 @@ impl WpAuthentication {
         match self {
             Self::None => None,
             Self::AuthorizationHeader { token } => {
-                Some(HeaderValue::from_str(&format!("Basic {}", token))
+                Some(HeaderValue::from_str(&format!("Basic {token}"))
                 .expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token"))
             }
             Self::Bearer { token } => {
-                Some(HeaderValue::from_str(&format!("Bearer {}", token)).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token"))
+                Some(HeaderValue::from_str(&format!("Bearer {token}")).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token"))
             }
         }
     }

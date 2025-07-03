@@ -154,9 +154,9 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/posts?context={}", context)
+                format!("/posts?context={context}")
             } else {
-                format!("/posts?context={}&{}", context, expected_additional_params)
+                format!("/posts?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(
@@ -216,12 +216,9 @@ mod tests {
         let post_id = PostId(54);
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/posts/54?context={}", context)
+                format!("/posts/54?context={context}")
             } else {
-                format!(
-                    "/posts/54?context={}&{}",
-                    context, expected_additional_params
-                )
+                format!("/posts/54?context={context}&{expected_additional_params}")
             }
         };
         let params = PostRetrieveParams {
@@ -244,7 +241,7 @@ mod tests {
     #[rstest]
     #[case(None, &[], "/posts/54?context=view&_fields=")]
     #[case(Some("foo"), &[SparsePostFieldWithViewContext::Author], "/posts/54?context=view&password=foo&_fields=author")]
-    #[case(Some("foo"), ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT, &format!("/posts/54?context=view&password=foo&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(Some("foo"), ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT, &format!("/posts/54?context=view&password=foo&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_retrieve_post_with_view_context(
         endpoint: PostsRequestEndpoint,
         #[case] password: Option<&str>,

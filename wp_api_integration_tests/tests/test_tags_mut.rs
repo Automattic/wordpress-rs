@@ -81,7 +81,7 @@ async fn create_tag_with_name_description_and_slug() {
 async fn delete_tag() {
     // Delete the tag using the API and ensure it's successful
     let tag_delete_response = api_client().tags().delete(&TAG_ID_100).await;
-    assert!(tag_delete_response.is_ok(), "{:#?}", tag_delete_response);
+    assert!(tag_delete_response.is_ok(), "{tag_delete_response:#?}");
     assert!(tag_delete_response.unwrap().data.deleted);
 
     // Assert that the tag was deleted

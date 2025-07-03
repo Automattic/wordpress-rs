@@ -53,13 +53,12 @@ impl WpCliUser {
 
 impl WpCliUserMeta {
     pub fn list(user_id: i64) -> Result<Vec<Self>> {
-        println!("Fetching user meta: {}", user_id);
+        println!("Fetching user meta: {user_id}");
         let output = run_wp_cli_command(["user", "meta", "list", &user_id.to_string()]);
         println!("Fetched: {:#?}", String::from_utf8_lossy(&output.stdout));
         serde_json::from_slice::<Vec<Self>>(&output.stdout).with_context(|| {
             format!(
-                "Failed to parse `wp user meta list {} --format=json` into WpCliUserMeta",
-                user_id
+                "Failed to parse `wp user meta list {user_id} --format=json` into WpCliUserMeta"
             )
         })
     }
