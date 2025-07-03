@@ -298,6 +298,7 @@ lane :sync_localization do
       🔄 This is an automated localization sync.
     BODY
     labels: 'Localization',
+    team_reviewers: ['wordpress-rs'],
     base: GIT_BASE_BRANCH,
     head: sync_branch,
     api_token: github_token
