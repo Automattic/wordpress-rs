@@ -86,7 +86,7 @@ impl InnerRequestBuilder {
         }
     }
 
-    pub fn post<T>(&self, url: ApiEndpointUrl, json_body: &T) -> WpNetworkRequest
+    pub fn post<T>(&self, url: ApiEndpointUrl, json_body: Option<&T>) -> WpNetworkRequest
     where
         T: ?Sized + Serialize,
     {
@@ -96,9 +96,11 @@ impl InnerRequestBuilder {
             method: RequestMethod::POST,
             url: url.into(),
             header_map: self.header_map_for_post_request().into(),
-            body: serde_json::to_vec(json_body)
-                .ok()
-                .map(|b| Arc::new(WpNetworkRequestBody::new(b))),
+            body: json_body.and_then(|j| {
+                serde_json::to_vec(j)
+                    .ok()
+                    .map(|b| Arc::new(WpNetworkRequestBody::new(b)))
+            }),
         }
     }
 

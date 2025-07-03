@@ -422,6 +422,12 @@ impl std::fmt::Display for UserId {
     }
 }
 
+impl From<i64> for UserId {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseUser {
     #[WpContext(edit, embed, view)]

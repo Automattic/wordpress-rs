@@ -96,6 +96,14 @@ where
     deserializer.deserialize_any(DeserializeU64OrStringVisitor)
 }
 
+pub fn deserialize_i64_or_string_as_t<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: From<i64>,
+{
+    deserialize_i64_or_string(deserializer).map(Into::into)
+}
+
 struct DeserializeU64OrStringVisitor;
 
 impl de::Visitor<'_> for DeserializeU64OrStringVisitor {

@@ -5,6 +5,7 @@ use std::{num::ParseIntError, str::FromStr, sync::Arc};
 
 pub mod client;
 pub mod endpoint;
+pub mod followers;
 pub mod jetpack_connection;
 pub mod oauth2;
 pub mod subscribers;
@@ -31,6 +32,7 @@ impl std::fmt::Display for WpComSiteId {
 
 pub(crate) enum WpComNamespace {
     Oauth2,
+    RestV1_1,
     V2,
 }
 
@@ -38,6 +40,7 @@ impl AsNamespace for WpComNamespace {
     fn namespace_value(&self) -> &'static str {
         match self {
             WpComNamespace::Oauth2 => "/oauth2",
+            WpComNamespace::RestV1_1 => "/rest/v1.1",
             WpComNamespace::V2 => "/wpcom/v2",
         }
     }
