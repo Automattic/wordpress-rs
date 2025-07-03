@@ -13,6 +13,7 @@ LANE_VALUE_XCFRAMEWORK_CHECKSUM_PATH = 'WP_XCFRAMEWORK_CHECKSUM_PATH'
 
 GITHUB_REPO = 'automattic/wordpress-rs'
 GIT_REMOTE_NAME = 'origin'
+GIT_BASE_BRANCH = 'trunk'
 
 # Localization constants
 LOCALIZATION_FLUENT_FILES_DIR = File.join(PROJECT_ROOT, 'wp_localization', 'localization')
@@ -179,8 +180,9 @@ end
 # The resulting PO file is saved as the source file (.pot) for translations and is synced to GlotPress.
 #
 # @param commit_changes [Boolean] Whether to commit the generated PO file (default: false)
+# @param skip_date_only_changes [Boolean] Whether to skip commit if only date headers changed (default: true)
 #
-lane :generate_source_po_file do |commit_changes: false|
+lane :generate_source_po_file do |commit_changes: false, skip_date_only_changes: true|
   UI.header('🔄 Converting English Fluent file to PO format')
 
   FileUtils.mkdir_p(File.dirname(LOCALIZATION_PO_SOURCE_FILE))
@@ -202,6 +204,12 @@ lane :generate_source_po_file do |commit_changes: false|
   end
 
   if commit_changes
+    # Check if we should skip commit when only date headers changed
+    if skip_date_only_changes && only_date_headers_changed?(LOCALIZATION_PO_SOURCE_FILE)
+      UI.message('ℹ️ Skipping commit - only date headers changed in PO file')
+      next
+    end
+
     commit_changed_files(
       files: LOCALIZATION_PO_SOURCE_FILE,
       message: 'Update source PO file (en-US.pot) to be synced to GlotPress'
@@ -246,6 +254,56 @@ lane :download_translations do |commit_changes: false|
       )
     end
   end
+end
+
+# Synchronizes localization files with GlotPress and creates a PR
+#
+# This lane performs a complete localization sync:
+# 1. Generates source PO file from English Fluent file
+# 2. Downloads latest translations from GlotPress
+# 3. Creates a PR with the changes instead of pushing directly to trunk
+#
+lane :sync_localization do
+  github_token = ENV['GITHUB_TOKEN'] || UI.user_error!('GITHUB_TOKEN environment variable is required')
+
+  sync_branch = 'localization/sync-translations'
+
+  Fastlane::Helper::GitHelper.delete_local_branch_if_exists!(sync_branch)
+  Fastlane::Helper::GitHelper.create_branch(sync_branch)
+
+  po_result = generate_source_po_file(commit_changes: true, skip_date_only_changes: true)
+  translations_result = download_translations(commit_changes: true)
+
+  # Check if either operation resulted in changes
+  has_changes = !po_result.nil? || !translations_result.nil?
+  unless has_changes
+    UI.important('⚠️ No changes to commit')
+    next
+  end
+
+  Fastlane::Helper::GitHelper.delete_remote_branch_if_exists!(sync_branch)
+
+  # Push the localization sync branch to remote
+  push_to_git_remote(set_upstream: true, tags: false)
+
+  pr_result = create_pull_request(
+    repo: GITHUB_REPO,
+    title: 'Sync localization files with GlotPress',
+    body: <<~BODY,
+      This PR synchronizes localization files with GlotPress:
+
+      - **Source PO file**: Updated from English Fluent file for GlotPress sync
+      - **Translations**: Downloaded latest translations from GlotPress and converted to Fluent format
+
+      🔄 This is an automated localization sync.
+    BODY
+    labels: 'Localization',
+    base: GIT_BASE_BRANCH,
+    head: sync_branch,
+    api_token: github_token
+  )
+
+  UI.success("✅ Created pull request: #{pr_result}")
 end
 
 # Downloads PO files from GlotPress for existing project locales
@@ -357,4 +415,34 @@ def commit_changed_files(files:, message:, push: false)
   elsif push
     push_to_git_remote(set_upstream: true, tags: false)
   end
+
+  result
+end
+
+# Checks if only date headers changed in a PO file
+#
+# This method uses git diff to check if the only changes in a PO file
+# are the POT-Creation-Date and PO-Revision-Date headers.
+#
+# @param file_path [String] Path to the PO file to check
+# @return [Boolean] true if only date headers changed, false otherwise
+#
+def only_date_headers_changed?(file_path)
+  begin
+    diff_output = sh('git', 'diff', file_path).strip
+  rescue
+    return false
+  end
+
+  return false if diff_output.empty?
+
+  # Parse diff lines that start with + or - (actual changes)
+  changed_lines = diff_output.split("\n").select do |line|
+    line.start_with?('+') || line.start_with?('-')
+  end.reject do |line|
+    # Exclude diff metadata lines
+    line.start_with?('+++') || line.start_with?('---')
+  end
+
+  changed_lines.all? { |l| l.include?('"POT-Creation-Date:') || l.include?('"PO-Revision-Date:') }
 end
