@@ -12,4 +12,4 @@ echo "--- :rubygems: Setting up Gems"
 install_gems
 
 echo "--- :globe_with_meridians: :arrows_counterclockwise: Synchronizing localization files with GlotPress"
-bundle exec fastlane sync_localization skip_confirm:true
+bundle exec fastlane sync_localization
