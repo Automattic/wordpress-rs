@@ -6,6 +6,7 @@ use crate::{
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 
+pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
 pub mod oauth2;
 pub mod subscribers_endpoint;
