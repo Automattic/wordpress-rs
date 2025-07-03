@@ -278,6 +278,15 @@ lane :sync_localization do
   has_changes = !po_result.nil? || !translations_result.nil?
   unless has_changes
     UI.important('⚠️ No changes to commit')
+
+    if is_ci
+      buildkite_annotate(
+        context: 'localization-sync-no-changes',
+        style: 'info',
+        message: 'No localization changes to commit. No PR was created.'
+      )
+    end
+
     next
   end
 
@@ -304,7 +313,15 @@ lane :sync_localization do
     api_token: github_token
   )
 
-  UI.success("✅ Created pull request: #{pr_result}")
+  UI.success("✅ Created pull request: #{pr_result}") if pr_result
+
+  if is_ci && pr_result
+    buildkite_annotate(
+      context: 'localization-sync-pr',
+      style: 'info',
+      message: "Localization Sync Pull Request: #{pr_result}"
+    )
+  end
 end
 
 # Downloads PO files from GlotPress for existing project locales
