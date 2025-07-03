@@ -34,25 +34,24 @@ fn generate_test_credentials(
             .as_object()
             .expect("{test_credential_json_file_path} should be a valid JSON Object")
             .into_iter()
-            .map(|(k, v)| format!("{}: {},", k, v))
+            .map(|(k, v)| format!("{k}: {v},"))
             .collect::<Vec<String>>()
             .join("\n");
-        format!("{test_credentials_type} {{ {} }}", fields)
+        format!("{test_credentials_type} {{ {fields} }}")
     } else {
         format!("{test_credentials_type}::default()")
     };
     let generated_content = format!(
         r#"
-            impl {} {{
+            impl {test_credentials_type} {{
                 pub fn instance() -> Self {{
-                    {}
+                    {instance}
                 }}
             }}
-        "#,
-        test_credentials_type, instance
+        "#
     );
 
-    write!(buf_writer, "{}", generated_content)?;
+    write!(buf_writer, "{generated_content}")?;
 
     Ok(())
 }

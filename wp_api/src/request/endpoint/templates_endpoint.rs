@@ -114,11 +114,10 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/templates?context={}", context)
+                format!("/templates?context={context}")
             } else {
                 format!(
-                    "/templates?context={}&{}",
-                    context, expected_additional_params
+                    "/templates?context={context}&{expected_additional_params}"
                 )
             }
         };
@@ -139,7 +138,7 @@ mod tests {
     #[rstest]
     #[case(TemplateListParams::default(), &[], "/templates?context=view&_fields=")]
     #[case(generate!(TemplateListParams, (area, Some(TemplateArea::Footer))), &[SparseTemplateFieldWithViewContext::Author], "/templates?context=view&area=footer&_fields=author")]
-    #[case(template_list_params_with_all_fields(), ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT, &format!("/templates?context=view&{}&{}", EXPECTED_QUERY_PAIRS_FOR_TEMPLATE_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(template_list_params_with_all_fields(), ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT, &format!("/templates?context=view&{EXPECTED_QUERY_PAIRS_FOR_TEMPLATE_LIST_PARAMS_WITH_ALL_FIELDS}&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_list_template_with_view_context(
         endpoint: TemplatesRequestEndpoint,
         #[case] params: TemplateListParams,
@@ -172,7 +171,7 @@ mod tests {
     #[rstest]
     #[case(&[], "/templates/foo?context=view&_fields=")]
     #[case(&[SparseTemplateFieldWithViewContext::Slug], "/templates/foo?context=view&_fields=slug")]
-    #[case(ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT, &format!("/templates/foo?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT, &format!("/templates/foo?context=view&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TEMPLATE_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_retrieve_template_with_view_context(
         endpoint: TemplatesRequestEndpoint,
         #[case] fields: &[SparseTemplateFieldWithViewContext],

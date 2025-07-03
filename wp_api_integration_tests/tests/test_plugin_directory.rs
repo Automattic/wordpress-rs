@@ -69,7 +69,7 @@ async fn query_all_plugin_slugs(client: &WordPressOrgApiClient) -> (Vec<String>,
             query_plugins_failures.len()
         );
         for (page, e) in &query_plugins_failures {
-            println!("  - Page {:?}, page size {:?} : {:?}", page, page_size, e);
+            println!("  - Page {page:?}, page size {page_size:?} : {e:?}");
         }
     } else {
         println!("Successfully fetched {total_pages} query plugins pages!");
@@ -102,7 +102,7 @@ async fn fetch_plugin_information_for_all_slugs(
             plugin_information_failures.len()
         );
         for (slug, e) in &plugin_information_failures {
-            println!("  - {:?} : {:?}", slug, e);
+            println!("  - {slug:?} : {e:?}");
         }
     } else {
         println!("Successfully fetched and parsed {number_of_plugins} plugins!");
@@ -163,7 +163,6 @@ async fn test_search_plugins() {
         .plugins;
     assert!(
         plugins.iter().any(|p| p.slug == "jetpack-social".into()),
-        "Plugins search result doesn't contain 'jetpack-social': {:#?}",
-        plugins
+        "Plugins search result doesn't contain 'jetpack-social': {plugins:#?}"
     );
 }

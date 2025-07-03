@@ -33,7 +33,7 @@ impl Display for TaxonomyType {
             Self::WpPatternCategory => "wp_pattern_category",
             Self::Custom(name) => name.as_str(),
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

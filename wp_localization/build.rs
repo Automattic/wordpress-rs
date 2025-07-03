@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 continue;
             }
 
-            available_languages.push(format!("langid!(\"{}\")", lang_id));
+            available_languages.push(format!("langid!(\"{lang_id}\")"));
         }
     }
 

@@ -22,8 +22,7 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
         .assert_response();
     assert!(
         subscribers.data.total > 0,
-        "Retrieved no subscribers: {:#?}",
-        subscribers
+        "Retrieved no subscribers: {subscribers:#?}"
     );
 }
 

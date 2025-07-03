@@ -180,11 +180,10 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         {
             assert_eq!(
                 expected_error_code, error_code,
-                "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
-                expected_error_code, error_code, response
+                "Incorrect error code. Expected '{expected_error_code:?}', found '{error_code:?}'. Response was: '{response:?}'"
             );
         } else {
-            panic!("Unexpected wp_error '{}'", err);
+            panic!("Unexpected wp_error '{err}'");
         }
     }
 }

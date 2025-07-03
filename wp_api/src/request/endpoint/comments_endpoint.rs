@@ -131,11 +131,10 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/comments?context={}", context)
+                format!("/comments?context={context}")
             } else {
                 format!(
-                    "/comments?context={}&{}",
-                    context, expected_additional_params
+                    "/comments?context={context}&{expected_additional_params}"
                 )
             }
         };
@@ -244,11 +243,10 @@ mod tests {
         let comment_id = CommentId(54);
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/comments/54?context={}", context)
+                format!("/comments/54?context={context}")
             } else {
                 format!(
-                    "/comments/54?context={}&{}",
-                    context, expected_additional_params
+                    "/comments/54?context={context}&{expected_additional_params}"
                 )
             }
         };
@@ -272,7 +270,7 @@ mod tests {
     #[rstest]
     #[case(None, &[], "/comments/54?context=view&_fields=")]
     #[case(Some("foo"), &[SparseCommentFieldWithViewContext::Author], "/comments/54?context=view&password=foo&_fields=author")]
-    #[case(Some("foo"), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments/54?context=view&password=foo&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(Some("foo"), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments/54?context=view&password=foo&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_retrieve_comment_with_view_context(
         endpoint: CommentsRequestEndpoint,
         #[case] password: Option<&str>,

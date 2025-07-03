@@ -217,13 +217,13 @@ impl WpNetworkRequest {
 
     pub fn adding_http_authentication(&self, username: &str, password: &str) -> Self {
         let encoded_credentials =
-            base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", username, password));
+            base64::engine::general_purpose::STANDARD.encode(format!("{username}:{password}"));
 
         let mut new_header_map = self.header_map.inner.clone();
 
         new_header_map.insert(
             http::header::AUTHORIZATION,
-            format!("Basic {}", encoded_credentials).parse().expect(
+            format!("Basic {encoded_credentials}").parse().expect(
                 "base64 can only produce ASCII, so this string is guaranteed to be parseable",
             ),
         );
@@ -269,7 +269,7 @@ impl Debug for WpNetworkRequest {
             self.body_as_string()
         );
         s.pop(); // Remove the new line at the end
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -735,7 +735,7 @@ impl Debug for WpNetworkResponse {
             self.body_as_string()
         );
         s.pop(); // Remove the new line at the end
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

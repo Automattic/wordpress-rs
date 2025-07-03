@@ -31,7 +31,7 @@ where
         .arg("--path=/var/www/html")
         .arg("--format=json")
         .args(args);
-    println!("Running wp_cli command: {:#?}", c);
+    println!("Running wp_cli command: {c:#?}");
     c.output().expect("Failed to run wp-cli command")
 }
 
@@ -43,7 +43,7 @@ impl AsWpCliArguments for HashMap<&'static str, &String> {
     fn as_wp_cli_arguments(&self) -> Option<String> {
         let mut s = String::new();
         self.iter().for_each(|(k, v)| {
-            s.push_str(format!("--{}={}", k, v).as_str());
+            s.push_str(format!("--{k}={v}").as_str());
         });
         if s.is_empty() { None } else { Some(s) }
     }

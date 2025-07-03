@@ -292,7 +292,7 @@ impl Display for ApplePlatform {
             ApplePlatform::TvOS => "tvos",
             ApplePlatform::WatchOS => "watchos",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -306,7 +306,7 @@ impl LibraryGroupId {
 
         let os: ApplePlatform = parts
             .next()
-            .with_context(|| format!("No OS in target: {}", target))?
+            .with_context(|| format!("No OS in target: {target}"))?
             .try_into()?;
 
         let output = Command::new("rustc")
@@ -354,7 +354,7 @@ impl ExecuteCommand for Command {
     fn successful_output(&mut self) -> Result<std::process::Output> {
         let output = self
             .output()
-            .with_context(|| format!("Command failed: $ {:?}", self))?;
+            .with_context(|| format!("Command failed: $ {self:?}"))?;
         if output.status.success() {
             Ok(output)
         } else {
@@ -372,8 +372,8 @@ impl ExecuteCommand for Command {
 fn recreate_directory(dir: &PathBuf) -> Result<()> {
     if dir.exists() {
         std::fs::remove_dir_all(dir)
-            .with_context(|| format!("Failed to remove directory at {:?}", dir))?;
+            .with_context(|| format!("Failed to remove directory at {dir:?}"))?;
     }
 
-    std::fs::create_dir_all(dir).with_context(|| format!("Failed to create directory: {:?}", dir))
+    std::fs::create_dir_all(dir).with_context(|| format!("Failed to create directory: {dir:?}"))
 }

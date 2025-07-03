@@ -163,8 +163,7 @@ mod language_identifier_tests {
         for lang_id in LOCALES.locales() {
             assert!(
                 AVAILABLE_LANGUAGES.contains(lang_id),
-                "Language identifier '{}' should be available",
-                lang_id
+                "Language identifier '{lang_id}' should be available"
             );
         }
     }
@@ -186,8 +185,7 @@ mod language_identifier_tests {
             let dir_path = localization_dir.join(&lang_str);
             assert!(
                 dir_path.exists(),
-                "Language directory '{}' should exist in localization directory",
-                lang_str
+                "Language directory '{lang_str}' should exist in localization directory"
             );
         }
 
@@ -195,8 +193,7 @@ mod language_identifier_tests {
         let dir_path = localization_dir.join(&default_lang);
         assert!(
             dir_path.exists(),
-            "The default language directory '{}' should exist in localization directory",
-            default_lang
+            "The default language directory '{default_lang}' should exist in localization directory"
         );
     }
 }

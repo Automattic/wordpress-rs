@@ -510,8 +510,7 @@ mod tests {
                     ..
                 })
             ),
-            "{:#?}",
-            result
+            "{result:#?}"
         );
     }
 }

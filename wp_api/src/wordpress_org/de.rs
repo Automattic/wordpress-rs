@@ -70,7 +70,7 @@ mod tests {
             }
         }"#;
         let result = serde_json::from_str::<Payload>(json);
-        assert!(result.is_ok(), "Parsing failed: {:?}", result);
+        assert!(result.is_ok(), "Parsing failed: {result:?}");
 
         let payload = result.unwrap();
 
@@ -84,7 +84,7 @@ mod tests {
     fn test_parsing_false() {
         let json = r#"{"string": false, "object": false}"#;
         let result = serde_json::from_str::<Payload>(json);
-        assert!(result.is_ok(), "Parsing failed: {:?}", result);
+        assert!(result.is_ok(), "Parsing failed: {result:?}");
 
         let payload = result.unwrap();
         assert_eq!(payload.string, "".to_string());
@@ -95,7 +95,7 @@ mod tests {
     fn test_parsing_empty_list() {
         let json = r#"{"string": "string", "object": []}"#;
         let result = serde_json::from_str::<Payload>(json);
-        assert!(result.is_ok(), "Parsing failed: {:?}", result);
+        assert!(result.is_ok(), "Parsing failed: {result:?}");
 
         let payload = result.unwrap();
         assert_eq!(payload.string, "string".to_string());
@@ -108,8 +108,7 @@ mod tests {
         let result = serde_json::from_str::<Payload>(json);
         assert!(
             result.is_err(),
-            "Parsing 'object' should fail. Expected an error, got {:?}",
-            result
+            "Parsing 'object' should fail. Expected an error, got {result:?}"
         );
     }
 }

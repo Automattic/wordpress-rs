@@ -268,7 +268,7 @@ mod tests {
             .append_query_value_pair("orderby", &orderby);
         assert_eq!(
             url.query().map(|x| x.to_string()),
-            Some(format!("orderby={}", expected))
+            Some(format!("orderby={expected}"))
         );
     }
 

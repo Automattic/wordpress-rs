@@ -56,7 +56,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
         );
         let sparse_field_ident = Ident::new(
             &ident_name_for_context(
-                format!("{}Field", original_ident_name).as_str(),
+                format!("{original_ident_name}Field").as_str(),
                 current_context,
             ),
             original_ident.span(),
@@ -652,7 +652,7 @@ fn extract_inner_type_of_option(ty: &syn::Type) -> Option<syn::Type> {
 }
 
 fn ident_name_for_context(ident_name_without_prefix: &str, context: &WpContextAttr) -> String {
-    format!("{}With{}Context", ident_name_without_prefix, context)
+    format!("{ident_name_without_prefix}With{context}Context")
 }
 
 fn is_wp_context_ident(ident: &Ident) -> bool {

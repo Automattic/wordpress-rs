@@ -31,8 +31,7 @@ impl Backend {
     }
     pub async fn category(category_id: &CategoryId) -> WpCliCategory {
         Self::get(format!(
-            "{}?category_id={}",
-            BACKEND_PATH_CATEGORY, category_id
+            "{BACKEND_PATH_CATEGORY}?category_id={category_id}"
         ))
         .await
         .expect("Failed to parse fetched category from wp_cli")
@@ -44,8 +43,7 @@ impl Backend {
     }
     pub async fn comment(comment_id: &CommentId) -> WpCliComment {
         Self::get(format!(
-            "{}?comment_id={}",
-            BACKEND_PATH_COMMENT, comment_id
+            "{BACKEND_PATH_COMMENT}?comment_id={comment_id}"
         ))
         .await
         .expect("Failed to parse fetched comment from wp_cli")
@@ -53,8 +51,7 @@ impl Backend {
     pub async fn comments(comment_status: Option<&str>) -> Vec<WpCliComment> {
         let url = if let Some(comment_status) = comment_status {
             format!(
-                "{}?comment_status={}",
-                BACKEND_PATH_COMMENTS, comment_status
+                "{BACKEND_PATH_COMMENTS}?comment_status={comment_status}"
             )
         } else {
             BACKEND_PATH_COMMENTS.to_string()
@@ -67,13 +64,13 @@ impl Backend {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await
     }
     pub async fn post(post_id: &PostId) -> WpCliPost {
-        Self::get(format!("{}?post_id={}", BACKEND_PATH_POST, post_id))
+        Self::get(format!("{BACKEND_PATH_POST}?post_id={post_id}"))
             .await
             .expect("Failed to parse fetched post from wp_cli")
     }
     pub async fn posts(post_status: Option<&str>) -> Vec<WpCliPost> {
         let url = if let Some(post_status) = post_status {
-            format!("{}?post_status={}", BACKEND_PATH_POSTS, post_status)
+            format!("{BACKEND_PATH_POSTS}?post_status={post_status}")
         } else {
             BACKEND_PATH_POSTS.to_string()
         };
@@ -82,7 +79,7 @@ impl Backend {
             .expect("Failed to parse fetched posts from wp_cli")
     }
     pub async fn tag(tag_id: &TagId) -> WpCliTag {
-        Self::get(format!("{}?tag_id={}", BACKEND_PATH_TAG, tag_id))
+        Self::get(format!("{BACKEND_PATH_TAG}?tag_id={tag_id}"))
             .await
             .expect("Failed to parse fetched tag from wp_cli")
     }
@@ -92,7 +89,7 @@ impl Backend {
             .expect("Failed to parse fetched tags from wp_cli")
     }
     pub async fn user(user_id: &UserId) -> WpCliUser {
-        Self::get(format!("{}?user_id={}", BACKEND_PATH_USER, user_id))
+        Self::get(format!("{BACKEND_PATH_USER}?user_id={user_id}"))
             .await
             .expect("Failed to parse fetched user from wp_cli")
     }
@@ -102,19 +99,17 @@ impl Backend {
             .expect("Failed to parse fetched users from wp_cli")
     }
     pub async fn user_meta(user_id: &UserId) -> Vec<WpCliUserMeta> {
-        Self::get(format!("{}?user_id={}", BACKEND_PATH_USER_META, user_id))
+        Self::get(format!("{BACKEND_PATH_USER_META}?user_id={user_id}"))
             .await
             .expect("Failed to parse fetched user meta from wp_cli")
     }
     async fn restore(db: bool, plugins: bool) {
         let url = format!(
-            "{}{}?db={}&plugins={}",
-            BACKEND_ADDRESS, BACKEND_PATH_RESTORE, db, plugins
+            "{BACKEND_ADDRESS}{BACKEND_PATH_RESTORE}?db={db}&plugins={plugins}"
         );
         reqwest::get(url).await.unwrap_or_else(|_| {
             panic!(
-                "Restoring server failed: (db({}), plugins({}))",
-                db, plugins
+                "Restoring server failed: (db({db}), plugins({plugins}))"
             )
         });
     }

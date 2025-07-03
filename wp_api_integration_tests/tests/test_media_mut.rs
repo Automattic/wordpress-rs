@@ -33,8 +33,7 @@ async fn delete_media() {
     let media_delete_response = api_client().media().delete(&MEDIA_ID_611).await;
     assert!(
         media_delete_response.is_ok(),
-        "{:#?}",
-        media_delete_response
+        "{media_delete_response:#?}"
     );
     assert!(media_delete_response.unwrap().data.deleted);
 

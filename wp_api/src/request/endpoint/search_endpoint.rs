@@ -78,9 +78,9 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/search?context={}", context)
+                format!("/search?context={context}")
             } else {
-                format!("/search?context={}&{}", context, expected_additional_params)
+                format!("/search?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(
@@ -95,7 +95,7 @@ mod tests {
 
     #[rstest]
     #[case(SearchListParams::default(), &[], "/search?context=embed&_fields=")]
-    #[case(search_list_params_with_all_fields(), ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_EMBED_CONTEXT, &format!("/search?context=embed&{}&{}", EXPECTED_QUERY_PAIRS_FOR_SEARCH_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(search_list_params_with_all_fields(), ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_EMBED_CONTEXT, &format!("/search?context=embed&{EXPECTED_QUERY_PAIRS_FOR_SEARCH_LIST_PARAMS_WITH_ALL_FIELDS}&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_EMBED_CONTEXT}"))]
     fn filter_list_search_with_embed_context(
         endpoint: SearchRequestEndpoint,
         #[case] params: SearchListParams,
@@ -110,7 +110,7 @@ mod tests {
 
     #[rstest]
     #[case(SearchListParams::default(), &[], "/search?context=view&_fields=")]
-    #[case(search_list_params_with_all_fields(), ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_VIEW_CONTEXT, &format!("/search?context=view&{}&{}", EXPECTED_QUERY_PAIRS_FOR_SEARCH_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(search_list_params_with_all_fields(), ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_VIEW_CONTEXT, &format!("/search?context=view&{EXPECTED_QUERY_PAIRS_FOR_SEARCH_LIST_PARAMS_WITH_ALL_FIELDS}&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_SEARCH_RESULT_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_list_search_with_view_context(
         endpoint: SearchRequestEndpoint,
         #[case] params: SearchListParams,

@@ -18,12 +18,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut buf_writer = BufWriter::new(File::create(dest_path)?);
     let generated_content = format!(
         r#"
-            const LOCALIZATION_CONTENTS: &str = "{}";
-        "#,
-        contents
+            const LOCALIZATION_CONTENTS: &str = "{contents}";
+        "#
     );
 
-    write!(buf_writer, "{}", generated_content)?;
+    write!(buf_writer, "{generated_content}")?;
 
     Ok(())
 }
