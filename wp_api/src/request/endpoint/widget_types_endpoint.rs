@@ -61,7 +61,7 @@ mod tests {
     #[rstest]
     #[case(&[], "/widget-types?context=edit&_fields=")]
     #[case(&[SparseWidgetTypeFieldWithEditContext::Description], "/widget-types?context=edit&_fields=description")]
-    #[case(ALL_SPARSE_WIDGET_TYPE_FIELDS_WITH_EDIT_CONTEXT, &format!("/widget-types?context=edit&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_WIDGET_TYPE_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(ALL_SPARSE_WIDGET_TYPE_FIELDS_WITH_EDIT_CONTEXT, &format!("/widget-types?context=edit&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_WIDGET_TYPE_FIELDS_WITH_EDIT_CONTEXT}"))]
     fn filter_list_widget_types(
         endpoint: WidgetTypesRequestEndpoint,
         #[case] fields: &[SparseWidgetTypeFieldWithEditContext],
