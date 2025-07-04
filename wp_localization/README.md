@@ -15,27 +15,24 @@ _Note that we have to commit the `glotpress/en-US.pot` file here because that fi
 
 ## Workflow for Developers
 
-### Automated Daily Sync
+### Automated Nightly Sync
 
 The localization process runs automatically every night via a Buildkite pipeline (`.buildkite/nightly.yml`). This automated job:
 
 1. **Generates the source en-US PO file** from `localization/en-US/main.ftl` and commits it to `glotpress/en-US.pot`
 2. **Downloads latest translations** from GlotPress for all supported locales as PO files
 3. **Converts downloaded PO files to Fluent format** and updates the corresponding `localization/*/main.ftl` files
-4. **Creates a Pull Request** with the updated translation files and the updated original en-US PO file in the repository
+4. **Creates a Pull Request** targeting `trunk` with the updated translation files and the updated original en-US PO file in the repository. If a previous localization sync Pull Request was still open at the time the nightly sync happens, that previous Pull Request will be closed and a new one will be opened with the latest translations to take its place.
 
-Once you merge the Pull Request into `trunk`, the update `glotpress/en-US.pot` file will be picked up by a wpcom job to import it into GlotPress, so that translators can start working on the new strings.
+Once you merge the Pull Request into `trunk`, the updated `glotpress/en-US.pot` file will be picked up by a wpcom job to import it into GlotPress, so that translators can start working on the new strings.
 
 This means that translation updates happen automatically without developer intervention.
 
 ### Adding New Localization Strings
 
-1. **Add strings to the source file**: Edit `wp_localization/localization/en-US/main.ftl` to add or update localization strings.
+To add or update new localizable strings to the project, just edit `wp_localization/localization/en-US/main.ftl` to add or update them, using the English copy.
 
-2. **The automated nightly job will handle the rest**, and the next nightly run will automatically:
-   - Convert your changes to PO format (`glotpress/en-US.pot`)
-   - Create a PR targeting `trunk` with the updated source file (closing and replacing any previous one that might still be open and wasn't merged in time)
-   - Upload to GlotPress via the wpcom cron job
+[The "Automated Nightly Sync" described above](#automated-nightly-sync) will take care of the rest.
 
 ### Manual Operations (Optional)
 
@@ -51,7 +48,7 @@ bundle exec fastlane generate_source_po_file
 bundle exec fastlane download_translations
 ```
 
-**Runs both lanes above and, creates a new Pull Request with the changes targeting `trunk`:**
+**Runs both lanes above and creates a new Pull Request with the changes targeting `trunk`:**
 ```bash
 bundle exec fastlane sync_localization
 ```
@@ -65,5 +62,5 @@ bundle exec fastlane sync_localization
 
 - **Fluent format**: Uses [Project Fluent](https://projectfluent.org/) for localization files
 - **PO format**: Standard [gettext](https://www.gnu.org/software/gettext/manual/gettext.html) format used by GlotPress
-- **Conversion tool**: Uses the [fluent-tools](https://github.com/Automattic/fluent-rust-tools) Ruby gem for format conversion
+- **Conversion tool**: Uses the [fluent-tools](https://github.com/Automattic/fluent-rust-tools) CLI and Ruby Gem for format conversion
 - **GlotPress integration**: Downloads translations from `https://translate.wordpress.com/projects/mobile/wordpress-rs`
