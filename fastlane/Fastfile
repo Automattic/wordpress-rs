@@ -281,7 +281,7 @@ lane :sync_localization do
 
     if is_ci
       buildkite_annotate(
-        context: 'localization-sync-no-changes',
+        context: 'localization-sync',
         style: 'info',
         message: 'No localization changes to commit. No PR was created.'
       )
@@ -317,7 +317,7 @@ lane :sync_localization do
 
   if is_ci && pr_result
     buildkite_annotate(
-      context: 'localization-sync-pr',
+      context: 'localization-sync',
       style: 'info',
       message: "Localization Sync Pull Request: #{pr_result}"
     )
