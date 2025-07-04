@@ -138,6 +138,7 @@ public actor WordPressAPI {
     ) async throws -> MediaRequestCreateResponse {
         precondition(localFileURL.isFileURL)
         precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
+        precondition(progress.cancellationHandler == nil)
 
         let requestId = WpUuid()
 
@@ -168,13 +169,18 @@ public actor WordPressAPI {
             )
         }
 
-        if progress.cancellationHandler == nil {
-            progress.cancellationHandler = {
-                uploadTask.cancel()
-            }
+        progress.cancellationHandler = {
+            uploadTask.cancel()
         }
 
-        return try await uploadTask.value
+        return try await withTaskCancellationHandler {
+            try await uploadTask.value
+        } onCancel: {
+            // Please note: for some reason calling `uploadTask.cancel()` here does not actually cancel
+            // the HTTP request. But calling `progress.cancel()` does, even though `progress.cancel()` eventually
+            // calls `uploadTask.cancel()`.
+            progress.cancel()
+        }
     }
 #endif
 
