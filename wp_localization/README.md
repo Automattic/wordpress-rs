@@ -24,6 +24,8 @@ The localization process runs automatically every night via a Buildkite pipeline
 3. **Converts downloaded PO files to Fluent format** and updates the corresponding `localization/*/main.ftl` files
 4. **Creates a Pull Request** with the updated translation files and the updated original en-US PO file in the repository
 
+Once you merge the Pull Request into `trunk`, the update `glotpress/en-US.pot` file will be picked up by a wpcom job to import it into GlotPress, so that translators can start working on the new strings.
+
 This means that translation updates happen automatically without developer intervention.
 
 ### Adding New Localization Strings
