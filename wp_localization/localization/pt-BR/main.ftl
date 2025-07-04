@@ -18,6 +18,8 @@ xmlrpc_endpoint_not_found = O endpoint XML-RPC do site não pôde ser encontrado
 
 xmlrpc_disabled_by_multiple_plugins = O XML-RPC do site está desabilitado – há múltiplos plugins instalados que podem ter desabilitado o XML-RPC. Por favor, desabilite-os e tente novamente.
 
+rest_api_disabled = A API REST do site está desativada. Atualize as configurações do site para ativar a API REST.
+
 wordpress_org_api_client_error_request_encoding = Falha ao codificar solicitação. Motivo: { $reason }.
 
 uuid_parse_error_not_version_4 = Não é um UUID versão 4.
