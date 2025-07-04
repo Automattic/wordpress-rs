@@ -18,6 +18,7 @@ pub mod taxonomies_endpoint;
 pub mod templates_endpoint;
 pub mod themes_endpoint;
 pub mod users_endpoint;
+pub mod widget_types_endpoint;
 pub mod widgets_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
