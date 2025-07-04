@@ -40,30 +40,6 @@ To add or update new localizable strings to the project, just edit `wp_localizat
 * After you merge that Pull Request (5), the wpcom job will be able to later import the `en-US.pot` file with the latest originals to GlotPress (6 & 7)
 * Note that you'll only get the translations from the new string after 2 cycles of the Automated Nightly Sync: the first one (2–7) will ensure the new strings you added in (1) will make its way to GlotPress for translators to start working on it, while the 2nd run (9–14) will bring those translations from GlotPress to trunk after the translators had time to work on them.
 
-### Manual Operations (Optional)
-
-If you need to run the localization sync manually instead of waiting for the nightly job:
-
-**Generate source PO file:**
-```bash
-bundle exec fastlane generate_source_po_file
-```
-
-**Download GlotPress translations and generate local Fluent translation files:**
-```bash
-bundle exec fastlane download_translations
-```
-
-**Runs both lanes above and creates a new Pull Request with the changes targeting `trunk`:**
-```bash
-bundle exec fastlane sync_localization
-```
-
-### Helper Lanes
-
-- **`download_po_files_from_glotpress`**: Downloads PO files for all supported locales
-- **`generate_fluent_file_from_po`**: Converts individual PO files back to Fluent format
-
 ## Localization Process Flow
 
 Here's a visual representation of the typical localization workflow:
@@ -127,6 +103,30 @@ sequenceDiagram
     note over GlotPress: Translators work on new string "B"
     deactivate GlotPress
 ```
+
+### Manual Operations (Optional)
+
+If you need to run the localization sync manually instead of waiting for the nightly job:
+
+**Generate source PO file:**
+```bash
+bundle exec fastlane generate_source_po_file
+```
+
+**Download GlotPress translations and generate local Fluent translation files:**
+```bash
+bundle exec fastlane download_translations
+```
+
+**Runs both lanes above and creates a new Pull Request with the changes targeting `trunk`:**
+```bash
+bundle exec fastlane sync_localization
+```
+
+### Helper Lanes
+
+- **`download_po_files_from_glotpress`**: Downloads PO files for all supported locales
+- **`generate_fluent_file_from_po`**: Converts individual PO files back to Fluent format
 
 ## References
 
