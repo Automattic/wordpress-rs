@@ -32,7 +32,7 @@ This means that translation updates happen automatically without developer inter
 
 2. **The automated nightly job will handle the rest**, and the next nightly run will automatically:
    - Convert your changes to PO format (`glotpress/en-US.pot`)
-   - Create a PR targeting `trunk` with the updated source file
+   - Create a PR targeting `trunk` with the updated source file (closing and replacing any previous one that might still be open and wasn't merged in time)
    - Upload to GlotPress via the wpcom cron job
 
 ### Manual Operations (Optional)
