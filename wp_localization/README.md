@@ -22,7 +22,7 @@ The localization process runs automatically every night via a Buildkite pipeline
 1. **Generates the source en-US PO file** from `localization/en-US/main.ftl` and commits it to `glotpress/en-US.pot`
 2. **Downloads latest translations** from GlotPress for all supported locales as PO files
 3. **Converts downloaded PO files to Fluent format** and updates the corresponding `localization/*/main.ftl` files
-4. **Commits the updated translation files** to the repository
+4. **Creates a Pull Request** with the updated translation files and the updated original en-US PO file in the repository
 
 This means that translation updates happen automatically without developer intervention.
 
@@ -30,9 +30,9 @@ This means that translation updates happen automatically without developer inter
 
 1. **Add strings to the source file**: Edit `wp_localization/localization/en-US/main.ftl` to add or update localization strings.
 
-2. **The automated nightly job will handle the rest**: The next nightly run will automatically:
+2. **The automated nightly job will handle the rest**, and the next nightly run will automatically:
    - Convert your changes to PO format (`glotpress/en-US.pot`)
-   - Commit the updated source file
+   - Create a PR targeting `trunk` with the updated source file
    - Upload to GlotPress via the wpcom cron job
 
 ### Manual Operations (Optional)
@@ -47,6 +47,11 @@ bundle exec fastlane generate_source_po_file
 **Download GlotPress translations and generate local Fluent translation files:**
 ```bash
 bundle exec fastlane download_translations
+```
+
+**Runs both lanes above and, creates a new Pull Request with the changes targeting `trunk`:**
+```bash
+bundle exec fastlane sync_localization
 ```
 
 ### Helper Lanes
