@@ -22,7 +22,8 @@ The localization process runs automatically every night via a Buildkite pipeline
 1. **Generates the source en-US PO file** from `localization/en-US/main.ftl` and commits it to `glotpress/en-US.pot`
 2. **Downloads latest translations** from GlotPress for all supported locales as PO files
 3. **Converts downloaded PO files to Fluent format** and updates the corresponding `localization/*/main.ftl` files
-4. **Creates a Pull Request** targeting `trunk` with the updated translation files and the updated original en-US PO file in the repository. If a previous localization sync Pull Request was still open at the time the nightly sync happens, that previous Pull Request will be closed and a new one will be opened with the latest translations to take its place.
+4. **Creates a Pull Request** targeting `trunk` with the updated translation files and the updated original en-US PO file in the repository.
+   - If a previous localization sync Pull Request was still open at the time the nightly sync happens, that previous Pull Request will be closed and a new one will be opened with the latest translations to take its place.
 
 Once you merge the Pull Request into `trunk`, the updated `glotpress/en-US.pot` file will be picked up by a wpcom job to import it into GlotPress, so that translators can start working on the new strings.
 
