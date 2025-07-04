@@ -33,7 +33,12 @@ This means that translation updates happen automatically without developer inter
 
 To add or update new localizable strings to the project, just edit `wp_localization/localization/en-US/main.ftl` to add or update them, using the English copy.
 
-[The "Automated Nightly Sync" described above](#automated-nightly-sync) will take care of the rest.
+[The "Automated Nightly Sync" described above](#automated-nightly-sync) will take care of the rest. In particular:
+
+* Once your `en-US/main.ftl` file has landed into `trunk`, it will be read by the "Automated Nightly Sync" job on its next run (2), to generate a `en-US.pot` file (which will later be imported in GlotPress (6 & 7))
+* That automation will also use the occasion to download latest translations from GlotPress (3), then create a Pull Request (4) containing both this generated `en-US.pot` from (2) and the new `*/main.ftl` translations from (3)
+* After you merge that Pull Request (5), the wpcom job will be able to later import the `en-US.pot` file with the latest originals to GlotPress (6 & 7)
+* Note that you'll only get the translations from the new string after 2 cycles of the Automated Nightly Sync: the first one (2–7) will ensure the new strings you added in (1) will make its way to GlotPress for translators to start working on it, while the 2nd run (9–14) will bring those translations from GlotPress to trunk after the translators had time to work on them.
 
 ### Manual Operations (Optional)
 
