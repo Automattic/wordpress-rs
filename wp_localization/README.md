@@ -58,6 +58,70 @@ bundle exec fastlane sync_localization
 - **`download_po_files_from_glotpress`**: Downloads PO files for all supported locales
 - **`generate_fluent_file_from_po`**: Converts individual PO files back to Fluent format
 
+## Localization Process Flow
+
+Here's a visual representation of the typical localization workflow:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev
+    participant Git
+    participant ANS as Automated Nightly Sync<br/>(Buildkite Job)
+    participant GlotPress
+    participant wpcom as wpcom cron job
+
+    Dev->>Git: Add new string "A" to `en-US/main.ftl` and commit to trunk
+
+    loop Nightly Sync (Run 1)
+        activate ANS
+        Git-->>ANS: Read `en-US/main.ftl` from trunk<br/>(existing strings + "A")
+        note over ANS: Generate `en-US.pot` with all strings including "A"
+        GlotPress-->>ANS: Download `.po` translations for existing strings
+        note over ANS: Convert `.po` to `*/main.ftl` files
+        ANS->>Git: Create Pull Request targeting trunk
+        note right of Git: PR contains updated `en-US.pot` (with new string "A")<br/>and updated `*/main.ftl` files (existing translations only)
+        deactivate ANS
+    end
+
+    Dev->>Git: Merge Pull Request into trunk
+    note right of Git: `en-US.pot` with string "A" now available
+
+    activate wpcom
+    Git-->>wpcom: wpcom cron picks up updated `en-US.pot` from trunk
+    wpcom->>GlotPress: Import new `en-US.pot` with string "A"
+    deactivate wpcom
+    
+    activate GlotPress
+    note over GlotPress: Translators work on new string "A"
+    deactivate GlotPress
+
+    Dev->>Git: Add new string "B" to `en-US/main.ftl` and commit to trunk
+
+    loop Nightly Sync (Run 2)
+        activate ANS
+        Git-->>ANS: Read `en-US/main.ftl` from trunk<br/>(existing + "A" + "B")
+        note over ANS: Generate `en-US.pot` with all strings including "A" and "B"
+        GlotPress-->>ANS: Download `.po` translations (now includes "A" translations)
+        note over ANS: Convert `.po` to `*/main.ftl` files
+        ANS->>Git: Create Pull Request targeting trunk
+        note right of Git: PR contains updated `en-US.pot` (with new string "B")<br/>and updated `*/main.ftl` files (including "A" translations)
+        deactivate ANS
+    end
+
+    Dev->>Git: Merge Pull Request into trunk
+    note right of Git: Translations for string "A" now in trunk
+
+    activate wpcom
+    Git-->>wpcom: wpcom cron picks up updated `en-US.pot` from trunk
+    wpcom->>GlotPress: Import new `en-US.pot` with string "B"
+    deactivate wpcom
+    
+    activate GlotPress
+    note over GlotPress: Translators work on new string "B"
+    deactivate GlotPress
+```
+
 ## References
 
 - **Fluent format**: Uses [Project Fluent](https://projectfluent.org/) for localization files
