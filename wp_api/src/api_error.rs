@@ -566,6 +566,7 @@ pub enum RequestExecutionErrorReason {
     DeviceIsOfflineError {
         error_message: String,
     },
+    CancellationError,
     HttpError {
         reason: String,
     },
@@ -656,6 +657,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
                 WpMessages::just(error_message)
             }
             RequestExecutionErrorReason::HttpTimeoutError => WpMessages::http_timeout_error(),
+            RequestExecutionErrorReason::CancellationError => WpMessages::http_cancellation_error(),
         }
     }
 }
