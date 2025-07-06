@@ -46,22 +46,25 @@ struct MediaTests {
         #expect(progress.fractionCompleted == 0)
 
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        await #expect(throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError), performing: {
-            let task = Task {
-                let _ = try await api.uploadMedia(
-                    params: .init(),
-                    fromLocalFileURL: file,
-                    fulfilling: progress
-                )
-            }
+        await #expect(
+            throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError),
+            performing: {
+                let task = Task {
+                    _ = try await api.uploadMedia(
+                        params: .init(),
+                        fromLocalFileURL: file,
+                        fulfilling: progress
+                    )
+                }
 
-            let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
-                progress.cancel()
-            }
-            defer { cancellable.cancel() }
+                let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
+                    progress.cancel()
+                }
+                defer { cancellable.cancel() }
 
-            try await task.value
-        })
+                try await task.value
+            }
+        )
 
         try await restoreTestServer()
     }
@@ -71,22 +74,25 @@ struct MediaTests {
         let progress = Progress.discreteProgress(totalUnitCount: 100)
         #expect(progress.fractionCompleted == 0)
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        await #expect(throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError), performing: {
-            let task = Task {
-                let _ = try await api.uploadMedia(
-                    params: .init(),
-                    fromLocalFileURL: file,
-                    fulfilling: progress
-                )
-            }
+        await #expect(
+            throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError),
+            performing: {
+                let task = Task {
+                    _ = try await api.uploadMedia(
+                        params: .init(),
+                        fromLocalFileURL: file,
+                        fulfilling: progress
+                    )
+                }
 
-            let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
-                task.cancel()
-            }
-            defer { cancellable.cancel() }
+                let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
+                    task.cancel()
+                }
+                defer { cancellable.cancel() }
 
-            try await task.value
-        })
+                try await task.value
+            }
+        )
 
         try await restoreTestServer()
     }
