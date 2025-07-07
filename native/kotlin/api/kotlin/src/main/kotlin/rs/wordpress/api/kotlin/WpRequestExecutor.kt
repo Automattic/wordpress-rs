@@ -17,6 +17,7 @@ import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
@@ -36,9 +37,15 @@ class WpRequestExecutor(
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
+            val wpNetworkRequestBody = request.body()?.contents()?.toRequestBody()
             requestBuilder.method(
-                request.method().toString(),
-                request.body()?.contents()?.toRequestBody()
+                method = request.method().toString(),
+                body = if (request.method() == RequestMethod.POST) {
+                    // OkHttp doesn't allow empty bodies for POST requests
+                    wpNetworkRequestBody ?: "".toRequestBody()
+                } else {
+                    wpNetworkRequestBody
+                }
             )
             request.headerMap().toMap().forEach { (key, values) ->
                 values.forEach { value ->
