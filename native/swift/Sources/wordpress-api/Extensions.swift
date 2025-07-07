@@ -64,3 +64,12 @@ extension CommentType: ExpressibleByStringLiteral {
         self.init(stringLiteral)
     }
 }
+
+extension WpApiError {
+    public var isCancellationError: Bool {
+        if case .RequestExecutionFailed(statusCode: _, redirects: _, reason: .cancellationError) = self {
+            return true
+        }
+        return false
+    }
+}

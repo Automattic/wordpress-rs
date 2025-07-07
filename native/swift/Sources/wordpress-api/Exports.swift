@@ -111,6 +111,8 @@ public typealias MediaUploadRequest = WordPressAPIInternal.MediaUploadRequest
 public typealias MediaWithEditContext = WordPressAPIInternal.MediaWithEditContext
 public typealias MediaWithViewContext = WordPressAPIInternal.MediaWithViewContext
 public typealias MediaWithEmbedContext = WordPressAPIInternal.MediaWithEmbedContext
+public typealias MediaCreateParams = WordPressAPIInternal.MediaCreateParams
+public typealias MediaUpdateParams = WordPressAPIInternal.MediaUpdateParams
 public typealias MediaListParams = WordPressAPIInternal.MediaListParams
 public typealias MediaRequestExecutor = WordPressAPIInternal.MediaRequestExecutor
 
