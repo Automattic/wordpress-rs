@@ -129,6 +129,18 @@ public actor WordPressAPI {
         self.requestBuilder.siteSettings()
     }
 
+    public var taxonomies: TaxonomiesRequestExecutor {
+        self.requestBuilder.taxonomies()
+    }
+
+    public var tags: TagsRequestExecutor {
+        self.requestBuilder.tags()
+    }
+
+    public var categories: CategoriesRequestExecutor {
+        self.requestBuilder.categories()
+    }
+
 #if PROGRESS_REPORTING_ENABLED
     public func uploadMedia(
         params: MediaCreateParams,

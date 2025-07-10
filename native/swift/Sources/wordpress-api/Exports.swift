@@ -120,6 +120,34 @@ public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.
 public typealias MediaRequestListWithViewContextResponse = WordPressAPIInternal.MediaRequestListWithViewContextResponse
 public typealias MediaRequestListWithEmbedContextResponse = WordPressAPIInternal.MediaRequestListWithEmbedContextResponse
 
+// MARK: - Tags
+public typealias TagId = WordPressAPIInternal.TagId
+public typealias SparseTag = WordPressAPIInternal.SparseTag
+public typealias TagWithEditContext = WordPressAPIInternal.TagWithEditContext
+public typealias TagWithViewContext = WordPressAPIInternal.TagWithViewContext
+public typealias TagWithEmbedContext = WordPressAPIInternal.TagWithEmbedContext
+public typealias TagCreateParams = WordPressAPIInternal.TagCreateParams
+public typealias TagUpdateParams = WordPressAPIInternal.TagUpdateParams
+public typealias TagListParams = WordPressAPIInternal.TagListParams
+public typealias TagsRequestExecutor = WordPressAPIInternal.TagsRequestExecutor
+public typealias TagsRequestListWithEditContextResponse = WordPressAPIInternal.TagsRequestListWithEditContextResponse
+public typealias TagsRequestListWithViewContextResponse = WordPressAPIInternal.TagsRequestListWithViewContextResponse
+public typealias TagsRequestListWithEmbedContextResponse = WordPressAPIInternal.TagsRequestListWithEmbedContextResponse
+
+// MARK: - Categories
+public typealias CategoryId = WordPressAPIInternal.CategoryId
+public typealias SparseCategory = WordPressAPIInternal.SparseCategory
+public typealias CategoryWithEditContext = WordPressAPIInternal.CategoryWithEditContext
+public typealias CategoryWithViewContext = WordPressAPIInternal.CategoryWithViewContext
+public typealias CategoryWithEmbedContext = WordPressAPIInternal.CategoryWithEmbedContext
+public typealias CategoryCreateParams = WordPressAPIInternal.CategoryCreateParams
+public typealias CategoryUpdateParams = WordPressAPIInternal.CategoryUpdateParams
+public typealias CategoryListParams = WordPressAPIInternal.CategoryListParams
+public typealias CategoriesRequestExecutor = WordPressAPIInternal.CategoriesRequestExecutor
+public typealias CategoriesRequestListWithEditContextResponse = WordPressAPIInternal.CategoriesRequestListWithEditContextResponse
+public typealias CategoriesRequestListWithViewContextResponse = WordPressAPIInternal.CategoriesRequestListWithViewContextResponse
+public typealias CategoriesRequestListWithEmbedContextResponse = WordPressAPIInternal.CategoriesRequestListWithEmbedContextResponse
+
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext
