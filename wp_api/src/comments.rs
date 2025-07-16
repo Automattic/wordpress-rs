@@ -1,5 +1,5 @@
 use crate::{
-    UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
+    JsonValue, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
     date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     posts::PostId,
@@ -528,6 +528,9 @@ pub struct SparseComment {
     pub comment_type: Option<CommentType>,
     #[WpContext(edit, embed, view)]
     pub author_avatar_urls: Option<HashMap<UserAvatarSize, WpResponseString>>,
+    #[serde(flatten)]
+    #[WpContext(edit, embed, view)]
+    pub extras: Option<JsonValue>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
 }
 
