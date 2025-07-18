@@ -7,7 +7,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not};
-use wp_serde_helper::deserialize_u64_or_string;
+use wp_serde_helper::{deserialize_false_or_string, deserialize_u64_or_string};
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
@@ -74,8 +74,10 @@ pub enum SubscriptionStatus {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SubscriberCountry {
-    code: String,
-    name: String,
+    #[serde(default, deserialize_with = "deserialize_false_or_string")]
+    code: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_false_or_string")]
+    name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
@@ -95,27 +97,30 @@ pub struct SubscriptionPlan {
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct SubscribersListParams {
-    // The current page.
+    /// The current page.
     #[uniffi(default = None)]
     pub page: Option<u64>,
-    // The amount of items to show per page.
+    /// The amount of items to show per page.
     #[uniffi(default = None)]
     pub per_page: Option<u64>,
-    // Search for subscribers
+    /// Search for subscribers
     #[uniffi(default = None)]
     pub search: Option<String>,
-    // Sort subscribers by a specific field
+    /// Sort subscribers by a specific field
     #[uniffi(default = None)]
     pub sort: Option<ListSubscribersSortField>,
-    // Sort order
+    /// Sort order
     #[uniffi(default = None)]
     pub sort_order: Option<WpApiParamOrder>,
-    // Filter subscribers by a specific subscriber type
+    /// Filter subscribers by a specific subscriber type
     #[uniffi(default = None)]
     pub filter: Option<SubscriberType>,
-    // Array of filters to apply (combined with AND logic). If provided, overrides the single filter parameter.
+    /// Array of filters to apply (combined with AND logic). If provided, overrides the single filter parameter.
     #[uniffi(default = None)]
     pub filters: Option<Vec<SubscriberType>>,
+    /// An array of additional fields to include
+    #[uniffi(default = [])]
+    pub include: Vec<ListSubscribersIncludeField>,
 }
 
 impl AppendUrlQueryPairs for SubscribersListParams {
@@ -125,7 +130,8 @@ impl AppendUrlQueryPairs for SubscribersListParams {
             .append_option_query_value_pair("per_page", self.per_page.as_ref())
             .append_option_query_value_pair("search", self.search.as_ref())
             .append_option_query_value_pair("sort", self.sort.as_ref())
-            .append_option_query_value_pair("sort_order", self.sort_order.as_ref());
+            .append_option_query_value_pair("sort_order", self.sort_order.as_ref())
+            .append_vec_query_value_pair("include", self.include.as_ref());
 
         if let Some(filters) = &self.filters {
             query_pairs_mut.append_pair(
@@ -164,6 +170,23 @@ pub enum ListSubscribersSortField {
 }
 
 impl_as_query_value_from_to_string!(ListSubscribersSortField);
+
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
+pub enum ListSubscribersIncludeField {
+    Country,
+}
+
+impl_as_query_value_from_to_string!(ListSubscribersIncludeField);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct ListSubscribersResponse {
@@ -396,6 +419,7 @@ mod tests {
             sort_order: Some(WpApiParamOrder::Asc),
             filter: Some(SubscriberType::All),
             filters: Some(vec![SubscriberType::All]),
+            include: vec![],
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -421,6 +445,7 @@ mod tests {
             sort_order: Some(WpApiParamOrder::Asc),
             filter: Some(SubscriberType::EmailSubscriber),
             filters: None,
+            include: vec![],
         };
 
         let mut query_pairs = url.query_pairs_mut();

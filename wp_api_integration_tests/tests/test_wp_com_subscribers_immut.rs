@@ -1,8 +1,8 @@
 use wp_api::wp_com::{
     WpComSiteId,
     subscribers::{
-        IndividualSubscriberParams, IndividualSubscriberStatsParams, ListSubscribersSortField,
-        SubscribersListParams, SubscriptionId,
+        IndividualSubscriberParams, IndividualSubscriberStatsParams, ListSubscribersIncludeField,
+        ListSubscribersSortField, SubscribersListParams, SubscriptionId,
     },
 };
 use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
@@ -23,6 +23,36 @@ async fn list_subscribers(#[case] params: SubscribersListParams) {
     assert!(
         subscribers.data.total > 0,
         "Retrieved no subscribers: {subscribers:#?}"
+    );
+}
+
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn list_subscribers_include_country() {
+    let subscribers = wp_com_client()
+        .subscribers()
+        .list_subscribers(
+            &WpComSiteId(WpComTestCredentials::instance().site_id),
+            &SubscribersListParams {
+                include: vec![ListSubscribersIncludeField::Country],
+                ..Default::default()
+            },
+        )
+        .await
+        .assert_response();
+    assert!(
+        subscribers.data.total > 0,
+        "Retrieved no subscribers: {subscribers:#?}"
+    );
+    let first_subscriber = subscribers
+        .data
+        .subscribers
+        .first()
+        .expect("Confirmed that there is at least one subscriber");
+    assert!(
+        first_subscriber.country.is_some(),
+        "'country' field is requested and should be available"
     );
 }
 
