@@ -1,3 +1,5 @@
+http_cancellation_error = A solicitação foi cancelada.
+
 parse_api_root_failure_reason_wordfence_blocking_access = O Wordfence está bloqueando o acesso à API do site. Por favor, verifique sua configuração do Wordfence.
 
 parse_api_root_failure_reason_server_fatal_error = Seu servidor encontrou um erro irrecuperável e não pôde processar a solicitação. Por favor, verifique os logs de erro do seu servidor para detalhes.
@@ -17,6 +19,10 @@ application_password_blocked_by_plugin = Não foi possível fazer login em { $ur
 xmlrpc_endpoint_not_found = O endpoint XML-RPC do site não pôde ser encontrado. Por favor, verifique as configurações do seu site e tente novamente.
 
 xmlrpc_disabled_by_multiple_plugins = O XML-RPC do site está desabilitado – há múltiplos plugins instalados que podem ter desabilitado o XML-RPC. Por favor, desabilite-os e tente novamente.
+
+xmlrpc_disabled_by_plugin = O XML-RPC do site está desativado – o plugin { $plugin } pode ter desativado o XML-RPC. Por favor, visite { $support_url } para saber mais.
+
+xmlrpc_disabled_by_host = O XML-RPC do site está desativado. Por favor, entre em contato com seu provedor de hospedagem para resolver esse problema.
 
 rest_api_disabled = A API REST do site está desativada. Atualize as configurações do site para ativar a API REST.
 
@@ -48,11 +54,17 @@ oauth_response_url_error_unsuccessful_login = Falha no login.
 
 oauth_response_url_error_url_invalid = O site enviou uma URL de resposta de autenticação inválida.
 
+misconfigured_rate_limit_error = O servidor está limitando as requisições de uma forma que nunca vai ter sucesso. Por favor, verifique a configuração de limite de requisições do seu site.
+
 misconfigured_http_authentication_error = O servidor está enviando informações de autenticação HTTP inválidas. Por favor, verifique a configuração de autenticação HTTP do seu site.
+
+http_server_error = Não foi possível conectar ao servidor: { $reason }. Por favor, entre em contato com seu provedor de servidor.
 
 http_authentication_rejected_error = O servidor em { $url } rejeitou suas credenciais. Por favor, forneça um nome de usuário e senha válidos.
 
 http_timeout_error = A conexão expirou
+
+http_forbidden_error = O servidor em { $url } negou acesso ao recurso solicitado. Por favor, verifique a configuração do seu site.
 
 http_authentication_required_error = O servidor em { $url } requer autenticação. Por favor, forneça seu nome de usuário e senha.
 
