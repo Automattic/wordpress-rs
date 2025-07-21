@@ -81,6 +81,7 @@ class WpRequestExecutor(
             }
         }
 
+    @Suppress("ComplexCondition")
     override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(mediaUploadRequest.url())
