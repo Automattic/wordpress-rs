@@ -89,7 +89,7 @@ class WpRequestExecutor(
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
             val file = File(mediaUploadRequest.filePath())
-            if (!file.canRead()) {
+            if (!file.exists() || !file.isFile || !file.canRead()) {
                 throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
             }
             multipartBodyBuilder.addFormDataPart(
