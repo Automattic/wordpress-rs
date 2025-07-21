@@ -66,7 +66,7 @@ class MediaEndpointTest {
         val response = client.request { requestBuilder ->
             requestBuilder.media().create(
                 params = MediaCreateParams(title = title),
-                "test_media.jpg",
+                "/test-data/test_media.jpg",
                 "image/jpeg",
                 null
             )
