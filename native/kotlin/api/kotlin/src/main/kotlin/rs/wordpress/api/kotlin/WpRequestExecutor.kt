@@ -32,7 +32,8 @@ const val USER_AGENT_HEADER_NAME = "User-Agent"
 
 class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val fileResolver: FileResolver = FileResolver()
 ) : RequestExecutor {
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
@@ -88,8 +89,8 @@ class WpRequestExecutor(
             mediaUploadRequest.mediaParams().forEach { (k, v) ->
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
-            val file = File(mediaUploadRequest.filePath())
-            if (!file.exists() || !file.isFile || !file.canRead()) {
+            val file = fileResolver.getFile(mediaUploadRequest.filePath())
+            if (file == null || !file.exists() || !file.isFile || !file.canRead()) {
                 throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
             }
             multipartBodyBuilder.addFormDataPart(
@@ -165,3 +166,7 @@ private fun requestExecutionFailedWith(reason: RequestExecutionErrorReason) =
         redirects = null,
         reason = reason
     )
+
+open class FileResolver {
+    open fun getFile(path: String): File? = File(path)
+}

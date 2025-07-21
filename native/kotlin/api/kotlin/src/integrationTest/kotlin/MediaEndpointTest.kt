@@ -6,13 +6,15 @@ import org.junit.jupiter.api.Test
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.MediaListParams
 import uniffi.wp_api.SparseMediaFieldWithEditContext
+import uniffi.wp_api.WpAuthenticationProvider
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 private const val MEDIA_ID_611: Long = 611
 
 class MediaEndpointTest {
-    private val client = defaultApiClient()
+    private val client = mediaApiClient()
 
     @Test
     fun testMediaListRequest() = runTest {
@@ -66,12 +68,37 @@ class MediaEndpointTest {
         val response = client.request { requestBuilder ->
             requestBuilder.media().create(
                 params = MediaCreateParams(title = title),
-                "/test-data/test_media.jpg",
+                "test_media.jpg",
                 "image/jpeg",
                 null
             )
         }.assertSuccessAndRetrieveData().data
         assertEquals(title, response.title.rendered)
         restoreTestServer()
+    }
+
+    fun mediaApiClient(): WpApiClient {
+        val testCredentials = TestCredentials.INSTANCE
+        val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
+            username = testCredentials.adminUsername, password = testCredentials.adminPassword
+        )
+        val requestExecutor = WpRequestExecutor(
+            fileResolver = FileResolverMock()
+        )
+        return WpApiClient(
+            wpOrgSiteApiRootUrl = testCredentials.apiRootUrl,
+            authProvider = authProvider,
+            requestExecutor = requestExecutor
+        )
+    }
+
+    class FileResolverMock: FileResolver() {
+        // in order to properly resolve the file from the test assets, we need to do it in the following way
+        override fun getFile(path: String): File? =
+            WpAuthenticationProvider::class.java.classLoader?.getResource(path)?.file?.let {
+                File(
+                    it
+                )
+            }
     }
 }
