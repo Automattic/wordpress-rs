@@ -92,7 +92,7 @@ class MediaEndpointTest {
         )
     }
 
-    class FileResolverMock: FileResolver() {
+    class FileResolverMock: FileResolver {
         // in order to properly resolve the file from the test assets, we need to do it in the following way
         override fun getFile(path: String): File? =
             WpAuthenticationProvider::class.java.classLoader?.getResource(path)?.file?.let {

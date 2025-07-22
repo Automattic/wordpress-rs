@@ -33,7 +33,7 @@ const val USER_AGENT_HEADER_NAME = "User-Agent"
 class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val fileResolver: FileResolver = FileResolver()
+    private val fileResolver: FileResolver = DefaultFileResolver()
 ) : RequestExecutor {
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
@@ -81,7 +81,6 @@ class WpRequestExecutor(
             }
         }
 
-    @Suppress("ComplexCondition")
     override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(mediaUploadRequest.url())
@@ -91,7 +90,7 @@ class WpRequestExecutor(
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
             val file = fileResolver.getFile(mediaUploadRequest.filePath())
-            if (file == null || !file.exists() || !file.isFile || !file.canRead()) {
+            if (file == null || !file.canBeUploaded()) {
                 throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
             }
             multipartBodyBuilder.addFormDataPart(
@@ -123,6 +122,8 @@ class WpRequestExecutor(
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
     }
+
+    private fun File.canBeUploaded() = exists() && isFile && canRead()
 }
 
 private fun RequestExecutionErrorReason.Companion.unknownHost(e: UnknownHostException) =
@@ -167,7 +168,3 @@ private fun requestExecutionFailedWith(reason: RequestExecutionErrorReason) =
         redirects = null,
         reason = reason
     )
-
-open class FileResolver {
-    open fun getFile(path: String): File? = File(path)
-}
