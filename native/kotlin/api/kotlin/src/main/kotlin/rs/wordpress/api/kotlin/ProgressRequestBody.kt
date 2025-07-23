@@ -9,6 +9,7 @@ import okio.Sink
 import okio.buffer
 import java.io.IOException
 
+private const val PROGRESS_THROTTLE_MS = 500
 class ProgressRequestBody(
     private val delegate: RequestBody,
     private val progressListener: ProgressListener
@@ -38,20 +39,15 @@ class ProgressRequestBody(
     ) : ForwardingSink(delegate) {
         private var totalBytesWritten = 0L
         private var lastProgressTime = 0L
-        
-        // Throttle to 2 calls per second (500ms minimum between calls)
-        private val progressThrottleMs = 500L
 
         @Throws(IOException::class)
         override fun write(source: Buffer, byteCount: Long) {
             super.write(source, byteCount)
             totalBytesWritten += byteCount
-            
             val currentTime = System.currentTimeMillis()
             val isComplete = totalBytesWritten >= contentLength
-            
             // Always send progress for completion, or if enough time has passed
-            if (isComplete || currentTime - lastProgressTime >= progressThrottleMs) {
+            if (isComplete || currentTime - lastProgressTime >= PROGRESS_THROTTLE_MS) {
                 listener.onProgress(totalBytesWritten, contentLength)
                 lastProgressTime = currentTime
             }

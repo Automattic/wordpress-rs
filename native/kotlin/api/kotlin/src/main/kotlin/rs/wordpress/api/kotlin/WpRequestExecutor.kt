@@ -96,11 +96,14 @@ class WpRequestExecutor(
             }
             val fileRequestBody = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
             val progressRequestBody = if (uploadProgressListener != null) {
-                ProgressRequestBody(fileRequestBody, object : ProgressRequestBody.ProgressListener {
-                    override fun onProgress(bytesWritten: Long, contentLength: Long) {
-                        uploadProgressListener.invoke(bytesWritten, contentLength)
+                ProgressRequestBody(
+                    delegate = fileRequestBody,
+                    progressListener = object : ProgressRequestBody.ProgressListener {
+                        override fun onProgress(bytesWritten: Long, contentLength: Long) {
+                            uploadProgressListener.invoke(bytesWritten, contentLength)
+                        }
                     }
-                })
+                )
             } else {
                 fileRequestBody
             }
