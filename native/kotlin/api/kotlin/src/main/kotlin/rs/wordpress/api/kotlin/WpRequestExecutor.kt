@@ -33,7 +33,8 @@ const val USER_AGENT_HEADER_NAME = "User-Agent"
 class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val fileResolver: FileResolver = DefaultFileResolver()
+    private val fileResolver: FileResolver = DefaultFileResolver(),
+    private val uploadProgressListener: ((uploadedBytes: Long, totalBytes: Long) -> Unit)? = null
 ) : RequestExecutor {
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
@@ -93,10 +94,21 @@ class WpRequestExecutor(
             if (file == null || !file.canBeUploaded()) {
                 throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
             }
+            val fileRequestBody = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+            val progressRequestBody = if (uploadProgressListener != null) {
+                ProgressRequestBody(fileRequestBody, object : ProgressRequestBody.ProgressListener {
+                    override fun onProgress(bytesWritten: Long, contentLength: Long) {
+                        uploadProgressListener.invoke(bytesWritten, contentLength)
+                    }
+                })
+            } else {
+                fileRequestBody
+            }
+
             multipartBodyBuilder.addFormDataPart(
                 name = "file",
                 filename = file.name,
-                body = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+                body = progressRequestBody
             )
             requestBuilder.method(
                 method = mediaUploadRequest.method().toString(),
