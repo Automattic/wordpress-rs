@@ -9,6 +9,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttp
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.InvalidSslErrorReason
@@ -33,7 +34,8 @@ const val USER_AGENT_HEADER_NAME = "User-Agent"
 class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val fileResolver: FileResolver = DefaultFileResolver()
+    private val fileResolver: FileResolver = DefaultFileResolver(),
+    private val uploadProgressListener: ((uploadedBytes: Long, totalBytes: Long) -> Unit)? = null
 ) : RequestExecutor {
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
@@ -93,10 +95,11 @@ class WpRequestExecutor(
             if (file == null || !file.canBeUploaded()) {
                 throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
             }
+            val progressRequestBody = getRequestBody(file, mediaUploadRequest, uploadProgressListener)
             multipartBodyBuilder.addFormDataPart(
                 name = "file",
                 filename = file.name,
-                body = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+                body = progressRequestBody
             )
             requestBuilder.method(
                 method = mediaUploadRequest.method().toString(),
@@ -118,6 +121,26 @@ class WpRequestExecutor(
                 )
             }
         }
+
+    private fun getRequestBody(
+        file: File,
+        mediaUploadRequest: MediaUploadRequest,
+        uploadProgressListener: ((uploadedBytes: Long, totalBytes: Long) -> Unit)?
+    ): RequestBody {
+        val fileRequestBody = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+        return if (uploadProgressListener != null) {
+            ProgressRequestBody(
+                delegate = fileRequestBody,
+                progressListener = object : ProgressRequestBody.ProgressListener {
+                    override fun onProgress(bytesWritten: Long, contentLength: Long) {
+                        uploadProgressListener.invoke(bytesWritten, contentLength)
+                    }
+                }
+            )
+        } else {
+            fileRequestBody
+        }
+    }
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
