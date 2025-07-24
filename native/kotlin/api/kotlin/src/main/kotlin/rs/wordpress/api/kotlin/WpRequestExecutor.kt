@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -35,7 +36,7 @@ class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val fileResolver: FileResolver = DefaultFileResolver(),
-    private val uploadProgressListener: ((uploadedBytes: Long, totalBytes: Long) -> Unit)? = null
+    private val uploadListener: UploadListener? = null
 ) : RequestExecutor {
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
@@ -95,7 +96,7 @@ class WpRequestExecutor(
             if (file == null || !file.canBeUploaded()) {
                 throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
             }
-            val progressRequestBody = getRequestBody(file, mediaUploadRequest, uploadProgressListener)
+            val progressRequestBody = getRequestBody(file, mediaUploadRequest, uploadListener)
             multipartBodyBuilder.addFormDataPart(
                 name = "file",
                 filename = file.name,
@@ -111,7 +112,10 @@ class WpRequestExecutor(
                 }
             }
 
-            httpClient.getClient().newCall(requestBuilder.build()).execute().use { response ->
+            val call = httpClient.getClient().newCall(requestBuilder.build())
+            // Notify about the call creation so it can be cancelled if needed
+            uploadListener?.onUploadStarted(call)
+            call.execute().use { response ->
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
@@ -125,15 +129,15 @@ class WpRequestExecutor(
     private fun getRequestBody(
         file: File,
         mediaUploadRequest: MediaUploadRequest,
-        uploadProgressListener: ((uploadedBytes: Long, totalBytes: Long) -> Unit)?
+        uploadListener: UploadListener?
     ): RequestBody {
         val fileRequestBody = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
-        return if (uploadProgressListener != null) {
+        return if (uploadListener != null) {
             ProgressRequestBody(
                 delegate = fileRequestBody,
                 progressListener = object : ProgressRequestBody.ProgressListener {
                     override fun onProgress(bytesWritten: Long, contentLength: Long) {
-                        uploadProgressListener.invoke(bytesWritten, contentLength)
+                        uploadListener.onProgressUpdate(bytesWritten, contentLength)
                     }
                 }
             )
@@ -147,6 +151,11 @@ class WpRequestExecutor(
     }
 
     private fun File.canBeUploaded() = exists() && isFile && canRead()
+
+    interface UploadListener {
+        fun onProgressUpdate(uploadedBytes: Long, totalBytes: Long)
+        fun onUploadStarted(uploadCall: Call)
+    }
 }
 
 private fun RequestExecutionErrorReason.Companion.unknownHost(e: UnknownHostException) =
