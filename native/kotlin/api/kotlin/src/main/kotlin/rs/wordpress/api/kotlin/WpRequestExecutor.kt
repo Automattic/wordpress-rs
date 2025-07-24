@@ -152,8 +152,27 @@ class WpRequestExecutor(
 
     private fun File.canBeUploaded() = exists() && isFile && canRead()
 
+    /**
+     * Interface for monitoring the progress and status of a media upload.
+     */
     interface UploadListener {
+        /**
+         * Called to report the progress of the upload.
+         *
+         * @param uploadedBytes The number of bytes that have been uploaded so far.
+         * @param totalBytes The total number of bytes to be uploaded.
+         */
         fun onProgressUpdate(uploadedBytes: Long, totalBytes: Long)
+
+        /**
+         * Called when the upload starts.
+         *
+         * @param uploadCall The [Call] object representing the upload request. This can be used
+         * to cancel the upload if needed by calling [Call.cancel].
+         *
+         * This method is invoked at the beginning of the upload process, allowing the caller
+         * to monitor or control the upload operation.
+         */
         fun onUploadStarted(uploadCall: Call)
     }
 }
