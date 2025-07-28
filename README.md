@@ -18,6 +18,8 @@ Given the multi-platform nature of this project, the development environment wil
 | [Android SDK](https://developer.android.com/tools)        | Android          |
 | [Docker](https://www.docker.com/) (for integration tests) | Core + Android   |
 
+See [Android Studio Configuration](#android-studio-configuration) for required IDE setup.
+
 ### Swift
 
 | Dependency                                                                       | Platform        |
@@ -52,4 +54,21 @@ This project has several test suites. Integration tests require Docker, and you 
 | Rust Integration Tests           | `cargo test -p wp_api_integration_tests` | `make test-rust-integration`    |
 | Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest` | `make test-kotlin-integration`   |
 | Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
+
+#### Android Studio Configuration
+
+This project generates large Kotlin files that exceed Android Studio's default indexing limits. Add the following VM option to enable proper code indexing:
+
+```
+-Didea.max.intellisense.filesize=999999
+```
+
+To add this:
+1. Go to `Help` > `Edit Custom VM Options`
+2. Add the line to the `studio.vmoptions` file
+3. Invalidate caches and restart Android Studio
+
+This setting helps resolve indexing issues with large generated files like `wp_api.kt`.
+
+**Troubleshooting:** If Android Studio cannot find `cargo`, it may be using its internal JDK instead of the system one. To fix this, [switch Android Studio to use your system JDK](https://stackoverflow.com/questions/30631286/how-to-specify-the-jdk-version-in-android-studio).
 
