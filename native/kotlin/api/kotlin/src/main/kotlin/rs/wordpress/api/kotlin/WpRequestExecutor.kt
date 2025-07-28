@@ -114,7 +114,7 @@ class WpRequestExecutor(
 
             val call = httpClient.getClient().newCall(requestBuilder.build())
             // Notify about the call creation so it can be cancelled if needed
-            uploadListener?.onUploadStarted(call)
+            uploadListener?.onUploadStarted(CancellableCall(call))
             call.execute().use { response ->
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
@@ -167,13 +167,32 @@ class WpRequestExecutor(
         /**
          * Called when the upload starts.
          *
-         * @param uploadCall The [Call] object representing the upload request. This can be used
-         * to cancel the upload if needed by calling [Call.cancel].
+         * @param cancellableUpload The [CancellableUpload] object representing the upload request. This can be used
+         * to cancel the upload if needed by calling [cancellableUpload.cancel].
          *
          * This method is invoked at the beginning of the upload process, allowing the caller
          * to monitor or control the upload operation.
          */
-        fun onUploadStarted(uploadCall: Call)
+        fun onUploadStarted(cancellableUpload: CancellableUpload)
+    }
+
+    /**
+     * Represents a cancellable upload operation.
+     */
+    interface CancellableUpload {
+        /**
+         * Cancels the upload operation.
+         */
+        fun cancel()
+    }
+
+    /**
+     * Implementation of [CancellableUpload] that delegates to an OkHttp [Call].
+     */
+    class CancellableCall(private val call: Call) : CancellableUpload {
+        override fun cancel() {
+            call.cancel()
+        }
     }
 }
 
