@@ -188,9 +188,13 @@ public actor WordPressAPI {
         return try await withTaskCancellationHandler {
             try await uploadTask.value
         } onCancel: {
-            // Please note: for some reason calling `uploadTask.cancel()` here does not actually cancel
-            // the HTTP request. But calling `progress.cancel()` does, even though `progress.cancel()` eventually
-            // calls `uploadTask.cancel()`.
+            // Please note: the async functions exported by uniffi-rs _do not_ support cancellation.
+            // That means cancelling an API call like `Task { try await api.users.retrieveMe() }.cancel()`
+            // does not cancel the underlying HTTP request sent by URLSession.
+            //
+            // The `progress.cancel()` in this particular function can cancel the HTTP request, because the
+            // `progress` instance is the parent progress of `URLSessionTask.progress`, and cancelling a parent
+            // progress automatically cancels their child progress, which is the `URLSessionTask` in this case.
             progress.cancel()
         }
     }
