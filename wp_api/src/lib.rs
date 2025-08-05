@@ -1,5 +1,6 @@
 use plugins::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use users::*;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
@@ -118,6 +119,14 @@ pub enum JsonValue {
     Object(HashMap<String, JsonValue>),
 }
 
+/// Similar to `JsonValue`, but exported as a Uniffi object.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
+pub struct AnyJson {
+    #[serde(flatten)]
+    pub raw: Value,
+}
+
 uniffi::custom_newtype!(WpResponseString, Option<String>);
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(try_from = "BoolOrString")]
@@ -234,5 +243,31 @@ mod tests {
     #[case(WpApiParamOrder::Desc)]
     fn test_orderby_string_conversion(#[case] orderby: WpApiParamOrder) {
         assert_eq!(orderby, orderby.to_string().parse().unwrap());
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct Person {
+        name: String,
+        #[serde(flatten)]
+        other_fields: AnyJson,
+    }
+
+    #[test]
+    fn test_parse_any_json() {
+        let json = r#"{"name": "Alice", "age": 30, "city": "Wonderland"}"#;
+        let person: Person = serde_json::from_str(json).unwrap();
+        assert_eq!(person.name, "Alice");
+        assert_eq!(
+            person.other_fields.raw,
+            serde_json::json!({"age": 30, "city": "Wonderland"})
+        );
+    }
+
+    #[test]
+    fn test_parse_empty_any_json() {
+        let json = r#"{"name": "Alice"}"#;
+        let person: Person = serde_json::from_str(json).unwrap();
+        assert_eq!(person.name, "Alice");
+        assert_eq!(person.other_fields.raw, serde_json::json!({}));
     }
 }

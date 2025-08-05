@@ -1,5 +1,5 @@
+use serde_json::Value;
 use wp_api::{
-    JsonValue,
     comments::{
         CommentId, CommentListParams, CommentRetrieveParams, CommentStatus, CommentType,
         SparseCommentFieldWithEditContext, SparseCommentFieldWithEmbedContext,
@@ -7,8 +7,9 @@ use wp_api::{
     },
     posts::PostId,
     users::UserAvatarSize,
+    wp_com::{WpComBaseUrl, endpoint::WpComDotOrgApiUrlResolver},
 };
-use wp_api_integration_tests::prelude::*;
+use wp_api_integration_tests::{WpComTestCredentials, prelude::*};
 
 #[tokio::test]
 #[apply(list_cases)]
@@ -217,12 +218,62 @@ async fn parse_extras() {
         .await
         .assert_response()
         .data;
-    match comment.extras {
-        JsonValue::Object(ref map) => {
+    match comment.additional_fields.raw {
+        Value::Object(ref map) => {
             assert!(map.contains_key("_links"));
         }
         _ => panic!("Expected extras to be an object"),
     }
+}
+
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn wpcom_comment_extension() {
+    // You'll need to replace the site ID and comment ID with valid ones.
+    let site_id = "site_id".to_string();
+    let comment_id = CommentId(2);
+    let client = WpApiClient::new(
+        Arc::new(WpComDotOrgApiUrlResolver::new(
+            site_id,
+            WpComBaseUrl::Production,
+        )),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_auth(
+                WpAuthentication::Bearer {
+                    token: WpComTestCredentials::instance().bearer_token.to_string(),
+                },
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
+    );
+    use wp_api::wp_com::endpoint::extensions::comments::WpComCommentExtensionProvider;
+
+    let comment = client
+        .comments()
+        .retrieve_with_view_context(&comment_id, &CommentRetrieveParams::default())
+        .await
+        .assert_response()
+        .data;
+    assert!(comment.additional_fields.parse_extension().is_ok());
+
+    let comment = client
+        .comments()
+        .retrieve_with_edit_context(&comment_id, &CommentRetrieveParams::default())
+        .await
+        .assert_response()
+        .data;
+    assert!(comment.additional_fields.parse_extension().is_ok());
+
+    let comment = client
+        .comments()
+        .retrieve_with_embed_context(&comment_id, &CommentRetrieveParams::default())
+        .await
+        .assert_response()
+        .data;
+    assert!(comment.additional_fields.parse_extension().is_ok());
 }
 
 #[template]
