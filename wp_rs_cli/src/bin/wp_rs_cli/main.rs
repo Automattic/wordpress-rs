@@ -420,7 +420,7 @@ async fn resolve_post_id(client: &WpApiClient, post_url: &str) -> Result<PostId>
     let url = Url::parse(post_url).map_err(|e| anyhow!("Invalid url: {e}"))?;
     let slug_candidate = url
         .path_segments()
-        .and_then(|segs| segs.filter(|s| !s.is_empty()).last())
+        .and_then(|segs| segs.rev().find(|s| !s.is_empty()))
         .map(|s| s.trim_end_matches('/'))
         .unwrap_or("")
         .to_string();
@@ -431,11 +431,13 @@ async fn resolve_post_id(client: &WpApiClient, post_url: &str) -> Result<PostId>
 
     // Query posts by slug; returns an array, take first match.
     // Using view context to ensure public content shape.
-    let mut params = wp_api::posts::PostListParams::default();
-    params.slug = vec![slug_candidate.clone()];
-    params.per_page = Some(1);
+    let params = wp_api::posts::PostListParams {
+        slug: vec![slug_candidate.clone()],
+        per_page: Some(1),
+        ..Default::default()
+    };
     let resp = client.posts().list_with_view_context(&params).await?;
-    if let Some(p) = resp.data.into_iter().find_map(|sp| Some(sp.id)) {
+    if let Some(p) = resp.data.into_iter().map(|sp| sp.id).next() {
         return Ok(p);
     }
 
