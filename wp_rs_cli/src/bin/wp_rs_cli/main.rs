@@ -64,6 +64,42 @@ struct AuthArgs {
     password: Option<String>,
 }
 
+#[derive(Debug, Parser)]
+#[command(group(
+    ArgGroup::new("site_type")
+        .args(["wpcom_site", "api_root", "url"]),
+), group(
+    ArgGroup::new("post_ref")
+        .required(true)
+        .args(["post_id", "url"]),
+))]
+struct FetchPostArgs {
+    /// Common authentication parameters
+    #[command(flatten)]
+    auth: AuthArgs,
+
+    /// Full post URL (alternative to --post-id)
+    /// When provided, this URL is used to infer the site (wp.com) or autodiscover the API root (wp.org/Jetpack).
+    #[arg(long)]
+    url: Option<String>,
+
+    /// The post ID to fetch
+    #[arg(long, value_parser = parse_post_id)]
+    post_id: Option<PostId>,
+
+    /// Password for the post if it is password-protected
+    #[arg(long)]
+    post_password: Option<String>,
+
+    /// Max items per page when fetching comments
+    #[arg(long, default_value_t = 100)]
+    per_page: u32,
+
+    /// Output pretty-printed JSON
+    #[arg(long, default_value_t = false)]
+    pretty: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -365,7 +401,7 @@ fn env_or_arg(value: &Option<String>, var: &str) -> Option<String> {
 async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApiClient> {
     let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
     let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
-    // Determine target and auth
+    // Determine resolver and auth provider
     let api_type = SiteApiType::detect_from_args(args, url, &request_executor).await?;
     let resolver: Arc<dyn ApiUrlResolver> = api_type.api_url_resolver();
     let auth_provider: Arc<WpAuthenticationProvider> = api_type.auth_provider(args)?;
@@ -391,42 +427,6 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
             app_notifier: Arc::new(CliAppNotifier),
         },
     ))
-}
-
-#[derive(Debug, Parser)]
-#[command(group(
-    ArgGroup::new("target")
-        .args(["wpcom_site", "api_root", "url"]),
-), group(
-    ArgGroup::new("post_ref")
-        .required(true)
-        .args(["post_id", "url"]),
-))]
-struct FetchPostArgs {
-    /// Common authentication and target parameters
-    #[command(flatten)]
-    auth: AuthArgs,
-
-    /// Full post URL (alternative to --post-id)
-    /// When provided, this URL is used to infer the site (wp.com) or autodiscover the API root (wp.org/Jetpack).
-    #[arg(long)]
-    url: Option<String>,
-
-    /// The post ID to fetch
-    #[arg(long, value_parser = parse_post_id)]
-    post_id: Option<PostId>,
-
-    /// Password for the post if it is password-protected
-    #[arg(long)]
-    post_password: Option<String>,
-
-    /// Max items per page when fetching comments
-    #[arg(long, default_value_t = 100)]
-    per_page: u32,
-
-    /// Output pretty-printed JSON
-    #[arg(long, default_value_t = false)]
-    pretty: bool,
 }
 
 fn parse_post_id(s: &str) -> Result<PostId, String> {
