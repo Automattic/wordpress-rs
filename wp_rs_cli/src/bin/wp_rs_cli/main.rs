@@ -179,7 +179,6 @@ fn build_login_client() -> WpLoginClient {
 #[derive(Debug, Parser)]
 #[command(group(
     ArgGroup::new("target")
-        .required(true)
         .args(["wpcom_site", "api_root"]),
 ), group(
     ArgGroup::new("post_ref")
@@ -240,20 +239,47 @@ enum TargetSiteResolver {
     WpOrg { api_root: Arc<ParsedUrl> },
 }
 
-fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
+async fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
+    let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
+    let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
     // Determine target and auth
     let target = if let Some(site) = &args.wpcom_site {
+        // Explicit WordPress.com site takes priority
         TargetSiteResolver::WpCom { site: site.clone() }
     } else if let Some(api_root) = &args.api_root {
-        let parsed = ParsedUrl::try_from(api_root.as_str()).map_err(|_| {
-            anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json")
-        })?;
-        TargetSiteResolver::WpOrg {
-            api_root: Arc::new(parsed),
+        // Explicit api_root takes priority for wp.org/Jetpack
+        let parsed = ParsedUrl::try_from(api_root.as_str())
+            .map_err(|_| anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json"))?;
+        TargetSiteResolver::WpOrg { api_root: Arc::new(parsed) }
+    } else if let Some(post_url) = &args.post_url {
+        // Derive from post_url if possible
+        if let Ok(u) = Url::parse(post_url) {
+            let host = u.host_str().unwrap_or("");
+            if host.ends_with(".wordpress.com") {
+                TargetSiteResolver::WpCom { site: host.to_string() }
+            } else {
+                // Attempt autodiscovery of API root from post URL
+                let login_client = WpLoginClient::new_with_default_middleware_pipeline(request_executor.clone());
+                match login_client
+                    .api_discovery(post_url.clone())
+                    .await
+                    .combined_result()
+                    .cloned()
+                {
+                    Ok(success) => TargetSiteResolver::WpOrg { api_root: success.api_root_url },
+                    Err(_) => {
+                        return Err(anyhow!(
+                            "Could not autodiscover API root from --post-url. Please provide --api-root explicitly."
+                        ));
+                    }
+                }
+            }
+        } else {
+            return Err(anyhow!("Invalid --post-url; could not parse URL"));
         }
     } else {
         return Err(anyhow!(
-            "Either --wpcom-site or --api-root must be provided"
+            "Provide either --wpcom-site, or --api-root, or a wordpress.com --post-url"
         ));
     };
 
@@ -294,9 +320,6 @@ fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
             }
         };
 
-    let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
-    let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
-
     #[derive(Debug)]
     struct NoopNotifier;
     #[async_trait::async_trait]
@@ -316,7 +339,7 @@ fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
 }
 
 async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
-    let client = build_api_client(&args)?;
+    let client = build_api_client(&args).await?;
 
     let post_id = resolve_post_id(&client, &args).await?;
 
