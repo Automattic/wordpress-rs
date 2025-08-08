@@ -25,12 +25,12 @@ pub struct WpComCommentExtensionPostInfo {
 
 #[uniffi::export(with_foreign)]
 pub trait WpComCommentExtensionProvider: Send + Sync {
-    fn parse_extension(&self) -> Result<WpComCommentExtension, UniffiSerializationError>;
+    fn parse_wpcom_comments_extension(&self) -> Result<WpComCommentExtension, UniffiSerializationError>;
 }
 
 #[uniffi::export]
 impl WpComCommentExtensionProvider for AnyJson {
-    fn parse_extension(&self) -> Result<WpComCommentExtension, UniffiSerializationError> {
+    fn parse_wpcom_comments_extension(&self) -> Result<WpComCommentExtension, UniffiSerializationError> {
         serde_json::to_string(&self.raw)
             .and_then(|json| serde_json::from_str(&json))
             .map_err(Into::into)

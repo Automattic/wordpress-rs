@@ -257,7 +257,7 @@ async fn wpcom_comment_extension() {
         .await
         .assert_response()
         .data;
-    assert!(comment.additional_fields.parse_extension().is_ok());
+    assert!(comment.additional_fields.parse_wpcom_comments_extension().is_ok());
 
     let comment = client
         .comments()
@@ -265,7 +265,7 @@ async fn wpcom_comment_extension() {
         .await
         .assert_response()
         .data;
-    assert!(comment.additional_fields.parse_extension().is_ok());
+    assert!(comment.additional_fields.parse_wpcom_comments_extension().is_ok());
 
     let comment = client
         .comments()
@@ -273,7 +273,7 @@ async fn wpcom_comment_extension() {
         .await
         .assert_response()
         .data;
-    assert!(comment.additional_fields.parse_extension().is_ok());
+    assert!(comment.additional_fields.parse_wpcom_comments_extension().is_ok());
 }
 
 #[template]
