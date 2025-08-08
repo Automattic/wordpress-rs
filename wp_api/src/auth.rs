@@ -77,6 +77,10 @@ pub trait WpDynamicAuthenticationProvider: Send + Sync + Debug {
 
     /// Refresh the authentication token. The implementation should only return true
     /// if the authentication was successfully refreshed.
+    ///
+    /// **Concurrency:** This method may be called concurrently by multiple request
+    /// executors. Implementations must handle concurrent calls safely and avoid
+    /// unnecessary duplicate refresh operations.
     async fn refresh(&self) -> bool;
 }
 
