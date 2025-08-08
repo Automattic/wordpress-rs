@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{ArgGroup, Args, Parser, Subcommand};
 use colored::Colorize;
 use csv::Writer;
 use futures::stream::StreamExt;
@@ -68,7 +68,7 @@ async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<P
     if let Some(id) = args.post_id {
         return Ok(id);
     }
-    let Some(post_url) = &args.post_url else {
+    let Some(post_url) = &args.url else {
         return Err(anyhow!("Either --post-id or --post-url must be provided"));
     };
 
@@ -179,40 +179,25 @@ fn build_login_client() -> WpLoginClient {
 #[derive(Debug, Parser)]
 #[command(group(
     ArgGroup::new("target")
-        .args(["wpcom_site", "api_root"]),
+        .args(["wpcom_site", "api_root", "url"]),
 ), group(
     ArgGroup::new("post_ref")
         .required(true)
-        .args(["post_id", "post_url"]),
+        .args(["post_id", "url"]),
 ))]
 struct FetchPostArgs {
+    /// Common authentication and target parameters
+    #[command(flatten)]
+    auth: AuthArgs,
+
+    /// Full post URL (alternative to --post-id)
+    /// When provided, this URL is used to infer the site (wp.com) or autodiscover the API root (wp.org/Jetpack).
+    #[arg(long)]
+    url: Option<String>,
+
     /// The post ID to fetch
     #[arg(long, value_parser = parse_post_id)]
     post_id: Option<PostId>,
-
-    /// Full post URL (alternative to --post-id)
-    #[arg(long)]
-    post_url: Option<String>,
-
-    /// For WordPress.com: site identifier (e.g. example.wordpress.com or numeric site id)
-    #[arg(long)]
-    wpcom_site: Option<String>,
-
-    /// For WordPress.org/Jetpack: full API root URL (must end with /wp-json)
-    #[arg(long)]
-    api_root: Option<String>,
-
-    /// Bearer token for WordPress.com (fallback env: WP_BEARER_TOKEN)
-    #[arg(long)]
-    bearer: Option<String>,
-
-    /// Application Password username for wp.org/Jetpack (fallback env: WP_USERNAME)
-    #[arg(long)]
-    username: Option<String>,
-
-    /// Application Password for wp.org/Jetpack (fallback env: WP_APP_PASSWORD)
-    #[arg(long)]
-    password: Option<String>,
 
     /// Password for the post if it is password-protected
     #[arg(long)]
@@ -239,7 +224,30 @@ enum TargetSiteResolver {
     WpOrg { api_root: Arc<ParsedUrl> },
 }
 
-async fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
+#[derive(Debug, Args, Clone)]
+struct AuthArgs {
+    /// WordPress.com site (e.g. example.wordpress.com or numeric ID)
+    #[arg(long)]
+    wpcom_site: Option<String>,
+
+    /// WordPress.org/Jetpack API root (must end with /wp-json)
+    #[arg(long)]
+    api_root: Option<String>,
+
+    /// Bearer token for WordPress.com (fallback env: WP_BEARER_TOKEN)
+    #[arg(long)]
+    bearer: Option<String>,
+
+    /// Application Password username for wp.org/Jetpack (fallback env: WP_USERNAME)
+    #[arg(long)]
+    username: Option<String>,
+
+    /// Application Password for wp.org/Jetpack (fallback env: WP_APP_PASSWORD)
+    #[arg(long)]
+    password: Option<String>,
+}
+
+async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApiClient> {
     let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
     let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
     // Determine target and auth
@@ -248,38 +256,46 @@ async fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
         TargetSiteResolver::WpCom { site: site.clone() }
     } else if let Some(api_root) = &args.api_root {
         // Explicit api_root takes priority for wp.org/Jetpack
-        let parsed = ParsedUrl::try_from(api_root.as_str())
-            .map_err(|_| anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json"))?;
-        TargetSiteResolver::WpOrg { api_root: Arc::new(parsed) }
-    } else if let Some(post_url) = &args.post_url {
-        // Derive from post_url if possible
-        if let Ok(u) = Url::parse(post_url) {
+        let parsed = ParsedUrl::try_from(api_root.as_str()).map_err(|_| {
+            anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json")
+        })?;
+        TargetSiteResolver::WpOrg {
+            api_root: Arc::new(parsed),
+        }
+    } else if let Some(url) = url {
+        // Derive from URL if possible
+        if let Ok(u) = Url::parse(url.as_str()) {
             let host = u.host_str().unwrap_or("");
             if host.ends_with(".wordpress.com") {
-                TargetSiteResolver::WpCom { site: host.to_string() }
+                TargetSiteResolver::WpCom {
+                    site: host.to_string(),
+                }
             } else {
-                // Attempt autodiscovery of API root from post URL
-                let login_client = WpLoginClient::new_with_default_middleware_pipeline(request_executor.clone());
+                // Attempt autodiscovery of API root from URL
+                let login_client =
+                    WpLoginClient::new_with_default_middleware_pipeline(request_executor.clone());
                 match login_client
-                    .api_discovery(post_url.clone())
+                    .api_discovery(url.clone())
                     .await
                     .combined_result()
                     .cloned()
                 {
-                    Ok(success) => TargetSiteResolver::WpOrg { api_root: success.api_root_url },
+                    Ok(success) => TargetSiteResolver::WpOrg {
+                        api_root: success.api_root_url,
+                    },
                     Err(_) => {
                         return Err(anyhow!(
-                            "Could not autodiscover API root from --post-url. Please provide --api-root explicitly."
+                            "Could not autodiscover API root from URL. Please provide --api-root explicitly."
                         ));
                     }
                 }
             }
         } else {
-            return Err(anyhow!("Invalid --post-url; could not parse URL"));
+            return Err(anyhow!("Invalid URL; could not parse"));
         }
     } else {
         return Err(anyhow!(
-            "Provide either --wpcom-site, or --api-root, or a wordpress.com --post-url"
+            "Provide either --wpcom-site, or --api-root, or a wordpress.com URL"
         ));
     };
 
@@ -339,7 +355,7 @@ async fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
 }
 
 async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
-    let client = build_api_client(&args).await?;
+    let client = build_api_client(&args.auth, &args.url).await?;
 
     let post_id = resolve_post_id(&client, &args).await?;
 
