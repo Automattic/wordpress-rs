@@ -325,7 +325,9 @@ impl SiteApiType {
                 site.clone(),
                 WpComBaseUrl::Production,
             )),
-            SiteApiType::WpOrg { api_root } => Arc::new(WpOrgSiteApiUrlResolver::new(api_root.clone())),
+            SiteApiType::WpOrg { api_root } => {
+                Arc::new(WpOrgSiteApiUrlResolver::new(api_root.clone()))
+            }
         }
     }
 
@@ -349,9 +351,7 @@ impl SiteApiType {
                     )
                 })?;
                 Ok(Arc::new(
-                    WpAuthenticationProvider::static_with_username_and_password(
-                        username, password,
-                    ),
+                    WpAuthenticationProvider::static_with_username_and_password(username, password),
                 ))
             }
         }
