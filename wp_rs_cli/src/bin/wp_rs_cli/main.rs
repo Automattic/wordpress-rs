@@ -353,10 +353,15 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
         };
 
     #[derive(Debug)]
-    struct NoopNotifier;
+    struct CliAppNotifier;
     #[async_trait::async_trait]
-    impl WpAppNotifier for NoopNotifier {
-        async fn requested_with_invalid_authentication(&self) {}
+    impl WpAppNotifier for CliAppNotifier {
+        async fn requested_with_invalid_authentication(&self) {
+            eprintln!(
+                "Authentication failed. Please verify your credentials or token and try again."
+            );
+            std::process::exit(1);
+        }
     }
 
     Ok(WpApiClient::new(
@@ -365,7 +370,7 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
             auth_provider,
             request_executor,
             middleware_pipeline,
-            app_notifier: Arc::new(NoopNotifier),
+            app_notifier: Arc::new(CliAppNotifier),
         },
     ))
 }
