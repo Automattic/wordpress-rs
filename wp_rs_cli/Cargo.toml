@@ -16,6 +16,7 @@ tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
 wp_api = { path = "../wp_api", features = [ "reqwest-request-executor" ] }
 async-trait = { workspace = true }
+url = { workspace = true }
 
 [[bin]]
 name = "wp_rs_cli"

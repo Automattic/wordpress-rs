@@ -4808,6 +4808,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "url",
  "wp_api",
 ]
 

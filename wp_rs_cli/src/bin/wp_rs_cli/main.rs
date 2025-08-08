@@ -4,6 +4,7 @@ use colored::Colorize;
 use csv::Writer;
 use futures::stream::StreamExt;
 use std::{fmt::Display, fs::File, sync::Arc, time::Duration};
+use url::Url;
 use wp_api::{
     comments::CommentListParams,
     parsed_url::ParsedUrl,
@@ -61,6 +62,46 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<PostId> {
+    if let Some(id) = args.post_id {
+        return Ok(id);
+    }
+    let Some(post_url) = &args.post_url else {
+        return Err(anyhow!("Either --post-id or --post-url must be provided"));
+    };
+
+    // Strategy: retrieve by slug via posts list API when possible.
+    // For wp.com, the resolver requires site context; for wp.org, api_root is given.
+    // We'll try to parse the URL and extract a last path segment as potential slug.
+    let url = Url::parse(post_url).map_err(|e| anyhow!("Invalid --post-url: {e}"))?;
+    let slug_candidate = url
+        .path_segments()
+        .and_then(|segs| segs.filter(|s| !s.is_empty()).last())
+        .map(|s| s.trim_end_matches('/'))
+        .unwrap_or("")
+        .to_string();
+
+    if slug_candidate.is_empty() {
+        return Err(anyhow!("Could not parse a slug from --post-url"));
+    }
+
+    // Query posts by slug; returns an array, take first match.
+    // Using view context to ensure public content shape.
+    let mut params = wp_api::posts::PostListParams::default();
+    params.slug = vec![slug_candidate.clone()];
+    params.per_page = Some(1);
+    let resp = client.posts().list_with_view_context(&params).await?;
+    if let Some(p) = resp.data.into_iter().find_map(|sp| Some(sp.id)) {
+        return Ok(p);
+    }
+
+    Err(anyhow!(
+        "No post found for slug '{slug}' parsed from URL '{url}'",
+        slug = slug_candidate,
+        url = post_url
+    ))
 }
 
 async fn discover_login_url(login_client: &WpLoginClient, site: String) {
@@ -140,11 +181,19 @@ fn build_login_client() -> WpLoginClient {
     ArgGroup::new("target")
         .required(true)
         .args(["wpcom_site", "api_root"]),
+), group(
+    ArgGroup::new("post_ref")
+        .required(true)
+        .args(["post_id", "post_url"]),
 ))]
 struct FetchPostArgs {
     /// The post ID to fetch
     #[arg(long, value_parser = parse_post_id)]
-    post_id: PostId,
+    post_id: Option<PostId>,
+
+    /// Full post URL (alternative to --post-id)
+    #[arg(long)]
+    post_url: Option<String>,
 
     /// For WordPress.com: site identifier (e.g. example.wordpress.com or numeric site id)
     #[arg(long)]
@@ -269,10 +318,12 @@ fn build_api_client(args: &FetchPostArgs) -> Result<WpApiClient> {
 async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
     let client = build_api_client(&args)?;
 
+    let post_id = resolve_post_id(&client, &args).await?;
+
     let post = client
         .posts()
         .retrieve_with_view_context(
-            &args.post_id,
+            &post_id,
             &PostRetrieveParams {
                 password: args.post_password.clone(),
             },
@@ -283,7 +334,7 @@ async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
     let mut page = client
         .comments()
         .list_with_view_context(&CommentListParams {
-            post: vec![args.post_id],
+            post: vec![post_id],
             per_page: Some(args.per_page),
             ..Default::default()
         })
