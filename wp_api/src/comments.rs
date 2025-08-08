@@ -530,6 +530,7 @@ pub struct SparseComment {
     pub author_avatar_urls: Option<HashMap<UserAvatarSize, WpResponseString>>,
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
+    #[WpContextualExcludeFromFields]
     pub additional_fields: Option<Arc<AnyJson>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
 }
