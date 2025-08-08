@@ -418,13 +418,13 @@ async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<P
         return Ok(id);
     }
     let Some(post_url) = &args.url else {
-        return Err(anyhow!("Either --post-id or --post-url must be provided"));
+        return Err(anyhow!("Either --post-id or --url must be provided"));
     };
 
     // Strategy: retrieve by slug via posts list API when possible.
     // For wp.com, the resolver requires site context; for wp.org, api_root is given.
     // We'll try to parse the URL and extract a last path segment as potential slug.
-    let url = Url::parse(post_url).map_err(|e| anyhow!("Invalid --post-url: {e}"))?;
+    let url = Url::parse(post_url).map_err(|e| anyhow!("Invalid url: {e}"))?;
     let slug_candidate = url
         .path_segments()
         .and_then(|segs| segs.filter(|s| !s.is_empty()).last())
@@ -433,7 +433,7 @@ async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<P
         .to_string();
 
     if slug_candidate.is_empty() {
-        return Err(anyhow!("Could not parse a slug from --post-url"));
+        return Err(anyhow!("Could not parse a slug from url"));
     }
 
     // Query posts by slug; returns an array, take first match.
