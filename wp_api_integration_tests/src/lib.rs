@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use wp_api::wp_com::{client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver, WpComBaseUrl};
+use wp_api::wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver};
 
 pub mod mock;
 pub mod prelude;

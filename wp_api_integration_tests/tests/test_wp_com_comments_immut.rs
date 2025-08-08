@@ -1,9 +1,9 @@
 use wp_api::{
     comments::{CommentId, CommentRetrieveParams},
-    wp_com::endpoint::extensions::comments::WpComCommentExtensionProvider
+    wp_com::endpoint::extensions::comments::WpComCommentExtensionProvider,
 };
 
-use wp_api_integration_tests::{api_client_backed_by_wp_com, prelude::*, WpComTestCredentials};
+use wp_api_integration_tests::{WpComTestCredentials, api_client_backed_by_wp_com, prelude::*};
 
 #[tokio::test]
 #[parallel]
