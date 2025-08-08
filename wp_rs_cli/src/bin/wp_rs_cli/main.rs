@@ -41,6 +41,29 @@ enum Commands {
     FetchPost(FetchPostArgs),
 }
 
+#[derive(Debug, Args, Clone)]
+struct AuthArgs {
+    /// WordPress.com site (e.g. example.wordpress.com or numeric ID)
+    #[arg(long)]
+    wpcom_site: Option<String>,
+
+    /// WordPress.org/Jetpack API root (must end with /wp-json)
+    #[arg(long)]
+    api_root: Option<String>,
+
+    /// Bearer token for WordPress.com (fallback env: WP_BEARER_TOKEN)
+    #[arg(long)]
+    bearer: Option<String>,
+
+    /// Application Password username for wp.org/Jetpack (fallback env: WP_USERNAME)
+    #[arg(long)]
+    username: Option<String>,
+
+    /// Application Password for wp.org/Jetpack (fallback env: WP_APP_PASSWORD)
+    #[arg(long)]
+    password: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -62,46 +85,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<PostId> {
-    if let Some(id) = args.post_id {
-        return Ok(id);
-    }
-    let Some(post_url) = &args.url else {
-        return Err(anyhow!("Either --post-id or --post-url must be provided"));
-    };
-
-    // Strategy: retrieve by slug via posts list API when possible.
-    // For wp.com, the resolver requires site context; for wp.org, api_root is given.
-    // We'll try to parse the URL and extract a last path segment as potential slug.
-    let url = Url::parse(post_url).map_err(|e| anyhow!("Invalid --post-url: {e}"))?;
-    let slug_candidate = url
-        .path_segments()
-        .and_then(|segs| segs.filter(|s| !s.is_empty()).last())
-        .map(|s| s.trim_end_matches('/'))
-        .unwrap_or("")
-        .to_string();
-
-    if slug_candidate.is_empty() {
-        return Err(anyhow!("Could not parse a slug from --post-url"));
-    }
-
-    // Query posts by slug; returns an array, take first match.
-    // Using view context to ensure public content shape.
-    let mut params = wp_api::posts::PostListParams::default();
-    params.slug = vec![slug_candidate.clone()];
-    params.per_page = Some(1);
-    let resp = client.posts().list_with_view_context(&params).await?;
-    if let Some(p) = resp.data.into_iter().find_map(|sp| Some(sp.id)) {
-        return Ok(p);
-    }
-
-    Err(anyhow!(
-        "No post found for slug '{slug}' parsed from URL '{url}'",
-        slug = slug_candidate,
-        url = post_url
-    ))
 }
 
 async fn discover_login_url(login_client: &WpLoginClient, site: String) {
@@ -176,75 +159,109 @@ fn build_login_client() -> WpLoginClient {
     WpLoginClient::new_with_default_middleware_pipeline(request_executor)
 }
 
-#[derive(Debug, Parser)]
-#[command(group(
-    ArgGroup::new("target")
-        .args(["wpcom_site", "api_root", "url"]),
-), group(
-    ArgGroup::new("post_ref")
-        .required(true)
-        .args(["post_id", "url"]),
-))]
-struct FetchPostArgs {
-    /// Common authentication and target parameters
-    #[command(flatten)]
-    auth: AuthArgs,
-
-    /// Full post URL (alternative to --post-id)
-    /// When provided, this URL is used to infer the site (wp.com) or autodiscover the API root (wp.org/Jetpack).
-    #[arg(long)]
-    url: Option<String>,
-
-    /// The post ID to fetch
-    #[arg(long, value_parser = parse_post_id)]
-    post_id: Option<PostId>,
-
-    /// Password for the post if it is password-protected
-    #[arg(long)]
-    post_password: Option<String>,
-
-    /// Max items per page when fetching comments
-    #[arg(long, default_value_t = 100)]
-    per_page: u32,
-
-    /// Output pretty-printed JSON
-    #[arg(long, default_value_t = false)]
-    pretty: bool,
+fn parse_input_file(input_file: &str) -> Result<Vec<BatchTestRow>> {
+    Ok(csv::Reader::from_path(input_file)?
+        .deserialize::<BatchTestRow>()
+        .filter_map(|r| r.ok())
+        .collect())
 }
 
-fn parse_post_id(s: &str) -> Result<PostId, String> {
-    s.parse::<i64>()
-        .map(PostId)
-        .map_err(|e| format!("Invalid post id '{s}': {e}"))
+#[derive(Debug, serde::Deserialize)]
+struct BatchTestRow {
+    #[serde(rename = "URL")]
+    url: String,
+}
+
+#[derive(Debug)]
+struct SimplifiedDiscoveryResult {
+    attempt_site_url: String,
+    result: Result<LoginUrl, AutoDiscoveryAttemptFailure>,
+}
+
+impl SimplifiedDiscoveryResult {
+    fn success(attempt_site_url: String, login_url: LoginUrl) -> Self {
+        Self {
+            attempt_site_url,
+            result: Ok(login_url),
+        }
+    }
+
+    fn failure(attempt_site_url: String, error: AutoDiscoveryAttemptFailure) -> Self {
+        Self {
+            attempt_site_url,
+            result: Err(error),
+        }
+    }
+
+    fn write_as_csv_record(self, writer: &mut csv::Writer<File>) -> Result<()> {
+        let (error_type, error_message) = self
+            .result
+            .as_ref()
+            .err()
+            .map(|e| (csv_error_type(e), e.to_string()))
+            .unwrap_or(("".to_string(), "".to_string()));
+        Ok(writer.write_record(&[
+            self.result.is_ok().to_string(),
+            self.attempt_site_url,
+            error_type,
+            error_message,
+        ])?)
+    }
+
+    fn log_result(&self) {
+        match &self.result {
+            Ok(login_url) => {
+                println!("{}", format!("Login URL found: {login_url}").green());
+            }
+            Err(error) => {
+                println!("{}", error.to_string().red());
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LoginUrl(Arc<ParsedUrl>);
+
+impl Display for LoginUrl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+fn csv_error_type(failure: &AutoDiscoveryAttemptFailure) -> String {
+    match failure {
+        AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => "ParseSiteUrl".to_string(),
+        AutoDiscoveryAttemptFailure::FindApiRoot {
+            find_api_root_failure,
+            ..
+        } => match find_api_root_failure {
+            FindApiRootFailure::FetchHomepage { .. } => "FetchHomepage".to_string(),
+            FindApiRootFailure::ProbablyNotAWordPressSite => {
+                "ProbablyNotAWordPressSite".to_string()
+            }
+            FindApiRootFailure::RestApiDisabled => "RestApiDisabled".to_string(),
+        },
+        AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+            fetch_and_parse_api_root_failure,
+            ..
+        } => match fetch_and_parse_api_root_failure {
+            FetchAndParseApiRootFailure::FetchApiRoot { .. } => "FetchApiRoot".to_string(),
+            FetchAndParseApiRootFailure::ParseApiRoot { .. } => "ParseApiRoot".to_string(),
+            FetchAndParseApiRootFailure::WpError { error_code, .. } => {
+                format!("WpError-{error_code:#?}")
+            }
+            FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } => {
+                format!("ApplicationPasswordsNotSupported-{reason:#?}")
+            }
+        },
+    }
 }
 
 #[derive(Debug)]
 enum TargetSiteResolver {
     WpCom { site: String },
     WpOrg { api_root: Arc<ParsedUrl> },
-}
-
-#[derive(Debug, Args, Clone)]
-struct AuthArgs {
-    /// WordPress.com site (e.g. example.wordpress.com or numeric ID)
-    #[arg(long)]
-    wpcom_site: Option<String>,
-
-    /// WordPress.org/Jetpack API root (must end with /wp-json)
-    #[arg(long)]
-    api_root: Option<String>,
-
-    /// Bearer token for WordPress.com (fallback env: WP_BEARER_TOKEN)
-    #[arg(long)]
-    bearer: Option<String>,
-
-    /// Application Password username for wp.org/Jetpack (fallback env: WP_USERNAME)
-    #[arg(long)]
-    username: Option<String>,
-
-    /// Application Password for wp.org/Jetpack (fallback env: WP_APP_PASSWORD)
-    #[arg(long)]
-    password: Option<String>,
 }
 
 async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApiClient> {
@@ -354,6 +371,88 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
     ))
 }
 
+#[derive(Debug, Parser)]
+#[command(group(
+    ArgGroup::new("target")
+        .args(["wpcom_site", "api_root", "url"]),
+), group(
+    ArgGroup::new("post_ref")
+        .required(true)
+        .args(["post_id", "url"]),
+))]
+struct FetchPostArgs {
+    /// Common authentication and target parameters
+    #[command(flatten)]
+    auth: AuthArgs,
+
+    /// Full post URL (alternative to --post-id)
+    /// When provided, this URL is used to infer the site (wp.com) or autodiscover the API root (wp.org/Jetpack).
+    #[arg(long)]
+    url: Option<String>,
+
+    /// The post ID to fetch
+    #[arg(long, value_parser = parse_post_id)]
+    post_id: Option<PostId>,
+
+    /// Password for the post if it is password-protected
+    #[arg(long)]
+    post_password: Option<String>,
+
+    /// Max items per page when fetching comments
+    #[arg(long, default_value_t = 100)]
+    per_page: u32,
+
+    /// Output pretty-printed JSON
+    #[arg(long, default_value_t = false)]
+    pretty: bool,
+}
+
+fn parse_post_id(s: &str) -> Result<PostId, String> {
+    s.parse::<i64>()
+        .map(PostId)
+        .map_err(|e| format!("Invalid post id '{s}': {e}"))
+}
+
+async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<PostId> {
+    if let Some(id) = args.post_id {
+        return Ok(id);
+    }
+    let Some(post_url) = &args.url else {
+        return Err(anyhow!("Either --post-id or --post-url must be provided"));
+    };
+
+    // Strategy: retrieve by slug via posts list API when possible.
+    // For wp.com, the resolver requires site context; for wp.org, api_root is given.
+    // We'll try to parse the URL and extract a last path segment as potential slug.
+    let url = Url::parse(post_url).map_err(|e| anyhow!("Invalid --post-url: {e}"))?;
+    let slug_candidate = url
+        .path_segments()
+        .and_then(|segs| segs.filter(|s| !s.is_empty()).last())
+        .map(|s| s.trim_end_matches('/'))
+        .unwrap_or("")
+        .to_string();
+
+    if slug_candidate.is_empty() {
+        return Err(anyhow!("Could not parse a slug from --post-url"));
+    }
+
+    // Query posts by slug; returns an array, take first match.
+    // Using view context to ensure public content shape.
+    let mut params = wp_api::posts::PostListParams::default();
+    params.slug = vec![slug_candidate.clone()];
+    params.per_page = Some(1);
+    let resp = client.posts().list_with_view_context(&params).await?;
+    if let Some(p) = resp.data.into_iter().find_map(|sp| Some(sp.id)) {
+        return Ok(p);
+    }
+
+    Err(anyhow!(
+        "No post found for slug '{slug}' parsed from URL '{url}'",
+        slug = slug_candidate,
+        url = post_url
+    ))
+}
+
 async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
     let client = build_api_client(&args.auth, &args.url).await?;
 
@@ -397,103 +496,4 @@ async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
         println!("{}", serde_json::to_string(&out)?);
     }
     Ok(())
-}
-
-fn parse_input_file(input_file: &str) -> Result<Vec<BatchTestRow>> {
-    Ok(csv::Reader::from_path(input_file)?
-        .deserialize::<BatchTestRow>()
-        .filter_map(|r| r.ok())
-        .collect())
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct BatchTestRow {
-    #[serde(rename = "URL")]
-    url: String,
-}
-
-#[derive(Debug)]
-struct SimplifiedDiscoveryResult {
-    attempt_site_url: String,
-    result: Result<LoginUrl, AutoDiscoveryAttemptFailure>,
-}
-
-impl SimplifiedDiscoveryResult {
-    fn success(attempt_site_url: String, login_url: LoginUrl) -> Self {
-        Self {
-            attempt_site_url,
-            result: Ok(login_url),
-        }
-    }
-
-    fn failure(attempt_site_url: String, error: AutoDiscoveryAttemptFailure) -> Self {
-        Self {
-            attempt_site_url,
-            result: Err(error),
-        }
-    }
-
-    fn write_as_csv_record(self, writer: &mut csv::Writer<File>) -> Result<()> {
-        let (error_type, error_message) = self
-            .result
-            .as_ref()
-            .err()
-            .map(|e| (csv_error_type(e), e.to_string()))
-            .unwrap_or(("".to_string(), "".to_string()));
-        Ok(writer.write_record(&[
-            self.result.is_ok().to_string(),
-            self.attempt_site_url,
-            error_type,
-            error_message,
-        ])?)
-    }
-
-    fn log_result(&self) {
-        match &self.result {
-            Ok(login_url) => {
-                println!("{}", format!("Login URL found: {login_url}").green());
-            }
-            Err(error) => {
-                println!("{}", error.to_string().red());
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-struct LoginUrl(Arc<ParsedUrl>);
-
-impl Display for LoginUrl {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-fn csv_error_type(failure: &AutoDiscoveryAttemptFailure) -> String {
-    match failure {
-        AutoDiscoveryAttemptFailure::ParseSiteUrl { .. } => "ParseSiteUrl".to_string(),
-        AutoDiscoveryAttemptFailure::FindApiRoot {
-            find_api_root_failure,
-            ..
-        } => match find_api_root_failure {
-            FindApiRootFailure::FetchHomepage { .. } => "FetchHomepage".to_string(),
-            FindApiRootFailure::ProbablyNotAWordPressSite => {
-                "ProbablyNotAWordPressSite".to_string()
-            }
-            FindApiRootFailure::RestApiDisabled => "RestApiDisabled".to_string(),
-        },
-        AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
-            fetch_and_parse_api_root_failure,
-            ..
-        } => match fetch_and_parse_api_root_failure {
-            FetchAndParseApiRootFailure::FetchApiRoot { .. } => "FetchApiRoot".to_string(),
-            FetchAndParseApiRootFailure::ParseApiRoot { .. } => "ParseApiRoot".to_string(),
-            FetchAndParseApiRootFailure::WpError { error_code, .. } => {
-                format!("WpError-{error_code:#?}")
-            }
-            FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } => {
-                format!("ApplicationPasswordsNotSupported-{reason:#?}")
-            }
-        },
-    }
 }
