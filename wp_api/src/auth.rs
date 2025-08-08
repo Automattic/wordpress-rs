@@ -1,4 +1,5 @@
 use http::HeaderValue;
+use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, uniffi::Enum)]
@@ -70,8 +71,17 @@ impl ModifiableAuthenticationProvider {
 }
 
 #[uniffi::export(with_foreign)]
-pub trait WpDynamicAuthenticationProvider: Send + Sync {
+#[async_trait::async_trait]
+pub trait WpDynamicAuthenticationProvider: Send + Sync + Debug {
     fn auth(&self) -> WpAuthentication;
+
+    /// Refresh the authentication token. The implementation should only return true
+    /// if the authentication was successfully refreshed.
+    ///
+    /// **Concurrency:** This method may be called concurrently by multiple request
+    /// executors. Implementations must handle concurrent calls safely and avoid
+    /// unnecessary duplicate refresh operations.
+    async fn refresh(&self) -> bool;
 }
 
 #[derive(uniffi::Object)]
@@ -133,6 +143,16 @@ impl WpAuthenticationProvider {
                 inner.auth().header_value()
             }
             WpAuthenticationProvider::Modifiable { inner } => inner.header_value(),
+        }
+    }
+
+    pub(crate) async fn refresh(&self) -> bool {
+        match self {
+            WpAuthenticationProvider::StaticAuthenticationProvider { .. } => false,
+            WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => {
+                inner.refresh().await
+            }
+            WpAuthenticationProvider::Modifiable { .. } => false,
         }
     }
 }

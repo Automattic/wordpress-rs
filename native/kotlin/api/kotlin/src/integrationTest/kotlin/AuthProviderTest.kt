@@ -1,5 +1,8 @@
 package rs.wordpress.api.kotlin
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.ModifiableAuthenticationProvider
@@ -31,7 +34,10 @@ class AuthProviderTest {
 
     @Test
     fun testDynamicAuthProvider() = runTest {
-        class DynamicAuthProvider(var isAuthorized: Boolean = false): WpDynamicAuthenticationProvider {
+        class DynamicAuthProvider(
+            var isAuthorized: Boolean = false,
+            private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+        ): WpDynamicAuthenticationProvider {
             override fun auth(): WpAuthentication =
                 if (isAuthorized) {
                     wpAuthenticationFromUsernameAndPassword(
@@ -41,6 +47,7 @@ class AuthProviderTest {
                 } else {
                     WpAuthentication.None
                 }
+            override suspend fun refresh(): Boolean = withContext(dispatcher) { false }
         }
 
         val dynamicAuthProvider = DynamicAuthProvider()
