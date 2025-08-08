@@ -413,14 +413,7 @@ fn parse_post_id(s: &str) -> Result<PostId, String> {
         .map_err(|e| format!("Invalid post id '{s}': {e}"))
 }
 
-async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<PostId> {
-    if let Some(id) = args.post_id {
-        return Ok(id);
-    }
-    let Some(post_url) = &args.url else {
-        return Err(anyhow!("Either --post-id or --url must be provided"));
-    };
-
+async fn resolve_post_id(client: &WpApiClient, post_url: &str) -> Result<PostId> {
     // Strategy: retrieve by slug via posts list API when possible.
     // For wp.com, the resolver requires site context; for wp.org, api_root is given.
     // We'll try to parse the URL and extract a last path segment as potential slug.
@@ -456,7 +449,15 @@ async fn resolve_post_id(client: &WpApiClient, args: &FetchPostArgs) -> Result<P
 async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
     let client = build_api_client(&args.auth, &args.url).await?;
 
-    let post_id = resolve_post_id(&client, &args).await?;
+    let post_id = if let Some(id) = args.post_id {
+        id
+    } else {
+        let post_url = args
+            .url
+            .as_ref()
+            .ok_or_else(|| anyhow!("Either --post-id or --url must be provided"))?;
+        resolve_post_id(&client, post_url.as_str()).await?
+    };
 
     let post = client
         .posts()
