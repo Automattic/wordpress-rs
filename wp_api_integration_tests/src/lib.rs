@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver};
 
 pub mod mock;
 pub mod prelude;
@@ -42,6 +42,7 @@ pub struct WpComTestCredentials {
     pub site_id: u64,
     pub wp_com_subscriber_user_id: i64,
     pub email_subscriber_subscription_id: u64,
+    pub comment_id: i64,
 }
 
 pub mod backend;
@@ -150,6 +151,25 @@ pub fn wp_com_client() -> WpComApiClient {
         middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         app_notifier: Arc::new(EmptyAppNotifier),
     })
+}
+
+pub fn api_client_backed_by_wp_com(site_id: String) -> WpApiClient {
+    WpApiClient::new(
+        Arc::new(WpComDotOrgApiUrlResolver::new(
+            site_id,
+            WpComBaseUrl::Production,
+        )),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_auth(
+                WpAuthentication::Bearer {
+                    token: WpComTestCredentials::instance().bearer_token.to_string(),
+                },
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
+    )
 }
 
 pub fn test_site_url() -> ParsedUrl {

@@ -275,6 +275,9 @@ fn generate_integration_test_helper(
     let mut assertions = Vec::with_capacity(fields.len());
     let mut rs_test_cases = Vec::with_capacity(fields.len());
     for f in fields {
+        if f.is_wp_contextual_exclude_from_fields {
+            continue;
+        }
         if let Some(f_ident) = &f.field.ident {
             let variant_ident = format_ident!("{}", f_ident.to_string().to_case(Case::UpperCamel));
             let field_ident_str = f_ident.to_string();
