@@ -268,6 +268,45 @@
 //! ```
 //! ---
 //!
+//! In some cases, you might want to exclude certain fields from the generated field enums (like
+//! `SparseFooFieldWithEditContext`). This is particularly useful for fields that are not suitable for
+//! field filtering, such as catch-all fields for additional data or serde flattened fields. The
+//! `WpContextualExcludeFromFields` attribute can be used for this purpose:
+//!
+//! ```
+//! # use wp_contextual::WpContextual;
+//! #[derive(WpContextual)]
+//! pub struct SparseComment {
+//!     #[WpContext(edit, embed, view)]
+//!     pub id: Option<u32>,
+//!     #[WpContext(edit, embed, view)]
+//!     #[WpContextualExcludeFromFields]
+//!     pub additional_fields: Option<String>,
+//! }
+//! # // We need these 2 lines for UniFFI
+//! # uniffi::setup_scaffolding!();
+//! # fn main() {}
+//! ```
+//!
+//! This will generate the contextual types as usual, but the field enums will exclude the `additional_fields` field:
+//!
+//! ```
+//! pub enum SparseCommentFieldWithEditContext {
+//!     Id,
+//!     // Note: additional_fields is excluded from field filtering
+//! }
+//! pub enum SparseCommentFieldWithEmbedContext {
+//!     Id,
+//!     // Note: additional_fields is excluded from field filtering
+//! }
+//! pub enum SparseCommentFieldWithViewContext {
+//!     Id,
+//!     // Note: additional_fields is excluded from field filtering
+//! }
+//! ```
+//!
+//! ---
+//!
 //! Most endpoints support filtering the fields by `_fields` argument which means some of the
 //! fields might be missing from the response. In these cases, we want to use the `Sparse` type.
 //! In order to make it easier to combine `context` & `_fields` arguments, and get the most useful
@@ -342,6 +381,8 @@ mod wp_contextual;
 ///   type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
 ///   `BazWithViewContext`.
 /// * `[WpContextualOption]` is used to tell the compiler to keep the field's `Option` type.
+/// * `[WpContextualExcludeFromFields]` is used to exclude a field from the generated field enums
+///   (`SparseFooFieldWithEditContext`, etc.) while still including it in the contextual types.
 /// * Generated types will have the following derive macros:
 ///   `#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]`. These types are meant
 ///   to be used for the
@@ -453,7 +494,12 @@ mod wp_contextual;
 ///   `#[WpContextualOption]`.
 #[proc_macro_derive(
     WpContextual,
-    attributes(WpContext, WpContextualField, WpContextualOption)
+    attributes(
+        WpContext,
+        WpContextualField,
+        WpContextualOption,
+        WpContextualExcludeFromFields
+    )
 )]
 pub fn derive(input: TokenStream) -> TokenStream {
     wp_contextual::wp_contextual(parse_macro_input!(input))

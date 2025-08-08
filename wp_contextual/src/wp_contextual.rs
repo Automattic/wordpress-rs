@@ -148,6 +148,9 @@ fn parse_fields(
                     if is_wp_contextual_option_ident(segment_ident) {
                         return Ok(WpParsedAttr::ParsedWpContextualOption);
                     }
+                    if is_wp_contextual_exclude_from_fields_ident(segment_ident) {
+                        return Ok(WpParsedAttr::ParsedWpContextualExcludeFromFields);
+                    }
                     if is_wp_context_ident(segment_ident) {
                         if let syn::Meta::List(meta_list) = &attr.meta {
                             let contexts = parse_contexts_from_tokens(meta_list.tokens.clone())?;
@@ -228,6 +231,9 @@ fn generate_sparse_field_type(
     let mut variant_idents = Vec::with_capacity(fields.len());
     let mut as_field_names = Vec::with_capacity(fields.len());
     for f in fields {
+        if f.is_wp_contextual_exclude_from_fields {
+            continue;
+        }
         if let Some(f_ident) = &f.field.ident {
             let field_name = f_ident.to_string();
             let variant_ident = format_ident!("{}", field_name.to_case(Case::UpperCamel));
@@ -335,6 +341,7 @@ fn generate_integration_test_helper(
 struct GeneratedContextualField {
     field: syn::Field,
     is_wp_contextual_option: bool,
+    is_wp_contextual_exclude_from_fields: bool,
 }
 
 impl GeneratedContextualField {
@@ -364,6 +371,10 @@ impl GeneratedContextualField {
                 let is_wp_contextual_option = pf
                     .parsed_attrs
                     .contains(&WpParsedAttr::ParsedWpContextualOption);
+
+                let is_wp_contextual_exclude_from_fields = pf
+                    .parsed_attrs
+                    .contains(&WpParsedAttr::ParsedWpContextualExcludeFromFields);
 
                 let new_type = if is_wp_contextual_option {
                     f.ty.clone()
@@ -411,6 +422,7 @@ impl GeneratedContextualField {
                 Ok(Self {
                     field: new_field,
                     is_wp_contextual_option,
+                    is_wp_contextual_exclude_from_fields,
                 })
             })
             .collect()
@@ -667,6 +679,10 @@ fn is_wp_contextual_option_ident(ident: &Ident) -> bool {
     ident.to_string().eq("WpContextualOption")
 }
 
+fn is_wp_contextual_exclude_from_fields_ident(ident: &Ident) -> bool {
+    ident.to_string().eq("WpContextualExcludeFromFields")
+}
+
 // ```
 // #[WpContextual]
 // pub struct SparseFoo {
@@ -716,6 +732,7 @@ struct WpParsedField {
 enum WpParsedAttr {
     ParsedWpContextualField,
     ParsedWpContextualOption,
+    ParsedWpContextualExcludeFromFields,
     ParsedWpContext { contexts: Vec<WpContextAttr> },
     ExternalAttr { attr: Box<syn::Attribute> },
 }
