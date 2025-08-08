@@ -258,35 +258,41 @@ fn csv_error_type(failure: &AutoDiscoveryAttemptFailure) -> String {
     }
 }
 
-async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApiClient> {
-    let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
-    let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
-    #[derive(Debug)]
-    enum TargetSiteResolver {
-        WpCom { site: String },
-        WpOrg { api_root: Arc<ParsedUrl> },
-    }
-    // Determine target and auth
-    let target = if let Some(site) = &args.wpcom_site {
-        // Explicit WordPress.com site takes priority
-        TargetSiteResolver::WpCom { site: site.clone() }
-    } else if let Some(api_root) = &args.api_root {
-        // Explicit api_root takes priority for wp.org/Jetpack
-        let parsed = ParsedUrl::try_from(api_root.as_str()).map_err(|_| {
-            anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json")
-        })?;
-        TargetSiteResolver::WpOrg {
-            api_root: Arc::new(parsed),
+#[derive(Debug)]
+enum SiteApiType {
+    WpCom { site: String },
+    WpOrg { api_root: Arc<ParsedUrl> },
+}
+
+impl SiteApiType {
+    async fn detect_from_args(
+        args: &AuthArgs,
+        url: &Option<String>,
+        request_executor: &Arc<ReqwestRequestExecutor>,
+    ) -> Result<Self> {
+        if let Some(site) = &args.wpcom_site {
+            // Explicit WordPress.com site takes priority
+            return Ok(SiteApiType::WpCom { site: site.clone() });
         }
-    } else if let Some(url) = url {
-        // Derive from URL if possible
-        if let Ok(u) = Url::parse(url.as_str()) {
-            let host = u.host_str().unwrap_or("");
-            if host.ends_with(".wordpress.com") {
-                TargetSiteResolver::WpCom {
-                    site: host.to_string(),
+        if let Some(api_root) = &args.api_root {
+            // Explicit api_root takes priority for wp.org/Jetpack
+            let parsed = ParsedUrl::try_from(api_root.as_str()).map_err(|_| {
+                anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json")
+            })?;
+            return Ok(SiteApiType::WpOrg {
+                api_root: Arc::new(parsed),
+            });
+        }
+        if let Some(url) = url {
+            // Derive from URL if possible
+            if let Ok(u) = Url::parse(url.as_str()) {
+                let host = u.host_str().unwrap_or("");
+                if host.ends_with(".wordpress.com") {
+                    return Ok(SiteApiType::WpCom {
+                        site: host.to_string(),
+                    });
                 }
-            } else {
+
                 // Attempt autodiscovery of API root from URL
                 let login_client =
                     WpLoginClient::new_with_default_middleware_pipeline(request_executor.clone());
@@ -296,45 +302,44 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
                     .combined_result()
                     .cloned()
                 {
-                    Ok(success) => TargetSiteResolver::WpOrg {
+                    Ok(success) => Ok(SiteApiType::WpOrg {
                         api_root: success.api_root_url,
-                    },
-                    Err(_) => {
-                        return Err(anyhow!(
-                            "Could not autodiscover API root from URL. Please provide --api-root explicitly."
-                        ));
-                    }
+                    }),
+                    Err(_) => Err(anyhow!(
+                        "Could not autodiscover API root from URL. Please provide --api-root explicitly."
+                    )),
                 }
+            } else {
+                Err(anyhow!("Invalid URL; could not parse"))
             }
         } else {
-            return Err(anyhow!("Invalid URL; could not parse"));
+            Err(anyhow!(
+                "Provide either --wpcom-site, or --api-root, or a wordpress.com URL"
+            ))
         }
-    } else {
-        return Err(anyhow!(
-            "Provide either --wpcom-site, or --api-root, or a wordpress.com URL"
-        ));
-    };
-
-    fn env_or_arg(value: &Option<String>, var: &str) -> Option<String> {
-        value.clone().or_else(|| std::env::var(var).ok())
     }
 
-    let (resolver, auth_provider): (Arc<dyn ApiUrlResolver>, Arc<WpAuthenticationProvider>) =
-        match target {
-            TargetSiteResolver::WpCom { site } => {
+    fn api_url_resolver(&self) -> Arc<dyn ApiUrlResolver> {
+        match self {
+            SiteApiType::WpCom { site } => Arc::new(WpComDotOrgApiUrlResolver::new(
+                site.clone(),
+                WpComBaseUrl::Production,
+            )),
+            SiteApiType::WpOrg { api_root } => Arc::new(WpOrgSiteApiUrlResolver::new(api_root.clone())),
+        }
+    }
+
+    fn auth_provider(&self, args: &AuthArgs) -> Result<Arc<WpAuthenticationProvider>> {
+        match self {
+            SiteApiType::WpCom { .. } => {
                 let token = env_or_arg(&args.bearer, "WP_BEARER_TOKEN").ok_or_else(|| {
                     anyhow!("Missing bearer token. Provide --bearer or set WP_BEARER_TOKEN")
                 })?;
-                let resolver: Arc<dyn ApiUrlResolver> = Arc::new(WpComDotOrgApiUrlResolver::new(
-                    site,
-                    WpComBaseUrl::Production,
-                ));
-                let auth_provider = Arc::new(WpAuthenticationProvider::static_with_auth(
+                Ok(Arc::new(WpAuthenticationProvider::static_with_auth(
                     WpAuthentication::Bearer { token },
-                ));
-                (resolver, auth_provider)
+                )))
             }
-            TargetSiteResolver::WpOrg { api_root } => {
+            SiteApiType::WpOrg { .. } => {
                 let username = env_or_arg(&args.username, "WP_USERNAME").ok_or_else(|| {
                     anyhow!("Missing username. Provide --username or set WP_USERNAME")
                 })?;
@@ -343,14 +348,27 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
                         "Missing application password. Provide --password or set WP_APP_PASSWORD"
                     )
                 })?;
-                let resolver: Arc<dyn ApiUrlResolver> =
-                    Arc::new(WpOrgSiteApiUrlResolver::new(api_root));
-                let auth_provider = Arc::new(
-                    WpAuthenticationProvider::static_with_username_and_password(username, password),
-                );
-                (resolver, auth_provider)
+                Ok(Arc::new(
+                    WpAuthenticationProvider::static_with_username_and_password(
+                        username, password,
+                    ),
+                ))
             }
-        };
+        }
+    }
+}
+
+fn env_or_arg(value: &Option<String>, var: &str) -> Option<String> {
+    value.clone().or_else(|| std::env::var(var).ok())
+}
+
+async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApiClient> {
+    let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
+    let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
+    // Determine target and auth
+    let api_type = SiteApiType::detect_from_args(args, url, &request_executor).await?;
+    let resolver: Arc<dyn ApiUrlResolver> = api_type.api_url_resolver();
+    let auth_provider: Arc<WpAuthenticationProvider> = api_type.auth_provider(args)?;
 
     #[derive(Debug)]
     struct CliAppNotifier;
