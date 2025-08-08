@@ -258,15 +258,14 @@ fn csv_error_type(failure: &AutoDiscoveryAttemptFailure) -> String {
     }
 }
 
-#[derive(Debug)]
-enum TargetSiteResolver {
-    WpCom { site: String },
-    WpOrg { api_root: Arc<ParsedUrl> },
-}
-
 async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApiClient> {
     let request_executor = Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60)));
     let middleware_pipeline = Arc::new(WpApiMiddlewarePipeline::default());
+    #[derive(Debug)]
+    enum TargetSiteResolver {
+        WpCom { site: String },
+        WpOrg { api_root: Arc<ParsedUrl> },
+    }
     // Determine target and auth
     let target = if let Some(site) = &args.wpcom_site {
         // Explicit WordPress.com site takes priority
