@@ -1,17 +1,17 @@
 use wp_api::{
     comments::{CommentId, CommentRetrieveParams},
+    wp_com::endpoint::extensions::comments::WpComCommentExtensionProvider
 };
+
 use wp_api_integration_tests::{api_client_backed_by_wp_com, prelude::*, WpComTestCredentials};
 
 #[tokio::test]
 #[parallel]
 #[ignore]
-async fn parse_extension() {
+async fn parse_extension_view_context() {
     let site_id = WpComTestCredentials::instance().site_id.to_string();
     let comment_id = CommentId(WpComTestCredentials::instance().comment_id);
     let client = api_client_backed_by_wp_com(site_id);
-
-    use wp_api::wp_com::endpoint::extensions::comments::WpComCommentExtensionProvider;
 
     let comment = client
         .comments()
@@ -25,6 +25,15 @@ async fn parse_extension() {
             .parse_wpcom_comments_extension()
             .is_ok()
     );
+}
+
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn parse_extension_edit_context() {
+    let site_id = WpComTestCredentials::instance().site_id.to_string();
+    let comment_id = CommentId(WpComTestCredentials::instance().comment_id);
+    let client = api_client_backed_by_wp_com(site_id);
 
     let comment = client
         .comments()
@@ -38,6 +47,15 @@ async fn parse_extension() {
             .parse_wpcom_comments_extension()
             .is_ok()
     );
+}
+
+#[tokio::test]
+#[parallel]
+#[ignore]
+async fn parse_extension_embed_context() {
+    let site_id = WpComTestCredentials::instance().site_id.to_string();
+    let comment_id = CommentId(WpComTestCredentials::instance().comment_id);
+    let client = api_client_backed_by_wp_com(site_id);
 
     let comment = client
         .comments()
