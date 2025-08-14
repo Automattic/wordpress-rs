@@ -544,7 +544,7 @@ pub struct SparseMedia {
 #[derive(Debug, Serialize, Deserialize, uniffi::Object)]
 #[serde(transparent)]
 pub struct MediaDetails {
-    payload: Box<RawValue>,
+    pub payload: Box<RawValue>,
 }
 
 #[uniffi::export]
