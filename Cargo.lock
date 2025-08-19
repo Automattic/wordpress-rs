@@ -4999,6 +4999,7 @@ name = "wordpress-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "clap",
  "colored",
  "csv",
@@ -5007,6 +5008,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "url",
  "wp_api",
 ]
 
