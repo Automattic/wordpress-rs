@@ -2,7 +2,7 @@
 
 set -e
 
-# This script sets up a WordPress test site on the `wordpress` docker image. 
+# This script sets up a WordPress test site on the `wordpress` docker image.
 # You might wonder "why not do this work once, then just import the database for each run?"
 # We do each step each time for each build because we're trying to get a "mint" condition site
 # for each WordPress version – if there are issues with DB migrations, different default themes
@@ -19,7 +19,7 @@ tries=0
 while true; do
 
 	code=0
-	wp db check || code=$?
+	wp db check --skip-ssl || code=$?
 
 	if [ $code == 0 ]; then
 		echo 'Database Ready'
@@ -169,5 +169,4 @@ wp option update timezone_string "America/New_York"
 
 cp -rp wp-content/plugins wp-content/plugins-backup
 
-wp db export --add-drop-table wp-content/dump.sql
-
+wp db export --skip-ssl --add-drop-table wp-content/dump.sql
