@@ -19,7 +19,7 @@ tries=0
 while true; do
 
 	code=0
-	wp db check || code=$?
+	wp db check --skip-ssl || code=$?
 
 	if [ $code == 0 ]; then
 		echo 'Database Ready'
@@ -169,4 +169,4 @@ wp option update timezone_string "America/New_York"
 
 cp -rp wp-content/plugins wp-content/plugins-backup
 
-wp db export --add-drop-table wp-content/dump.sql
+wp db export --skip-ssl --add-drop-table wp-content/dump.sql
