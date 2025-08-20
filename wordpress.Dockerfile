@@ -1,7 +1,18 @@
-FROM public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION:-latest}
+ARG WORDPRESS_VERSION="latest"
+
+FROM public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION}
 
 RUN apt-get update  \
-  && apt-get install -y openjdk-17-jdk-headless android-sdk wget default-mysql-client less libssl-dev jo \
+  && apt-get install -y wget gpg
+
+# https://docs.aws.amazon.com/corretto/latest/corretto-21-ug/generic-linux-install.html
+# To use the Corretto Apt repositories on Debian-based systems, such as Ubuntu, import the \
+# Corretto public key and then add the repository to the system list by using the following commands:
+RUN wget -O - https://apt.corretto.aws/corretto.key | gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg && \
+  echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | tee /etc/apt/sources.list.d/corretto.list
+
+RUN apt-get update  \
+  && apt-get install -y java-21-amazon-corretto-jdk android-sdk wget default-mysql-client less libssl-dev jo \
   && apt-get -y autoclean
 
 # Install wp-cli
@@ -33,7 +44,7 @@ ENV PATH="//usr/lib/android-sdk/cmdline-tools/latest/bin:${PATH}"
 RUN yes | sdkmanager --licenses
 
 RUN sdkmanager --install \
-  "ndk;27.0.12077973"
+  "ndk;28.1.13356709"
 
 # Cache Gradle 8.7
 RUN mkdir gradle-cache-tmp \

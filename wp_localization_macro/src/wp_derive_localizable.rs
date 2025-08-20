@@ -29,7 +29,7 @@ pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
 fn crate_ident(crate_name: &str) -> Ident {
     let found_crate = proc_macro_crate::crate_name(crate_name)
-        .unwrap_or_else(|_| panic!("{} is not present in `Cargo.toml`", crate_name));
+        .unwrap_or_else(|_| panic!("{crate_name} is not present in `Cargo.toml`"));
     match found_crate {
         FoundCrate::Itself => format_ident!("crate"),
         FoundCrate::Name(name) => Ident::new(&name, Span::call_site()),

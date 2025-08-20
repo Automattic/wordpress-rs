@@ -108,7 +108,7 @@ async fn create_post_with_title_content_and_excerpt() {
 async fn delete_post() {
     // Delete the post using the API and ensure it's successful
     let post_delete_response = api_client().posts().delete(&FIRST_POST_ID).await;
-    assert!(post_delete_response.is_ok(), "{:#?}", post_delete_response);
+    assert!(post_delete_response.is_ok(), "{post_delete_response:#?}");
     assert!(post_delete_response.unwrap().data.deleted);
 
     // Assert that the post was deleted
@@ -128,7 +128,7 @@ async fn delete_post() {
 async fn trash_post() {
     // Trash the post using the API and ensure it's successful
     let post_trash_response = api_client().posts().trash(&FIRST_POST_ID).await;
-    assert!(post_trash_response.is_ok(), "{:#?}", post_trash_response);
+    assert!(post_trash_response.is_ok(), "{post_trash_response:#?}");
 
     // Assert that the post was trashed
     let trashed_post = Backend::posts(Some("trash"))

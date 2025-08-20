@@ -74,13 +74,33 @@ fn generate_async_request_executor(
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
                     use #crate_ident::api_error::MaybeWpError;
                     use #crate_ident::middleware::PerformsRequests;
-                    #request_from_request_builder
-                    let response = self.perform(std::sync::Arc::new(request)).await?;
-                    let response_status_code = response.status_code;
-                    let parsed_response = response.parse();
-                    if parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default()) {
+                    let perform_request = async || {
+                        #request_from_request_builder
+                        let response = self.perform(std::sync::Arc::new(request)).await?;
+                        let response_status_code = response.status_code;
+                        let parsed_response = response.parse();
+                        let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default());
+
+                        Ok((parsed_response, unauthorized))
+                    };
+
+                    let mut parsed_response;
+                    let mut unauthorized;
+
+                    // The Rust compiler has trouble figuring out the return type. The statement below helps it.
+                    let result: Result<_, #error_type> = perform_request().await;
+                    (parsed_response, unauthorized) = result?;
+
+                    // If the auth provider successfully refreshed the authentication, we can retry the request.
+                    if unauthorized && self.delegate.auth_provider.refresh().await {
+                        // The response of the retried request will be returned instead of the original one.
+                        (parsed_response, unauthorized) = perform_request().await?;
+                    }
+
+                    if unauthorized {
                         self.delegate.app_notifier.requested_with_invalid_authentication().await;
                     }
+
                     parsed_response
                }
             }
@@ -401,7 +421,7 @@ impl Display for WpContext {
             WpContext::Embed => "Embed",
             WpContext::View => "View",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -432,7 +452,7 @@ impl Config {
     fn new(parsed_enum: &ParsedEnum) -> Self {
         let crate_name = "wp_api";
         let found_crate = proc_macro_crate::crate_name(crate_name)
-            .unwrap_or_else(|_| panic!("{} is not present in `Cargo.toml`", crate_name));
+            .unwrap_or_else(|_| panic!("{crate_name} is not present in `Cargo.toml`"));
 
         let crate_ident = match found_crate {
             FoundCrate::Itself => format_ident!("crate"),

@@ -25,8 +25,7 @@ pub mod wp_utc_date_format {
                 }
 
                 Err(serde::de::Error::custom(format!(
-                    "Invalid date : {}",
-                    timestamp
+                    "Invalid date : {timestamp}"
                 )))
             }
             DateRepresentation::String(s) => {
@@ -53,14 +52,12 @@ pub mod wp_utc_date_format {
                 }
 
                 // WP format with sub-second precision
-                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, &format!("{}.%f", WP_DATE_FORMAT))
-                {
+                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, &format!("{WP_DATE_FORMAT}.%f")) {
                     return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
                 }
 
                 Err(serde::de::Error::custom(format!(
-                    "Invalid date format: {}",
-                    s
+                    "Invalid date format: {s}"
                 )))
             }
         }
@@ -94,7 +91,7 @@ mod tests {
     #[case(r#""1683901845""#)]
     #[case("1683901845")]
     fn test_deserialize_date(#[case] date_string: &str) {
-        let json_str = format!("{{\"wp_utc_date_time\": {}}}", date_string);
+        let json_str = format!("{{\"wp_utc_date_time\": {date_string}}}");
         let foo: Foo = serde_json::from_str(&json_str).expect("Failed to deserialize JSON");
 
         assert_eq!(foo.wp_utc_date_time.year_ce(), (true, 2023));
@@ -113,7 +110,7 @@ mod tests {
     #[case(r#""invalid""#)] // invalid date string
     #[case("42.78")] // invalid timestamp
     fn test_invalid_date(#[case] date_string: &str) {
-        let json_str = format!("{{\"wp_utc_date_time\": {}}}", date_string);
+        let json_str = format!("{{\"wp_utc_date_time\": {date_string}}}");
         assert!(
             serde_json::from_str::<Foo>(&json_str).is_err(),
             "Expected error for invalid date"

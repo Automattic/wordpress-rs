@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.net.URI
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.TimeZone
@@ -24,8 +25,30 @@ data class TestCredentials(
     val subscriberPassword: String,
     @SerialName("subscriber_password_uuid")
     val subscriberPasswordUuid: String,
+    @SerialName("author_username")
+    val authorUsername: String,
+    @SerialName("author_password")
+    val authorPassword: String,
+    @SerialName("password_protected_post_id")
+    val passwordProtectedPostId: Long,
+    @SerialName("password_protected_post_password")
+    val passwordProtectedPostPassword: String,
+    @SerialName("password_protected_post_title")
+    val passwordProtectedPostTitle: String,
+    @SerialName("password_protected_comment_id")
+    val passwordProtectedCommentId: Long,
+    @SerialName("password_protected_comment_author")
+    val passwordProtectedCommentAuthor: String,
+    @SerialName("trashed_post_id")
+    val trashedPostId: Long,
     @SerialName("first_post_date_gmt")
-    val firstPostDateGmt: String
+    val firstPostDateGmt: String,
+    @SerialName("wordpress_core_version")
+    val wordpressCoreVersion: String,
+    @SerialName("integration_test_custom_template_id")
+    val integrationTestCustomTemplateId: String,
+    @SerialName("revisioned_post_id")
+    val revisionedPostId: Long,
 ) {
     companion object {
         private val json by lazy {
@@ -44,5 +67,5 @@ data class TestCredentials(
         }
     }
 
-    val apiRootUrl by lazy { URL("$siteUrl/wp-json") }
+    val apiRootUrl by lazy { URI("$siteUrl/wp-json").toURL() }
 }

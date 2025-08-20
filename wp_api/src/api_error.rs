@@ -194,6 +194,10 @@ pub enum WpErrorCode {
     CannotListApplicationPasswords,
     #[serde(rename = "rest_cannot_manage_plugins")]
     CannotManagePlugins,
+    #[serde(rename = "rest_cannot_manage_templates")]
+    CannotManageTemplates,
+    #[serde(rename = "rest_cannot_manage_widgets")]
+    CannotManageWidgets,
     #[serde(rename = "rest_cannot_read_application_password")]
     CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_read")]
@@ -262,6 +266,8 @@ pub enum WpErrorCode {
     InvalidParam,
     #[serde(rename = "rest_invalid_template")]
     InvalidTemplate,
+    #[serde(rename = "rest_invalid_widget")]
+    InvalidWidget,
     #[serde(rename = "rest_no_search_term_defined")]
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
@@ -280,10 +286,6 @@ pub enum WpErrorCode {
     RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
-    #[serde(rename = "rest_template_already_trashed")]
-    TemplateAlreadyTrashed,
-    #[serde(rename = "rest_template_insert_error")]
-    TemplateInsertError,
     #[serde(rename = "rest_template_not_found")]
     TemplateNotFound,
     #[serde(rename = "rest_term_invalid")]
@@ -310,6 +312,10 @@ pub enum WpErrorCode {
     UserInvalidRole,
     #[serde(rename = "rest_user_invalid_slug")]
     UserInvalidSlug,
+    #[serde(rename = "rest_widget_not_found")]
+    WidgetNotFound,
+    #[serde(rename = "rest_widget_type_invalid")]
+    WidgetTypeInvalid,
     // ------------------------------------------------------------------------------------
     // Untested, because we are unable to create the necessary conditions for them
     // ------------------------------------------------------------------------------------
@@ -363,6 +369,8 @@ pub enum WpErrorCode {
     SearchInvalidPageNumber,
     #[serde(rename = "rest_search_invalid_type")]
     SearchInvalidType,
+    #[serde(rename = "rest_template_insert_error")]
+    TemplateInsertError,
     #[serde(rename = "rest_upload_file_error")]
     UploadFileError,
     #[serde(rename = "rest_upload_file_too_big")]
@@ -422,6 +430,9 @@ pub enum WpErrorCode {
     // `parent` argument
     #[serde(rename = "rest_taxonomy_not_hierarchical")]
     TaxonomyNotHierarchical,
+    // If the template is already trashed, the server returns `rest_template_not_found`
+    #[serde(rename = "rest_template_already_trashed")]
+    TemplateAlreadyTrashed,
     // If `force=true` is missing from delete user request.
     // If trash is not supported for the post type: https://github.com/WordPress/WordPress/blob/6.6.2/wp-includes/rest-api/endpoints/class-wp-rest-posts-controller.php#L1011-L1029
     #[serde(rename = "rest_trash_not_supported")]
@@ -555,6 +566,7 @@ pub enum RequestExecutionErrorReason {
     DeviceIsOfflineError {
         error_message: String,
     },
+    CancellationError,
     HttpError {
         reason: String,
     },
@@ -645,6 +657,7 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
                 WpMessages::just(error_message)
             }
             RequestExecutionErrorReason::HttpTimeoutError => WpMessages::http_timeout_error(),
+            RequestExecutionErrorReason::CancellationError => WpMessages::http_cancellation_error(),
         }
     }
 }

@@ -165,7 +165,7 @@ impl std::fmt::Debug for MediaUploadRequest {
             self.media_params
         );
         s.pop(); // Remove the new line at the end
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -313,9 +313,9 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/media?context={}", context)
+                format!("/media?context={context}")
             } else {
-                format!("/media?context={}&{}", context, expected_additional_params)
+                format!("/media?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(

@@ -129,6 +129,18 @@ public actor WordPressAPI {
         self.requestBuilder.siteSettings()
     }
 
+    public var taxonomies: TaxonomiesRequestExecutor {
+        self.requestBuilder.taxonomies()
+    }
+
+    public var tags: TagsRequestExecutor {
+        self.requestBuilder.tags()
+    }
+
+    public var categories: CategoriesRequestExecutor {
+        self.requestBuilder.categories()
+    }
+
 #if PROGRESS_REPORTING_ENABLED
     public func uploadMedia(
         params: MediaCreateParams,
@@ -138,6 +150,7 @@ public actor WordPressAPI {
     ) async throws -> MediaRequestCreateResponse {
         precondition(localFileURL.isFileURL)
         precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
+        precondition(progress.cancellationHandler == nil)
 
         let requestId = WpUuid()
 
@@ -168,13 +181,22 @@ public actor WordPressAPI {
             )
         }
 
-        if progress.cancellationHandler == nil {
-            progress.cancellationHandler = {
-                uploadTask.cancel()
-            }
+        progress.cancellationHandler = {
+            uploadTask.cancel()
         }
 
-        return try await uploadTask.value
+        return try await withTaskCancellationHandler {
+            try await uploadTask.value
+        } onCancel: {
+            // Please note: the async functions exported by uniffi-rs _do not_ support cancellation.
+            // That means cancelling an API call like `Task { try await api.users.retrieveMe() }.cancel()`
+            // does not cancel the underlying HTTP request sent by URLSession.
+            //
+            // The `progress.cancel()` in this particular function can cancel the HTTP request, because the
+            // `progress` instance is the parent progress of `URLSessionTask.progress`, and cancelling a parent
+            // progress automatically cancels their child progress, which is the `URLSessionTask` in this case.
+            progress.cancel()
+        }
     }
 #endif
 

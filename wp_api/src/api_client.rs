@@ -24,6 +24,8 @@ use crate::{
             templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
             themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
             users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
+            widget_types_endpoint::{WidgetTypesRequestBuilder, WidgetTypesRequestExecutor},
+            widgets_endpoint::{WidgetsRequestBuilder, WidgetsRequestExecutor},
             wp_site_health_tests_endpoint::{
                 WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
             },
@@ -66,6 +68,8 @@ pub struct WpApiRequestBuilder {
     templates: Arc<TemplatesRequestBuilder>,
     themes: Arc<ThemesRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
+    widget_types: Arc<WidgetTypesRequestBuilder>,
+    widgets: Arc<WidgetsRequestBuilder>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
 }
 
@@ -92,6 +96,8 @@ impl WpApiRequestBuilder {
             templates,
             themes,
             users,
+            widget_types,
+            widgets,
             wp_site_health_tests
         )
     }
@@ -128,6 +134,8 @@ pub struct WpApiClient {
     templates: Arc<TemplatesRequestExecutor>,
     themes: Arc<ThemesRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
+    widget_types: Arc<WidgetTypesRequestExecutor>,
+    widgets: Arc<WidgetsRequestExecutor>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
 }
 
@@ -151,6 +159,8 @@ impl WpApiClient {
             templates,
             themes,
             users,
+            widget_types,
+            widgets,
             wp_site_health_tests
         )
     }
@@ -184,6 +194,8 @@ api_client_generate_endpoint_impl!(WpApi, taxonomies);
 api_client_generate_endpoint_impl!(WpApi, templates);
 api_client_generate_endpoint_impl!(WpApi, themes);
 api_client_generate_endpoint_impl!(WpApi, users);
+api_client_generate_endpoint_impl!(WpApi, widget_types);
+api_client_generate_endpoint_impl!(WpApi, widgets);
 api_client_generate_endpoint_impl!(WpApi, wp_site_health_tests);
 
 #[macro_export]

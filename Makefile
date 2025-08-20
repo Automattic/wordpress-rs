@@ -4,7 +4,7 @@
 docker_container_repo_dir=/app
 
 # Common docker options
-rust_docker_container := public.ecr.aws/docker/library/rust:1.86.0
+rust_docker_container := public.ecr.aws/docker/library/rust:1.88.0
 
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e TEST_ALL_PLUGINS -e CARGO_HOME=/app/.cargo $(rust_docker_container)
@@ -17,7 +17,7 @@ swift_package_platform_watchos = $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
-rust_nightly_toolchain := nightly-2024-12-08
+rust_nightly_toolchain := nightly-2025-07-29
 
 clean:
 	@# Help: Remove untracked files from the project via Git.

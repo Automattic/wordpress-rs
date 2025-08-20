@@ -97,6 +97,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 return handleDeviceIsOfflineError(error)
             }
 
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                return .failure(.RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: nil,
+                    reason: .cancellationError
+                ))
+            }
+
             return .failure(.RequestExecutionFailed(
                 statusCode: nil,
                 redirects: nil,

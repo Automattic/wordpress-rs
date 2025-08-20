@@ -57,7 +57,7 @@ impl AutoDiscoveryAttempt {
             .or_else(|| input_url_as_string.strip_suffix("wp-login.php"))
             .unwrap_or(input_url_as_string.as_str());
         let url = if !processed_site_url.starts_with("http") {
-            format!("https://{}", processed_site_url)
+            format!("https://{processed_site_url}")
         } else if !processed_site_url.starts_with("https") {
             processed_site_url.replacen("http", "https", 1)
         } else {

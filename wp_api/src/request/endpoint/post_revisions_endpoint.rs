@@ -73,12 +73,9 @@ mod tests {
         let post_id = PostId(777);
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/posts/{post_id}/revisions?context={}", context)
+                format!("/posts/{post_id}/revisions?context={context}")
             } else {
-                format!(
-                    "/posts/{post_id}/revisions?context={}&{}",
-                    context, expected_additional_params
-                )
+                format!("/posts/{post_id}/revisions?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(

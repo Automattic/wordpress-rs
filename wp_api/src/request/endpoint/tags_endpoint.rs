@@ -89,9 +89,9 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/tags?context={}", context)
+                format!("/tags?context={context}")
             } else {
-                format!("/tags?context={}&{}", context, expected_additional_params)
+                format!("/tags?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(
@@ -111,7 +111,7 @@ mod tests {
     #[rstest]
     #[case(TagListParams::default(), &[], "/tags?context=edit&_fields=")]
     #[case(generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Id))), &[SparseTagFieldWithEditContext::Count], "/tags?context=edit&orderby=id&_fields=count")]
-    #[case(tag_list_params_with_all_fields(), ALL_SPARSE_TAG_FIELDS_WITH_EDIT_CONTEXT, &format!("/tags?context=edit&{}&{}", EXPECTED_QUERY_PAIRS_FOR_TAG_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(tag_list_params_with_all_fields(), ALL_SPARSE_TAG_FIELDS_WITH_EDIT_CONTEXT, &format!("/tags?context=edit&{EXPECTED_QUERY_PAIRS_FOR_TAG_LIST_PARAMS_WITH_ALL_FIELDS}&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_EDIT_CONTEXT}"))]
     fn filter_list_tags_with_edit_context(
         endpoint: TagsRequestEndpoint,
         #[case] params: TagListParams,
@@ -127,7 +127,7 @@ mod tests {
     #[rstest]
     #[case(TagListParams::default(), &[], "/tags?context=embed&_fields=")]
     #[case(generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Slug))), &[SparseTagFieldWithEmbedContext::Link], "/tags?context=embed&orderby=slug&_fields=link")]
-    #[case(tag_list_params_with_all_fields(), ALL_SPARSE_TAG_FIELDS_WITH_EMBED_CONTEXT, &format!("/tags?context=embed&{}&{}", EXPECTED_QUERY_PAIRS_FOR_TAG_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(tag_list_params_with_all_fields(), ALL_SPARSE_TAG_FIELDS_WITH_EMBED_CONTEXT, &format!("/tags?context=embed&{EXPECTED_QUERY_PAIRS_FOR_TAG_LIST_PARAMS_WITH_ALL_FIELDS}&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_EMBED_CONTEXT}"))]
     fn filter_list_tags_with_embed_context(
         endpoint: TagsRequestEndpoint,
         #[case] params: TagListParams,
@@ -143,7 +143,7 @@ mod tests {
     #[rstest]
     #[case(TagListParams::default(), &[], "/tags?context=view&_fields=")]
     #[case(generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Include))), &[SparseTagFieldWithViewContext::Description], "/tags?context=view&orderby=include&_fields=description")]
-    #[case(tag_list_params_with_all_fields(), ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT, &format!("/tags?context=view&{}&{}", EXPECTED_QUERY_PAIRS_FOR_TAG_LIST_PARAMS_WITH_ALL_FIELDS, EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(tag_list_params_with_all_fields(), ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT, &format!("/tags?context=view&{EXPECTED_QUERY_PAIRS_FOR_TAG_LIST_PARAMS_WITH_ALL_FIELDS}&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_list_tags_with_view_context(
         endpoint: TagsRequestEndpoint,
         #[case] params: TagListParams,
@@ -176,7 +176,7 @@ mod tests {
     #[rstest]
     fn retrieve_tag(endpoint: TagsRequestEndpoint) {
         let tag_id = TagId(54);
-        let expected_path = |context: &str| format!("/tags/54?context={}", context);
+        let expected_path = |context: &str| format!("/tags/54?context={context}");
         validate_wp_v2_endpoint(
             endpoint.retrieve_with_edit_context(&tag_id),
             &expected_path("edit"),
@@ -194,7 +194,7 @@ mod tests {
     #[rstest]
     #[case(&[], "/tags/54?context=view&_fields=")]
     #[case(&[SparseTagFieldWithViewContext::Count], "/tags/54?context=view&_fields=count")]
-    #[case(ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT, &format!("/tags/54?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT, &format!("/tags/54?context=view&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_TAG_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_retrieve_tag_with_view_context(
         endpoint: TagsRequestEndpoint,
         #[case] fields: &[SparseTagFieldWithViewContext],

@@ -52,8 +52,7 @@ async fn login_spec_2_local_development_environment() {
         );
     } else {
         panic!(
-            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {:?}",
-            error
+            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {error:?}"
         );
     }
 }
@@ -96,8 +95,7 @@ async fn login_spec_5_http_only_site() {
         );
     } else {
         panic!(
-            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {:?}",
-            error
+            "Expected FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported, got: {error:?}"
         );
     }
 }
@@ -140,8 +138,7 @@ async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
         assert_eq!(plugin.name, "Wordfence");
     } else {
         panic!(
-            "Expected ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin, got: {:?}",
-            error
+            "Expected ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin, got: {error:?}"
         );
     }
 }
@@ -198,8 +195,7 @@ async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
         assert_eq!(hostname, expected_hostname);
     } else {
         panic!(
-            "Expected RequestExecutionErrorReason::HttpAuthenticationRequiredError, got: {:?}",
-            reason
+            "Expected RequestExecutionErrorReason::HttpAuthenticationRequiredError, got: {reason:?}"
         );
     }
 }
@@ -224,8 +220,7 @@ async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
         assert_eq!(hostname, expected_hostname);
     } else {
         panic!(
-            "Expected RequestExecutionErrorReason::HttpAuthenticationRejectedError, got: {:?}",
-            reason
+            "Expected RequestExecutionErrorReason::HttpAuthenticationRejectedError, got: {reason:?}"
         );
     }
 }
@@ -311,8 +306,7 @@ async fn login_spec_16_invalid_url() {
             request_execution_error_reason,
             RequestExecutionErrorReason::NonExistentSiteError { .. }
         ),
-        "Expected RequestExecutionErrorReason::NonExistentSiteError, got: {:?}",
-        request_execution_error_reason
+        "Expected RequestExecutionErrorReason::NonExistentSiteError, got: {request_execution_error_reason:?}"
     );
 }
 
@@ -331,8 +325,7 @@ async fn login_spec_17_invalid_https_fails() {
                 reason: InvalidSslErrorReason::CertificateNotValidForName { .. }
             }
         ),
-        "Expected RequestExecutionErrorReason::InvalidSslError, got: {:?}",
-        request_execution_error_reason
+        "Expected RequestExecutionErrorReason::InvalidSslError, got: {request_execution_error_reason:?}"
     );
 }
 
@@ -415,10 +408,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
         {
             find_api_root_failure.clone()
         } else {
-            panic!(
-                "Expected AutoDiscoveryAttemptFailure::FindApiRoot, got: {:?}",
-                self
-            );
+            panic!("Expected AutoDiscoveryAttemptFailure::FindApiRoot, got: {self:?}");
         }
     }
 
@@ -430,10 +420,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
         {
             reason
         } else {
-            panic!(
-                "Expected FindApiRootFailure::FetchHomepage, got: {:?}",
-                error
-            );
+            panic!("Expected FindApiRootFailure::FetchHomepage, got: {error:?}");
         }
     }
 
@@ -445,10 +432,7 @@ impl AutoDiscoveryAttemptFailureExtension for AutoDiscoveryAttemptFailure {
         {
             fetch_and_parse_api_root_failure
         } else {
-            panic!(
-                "Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {:?}",
-                self
-            );
+            panic!("Expected AutoDiscoveryAttemptFailure::FetchAndParseApiRoot, got: {self:?}");
         }
     }
 }

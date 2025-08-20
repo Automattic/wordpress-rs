@@ -27,5 +27,5 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
     let response = request_executor.async_request(wp_request.into()).await;
     let result: Result<UsersRequestListWithEditContextResponse, WpApiError> =
         response.unwrap().parse();
-    assert!(result.is_ok(), "Response was: '{:?}'", result);
+    assert!(result.is_ok(), "Response was: '{result:?}'");
 }

@@ -5,20 +5,23 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
 };
-
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not};
-use wp_serde_helper::deserialize_u64_or_string;
+use wp_serde_helper::{deserialize_false_or_string, deserialize_u64_or_string};
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
     pub user_id: UserId,
+    pub subscription_id: SubscriptionId,
     pub display_name: String,
     pub email_address: String,
-    pub email_subscription_id: Option<u64>,
+    pub is_email_subscriber: bool,
     pub date_subscribed: WpGmtDateTime,
-    pub subscription_status: String,
+    pub subscription_status: Option<String>,
     pub avatar: String,
+    pub url: Option<String>,
+    pub country: Option<SubscriberCountry>,
+    pub plans: Option<Vec<SubscriptionPlan>>,
 }
 
 #[derive(
@@ -69,35 +72,55 @@ pub enum SubscriptionStatus {
     Custom(String),
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SubscriberCountry {
+    #[serde(default, deserialize_with = "deserialize_false_or_string")]
+    code: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_false_or_string")]
+    name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct SubscriptionPlan {
+    pub is_gift: bool,
+    pub gift_id: Option<u64>,
+    pub paid_subscription_id: Option<String>,
+    pub status: String,
+    pub title: String,
+    pub currency: String,
+    pub renew_interval: String,
+    pub inactive_renew_interval: Option<String>,
+    pub renewal_price: f64,
+    pub start_date: WpGmtDateTime,
+    pub end_date: WpGmtDateTime,
+}
+
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct SubscribersListParams {
-    // The current page.
+    /// The current page.
     #[uniffi(default = None)]
-    page: Option<u64>,
-
-    // The amount of items to show per page.
+    pub page: Option<u64>,
+    /// The amount of items to show per page.
     #[uniffi(default = None)]
-    per_page: Option<u64>,
-
-    // Search for subscribers
+    pub per_page: Option<u64>,
+    /// Search for subscribers
     #[uniffi(default = None)]
-    search: Option<String>,
-
-    // Sort subscribers by a specific field
+    pub search: Option<String>,
+    /// Sort subscribers by a specific field
     #[uniffi(default = None)]
-    sort: Option<ListSubscribersSortField>,
-
-    // Sort order
+    pub sort: Option<ListSubscribersSortField>,
+    /// Sort order
     #[uniffi(default = None)]
-    sort_order: Option<WpApiParamOrder>,
-
-    // Filter subscribers by a specific subscriber type
+    pub sort_order: Option<WpApiParamOrder>,
+    /// Filter subscribers by a specific subscriber type
     #[uniffi(default = None)]
-    filter: Option<SubscriberType>,
-
-    // Array of filters to apply (combined with AND logic). If provided, overrides the single filter parameter.
+    pub filter: Option<SubscriberType>,
+    /// Array of filters to apply (combined with AND logic). If provided, overrides the single filter parameter.
     #[uniffi(default = None)]
-    filters: Option<Vec<SubscriberType>>,
+    pub filters: Option<Vec<SubscriberType>>,
+    /// An array of additional fields to include
+    #[uniffi(default = [])]
+    pub include: Vec<ListSubscribersIncludeField>,
 }
 
 impl AppendUrlQueryPairs for SubscribersListParams {
@@ -107,7 +130,8 @@ impl AppendUrlQueryPairs for SubscribersListParams {
             .append_option_query_value_pair("per_page", self.per_page.as_ref())
             .append_option_query_value_pair("search", self.search.as_ref())
             .append_option_query_value_pair("sort", self.sort.as_ref())
-            .append_option_query_value_pair("sort_order", self.sort_order.as_ref());
+            .append_option_query_value_pair("sort_order", self.sort_order.as_ref())
+            .append_vec_query_value_pair("include", self.include.as_ref());
 
         if let Some(filters) = &self.filters {
             query_pairs_mut.append_pair(
@@ -137,13 +161,32 @@ impl AppendUrlQueryPairs for SubscribersListParams {
 #[strum(serialize_all = "snake_case")]
 pub enum ListSubscribersSortField {
     DateSubscribed,
+    #[strum(serialize = "email")]
     EmailAddress,
+    #[strum(serialize = "name")]
     DisplayName,
     Plan,
     SubscriptionStatus,
 }
 
 impl_as_query_value_from_to_string!(ListSubscribersSortField);
+
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
+pub enum ListSubscribersIncludeField {
+    Country,
+}
+
+impl_as_query_value_from_to_string!(ListSubscribersIncludeField);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct ListSubscribersResponse {
@@ -152,32 +195,54 @@ pub struct ListSubscribersResponse {
     pub page: u64,
     pub per_page: u64,
     pub subscribers: Vec<Subscriber>,
+    pub is_owner_subscribed: bool,
 }
 
 // MARK: - Get Subscriber
 
 #[derive(Debug, uniffi::Enum)]
-pub enum GetSubscriberQuery {
+pub enum IndividualSubscriberParams {
     // Return subscribers that receive notifications via WordPress.com for new posts.
-    WpCom(u64),
+    WpCom(UserId),
 
     // Return subscribers that receive notifications via email for new posts.
-    Email(u64),
+    Email(SubscriptionId),
 }
 
-impl AppendUrlQueryPairs for GetSubscriberQuery {
+impl AppendUrlQueryPairs for IndividualSubscriberParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         match self {
-            GetSubscriberQuery::WpCom(user_id) => {
+            IndividualSubscriberParams::WpCom(user_id) => {
                 query_pairs_mut.append_pair("user_id", &user_id.to_string());
                 query_pairs_mut.append_pair("type", "wpcom");
             }
-            GetSubscriberQuery::Email(email) => {
+            IndividualSubscriberParams::Email(email) => {
                 query_pairs_mut.append_pair("subscription_id", &email.to_string());
                 query_pairs_mut.append_pair("type", "email");
             }
         }
     }
+}
+
+// MARK: - Individual Subscriber Stats
+
+#[derive(Debug, PartialEq, Eq, uniffi::Record)]
+pub struct IndividualSubscriberStatsParams {
+    pub subscription_id: SubscriptionId,
+}
+
+impl AppendUrlQueryPairs for IndividualSubscriberStatsParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_query_value_pair("subscription_id", &self.subscription_id);
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct IndividualSubscriberStats {
+    emails_sent: u64,
+    unique_opens: u64,
+    unique_clicks: u64,
+    blog_registration_date: String,
 }
 
 // MARK: - Add Subscribers
@@ -186,12 +251,10 @@ impl AppendUrlQueryPairs for GetSubscriberQuery {
 pub struct AddSubscribersParams {
     // A list of emails to add as subscribers to the current site.
     pub emails: Vec<String>,
-
     // A list of category IDs the emails should be subscribed to.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub categories: Option<Vec<String>>,
-
     // If true, the import will only parse the file and return the number of subscribers that would be imported.
     #[uniffi(default = false)]
     #[serde(skip_serializing_if = "<&bool>::not")]
@@ -267,7 +330,7 @@ pub struct SubscriberImportJob {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SubscriberImportJobsListParams {
     #[uniffi(default = None)]
-    status: Option<SubscriberImportJobStatus>,
+    pub status: Option<SubscriberImportJobStatus>,
 }
 
 impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
@@ -275,6 +338,25 @@ impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
         if let Some(status) = &self.status {
             query_pairs_mut.append_pair("status", &status.to_string());
         }
+    }
+}
+
+impl_as_query_value_for_new_type!(SubscriptionId);
+uniffi::custom_newtype!(SubscriptionId, u64);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubscriptionId(pub u64);
+
+impl std::str::FromStr for SubscriptionId {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+impl std::fmt::Display for SubscriptionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -337,6 +419,7 @@ mod tests {
             sort_order: Some(WpApiParamOrder::Asc),
             filter: Some(SubscriberType::All),
             filters: Some(vec![SubscriberType::All]),
+            include: vec![],
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -362,6 +445,7 @@ mod tests {
             sort_order: Some(WpApiParamOrder::Asc),
             filter: Some(SubscriberType::EmailSubscriber),
             filters: None,
+            include: vec![],
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -380,11 +464,11 @@ mod tests {
         let response: ListSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.total, 8);
+        assert_eq!(response.total, 4);
         assert_eq!(response.pages, 1);
         assert_eq!(response.page, 1);
         assert_eq!(response.per_page, 100);
-        assert_eq!(response.subscribers.len(), 8);
+        assert_eq!(response.subscribers.len(), 4);
     }
 
     #[test]
@@ -406,7 +490,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::WpCom(123).append_query_pairs(&mut query_pairs);
+        IndividualSubscriberParams::WpCom(UserId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?user_id=123&type=wpcom"
@@ -421,7 +505,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let mut query_pairs = url.query_pairs_mut();
-        GetSubscriberQuery::Email(123).append_query_pairs(&mut query_pairs);
+        IndividualSubscriberParams::Email(SubscriptionId(123)).append_query_pairs(&mut query_pairs);
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers/individual?subscription_id=123&type=email"
@@ -515,5 +599,25 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
         assert_eq!(response.counts.email_subscribers, 26);
         assert_eq!(response.aggregate.len(), 60);
+    }
+
+    #[test]
+    fn test_get_subscriber_with_paid_plans_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/subscriber-with-paid-plans.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let subscriber: Subscriber = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let plans = subscriber.plans.expect("JSON file includes plans");
+        assert_eq!(plans.len(), 2);
+        assert_eq!(plans[0].start_date.to_string(), "2025-01-13T18:51:55+00:00");
+    }
+
+    #[test]
+    fn test_individual_subscriber_stats_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/individual-subscriber-stats.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let stats: IndividualSubscriberStats =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(stats.emails_sent, 2);
     }
 }

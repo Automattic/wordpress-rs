@@ -13,6 +13,7 @@ import rs.wordpress.api.kotlin.WpLoginClient
 import rs.wordpress.example.shared.App
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import androidx.core.net.toUri
+import rs.wordpress.api.kotlin.toURL
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 
 class WelcomeActivity : ComponentActivity() {
@@ -60,8 +61,8 @@ class WelcomeActivity : ComponentActivity() {
                 val discoverySuccess = apiDiscoverySuccess
                     ?: throw IllegalStateException("Api discovery has to be successful before authentication")
                 authRepository.addAuthenticatedSite(
-                    discoverySuccess.parsedSiteUrl,
-                    discoverySuccess.apiRootUrl,
+                    discoverySuccess.parsedSiteUrl.toURL(),
+                    discoverySuccess.apiRootUrl.toURL(),
                     username,
                     password
                 )

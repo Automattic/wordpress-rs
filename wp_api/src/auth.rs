@@ -1,4 +1,5 @@
 use http::HeaderValue;
+use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, uniffi::Enum)]
@@ -20,7 +21,7 @@ impl WpAuthentication {
     pub fn from_username_and_password(username: String, password: String) -> Self {
         use base64::prelude::*;
         WpAuthentication::AuthorizationHeader {
-            token: BASE64_STANDARD.encode(format!("{}:{}", username, password)),
+            token: BASE64_STANDARD.encode(format!("{username}:{password}")),
         }
     }
 
@@ -28,11 +29,11 @@ impl WpAuthentication {
         match self {
             Self::None => None,
             Self::AuthorizationHeader { token } => {
-                Some(HeaderValue::from_str(&format!("Basic {}", token))
+                Some(HeaderValue::from_str(&format!("Basic {token}"))
                 .expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token"))
             }
             Self::Bearer { token } => {
-                Some(HeaderValue::from_str(&format!("Bearer {}", token)).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token"))
+                Some(HeaderValue::from_str(&format!("Bearer {token}")).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token"))
             }
         }
     }
@@ -70,8 +71,17 @@ impl ModifiableAuthenticationProvider {
 }
 
 #[uniffi::export(with_foreign)]
-pub trait WpDynamicAuthenticationProvider: Send + Sync {
+#[async_trait::async_trait]
+pub trait WpDynamicAuthenticationProvider: Send + Sync + Debug {
     fn auth(&self) -> WpAuthentication;
+
+    /// Refresh the authentication token. The implementation should only return true
+    /// if the authentication was successfully refreshed.
+    ///
+    /// **Concurrency:** This method may be called concurrently by multiple request
+    /// executors. Implementations must handle concurrent calls safely and avoid
+    /// unnecessary duplicate refresh operations.
+    async fn refresh(&self) -> bool;
 }
 
 #[derive(uniffi::Object)]
@@ -133,6 +143,16 @@ impl WpAuthenticationProvider {
                 inner.auth().header_value()
             }
             WpAuthenticationProvider::Modifiable { inner } => inner.header_value(),
+        }
+    }
+
+    pub(crate) async fn refresh(&self) -> bool {
+        match self {
+            WpAuthenticationProvider::StaticAuthenticationProvider { .. } => false,
+            WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => {
+                inner.refresh().await
+            }
+            WpAuthenticationProvider::Modifiable { .. } => false,
         }
     }
 }

@@ -55,9 +55,9 @@ mod tests {
     ) {
         let expected_path = |context: &str| {
             if expected_additional_params.is_empty() {
-                format!("/themes?context={}", context)
+                format!("/themes?context={context}")
             } else {
-                format!("/themes?context={}&{}", context, expected_additional_params)
+                format!("/themes?context={context}&{expected_additional_params}")
             }
         };
         validate_wp_v2_endpoint(
@@ -76,9 +76,9 @@ mod tests {
 
     #[rstest]
     #[case(ThemeListParams::default(), &[], "/themes?context=edit&_fields=")]
-    #[case(ThemeListParams::default(), ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT, &format!("/themes?context=edit&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(ThemeListParams::default(), ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT, &format!("/themes?context=edit&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT}"))]
     #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Active))), &[], "/themes?context=edit&status=active&_fields=")]
-    #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Inactive))), ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT, &format!("/themes?context=edit&status=inactive&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Inactive))), ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT, &format!("/themes?context=edit&status=inactive&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT}"))]
     fn filter_list_themes_with_edit_context(
         endpoint: ThemesRequestEndpoint,
         #[case] params: ThemeListParams,
@@ -93,9 +93,9 @@ mod tests {
 
     #[rstest]
     #[case(ThemeListParams::default(), &[], "/themes?context=embed&_fields=")]
-    #[case(ThemeListParams::default(), ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT, &format!("/themes?context=embed&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(ThemeListParams::default(), ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT, &format!("/themes?context=embed&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT}"))]
     #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Active))), &[], "/themes?context=embed&status=active&_fields=")]
-    #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Inactive))), ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT, &format!("/themes?context=embed&status=inactive&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Inactive))), ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT, &format!("/themes?context=embed&status=inactive&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT}"))]
     fn filter_list_themes_with_embed_context(
         endpoint: ThemesRequestEndpoint,
         #[case] params: ThemeListParams,
@@ -110,9 +110,9 @@ mod tests {
 
     #[rstest]
     #[case(ThemeListParams::default(), &[], "/themes?context=view&_fields=")]
-    #[case(ThemeListParams::default(), ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT, &format!("/themes?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(ThemeListParams::default(), ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT, &format!("/themes?context=view&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT}"))]
     #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Active))), &[], "/themes?context=view&status=active&_fields=")]
-    #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Inactive))), ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT, &format!("/themes?context=view&status=inactive&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(generate!(ThemeListParams, (status, Some(ThemeStatus::Inactive))), ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT, &format!("/themes?context=view&status=inactive&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_list_themes_with_view_context(
         endpoint: ThemesRequestEndpoint,
         #[case] params: ThemeListParams,
@@ -128,7 +128,7 @@ mod tests {
     #[rstest]
     fn retrieve_theme(endpoint: ThemesRequestEndpoint) {
         let theme_stylesheet: ThemeStylesheet = "foo".into();
-        let expected_path = |context: &str| format!("/themes/foo?context={}", context);
+        let expected_path = |context: &str| format!("/themes/foo?context={context}");
         validate_wp_v2_endpoint(
             endpoint.retrieve_with_edit_context(&theme_stylesheet),
             &expected_path("edit"),
@@ -146,7 +146,7 @@ mod tests {
     #[rstest]
     #[case(&[], "/themes/foo?context=edit&_fields=")]
     #[case(&[SparseThemeFieldWithEditContext::Author], "/themes/foo?context=edit&_fields=author")]
-    #[case(ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT, &format!("/themes/foo?context=edit&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT, &format!("/themes/foo?context=edit&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EDIT_CONTEXT}"))]
     fn filter_retrieve_theme_with_edit_context(
         endpoint: ThemesRequestEndpoint,
         #[case] fields: &[SparseThemeFieldWithEditContext],
@@ -161,7 +161,7 @@ mod tests {
     #[rstest]
     #[case(&[], "/themes/foo?context=embed&_fields=")]
     #[case(&[SparseThemeFieldWithEmbedContext::Author], "/themes/foo?context=embed&_fields=author")]
-    #[case(ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT, &format!("/themes/foo?context=embed&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT, &format!("/themes/foo?context=embed&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_EMBED_CONTEXT}"))]
     fn filter_retrieve_theme_with_embed_context(
         endpoint: ThemesRequestEndpoint,
         #[case] fields: &[SparseThemeFieldWithEmbedContext],
@@ -176,7 +176,7 @@ mod tests {
     #[rstest]
     #[case(&[], "/themes/foo?context=view&_fields=")]
     #[case(&[SparseThemeFieldWithViewContext::Author], "/themes/foo?context=view&_fields=author")]
-    #[case(ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT, &format!("/themes/foo?context=view&{}", EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT, &format!("/themes/foo?context=view&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_THEME_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_retrieve_theme_with_view_context(
         endpoint: ThemesRequestEndpoint,
         #[case] fields: &[SparseThemeFieldWithViewContext],

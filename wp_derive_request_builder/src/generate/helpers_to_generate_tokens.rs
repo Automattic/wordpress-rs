@@ -370,11 +370,11 @@ pub fn fn_body_build_request_from_url(
         RequestType::Post => {
             if params_type.is_some() {
                 quote! {
-                    self.inner.post(url, params)
+                    self.inner.post(url, Some(params))
                 }
             } else {
                 quote! {
-                    self.inner.post(url)
+                    self.inner.post(url, None::<&()>)
                 }
             }
         }
@@ -1053,11 +1053,15 @@ mod tests {
         RequestType::Delete,
         "self . inner . delete (url)"
     )]
-    #[case(None, RequestType::Post, "self . inner . post (url)")]
+    #[case(
+        None,
+        RequestType::Post,
+        "self . inner . post (url , None :: < & () >)"
+    )]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Post,
-        "self . inner . post (url , params)"
+        "self . inner . post (url , Some (params))"
     )]
     fn test_fn_body_build_request_from_url(
         #[case] params: Option<ParamsType>,

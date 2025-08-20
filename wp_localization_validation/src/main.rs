@@ -284,9 +284,9 @@ fn print_and_check_errors(errors: &[ValidationError], config: &Config) {
     for error in errors {
         if error.is_critical(config) {
             has_critical_issues = true;
-            eprintln!("Error: {}", error);
+            eprintln!("Error: {error}");
         } else {
-            eprintln!("Warning: {}", error);
+            eprintln!("Warning: {error}");
         }
     }
     if has_critical_issues {

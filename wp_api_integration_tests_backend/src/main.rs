@@ -111,8 +111,7 @@ async fn restore_wp_server(db: bool, plugins: bool) -> Result<Status, Error> {
         let output = wp_cli::restore_db();
         if !output.status.success() {
             return Err(Error::AsString(format!(
-                "Failed to restore db: {:#?}",
-                output
+                "Failed to restore db: {output:#?}"
             )));
         }
     }
@@ -140,8 +139,8 @@ fn rocket() -> _ {
 async fn inner_restore_wp_content_plugins() {
     println!("Restoring wp-content/plugins");
 
-    let plugins_folder = &format!("{}/plugins", TEST_SITE_WP_CONTENT_PATH);
-    let plugins_backup_folder = &format!("{}/plugins-backup", TEST_SITE_WP_CONTENT_PATH);
+    let plugins_folder = &format!("{TEST_SITE_WP_CONTENT_PATH}/plugins");
+    let plugins_backup_folder = &format!("{TEST_SITE_WP_CONTENT_PATH}/plugins-backup");
 
     std::fs::remove_dir_all(plugins_folder).expect("Failed to remove old plugins");
 

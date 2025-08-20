@@ -1,5 +1,6 @@
 use plugins::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use users::*;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
@@ -35,6 +36,8 @@ pub mod themes;
 pub mod url_query;
 pub mod users;
 pub mod uuid;
+pub mod widget_types;
+pub mod widgets;
 pub mod wordpress_org;
 pub mod wp_site_health_tests;
 
@@ -104,7 +107,7 @@ pub enum EnumFromStrParsingError {
     UnknownVariant { value: String },
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum JsonValue {
     Null,
@@ -114,6 +117,14 @@ pub enum JsonValue {
     String(String),
     Array(Vec<JsonValue>),
     Object(HashMap<String, JsonValue>),
+}
+
+/// Similar to `JsonValue`, but exported as a Uniffi object.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
+pub struct AnyJson {
+    #[serde(flatten)]
+    pub raw: Value,
 }
 
 uniffi::custom_newtype!(WpResponseString, Option<String>);
@@ -223,7 +234,7 @@ mod tests {
             .append_query_value_pair("orderby", &orderby);
         assert_eq!(
             url.query().map(|x| x.to_string()),
-            Some(format!("orderby={}", expected))
+            Some(format!("orderby={expected}"))
         );
     }
 
@@ -232,5 +243,31 @@ mod tests {
     #[case(WpApiParamOrder::Desc)]
     fn test_orderby_string_conversion(#[case] orderby: WpApiParamOrder) {
         assert_eq!(orderby, orderby.to_string().parse().unwrap());
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct Person {
+        name: String,
+        #[serde(flatten)]
+        other_fields: AnyJson,
+    }
+
+    #[test]
+    fn test_parse_any_json() {
+        let json = r#"{"name": "Alice", "age": 30, "city": "Wonderland"}"#;
+        let person: Person = serde_json::from_str(json).unwrap();
+        assert_eq!(person.name, "Alice");
+        assert_eq!(
+            person.other_fields.raw,
+            serde_json::json!({"age": 30, "city": "Wonderland"})
+        );
+    }
+
+    #[test]
+    fn test_parse_empty_any_json() {
+        let json = r#"{"name": "Alice"}"#;
+        let person: Person = serde_json::from_str(json).unwrap();
+        assert_eq!(person.name, "Alice");
+        assert_eq!(person.other_fields.raw, serde_json::json!({}));
     }
 }

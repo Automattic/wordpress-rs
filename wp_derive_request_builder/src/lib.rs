@@ -26,13 +26,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
 fn read_crate_config() -> CrateConfig {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR")
         .expect("Crate config can't be found without the `CARGO_MANIFEST_DIR` environment varible");
-    let file_path = format!("{}/wp_derived_request.toml", manifest_dir);
-    let contents = match fs::read_to_string(&file_path) {
+    let file_path = format!("{manifest_dir}/wp_derived_request.toml");
+    match fs::read_to_string(&file_path) {
         Ok(c) => toml::from_str(c.as_str())
-            .unwrap_or_else(|e| panic!("'{}' is not formatted correctly:\n{:#?}", file_path, e)),
+            .unwrap_or_else(|e| panic!("'{file_path}' is not formatted correctly:\n{e:#?}")),
         Err(_) => {
-            panic!("{} is missing", file_path);
+            panic!("{file_path} is missing");
         }
-    };
-    contents
+    }
 }

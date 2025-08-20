@@ -3,6 +3,7 @@ use crate::request::endpoint::AsNamespace;
 pub mod client;
 pub mod connection;
 pub mod endpoint;
+pub mod videopress;
 
 pub(crate) struct JetpackNamespace();
 

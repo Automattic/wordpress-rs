@@ -130,7 +130,7 @@ impl Display for SiteSettingsPingStatus {
             Self::Closed => "closed",
             Self::Custom(name) => name.as_str(),
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -152,6 +152,6 @@ impl Display for SiteSettingsCommentStatus {
             Self::Closed => "closed",
             Self::Custom(name) => name.as_str(),
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }

@@ -356,8 +356,7 @@ mod tests {
         );
 
         let expected_url = format!(
-            "https://example.com/wp-login.php?app_name=AppName&app_id={}&success_url=https%3A%2F%2Fexample.com%2Fsuccess&reject_url=https%3A%2F%2Fexample.com%2Freject",
-            app_id_str
+            "https://example.com/wp-login.php?app_name=AppName&app_id={app_id_str}&success_url=https%3A%2F%2Fexample.com%2Fsuccess&reject_url=https%3A%2F%2Fexample.com%2Freject"
         );
         assert_eq!(auth_url, ParsedUrl::parse(expected_url.as_str()).unwrap());
     }
@@ -438,8 +437,7 @@ mod tests {
 
         assert!(
             result.is_ok(),
-            "Failed to parse json as `WpApiDetails`: {:#?}",
-            result
+            "Failed to parse json as `WpApiDetails`: {result:#?}"
         );
     }
 

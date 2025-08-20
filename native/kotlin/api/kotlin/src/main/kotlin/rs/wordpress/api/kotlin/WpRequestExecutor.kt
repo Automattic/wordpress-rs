@@ -4,11 +4,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttp
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.InvalidSslErrorReason
@@ -17,6 +19,7 @@ import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
@@ -31,14 +34,22 @@ const val USER_AGENT_HEADER_NAME = "User-Agent"
 
 class WpRequestExecutor(
     private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val fileResolver: FileResolver = DefaultFileResolver(),
+    private val uploadListener: UploadListener? = null
 ) : RequestExecutor {
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
+            val wpNetworkRequestBody = request.body()?.contents()?.toRequestBody()
             requestBuilder.method(
-                request.method().toString(),
-                request.body()?.contents()?.toRequestBody()
+                method = request.method().toString(),
+                body = if (request.method() == RequestMethod.POST) {
+                    // OkHttp doesn't allow empty bodies for POST requests
+                    wpNetworkRequestBody ?: "".toRequestBody()
+                } else {
+                    wpNetworkRequestBody
+                }
             )
             request.headerMap().toMap().forEach { (key, values) ->
                 values.forEach { value ->
@@ -81,17 +92,15 @@ class WpRequestExecutor(
             mediaUploadRequest.mediaParams().forEach { (k, v) ->
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
-            val filePath = mediaUploadRequest.filePath()
-            val file =
-                WpRequestExecutor::class.java.classLoader?.getResource(filePath)?.file?.let {
-                    File(
-                        it
-                    )
-                } ?: throw MediaUploadRequestExecutionException.MediaFileNotFound(filePath)
+            val file = fileResolver.getFile(mediaUploadRequest.filePath())
+            if (file == null || !file.canBeUploaded()) {
+                throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
+            }
+            val progressRequestBody = getRequestBody(file, mediaUploadRequest, uploadListener)
             multipartBodyBuilder.addFormDataPart(
                 name = "file",
                 filename = file.name,
-                body = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+                body = progressRequestBody
             )
             requestBuilder.method(
                 method = mediaUploadRequest.method().toString(),
@@ -103,7 +112,10 @@ class WpRequestExecutor(
                 }
             }
 
-            httpClient.getClient().newCall(requestBuilder.build()).execute().use { response ->
+            val call = httpClient.getClient().newCall(requestBuilder.build())
+            // Notify about the call creation so it can be cancelled if needed
+            uploadListener?.onUploadStarted(CancellableCall(call))
+            call.execute().use { response ->
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
@@ -114,8 +126,73 @@ class WpRequestExecutor(
             }
         }
 
+    private fun getRequestBody(
+        file: File,
+        mediaUploadRequest: MediaUploadRequest,
+        uploadListener: UploadListener?
+    ): RequestBody {
+        val fileRequestBody = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+        return if (uploadListener != null) {
+            ProgressRequestBody(
+                delegate = fileRequestBody,
+                progressListener = object : ProgressRequestBody.ProgressListener {
+                    override fun onProgress(bytesWritten: Long, contentLength: Long) {
+                        uploadListener.onProgressUpdate(bytesWritten, contentLength)
+                    }
+                }
+            )
+        } else {
+            fileRequestBody
+        }
+    }
+
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
+    }
+
+    private fun File.canBeUploaded() = exists() && isFile && canRead()
+
+    /**
+     * Interface for monitoring the progress and status of a media upload.
+     */
+    interface UploadListener {
+        /**
+         * Called to report the progress of the upload.
+         *
+         * @param uploadedBytes The number of bytes that have been uploaded so far.
+         * @param totalBytes The total number of bytes to be uploaded.
+         */
+        fun onProgressUpdate(uploadedBytes: Long, totalBytes: Long)
+
+        /**
+         * Called when the upload starts.
+         *
+         * @param cancellableUpload The [CancellableUpload] object representing the upload request. This can be used
+         * to cancel the upload if needed by calling [cancellableUpload.cancel].
+         *
+         * This method is invoked at the beginning of the upload process, allowing the caller
+         * to monitor or control the upload operation.
+         */
+        fun onUploadStarted(cancellableUpload: CancellableUpload)
+    }
+
+    /**
+     * Represents a cancellable upload operation.
+     */
+    interface CancellableUpload {
+        /**
+         * Cancels the upload operation.
+         */
+        fun cancel()
+    }
+
+    /**
+     * Implementation of [CancellableUpload] that delegates to an OkHttp [Call].
+     */
+    class CancellableCall(private val call: Call) : CancellableUpload {
+        override fun cancel() {
+            call.cancel()
+        }
     }
 }
 

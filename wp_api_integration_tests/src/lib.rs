@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use wp_api::wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver};
 
 pub mod mock;
 pub mod prelude;
@@ -35,6 +36,15 @@ impl TestCredentials {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct WpComTestCredentials {
+    pub bearer_token: &'static str,
+    pub site_id: u64,
+    pub wp_com_subscriber_user_id: i64,
+    pub email_subscriber_subscription_id: u64,
+    pub comment_id: i64,
+}
+
 pub mod backend;
 
 // The first user is also the current user
@@ -55,6 +65,9 @@ pub const POST_ID_555: PostId = PostId(555);
 pub const POST_ID_DRAFT: PostId = PostId(1164);
 pub const POST_ID_INVALID: PostId = PostId(99999999);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
+pub const MEDIA_ID_VIDEO: MediaId = MediaId(1690);
+pub const MEDIA_ID_AUDIO: MediaId = MediaId(821);
+pub const MEDIA_ID_IMAGE: MediaId = MediaId(1692);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test-data/test_media.jpg";
 pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
 pub const CATEGORY_ID_48: CategoryId = CategoryId(48);
@@ -67,6 +80,9 @@ pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";
+pub const WIDGET_ID_BLOCK_2: &str = "block-2";
+pub const WIDGET_INACTIVE_WIDGETS_SIDEBAR: &str = "wp_inactive_widgets";
+pub const WIDGET_TYPE_TEXT: &str = "text";
 
 pub fn api_client() -> WpApiClient {
     WpApiClient::new(
@@ -125,6 +141,37 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
     )
 }
 
+pub fn wp_com_client() -> WpComApiClient {
+    WpComApiClient::new(WpApiClientDelegate {
+        auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
+            token: WpComTestCredentials::instance().bearer_token.to_string(),
+        })
+        .into(),
+        request_executor: Arc::new(ReqwestRequestExecutor::default()),
+        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        app_notifier: Arc::new(EmptyAppNotifier),
+    })
+}
+
+pub fn api_client_backed_by_wp_com(site_id: String) -> WpApiClient {
+    WpApiClient::new(
+        Arc::new(WpComDotOrgApiUrlResolver::new(
+            site_id,
+            WpComBaseUrl::Production,
+        )),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::static_with_auth(
+                WpAuthentication::Bearer {
+                    token: WpComTestCredentials::instance().bearer_token.to_string(),
+                },
+            )),
+            request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
+    )
+}
+
 pub fn test_site_url() -> ParsedUrl {
     let mut url: Url = TestCredentials::instance()
         .site_url
@@ -153,11 +200,10 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         {
             assert_eq!(
                 expected_error_code, error_code,
-                "Incorrect error code. Expected '{:?}', found '{:?}'. Response was: '{:?}'",
-                expected_error_code, error_code, response
+                "Incorrect error code. Expected '{expected_error_code:?}', found '{error_code:?}'. Response was: '{response:?}'"
             );
         } else {
-            panic!("Unexpected wp_error '{}'", err);
+            panic!("Unexpected wp_error '{err}'");
         }
     }
 }
