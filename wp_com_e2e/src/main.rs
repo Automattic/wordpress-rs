@@ -2,13 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
-use wp_api::{
-    WpApiClientDelegate, WpAppNotifier,
-    auth::{WpAuthentication, WpAuthenticationProvider},
-    middleware::WpApiMiddlewarePipeline,
-    reqwest_request_executor::ReqwestRequestExecutor,
-    wp_com::client::WpComApiClient,
-};
+use wp_api::{prelude::*, wp_com::client::WpComApiClient};
 
 mod oauth2_tests;
 mod support_eligibility_test;
