@@ -228,6 +228,17 @@ impl From<reqwest::Error> for RequestExecutionError {
             };
         }
 
+        if error.is_connect() {
+            return RequestExecutionError::RequestExecutionFailed {
+                status_code,
+                redirects: None,
+                reason: RequestExecutionErrorReason::NonExistentSiteError {
+                    error_message: Some(error.to_string()),
+                    suggested_action: None,
+                },
+            };
+        }
+
         RequestExecutionError::RequestExecutionFailed {
             status_code,
             redirects: None,
