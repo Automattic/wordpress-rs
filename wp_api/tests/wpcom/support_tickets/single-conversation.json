@@ -1,0 +1,131 @@
+{
+  "id": 9796958,
+  "title": "Issue with Jetpack Connection",
+  "description": "Having trouble connecting Jetpack to my site",
+  "status": "open",
+  "messages": [
+    {
+      "id": 37691022090900,
+      "content": "I'm having trouble connecting Jetpack to my WordPress site. The connection keeps failing and I'm not sure what to do.",
+      "role": "user",
+      "author": {
+        "id": 375621849651,
+        "name": "Test User",
+        "email": "test.user@example.com"
+      },
+      "author_is_current_user": true,
+      "created_at": "2025-05-21T01:03:11+00:00",
+      "attachments": []
+    },
+    {
+      "id": 37691118978324,
+      "content": "Hi Test User,\n\nI'm sorry to hear you're having trouble with your Jetpack connection. Could you please try disconnecting and reconnecting Jetpack from your site's dashboard? Also, please check if your site's XML-RPC is enabled.\n\nSupport Agent\nSupport Agent\n**| Automattic | WordPress.com**",
+      "role": "support",
+      "author": {
+        "id": 370234131652,
+        "name": "Support Agent"
+      },
+      "author_is_current_user": false,
+      "created_at": "2025-05-21T01:05:27+00:00",
+      "attachments": []
+    },
+    {
+      "id": 37691524437652,
+      "content": "I've tried disconnecting and reconnecting, but I'm still seeing the same error message. Here's what I see on my screen.\n\nSupport Agent\nSupport Agent\n**| Automattic | WordPress.com**",
+      "role": "support",
+      "author": {
+        "id": 370234131652,
+        "name": "Support Agent"
+      },
+      "author_is_current_user": false,
+      "created_at": "2025-05-21T01:35:23+00:00",
+      "attachments": []
+    },
+    {
+      "id": 37691573997588,
+      "content": "Could you please check if your site's firewall or security plugins might be blocking the connection? Sometimes these can interfere with Jetpack's connection process.\n\nSupport Agent\nSupport Agent\n**| Automattic | WordPress.com**",
+      "role": "support",
+      "author": {
+        "id": 370234131652,
+        "name": "Support Agent"
+      },
+      "author_is_current_user": false,
+      "created_at": "2025-05-21T01:37:51+00:00",
+      "attachments": []
+    },
+    {
+      "id": 37725928573972,
+      "content": "I've attached a screenshot of the error message I'm seeing. It says 'Connection failed' with error code 403.",
+      "role": "user",
+      "author": {
+        "id": 375621849651,
+        "name": "Test User",
+        "email": "test.user@example.com"
+      },
+      "author_is_current_user": true,
+      "created_at": "2025-05-22T00:04:48+00:00",
+      "attachments": [
+        {
+          "id": 37725924561684,
+          "filename": "test_screenshot_1.jpeg",
+          "content_type": "image\/jpeg",
+          "size": 246171,
+          "url": "https:\/\/a8c.zendesk.com\/attachments\/token\/nZ1I5S7NkM8J8lpf9wAA9V6BL\/?name=test_screenshot_1.jpeg",
+          "metadata": {
+            "width": 1179,
+            "height": 2556
+          }
+        }
+      ]
+    },
+    {
+      "id": 37726042281364,
+      "content": "Here's another screenshot showing my site's security settings. I've temporarily disabled the firewall to test the connection.",
+      "role": "user",
+      "author": {
+        "id": 375621849651,
+        "name": "Test User",
+        "email": "test.user@example.com"
+      },
+      "author_is_current_user": true,
+      "created_at": "2025-05-22T00:11:50+00:00",
+      "attachments": [
+        {
+          "id": 37726025831316,
+          "filename": "test_screenshot_2.jpeg",
+          "content_type": "image\/jpeg",
+          "size": 246171,
+          "url": "https:\/\/a8c.zendesk.com\/attachments\/token\/nGyuwTgotHH3HAnm6WOCmfXuP\/?name=test_screenshot_2.jpeg",
+          "metadata": {
+            "width": 1179,
+            "height": 2556
+          }
+        }
+      ]
+    },
+    {
+      "id": 37726222988180,
+      "content": "I've recorded a video showing the connection process and the error that occurs. You can see exactly what happens when I try to connect.",
+      "role": "user",
+      "author": {
+        "id": 375621849651,
+        "name": "Test User",
+        "email": "test.user@example.com"
+      },
+      "author_is_current_user": true,
+      "created_at": "2025-05-22T00:22:09+00:00",
+      "attachments": [
+        {
+          "id": 37726236284948,
+          "filename": "test_recording_1.mp4",
+          "content_type": "video\/mp4",
+          "size": 25897659,
+          "url": "https:\/\/a8c.zendesk.com\/attachments\/token\/pxM2QJE7errXpreLxEgFA4w5L\/?name=test_recording_1.mp4",
+          "metadata": {}
+        }
+      ]
+    }
+  ],
+  "created_at": "2025-05-21T01:03:10+00:00",
+  "updated_at": "2025-05-22T00:22:09+00:00"
+}

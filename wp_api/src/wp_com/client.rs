@@ -6,6 +6,10 @@ use super::endpoint::{
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
+    support_eligibility_endpoint::{
+        SupportEligibilityRequestBuilder, SupportEligibilityRequestExecutor,
+    },
+    support_tickets_endpoint::{SupportTicketsRequestBuilder, SupportTicketsRequestExecutor},
 };
 use crate::{
     api_client::WpApiClientDelegate, api_client_generate_api_client,
@@ -36,6 +40,8 @@ pub struct WpComApiRequestBuilder {
     oauth2: Arc<Oauth2RequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
+    support_eligibility: Arc<SupportEligibilityRequestBuilder>,
+    support_tickets: Arc<SupportTicketsRequestBuilder>,
 }
 
 impl WpComApiRequestBuilder {
@@ -49,7 +55,9 @@ impl WpComApiRequestBuilder {
             jetpack_connection,
             oauth2,
             subscribers,
-            support_bots
+            support_bots,
+            support_eligibility,
+            support_tickets
         )
     }
 }
@@ -75,6 +83,8 @@ pub struct WpComApiClient {
     oauth2: Arc<Oauth2RequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
+    support_eligibility: Arc<SupportEligibilityRequestExecutor>,
+    support_tickets: Arc<SupportTicketsRequestExecutor>,
 }
 
 impl WpComApiClient {
@@ -89,7 +99,9 @@ impl WpComApiClient {
             jetpack_connection,
             oauth2,
             subscribers,
-            support_bots
+            support_bots,
+            support_eligibility,
+            support_tickets
         )
     }
 }
@@ -98,3 +110,5 @@ api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
+api_client_generate_endpoint_impl!(WpComApi, support_eligibility);
+api_client_generate_endpoint_impl!(WpComApi, support_tickets);

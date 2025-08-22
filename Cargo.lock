@@ -5100,6 +5100,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "wp_com_e2e"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "colored",
+ "csv",
+ "futures",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "wp_api",
+]
+
+[[package]]
 name = "wp_contextual"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,90 @@
+[
+    {
+      "id": 9033503,
+      "title": "🎨 Theme Customization Help",
+      "description": "Hello! 👋\n\nI see you're having trouble with your theme customization. Let me help you with that!\n\nThe color picker issue you're experiencing is a known bug that we've fixed in the latest update. Please try updating your theme to version 2.3.1.\n\nIf you need any further assistance, I'm here to help!\n\nBest regards,\n\nTheme Support Team 🌟",
+      "status": "closed",
+      "created_at": "2024-03-15T14:30:22+00:00",
+      "updated_at": "2024-03-18T09:45:33+00:00"
+    },
+    {
+      "id": 1698812,
+      "title": "🔒 Security Update Required",
+      "description": "مرحباً!\n\nلقد لاحظنا أن موقعك يحتاج إلى تحديث أمني. يرجى تحديث إصدار WordPress الخاص بك إلى أحدث إصدار متاح.\n\nيمكنك القيام بذلك من لوحة التحكم الخاصة بك.\n\nمع تحياتنا،\n\nفريق الدعم الأمني",
+      "status": "closed",
+      "created_at": "2024-03-10T09:15:45+00:00",
+      "updated_at": "2024-03-11T16:20:12+00:00"
+    },
+    {
+      "id": 1629241,
+      "title": "🚀 Performance Optimization",
+      "description": "Bonjour!\n\nJe vois que vous souhaitez optimiser les performances de votre site. Voici quelques suggestions:\n\n1. Activez la mise en cache\n2. Optimisez vos images\n3. Utilisez un CDN\n\nVoulez-vous que je vous guide à travers ces étapes?\n\nCordialement,\n\nL'équipe de support",
+      "status": "closed",
+      "created_at": "2024-03-05T11:22:18+00:00",
+      "updated_at": "2024-03-07T14:33:29+00:00"
+    },
+    {
+      "id": 1500710,
+      "title": "📱 Mobile App Feedback",
+      "description": "Hi there! 👋\n\nThank you for your feedback about our mobile app. We're constantly working to improve the user experience.\n\nYour suggestion about the navigation menu has been forwarded to our development team.\n\nKeep the feedback coming! 💪\n\nBest regards,\n\nMobile Support Team",
+      "status": "closed",
+      "created_at": "2024-02-28T15:40:55+00:00",
+      "updated_at": "2024-03-01T10:15:22+00:00"
+    },
+    {
+      "id": 1499869,
+      "title": "🎯 SEO Optimization Help",
+      "description": "Hello!\n\nI'd be happy to help you with your SEO optimization. Here are some key areas we can focus on:\n\n1. Meta descriptions\n2. Image alt tags\n3. URL structure\n\nWould you like me to provide more specific guidance on any of these topics?\n\nBest regards,\n\nSEO Support Team",
+      "status": "closed",
+      "created_at": "2024-02-25T13:20:33+00:00",
+      "updated_at": "2024-02-27T09:45:11+00:00"
+    },
+    {
+      "id": 1500203,
+      "title": "💰 Payment Gateway Setup",
+      "description": "Hi!\n\nI see you're setting up a new payment gateway. Let's make sure everything is configured correctly.\n\nPlease verify these settings:\n1. API keys\n2. Webhook endpoints\n3. Test mode status\n\nNeed any clarification? 🤔\n\nBest regards,\n\nPayment Support Team",
+      "status": "closed",
+      "created_at": "2024-02-20T10:15:44+00:00",
+      "updated_at": "2024-02-22T16:30:27+00:00"
+    },
+    {
+      "id": 1698812,
+      "title": "🎨 Design Consultation",
+      "description": "Hello! 👋\n\nThank you for reaching out about your site's design. I'd be happy to help you achieve the look you're going for.\n\nWould you like to schedule a design consultation call? We can discuss:\n- Color schemes\n- Layout options\n- Typography\n\nLet me know what works best for you! ✨\n\nBest regards,\n\nDesign Support Team",
+      "status": "closed",
+      "created_at": "2024-02-15T09:30:22+00:00",
+      "updated_at": "2024-02-17T14:45:33+00:00"
+    },
+    {
+      "id": 1629241,
+      "title": "📊 Analytics Integration",
+      "description": "Hi there!\n\nI see you're having trouble with your analytics integration. Let's get that sorted out.\n\nFirst, please verify that you've added the tracking code correctly to your site's header.\n\nNeed help finding where to add it? 🧐\n\nBest regards,\n\nAnalytics Support Team",
+      "status": "closed",
+      "created_at": "2024-02-10T11:20:18+00:00",
+      "updated_at": "2024-02-12T15:33:29+00:00"
+    },
+    {
+      "id": 1500710,
+      "title": "🌐 Multilingual Setup",
+      "description": "Bonjour!\n\nJe vois que vous souhaitez configurer votre site en plusieurs langues. Voici les étapes à suivre:\n\n1. Installer le plugin de traduction\n2. Configurer les langues\n3. Traduire le contenu\n\nBesoin d'aide avec l'une de ces étapes? 🤝\n\nCordialement,\n\nL'équipe de support multilingue",
+      "status": "closed",
+      "created_at": "2024-02-05T13:40:55+00:00",
+      "updated_at": "2024-02-07T10:15:22+00:00"
+    },
+    {
+      "id": 1499869,
+      "title": "🔧 Technical Support",
+      "description": "Hello! 👋\n\nI understand you're experiencing some technical issues. Let's troubleshoot this step by step.\n\nCould you please:\n1. Clear your browser cache\n2. Try a different browser\n3. Check your internet connection\n\nLet me know if you need help with any of these steps! 🛠️\n\nBest regards,\n\nTechnical Support Team",
+      "status": "closed",
+      "created_at": "2024-02-01T10:20:33+00:00",
+      "updated_at": "2024-02-03T09:45:11+00:00"
+    },
+    {
+      "id": 1500203,
+      "title": "📝 Content Migration",
+      "description": "Hi there!\n\nI see you're planning to migrate your content. Let me help you with that process.\n\nWe can use our automated migration tool, or I can guide you through a manual migration.\n\nWhich option would you prefer? 🤔\n\nBest regards,\n\nMigration Support Team",
+      "status": "closed",
+      "created_at": "2024-01-28T09:15:44+00:00",
+      "updated_at": "2024-01-30T16:30:27+00:00"
+    }
+  ]

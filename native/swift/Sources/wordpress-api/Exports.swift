@@ -179,3 +179,7 @@ public typealias CreateBotConversationParams = WordPressAPIInternal.CreateBotCon
 public typealias AddMessageToBotConversationParams = WordPressAPIInternal.AddMessageToBotConversationParams
 public typealias GetBotConversationParams = WordPressAPIInternal.GetBotConversationParams
 public typealias CreateBotConversationFeedbackParams = WordPressAPIInternal.CreateBotConversationFeedbackParams
+
+// MARK: Support Tickets
+public typealias CreateSupportTicketParams = WordPressAPIInternal.CreateSupportTicketParams
+public typealias AddMessageToSupportConversationParams = WordPressAPIInternal.AddMessageToSupportConversationParams

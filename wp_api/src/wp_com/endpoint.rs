@@ -12,6 +12,8 @@ pub mod jetpack_connection_endpoint;
 pub mod oauth2;
 pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
+pub mod support_eligibility_endpoint;
+pub mod support_tickets_endpoint;
 
 #[derive(uniffi::Object)]
 pub struct WpComDotOrgApiUrlResolver {
