@@ -270,3 +270,49 @@ extension CommentsRequestExecutor: PaginationAwareExecutor {
     public typealias ViewContextResponseType = CommentsRequestListWithViewContextResponse
     public typealias EmbedContextResponseType = CommentsRequestListWithEmbedContextResponse
 }
+
+// MARK: - Categories
+
+extension CategoriesRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = CategoryListParams
+    public typealias DataType = CategoryWithEditContext
+}
+
+extension CategoriesRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = CategoryListParams
+    public typealias DataType = CategoryWithViewContext
+}
+
+extension CategoriesRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = CategoryListParams
+    public typealias DataType = CategoryWithEmbedContext
+}
+
+extension CategoriesRequestExecutor: PaginationAwareExecutor {
+    public typealias EditContextResponseType = CategoriesRequestListWithEditContextResponse
+    public typealias ViewContextResponseType = CategoriesRequestListWithViewContextResponse
+    public typealias EmbedContextResponseType = CategoriesRequestListWithEmbedContextResponse
+}
+
+// MARK: - Tags
+
+extension TagsRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = TagListParams
+    public typealias DataType = TagWithEditContext
+}
+
+extension TagsRequestListWithViewContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = TagListParams
+    public typealias DataType = TagWithViewContext
+}
+
+extension TagsRequestListWithEmbedContextResponse: PaginatableResponse, @unchecked Sendable {
+    public typealias ParamsType = TagListParams
+    public typealias DataType = TagWithEmbedContext
+}
+
+extension TagsRequestExecutor: PaginationAwareExecutor {
+    public typealias EditContextResponseType = TagsRequestListWithEditContextResponse
+    public typealias ViewContextResponseType = TagsRequestListWithViewContextResponse
+    public typealias EmbedContextResponseType = TagsRequestListWithEmbedContextResponse
+}
