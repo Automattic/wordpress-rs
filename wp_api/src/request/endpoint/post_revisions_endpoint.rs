@@ -15,11 +15,20 @@ enum PostRevisionsRequest {
     List,
     #[contextual_get(url = "/posts/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::SparsePostRevision, filter_by = crate::post_revisions::SparsePostRevisionField)]
     Retrieve,
+    #[delete(url = "/posts/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::PostRevisionDeleteResponse)]
+    Delete,
 }
 
 impl DerivedRequest for PostRevisionsRequest {
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
+    }
+
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            PostRevisionsRequest::Delete => vec![("force", "true".to_string())],
+            _ => vec![],
+        }
     }
 }
 
@@ -159,6 +168,16 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.filter_retrieve_with_edit_context(&PostId(777), &PostRevisionId(888), fields),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn delete_post_revision(endpoint: PostRevisionsRequestEndpoint) {
+        let post_id = PostId(777);
+        let revision_id = PostRevisionId(888);
+        validate_wp_v2_endpoint(
+            endpoint.delete(&post_id, &revision_id),
+            &format!("/posts/{post_id}/revisions/{revision_id}?force=true"),
         );
     }
 
