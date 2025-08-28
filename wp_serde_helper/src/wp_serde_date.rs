@@ -40,10 +40,10 @@ pub mod wp_utc_date_format {
                 }
 
                 // Unix Timestamp (wrapped in a string)
-                if let Ok(timestamp) = s.parse::<i64>() {
-                    if let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0) {
-                        return Ok(dt);
-                    }
+                if let Ok(timestamp) = s.parse::<i64>()
+                    && let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0)
+                {
+                    return Ok(dt);
                 }
 
                 // MySQL format

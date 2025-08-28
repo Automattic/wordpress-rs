@@ -36,10 +36,10 @@ pub fn extract_login_details_from_parsed_url(
             .query_pairs()
             .find_map(|(k, v)| (k == key).then_some(v.to_string()))
     };
-    if let Some(is_success) = f("success") {
-        if is_success == "false" {
-            return Err(OAuthResponseUrlError::UnsuccessfulLogin);
-        }
+    if let Some(is_success) = f("success")
+        && is_success == "false"
+    {
+        return Err(OAuthResponseUrlError::UnsuccessfulLogin);
     }
     let site_url = f("site_url").ok_or(OAuthResponseUrlError::MissingSiteUrl)?;
     let user_login = f("user_login").ok_or(OAuthResponseUrlError::MissingUsername)?;
@@ -210,7 +210,7 @@ pub enum OAuthResponseUrlError {
 }
 
 impl WpSupportsLocalization for OAuthResponseUrlError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             OAuthResponseUrlError::MissingSiteUrl
             | OAuthResponseUrlError::MissingUsername

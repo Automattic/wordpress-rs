@@ -27,7 +27,7 @@ pub enum WpUuidParseError {
 }
 
 impl WpSupportsLocalization for WpUuidParseError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             WpUuidParseError::InvalidUuid => WpMessages::uuid_parse_error_invalid_uuid(),
             WpUuidParseError::NotVersion4 => WpMessages::uuid_parse_error_not_version_4(),

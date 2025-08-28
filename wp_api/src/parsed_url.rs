@@ -58,10 +58,10 @@ impl UrlExtension for Url {
         I::Item: AsRef<str>,
     {
         // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
-        if let Some(mut segments) = self.path_segments() {
-            if segments.next_back() == Some("") {
-                self.path_segments_mut()?.pop();
-            }
+        if let Some(mut segments) = self.path_segments()
+            && segments.next_back() == Some("")
+        {
+            self.path_segments_mut()?.pop();
         }
 
         self.path_segments_mut()?.extend(segments);
@@ -121,7 +121,7 @@ pub enum ParseUrlError {
 }
 
 impl WpSupportsLocalization for ParseUrlError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         WpMessages::url_parsing_error()
     }
 }

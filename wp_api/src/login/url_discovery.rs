@@ -413,7 +413,7 @@ impl AutoDiscoveryAttemptFailure {
 }
 
 impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             Self::ParseSiteUrl { error } => error.message_bundle(),
             Self::FindApiRoot {
@@ -439,7 +439,7 @@ pub enum FindApiRootFailure {
 }
 
 impl FindApiRootFailure {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             Self::FetchHomepage { error } => error.message_bundle(),
             Self::ProbablyNotAWordPressSite => WpMessages::probably_not_wordpress_site(),
@@ -486,7 +486,7 @@ pub enum FetchAndParseApiRootFailure {
 }
 
 impl FetchAndParseApiRootFailure {
-    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
+    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle<'_> {
         match self {
             Self::FetchApiRoot { error } => error.message_bundle(),
             Self::ParseApiRoot { reason, .. } => {
@@ -530,7 +530,7 @@ pub enum ApplicationPasswordsNotSupportedReason {
 }
 
 impl ApplicationPasswordsNotSupportedReason {
-    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
+    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle<'_> {
         match self {
             Self::ApplicationPasswordBlockedByPlugin { plugin } => {
                 WpMessages::application_password_blocked_by_plugin(
@@ -688,7 +688,7 @@ pub enum FetchApiDetailsError {
 }
 
 impl WpSupportsLocalization for FetchApiDetailsError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             FetchApiDetailsError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
             FetchApiDetailsError::ApiDetailsCouldntBeParsed { reason, .. } => {
@@ -715,7 +715,7 @@ pub enum XmlrpcDisabledReason {
 }
 
 impl WpSupportsLocalization for XmlrpcDiscoveryError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             XmlrpcDiscoveryError::FetchHomepage { error } => error.message_bundle(),
             XmlrpcDiscoveryError::EndpointNotFound => WpMessages::xmlrpc_endpoint_not_found(),
@@ -789,7 +789,7 @@ impl ParseApiRootFailureReason {
         }
     }
 
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             Self::ServerFatalError => {
                 WpMessages::parse_api_root_failure_reason_server_fatal_error()

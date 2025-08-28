@@ -145,12 +145,12 @@ impl ParsedVariantAttribute {
         let mut collection = vec![];
         let mut temp_v = vec![];
         for t in tokens {
-            if let TokenTree::Punct(ref p) = t {
-                if p.as_char() == ',' {
-                    collection.push(temp_v);
-                    temp_v = vec![];
-                    continue;
-                }
+            if let TokenTree::Punct(ref p) = t
+                && p.as_char() == ','
+            {
+                collection.push(temp_v);
+                temp_v = vec![];
+                continue;
             }
             temp_v.push(t);
         }

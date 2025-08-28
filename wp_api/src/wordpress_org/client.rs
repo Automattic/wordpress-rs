@@ -214,7 +214,7 @@ pub enum WordPressOrgApiClientError {
 }
 
 impl WpSupportsLocalization for WordPressOrgApiClientError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             WordPressOrgApiClientError::RequestEncodingError { reason } => {
                 WpMessages::wordpress_org_api_client_error_request_encoding(reason)
