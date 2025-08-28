@@ -12,11 +12,11 @@ RUN wget -O - https://apt.corretto.aws/corretto.key | gpg --dearmor -o /usr/shar
   echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | tee /etc/apt/sources.list.d/corretto.list
 
 RUN apt-get update  \
-  && apt-get install -y java-21-amazon-corretto-jdk android-sdk wget default-mysql-client less libssl-dev jo \
+  && apt-get install -y java-21-amazon-corretto-jdk android-sdk wget default-mysql-client less libssl-dev jo jq \
   && apt-get -y autoclean
 
 # Install wp-cli
-RUN curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.6.0/wp-cli-2.6.0.phar --output /usr/bin/wp
+RUN curl -L https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar --output /usr/bin/wp
 RUN chmod +x /usr/bin/wp
 
 # Create wpcli working directory

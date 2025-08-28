@@ -41,8 +41,42 @@ async fn list_with_view_context(#[case] params: PostRevisionListParams) {
         .assert_response();
 }
 
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .post_revisions()
+        .retrieve_with_edit_context(&revisioned_post_id(), &revision_id_for_revisioned_post_id())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context() {
+    api_client()
+        .post_revisions()
+        .retrieve_with_embed_context(&revisioned_post_id(), &revision_id_for_revisioned_post_id())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context() {
+    api_client()
+        .post_revisions()
+        .retrieve_with_view_context(&revisioned_post_id(), &revision_id_for_revisioned_post_id())
+        .await
+        .assert_response();
+}
+
 fn revisioned_post_id() -> PostId {
     PostId(TestCredentials::instance().revisioned_post_id)
+}
+
+fn revision_id_for_revisioned_post_id() -> PostRevisionId {
+    PostRevisionId(TestCredentials::instance().revision_id_for_revisioned_post_id)
 }
 
 #[template]
@@ -138,5 +172,65 @@ mod filter {
             .for_each(|post| {
                 post.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_post_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparsePostRevisionFieldWithEditContext::Id, SparsePostRevisionFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_edit_context(
+        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+    ) {
+        api_client()
+            .post_revisions()
+            .filter_retrieve_with_edit_context(
+                &revisioned_post_id(),
+                &revision_id_for_revisioned_post_id(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data
+            .assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_post_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparsePostRevisionFieldWithEmbedContext::Id, SparsePostRevisionFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_embed_context(
+        #[case] fields: &[SparsePostRevisionFieldWithEmbedContext],
+    ) {
+        api_client()
+            .post_revisions()
+            .filter_retrieve_with_embed_context(
+                &revisioned_post_id(),
+                &revision_id_for_revisioned_post_id(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data
+            .assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_post_revision_field_with_view_context_test_cases)]
+    #[case(&[SparsePostRevisionFieldWithViewContext::Id, SparsePostRevisionFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_view_context(
+        #[case] fields: &[SparsePostRevisionFieldWithViewContext],
+    ) {
+        api_client()
+            .post_revisions()
+            .filter_retrieve_with_view_context(
+                &revisioned_post_id(),
+                &revision_id_for_revisioned_post_id(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data
+            .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 }

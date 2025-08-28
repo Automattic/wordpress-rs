@@ -99,6 +99,7 @@ create_test_credentials () {
   local INTEGRATION_TEST_CUSTOM_TEMPLATE_ID
   SITE_URL="http://localhost"
   ADMIN_USERNAME="test@example.com"
+  ADMIN_USER_ID="$(wp user get "$ADMIN_USERNAME" --field=ID)"
   ADMIN_PASSWORD="$(wp user application-password create test@example.com test --porcelain)"
   ADMIN_PASSWORD_UUID="$(wp user application-password list test@example.com --fields=uuid --format=csv | sed -n '2 p')"
   SUBSCRIBER_USERNAME="themedemos"
@@ -130,8 +131,10 @@ create_test_credentials () {
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
   for i in {1..10};
   do
-    curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\"}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID"
+    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID"
   done
+  # Generating revisions don't return an id, but since we just created the `REVISIONED_POST_ID`, we can use it to calculate the revision id
+  REVISION_ID_FOR_REVISIONED_POST_ID=$((REVISIONED_POST_ID + 1))
 
   rm -rf /app/test_credentials.json
   jo -p \
@@ -154,6 +157,7 @@ create_test_credentials () {
     wordpress_core_version="\"$WORDPRESS_VERSION\"" \
     integration_test_custom_template_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" \
     revisioned_post_id="$REVISIONED_POST_ID" \
+    revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
