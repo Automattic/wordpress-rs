@@ -81,7 +81,7 @@ where
 }
 
 impl WpSupportsLocalization for WpApiError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             WpApiError::InvalidHttpStatusCode { status_code } => {
                 WpMessages::invalid_http_status_code(status_code)
@@ -510,7 +510,7 @@ pub enum RequestExecutionError {
 }
 
 impl WpSupportsLocalization for RequestExecutionError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             RequestExecutionError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
         }
@@ -527,7 +527,7 @@ pub enum InvalidSslErrorReason {
 }
 
 impl InvalidSslErrorReason {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             Self::CertificateNotValidForName { .. } => {
                 WpMessages::invalid_ssl_error_certificate_not_valid_for_name()
@@ -626,7 +626,7 @@ impl RequestExecutionErrorReason {
 }
 
 impl WpSupportsLocalization for RequestExecutionErrorReason {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             RequestExecutionErrorReason::InvalidSslError { reason } => reason.message_bundle(),
             RequestExecutionErrorReason::NonExistentSiteError { .. } => {
@@ -675,7 +675,7 @@ pub enum MediaUploadRequestExecutionError {
 }
 
 impl WpSupportsLocalization for MediaUploadRequestExecutionError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             MediaUploadRequestExecutionError::RequestExecutionFailed { reason, .. } => {
                 reason.message_bundle()

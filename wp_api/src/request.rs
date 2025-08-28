@@ -431,7 +431,7 @@ pub enum WpNetworkHeaderMapError {
 }
 
 impl WpSupportsLocalization for WpNetworkHeaderMapError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             WpNetworkHeaderMapError::InvalidHeaderName { header_name } => {
                 WpMessages::invalid_header_name_error(header_name)
@@ -638,7 +638,7 @@ pub enum HttpAuthMethodParsingError {
 }
 
 impl WpSupportsLocalization for HttpAuthMethodParsingError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             HttpAuthMethodParsingError::MissingNonce => {
                 WpMessages::http_auth_method_missing_nonce()

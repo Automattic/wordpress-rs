@@ -204,11 +204,9 @@ impl JetpackConnectionClient {
             error_code: WpErrorCode::CustomError(code),
             ..
         }) = &result
-        {
-            if code == "success" || code == "already_connected" {
+            && (code == "success" || code == "already_connected") {
                 return Ok(blog_id);
             }
-        }
 
         let result = result
             .map_err(JetpackConnectionClientError::Unhandled)?

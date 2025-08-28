@@ -7,7 +7,7 @@ pub enum UniffiSerializationError {
 }
 
 impl WpSupportsLocalization for UniffiSerializationError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             UniffiSerializationError::Serde { reason } => {
                 WpMessages::uniffi_serialization_error_serde(reason)

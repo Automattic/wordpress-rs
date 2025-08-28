@@ -149,7 +149,7 @@ pub enum WpApiNewtypeParsingError {
 }
 
 impl WpSupportsLocalization for WpApiNewtypeParsingError {
-    fn message_bundle(&self) -> MessageBundle {
+    fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             WpApiNewtypeParsingError::BooleanTrueIsReturnedWhenStringIsExpected => {
                 WpMessages::boolean_true_is_returned_when_string_is_expected()
