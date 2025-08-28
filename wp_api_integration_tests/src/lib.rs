@@ -28,6 +28,7 @@ pub struct TestCredentials {
     pub wordpress_core_version: &'static str,
     pub integration_test_custom_template_id: &'static str,
     pub revisioned_post_id: i64,
+    pub revision_id_for_revisioned_post_id: i64,
 }
 
 impl TestCredentials {

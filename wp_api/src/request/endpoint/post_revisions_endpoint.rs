@@ -2,7 +2,7 @@ use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
     SparseField,
     post_revisions::{
-        PostRevisionListParams, SparsePostRevisionFieldWithEditContext,
+        PostRevisionId, PostRevisionListParams, SparsePostRevisionFieldWithEditContext,
         SparsePostRevisionFieldWithEmbedContext, SparsePostRevisionFieldWithViewContext,
     },
     posts::PostId,
@@ -13,6 +13,8 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum PostRevisionsRequest {
     #[contextual_paged(url = "/posts/<post_id>/revisions", params = &PostRevisionListParams, output = Vec<crate::post_revisions::SparsePostRevision>, filter_by = crate::post_revisions::SparsePostRevisionField)]
     List,
+    #[contextual_get(url = "/posts/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::SparsePostRevision, filter_by = crate::post_revisions::SparsePostRevisionField)]
+    Retrieve,
 }
 
 impl DerivedRequest for PostRevisionsRequest {
@@ -124,6 +126,40 @@ mod tests {
             order: Some(WpApiParamOrder::Asc),
             orderby: Some(WpApiParamPostRevisionsOrderBy::Id),
         }
+    }
+
+    #[rstest]
+    fn retrieve_post_revision(endpoint: PostRevisionsRequestEndpoint) {
+        let post_id = PostId(777);
+        let revision_id = PostRevisionId(888);
+        let expected_path =
+            |context: &str| format!("/posts/{post_id}/revisions/{revision_id}?context={context}");
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_edit_context(&post_id, &revision_id),
+            &expected_path("edit"),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_embed_context(&post_id, &revision_id),
+            &expected_path("embed"),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_view_context(&post_id, &revision_id),
+            &expected_path("view"),
+        );
+    }
+
+    #[rstest]
+    #[case(&[], "/posts/777/revisions/888?context=edit&_fields=")]
+    #[case(&[SparsePostRevisionFieldWithEditContext::Date], "/posts/777/revisions/888?context=edit&_fields=date")]
+    fn filter_retrieve_post_revision_with_edit_context(
+        endpoint: PostRevisionsRequestEndpoint,
+        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_edit_context(&PostId(777), &PostRevisionId(888), fields),
+            expected_path,
+        );
     }
 
     const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_REVISION_FIELDS_WITH_EDIT_CONTEXT: &str = "_fields=id%2Cauthor%2Cdate%2Cdate_gmt%2Cmodified%2Cmodified_gmt%2Cparent%2Cslug%2Cguid%2Ctitle%2Ccontent%2Cexcerpt%2Cmeta";
