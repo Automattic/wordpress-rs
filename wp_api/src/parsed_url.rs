@@ -59,9 +59,10 @@ impl UrlExtension for Url {
     {
         // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
         if let Some(mut segments) = self.path_segments()
-            && segments.next_back() == Some("") {
-                self.path_segments_mut()?.pop();
-            }
+            && segments.next_back() == Some("")
+        {
+            self.path_segments_mut()?.pop();
+        }
 
         self.path_segments_mut()?.extend(segments);
         Ok(self)

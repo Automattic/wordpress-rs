@@ -486,7 +486,7 @@ pub enum FetchAndParseApiRootFailure {
 }
 
 impl FetchAndParseApiRootFailure {
-    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
+    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle<'_> {
         match self {
             Self::FetchApiRoot { error } => error.message_bundle(),
             Self::ParseApiRoot { reason, .. } => {
@@ -530,7 +530,7 @@ pub enum ApplicationPasswordsNotSupportedReason {
 }
 
 impl ApplicationPasswordsNotSupportedReason {
-    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle {
+    fn message_bundle(&self, parsed_site_url: impl std::fmt::Display) -> MessageBundle<'_> {
         match self {
             Self::ApplicationPasswordBlockedByPlugin { plugin } => {
                 WpMessages::application_password_blocked_by_plugin(

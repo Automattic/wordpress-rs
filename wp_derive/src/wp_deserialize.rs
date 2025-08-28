@@ -147,20 +147,22 @@ impl ParsedStruct {
         let attrs = Attribute::parse_outer(input)?;
         for attr in &attrs {
             if let syn::Meta::List(meta_list) = &attr.meta
-                && let Some(ident) = meta_list.path.get_ident() {
-                    if *ident != "serde" {
-                        continue;
-                    }
-
-                    if let Some(proc_macro2::TokenTree::Ident(first_token_ident)) =
-                        meta_list.tokens.clone().into_iter().next()
-                        && first_token_ident.to_string().as_str() == "transparent" {
-                            return Err(
-                                WpDeserializeParseError::SerdeTransparentAttributeNotSupported
-                                    .into_syn_error(first_token_ident.span()),
-                            );
-                        }
+                && let Some(ident) = meta_list.path.get_ident()
+            {
+                if *ident != "serde" {
+                    continue;
                 }
+
+                if let Some(proc_macro2::TokenTree::Ident(first_token_ident)) =
+                    meta_list.tokens.clone().into_iter().next()
+                    && first_token_ident.to_string().as_str() == "transparent"
+                {
+                    return Err(
+                        WpDeserializeParseError::SerdeTransparentAttributeNotSupported
+                            .into_syn_error(first_token_ident.span()),
+                    );
+                }
+            }
         }
         Ok(attrs)
     }
