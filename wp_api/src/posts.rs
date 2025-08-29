@@ -531,6 +531,7 @@ pub struct SparsePost {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostGuid {
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
     #[WpContext(edit, view)]
     pub rendered: Option<String>,
@@ -539,6 +540,7 @@ pub struct SparsePostGuid {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostTitle {
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
     #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
@@ -547,6 +549,7 @@ pub struct SparsePostTitle {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostContent {
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
     #[WpContext(edit, view)]
     pub rendered: Option<String>,
@@ -561,6 +564,7 @@ pub struct SparsePostContent {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostExcerpt {
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
     #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,

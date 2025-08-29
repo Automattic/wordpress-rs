@@ -188,6 +188,12 @@ pub struct SparsePostRevision {
     pub meta: Option<crate::posts::PostMeta>,
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct PostRevisionDeleteResponse {
+    pub deleted: bool,
+    pub previous: PostRevisionWithEditContext,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

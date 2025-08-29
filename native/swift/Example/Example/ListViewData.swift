@@ -133,7 +133,7 @@ extension SiteSettingsWithEditContext {
 
 extension PostWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.title.raw, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.title.rendered, subtitle: self.slug, fields: [:])
     }
 }
 
@@ -143,7 +143,7 @@ extension MediaWithEditContext: ListViewDataConvertable {
         return ListViewData(
             id: self.slug,
             title: details.emoji + " " + (URL(string: self.sourceUrl)?.lastPathComponent ?? "<invalid-source-url>"),
-            subtitle: self.title.raw,
+            subtitle: self.title.rendered,
             fields: details.fields
         )
     }
