@@ -1,4 +1,9 @@
-use std::{collections::HashMap, ffi::OsStr, process::Command};
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    fs::File,
+    process::{Command, Stdio},
+};
 
 mod wp_cli_categories;
 mod wp_cli_comments;
@@ -17,7 +22,19 @@ pub use wp_cli_users::*;
 const BACKUP_PATH: &str = "/var/www/html/wp-content/dump.sql";
 
 pub fn restore_db() -> std::process::Output {
-    run_wp_cli_command(["db", "import", BACKUP_PATH])
+    Command::new("mariadb")
+        .arg("--skip-ssl")
+        .arg("-h")
+        .arg("database")
+        .arg("-u")
+        .arg("wordpress")
+        .arg("-pwordpress")
+        .arg("wordpress")
+        .stdin(Stdio::from(
+            File::open(BACKUP_PATH).expect("Failed to open backup file"),
+        ))
+        .output()
+        .expect("Failed to restore db")
 }
 
 fn run_wp_cli_command<I, S>(args: I) -> std::process::Output
