@@ -23,13 +23,23 @@ const BACKUP_PATH: &str = "/var/www/html/wp-content/dump.sql";
 
 pub fn restore_db() -> std::process::Output {
     Command::new("mariadb")
+        // Disable SSL to avoid connection errors
         .arg("--skip-ssl")
+        // Host flag
         .arg("-h")
+        // MySQL/MariaDB container hostname
         .arg("database")
+        // Username flag
         .arg("-u")
+        // Database username
         .arg("wordpress")
-        .arg("-pwordpress")
+        // Password flag
+        .arg("-p")
+        // Database password
         .arg("wordpress")
+        // Database name to connect to
+        .arg("wordpress")
+        // Pipe SQL dump file contents to stdin
         .stdin(Stdio::from(
             File::open(BACKUP_PATH).expect("Failed to open backup file"),
         ))
