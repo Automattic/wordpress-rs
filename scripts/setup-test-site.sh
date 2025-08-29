@@ -123,15 +123,15 @@ create_test_credentials () {
   # Trash the post
   wp post delete "$TRASHED_POST_ID"
 
-  # Create a custom template
-  curl --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates
+  echo "Creating a custom template for integration tests.."
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates > /dev/null
   INTEGRATION_TEST_CUSTOM_TEMPLATE_ID="twentytwentyfour//integration_test_custom_template"
 
-  # Setup a post with post revisions for integration tests
+  echo "Setting up a post with 10 revisions for integration tests.."
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
   for i in {1..10};
   do
-    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID"
+    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID" > /dev/null
   done
   # Generating revisions don't return an id, but since we just created the `REVISIONED_POST_ID`, we can use it to calculate the revision id
   REVISION_ID_FOR_REVISIONED_POST_ID=$((REVISIONED_POST_ID + 1))
