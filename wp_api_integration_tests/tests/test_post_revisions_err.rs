@@ -1,4 +1,7 @@
-use wp_api::{post_revisions::{PostRevisionListParams, PostRevisionId}, posts::PostId};
+use wp_api::{
+    post_revisions::{PostRevisionId, PostRevisionListParams},
+    posts::PostId,
+};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
