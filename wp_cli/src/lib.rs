@@ -33,10 +33,8 @@ pub fn restore_db() -> std::process::Output {
         .arg("-u")
         // Database username
         .arg("wordpress")
-        // Password flag
-        .arg("-p")
         // Database password
-        .arg("wordpress")
+        .arg("-pwordpress")
         // Database name to connect to
         .arg("wordpress")
         // Pipe SQL dump file contents to stdin
