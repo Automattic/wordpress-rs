@@ -284,6 +284,8 @@ pub enum WpErrorCode {
     PostInvalidParent,
     #[serde(rename = "rest_revision_invalid_offset_number")]
     RevisionInvalidOffsetNumber,
+    #[serde(rename = "rest_revision_invalid_page_number")]
+    RevisionInvalidPageNumber,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
     #[serde(rename = "rest_template_not_found")]
@@ -426,6 +428,11 @@ pub enum WpErrorCode {
     // If the create post request includes an id.
     #[serde(rename = "rest_post_exists")]
     PostExists,
+    /// If a revision doesn't belong to the specified parent post.
+    /// However, WordPress validates revision existence first via `get_revision()` which will
+    /// return `rest_post_invalid_id` before checking parent-child relationships.
+    #[serde(rename = "rest_revision_parent_id_mismatch")]
+    RevisionParentIdMismatch,
     // If a create/update request to a non-hierarchical endpoint, such as `/tags`, include
     // `parent` argument
     #[serde(rename = "rest_taxonomy_not_hierarchical")]
