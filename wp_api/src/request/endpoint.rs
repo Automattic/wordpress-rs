@@ -4,6 +4,7 @@ use strum_macros::EnumIter;
 use url::Url;
 
 pub mod application_passwords_endpoint;
+pub mod autosaves_endpoint;
 pub mod categories_endpoint;
 pub mod comments_endpoint;
 pub mod media_endpoint;

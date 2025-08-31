@@ -10,6 +10,7 @@ use crate::{
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
+            autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
@@ -54,6 +55,7 @@ impl UniffiWpApiRequestBuilder {
 
 pub struct WpApiRequestBuilder {
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
+    autosaves: Arc<AutosavesRequestBuilder>,
     categories: Arc<CategoriesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
@@ -82,6 +84,7 @@ impl WpApiRequestBuilder {
             api_url_resolver,
             auth_provider;
             application_passwords,
+            autosaves,
             categories,
             comments,
             media,
@@ -120,6 +123,7 @@ impl UniffiWpApiClient {
 
 pub struct WpApiClient {
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
+    autosaves: Arc<AutosavesRequestExecutor>,
     categories: Arc<CategoriesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
@@ -145,6 +149,7 @@ impl WpApiClient {
             api_url_resolver,
             delegate;
             application_passwords,
+            autosaves,
             categories,
             comments,
             media,
@@ -180,6 +185,7 @@ pub trait IsWpApiClientDelegate {
 }
 
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
+api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, categories);
 api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);

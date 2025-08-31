@@ -85,6 +85,20 @@ wp theme activate twentytwentyfour
 wp comment trash 22
 wp comment spam 23
 
+create_post_revision() {
+  local revision_number="$1"
+  local post_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$revision_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$post_id" > /dev/null
+}
+
+create_post_autosave() {
+  local autosave_number="$1"
+  local post_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$post_id/autosaves"
+}
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME
@@ -98,6 +112,8 @@ create_test_credentials () {
   local PASSWORD_PROTECTED_COMMENT_ID
   local PASSWORD_PROTECTED_COMMENT_AUTHOR
   local REVISIONED_POST_ID
+  local AUTOSAVED_POST_ID
+  local AUTOSAVE_ID_FOR_AUTOSAVED_POST_ID
   local FIRST_POST_DATE_GMT
   local WORDPRESS_VERSION
   local INTEGRATION_TEST_CUSTOM_TEMPLATE_ID
@@ -133,12 +149,25 @@ create_test_credentials () {
 
   echo "Setting up a post with 10 revisions for integration tests.."
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
+  # Create revisions
   for i in {1..10};
   do
-    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$i\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$REVISIONED_POST_ID" > /dev/null
+    create_post_revision "$i" "$REVISIONED_POST_ID"
   done
   # Generating revisions don't return an id, but since we just created the `REVISIONED_POST_ID`, we can use it to calculate the revision id
   REVISION_ID_FOR_REVISIONED_POST_ID=$((REVISIONED_POST_ID + 1))
+
+  echo "Setting up a post with autosave for integration tests.."
+  # Autosaves require special setup: WordPress only creates separate autosave revisions when
+  # the autosave is made by a different user than the post author. If the same user creates
+  # an autosave, WordPress just updates the original post instead of creating a revision.
+  # See: https://github.com/WordPress/WordPress/blob/c90da2b67323e36b0390a9efa95f2b4bbb3be31b/wp-includes/rest-api/endpoints/class-wp-rest-autosaves-controller.php#L235-L244
+  # Create post as author user to enable proper autosave behavior
+  AUTHOR_USER_ID="$(wp user get "$AUTHOR_USERNAME" --field=ID)"
+  AUTOSAVED_POST_ID="$(wp post create --post_type=post --post_title=Autosaved_POST_FOR_INTEGRATION_TESTS --post_author="$AUTHOR_USER_ID" --porcelain)"
+  # Create autosave as admin user (different from post author) and capture its ID
+  AUTOSAVE_RESPONSE="$(create_post_autosave "1" "$AUTOSAVED_POST_ID")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_POST_ID="$(echo "$AUTOSAVE_RESPONSE" | jq -r '.id')"
 
   rm -rf /app/test_credentials.json
   jo -p \
@@ -162,6 +191,8 @@ create_test_credentials () {
     integration_test_custom_template_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" \
     revisioned_post_id="$REVISIONED_POST_ID" \
     revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \
+    autosaved_post_id="$AUTOSAVED_POST_ID" \
+    autosave_id_for_autosaved_post_id="$AUTOSAVE_ID_FOR_AUTOSAVED_POST_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
