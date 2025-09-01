@@ -8,6 +8,8 @@ enum AutosavesRequest {
     List,
     #[contextual_get(url = "/posts/<post_id>/autosaves/<post_revision_id>", output = crate::post_revisions::SparsePostRevision, filter_by = crate::post_revisions::SparsePostRevisionField)]
     Retrieve,
+    #[post(url = "/posts/<post_id>/autosaves", params = &crate::posts::PostCreateParams, output = crate::post_revisions::PostRevisionWithEditContext)]
+    Create,
 }
 
 impl DerivedRequest for AutosavesRequest {
@@ -64,6 +66,14 @@ mod tests {
             endpoint.retrieve_with_view_context(&post_id, &post_revision_id),
             &expected_path("view"),
         );
+    }
+
+    #[rstest]
+    fn create_autosave(endpoint: AutosavesRequestEndpoint) {
+        let post_id = PostId(777);
+        let expected_path = format!("/posts/{post_id}/autosaves");
+
+        validate_wp_v2_endpoint(endpoint.create(&post_id), &expected_path);
     }
 
     #[fixture]
