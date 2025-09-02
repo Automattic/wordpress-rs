@@ -10,11 +10,11 @@ use crate::{
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
-            autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
+            post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
             post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
             posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
