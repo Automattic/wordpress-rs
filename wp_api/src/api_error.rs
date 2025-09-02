@@ -282,6 +282,8 @@ pub enum WpErrorCode {
     PostInvalidPageNumber,
     #[serde(rename = "rest_post_invalid_parent")]
     PostInvalidParent,
+    #[serde(rename = "rest_post_no_autosave")]
+    PostNoAutosave,
     #[serde(rename = "rest_revision_invalid_offset_number")]
     RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_revision_invalid_page_number")]
