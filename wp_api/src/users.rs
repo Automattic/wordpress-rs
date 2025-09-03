@@ -165,59 +165,12 @@ pub struct UserListParams {
     /// Limit result set to users who are considered authors.
     /// One of: `authors`
     #[uniffi(default = None)]
+    #[from_query_method("get_using_option_from_str")]
+    #[append_query_custom("self.who.as_ref().and_then(|w| w.as_str()).as_ref()")]
     pub who: Option<WpApiParamUsersWho>,
     /// Limit result set to users who have published posts.
     #[uniffi(default = None)]
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
-}
-
-impl AppendUrlQueryPairs for UserListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(UserListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(UserListParamsField::PerPage, self.per_page.as_ref())
-            .append_option_query_value_pair(UserListParamsField::Search, self.search.as_ref())
-            .append_vec_query_value_pair(UserListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(UserListParamsField::Include, &self.include)
-            .append_option_query_value_pair(UserListParamsField::Offset, self.offset.as_ref())
-            .append_option_query_value_pair(UserListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(UserListParamsField::Orderby, self.orderby.as_ref())
-            .append_vec_query_value_pair(UserListParamsField::Slug, &self.slug)
-            .append_vec_query_value_pair(UserListParamsField::Roles, &self.roles)
-            .append_vec_query_value_pair(UserListParamsField::Capabilities, &self.capabilities)
-            .append_option_query_value_pair(
-                UserListParamsField::Who,
-                self.who.as_ref().and_then(|w| w.as_str()).as_ref(),
-            )
-            .append_option_query_value_pair(
-                UserListParamsField::HasPublishedPosts,
-                self.has_published_posts.as_ref(),
-            );
-    }
-}
-
-impl FromUrlQueryPairs for UserListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(UserListParamsField::Page),
-            per_page: query_pairs.get(UserListParamsField::PerPage),
-            search: query_pairs.get(UserListParamsField::Search),
-            exclude: query_pairs.get_csv(UserListParamsField::Exclude),
-            include: query_pairs.get_csv(UserListParamsField::Include),
-            offset: query_pairs.get(UserListParamsField::Offset),
-            order: query_pairs.get(UserListParamsField::Order),
-            orderby: query_pairs.get(UserListParamsField::Orderby),
-            slug: query_pairs.get_csv(UserListParamsField::Slug),
-            roles: query_pairs.get_csv(UserListParamsField::Roles),
-            capabilities: query_pairs.get_csv(UserListParamsField::Capabilities),
-            who: query_pairs.get_using_option_from_str(UserListParamsField::Who),
-            has_published_posts: query_pairs.get(UserListParamsField::HasPublishedPosts),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, uniffi::Record)]

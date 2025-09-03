@@ -5,6 +5,8 @@ use syn::{Attribute, DeriveInput, Lit, Meta, parse_macro_input, spanned::Spanned
 
 const ATTR_FIELD_NAME: &str = "field_name";
 const ATTR_PAGINATION: &str = "supports_pagination";
+const ATTR_FROM_QUERY_METHOD: &str = "from_query_method";
+const ATTR_APPEND_QUERY_CUSTOM: &str = "append_query_custom";
 
 pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -28,6 +30,8 @@ pub struct ParsedField {
     pub field_ident: Ident,
     pub field_type: syn::Type,
     pub field_name_override: Option<String>,
+    pub from_query_method_override: Option<String>,
+    pub append_query_custom_override: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -79,13 +83,19 @@ impl ParsedParamsStruct {
                             WpDeriveParamsFieldError::UnnamedField.into_syn_error(field_span)
                         })?;
 
-                        // Parse field attributes for #[field_name("...")]
+                        // Parse field attributes
                         let field_name_override = Self::parse_field_name_attribute(&field.attrs)?;
+                        let from_query_method_override =
+                            Self::parse_from_query_method_attribute(&field.attrs)?;
+                        let append_query_custom_override =
+                            Self::parse_append_query_custom_attribute(&field.attrs)?;
 
                         Ok(ParsedField {
                             field_ident,
                             field_type: field.ty.clone(),
                             field_name_override,
+                            from_query_method_override,
+                            append_query_custom_override,
                         })
                     })
                     .collect()
@@ -154,6 +164,44 @@ impl ParsedParamsStruct {
         }
 
         Ok(field_name_override)
+    }
+
+    fn parse_from_query_method_attribute(attrs: &[Attribute]) -> syn::Result<Option<String>> {
+        let mut from_query_method_override = None;
+
+        for attr in attrs {
+            if attr.path().is_ident(ATTR_FROM_QUERY_METHOD) {
+                if from_query_method_override.is_some() {
+                    return Err(WpDeriveParamsFieldError::DuplicateFromQueryMethodAttribute
+                        .into_syn_error(attr.span()));
+                }
+
+                let literal: syn::LitStr = attr.parse_args()?;
+                from_query_method_override = Some(literal.value());
+            }
+        }
+
+        Ok(from_query_method_override)
+    }
+
+    fn parse_append_query_custom_attribute(attrs: &[Attribute]) -> syn::Result<Option<String>> {
+        let mut append_query_custom_override = None;
+
+        for attr in attrs {
+            if attr.path().is_ident(ATTR_APPEND_QUERY_CUSTOM) {
+                if append_query_custom_override.is_some() {
+                    return Err(
+                        WpDeriveParamsFieldError::DuplicateAppendQueryCustomAttribute
+                            .into_syn_error(attr.span()),
+                    );
+                }
+
+                let literal: syn::LitStr = attr.parse_args()?;
+                append_query_custom_override = Some(literal.value());
+            }
+        }
+
+        Ok(append_query_custom_override)
     }
 
     fn generate_all(&self) -> TokenStream {
@@ -245,6 +293,20 @@ impl ParsedParamsStruct {
         let enum_name = self.generate_enum_name();
         let variant_name = self.generate_variant_name(&field.field_ident);
 
+        // If there's a custom override, use it directly
+        if let Some(custom_expr) = &field.append_query_custom_override {
+            let custom_tokens: TokenStream = custom_expr.parse().unwrap_or_else(|_| {
+                quote! { compile_error!("Invalid append_query_custom expression") }
+            });
+            return quote! {
+                append_option_query_value_pair(
+                    #enum_name::#variant_name,
+                    #custom_tokens
+                )
+            };
+        }
+
+        // Otherwise use auto-detection
         match field.detect_append_query_method() {
             AppendQueryMethod::AppendOption => {
                 quote! {
@@ -306,6 +368,15 @@ impl ParsedParamsStruct {
         let enum_name = self.generate_enum_name();
         let variant_name = self.generate_variant_name(&field.field_ident);
 
+        // If there's a method override, use it directly
+        if let Some(custom_method) = &field.from_query_method_override {
+            let method_ident: Ident = format_ident!("{}", custom_method);
+            return quote! {
+                #field_ident: query_pairs.#method_ident(#enum_name::#variant_name)
+            };
+        }
+
+        // Otherwise use auto-detection
         match field.detect_from_query_method() {
             FromQueryMethod::Get => {
                 quote! {
@@ -396,6 +467,10 @@ enum WpDeriveParamsFieldError {
     OnlyStructsSupported,
     #[error("Duplicate #[field_name] attribute found")]
     DuplicateFieldNameAttribute,
+    #[error("Duplicate #[from_query_method] attribute found")]
+    DuplicateFromQueryMethodAttribute,
+    #[error("Duplicate #[append_query_custom] attribute found")]
+    DuplicateAppendQueryCustomAttribute,
     #[error("Duplicate #[supports_pagination] attribute found")]
     DuplicatePaginationAttribute,
     #[error("#[supports_pagination] attribute is required")]
@@ -424,6 +499,8 @@ mod tests {
             field_ident: format_ident!("page"),
             field_type,
             field_name_override: None,
+            from_query_method_override: None,
+            append_query_custom_override: None,
         };
 
         assert!(matches!(
@@ -443,6 +520,8 @@ mod tests {
             field_ident: format_ident!("author"),
             field_type,
             field_name_override: None,
+            from_query_method_override: None,
+            append_query_custom_override: None,
         };
 
         assert!(matches!(
@@ -462,6 +541,8 @@ mod tests {
             field_ident: format_ident!("after"),
             field_type,
             field_name_override: None,
+            from_query_method_override: None,
+            append_query_custom_override: None,
         };
 
         assert!(matches!(
@@ -481,6 +562,8 @@ mod tests {
             field_ident: format_ident!("name"),
             field_type,
             field_name_override: None,
+            from_query_method_override: None,
+            append_query_custom_override: None,
         };
 
         assert!(matches!(
