@@ -70,6 +70,7 @@ pub enum CommentType {
 impl_as_query_value_from_to_string!(CommentType);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct CommentListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -138,76 +139,6 @@ pub struct CommentListParams {
     /// The password for the post if it is password protected.
     #[uniffi(default = None)]
     pub password: Option<String>,
-}
-
-impl AppendUrlQueryPairs for CommentListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(CommentListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(CommentListParamsField::PerPage, self.per_page.as_ref())
-            .append_option_query_value_pair(CommentListParamsField::Search, self.search.as_ref())
-            .append_option_query_value_pair(CommentListParamsField::After, self.after.as_ref())
-            .append_vec_query_value_pair(CommentListParamsField::Author, &self.author)
-            .append_vec_query_value_pair(
-                CommentListParamsField::AuthorExclude,
-                &self.author_exclude,
-            )
-            .append_option_query_value_pair(
-                CommentListParamsField::AuthorEmail,
-                self.author_email.as_ref(),
-            )
-            .append_option_query_value_pair(CommentListParamsField::Before, self.before.as_ref())
-            .append_vec_query_value_pair(CommentListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(CommentListParamsField::Include, &self.include)
-            .append_option_query_value_pair(CommentListParamsField::Offset, self.offset.as_ref())
-            .append_option_query_value_pair(CommentListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(CommentListParamsField::Orderby, self.orderby.as_ref())
-            .append_vec_query_value_pair(CommentListParamsField::Parent, self.parent.as_ref())
-            .append_vec_query_value_pair(
-                CommentListParamsField::ParentExclude,
-                self.parent_exclude.as_ref(),
-            )
-            .append_vec_query_value_pair(CommentListParamsField::Post, self.post.as_ref())
-            .append_option_query_value_pair(CommentListParamsField::Status, self.status.as_ref())
-            .append_option_query_value_pair(
-                CommentListParamsField::CommentType,
-                self.comment_type.as_ref(),
-            )
-            .append_option_query_value_pair(
-                CommentListParamsField::Password,
-                self.password.as_ref(),
-            );
-    }
-}
-
-impl FromUrlQueryPairs for CommentListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(CommentListParamsField::Page),
-            per_page: query_pairs.get(CommentListParamsField::PerPage),
-            search: query_pairs.get(CommentListParamsField::Search),
-            after: query_pairs.get(CommentListParamsField::After),
-            author: query_pairs.get_csv(CommentListParamsField::Author),
-            author_exclude: query_pairs.get_csv(CommentListParamsField::AuthorExclude),
-            author_email: query_pairs.get(CommentListParamsField::AuthorEmail),
-            before: query_pairs.get(CommentListParamsField::Before),
-            exclude: query_pairs.get_csv(CommentListParamsField::Exclude),
-            include: query_pairs.get_csv(CommentListParamsField::Include),
-            offset: query_pairs.get(CommentListParamsField::Offset),
-            order: query_pairs.get(CommentListParamsField::Order),
-            orderby: query_pairs.get(CommentListParamsField::Orderby),
-            parent: query_pairs.get_csv(CommentListParamsField::Parent),
-            parent_exclude: query_pairs.get_csv(CommentListParamsField::ParentExclude),
-            post: query_pairs.get_csv(CommentListParamsField::Post),
-            status: query_pairs.get(CommentListParamsField::Status),
-            comment_type: query_pairs.get(CommentListParamsField::CommentType),
-            password: query_pairs.get(CommentListParamsField::Password),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Default, uniffi::Record)]

@@ -48,26 +48,9 @@ pub struct WidgetInstance {
 }
 
 #[derive(Debug, Clone, Default, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)]
 pub struct WidgetListParams {
     pub sidebar: Option<String>,
-}
-
-impl AppendUrlQueryPairs for WidgetListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(WidgetListParamsField::Sidebar, self.sidebar.as_ref());
-    }
-}
-impl FromUrlQueryPairs for WidgetListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            sidebar: query_pairs.get(WidgetListParamsField::Sidebar),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        false
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

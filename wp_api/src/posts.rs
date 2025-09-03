@@ -68,6 +68,7 @@ pub enum WpApiParamPostsSearchColumn {
 impl_as_query_value_from_to_string!(WpApiParamPostsSearchColumn);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct PostListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -147,81 +148,6 @@ pub struct PostListParams {
     /// Limit result set to items that are sticky.
     #[uniffi(default = None)]
     pub sticky: Option<bool>,
-}
-
-impl AppendUrlQueryPairs for PostListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(PostListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(PostListParamsField::PerPage, self.per_page.as_ref())
-            .append_option_query_value_pair(PostListParamsField::Search, self.search.as_ref())
-            .append_option_query_value_pair(PostListParamsField::After, self.after.as_ref())
-            .append_option_query_value_pair(
-                PostListParamsField::ModifiedAfter,
-                self.modified_after.as_ref(),
-            )
-            .append_vec_query_value_pair(PostListParamsField::Author, &self.author)
-            .append_vec_query_value_pair(PostListParamsField::AuthorExclude, &self.author_exclude)
-            .append_option_query_value_pair(PostListParamsField::Before, self.before.as_ref())
-            .append_option_query_value_pair(
-                PostListParamsField::ModifiedBefore,
-                self.modified_before.as_ref(),
-            )
-            .append_vec_query_value_pair(PostListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(PostListParamsField::Include, &self.include)
-            .append_option_query_value_pair(PostListParamsField::Offset, self.offset.as_ref())
-            .append_option_query_value_pair(PostListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(PostListParamsField::Orderby, self.orderby.as_ref())
-            .append_vec_query_value_pair(PostListParamsField::SearchColumns, &self.search_columns)
-            .append_vec_query_value_pair(PostListParamsField::Slug, &self.slug)
-            .append_vec_query_value_pair(PostListParamsField::Status, &self.status)
-            .append_option_query_value_pair(
-                PostListParamsField::TaxRelation,
-                self.tax_relation.as_ref(),
-            )
-            .append_vec_query_value_pair(PostListParamsField::Categories, &self.categories)
-            .append_vec_query_value_pair(
-                PostListParamsField::CategoriesExclude,
-                &self.categories_exclude,
-            )
-            .append_vec_query_value_pair(PostListParamsField::Tags, &self.tags)
-            .append_vec_query_value_pair(PostListParamsField::TagsExclude, &self.tags_exclude)
-            .append_option_query_value_pair(PostListParamsField::Sticky, self.sticky.as_ref());
-    }
-}
-
-impl FromUrlQueryPairs for PostListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(PostListParamsField::Page),
-            per_page: query_pairs.get(PostListParamsField::PerPage),
-            search: query_pairs.get(PostListParamsField::Search),
-            after: query_pairs.get_wp_date_time(PostListParamsField::After),
-            modified_after: query_pairs.get_wp_date_time(PostListParamsField::ModifiedAfter),
-            author: query_pairs.get_csv(PostListParamsField::Author),
-            author_exclude: query_pairs.get_csv(PostListParamsField::AuthorExclude),
-            before: query_pairs.get_wp_date_time(PostListParamsField::Before),
-            modified_before: query_pairs.get_wp_date_time(PostListParamsField::ModifiedBefore),
-            exclude: query_pairs.get_csv(PostListParamsField::Exclude),
-            include: query_pairs.get_csv(PostListParamsField::Include),
-            offset: query_pairs.get(PostListParamsField::Offset),
-            order: query_pairs.get(PostListParamsField::Order),
-            orderby: query_pairs.get(PostListParamsField::Orderby),
-            search_columns: query_pairs.get_csv(PostListParamsField::SearchColumns),
-            slug: query_pairs.get_csv(PostListParamsField::Slug),
-            status: query_pairs.get_csv(PostListParamsField::Status),
-            tax_relation: query_pairs.get(PostListParamsField::TaxRelation),
-            categories: query_pairs.get_csv(PostListParamsField::Categories),
-            categories_exclude: query_pairs.get_csv(PostListParamsField::CategoriesExclude),
-            tags: query_pairs.get_csv(PostListParamsField::Tags),
-            tags_exclude: query_pairs.get_csv(PostListParamsField::TagsExclude),
-            sticky: query_pairs.get(PostListParamsField::Sticky),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Default, uniffi::Record)]

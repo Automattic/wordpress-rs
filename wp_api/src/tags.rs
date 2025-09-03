@@ -40,6 +40,7 @@ pub enum WpApiParamTagsOrderBy {
 impl_as_query_value_from_to_string!(WpApiParamTagsOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct TagListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -81,45 +82,6 @@ pub struct TagListParams {
     /// Limit result set to users with one or more specific slugs.
     #[uniffi(default = [])]
     pub slug: Vec<String>,
-}
-
-impl AppendUrlQueryPairs for TagListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(TagListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(TagListParamsField::PerPage, self.per_page.as_ref())
-            .append_option_query_value_pair(TagListParamsField::Search, self.search.as_ref())
-            .append_vec_query_value_pair(TagListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(TagListParamsField::Include, &self.include)
-            .append_option_query_value_pair(TagListParamsField::Offset, self.offset.as_ref())
-            .append_option_query_value_pair(TagListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(TagListParamsField::Orderby, self.orderby.as_ref())
-            .append_option_query_value_pair(TagListParamsField::HideEmpty, self.hide_empty.as_ref())
-            .append_option_query_value_pair(TagListParamsField::Post, self.post.as_ref())
-            .append_vec_query_value_pair(TagListParamsField::Slug, &self.slug);
-    }
-}
-
-impl FromUrlQueryPairs for TagListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(TagListParamsField::Page),
-            per_page: query_pairs.get(TagListParamsField::PerPage),
-            search: query_pairs.get(TagListParamsField::Search),
-            exclude: query_pairs.get_csv(TagListParamsField::Exclude),
-            include: query_pairs.get_csv(TagListParamsField::Include),
-            offset: query_pairs.get(TagListParamsField::Offset),
-            order: query_pairs.get(TagListParamsField::Order),
-            orderby: query_pairs.get(TagListParamsField::Orderby),
-            hide_empty: query_pairs.get(TagListParamsField::HideEmpty),
-            post: query_pairs.get(TagListParamsField::Post),
-            slug: query_pairs.get_csv(TagListParamsField::Slug),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

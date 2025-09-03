@@ -91,32 +91,12 @@ pub enum TaxonomyTypeLabels {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)]
 pub struct TaxonomyListParams {
     /// Limit results to taxonomies associated with a specific post type.
     #[uniffi(default = None)]
     #[field_name("type")]
     pub post_type: Option<PostType>,
-}
-
-impl AppendUrlQueryPairs for TaxonomyListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut.append_option_query_value_pair(
-            TaxonomyListParamsField::PostType,
-            self.post_type.as_ref(),
-        );
-    }
-}
-
-impl FromUrlQueryPairs for TaxonomyListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            post_type: query_pairs.get(TaxonomyListParamsField::PostType),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        false
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

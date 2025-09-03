@@ -120,6 +120,7 @@ pub enum UserAvatarSize {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
