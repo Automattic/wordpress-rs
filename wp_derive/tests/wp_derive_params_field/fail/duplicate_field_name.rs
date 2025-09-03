@@ -1,6 +1,7 @@
 use wp_derive::WpDeriveParamsField;
 
 #[derive(WpDeriveParamsField)]
+#[pagination(true)]
 pub struct TestParams {
     #[field_name("per_page")]
     #[field_name("per_page")] // Duplicate should fail

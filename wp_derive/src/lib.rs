@@ -8,7 +8,7 @@ pub fn derive_wp_deserialize(input: TokenStream) -> TokenStream {
     wp_deserialize::derive(input)
 }
 
-#[proc_macro_derive(WpDeriveParamsField, attributes(field_name))]
+#[proc_macro_derive(WpDeriveParamsField, attributes(field_name, pagination))]
 pub fn derive_params_field(input: TokenStream) -> TokenStream {
     params_field::derive(input)
 }

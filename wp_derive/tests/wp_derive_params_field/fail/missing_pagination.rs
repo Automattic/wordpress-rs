@@ -1,7 +1,8 @@
 use wp_derive::WpDeriveParamsField;
 
 #[derive(WpDeriveParamsField)]
-#[pagination(false)]
-pub struct EmptyParams {}
+pub struct PostListParams {
+    pub page: Option<u32>,
+}
 
 fn main() {}

@@ -1,0 +1,5 @@
+error: Duplicate #[pagination] attribute found
+ --> tests/wp_derive_params_field/fail/pagination_duplicate.rs:5:1
+  |
+5 | #[pagination(false)] // Duplicate should fail
+  | ^

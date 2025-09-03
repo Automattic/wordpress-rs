@@ -1,77 +1,127 @@
 use convert_case::{Case, Casing};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
-use syn::{
-    Attribute, Field, Token, braced,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
-    punctuated::Punctuated,
-    spanned::Spanned,
-    token::Comma,
-};
+use syn::{Attribute, DeriveInput, Lit, Meta, parse_macro_input, spanned::Spanned};
 
 const ATTR_FIELD_NAME: &str = "field_name";
+const ATTR_PAGINATION: &str = "pagination";
 
 pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let parsed_struct = parse_macro_input!(input as ParsedParamsStruct);
+    let input = parse_macro_input!(input as DeriveInput);
+    let parsed_struct = ParsedParamsStruct::from_derive_input(input);
 
-    parsed_struct.generate_params_field_enum().into()
+    match parsed_struct {
+        Ok(parsed) => parsed.generate_all().into(),
+        Err(e) => e.to_compile_error().into(),
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedParamsStruct {
     pub struct_ident: Ident,
     pub fields: Vec<ParsedField>,
+    pub pagination: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParsedField {
     pub field_ident: Ident,
-    pub _field_type: syn::Type,
+    pub field_type: syn::Type,
     pub field_name_override: Option<String>,
 }
 
-impl Parse for ParsedParamsStruct {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let _vis: syn::Visibility = input.parse()?;
-        let _struct_token: Token![struct] = input.parse()?;
-        let struct_ident: Ident = input.parse()?;
+impl ParsedParamsStruct {
+    pub fn from_derive_input(input: DeriveInput) -> syn::Result<Self> {
+        let struct_ident = input.ident;
 
-        let content;
-        let _brace_token = braced!(content in input);
+        // Parse pagination attribute from derive input attrs
+        let pagination = Self::parse_pagination_attribute(&input.attrs)?;
 
-        let fields = Self::parse_fields(&content)?;
+        // Extract struct fields
+        let fields = match input.data {
+            syn::Data::Struct(data_struct) => Self::parse_fields_from_struct(&data_struct.fields)?,
+            _ => {
+                return Err(WpDeriveParamsFieldError::OnlyStructsSupported
+                    .into_syn_error(struct_ident.span()));
+            }
+        };
 
         Ok(Self {
             struct_ident,
             fields,
+            pagination,
         })
     }
-}
 
-impl ParsedParamsStruct {
-    fn parse_fields(content: ParseStream) -> syn::Result<Vec<ParsedField>> {
-        let fields: Punctuated<Field, Comma> =
-            content.parse_terminated(Field::parse_named, Token![,])?;
+    fn parse_fields_from_struct(fields: &syn::Fields) -> syn::Result<Vec<ParsedField>> {
+        match fields {
+            syn::Fields::Named(named_fields) => {
+                named_fields
+                    .named
+                    .iter()
+                    .map(|field| {
+                        let field_span = field.span();
+                        let field_ident = field.ident.clone().ok_or_else(|| {
+                            WpDeriveParamsFieldError::UnnamedField.into_syn_error(field_span)
+                        })?;
 
-        fields
-            .into_iter()
-            .map(|field| {
-                let field_span = field.span();
-                let field_ident = field.ident.ok_or_else(|| {
-                    WpDeriveParamsFieldError::UnnamedField.into_syn_error(field_span)
-                })?;
+                        // Parse field attributes for #[field_name("...")]
+                        let field_name_override = Self::parse_field_name_attribute(&field.attrs)?;
 
-                // Parse field attributes for #[field_name("...")]
-                let field_name_override = Self::parse_field_name_attribute(&field.attrs)?;
+                        Ok(ParsedField {
+                            field_ident,
+                            field_type: field.ty.clone(),
+                            field_name_override,
+                        })
+                    })
+                    .collect()
+            }
+            _ => Err(WpDeriveParamsFieldError::OnlyNamedFieldsSupported
+                .into_syn_error(proc_macro2::Span::call_site())),
+        }
+    }
 
-                Ok(ParsedField {
-                    field_ident,
-                    _field_type: field.ty,
-                    field_name_override,
-                })
-            })
-            .collect()
+    fn parse_pagination_attribute(attrs: &[Attribute]) -> syn::Result<bool> {
+        let mut pagination_value = None;
+
+        for attr in attrs {
+            if attr.path().is_ident(ATTR_PAGINATION) {
+                if pagination_value.is_some() {
+                    return Err(WpDeriveParamsFieldError::DuplicatePaginationAttribute
+                        .into_syn_error(attr.span()));
+                }
+
+                let meta = attr.meta.clone();
+                match meta {
+                    Meta::List(list) => {
+                        if list.tokens.is_empty() {
+                            return Err(WpDeriveParamsFieldError::PaginationRequiresValue
+                                .into_syn_error(attr.span()));
+                        }
+
+                        let literal: Lit = syn::parse2(list.tokens)?;
+                        match literal {
+                            Lit::Bool(bool_lit) => {
+                                pagination_value = Some(bool_lit.value);
+                            }
+                            _ => {
+                                return Err(WpDeriveParamsFieldError::PaginationMustBeBool
+                                    .into_syn_error(attr.span()));
+                            }
+                        }
+                    }
+                    _ => {
+                        return Err(WpDeriveParamsFieldError::PaginationRequiresValue
+                            .into_syn_error(attr.span()));
+                    }
+                }
+            }
+        }
+
+        pagination_value.ok_or_else(|| {
+            WpDeriveParamsFieldError::PaginationAttributeRequired
+                .into_syn_error(proc_macro2::Span::call_site())
+        })
     }
 
     fn parse_field_name_attribute(attrs: &[Attribute]) -> syn::Result<Option<String>> {
@@ -90,6 +140,10 @@ impl ParsedParamsStruct {
         }
 
         Ok(field_name_override)
+    }
+
+    fn generate_all(&self) -> TokenStream {
+        self.generate_params_field_enum()
     }
 
     /// Generate the params field enum from the parsed struct
@@ -147,8 +201,20 @@ impl ParsedParamsStruct {
 enum WpDeriveParamsFieldError {
     #[error("Only named fields are supported")]
     UnnamedField,
+    #[error("Only named fields are supported")]
+    OnlyNamedFieldsSupported,
+    #[error("Only structs are supported")]
+    OnlyStructsSupported,
     #[error("Duplicate #[field_name] attribute found")]
     DuplicateFieldNameAttribute,
+    #[error("Duplicate #[pagination] attribute found")]
+    DuplicatePaginationAttribute,
+    #[error("#[pagination] attribute is required")]
+    PaginationAttributeRequired,
+    #[error("#[pagination] attribute requires a boolean value")]
+    PaginationRequiresValue,
+    #[error("#[pagination] attribute must be a boolean (true or false)")]
+    PaginationMustBeBool,
 }
 
 impl WpDeriveParamsFieldError {
