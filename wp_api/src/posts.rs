@@ -2,15 +2,15 @@ use crate::{
     UserId, WpApiParamOrder,
     categories::CategoryId,
     date::WpGmtDateTime,
-    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    impl_as_query_value_from_to_string,
     media::MediaId,
     tags::TagId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
@@ -448,24 +448,7 @@ pub struct PostUpdateParams {
     pub tags: Vec<TagId>,
 }
 
-impl_as_query_value_for_new_type!(PostId);
-uniffi::custom_newtype!(PostId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PostId(pub i64);
-
-impl FromStr for PostId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for PostId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_i64_id!(PostId);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePost {

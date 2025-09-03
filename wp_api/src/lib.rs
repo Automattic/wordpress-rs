@@ -39,6 +39,7 @@ pub mod uuid;
 pub mod widget_types;
 pub mod widgets;
 pub mod wordpress_org;
+pub mod wp_content_macros;
 pub mod wp_site_health_tests;
 
 mod uniffi_serde;

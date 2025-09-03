@@ -1,34 +1,17 @@
 use crate::{
-    WpApiParamOrder, impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    WpApiParamOrder, impl_as_query_value_from_to_string,
     posts::PostId,
     taxonomies::TaxonomyType,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
-impl_as_query_value_for_new_type!(CategoryId);
-uniffi::custom_newtype!(CategoryId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CategoryId(pub i64);
-
-impl FromStr for CategoryId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for CategoryId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_i64_id!(CategoryId);
 
 #[derive(
     Debug,

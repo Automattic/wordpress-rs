@@ -1,14 +1,13 @@
 use crate::{
     EnumFromStrParsingError, OptionFromStr, WpApiParamOrder, WpResponseString,
-    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap, convert::Infallible, fmt::Display, num::ParseIntError, str::FromStr,
-};
+use std::{collections::HashMap, convert::Infallible, fmt::Display, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -403,30 +402,7 @@ pub struct UserDeleteResponse {
     pub previous: UserWithEditContext,
 }
 
-impl_as_query_value_for_new_type!(UserId);
-uniffi::custom_newtype!(UserId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UserId(pub i64);
-
-impl FromStr for UserId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for UserId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<i64> for UserId {
-    fn from(value: i64) -> Self {
-        Self(value)
-    }
-}
+wp_content_i64_id!(UserId);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseUser {

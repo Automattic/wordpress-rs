@@ -17,6 +17,7 @@ pub use crate::{
         endpoint::{ApiUrlResolver, WpOrgSiteApiUrlResolver, media_endpoint::MediaUploadRequest},
     },
     uuid::{WpUuid, WpUuidParseError},
+    wp_content_i64_id, wp_content_string_id,
 };
 
 #[cfg(feature = "reqwest-request-executor")]
