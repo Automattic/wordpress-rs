@@ -6,8 +6,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
@@ -35,17 +35,11 @@ pub enum ThemeStatus {
 
 impl_as_query_value_from_to_string!(ThemeStatus);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct ThemeListParams {
     /// Limit result set to themes assigned one or more statuses.
     #[uniffi(default = None)]
     pub status: Option<ThemeStatus>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum ThemeListParamsField {
-    #[strum(serialize = "status")]
-    Status,
 }
 
 impl AppendUrlQueryPairs for ThemeListParams {

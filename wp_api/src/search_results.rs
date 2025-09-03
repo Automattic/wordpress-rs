@@ -5,8 +5,8 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
@@ -69,7 +69,7 @@ pub enum SearchResultSubtype {
 
 impl_as_query_value_from_to_string!(SearchResultSubtype);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct SearchListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -86,10 +86,12 @@ pub struct SearchListParams {
     /// Default: `post`
     /// One of: `post`, `term`, `post-format`
     #[uniffi(default = None)]
+    #[field_name("type")]
     pub object_type: Option<SearchResultType>,
     /// Limit results to items of one or more object subtypes.
     /// Default: `any`
     #[uniffi(default = None)]
+    #[field_name("subtype")]
     pub object_subtype: Option<SearchResultSubtype>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
@@ -97,24 +99,6 @@ pub struct SearchListParams {
     /// Limit result set to specific IDs.
     #[uniffi(default = [])]
     pub include: Vec<i64>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum SearchListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "type")]
-    ObjectType,
-    #[strum(serialize = "subtype")]
-    ObjectSubtype,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
 }
 
 impl AppendUrlQueryPairs for SearchListParams {

@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::collections::HashMap;
 use std::sync::Arc;
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 wp_content_i64_id!(MediaId);
 
@@ -107,7 +107,7 @@ pub enum MediaStatus {
 
 impl_as_query_value_from_to_string!(MediaStatus);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct MediaListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -156,6 +156,7 @@ pub struct MediaListParams {
     /// Default: date
     /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title
     #[uniffi(default = None)]
+    #[field_name("orderby")]
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Limit result set to items with particular parent IDs.
     #[uniffi(default = [])]
@@ -180,52 +181,6 @@ pub struct MediaListParams {
     /// Limit result set to attachments of a particular MIME type.
     #[uniffi(default = None)]
     pub mime_type: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum MediaListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "after")]
-    After,
-    #[strum(serialize = "modified_after")]
-    ModifiedAfter,
-    #[strum(serialize = "author")]
-    Author,
-    #[strum(serialize = "author_exclude")]
-    AuthorExclude,
-    #[strum(serialize = "before")]
-    Before,
-    #[strum(serialize = "modified_before")]
-    ModifiedBefore,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
-    #[strum(serialize = "offset")]
-    Offset,
-    #[strum(serialize = "order")]
-    Order,
-    #[strum(serialize = "orderby")]
-    Orderby,
-    #[strum(serialize = "parent")]
-    Parent,
-    #[strum(serialize = "parent_exclude")]
-    ParentExclude,
-    #[strum(serialize = "search_columns")]
-    SearchColumns,
-    #[strum(serialize = "slug")]
-    Slug,
-    #[strum(serialize = "status")]
-    Status,
-    #[strum(serialize = "media_type")]
-    MediaType,
-    #[strum(serialize = "mime_type")]
-    MimeType,
 }
 
 impl AppendUrlQueryPairs for MediaListParams {
