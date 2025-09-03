@@ -1,5 +1,19 @@
 use wp_derive::WpDeriveParamsField;
 
+// Minimal mock traits and implementations
+trait AppendUrlQueryPairs { fn append_query_pairs(&self, _: &mut QueryPairs); }
+trait FromUrlQueryPairs { fn from_url_query_pairs(_: UrlQueryPairsMap) -> Option<Self> where Self: Sized; fn supports_pagination() -> bool; }
+struct QueryPairs;
+struct UrlQueryPairsMap;
+impl QueryPairs {
+    fn append_option_query_value_pair<T>(&mut self, _: impl Into<TestListParamsField>, _: Option<&T>) -> &mut Self { self }
+    fn append_vec_query_value_pair<T>(&mut self, _: impl Into<TestListParamsField>, _: &[T]) -> &mut Self { self }
+}
+impl UrlQueryPairsMap {
+    fn get<T: Default>(&self, _: impl Into<TestListParamsField>) -> Option<T> { Some(T::default()) }
+    fn get_csv<T: Default>(&self, _: impl Into<TestListParamsField>) -> Vec<T> { vec![] }
+}
+
 #[derive(WpDeriveParamsField)]
 #[supports_pagination(true)]
 pub struct TestListParams {
