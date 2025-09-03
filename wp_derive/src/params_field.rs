@@ -43,9 +43,9 @@ enum FromQueryMethod {
 
 #[derive(Debug, Clone, Copy)]
 enum AppendQueryMethod {
-    AppendValue,
-    AppendOption,
-    AppendVec,
+    Value,
+    Option,
+    Vec,
 }
 
 impl ParsedParamsStruct {
@@ -308,7 +308,7 @@ impl ParsedParamsStruct {
 
         // Otherwise use auto-detection
         match field.detect_append_query_method() {
-            AppendQueryMethod::AppendOption => {
+            AppendQueryMethod::Option => {
                 quote! {
                     append_option_query_value_pair(
                         #enum_name::#variant_name,
@@ -316,7 +316,7 @@ impl ParsedParamsStruct {
                     )
                 }
             }
-            AppendQueryMethod::AppendVec => {
+            AppendQueryMethod::Vec => {
                 quote! {
                     append_vec_query_value_pair(
                         #enum_name::#variant_name,
@@ -324,7 +324,7 @@ impl ParsedParamsStruct {
                     )
                 }
             }
-            AppendQueryMethod::AppendValue => {
+            AppendQueryMethod::Value => {
                 quote! {
                     append_query_value_pair(
                         #enum_name::#variant_name,
@@ -429,29 +429,26 @@ impl ParsedField {
             syn::Type::Path(type_path) => {
                 if let Some(last_segment) = type_path.path.segments.last() {
                     match last_segment.ident.to_string().as_str() {
-                        "Option" => AppendQueryMethod::AppendOption,
-                        "Vec" => AppendQueryMethod::AppendVec,
-                        _ => AppendQueryMethod::AppendValue, // fallback for non-generic types
+                        "Option" => AppendQueryMethod::Option,
+                        "Vec" => AppendQueryMethod::Vec,
+                        _ => AppendQueryMethod::Value, // fallback for non-generic types
                     }
                 } else {
-                    AppendQueryMethod::AppendValue
+                    AppendQueryMethod::Value
                 }
             }
-            _ => AppendQueryMethod::AppendValue, // fallback for other types
+            _ => AppendQueryMethod::Value, // fallback for other types
         }
     }
 
     /// Check if this field is Option<WpGmtDateTime>
     fn is_wp_date_time_option(&self, option_segment: &syn::PathSegment) -> bool {
         // Check if Option has generic arguments
-        if let syn::PathArguments::AngleBracketed(ref args) = option_segment.arguments {
-            if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-                if let syn::Type::Path(inner_path) = inner_type {
-                    if let Some(last_segment) = inner_path.path.segments.last() {
-                        return last_segment.ident == "WpGmtDateTime";
-                    }
-                }
-            }
+        if let syn::PathArguments::AngleBracketed(ref args) = option_segment.arguments
+            && let Some(syn::GenericArgument::Type(syn::Type::Path(inner_path))) = args.args.first()
+            && let Some(last_segment) = inner_path.path.segments.last()
+        {
+            return last_segment.ident == "WpGmtDateTime";
         }
         false
     }
@@ -509,7 +506,7 @@ mod tests {
         ));
         assert!(matches!(
             field.detect_append_query_method(),
-            AppendQueryMethod::AppendOption
+            AppendQueryMethod::Option
         ));
     }
 
@@ -530,7 +527,7 @@ mod tests {
         ));
         assert!(matches!(
             field.detect_append_query_method(),
-            AppendQueryMethod::AppendVec
+            AppendQueryMethod::Vec
         ));
     }
 
@@ -551,7 +548,7 @@ mod tests {
         ));
         assert!(matches!(
             field.detect_append_query_method(),
-            AppendQueryMethod::AppendOption
+            AppendQueryMethod::Option
         ));
     }
 
@@ -572,7 +569,7 @@ mod tests {
         ));
         assert!(matches!(
             field.detect_append_query_method(),
-            AppendQueryMethod::AppendValue
+            AppendQueryMethod::Value
         ));
     }
 }
