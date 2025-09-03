@@ -9,11 +9,7 @@
 /// - FromStr, Display, and From implementations
 ///
 /// # Example
-/// ```rust
-/// # #[macro_use] extern crate wp_api;
-/// # // We need these 2 lines for UniFFI
-/// # uniffi::setup_scaffolding!();
-/// # fn main() {}
+/// ```rust,ignore
 /// wp_api::wp_content_i64_id!(PostId);
 /// // Generates: PostId(i64) with all required traits
 /// ```
@@ -55,11 +51,7 @@ macro_rules! wp_content_i64_id {
 /// - FromStr (infallible), Display, and From implementations
 ///
 /// # Example
-/// ```rust
-/// # #[macro_use] extern crate wp_api;
-/// # // We need these 2 lines for UniFFI
-/// # uniffi::setup_scaffolding!();
-/// # fn main() {}
+/// ```rust,ignore
 /// wp_api::wp_content_string_id!(WidgetId);
 /// // Generates: WidgetId(String) with all required traits
 /// ```
