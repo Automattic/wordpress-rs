@@ -1,8 +1,8 @@
 use wp_derive::WpDeriveParamsField;
 
 #[derive(WpDeriveParamsField)]
-#[pagination(true)]
-#[pagination(false)] // Duplicate should fail
+#[supports_pagination(true)]
+#[supports_pagination(false)] // Duplicate should fail
 pub struct TestParams {
     pub page: Option<u32>,
 }

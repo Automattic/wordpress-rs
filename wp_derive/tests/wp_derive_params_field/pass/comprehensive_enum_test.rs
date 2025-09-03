@@ -1,7 +1,7 @@
 use wp_derive::WpDeriveParamsField;
 
 #[derive(WpDeriveParamsField)]
-#[pagination(true)]
+#[supports_pagination(true)]
 pub struct TestListParams {
     // Basic field - should serialize to "page"
     pub page: Option<u32>,

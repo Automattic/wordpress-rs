@@ -1,4 +1,4 @@
-error: #[pagination] attribute is required
+error: #[supports_pagination] attribute is required
  --> tests/wp_derive_params_field/fail/missing_pagination.rs:3:10
   |
 3 | #[derive(WpDeriveParamsField)]

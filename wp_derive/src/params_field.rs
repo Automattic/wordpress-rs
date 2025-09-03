@@ -4,7 +4,7 @@ use quote::{format_ident, quote};
 use syn::{Attribute, DeriveInput, Lit, Meta, parse_macro_input, spanned::Spanned};
 
 const ATTR_FIELD_NAME: &str = "field_name";
-const ATTR_PAGINATION: &str = "pagination";
+const ATTR_PAGINATION: &str = "supports_pagination";
 
 pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -396,13 +396,13 @@ enum WpDeriveParamsFieldError {
     OnlyStructsSupported,
     #[error("Duplicate #[field_name] attribute found")]
     DuplicateFieldNameAttribute,
-    #[error("Duplicate #[pagination] attribute found")]
+    #[error("Duplicate #[supports_pagination] attribute found")]
     DuplicatePaginationAttribute,
-    #[error("#[pagination] attribute is required")]
+    #[error("#[supports_pagination] attribute is required")]
     PaginationAttributeRequired,
-    #[error("#[pagination] attribute requires a boolean value")]
+    #[error("#[supports_pagination] attribute requires a boolean value")]
     PaginationRequiresValue,
-    #[error("#[pagination] attribute must be a boolean (true or false)")]
+    #[error("#[supports_pagination] attribute must be a boolean (true or false)")]
     PaginationMustBeBool,
 }
 

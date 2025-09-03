@@ -1,7 +1,7 @@
 use wp_derive::WpDeriveParamsField;
 
 #[derive(WpDeriveParamsField)]
-#[pagination(false)]
+#[supports_pagination(false)]
 pub struct EmptyParams {}
 
 fn main() {}
