@@ -30,6 +30,20 @@ pub struct ParsedField {
     pub field_name_override: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum FromQueryMethod {
+    Get,
+    GetCsv,
+    GetWpDateTime,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AppendQueryMethod {
+    AppendValue,
+    AppendOption,
+    AppendVec,
+}
+
 impl ParsedParamsStruct {
     pub fn from_derive_input(input: DeriveInput) -> syn::Result<Self> {
         let struct_ident = input.ident;
@@ -143,7 +157,15 @@ impl ParsedParamsStruct {
     }
 
     fn generate_all(&self) -> TokenStream {
-        self.generate_params_field_enum()
+        let enum_tokens = self.generate_params_field_enum();
+        let append_trait_tokens = self.generate_append_url_query_pairs_impl();
+        let from_trait_tokens = self.generate_from_url_query_pairs_impl();
+
+        quote! {
+            #enum_tokens
+            #append_trait_tokens
+            #from_trait_tokens
+        }
     }
 
     /// Generate the params field enum from the parsed struct
@@ -153,7 +175,7 @@ impl ParsedParamsStruct {
 
         quote! {
             #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum_macros::IntoStaticStr)]
-            enum #enum_name {
+            pub enum #enum_name {
                 #(#enum_variants,)*
             }
         }
@@ -195,6 +217,173 @@ impl ParsedParamsStruct {
             .clone()
             .unwrap_or_else(|| field.field_ident.to_string())
     }
+
+    /// Generate AppendUrlQueryPairs trait implementation
+    fn generate_append_url_query_pairs_impl(&self) -> TokenStream {
+        let struct_name = &self.struct_ident;
+
+        // Generate method calls for each field
+        let method_calls: Vec<TokenStream> = self
+            .fields
+            .iter()
+            .map(|field| self.generate_append_method_call(field))
+            .collect();
+
+        quote! {
+            impl AppendUrlQueryPairs for #struct_name {
+                fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+                    query_pairs_mut
+                        #(.#method_calls)*;
+                }
+            }
+        }
+    }
+
+    /// Generate the appropriate append method call for a field
+    fn generate_append_method_call(&self, field: &ParsedField) -> TokenStream {
+        let field_ident = &field.field_ident;
+        let enum_name = self.generate_enum_name();
+        let variant_name = self.generate_variant_name(&field.field_ident);
+
+        match field.detect_append_query_method() {
+            AppendQueryMethod::AppendOption => {
+                quote! {
+                    append_option_query_value_pair(
+                        #enum_name::#variant_name,
+                        self.#field_ident.as_ref()
+                    )
+                }
+            }
+            AppendQueryMethod::AppendVec => {
+                quote! {
+                    append_vec_query_value_pair(
+                        #enum_name::#variant_name,
+                        &self.#field_ident
+                    )
+                }
+            }
+            AppendQueryMethod::AppendValue => {
+                quote! {
+                    append_query_value_pair(
+                        #enum_name::#variant_name,
+                        &self.#field_ident
+                    )
+                }
+            }
+        }
+    }
+
+    /// Generate FromUrlQueryPairs trait implementation
+    fn generate_from_url_query_pairs_impl(&self) -> TokenStream {
+        let struct_name = &self.struct_ident;
+        let pagination = self.pagination;
+
+        // Generate field assignments for each field
+        let field_assignments: Vec<TokenStream> = self
+            .fields
+            .iter()
+            .map(|field| self.generate_from_query_assignment(field))
+            .collect();
+
+        quote! {
+            impl FromUrlQueryPairs for #struct_name {
+                fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
+                    Some(Self {
+                        #(#field_assignments,)*
+                    })
+                }
+
+                fn supports_pagination() -> bool {
+                    #pagination
+                }
+            }
+        }
+    }
+
+    /// Generate the appropriate query method call for a field
+    fn generate_from_query_assignment(&self, field: &ParsedField) -> TokenStream {
+        let field_ident = &field.field_ident;
+        let enum_name = self.generate_enum_name();
+        let variant_name = self.generate_variant_name(&field.field_ident);
+
+        match field.detect_from_query_method() {
+            FromQueryMethod::Get => {
+                quote! {
+                    #field_ident: query_pairs.get(#enum_name::#variant_name)
+                }
+            }
+            FromQueryMethod::GetCsv => {
+                quote! {
+                    #field_ident: query_pairs.get_csv(#enum_name::#variant_name)
+                }
+            }
+            FromQueryMethod::GetWpDateTime => {
+                quote! {
+                    #field_ident: query_pairs.get_wp_date_time(#enum_name::#variant_name)
+                }
+            }
+        }
+    }
+}
+
+impl ParsedField {
+    /// Detect the appropriate FromUrlQueryPairs method based on field type
+    fn detect_from_query_method(&self) -> FromQueryMethod {
+        match &self.field_type {
+            syn::Type::Path(type_path) => {
+                if let Some(last_segment) = type_path.path.segments.last() {
+                    match last_segment.ident.to_string().as_str() {
+                        "Option" => {
+                            // Check if it's Option<WpGmtDateTime>
+                            if self.is_wp_date_time_option(last_segment) {
+                                FromQueryMethod::GetWpDateTime
+                            } else {
+                                FromQueryMethod::Get
+                            }
+                        }
+                        "Vec" => FromQueryMethod::GetCsv,
+                        _ => FromQueryMethod::Get, // fallback for non-generic types
+                    }
+                } else {
+                    FromQueryMethod::Get
+                }
+            }
+            _ => FromQueryMethod::Get, // fallback for other types
+        }
+    }
+
+    /// Detect the appropriate AppendUrlQueryPairs method based on field type
+    fn detect_append_query_method(&self) -> AppendQueryMethod {
+        match &self.field_type {
+            syn::Type::Path(type_path) => {
+                if let Some(last_segment) = type_path.path.segments.last() {
+                    match last_segment.ident.to_string().as_str() {
+                        "Option" => AppendQueryMethod::AppendOption,
+                        "Vec" => AppendQueryMethod::AppendVec,
+                        _ => AppendQueryMethod::AppendValue, // fallback for non-generic types
+                    }
+                } else {
+                    AppendQueryMethod::AppendValue
+                }
+            }
+            _ => AppendQueryMethod::AppendValue, // fallback for other types
+        }
+    }
+
+    /// Check if this field is Option<WpGmtDateTime>
+    fn is_wp_date_time_option(&self, option_segment: &syn::PathSegment) -> bool {
+        // Check if Option has generic arguments
+        if let syn::PathArguments::AngleBracketed(ref args) = option_segment.arguments {
+            if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+                if let syn::Type::Path(inner_path) = inner_type {
+                    if let Some(last_segment) = inner_path.path.segments.last() {
+                        return last_segment.ident == "WpGmtDateTime";
+                    }
+                }
+            }
+        }
+        false
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -220,5 +409,87 @@ enum WpDeriveParamsFieldError {
 impl WpDeriveParamsFieldError {
     fn into_syn_error(self, span: proc_macro2::Span) -> syn::Error {
         syn::Error::new(span, self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+
+    #[test]
+    fn test_type_detection_option_u32() {
+        let field_type: syn::Type = syn::parse2(quote! { Option<u32> }).unwrap();
+        let field = ParsedField {
+            field_ident: format_ident!("page"),
+            field_type,
+            field_name_override: None,
+        };
+
+        assert!(matches!(
+            field.detect_from_query_method(),
+            FromQueryMethod::Get
+        ));
+        assert!(matches!(
+            field.detect_append_query_method(),
+            AppendQueryMethod::AppendOption
+        ));
+    }
+
+    #[test]
+    fn test_type_detection_vec_i64() {
+        let field_type: syn::Type = syn::parse2(quote! { Vec<i64> }).unwrap();
+        let field = ParsedField {
+            field_ident: format_ident!("author"),
+            field_type,
+            field_name_override: None,
+        };
+
+        assert!(matches!(
+            field.detect_from_query_method(),
+            FromQueryMethod::GetCsv
+        ));
+        assert!(matches!(
+            field.detect_append_query_method(),
+            AppendQueryMethod::AppendVec
+        ));
+    }
+
+    #[test]
+    fn test_type_detection_option_wp_gmt_date_time() {
+        let field_type: syn::Type = syn::parse2(quote! { Option<WpGmtDateTime> }).unwrap();
+        let field = ParsedField {
+            field_ident: format_ident!("after"),
+            field_type,
+            field_name_override: None,
+        };
+
+        assert!(matches!(
+            field.detect_from_query_method(),
+            FromQueryMethod::GetWpDateTime
+        ));
+        assert!(matches!(
+            field.detect_append_query_method(),
+            AppendQueryMethod::AppendOption
+        ));
+    }
+
+    #[test]
+    fn test_type_detection_plain_type() {
+        let field_type: syn::Type = syn::parse2(quote! { String }).unwrap();
+        let field = ParsedField {
+            field_ident: format_ident!("name"),
+            field_type,
+            field_name_override: None,
+        };
+
+        assert!(matches!(
+            field.detect_from_query_method(),
+            FromQueryMethod::Get
+        ));
+        assert!(matches!(
+            field.detect_append_query_method(),
+            AppendQueryMethod::AppendValue
+        ));
     }
 }
