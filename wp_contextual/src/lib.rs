@@ -87,6 +87,8 @@
 //!     pub rendered: Option<String>,
 //! }
 //!
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -123,6 +125,8 @@
 //!     #[WpContext(edit, view)]
 //!     pub rendered: Option<String>,
 //! }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -168,6 +172,8 @@
 //! #     #[WpContext(edit, view)]
 //! #     pub rendered: Option<String>,
 //! # }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -212,6 +218,8 @@
 //! #     #[WpContext(edit, view)]
 //! #     pub rendered: Option<String>,
 //! # }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -253,6 +261,8 @@
 //!     #[WpContextualOption]
 //!     pub avatar_urls: Option<HashMap<String, String>>,
 //! }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -283,6 +293,8 @@
 //!     #[WpContextualExcludeFromFields]
 //!     pub additional_fields: Option<String>,
 //! }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -324,6 +336,8 @@
 //!     #[WpContext(edit, view)]
 //!     pub baz: Option<u32>,
 //! }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 //! # // We need these 2 lines for UniFFI
 //! # uniffi::setup_scaffolding!();
 //! # fn main() {}
@@ -415,6 +429,8 @@ mod wp_contextual;
 ///     #[WpContext(edit)]
 ///     pub qux: Option<Vec<u32>>,
 /// }
+/// # // We need this line because `WpContextual` implements `crate::SparseField`
+/// # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
 /// # // We need these 2 lines for UniFFI
 /// # uniffi::setup_scaffolding!();
 /// # fn main() {}

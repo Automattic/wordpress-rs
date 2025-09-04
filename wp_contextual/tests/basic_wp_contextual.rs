@@ -1,5 +1,8 @@
 use wp_contextual::WpContextual;
 
+mod sparse_field_trait;
+pub use sparse_field_trait::SparseField;
+
 #[derive(WpContextual)]
 pub struct SparseFoo {
     #[WpContext(edit, embed, view)]
