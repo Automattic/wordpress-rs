@@ -704,4 +704,36 @@ mod tests {
             serde_json::Value::Object(serde_json::Map::new())
         );
     }
+
+    #[rstest]
+    #[case(SparseMediaFieldWithEditContext::Id, "id")]
+    #[case(SparseMediaFieldWithEditContext::PostId, "post")]
+    #[case(SparseMediaFieldWithEditContext::PostType, "type")]
+    fn test_as_mapped_field_name_for_edit_context(
+        #[case] field: SparseMediaFieldWithEditContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseMediaFieldWithEmbedContext::Id, "id")]
+    #[case(SparseMediaFieldWithEmbedContext::PostType, "type")]
+    fn test_as_mapped_field_name_for_embed_context(
+        #[case] field: SparseMediaFieldWithEmbedContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseMediaFieldWithViewContext::Id, "id")]
+    #[case(SparseMediaFieldWithViewContext::PostId, "post")]
+    #[case(SparseMediaFieldWithViewContext::PostType, "type")]
+    fn test_as_mapped_field_name_for_view_context(
+        #[case] field: SparseMediaFieldWithViewContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
 }

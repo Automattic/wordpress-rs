@@ -271,3 +271,42 @@ impl TemplateCreateParams {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case(SparseTemplateFieldWithEditContext::Id, "id")]
+    #[case(SparseTemplateFieldWithEditContext::TemplateType, "type")]
+    #[case(SparseTemplateFieldWithEditContext::PostId, "wp_id")]
+    fn test_as_mapped_field_name_for_edit_context(
+        #[case] field: SparseTemplateFieldWithEditContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseTemplateFieldWithEmbedContext::Id, "id")]
+    #[case(SparseTemplateFieldWithEmbedContext::TemplateType, "type")]
+    #[case(SparseTemplateFieldWithEmbedContext::PostId, "wp_id")]
+    fn test_as_mapped_field_name_for_embed_context(
+        #[case] field: SparseTemplateFieldWithEmbedContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseTemplateFieldWithViewContext::Id, "id")]
+    #[case(SparseTemplateFieldWithViewContext::TemplateType, "type")]
+    #[case(SparseTemplateFieldWithViewContext::PostId, "wp_id")]
+    fn test_as_mapped_field_name_for_view_context(
+        #[case] field: SparseTemplateFieldWithViewContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+}

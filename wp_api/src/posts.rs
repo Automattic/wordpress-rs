@@ -671,6 +671,36 @@ mod tests {
         assert_expected_and_from_query_pairs(params, expected_query);
     }
 
+    #[rstest]
+    #[case(SparsePostFieldWithEditContext::Id, "id")]
+    #[case(SparsePostFieldWithEditContext::PostType, "type")]
+    fn test_as_mapped_field_name_for_edit_context(
+        #[case] field: SparsePostFieldWithEditContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparsePostFieldWithEmbedContext::Id, "id")]
+    #[case(SparsePostFieldWithEmbedContext::PostType, "type")]
+    fn test_as_mapped_field_name_for_embed_context(
+        #[case] field: SparsePostFieldWithEmbedContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparsePostFieldWithViewContext::Id, "id")]
+    #[case(SparsePostFieldWithViewContext::PostType, "type")]
+    fn test_as_mapped_field_name_for_view_context(
+        #[case] field: SparsePostFieldWithViewContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_str(), expected_mapped_field_name);
+    }
+
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
         let after = unit_test_example_date_as_query_value("after");
         let modified_after = unit_test_example_date_as_query_value("modified_after");
