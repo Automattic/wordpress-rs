@@ -1,5 +1,5 @@
 use crate::{
-    AnyJson, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
+    AnyJson, SparseField, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     posts::PostId,
@@ -408,6 +408,33 @@ pub struct SparseComment {
     #[WpContextualExcludeFromFields]
     pub additional_fields: Option<Arc<AnyJson>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
+}
+
+impl SparseField for SparseCommentFieldWithEditContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::CommentType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
+
+impl SparseField for SparseCommentFieldWithEmbedContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::CommentType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
+
+impl SparseField for SparseCommentFieldWithViewContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::CommentType => "type",
+            _ => self.as_field_name(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

@@ -1,5 +1,5 @@
 use crate::{
-    UserId, WpApiParamOrder,
+    SparseField, UserId, WpApiParamOrder,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     posts::{
@@ -405,6 +405,35 @@ pub struct SparseMedia {
     #[WpContext(edit)]
     pub missing_image_sizes: Option<Vec<String>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+}
+
+impl SparseField for SparseMediaFieldWithEditContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostId => "post",
+            Self::PostType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
+
+impl SparseField for SparseMediaFieldWithEmbedContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostType => "type",
+            _ => self.as_field_name(),
+        }
+    }
+}
+
+impl SparseField for SparseMediaFieldWithViewContext {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::PostId => "post",
+            Self::PostType => "type",
+            _ => self.as_field_name(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Object)]

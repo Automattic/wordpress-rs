@@ -1,12 +1,7 @@
 use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
-    SparseField,
     api_error::WpApiError,
-    media::{
-        MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
-        SparseMediaFieldWithEditContext, SparseMediaFieldWithEmbedContext,
-        SparseMediaFieldWithViewContext,
-    },
+    media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext},
     request::{
         CONTENT_TYPE_MULTIPART, NetworkRequestAccessor, ParsedResponse, RequestMethod,
         WpNetworkHeaderMap, WpNetworkResponse,
@@ -41,35 +36,6 @@ impl DerivedRequest for MediaRequest {
 
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
-    }
-}
-
-impl SparseField for SparseMediaFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostId => "post",
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseMediaFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseMediaFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostId => "post",
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
     }
 }
 
@@ -239,7 +205,10 @@ mod tests {
     use super::*;
     use crate::{
         UserId, WpApiParamOrder, generate,
-        media::{MediaId, MediaStatus, MediaTypeParam},
+        media::{
+            MediaId, MediaStatus, MediaTypeParam, SparseMediaFieldWithEditContext,
+            SparseMediaFieldWithEmbedContext, SparseMediaFieldWithViewContext,
+        },
         posts::{PostId, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn},
         request::endpoint::{
             ApiUrlResolver,

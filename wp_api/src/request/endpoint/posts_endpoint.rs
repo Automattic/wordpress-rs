@@ -1,12 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::{
-    SparseField,
-    posts::{
-        PostId, PostListParams, PostUpdateParams, PostWithEditContext,
-        SparsePostFieldWithEditContext, SparsePostFieldWithEmbedContext,
-        SparsePostFieldWithViewContext,
-    },
-};
+use crate::posts::{PostId, PostListParams, PostUpdateParams, PostWithEditContext};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -39,46 +32,22 @@ impl DerivedRequest for PostsRequest {
     }
 }
 
-impl SparseField for SparsePostFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparsePostFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparsePostFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::ApiUrlResolver;
     use crate::{
         UserId, WpApiParamOrder,
         categories::CategoryId,
         generate,
         posts::{
-            PostRetrieveParams, PostStatus, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
-            WpApiParamPostsTaxRelation,
+            PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
+            SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext,
+            WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
         },
-        request::endpoint::tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        request::endpoint::{
+            ApiUrlResolver,
+            tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        },
         tags::TagId,
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,

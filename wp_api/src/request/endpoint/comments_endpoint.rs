@@ -1,8 +1,4 @@
-use crate::SparseField;
-use crate::comments::{
-    CommentId, CommentListParams, CommentUpdateParams, SparseCommentFieldWithEditContext,
-    SparseCommentFieldWithEmbedContext, SparseCommentFieldWithViewContext,
-};
+use crate::comments::{CommentId, CommentListParams, CommentUpdateParams};
 use wp_derive_request_builder::WpDerivedRequest;
 
 use super::{AsNamespace, DerivedRequest, WpNamespace};
@@ -36,33 +32,6 @@ impl DerivedRequest for CommentsRequest {
     }
 }
 
-impl SparseField for SparseCommentFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CommentType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseCommentFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CommentType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseCommentFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CommentType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,7 +39,8 @@ mod tests {
         UserId, WpApiParamOrder,
         comments::{
             CommentDeleteParams, CommentId, CommentRetrieveParams, CommentStatus, CommentType,
-            WpApiParamCommentsOrderBy,
+            SparseCommentFieldWithEditContext, SparseCommentFieldWithEmbedContext,
+            SparseCommentFieldWithViewContext, WpApiParamCommentsOrderBy,
         },
         generate,
         posts::PostId,
