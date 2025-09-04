@@ -1,5 +1,5 @@
 use crate::{
-    SparseField, UserId, WpApiParamOrder,
+    UserId, WpApiParamOrder,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     posts::{
@@ -407,35 +407,6 @@ pub struct SparseMedia {
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
 }
 
-impl SparseField for SparseMediaFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostId => "post",
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseMediaFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseMediaFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostId => "post",
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, uniffi::Object)]
 #[serde(transparent)]
 pub struct MediaDetails {
@@ -557,7 +528,7 @@ pub struct SparseMediaCaption {
 mod tests {
     use super::*;
     use crate::{
-        generate,
+        SparseField, generate,
         posts::PostId,
         unit_test_common::{
             assert_expected_and_from_query_pairs, unit_test_example_date_as_option,

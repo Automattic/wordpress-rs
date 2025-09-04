@@ -134,22 +134,6 @@ impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
     }
 }
 
-mod macros {
-    macro_rules! default_sparse_field_implementation_from_field_name {
-        ($ident:ident) => {
-            paste::paste! {
-                impl SparseField for $ident {
-                    fn as_str(&self) -> &str {
-                        self.as_field_name()
-                    }
-                }
-            }
-        };
-    }
-
-    pub(crate) use default_sparse_field_implementation_from_field_name;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

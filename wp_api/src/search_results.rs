@@ -1,5 +1,5 @@
 use crate::{
-    IntegerOrString, SparseField, impl_as_query_value_from_to_string,
+    IntegerOrString, impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -119,29 +119,10 @@ pub struct SparseSearchResult {
     pub object_subtype: Option<SearchResultSubtype>,
 }
 
-impl SparseField for SparseSearchResultFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::ObjectType => "type",
-            Self::ObjectSubtype => "subtype",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseSearchResultFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::ObjectType => "type",
-            Self::ObjectSubtype => "subtype",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SparseField;
     use rstest::*;
 
     #[rstest]

@@ -1,18 +1,18 @@
-use wp_derive_request_builder::WpDerivedRequest;
-
-use crate::SparseField;
-use crate::application_passwords::{
-    ApplicationPasswordCreateParams, ApplicationPasswordDeleteAllResponse,
-    ApplicationPasswordDeleteResponse, ApplicationPasswordUpdateParams, ApplicationPasswordUuid,
-    ApplicationPasswordWithEditContext, ApplicationPasswordWithEmbedContext,
-    ApplicationPasswordWithViewContext, SparseApplicationPasswordFieldWithEditContext,
-    SparseApplicationPasswordFieldWithEmbedContext, SparseApplicationPasswordFieldWithViewContext,
-    SparseApplicationPasswordWithEditContext, SparseApplicationPasswordWithEmbedContext,
-    SparseApplicationPasswordWithViewContext,
-};
-use crate::users::UserId;
-
 use super::{AsNamespace, DerivedRequest, WpNamespace};
+use crate::{
+    application_passwords::{
+        ApplicationPasswordCreateParams, ApplicationPasswordDeleteAllResponse,
+        ApplicationPasswordDeleteResponse, ApplicationPasswordUpdateParams,
+        ApplicationPasswordUuid, ApplicationPasswordWithEditContext,
+        ApplicationPasswordWithEmbedContext, ApplicationPasswordWithViewContext,
+        SparseApplicationPasswordFieldWithEditContext,
+        SparseApplicationPasswordFieldWithEmbedContext,
+        SparseApplicationPasswordFieldWithViewContext, SparseApplicationPasswordWithEditContext,
+        SparseApplicationPasswordWithEmbedContext, SparseApplicationPasswordWithViewContext,
+    },
+    users::UserId,
+};
+use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum ApplicationPasswordsRequest {
@@ -37,16 +37,6 @@ impl DerivedRequest for ApplicationPasswordsRequest {
         WpNamespace::WpV2
     }
 }
-
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseApplicationPasswordFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseApplicationPasswordFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseApplicationPasswordFieldWithViewContext
-);
 
 #[cfg(test)]
 mod tests {

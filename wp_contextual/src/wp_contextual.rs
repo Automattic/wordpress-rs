@@ -224,12 +224,33 @@ fn parse_fields(
     Ok(parsed_fields)
 }
 
+fn extract_serde_rename(attrs: &[syn::Attribute]) -> Option<String> {
+    attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("serde"))
+        .and_then(|attr| {
+            let mut rename_value = None;
+            let _ = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename")
+                    && let Ok(value) = meta.value()
+                    && let Ok(lit_str) = value.parse::<syn::LitStr>()
+                {
+                    rename_value = Some(lit_str.value());
+                }
+                Ok(())
+            });
+            rename_value
+        })
+}
+
 fn generate_sparse_field_type(
     type_ident: &Ident,
     fields: &[GeneratedContextualField],
 ) -> TokenStream {
     let mut variant_idents = Vec::with_capacity(fields.len());
     let mut as_field_names = Vec::with_capacity(fields.len());
+    let mut sparse_field_mappings = Vec::with_capacity(fields.len());
+
     for f in fields {
         if f.is_wp_contextual_exclude_from_fields {
             continue;
@@ -237,17 +258,34 @@ fn generate_sparse_field_type(
         if let Some(f_ident) = &f.field.ident {
             let field_name = f_ident.to_string();
             let variant_ident = format_ident!("{}", field_name.to_case(Case::UpperCamel));
-            let field_name = field_name.as_str();
+
+            // Check for serde rename attribute and use it if present, otherwise use field name
+            let api_field_name =
+                extract_serde_rename(&f.field.attrs).unwrap_or_else(|| field_name.clone());
 
             variant_idents.push(variant_ident.clone());
             as_field_names.push(quote! {
                 Self::#variant_ident => #field_name
+            });
+            sparse_field_mappings.push(quote! {
+                Self::#variant_ident => #api_field_name
             });
         }
     }
     if variant_idents.is_empty() {
         return TokenStream::new();
     }
+
+    let sparse_field_impl = quote! {
+        impl crate::SparseField for #type_ident {
+            fn as_str(&self) -> &str {
+                match self {
+                    #(#sparse_field_mappings,)*
+                }
+            }
+        }
+    };
+
     quote! {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
         pub enum #type_ident {
@@ -260,6 +298,7 @@ fn generate_sparse_field_type(
                 }
             }
         }
+        #sparse_field_impl
     }
     .into()
 }

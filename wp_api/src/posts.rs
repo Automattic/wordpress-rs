@@ -1,5 +1,5 @@
 use crate::{
-    SparseField, UserId, WpApiParamOrder,
+    UserId, WpApiParamOrder,
     categories::CategoryId,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
@@ -388,33 +388,6 @@ pub struct SparsePost {
     pub tags: Option<Vec<TagId>>,
 }
 
-impl SparseField for SparsePostFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparsePostFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparsePostFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::PostType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparsePostGuid {
     #[WpContext(edit)]
@@ -606,7 +579,7 @@ impl PostFormat {
 mod tests {
     use super::*;
     use crate::{
-        generate,
+        SparseField, generate,
         unit_test_common::{
             assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
             unit_test_example_date_as_query_value,

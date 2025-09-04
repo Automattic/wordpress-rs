@@ -1,5 +1,5 @@
 use crate::{
-    AnyJson, SparseField, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
+    AnyJson, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     posts::PostId,
@@ -410,33 +410,6 @@ pub struct SparseComment {
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
 }
 
-impl SparseField for SparseCommentFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CommentType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseCommentFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CommentType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseCommentFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::CommentType => "type",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseCommentContent {
     #[WpContext(edit)]
@@ -509,13 +482,12 @@ fn comment_type_to_string(comment_type: CommentType) -> String {
 mod tests {
     use super::*;
     use crate::{
-        generate,
+        SparseField, generate,
         unit_test_common::{
             assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
             unit_test_example_date_as_query_value,
         },
     };
-
     use rstest::*;
 
     #[rstest]

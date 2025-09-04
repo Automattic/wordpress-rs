@@ -1,10 +1,6 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
-    SparseField,
-    post_revisions::{
-        PostRevisionId, PostRevisionListParams, SparsePostRevisionFieldWithEditContext,
-        SparsePostRevisionFieldWithEmbedContext, SparsePostRevisionFieldWithViewContext,
-    },
+    post_revisions::{PostRevisionId, PostRevisionListParams},
     posts::PostId,
 };
 use wp_derive_request_builder::WpDerivedRequest;
@@ -32,20 +28,12 @@ impl DerivedRequest for PostRevisionsRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePostRevisionFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePostRevisionFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePostRevisionFieldWithViewContext
-);
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::post_revisions::{PostRevisionId, WpApiParamPostRevisionsOrderBy};
+    use crate::post_revisions::{
+        PostRevisionId, SparsePostRevisionFieldWithEditContext, WpApiParamPostRevisionsOrderBy,
+    };
     use crate::request::endpoint::ApiUrlResolver;
     use crate::{
         WpApiParamOrder, generate,

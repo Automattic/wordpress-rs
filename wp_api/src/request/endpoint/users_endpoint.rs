@@ -1,11 +1,9 @@
+use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
-    SparseField, SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
-    SparseUserFieldWithViewContext, UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId,
-    UserListParams, UserUpdateParams, UserWithEditContext,
+    UserCreateParams, UserDeleteParams, UserDeleteResponse, UserId, UserListParams,
+    UserUpdateParams, UserWithEditContext,
 };
 use wp_derive_request_builder::WpDerivedRequest;
-
-use super::{AsNamespace, DerivedRequest, WpNamespace};
 
 #[derive(WpDerivedRequest)]
 enum UsersRequest {
@@ -33,19 +31,19 @@ impl DerivedRequest for UsersRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFieldWithEditContext);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseUserFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(SparseUserFieldWithViewContext);
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::ApiUrlResolver;
     use crate::{
         WpApiParamUsersHasPublishedPosts,
-        request::endpoint::tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        request::endpoint::{
+            ApiUrlResolver,
+            tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        },
+        users::{
+            SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
+            SparseUserFieldWithViewContext,
+        },
     };
     use rstest::*;
     use std::sync::Arc;

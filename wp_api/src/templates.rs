@@ -1,5 +1,5 @@
 use crate::{
-    SparseField, UserId, impl_as_query_value_from_to_string,
+    UserId, impl_as_query_value_from_to_string,
     post_types::PostType,
     posts::PostId,
     url_query::{
@@ -141,36 +141,6 @@ pub struct SparseTemplate {
     pub original_source: Option<String>,
 }
 
-impl SparseField for SparseTemplateFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::TemplateType => "type",
-            Self::PostId => "wp_id",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseTemplateFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::TemplateType => "type",
-            Self::PostId => "wp_id",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseTemplateFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::TemplateType => "type",
-            Self::PostId => "wp_id",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum SparseTemplateContentWrapper {
@@ -275,6 +245,7 @@ impl TemplateCreateParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SparseField;
     use rstest::*;
 
     #[rstest]

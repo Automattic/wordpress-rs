@@ -1,11 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::{
-    SparseField,
-    categories::{
-        CategoryId, CategoryListParams, SparseCategoryFieldWithEditContext,
-        SparseCategoryFieldWithEmbedContext, SparseCategoryFieldWithViewContext,
-    },
-};
+use crate::categories::{CategoryId, CategoryListParams};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -37,22 +31,15 @@ impl DerivedRequest for CategoriesRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseCategoryFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseCategoryFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseCategoryFieldWithViewContext
-);
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         WpApiParamOrder,
-        categories::{CategoryId, WpApiParamCategoriesOrderBy},
+        categories::{
+            CategoryId, SparseCategoryFieldWithEditContext, SparseCategoryFieldWithEmbedContext,
+            SparseCategoryFieldWithViewContext, WpApiParamCategoriesOrderBy,
+        },
         generate,
         posts::PostId,
         request::endpoint::{
