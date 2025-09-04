@@ -410,9 +410,10 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
     struct CliAppNotifier;
     #[async_trait::async_trait]
     impl WpAppNotifier for CliAppNotifier {
-        async fn requested_with_invalid_authentication(&self) {
+        async fn requested_with_invalid_authentication(&self, request_url: String) {
             eprintln!(
-                "Authentication failed. Please verify your credentials or token and try again."
+                "Authentication failed for request to: {}. Please verify your credentials or token and try again.",
+                request_url
             );
             std::process::exit(1);
         }

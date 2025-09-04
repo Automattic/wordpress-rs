@@ -2,7 +2,7 @@ import Foundation
 import WordPressAPI
 
 final class MockAppNotifier: WpAppNotifier {
-    func requestedWithInvalidAuthentication() async {
+    func requestedWithInvalidAuthentication(requestUrl: String) async {
         // no-op
     }
 }

@@ -74,31 +74,34 @@ fn generate_async_request_executor(
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
                     use #crate_ident::api_error::MaybeWpError;
                     use #crate_ident::middleware::PerformsRequests;
+                    use #crate_ident::request::NetworkRequestAccessor;
                     let perform_request = async || {
                         #request_from_request_builder
+                        let request_url: String = request.url().into();
                         let response = self.perform(std::sync::Arc::new(request)).await?;
                         let response_status_code = response.status_code;
                         let parsed_response = response.parse();
                         let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default());
 
-                        Ok((parsed_response, unauthorized))
+                        Ok((parsed_response, unauthorized, request_url))
                     };
 
                     let mut parsed_response;
                     let mut unauthorized;
+                    let mut request_url;
 
                     // The Rust compiler has trouble figuring out the return type. The statement below helps it.
                     let result: Result<_, #error_type> = perform_request().await;
-                    (parsed_response, unauthorized) = result?;
+                    (parsed_response, unauthorized, request_url) = result?;
 
                     // If the auth provider successfully refreshed the authentication, we can retry the request.
                     if unauthorized && self.delegate.auth_provider.refresh().await {
                         // The response of the retried request will be returned instead of the original one.
-                        (parsed_response, unauthorized) = perform_request().await?;
+                        (parsed_response, unauthorized, request_url) = perform_request().await?;
                     }
 
                     if unauthorized {
-                        self.delegate.app_notifier.requested_with_invalid_authentication().await;
+                        self.delegate.app_notifier.requested_with_invalid_authentication(request_url).await;
                     }
 
                     parsed_response

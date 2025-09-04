@@ -84,7 +84,7 @@ impl FooAppNotifier {
 
 #[async_trait]
 impl WpAppNotifier for FooAppNotifier {
-    async fn requested_with_invalid_authentication(&self) {
+    async fn requested_with_invalid_authentication(&self, _request_url: String) {
         let result = (self.requested_with_invalid_authentication_fn)();
         self.has_triggered_notification
             .store(result, Ordering::Relaxed);
