@@ -573,7 +573,7 @@ mod tests {
         #[case] field: SparseCommentFieldWithEditContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
@@ -583,7 +583,7 @@ mod tests {
         #[case] field: SparseCommentFieldWithEmbedContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
@@ -593,6 +593,6 @@ mod tests {
         #[case] field: SparseCommentFieldWithViewContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 }

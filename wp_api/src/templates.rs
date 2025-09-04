@@ -256,7 +256,7 @@ mod tests {
         #[case] field: SparseTemplateFieldWithEditContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
@@ -267,7 +267,7 @@ mod tests {
         #[case] field: SparseTemplateFieldWithEmbedContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
@@ -278,6 +278,6 @@ mod tests {
         #[case] field: SparseTemplateFieldWithViewContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 }

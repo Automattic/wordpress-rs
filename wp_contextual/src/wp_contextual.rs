@@ -248,7 +248,6 @@ fn generate_sparse_field_type(
     fields: &[GeneratedContextualField],
 ) -> TokenStream {
     let mut variant_idents = Vec::with_capacity(fields.len());
-    let mut as_field_names = Vec::with_capacity(fields.len());
     let mut sparse_field_mappings = Vec::with_capacity(fields.len());
 
     for f in fields {
@@ -264,9 +263,6 @@ fn generate_sparse_field_type(
                 extract_serde_rename(&f.field.attrs).unwrap_or_else(|| field_name.clone());
 
             variant_idents.push(variant_ident.clone());
-            as_field_names.push(quote! {
-                Self::#variant_ident => #field_name
-            });
             sparse_field_mappings.push(quote! {
                 Self::#variant_ident => #api_field_name
             });
@@ -278,7 +274,7 @@ fn generate_sparse_field_type(
 
     let sparse_field_impl = quote! {
         impl crate::SparseField for #type_ident {
-            fn as_str(&self) -> &str {
+            fn as_mapped_field_name(&self) -> &str {
                 match self {
                     #(#sparse_field_mappings,)*
                 }
@@ -290,13 +286,6 @@ fn generate_sparse_field_type(
         #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
         pub enum #type_ident {
             #(#variant_idents,)*
-        }
-        impl #type_ident {
-            pub fn as_field_name(&self) -> &str {
-                match self {
-                    #(#as_field_names,)*
-                }
-            }
         }
         #sparse_field_impl
     }

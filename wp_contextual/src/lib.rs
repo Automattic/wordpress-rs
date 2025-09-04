@@ -344,10 +344,8 @@
 //! Furthermore, it'll generate the `SparseFooFieldWithEditContext`,
 //! `SparseFooFieldWithEmbedContext` & `SparseFooFieldWithViewContext` types as an `enum` which
 //! will include all the fields from their `Sparse` type counterpart as its `enum` variants. It'll
-//! also generate `fn as_field_name(&self) -> &str` function that maps each `enum` variant to its
-//! field name, making it easier to implement functions such as `as_str`. Note that it
-//! intentionally doesn't generate the `as_str` function directly, as the field names might need to
-//! be mapped to a different casing.
+//! also generate `fn as_mapped_field_name(&self) -> &str` function that maps each `enum` variant to
+//! its mapped field name which supports `#[serde(rename = "{mapped_name}")]` attribute.
 //!
 //! So, the above example will also generate the following types:
 //!

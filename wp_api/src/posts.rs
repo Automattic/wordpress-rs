@@ -651,7 +651,7 @@ mod tests {
         #[case] field: SparsePostFieldWithEditContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
@@ -661,7 +661,7 @@ mod tests {
         #[case] field: SparsePostFieldWithEmbedContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
@@ -671,7 +671,7 @@ mod tests {
         #[case] field: SparsePostFieldWithViewContext,
         #[case] expected_mapped_field_name: &str,
     ) {
-        assert_eq!(field.as_str(), expected_mapped_field_name);
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
