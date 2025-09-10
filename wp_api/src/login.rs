@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str, sync::Arc};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
-use wp_serde_helper::{deserialize_false_or_string, deserialize_offset};
+use wp_serde_helper::{
+    deserialize_empty_array_or_hashmap, deserialize_false_or_string, deserialize_offset,
+};
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
@@ -225,22 +227,11 @@ impl WpSupportsLocalization for OAuthResponseUrlError {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct WpApiDetailsAuthenticationMap(HashMap<String, WpRestApiAuthenticationScheme>);
-
-// If the response is `[]`, default to an empty `HashMap`
-impl<'de> Deserialize<'de> for WpApiDetailsAuthenticationMap {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer
-            .deserialize_any(wp_serde_helper::DeserializeEmptyVecOrT::<
-                HashMap<String, WpRestApiAuthenticationScheme>,
-            >::new(Box::new(HashMap::new)))
-            .map(Self)
-    }
-}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WpApiDetailsAuthenticationMap(
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    HashMap<String, WpRestApiAuthenticationScheme>,
+);
 
 impl WpApiDetailsAuthenticationMap {
     pub fn has_application_passwords_authentication_url(&self) -> bool {
