@@ -1,11 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::{
-    SparseField,
-    widgets::{
-        SparseWidgetFieldWithEditContext, SparseWidgetFieldWithEmbedContext,
-        SparseWidgetFieldWithViewContext, WidgetId, WidgetListParams, WidgetWithEditContext,
-    },
-};
+use crate::widgets::{WidgetId, WidgetListParams, WidgetWithEditContext};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -34,13 +28,3 @@ impl DerivedRequest for WidgetsRequest {
         WpNamespace::WpV2
     }
 }
-
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseWidgetFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseWidgetFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseWidgetFieldWithViewContext
-);

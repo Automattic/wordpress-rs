@@ -1,10 +1,4 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::{
-    SparseField,
-    search_results::{
-        SparseSearchResultFieldWithEmbedContext, SparseSearchResultFieldWithViewContext,
-    },
-};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -19,26 +13,6 @@ impl DerivedRequest for SearchRequest {
     }
 }
 
-impl SparseField for SparseSearchResultFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::ObjectType => "type",
-            Self::ObjectSubtype => "subtype",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseSearchResultFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::ObjectType => "type",
-            Self::ObjectSubtype => "subtype",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,7 +22,10 @@ mod tests {
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
-        search_results::{SearchListParams, SearchResultSubtype, SearchResultType},
+        search_results::{
+            SearchListParams, SearchResultSubtype, SearchResultType,
+            SparseSearchResultFieldWithEmbedContext, SparseSearchResultFieldWithViewContext,
+        },
     };
     use rstest::*;
     use std::sync::Arc;

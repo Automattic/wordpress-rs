@@ -482,13 +482,12 @@ fn comment_type_to_string(comment_type: CommentType) -> String {
 mod tests {
     use super::*;
     use crate::{
-        generate,
+        SparseField, generate,
         unit_test_common::{
             assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
             unit_test_example_date_as_query_value,
         },
     };
-
     use rstest::*;
 
     #[rstest]
@@ -565,5 +564,35 @@ mod tests {
         format!(
             "page=11&per_page=22&search=s_q&{after}&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&{before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q"
         )
+    }
+
+    #[rstest]
+    #[case(SparseCommentFieldWithEditContext::Id, "id")]
+    #[case(SparseCommentFieldWithEditContext::CommentType, "type")]
+    fn test_as_mapped_field_name_for_edit_context(
+        #[case] field: SparseCommentFieldWithEditContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseCommentFieldWithEmbedContext::Id, "id")]
+    #[case(SparseCommentFieldWithEmbedContext::CommentType, "type")]
+    fn test_as_mapped_field_name_for_embed_context(
+        #[case] field: SparseCommentFieldWithEmbedContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseCommentFieldWithViewContext::Id, "id")]
+    #[case(SparseCommentFieldWithViewContext::CommentType, "type")]
+    fn test_as_mapped_field_name_for_view_context(
+        #[case] field: SparseCommentFieldWithViewContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 }

@@ -1,9 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::SparseField;
-use crate::templates::{
-    SparseTemplateFieldWithEditContext, SparseTemplateFieldWithEmbedContext,
-    SparseTemplateFieldWithViewContext, TemplateId,
-};
+use crate::templates::TemplateId;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -36,36 +32,6 @@ impl DerivedRequest for TemplatesRequest {
     }
 }
 
-impl SparseField for SparseTemplateFieldWithEditContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::TemplateType => "type",
-            Self::PostId => "wp_id",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseTemplateFieldWithEmbedContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::TemplateType => "type",
-            Self::PostId => "wp_id",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
-impl SparseField for SparseTemplateFieldWithViewContext {
-    fn as_str(&self) -> &str {
-        match self {
-            Self::TemplateType => "type",
-            Self::PostId => "wp_id",
-            _ => self.as_field_name(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,7 +43,7 @@ mod tests {
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
-        templates::{TemplateArea, TemplateListParams},
+        templates::{SparseTemplateFieldWithViewContext, TemplateArea, TemplateListParams},
     };
     use rstest::*;
     use std::sync::Arc;

@@ -329,7 +329,7 @@ pub fn fn_body_fields_query_pairs(
                 "_fields",
                 fields
                     .iter()
-                    .map(|f| f.as_str())
+                    .map(|f| f.as_mapped_field_name())
                     .collect::<Vec<&str>>()
                     .join(",")
                     .as_str(),

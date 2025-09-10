@@ -1,5 +1,8 @@
 use wp_contextual::WpContextual;
 
+mod sparse_field_trait;
+pub use sparse_field_trait::SparseField;
+
 // This test is validating that we are able to handle `#[WpContextualField]`s if its type
 // has multiple path segments. That's why we use a helper mod and use fully qualified paths
 // rather than the importing the mod.
@@ -24,7 +27,7 @@ fn main() {
         ),
     };
     let bar_field = SparseFooFieldWithEditContext::Bar;
-    assert_eq!(bar_field.as_field_name(), "bar");
+    assert_eq!(bar_field.as_mapped_field_name(), "bar");
 }
 
 uniffi::setup_scaffolding!();

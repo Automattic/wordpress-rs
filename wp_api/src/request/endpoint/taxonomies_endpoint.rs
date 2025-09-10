@@ -1,9 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::SparseField;
-use crate::taxonomies::{
-    SparseTaxonomyTypeDetailsFieldWithEditContext, SparseTaxonomyTypeDetailsFieldWithEmbedContext,
-    SparseTaxonomyTypeDetailsFieldWithViewContext, TaxonomyListParams, TaxonomyType,
-};
+use crate::taxonomies::{TaxonomyListParams, TaxonomyType};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -19,13 +15,3 @@ impl DerivedRequest for TaxonomiesRequest {
         WpNamespace::WpV2
     }
 }
-
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseTaxonomyTypeDetailsFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseTaxonomyTypeDetailsFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseTaxonomyTypeDetailsFieldWithViewContext
-);

@@ -39,7 +39,7 @@ pub enum SparseWpSiteHealthTestField {
 }
 
 impl SparseField for SparseWpSiteHealthTestField {
-    fn as_str(&self) -> &str {
+    fn as_mapped_field_name(&self) -> &str {
         match self {
             Self::Actions => "actions",
             Self::Badge => "badge",
@@ -98,7 +98,7 @@ pub enum SparseWpSiteHealthDirectorySizesField {
 }
 
 impl SparseField for SparseWpSiteHealthDirectorySizesField {
-    fn as_str(&self) -> &str {
+    fn as_mapped_field_name(&self) -> &str {
         match self {
             Self::DatabaseSize => "database_size",
             Self::FontsSize => "fonts_size",

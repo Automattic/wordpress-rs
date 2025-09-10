@@ -1,11 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::{
-    SparseField,
-    tags::{
-        SparseTagFieldWithEditContext, SparseTagFieldWithEmbedContext,
-        SparseTagFieldWithViewContext, TagId, TagListParams,
-    },
-};
+use crate::tags::{TagId, TagListParams};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -37,10 +31,6 @@ impl DerivedRequest for TagsRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(SparseTagFieldWithEditContext);
-super::macros::default_sparse_field_implementation_from_field_name!(SparseTagFieldWithEmbedContext);
-super::macros::default_sparse_field_implementation_from_field_name!(SparseTagFieldWithViewContext);
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -51,7 +41,10 @@ mod tests {
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
-        tags::{TagId, WpApiParamTagsOrderBy},
+        tags::{
+            SparseTagFieldWithEditContext, SparseTagFieldWithEmbedContext,
+            SparseTagFieldWithViewContext, TagId, WpApiParamTagsOrderBy,
+        },
     };
     use rstest::*;
     use std::sync::Arc;

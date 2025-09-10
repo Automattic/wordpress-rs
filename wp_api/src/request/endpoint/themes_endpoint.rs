@@ -1,11 +1,7 @@
-use crate::SparseField;
-use crate::themes::{
-    SparseThemeFieldWithEditContext, SparseThemeFieldWithEmbedContext,
-    SparseThemeFieldWithViewContext, ThemeStylesheet,
-};
+use super::{AsNamespace, DerivedRequest, WpNamespace};
+use crate::themes::ThemeStylesheet;
 use wp_derive_request_builder::WpDerivedRequest;
 
-use super::{AsNamespace, DerivedRequest, WpNamespace};
 #[derive(WpDerivedRequest)]
 enum ThemesRequest {
     #[contextual_get(url = "/themes", params = &crate::themes::ThemeListParams, output = Vec<crate::themes::SparseTheme>, filter_by = crate::themes::SparseThemeField)]
@@ -20,16 +16,6 @@ impl DerivedRequest for ThemesRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseThemeFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseThemeFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseThemeFieldWithViewContext
-);
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,7 +25,10 @@ mod tests {
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
-        themes::{ThemeListParams, ThemeStatus},
+        themes::{
+            SparseThemeFieldWithEditContext, SparseThemeFieldWithEmbedContext,
+            SparseThemeFieldWithViewContext, ThemeListParams, ThemeStatus,
+        },
     };
     use rstest::*;
     use std::sync::Arc;

@@ -122,6 +122,7 @@ pub struct SparseSearchResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SparseField;
     use rstest::*;
 
     #[rstest]
@@ -132,5 +133,27 @@ mod tests {
     #[case(SearchResultType::Custom("foo-bar".to_string()))]
     fn test_search_result_type_string_conversion(#[case] value: SearchResultType) {
         assert_eq!(value, value.to_string().parse().unwrap());
+    }
+
+    #[rstest]
+    #[case(SparseSearchResultFieldWithEmbedContext::Id, "id")]
+    #[case(SparseSearchResultFieldWithEmbedContext::ObjectType, "type")]
+    #[case(SparseSearchResultFieldWithEmbedContext::ObjectSubtype, "subtype")]
+    fn test_as_mapped_field_name_for_embed_context(
+        #[case] field: SparseSearchResultFieldWithEmbedContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(SparseSearchResultFieldWithViewContext::Id, "id")]
+    #[case(SparseSearchResultFieldWithViewContext::ObjectType, "type")]
+    #[case(SparseSearchResultFieldWithViewContext::ObjectSubtype, "subtype")]
+    fn test_as_mapped_field_name_for_view_context(
+        #[case] field: SparseSearchResultFieldWithViewContext,
+        #[case] expected_mapped_field_name: &str,
+    ) {
+        assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 }

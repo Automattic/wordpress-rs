@@ -1,5 +1,8 @@
 use wp_contextual::WpContextual;
 
+mod sparse_field_trait;
+pub use sparse_field_trait::SparseField;
+
 #[derive(WpContextual)]
 pub struct SparseFoo {
     #[WpContext(edit)]
@@ -33,11 +36,11 @@ fn main() {
     let bar_field = SparseFooFieldWithEditContext::Bar;
     let bar_2_field = SparseFooFieldWithEditContext::Bar2;
     let bar_3_field = SparseFooFieldWithEditContext::Bar3;
-    assert_eq!(bar_field.as_field_name(), "bar");
-    assert_eq!(bar_2_field.as_field_name(), "bar_2");
-    assert_eq!(bar_3_field.as_field_name(), "bar_3");
+    assert_eq!(bar_field.as_mapped_field_name(), "bar");
+    assert_eq!(bar_2_field.as_mapped_field_name(), "bar_2");
+    assert_eq!(bar_3_field.as_mapped_field_name(), "bar_3");
     let baz_field = SparseBarFieldWithEditContext::Baz;
-    assert_eq!(baz_field.as_field_name(), "baz");
+    assert_eq!(baz_field.as_mapped_field_name(), "baz");
 }
 
 uniffi::setup_scaffolding!();

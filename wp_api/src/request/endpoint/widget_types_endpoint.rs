@@ -1,11 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::{
-    SparseField,
-    widget_types::{
-        SparseWidgetTypeFieldWithEditContext, SparseWidgetTypeFieldWithEmbedContext,
-        SparseWidgetTypeFieldWithViewContext, WidgetTypeId,
-    },
-};
+use crate::widget_types::WidgetTypeId;
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -22,22 +16,17 @@ impl DerivedRequest for WidgetTypesRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseWidgetTypeFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseWidgetTypeFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparseWidgetTypeFieldWithViewContext
-);
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::ApiUrlResolver;
-    use crate::request::endpoint::tests::{
-        fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint,
+    use crate::{
+        request::endpoint::{
+            ApiUrlResolver,
+            tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
+        },
+        widget_types::{
+            SparseWidgetTypeFieldWithEditContext, SparseWidgetTypeFieldWithEmbedContext,
+        },
     };
     use rstest::*;
     use std::sync::Arc;

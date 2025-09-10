@@ -1,7 +1,4 @@
-use crate::{
-    PluginSlug, SparseField, SparsePluginFieldWithEditContext, SparsePluginFieldWithEmbedContext,
-    SparsePluginFieldWithViewContext,
-};
+use crate::PluginSlug;
 use wp_derive_request_builder::WpDerivedRequest;
 
 use super::{AsNamespace, DerivedRequest, WpNamespace};
@@ -26,21 +23,12 @@ impl DerivedRequest for PluginsRequest {
     }
 }
 
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePluginFieldWithEditContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePluginFieldWithEmbedContext
-);
-super::macros::default_sparse_field_implementation_from_field_name!(
-    SparsePluginFieldWithViewContext
-);
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         PluginListParams, PluginStatus, generate,
+        plugins::{SparsePluginFieldWithEditContext, SparsePluginFieldWithViewContext},
         request::endpoint::{
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},

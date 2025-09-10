@@ -91,7 +91,7 @@ pub enum WpApiParamOrder {
 impl_as_query_value_from_to_string!(WpApiParamOrder);
 
 trait SparseField {
-    fn as_str(&self) -> &str;
+    fn as_mapped_field_name(&self) -> &str;
 }
 
 trait OptionFromStr {
