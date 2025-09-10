@@ -298,6 +298,58 @@ where
     deserializer.deserialize_any(DeserializeEmptyArrayOrHashMapVisitor::<K, V>(PhantomData))
 }
 
+pub fn deserialize_u64_or_none<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeU64OrNoneVisitor)
+}
+
+pub struct DeserializeU64OrNoneVisitor;
+
+impl de::Visitor<'_> for DeserializeU64OrNoneVisitor {
+    type Value = Option<u64>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("u64, -1, false, or null")
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(v))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v == -1 {
+            return Ok(None);
+        }
+
+        return Err(E::invalid_value(Unexpected::Signed(v), &self))
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+        where
+            E: de::Error, {
+        if !v {
+            return Ok(None);
+        }
+
+        return Err(E::invalid_value(Unexpected::Bool(v), &self))
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error, {
+        Ok(None)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,4 +440,20 @@ mod tests {
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, wrapper.map);
     }
+
+    #[derive(Debug, Deserialize)]
+    pub struct EmptyUIntOrEmpty {
+        #[serde(deserialize_with = "deserialize_u64_or_none")]
+        pub value: Option<u64>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": 1}"#, Some(1))]
+    #[case(r#"{"value": null}"#, None)]
+    #[case(r#"{"value": -1}"#, None)]
+    fn test_deserialize_empty_uint_or_empty(#[case] test_case: &str, #[case] expected_result: Option<u64>) {
+        let empty_uint_or_empty: EmptyUIntOrEmpty = serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, empty_uint_or_empty.value);
+    }
+
 }
