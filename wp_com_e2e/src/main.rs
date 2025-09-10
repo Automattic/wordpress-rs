@@ -7,6 +7,7 @@ use wp_api::{prelude::*, wp_com::client::WpComApiClient};
 mod oauth2_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
+mod freshly_pressed_test;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -56,6 +57,7 @@ async fn main() -> Result<(), anyhow::Error> {
             oauth2_tests::oauth2_test(&client, token.clone()).await?;
             support_tickets_test::support_tickets_test(&client).await?;
             support_eligibility_test::support_eligibility_test(&client).await?;
+            freshly_pressed_test::freshly_pressed_test(&client).await?;
         }
     }
 

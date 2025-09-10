@@ -8,6 +8,7 @@ use strum::IntoEnumIterator;
 
 pub mod extensions;
 pub mod followers_endpoint;
+pub mod freshly_pressed;
 pub mod jetpack_connection_endpoint;
 pub mod oauth2;
 pub mod subscribers_endpoint;
