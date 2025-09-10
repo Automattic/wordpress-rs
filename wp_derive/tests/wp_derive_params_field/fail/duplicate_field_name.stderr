@@ -1,5 +1,5 @@
 error: Duplicate #[field_name] attribute found
- --> tests/wp_derive_params_field/fail/duplicate_field_name.rs:6:5
+ --> tests/wp_derive_params_field/fail/duplicate_field_name.rs:7:5
   |
-6 |     #[field_name("per_page")]  // Duplicate should fail
+7 |     #[field_name("per_page")] // Duplicate should fail
   |     ^

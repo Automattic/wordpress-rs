@@ -108,6 +108,7 @@ pub enum MediaStatus {
 impl_as_query_value_from_to_string!(MediaStatus);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct MediaListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -181,80 +182,6 @@ pub struct MediaListParams {
     /// Limit result set to attachments of a particular MIME type.
     #[uniffi(default = None)]
     pub mime_type: Option<String>,
-}
-
-impl AppendUrlQueryPairs for MediaListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(MediaListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(MediaListParamsField::PerPage, self.per_page.as_ref())
-            .append_option_query_value_pair(MediaListParamsField::Search, self.search.as_ref())
-            .append_option_query_value_pair(MediaListParamsField::After, self.after.as_ref())
-            .append_option_query_value_pair(
-                MediaListParamsField::ModifiedAfter,
-                self.modified_after.as_ref(),
-            )
-            .append_vec_query_value_pair(MediaListParamsField::Author, &self.author)
-            .append_vec_query_value_pair(MediaListParamsField::AuthorExclude, &self.author_exclude)
-            .append_option_query_value_pair(MediaListParamsField::Before, self.before.as_ref())
-            .append_option_query_value_pair(
-                MediaListParamsField::ModifiedBefore,
-                self.modified_before.as_ref(),
-            )
-            .append_vec_query_value_pair(MediaListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(MediaListParamsField::Include, &self.include)
-            .append_option_query_value_pair(MediaListParamsField::Offset, self.offset.as_ref())
-            .append_option_query_value_pair(MediaListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(MediaListParamsField::Orderby, self.orderby.as_ref())
-            .append_vec_query_value_pair(MediaListParamsField::Parent, self.parent.as_ref())
-            .append_vec_query_value_pair(MediaListParamsField::SearchColumns, &self.search_columns)
-            .append_vec_query_value_pair(MediaListParamsField::Slug, &self.slug)
-            .append_vec_query_value_pair(MediaListParamsField::Status, &self.status)
-            .append_vec_query_value_pair(
-                MediaListParamsField::ParentExclude,
-                self.parent_exclude.as_ref(),
-            )
-            .append_option_query_value_pair(
-                MediaListParamsField::MediaType,
-                self.media_type.as_ref(),
-            )
-            .append_option_query_value_pair(
-                MediaListParamsField::MimeType,
-                self.mime_type.as_ref(),
-            );
-    }
-}
-
-impl FromUrlQueryPairs for MediaListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(MediaListParamsField::Page),
-            per_page: query_pairs.get(MediaListParamsField::PerPage),
-            search: query_pairs.get(MediaListParamsField::Search),
-            after: query_pairs.get(MediaListParamsField::After),
-            modified_after: query_pairs.get(MediaListParamsField::ModifiedAfter),
-            author: query_pairs.get_csv(MediaListParamsField::Author),
-            author_exclude: query_pairs.get_csv(MediaListParamsField::AuthorExclude),
-            before: query_pairs.get(MediaListParamsField::Before),
-            modified_before: query_pairs.get(MediaListParamsField::ModifiedBefore),
-            exclude: query_pairs.get_csv(MediaListParamsField::Exclude),
-            include: query_pairs.get_csv(MediaListParamsField::Include),
-            offset: query_pairs.get(MediaListParamsField::Offset),
-            order: query_pairs.get(MediaListParamsField::Order),
-            orderby: query_pairs.get(MediaListParamsField::Orderby),
-            parent: query_pairs.get_csv(MediaListParamsField::Parent),
-            parent_exclude: query_pairs.get_csv(MediaListParamsField::ParentExclude),
-            search_columns: query_pairs.get_csv(MediaListParamsField::SearchColumns),
-            slug: query_pairs.get_csv(MediaListParamsField::Slug),
-            status: query_pairs.get_csv(MediaListParamsField::Status),
-            media_type: query_pairs.get(MediaListParamsField::MediaType),
-            mime_type: query_pairs.get(MediaListParamsField::MimeType),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -689,7 +616,7 @@ mod tests {
         let before = unit_test_example_date_as_query_value("before");
         let modified_before = unit_test_example_date_as_query_value("modified_before");
         format!(
-            "page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&parent_exclude=55555%2C55556&media_type=image&mime_type=image%2Fjpeg"
+            "page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&parent_exclude=55555%2C55556&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&media_type=image&mime_type=image%2Fjpeg"
         )
     }
 

@@ -40,6 +40,7 @@ pub enum WpApiParamCategoriesOrderBy {
 impl_as_query_value_from_to_string!(WpApiParamCategoriesOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct CategoryListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -84,53 +85,6 @@ pub struct CategoryListParams {
     /// Limit result set to users with one or more specific slugs.
     #[uniffi(default = [])]
     pub slug: Vec<String>,
-}
-
-impl AppendUrlQueryPairs for CategoryListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(CategoryListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(
-                CategoryListParamsField::PerPage,
-                self.per_page.as_ref(),
-            )
-            .append_option_query_value_pair(CategoryListParamsField::Search, self.search.as_ref())
-            .append_vec_query_value_pair(CategoryListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(CategoryListParamsField::Include, &self.include)
-            .append_option_query_value_pair(CategoryListParamsField::Offset, self.offset.as_ref())
-            .append_option_query_value_pair(CategoryListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(CategoryListParamsField::Orderby, self.orderby.as_ref())
-            .append_option_query_value_pair(
-                CategoryListParamsField::HideEmpty,
-                self.hide_empty.as_ref(),
-            )
-            .append_option_query_value_pair(CategoryListParamsField::Parent, self.parent.as_ref())
-            .append_option_query_value_pair(CategoryListParamsField::Post, self.post.as_ref())
-            .append_vec_query_value_pair(CategoryListParamsField::Slug, &self.slug);
-    }
-}
-
-impl FromUrlQueryPairs for CategoryListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(CategoryListParamsField::Page),
-            per_page: query_pairs.get(CategoryListParamsField::PerPage),
-            search: query_pairs.get(CategoryListParamsField::Search),
-            exclude: query_pairs.get_csv(CategoryListParamsField::Exclude),
-            include: query_pairs.get_csv(CategoryListParamsField::Include),
-            offset: query_pairs.get(CategoryListParamsField::Offset),
-            order: query_pairs.get(CategoryListParamsField::Order),
-            orderby: query_pairs.get(CategoryListParamsField::Orderby),
-            hide_empty: query_pairs.get(CategoryListParamsField::HideEmpty),
-            parent: query_pairs.get(CategoryListParamsField::Parent),
-            post: query_pairs.get(CategoryListParamsField::Post),
-            slug: query_pairs.get_csv(CategoryListParamsField::Slug),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

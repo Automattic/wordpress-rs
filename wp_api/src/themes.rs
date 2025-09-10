@@ -36,29 +36,11 @@ pub enum ThemeStatus {
 impl_as_query_value_from_to_string!(ThemeStatus);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct ThemeListParams {
     /// Limit result set to themes assigned one or more statuses.
     #[uniffi(default = None)]
     pub status: Option<ThemeStatus>,
-}
-
-impl AppendUrlQueryPairs for ThemeListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(ThemeListParamsField::Status, self.status.as_ref());
-    }
-}
-
-impl FromUrlQueryPairs for ThemeListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            status: query_pairs.get(ThemeListParamsField::Status),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

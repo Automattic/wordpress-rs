@@ -1,0 +1,7 @@
+error: #[supports_pagination] attribute is required
+ --> tests/wp_derive_params_field/fail/missing_pagination.rs:3:10
+  |
+3 | #[derive(WpDeriveParamsField)]
+  |          ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `WpDeriveParamsField` (in Nightly builds, run with -Z macro-backtrace for more info)

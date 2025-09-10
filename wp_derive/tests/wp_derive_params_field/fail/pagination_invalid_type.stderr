@@ -1,0 +1,5 @@
+error: #[supports_pagination] attribute must be a boolean (true or false)
+ --> tests/wp_derive_params_field/fail/pagination_invalid_type.rs:4:1
+  |
+4 | #[supports_pagination("not_a_bool")] // Should be true or false, not a string
+  | ^

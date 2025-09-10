@@ -40,6 +40,7 @@ pub enum WpApiParamPostRevisionsOrderBy {
 impl_as_query_value_from_to_string!(WpApiParamPostRevisionsOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct PostRevisionListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -71,51 +72,6 @@ pub struct PostRevisionListParams {
     #[uniffi(default = None)]
     #[field_name("orderby")]
     pub orderby: Option<WpApiParamPostRevisionsOrderBy>,
-}
-
-impl AppendUrlQueryPairs for PostRevisionListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(PostRevisionListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(
-                PostRevisionListParamsField::PerPage,
-                self.per_page.as_ref(),
-            )
-            .append_option_query_value_pair(
-                PostRevisionListParamsField::Search,
-                self.search.as_ref(),
-            )
-            .append_vec_query_value_pair(PostRevisionListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(PostRevisionListParamsField::Include, &self.include)
-            .append_option_query_value_pair(
-                PostRevisionListParamsField::Offset,
-                self.offset.as_ref(),
-            )
-            .append_option_query_value_pair(PostRevisionListParamsField::Order, self.order.as_ref())
-            .append_option_query_value_pair(
-                PostRevisionListParamsField::Orderby,
-                self.orderby.as_ref(),
-            );
-    }
-}
-
-impl FromUrlQueryPairs for PostRevisionListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(PostRevisionListParamsField::Page),
-            per_page: query_pairs.get(PostRevisionListParamsField::PerPage),
-            search: query_pairs.get(PostRevisionListParamsField::Search),
-            exclude: query_pairs.get_csv(PostRevisionListParamsField::Exclude),
-            include: query_pairs.get_csv(PostRevisionListParamsField::Include),
-            offset: query_pairs.get(PostRevisionListParamsField::Offset),
-            order: query_pairs.get(PostRevisionListParamsField::Order),
-            orderby: query_pairs.get(PostRevisionListParamsField::Orderby),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

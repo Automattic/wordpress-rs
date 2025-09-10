@@ -70,6 +70,7 @@ pub enum SearchResultSubtype {
 impl_as_query_value_from_to_string!(SearchResultSubtype);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(true)]
 pub struct SearchListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -99,43 +100,6 @@ pub struct SearchListParams {
     /// Limit result set to specific IDs.
     #[uniffi(default = [])]
     pub include: Vec<i64>,
-}
-
-impl AppendUrlQueryPairs for SearchListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(SearchListParamsField::Page, self.page.as_ref())
-            .append_option_query_value_pair(SearchListParamsField::PerPage, self.per_page.as_ref())
-            .append_option_query_value_pair(SearchListParamsField::Search, self.search.as_ref())
-            .append_option_query_value_pair(
-                SearchListParamsField::ObjectType,
-                self.object_type.as_ref(),
-            )
-            .append_option_query_value_pair(
-                SearchListParamsField::ObjectSubtype,
-                self.object_subtype.as_ref(),
-            )
-            .append_vec_query_value_pair(SearchListParamsField::Exclude, &self.exclude)
-            .append_vec_query_value_pair(SearchListParamsField::Include, &self.include);
-    }
-}
-
-impl FromUrlQueryPairs for SearchListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            page: query_pairs.get(SearchListParamsField::Page),
-            per_page: query_pairs.get(SearchListParamsField::PerPage),
-            search: query_pairs.get(SearchListParamsField::Search),
-            object_type: query_pairs.get(SearchListParamsField::ObjectType),
-            object_subtype: query_pairs.get(SearchListParamsField::ObjectSubtype),
-            exclude: query_pairs.get_csv(SearchListParamsField::Exclude),
-            include: query_pairs.get_csv(SearchListParamsField::Include),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

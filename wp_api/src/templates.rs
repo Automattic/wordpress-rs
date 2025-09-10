@@ -81,6 +81,7 @@ pub enum TemplateArea {
 impl_as_query_value_from_to_string!(TemplateArea);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)]
 pub struct TemplateListParams {
     /// Limit to the specified post id.
     #[uniffi(default = None)]
@@ -92,32 +93,6 @@ pub struct TemplateListParams {
     /// Post type to get the templates for.
     #[uniffi(default = None)]
     pub post_type: Option<PostType>,
-}
-
-impl AppendUrlQueryPairs for TemplateListParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair(TemplateListParamsField::PostId, self.post_id.as_ref())
-            .append_option_query_value_pair(TemplateListParamsField::Area, self.area.as_ref())
-            .append_option_query_value_pair(
-                TemplateListParamsField::PostType,
-                self.post_type.as_ref(),
-            );
-    }
-}
-
-impl FromUrlQueryPairs for TemplateListParams {
-    fn from_url_query_pairs(query_pairs: UrlQueryPairsMap) -> Option<Self> {
-        Some(Self {
-            post_id: query_pairs.get(TemplateListParamsField::PostId),
-            area: query_pairs.get(TemplateListParamsField::Area),
-            post_type: query_pairs.get(TemplateListParamsField::PostType),
-        })
-    }
-
-    fn supports_pagination() -> bool {
-        false
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, WpContextual)]
