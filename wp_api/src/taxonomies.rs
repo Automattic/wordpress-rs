@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt::Display};
 
 use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 use crate::{
     post_types::PostType,
@@ -90,17 +90,12 @@ pub enum TaxonomyTypeLabels {
     Custom(String),
 }
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct TaxonomyListParams {
     /// Limit results to taxonomies associated with a specific post type.
     #[uniffi(default = None)]
+    #[field_name("type")]
     pub post_type: Option<PostType>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum TaxonomyListParamsField {
-    #[strum(serialize = "type")]
-    PostType,
 }
 
 impl AppendUrlQueryPairs for TaxonomyListParams {

@@ -8,8 +8,8 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 wp_content_i64_id!(CategoryId);
 
@@ -39,7 +39,7 @@ pub enum WpApiParamCategoriesOrderBy {
 
 impl_as_query_value_from_to_string!(WpApiParamCategoriesOrderBy);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct CategoryListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -70,6 +70,7 @@ pub struct CategoryListParams {
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `slug`, `include_slugs`, `term_group`, `description`, `count`
     #[uniffi(default = None)]
+    #[field_name("orderby")]
     pub orderby: Option<WpApiParamCategoriesOrderBy>,
     /// Whether to hide terms not assigned to any posts.
     #[uniffi(default = None)]
@@ -83,34 +84,6 @@ pub struct CategoryListParams {
     /// Limit result set to users with one or more specific slugs.
     #[uniffi(default = [])]
     pub slug: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum CategoryListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
-    #[strum(serialize = "offset")]
-    Offset,
-    #[strum(serialize = "order")]
-    Order,
-    #[strum(serialize = "orderby")]
-    Orderby,
-    #[strum(serialize = "hide_empty")]
-    HideEmpty,
-    #[strum(serialize = "parent")]
-    Parent,
-    #[strum(serialize = "post")]
-    Post,
-    #[strum(serialize = "slug")]
-    Slug,
 }
 
 impl AppendUrlQueryPairs for CategoryListParams {

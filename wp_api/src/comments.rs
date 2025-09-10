@@ -10,8 +10,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
@@ -69,7 +69,7 @@ pub enum CommentType {
 
 impl_as_query_value_from_to_string!(CommentType);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct CommentListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -115,6 +115,7 @@ pub struct CommentListParams {
     /// Default: date_gmt
     /// One of: date, date_gmt, id, include, post, parent, type
     #[uniffi(default = None)]
+    #[field_name("orderby")]
     pub orderby: Option<WpApiParamCommentsOrderBy>,
     /// Limit result set to comments of specific parent IDs.
     #[uniffi(default = [])]
@@ -132,52 +133,11 @@ pub struct CommentListParams {
     /// Limit result set to comments assigned a specific type. Requires authorization.
     /// Default: comment
     #[uniffi(default = None)]
+    #[field_name("type")]
     pub comment_type: Option<CommentType>,
     /// The password for the post if it is password protected.
     #[uniffi(default = None)]
     pub password: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum CommentListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "after")]
-    After,
-    #[strum(serialize = "author")]
-    Author,
-    #[strum(serialize = "author_exclude")]
-    AuthorExclude,
-    #[strum(serialize = "author_email")]
-    AuthorEmail,
-    #[strum(serialize = "before")]
-    Before,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
-    #[strum(serialize = "offset")]
-    Offset,
-    #[strum(serialize = "order")]
-    Order,
-    #[strum(serialize = "orderby")]
-    Orderby,
-    #[strum(serialize = "parent")]
-    Parent,
-    #[strum(serialize = "parent_exclude")]
-    ParentExclude,
-    #[strum(serialize = "post")]
-    Post,
-    #[strum(serialize = "status")]
-    Status,
-    #[strum(serialize = "type")]
-    CommentType,
-    #[strum(serialize = "password")]
-    Password,
 }
 
 impl AppendUrlQueryPairs for CommentListParams {

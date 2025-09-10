@@ -8,8 +8,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 uniffi::custom_newtype!(TemplateId, String);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,10 +80,11 @@ pub enum TemplateArea {
 
 impl_as_query_value_from_to_string!(TemplateArea);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct TemplateListParams {
     /// Limit to the specified post id.
     #[uniffi(default = None)]
+    #[field_name("wp_id")]
     pub post_id: Option<PostId>,
     /// Limit to the specified template part area.
     #[uniffi(default = None)]
@@ -91,16 +92,6 @@ pub struct TemplateListParams {
     /// Post type to get the templates for.
     #[uniffi(default = None)]
     pub post_type: Option<PostType>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum TemplateListParamsField {
-    #[strum(serialize = "wp_id")]
-    PostId,
-    #[strum(serialize = "area")]
-    Area,
-    #[strum(serialize = "post_type")]
-    PostType,
 }
 
 impl AppendUrlQueryPairs for TemplateListParams {

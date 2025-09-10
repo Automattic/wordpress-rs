@@ -8,8 +8,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, fmt::Display, str::FromStr};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
@@ -119,7 +119,7 @@ pub enum UserAvatarSize {
     Custom(String),
 }
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct UserListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -150,6 +150,7 @@ pub struct UserListParams {
     /// Default: `name`
     /// One of: `id`, `include`, `name`, `registered_date`, `slug`, `include_slugs`, `email`, `url`
     #[uniffi(default = None)]
+    #[field_name("orderby")]
     pub orderby: Option<WpApiParamUsersOrderBy>,
     /// Limit result set to users with one or more specific slugs.
     #[uniffi(default = [])]
@@ -167,36 +168,6 @@ pub struct UserListParams {
     /// Limit result set to users who have published posts.
     #[uniffi(default = None)]
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum UserListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
-    #[strum(serialize = "offset")]
-    Offset,
-    #[strum(serialize = "order")]
-    Order,
-    #[strum(serialize = "orderby")]
-    Orderby,
-    #[strum(serialize = "slug")]
-    Slug,
-    #[strum(serialize = "roles")]
-    Roles,
-    #[strum(serialize = "capabilities")]
-    Capabilities,
-    #[strum(serialize = "who")]
-    Who,
-    #[strum(serialize = "has_published_posts")]
-    HasPublishedPosts,
 }
 
 impl AppendUrlQueryPairs for UserListParams {

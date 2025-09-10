@@ -11,8 +11,8 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 #[derive(
@@ -67,7 +67,7 @@ pub enum WpApiParamPostsSearchColumn {
 
 impl_as_query_value_from_to_string!(WpApiParamPostsSearchColumn);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct PostListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -116,6 +116,7 @@ pub struct PostListParams {
     /// Default: date
     /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title
     #[uniffi(default = None)]
+    #[field_name("orderby")]
     pub orderby: Option<WpApiParamPostsOrderBy>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
@@ -146,56 +147,6 @@ pub struct PostListParams {
     /// Limit result set to items that are sticky.
     #[uniffi(default = None)]
     pub sticky: Option<bool>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum PostListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "after")]
-    After,
-    #[strum(serialize = "modified_after")]
-    ModifiedAfter,
-    #[strum(serialize = "author")]
-    Author,
-    #[strum(serialize = "author_exclude")]
-    AuthorExclude,
-    #[strum(serialize = "before")]
-    Before,
-    #[strum(serialize = "modified_before")]
-    ModifiedBefore,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
-    #[strum(serialize = "offset")]
-    Offset,
-    #[strum(serialize = "order")]
-    Order,
-    #[strum(serialize = "orderby")]
-    Orderby,
-    #[strum(serialize = "search_columns")]
-    SearchColumns,
-    #[strum(serialize = "slug")]
-    Slug,
-    #[strum(serialize = "status")]
-    Status,
-    #[strum(serialize = "tax_relation")]
-    TaxRelation,
-    #[strum(serialize = "categories")]
-    Categories,
-    #[strum(serialize = "categories_exclude")]
-    CategoriesExclude,
-    #[strum(serialize = "tags")]
-    Tags,
-    #[strum(serialize = "tags_exclude")]
-    TagsExclude,
-    #[strum(serialize = "sticky")]
-    Sticky,
 }
 
 impl AppendUrlQueryPairs for PostListParams {

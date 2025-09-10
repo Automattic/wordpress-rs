@@ -9,8 +9,8 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 wp_content_i64_id!(PostRevisionId);
 
@@ -39,7 +39,7 @@ pub enum WpApiParamPostRevisionsOrderBy {
 
 impl_as_query_value_from_to_string!(WpApiParamPostRevisionsOrderBy);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 pub struct PostRevisionListParams {
     /// Current page of the collection.
     /// Default: `1`
@@ -69,27 +69,8 @@ pub struct PostRevisionListParams {
     /// Default: date
     /// One of: date, id, include, relevance, slug, include_slugs, title
     #[uniffi(default = None)]
+    #[field_name("orderby")]
     pub orderby: Option<WpApiParamPostRevisionsOrderBy>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum PostRevisionListParamsField {
-    #[strum(serialize = "page")]
-    Page,
-    #[strum(serialize = "per_page")]
-    PerPage,
-    #[strum(serialize = "search")]
-    Search,
-    #[strum(serialize = "exclude")]
-    Exclude,
-    #[strum(serialize = "include")]
-    Include,
-    #[strum(serialize = "offset")]
-    Offset,
-    #[strum(serialize = "order")]
-    Order,
-    #[strum(serialize = "orderby")]
-    Orderby,
 }
 
 impl AppendUrlQueryPairs for PostRevisionListParams {

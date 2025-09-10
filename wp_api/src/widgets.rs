@@ -5,8 +5,8 @@ use crate::url_query::{
 use crate::widget_types::WidgetTypeId;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display};
-use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 uniffi::custom_newtype!(WidgetId, String);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,15 +47,9 @@ pub struct WidgetInstance {
     pub raw: Option<HashMap<String, JsonValue>>,
 }
 
-#[derive(Debug, Clone, Default, uniffi::Record)]
+#[derive(Debug, Clone, Default, uniffi::Record, WpDeriveParamsField)]
 pub struct WidgetListParams {
     pub sidebar: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-enum WidgetListParamsField {
-    #[strum(serialize = "sidebar")]
-    Sidebar,
 }
 
 impl AppendUrlQueryPairs for WidgetListParams {
