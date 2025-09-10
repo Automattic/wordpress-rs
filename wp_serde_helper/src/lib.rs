@@ -329,26 +329,27 @@ impl de::Visitor<'_> for DeserializeU64OrNoneVisitor {
             return Ok(None);
         }
 
-        return Err(E::invalid_value(Unexpected::Signed(v), &self))
+        Err(E::invalid_value(Unexpected::Signed(v), &self))
     }
 
     fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-        where
-            E: de::Error, {
+    where
+        E: de::Error,
+    {
         if !v {
             return Ok(None);
         }
 
-        return Err(E::invalid_value(Unexpected::Bool(v), &self))
+        Err(E::invalid_value(Unexpected::Bool(v), &self))
     }
 
     fn visit_unit<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error, {
+    where
+        E: de::Error,
+    {
         Ok(None)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -451,9 +452,12 @@ mod tests {
     #[case(r#"{"value": 1}"#, Some(1))]
     #[case(r#"{"value": null}"#, None)]
     #[case(r#"{"value": -1}"#, None)]
-    fn test_deserialize_empty_uint_or_empty(#[case] test_case: &str, #[case] expected_result: Option<u64>) {
-        let empty_uint_or_empty: EmptyUIntOrEmpty = serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+    fn test_deserialize_empty_uint_or_empty(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<u64>,
+    ) {
+        let empty_uint_or_empty: EmptyUIntOrEmpty =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, empty_uint_or_empty.value);
     }
-
 }

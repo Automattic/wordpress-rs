@@ -4,10 +4,10 @@ use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use wp_api::{prelude::*, wp_com::client::WpComApiClient};
 
+mod freshly_pressed_test;
 mod oauth2_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
-mod freshly_pressed_test;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

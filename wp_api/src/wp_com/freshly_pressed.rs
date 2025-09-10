@@ -1,13 +1,20 @@
 use std::collections::HashMap;
 
 use crate::{
-    date::WpGmtDateTime, posts::PostId, url_query::{
+    JsonValue,
+    date::WpGmtDateTime,
+    posts::PostId,
+    url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
-    }, users::UserId, wp_com::WpComSiteId, JsonValue
+    },
+    users::UserId,
+    wp_com::WpComSiteId,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
-use wp_serde_helper::{deserialize_false_or_string, deserialize_u64_or_none,deserialize_empty_array_or_hashmap};
+use wp_serde_helper::{
+    deserialize_empty_array_or_hashmap, deserialize_false_or_string, deserialize_u64_or_none,
+};
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct FreshlyPressedPostList {
@@ -122,7 +129,7 @@ pub struct FreshlyPressedObjectMeta {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct FreshlyPressedKeyValuePair{
+pub struct FreshlyPressedKeyValuePair {
     pub id: String,
     pub key: String,
     pub value: JsonValue,
@@ -239,8 +246,14 @@ enum FreshlyPressedListParamsField {
 impl AppendUrlQueryPairs for FreshlyPressedListParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair(FreshlyPressedListParamsField::Number, self.number.as_ref())
-            .append_option_query_value_pair(FreshlyPressedListParamsField::Page, self.page.as_ref());
+            .append_option_query_value_pair(
+                FreshlyPressedListParamsField::Number,
+                self.number.as_ref(),
+            )
+            .append_option_query_value_pair(
+                FreshlyPressedListParamsField::Page,
+                self.page.as_ref(),
+            );
     }
 }
 
@@ -257,7 +270,6 @@ impl FromUrlQueryPairs for FreshlyPressedListParams {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,7 +281,7 @@ mod tests {
             serde_json::from_str(json).expect("Failed to deserialize freshly pressed post list");
         assert_eq!(conversation.number, 10);
         assert_eq!(conversation.posts[0].id, crate::posts::PostId(16283));
-        assert_eq!(conversation.posts[0].site_id, crate::wp_com::WpComSiteId(121838035));
+        assert_eq!(conversation.posts[0].site_id, 121838035.into());
         assert_eq!(conversation.posts[0].author.id, crate::users::UserId(1));
     }
 }

@@ -1,6 +1,9 @@
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
-    wp_com::{freshly_pressed::{FreshlyPressedListParams, FreshlyPressedPostList}, WpComNamespace},
+    wp_com::{
+        WpComNamespace,
+        freshly_pressed::{FreshlyPressedListParams, FreshlyPressedPostList},
+    },
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
