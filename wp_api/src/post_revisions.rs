@@ -1,35 +1,18 @@
 use crate::{
     UserId, WpApiParamOrder,
     date::WpGmtDateTime,
-    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
-impl_as_query_value_for_new_type!(PostRevisionId);
-uniffi::custom_newtype!(PostRevisionId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PostRevisionId(pub i64);
-
-impl FromStr for PostRevisionId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for PostRevisionId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_i64_id!(PostRevisionId);
 
 #[derive(
     Debug,

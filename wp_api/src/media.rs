@@ -1,7 +1,7 @@
 use crate::{
     UserId, WpApiParamOrder,
     date::WpGmtDateTime,
-    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    impl_as_query_value_from_to_string,
     posts::{
         PostCommentStatus, PostId, PostPingStatus, PostStatus, WpApiParamPostsOrderBy,
         WpApiParamPostsSearchColumn,
@@ -9,32 +9,16 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::{collections::HashMap, num::ParseIntError, str::FromStr};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
-impl_as_query_value_for_new_type!(MediaId);
-uniffi::custom_newtype!(MediaId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MediaId(pub i64);
-
-impl FromStr for MediaId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for MediaId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_i64_id!(MediaId);
 
 #[derive(
     Debug,

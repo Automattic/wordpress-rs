@@ -1,14 +1,15 @@
 use crate::{
     AnyJson, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
     date::WpGmtDateTime,
-    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::ParseIntError, str::FromStr, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use strum_macros::IntoStaticStr;
 use wp_contextual::WpContextual;
 
@@ -37,24 +38,7 @@ pub enum WpApiParamCommentsOrderBy {
 
 impl_as_query_value_from_to_string!(WpApiParamCommentsOrderBy);
 
-impl_as_query_value_for_new_type!(CommentId);
-uniffi::custom_newtype!(CommentId, i64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CommentId(pub i64);
-
-impl FromStr for CommentId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for CommentId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_i64_id!(CommentId);
 
 #[derive(
     Debug,
