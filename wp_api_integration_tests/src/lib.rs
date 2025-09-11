@@ -31,6 +31,11 @@ pub struct TestCredentials {
     pub revision_id_for_revisioned_post_id: i64,
     pub autosaved_post_id: i64,
     pub autosave_id_for_autosaved_post_id: i64,
+    pub password_protected_page_id: i64,
+    pub password_protected_page_password: &'static str,
+    pub password_protected_page_title: &'static str,
+    pub trashed_page_id: i64,
+    pub first_page_id: i64,
 }
 
 impl TestCredentials {
@@ -80,6 +85,7 @@ pub const TAG_ID_100: TagId = TagId(100);
 pub const TAG_ID_INVALID: TagId = TagId(99999999);
 pub const TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE: &str = "twentytwentyfour//single";
 pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
+pub const PAGE_TEMPLATE_WITH_SIDEBAR: &str = "page-with-sidebar";
 pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";
 pub const THEME_TWENTY_TWENTY_FOUR: &str = "twentytwentyfour";
 pub const THEME_TWENTY_TWENTY_THREE: &str = "twentytwentythree";

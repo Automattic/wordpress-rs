@@ -6,8 +6,8 @@ use std::fs::metadata;
 use std::io;
 use std::path::Path;
 use wp_cli::{
-    WpCliCategory, WpCliComment, WpCliCommentListArguments, WpCliPost, WpCliPostListArguments,
-    WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta,
+    WpCliCategory, WpCliComment, WpCliCommentListArguments, WpCliPage, WpCliPageListArguments,
+    WpCliPost, WpCliPostListArguments, WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta,
 };
 
 pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
@@ -63,6 +63,20 @@ fn wp_cli_post(post_id: i64) -> Result<Json<WpCliPost>, Error> {
 #[get("/posts?<post_status>")]
 fn wp_cli_posts(post_status: Option<String>) -> Result<Json<Vec<WpCliPost>>, Error> {
     WpCliPost::list(Some(WpCliPostListArguments { post_status }))
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/page?<page_id>")]
+fn wp_cli_page(page_id: i64) -> Result<Json<WpCliPage>, Error> {
+    WpCliPage::get(page_id)
+        .map(Json)
+        .map_err(|e| Error::AsString(e.to_string()))
+}
+
+#[get("/pages?<post_status>")]
+fn wp_cli_pages(post_status: Option<String>) -> Result<Json<Vec<WpCliPage>>, Error> {
+    WpCliPage::list(Some(WpCliPageListArguments { post_status }))
         .map(Json)
         .map_err(|e| Error::AsString(e.to_string()))
 }
@@ -127,6 +141,8 @@ fn rocket() -> _ {
         .mount("/wp-cli/", routes![wp_cli_comment])
         .mount("/wp-cli/", routes![wp_cli_comments])
         .mount("/wp-cli/", routes![wp_cli_site_settings])
+        .mount("/wp-cli/", routes![wp_cli_page])
+        .mount("/wp-cli/", routes![wp_cli_pages])
         .mount("/wp-cli/", routes![wp_cli_post])
         .mount("/wp-cli/", routes![wp_cli_posts])
         .mount("/wp-cli/", routes![wp_cli_tag])

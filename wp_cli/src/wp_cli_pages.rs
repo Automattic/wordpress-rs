@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wp_serde_helper::deserialize_i64_or_string;
 
-const POST_FIELDS_ARG: &str = "--fields=ID,post_name,post_title,post_date,post_status,post_author,post_date_gmt,post_content,post_excerpt,comment_status,ping_status,post_password,post_modified,post_modified_gmt,guid,post_type";
+const PAGE_FIELDS_ARG: &str = "--fields=ID,post_name,post_title,post_date,post_status,post_author,post_date_gmt,post_content,post_excerpt,comment_status,ping_status,post_password,post_modified,post_modified_gmt,guid,post_type,post_parent,menu_order";
 
 #[derive(Debug, Default)]
-pub struct WpCliPostListArguments {
+pub struct WpCliPageListArguments {
     pub post_status: Option<String>,
 }
 
-impl AsWpCliArguments for WpCliPostListArguments {
+impl AsWpCliArguments for WpCliPageListArguments {
     fn as_wp_cli_arguments(&self) -> Option<String> {
         let mut map = HashMap::new();
         if let Some(post_status) = &self.post_status {
@@ -22,7 +22,7 @@ impl AsWpCliArguments for WpCliPostListArguments {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WpCliPost {
+pub struct WpCliPage {
     #[serde(rename = "ID")]
     #[serde(deserialize_with = "deserialize_i64_or_string")]
     pub id: i64,
@@ -39,10 +39,16 @@ pub struct WpCliPost {
     #[serde(rename = "post_excerpt")]
     pub excerpt: String,
     pub guid: String,
+    #[serde(rename = "menu_order")]
+    #[serde(deserialize_with = "deserialize_i64_or_string")]
+    pub menu_order: i64,
     #[serde(rename = "post_modified")]
     pub modified: String,
     #[serde(rename = "post_modified_gmt")]
     pub modified_gmt: String,
+    #[serde(rename = "post_parent")]
+    #[serde(deserialize_with = "deserialize_i64_or_string")]
+    pub parent: i64,
     #[serde(rename = "post_password")]
     pub password: String,
     pub ping_status: String,
@@ -54,23 +60,30 @@ pub struct WpCliPost {
     pub title: String,
 }
 
-impl WpCliPost {
-    pub fn get(post_id: i64) -> Result<Self> {
+impl WpCliPage {
+    pub fn get(page_id: i64) -> Result<Self> {
         // Some `wp` commands return different fields/information for `get` or `list`. To avoid
-        // this, always use `wp post list` and then find the post we are interested in.
+        // this, always use `wp post list --post_type=page` and then find the page we are interested in.
         Self::list(None).and_then(|v| {
             v.into_iter()
-                .find(|u| u.id == post_id)
-                .ok_or(anyhow!("Can't find the post with post_id: {}", post_id,))
+                .find(|u| u.id == page_id)
+                .ok_or(anyhow!("Can't find the page with page_id: {}", page_id,))
         })
     }
-    pub fn list(arguments: Option<WpCliPostListArguments>) -> Result<Vec<Self>> {
+    pub fn list(arguments: Option<WpCliPageListArguments>) -> Result<Vec<Self>> {
         let output = if let Some(cli_arguments) = arguments.and_then(|a| a.as_wp_cli_arguments()) {
-            run_wp_cli_command(["post", "list", POST_FIELDS_ARG, cli_arguments.as_str()])
+            run_wp_cli_command([
+                "post",
+                "list",
+                "--post_type=page",
+                PAGE_FIELDS_ARG,
+                cli_arguments.as_str(),
+            ])
         } else {
-            run_wp_cli_command(["post", "list", POST_FIELDS_ARG])
+            run_wp_cli_command(["post", "list", "--post_type=page", PAGE_FIELDS_ARG])
         };
-        serde_json::from_slice::<Vec<Self>>(&output.stdout)
-            .with_context(|| "Failed to parse `wp post list --format=json` into Vec<WpCliPost>")
+        serde_json::from_slice::<Vec<Self>>(&output.stdout).with_context(
+            || "Failed to parse `wp post list --post_type=page --format=json` into Vec<WpCliPage>",
+        )
     }
 }
