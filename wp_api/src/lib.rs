@@ -109,7 +109,7 @@ pub enum EnumFromStrParsingError {
     UnknownVariant { value: String },
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum JsonValue {
     Null,
