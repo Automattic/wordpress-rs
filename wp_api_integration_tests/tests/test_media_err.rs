@@ -1,5 +1,6 @@
 use wp_api::{
     auth::WpAuthenticationProvider,
+    cancellation::CancellationToken,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     prelude::*,
@@ -18,6 +19,7 @@ async fn create_media_err_cannot_create() {
             MEDIA_TEST_FILE_PATH.to_string(),
             MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
             None,
+            None,
         )
         .await
         .assert_wp_error(WpErrorCode::CannotCreate)
@@ -32,6 +34,7 @@ async fn create_media_err_upload_no_data() {
             MediaCreateParams::default(),
             MEDIA_TEST_FILE_PATH.to_string(),
             MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
+            None,
             None,
         )
         .await
@@ -199,6 +202,7 @@ impl RequestExecutor for MediaErrNetworking {
     async fn execute(
         &self,
         _request: Arc<WpNetworkRequest>,
+        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         Err(RequestExecutionError::RequestExecutionFailed {
             status_code: None,
@@ -212,6 +216,7 @@ impl RequestExecutor for MediaErrNetworking {
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
+        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         let mut request = self
             .client

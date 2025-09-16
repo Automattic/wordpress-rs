@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use wp_api::{prelude::*, request::endpoint::media_endpoint::MediaUploadRequest};
+use wp_api::{
+    cancellation::CancellationToken, prelude::*,
+    request::endpoint::media_endpoint::MediaUploadRequest,
+};
 
 #[derive(Debug)]
 pub struct MockExecutor {
@@ -27,6 +30,7 @@ impl RequestExecutor for MockExecutor {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
+        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         (self.execute_fn)(request)
     }
@@ -34,6 +38,7 @@ impl RequestExecutor for MockExecutor {
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
+        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         (self.upload_media_fn)(media_upload_request)
     }

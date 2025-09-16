@@ -1,6 +1,7 @@
 use crate::{
     api_client::IsWpApiClientDelegate,
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
+    cancellation::CancellationToken,
     request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
@@ -22,12 +23,18 @@ impl WpApiMiddlewarePipeline {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
         for middleware in &self.middlewares {
             response = middleware
-                .process(request_executor.clone(), response, request.clone())
+                .process(
+                    request_executor.clone(),
+                    response,
+                    request.clone(),
+                    cancellation_token.clone(),
+                )
                 .await?;
         }
 
@@ -71,6 +78,7 @@ pub trait WpApiMiddleware: Send + Sync + Debug {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
@@ -84,15 +92,20 @@ pub trait PerformsRequests {
     async fn perform(
         &self,
         request: Arc<WpNetworkRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let pipeline = &self.get_middleware_pipeline();
-        let response = self.get_request_executor().execute(request.clone()).await?;
+        let response = self
+            .get_request_executor()
+            .execute(request.clone(), cancellation_token.clone())
+            .await?;
 
         let response = pipeline
             .process(
                 self.get_request_executor().clone(),
                 response,
                 request.clone(),
+                cancellation_token.clone(),
             )
             .await?;
 
@@ -153,6 +166,7 @@ impl WpApiMiddleware for RetryAfterMiddleware {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
@@ -176,8 +190,11 @@ impl WpApiMiddleware for RetryAfterMiddleware {
                 )
                 .await;
             let new_request = Arc::new(request.clone_with_incremented_retry_count());
-            response = request_executor.execute(new_request.clone()).await?;
-            self.process(request_executor, response, new_request).await
+            response = request_executor
+                .execute(new_request.clone(), cancellation_token.clone())
+                .await?;
+            self.process(request_executor, response, new_request, cancellation_token)
+                .await
         } else {
             // We have no idea how long to wait so we shouldn't try
             Ok(response)
@@ -210,6 +227,7 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         if response.request_header_map.has_http_authentication() {
             // Request was already authenticated
@@ -225,6 +243,7 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
                 request
                     .adding_http_authentication(&self.username, &self.password)
                     .into(),
+                cancellation_token,
             )
             .await
     }
@@ -236,9 +255,12 @@ mod tests {
 
     mod api_discovery_authentication_middleware {
         use crate::{
-            api_error::MediaUploadRequestExecutionError, cancellation::CancellationToken, request::{
-                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl}, WpNetworkHeaderMap
-            }
+            api_error::MediaUploadRequestExecutionError,
+            cancellation::CancellationToken,
+            request::{
+                WpNetworkHeaderMap,
+                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
+            },
         };
 
         use super::*;
@@ -256,6 +278,7 @@ mod tests {
             async fn execute(
                 &self,
                 request: Arc<WpNetworkRequest>,
+                _cancellation_token: Option<Arc<CancellationToken>>,
             ) -> Result<WpNetworkResponse, RequestExecutionError> {
                 (self.execute_fn)(request)
             }
@@ -363,6 +386,7 @@ mod tests {
                         request_header_map: Arc::new(map.into()),
                     },
                     WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
+                    None,
                 )
                 .await
         }
@@ -371,9 +395,12 @@ mod tests {
     mod retry_after_middleware {
         use super::*;
         use crate::{
-            api_error::MediaUploadRequestExecutionError, cancellation::CancellationToken, request::{
-                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl}, WpNetworkHeaderMap
-            }
+            api_error::MediaUploadRequestExecutionError,
+            cancellation::CancellationToken,
+            request::{
+                WpNetworkHeaderMap,
+                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
+            },
         };
         use async_trait::async_trait;
         use http::HeaderMap;
@@ -390,6 +417,7 @@ mod tests {
             async fn execute(
                 &self,
                 _: Arc<WpNetworkRequest>,
+                _cancellation_token: Option<Arc<CancellationToken>>,
             ) -> Result<WpNetworkResponse, RequestExecutionError> {
                 if self.first_request.load(Ordering::Relaxed) {
                     println!("First mock request; returning 429..");
@@ -458,6 +486,7 @@ mod tests {
                     Arc::new(foo_executor),
                     rate_limit_exceeded_response(),
                     WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
+                    None,
                 )
                 .await
         }

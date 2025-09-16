@@ -79,7 +79,8 @@ private actor CounterMiddleware: Middleware {
     func process(
         requestExecutor: RequestExecutor,
         response: WpNetworkResponse,
-        request: WpNetworkRequest
+        request: WpNetworkRequest,
+        cancellationToken: CancellationToken?
     ) async throws -> WpNetworkResponse {
         count += 1
         return response

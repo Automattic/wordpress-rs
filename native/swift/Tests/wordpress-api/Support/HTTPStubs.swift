@@ -25,7 +25,10 @@ final class HTTPStubs: SafeRequestExecutor {
         self
     }
 
-    public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    public func execute(
+        _ request: WpNetworkRequest,
+        cancellationToken: CancellationToken?
+    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
             return .success(response)
         }

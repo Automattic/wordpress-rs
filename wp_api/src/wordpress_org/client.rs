@@ -134,7 +134,10 @@ impl WordPressOrgApiClient {
     where
         T: DeserializeOwned,
     {
-        let response = self.request_executor.execute(Arc::new(request)).await?;
+        let response = self
+            .request_executor
+            .execute(Arc::new(request), None)
+            .await?;
         Self::parse(response)
     }
 

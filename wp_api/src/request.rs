@@ -144,6 +144,7 @@ pub trait RequestExecutor: Send + Sync {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 
     async fn upload_media(
@@ -789,7 +790,7 @@ pub async fn fetch_authentication_state(
         ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider)
             .retrieve_current_with_edit_context()
             .into();
-    let response = request_executor.execute(request).await?;
+    let response = request_executor.execute(request, None).await?;
     let parsed_res: Result<
         ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
         WpApiError,

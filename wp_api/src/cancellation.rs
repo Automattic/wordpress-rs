@@ -37,7 +37,10 @@ impl CancellationToken {
         self.uuid.uuid_string()
     }
 
-    pub fn register_handler(&self, handler: Arc<dyn CancellationHandler>) -> Result<(), CancellationTokenError> {
+    pub fn register_handler(
+        &self,
+        handler: Arc<dyn CancellationHandler>,
+    ) -> Result<(), CancellationTokenError> {
         let mut handlers = self.handler.lock()?;
         handlers.push_back(handler);
         Ok(())
@@ -189,7 +192,12 @@ mod tests {
     impl TestHandler {
         fn new() -> (Self, std::sync::Arc<std::sync::atomic::AtomicBool>) {
             let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-            (Self { called: called.clone() }, called)
+            (
+                Self {
+                    called: called.clone(),
+                },
+                called,
+            )
         }
     }
 
@@ -255,9 +263,7 @@ mod tests {
         token.register_handler(Arc::new(handler)).unwrap();
 
         let token_for_wait = token.clone();
-        let wait_task = tokio::spawn(async move {
-            token_for_wait.wait_for_cancellation().await
-        });
+        let wait_task = tokio::spawn(async move { token_for_wait.wait_for_cancellation().await });
 
         sleep(Duration::from_millis(10)).await;
         assert!(!wait_task.is_finished());
