@@ -12,7 +12,8 @@ import Combine
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
     func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest
+        mediaUploadRequest: MediaUploadRequest,
+        cancellationToken: CancellationToken?
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
 
     #if PROGRESS_REPORTING_ENABLED
@@ -28,8 +29,8 @@ extension SafeRequestExecutor {
         return try result.get()
     }
 
-    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest)
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest, cancellationToken: CancellationToken?) async throws -> WpNetworkResponse {
+        let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest, cancellationToken: cancellationToken)
         return try result.get()
     }
 }
@@ -39,6 +40,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     private let executorDelegate: RequestExecutorDelegate
 
     private let additionalHttpHeadersForAllRequests: [String: String]
+
+    private let cancellationHandlers = CancellationHandlers()
 
     public init(
         urlSession: URLSession,
@@ -60,9 +63,19 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     public func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest
+        mediaUploadRequest: MediaUploadRequest,
+        cancellationToken: CancellationToken?
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        (await perform(mediaUploadRequest))
+        if let cancellationToken {
+            let requestId = mediaUploadRequest.requestId()
+            await cancellationHandlers.whenCancelling(cancellationToken) {
+                Task { [weak self] in
+                    await self?.cancelRequest(withId: requestId)
+                }
+            }
+        }
+
+        let result = (await perform(mediaUploadRequest))
             .mapError { error in
                 switch error {
                 case let .RequestExecutionFailed(statusCode, redirects, reason):
@@ -73,6 +86,12 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                     )
                 }
             }
+
+        if let cancellationToken {
+            await cancellationHandlers.remove(cancellationToken)
+        }
+
+        return result
     }
 
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -130,6 +149,24 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .eraseToAnyPublisher()
     }
 #endif
+
+    private func cancelRequest(withId requestId: String) async {
+        var task = (await self.session.allTasks).first {
+            $0.originalRequest?.requestId == requestId
+        }
+
+        if task == nil {
+            task = await NotificationCenter.default
+                .publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
+                .compactMap { $0.object as? URLSessionTask }
+                .first { $0.originalRequest?.requestId == requestId }
+                .timeout(.seconds(1), scheduler: DispatchQueue.global())
+                .values
+                .first { _ in true }
+        }
+
+        task?.cancel()
+    }
 
     private func handleHttpsError(
         _ error: Error,
@@ -392,4 +429,38 @@ extension MediaUploadRequest: NetworkRequestContent {
         #endif
     }
 
+}
+
+private actor CancellationHandlers {
+    private var handlers: [String /* CancellationToken.uuid */: [RequestCancellationHandler]] = [:]
+
+    func whenCancelling(_ token: CancellationToken, closure: @escaping @Sendable () -> Void) {
+        let handler = RequestCancellationHandler(closure: closure)
+        handlers[token.uuid(), default: []].append(handler)
+        try? token.registerHandler(handler: handler)
+    }
+
+    func remove(_ token: CancellationToken) {
+        handlers.removeValue(forKey: token.uuid())
+    }
+}
+
+private final class RequestCancellationHandler: CancellationHandler, Hashable {
+    let closure: @Sendable () -> Void
+
+    init(closure: @escaping @Sendable () -> Void) {
+        self.closure = closure
+    }
+
+    func cancelled() {
+        self.closure()
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self))
+    }
+
+    static func == (lhs: RequestCancellationHandler, rhs: RequestCancellationHandler) -> Bool {
+        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+    }
 }

@@ -5,6 +5,7 @@ use crate::{
         RequestExecutionErrorReason, WpApiError, WpErrorCode,
     },
     auth::WpAuthenticationProvider,
+    cancellation::CancellationToken,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
@@ -148,6 +149,7 @@ pub trait RequestExecutor: Send + Sync {
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
+        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
 
     async fn sleep(&self, millis: u64);

@@ -13,6 +13,7 @@ pub mod api_client;
 pub mod api_error;
 pub mod application_passwords;
 pub mod auth;
+pub mod cancellation;
 pub mod categories;
 pub mod comments;
 pub mod date;

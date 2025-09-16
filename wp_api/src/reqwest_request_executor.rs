@@ -2,12 +2,9 @@ use crate::{
     api_error::{
         InvalidSslErrorReason, MediaUploadRequestExecutionError, RequestExecutionError,
         RequestExecutionErrorReason,
-    },
-    request::{
-        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
-        WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
-        user_agent,
-    },
+    }, cancellation::CancellationToken, request::{
+        endpoint::media_endpoint::MediaUploadRequest, user_agent, NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse
+    }
 };
 use async_trait::async_trait;
 use h2::Error as Http2Error;
@@ -150,6 +147,7 @@ impl RequestExecutor for ReqwestRequestExecutor {
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
+        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         self.upload_media_request(media_upload_request)
             .await

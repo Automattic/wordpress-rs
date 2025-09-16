@@ -2,7 +2,10 @@ use crate::{
     WpAppNotifier, api_client_generate_api_client, api_client_generate_endpoint_impl,
     api_client_generate_request_builder,
     auth::WpAuthenticationProvider,
+    cancellation::CancellationToken,
+    media::MediaCreateParams,
     middleware::WpApiMiddlewarePipeline,
+    prelude::WpApiError,
     request::{
         RequestExecutor,
         endpoint::{
@@ -12,7 +15,9 @@ use crate::{
             },
             categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
-            media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
+            media_endpoint::{
+                MediaRequestBuilder, MediaRequestCreateResponse, MediaRequestExecutor,
+            },
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
@@ -32,6 +37,7 @@ use crate::{
             },
         },
     },
+    uuid::WpUuid,
 };
 use std::sync::Arc;
 
@@ -118,6 +124,29 @@ impl UniffiWpApiClient {
         Self {
             inner: WpApiClient::new(api_url_resolver, delegate),
         }
+    }
+}
+
+#[uniffi::export]
+impl UniffiWpApiClient {
+    async fn create_media(
+        &self,
+        params: MediaCreateParams,
+        file_path: String,
+        file_content_type: String,
+        request_id: Option<Arc<WpUuid>>,
+        cancellation_token: Option<Arc<CancellationToken>>,
+    ) -> Result<MediaRequestCreateResponse, WpApiError> {
+        self.inner
+            .media
+            .create(
+                params,
+                file_path,
+                file_content_type,
+                request_id,
+                cancellation_token,
+            )
+            .await
     }
 }
 

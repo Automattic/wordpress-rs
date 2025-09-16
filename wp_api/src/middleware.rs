@@ -236,11 +236,9 @@ mod tests {
 
     mod api_discovery_authentication_middleware {
         use crate::{
-            api_error::MediaUploadRequestExecutionError,
-            request::{
-                WpNetworkHeaderMap,
-                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
-            },
+            api_error::MediaUploadRequestExecutionError, cancellation::CancellationToken, request::{
+                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl}, WpNetworkHeaderMap
+            }
         };
 
         use super::*;
@@ -265,6 +263,7 @@ mod tests {
             async fn upload_media(
                 &self,
                 _: Arc<MediaUploadRequest>,
+                _cancellation_token: Option<Arc<CancellationToken>>,
             ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
                 Err(MediaUploadRequestExecutionError::RequestExecutionFailed {
                     status_code: None,
@@ -372,11 +371,9 @@ mod tests {
     mod retry_after_middleware {
         use super::*;
         use crate::{
-            api_error::MediaUploadRequestExecutionError,
-            request::{
-                WpNetworkHeaderMap,
-                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
-            },
+            api_error::MediaUploadRequestExecutionError, cancellation::CancellationToken, request::{
+                endpoint::{media_endpoint::MediaUploadRequest, WpEndpointUrl}, WpNetworkHeaderMap
+            }
         };
         use async_trait::async_trait;
         use http::HeaderMap;
@@ -413,6 +410,7 @@ mod tests {
             async fn upload_media(
                 &self,
                 _: Arc<MediaUploadRequest>,
+                _cancellation_token: Option<Arc<CancellationToken>>,
             ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
                 Err(MediaUploadRequestExecutionError::RequestExecutionFailed {
                     status_code: None,
