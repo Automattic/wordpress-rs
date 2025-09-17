@@ -113,6 +113,16 @@ steps:
         depends_on: xcframework
         agents:
           queue: mac
+      - label: ":swift: Validate Package.resolved"
+        command: |
+          .buildkite/download-xcframework.sh
+          echo "--- :swift: Validate Package.resolved"
+          swift package resolve
+          git diff --exit-code
+        depends_on: xcframework
+        agents:
+          queue: mac
+
       - label: ":swift: Example Apps"
         command: |
           .buildkite/download-xcframework.sh
