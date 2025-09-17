@@ -74,10 +74,7 @@ steps:
           zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
         artifact_paths:
           - target/libwordpressFFI.xcframework.zip
-          - native/swift/Sources/wordpress-api-wrapper/wp_api.swift
-          - native/swift/Sources/wordpress-api-wrapper/wp_localization.swift
-          - native/swift/Sources/wordpress-api-wrapper/wp_com.swift
-          - native/swift/Sources/wordpress-api-wrapper/jetpack.swift
+          - native/swift/Sources/wordpress-api-wrapper/*.swift
         agents:
           queue: mac
       - label: ":swift: Build Docs"
