@@ -4,6 +4,8 @@ import Testing
 @testable import WordPressAPI
 @testable import WordPressAPIInternal
 
+#if os(macOS)
+
 struct CancellationTests {
     let api = WordPressAPI.admin()
 
@@ -31,3 +33,5 @@ struct CancellationTests {
         try await restoreTestServer()
     }
 }
+
+#endif

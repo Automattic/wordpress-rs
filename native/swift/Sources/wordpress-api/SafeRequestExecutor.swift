@@ -170,6 +170,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 #endif
 
     private func cancelRequest(withId requestId: String) async {
+#if canImport(Combine)
         var task = (await self.session.allTasks).first {
             $0.originalRequest?.requestId == requestId
         }
@@ -185,6 +186,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         }
 
         task?.cancel()
+#endif
     }
 
     private func handleHttpsError(
