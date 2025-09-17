@@ -116,11 +116,11 @@ fn generate_async_request_executor(
                }
             };
 
-            exported.push(cancellable);
-
-            if cfg!(feature = "without-uncancellable-endpoints") {
+            if cfg!(feature = "export-uncancellable-endpoints") {
+                exported.push(cancellable);
                 unexported.push(uncancellable);
             } else {
+                unexported.push(cancellable);
                 exported.push(uncancellable);
             }
 
