@@ -10,7 +10,10 @@ import Combine
 #endif
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
-    func execute(_ request: WpNetworkRequest, cancellationToken: CancellationToken?) async -> Result<WpNetworkResponse, RequestExecutionError>
+    func execute(
+        _ request: WpNetworkRequest,
+        cancellationToken: CancellationToken?
+    ) async -> Result<WpNetworkResponse, RequestExecutionError>
     func uploadMedia(
         mediaUploadRequest: MediaUploadRequest,
         cancellationToken: CancellationToken?
@@ -24,12 +27,18 @@ public protocol SafeRequestExecutor: RequestExecutor, Sendable {
 }
 
 extension SafeRequestExecutor {
-    public func execute(request: WpNetworkRequest, cancellationToken: CancellationToken?) async throws -> WpNetworkResponse {
+    public func execute(
+        request: WpNetworkRequest,
+        cancellationToken: CancellationToken?
+    ) async throws -> WpNetworkResponse {
         let result = await execute(request, cancellationToken: cancellationToken)
         return try result.get()
     }
 
-    public func uploadMedia(mediaUploadRequest: MediaUploadRequest, cancellationToken: CancellationToken?) async throws -> WpNetworkResponse {
+    public func uploadMedia(
+        mediaUploadRequest: MediaUploadRequest,
+        cancellationToken: CancellationToken?
+    ) async throws -> WpNetworkResponse {
         let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest, cancellationToken: cancellationToken)
         return try result.get()
     }
@@ -58,7 +67,10 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         self.additionalHttpHeadersForAllRequests = headers
     }
 
-    public func execute(_ request: WpNetworkRequest, cancellationToken: CancellationToken?) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    public func execute(
+        _ request: WpNetworkRequest,
+        cancellationToken: CancellationToken?
+    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         await perform(request, cancellationToken: cancellationToken)
     }
 
@@ -79,7 +91,10 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             }
     }
 
-    func perform(_ request: NetworkRequestContent, cancellationToken: CancellationToken?) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    func perform(
+        _ request: NetworkRequestContent,
+        cancellationToken: CancellationToken?
+    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let cancellationToken {
             let requestId = request.requestId()
             await cancellationHandlers.whenCancelling(cancellationToken) {

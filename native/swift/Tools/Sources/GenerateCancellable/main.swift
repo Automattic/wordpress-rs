@@ -18,7 +18,7 @@ struct GenerateCancellable: ParsableCommand {
     @Argument(help: "Output file path for generated extensions")
     var output: String
 
-    @Option(name: .long, help: "Set log level (trace, debug, info, notice, warning, error, critical)")
+    @Option(name: .long, help: "Set log level (debug, info, notice, warning, error, critical)")
     var logLevel: String = "info"
 
     mutating func run() throws {
@@ -127,8 +127,12 @@ class CancellationAnalyzer: SyntaxVisitor {
                 existingFunctions: currentExistingFunctions
             )
 
-            logger.debug("Found \(currentCancellationFunctions.count) cancellation functions in \(className)")
-            logger.debug("Found \(currentExistingFunctions.count) existing functions in \(className)")
+            logger.debug(
+                "Found \(currentCancellationFunctions.count) cancellation functions in \(className)"
+            )
+            logger.debug(
+                "Found \(currentExistingFunctions.count) existing functions in \(className)"
+            )
 
             currentClass = nil
         }
@@ -226,16 +230,18 @@ class ExtensionGenerator {
         var members: [MemberBlockItemSyntax] = []
 
         for cancellationFunc in classAnalysis.cancellationFunctions {
-            let nonCancellationName = String(cancellationFunc.name.dropLast("Cancellation".count))
+            let funcName = String(cancellationFunc.name.dropLast("Cancellation".count))
 
-            if classAnalysis.existingFunctions[nonCancellationName] != nil {
-                logger.warning("Skipping generation of '\(nonCancellationName)' - function already exists in \(classAnalysis.className)")
+            if classAnalysis.existingFunctions[funcName] != nil {
+                logger.warning(
+                    "Skipping generation of '\(funcName)' - function already exists in \(classAnalysis.className)"
+                )
                 continue
             }
 
-            logger.debug("Generating new function: \(nonCancellationName)")
+            logger.debug("Generating new function: \(funcName)")
 
-            let newFunction = createNonCancellationFunction(from: cancellationFunc, name: nonCancellationName)
+            let newFunction = createNonCancellationFunction(from: cancellationFunc, name: funcName)
             let memberItem = MemberBlockItemSyntax(
                 decl: DeclSyntax(newFunction),
                 trailingTrivia: .newline
@@ -246,7 +252,10 @@ class ExtensionGenerator {
         return members
     }
 
-    private func createNonCancellationFunction(from cancellationFunc: FunctionInfo, name: String) -> FunctionDeclSyntax {
+    private func createNonCancellationFunction(
+        from cancellationFunc: FunctionInfo,
+        name: String
+    ) -> FunctionDeclSyntax {
         var parametersWithoutCancellation: FunctionParameterListSyntax
 
         if cancellationFunc.parameters.isEmpty || cancellationFunc.parameters.count == 1 {

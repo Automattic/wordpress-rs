@@ -106,13 +106,23 @@ struct MediaTests {
             performing: {
                 let requestId = WpUuid()
                 let task = Task {
-                    _ = try await api.media.create(params: .init(), filePath: file.path(), fileContentType: "image/jpg", requestId: requestId, cancellationToken: nil)
+                    _ = try await api.media.create(
+                        params: .init(),
+                        filePath: file.path(),
+                        fileContentType: "image/jpg",
+                        requestId: requestId,
+                        cancellationToken: nil
+                    )
                 }
 
-                let progress = try await api.requestExecutor.progress(forRequestWithId: requestId.uuidString()).values.first { _ in true }
-                let cancellable = progress!.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
-                    task.cancel()
-                }
+                let progress = try await api.requestExecutor
+                    .progress(forRequestWithId: requestId.uuidString())
+                    .values
+                    .first { _ in true }
+                let cancellable = progress!
+                    .publisher(for: \.fractionCompleted)
+                    .first { $0 > 0 }
+                    .sink { _ in task.cancel() }
                 defer { cancellable.cancel() }
 
                 try await task.value
@@ -130,10 +140,18 @@ struct MediaTests {
             performing: {
                 let requestId = WpUuid()
                 let task = Task {
-                    _ = try await api.createMedia(params: .init(), filePath: file.path(), fileContentType: "image/jpg", requestId: requestId)
+                    _ = try await api.createMedia(
+                        params: .init(),
+                        filePath: file.path(),
+                        fileContentType: "image/jpg",
+                        requestId: requestId
+                    )
                 }
 
-                let progress = try await api.requestExecutor.progress(forRequestWithId: requestId.uuidString()).values.first { _ in true }
+                let progress = try await api.requestExecutor
+                    .progress(forRequestWithId: requestId.uuidString())
+                    .values
+                    .first { _ in true }
                 let cancellable = progress!.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
                     task.cancel()
                 }

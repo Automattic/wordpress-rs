@@ -201,10 +201,21 @@ public actor WordPressAPI {
     }
 #endif
 
-    public func createMedia(params: MediaCreateParams, filePath: String, fileContentType: String, requestId: WpUuid?) async throws -> MediaRequestCreateResponse {
+    public func createMedia(
+        params: MediaCreateParams,
+        filePath: String,
+        fileContentType: String,
+        requestId: WpUuid?
+    ) async throws -> MediaRequestCreateResponse {
         let cancellation = CancellationToken()
         return try await withTaskCancellationHandler {
-            try await media.create(params: params, filePath: filePath, fileContentType: fileContentType, requestId: requestId, cancellationToken: cancellation)
+            try await media.create(
+                params: params,
+                filePath: filePath,
+                fileContentType: fileContentType,
+                requestId: requestId,
+                cancellationToken: cancellation
+            )
         } onCancel: {
             do {
                 try cancellation.cancel()
@@ -212,7 +223,6 @@ public actor WordPressAPI {
                 NSLog("Failed to cancel \(#function): \(error)")
             }
         }
-
     }
 
     enum ParseError: Error {
