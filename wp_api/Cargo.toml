@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+without-uncancellable-endpoints = ["wp_derive_request_builder/without-uncancellable-endpoints"]
 integration-tests = []
 reqwest-request-executor = ["dep:reqwest", "dep:tokio", "dep:hyper-util", "dep:rustls", "dep:hickory-resolver", "dep:hyper", "dep:h2"]
 
