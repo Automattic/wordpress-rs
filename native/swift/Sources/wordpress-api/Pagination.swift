@@ -205,6 +205,28 @@ extension PostsRequestExecutor: PaginationAwareExecutor {
     public typealias EmbedContextResponseType = PostsRequestListWithEmbedContextResponse
 }
 
+// MARK: - Pages
+extension PagesRequestListWithEditContextResponse: PaginatableResponse {
+    public typealias ParamsType = PageListParams
+    public typealias DataType = PageWithEditContext
+}
+
+extension PagesRequestListWithViewContextResponse: PaginatableResponse {
+    public typealias ParamsType = PageListParams
+    public typealias DataType = PageWithViewContext
+}
+
+extension PagesRequestListWithEmbedContextResponse: PaginatableResponse {
+    public typealias ParamsType = PageListParams
+    public typealias DataType = PageWithEmbedContext
+}
+
+extension PagesRequestExecutor: PaginationAwareExecutor {
+    public typealias EditContextResponseType = PagesRequestListWithEditContextResponse
+    public typealias ViewContextResponseType = PagesRequestListWithViewContextResponse
+    public typealias EmbedContextResponseType = PagesRequestListWithEmbedContextResponse
+}
+
 // MARK: - Media
 extension MediaRequestListWithEditContextResponse: PaginatableResponse, @unchecked Sendable {
     public typealias ParamsType = MediaListParams
