@@ -117,6 +117,10 @@ public actor WordPressAPI {
         self.requestBuilder.posts()
     }
 
+    public var pages: PagesRequestExecutor {
+        self.requestBuilder.pages()
+    }
+
     public var comments: CommentsRequestExecutor {
         self.requestBuilder.comments()
     }

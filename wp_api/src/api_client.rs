@@ -13,6 +13,7 @@ use crate::{
             categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
+            pages_endpoint::{PagesRequestBuilder, PagesRequestExecutor},
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
@@ -59,6 +60,7 @@ pub struct WpApiRequestBuilder {
     categories: Arc<CategoriesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
+    pages: Arc<PagesRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
@@ -88,6 +90,7 @@ impl WpApiRequestBuilder {
             categories,
             comments,
             media,
+            pages,
             plugins,
             post_revisions,
             post_types,
@@ -127,6 +130,7 @@ pub struct WpApiClient {
     categories: Arc<CategoriesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
+    pages: Arc<PagesRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
@@ -153,6 +157,7 @@ impl WpApiClient {
             categories,
             comments,
             media,
+            pages,
             plugins,
             post_revisions,
             post_types,
@@ -189,6 +194,7 @@ api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, categories);
 api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);
+api_client_generate_endpoint_impl!(WpApi, pages);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
 api_client_generate_endpoint_impl!(WpApi, post_types);

@@ -131,6 +131,11 @@ create_test_credentials () {
   PASSWORD_PROTECTED_POST_ID="$(wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected --porcelain)"
   TRASHED_POST_ID="$(wp post create --post_type=post --post_title=Trashed_Post --porcelain)"
 
+  # Create test pages
+  PASSWORD_PROTECTED_PAGE_ID="$(wp post create --post_type=page --post_password=INTEGRATION_TEST --post_title=Password_Protected_Page --porcelain)"
+  TRASHED_PAGE_ID="$(wp post create --post_type=page --post_title=Trashed_Page --porcelain)"
+  FIRST_PAGE_ID="$(wp post list --post_type=page --posts_per_page=1 --orderby=ID --order=ASC --format=ids)"
+
   PASSWORD_PROTECTED_COMMENT_AUTHOR="setup-test-site.sh"
   PASSWORD_PROTECTED_COMMENT_ID="$(wp comment create --comment_post_ID="$PASSWORD_PROTECTED_POST_ID" --comment_content="test_comment_for_password_protected_post" --comment_author="$PASSWORD_PROTECTED_COMMENT_AUTHOR" --porcelain)"
 
@@ -140,8 +145,9 @@ create_test_credentials () {
 
   INTEGRATION_TEST_CUSTOM_TEMPLATE_SLUG="integration_test_custom_template"
 
-  # Trash the post
+  # Trash the post and page
   wp post delete "$TRASHED_POST_ID"
+  wp post delete "$TRASHED_PAGE_ID"
 
   echo "Creating a custom template for integration tests.."
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates > /dev/null
@@ -193,6 +199,11 @@ create_test_credentials () {
     revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \
     autosaved_post_id="$AUTOSAVED_POST_ID" \
     autosave_id_for_autosaved_post_id="$AUTOSAVE_ID_FOR_AUTOSAVED_POST_ID" \
+    password_protected_page_id="$PASSWORD_PROTECTED_PAGE_ID" \
+    password_protected_page_password="INTEGRATION_TEST" \
+    password_protected_page_title="Password_Protected_Page" \
+    trashed_page_id="$TRASHED_PAGE_ID" \
+    first_page_id="$FIRST_PAGE_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials

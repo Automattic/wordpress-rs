@@ -7,6 +7,7 @@ pub mod application_passwords_endpoint;
 pub mod categories_endpoint;
 pub mod comments_endpoint;
 pub mod media_endpoint;
+pub mod pages_endpoint;
 pub mod plugins_endpoint;
 pub mod post_autosaves_endpoint;
 pub mod post_revisions_endpoint;

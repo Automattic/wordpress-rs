@@ -137,6 +137,12 @@ extension PostWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension PageWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.title.rendered, subtitle: "", fields: [:])
+    }
+}
+
 extension MediaWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         let details = self.mediaDetails.parseAsMimeType(mimeType: self.mimeType)

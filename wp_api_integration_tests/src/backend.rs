@@ -1,9 +1,11 @@
 use serde::{Serialize, de::DeserializeOwned};
 use wp_api::{
-    categories::CategoryId, comments::CommentId, posts::PostId, tags::TagId, users::UserId,
+    categories::CategoryId, comments::CommentId, pages::PageId, posts::PostId, tags::TagId,
+    users::UserId,
 };
 use wp_cli::{
-    WpCliCategory, WpCliComment, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta,
+    WpCliCategory, WpCliComment, WpCliPage, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser,
+    WpCliUserMeta,
 };
 
 const BACKEND_ADDRESS: &str = "http://127.0.0.1:4000";
@@ -13,6 +15,8 @@ const BACKEND_PATH_CATEGORIES: &str = "/wp-cli/categories";
 const BACKEND_PATH_COMMENT: &str = "/wp-cli/comment";
 const BACKEND_PATH_COMMENTS: &str = "/wp-cli/comments";
 const BACKEND_PATH_SITE_SETTINGS: &str = "/wp-cli/site-settings";
+const BACKEND_PATH_PAGE: &str = "/wp-cli/page";
+const BACKEND_PATH_PAGES: &str = "/wp-cli/pages";
 const BACKEND_PATH_POST: &str = "/wp-cli/post";
 const BACKEND_PATH_POSTS: &str = "/wp-cli/posts";
 const BACKEND_PATH_TAG: &str = "/wp-cli/tag";
@@ -56,6 +60,21 @@ impl Backend {
     }
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await
+    }
+    pub async fn page(page_id: &PageId) -> WpCliPage {
+        Self::get(format!("{BACKEND_PATH_PAGE}?page_id={page_id}"))
+            .await
+            .expect("Failed to parse fetched page from wp_cli")
+    }
+    pub async fn pages(post_status: Option<&str>) -> Vec<WpCliPage> {
+        let url = if let Some(post_status) = post_status {
+            format!("{BACKEND_PATH_PAGES}?post_status={post_status}")
+        } else {
+            BACKEND_PATH_PAGES.to_string()
+        };
+        Self::get(url)
+            .await
+            .expect("Failed to parse fetched pages from wp_cli")
     }
     pub async fn post(post_id: &PostId) -> WpCliPost {
         Self::get(format!("{BACKEND_PATH_POST}?post_id={post_id}"))
