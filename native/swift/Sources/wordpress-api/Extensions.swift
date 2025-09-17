@@ -73,3 +73,28 @@ extension WpApiError {
         return false
     }
 }
+
+extension MediaRequestExecutor {
+    public func create(
+        params: MediaCreateParams,
+        filePath: String,
+        fileContentType: String,
+    ) async throws -> MediaRequestCreateResponse {
+        let cancellation = CancellationToken()
+        return try await withTaskCancellationHandler {
+            try await create(
+                params: params,
+                filePath: filePath,
+                fileContentType: fileContentType,
+                requestId: nil,
+                cancellationToken: cancellation
+            )
+        } onCancel: {
+            do {
+                try cancellation.cancel()
+            } catch {
+                NSLog("Failed to cancel \(#function): \(error)")
+            }
+        }
+    }
+}
