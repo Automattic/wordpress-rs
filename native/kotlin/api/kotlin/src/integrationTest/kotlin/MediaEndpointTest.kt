@@ -70,6 +70,7 @@ class MediaEndpointTest {
                 params = MediaCreateParams(title = title),
                 "test_media.jpg",
                 "image/jpeg",
+                null,
                 null
             )
         }.assertSuccessAndRetrieveData().data

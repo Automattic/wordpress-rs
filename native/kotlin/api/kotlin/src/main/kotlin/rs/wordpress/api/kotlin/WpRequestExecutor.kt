@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import uniffi.wp_api.CancellationToken
 import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
@@ -38,7 +39,7 @@ class WpRequestExecutor(
     private val fileResolver: FileResolver = DefaultFileResolver(),
     private val uploadListener: UploadListener? = null
 ) : RequestExecutor {
-    override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
+    override suspend fun execute(request: WpNetworkRequest, cancellationToken: CancellationToken?): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
             val wpNetworkRequestBody = request.body()?.contents()?.toRequestBody()
@@ -84,7 +85,7 @@ class WpRequestExecutor(
             }
         }
 
-    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse =
+    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest, cancellationToken: CancellationToken?): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(mediaUploadRequest.url())
             val multipartBodyBuilder = MultipartBody.Builder()
