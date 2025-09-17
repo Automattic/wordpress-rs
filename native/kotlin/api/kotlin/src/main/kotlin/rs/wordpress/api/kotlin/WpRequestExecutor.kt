@@ -39,7 +39,10 @@ class WpRequestExecutor(
     private val fileResolver: FileResolver = DefaultFileResolver(),
     private val uploadListener: UploadListener? = null
 ) : RequestExecutor {
-    override suspend fun execute(request: WpNetworkRequest, cancellationToken: CancellationToken?): WpNetworkResponse =
+    override suspend fun execute(
+        request: WpNetworkRequest,
+        cancellationToken: CancellationToken?
+    ): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
             val wpNetworkRequestBody = request.body()?.contents()?.toRequestBody()
@@ -85,7 +88,10 @@ class WpRequestExecutor(
             }
         }
 
-    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest, cancellationToken: CancellationToken?): WpNetworkResponse =
+    override suspend fun uploadMedia(
+        mediaUploadRequest: MediaUploadRequest,
+        cancellationToken: CancellationToken?
+    ): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(mediaUploadRequest.url())
             val multipartBodyBuilder = MultipartBody.Builder()
