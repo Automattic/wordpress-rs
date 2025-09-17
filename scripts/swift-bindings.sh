@@ -55,7 +55,7 @@ for swift_file in native/swift/Sources/wordpress-api-wrapper/*.swift; do
     basename=$(basename "$swift_file" .swift)
     output_file="native/swift/Sources/wordpress-api-wrapper/${basename}_cancellable.swift"
 
-    xcrun swift run -c release --quiet \
+    swift run -c release --quiet \
         --package-path native/swift/Tools \
         generate-cancellable --log-level warning "$swift_file" "$output_file"
 done
