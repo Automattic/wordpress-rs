@@ -93,7 +93,7 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
     dependsOn(rootProject.tasks.named("cargoBuildLibraryRelease"))
     workingDir(project.rootDir)
     commandLine(
-        "cargo",
+        rootProject.ext.get("cargoBinaryPath")!!,
         "run",
         "--release",
         "--bin",

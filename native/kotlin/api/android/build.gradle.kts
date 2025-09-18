@@ -86,6 +86,8 @@ dependencies {
 val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")!!
 val moduleName = "wp_api"
 cargo {
+    cargoCommand = rootProject.ext.get("cargoBinaryPath").toString()
+    rustcCommand = rootProject.ext.get("rustcBinaryPath").toString()
     module = "$cargoProjectRoot/$moduleName/"
     libname = moduleName
     profile = "release"

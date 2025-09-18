@@ -47,12 +47,17 @@ allprojects {
     }
 }
 
+val cargoBinaryPath = resolveBinary("cargo")
+val rustcBinaryPath = resolveBinary("rustc")
 val cargoProjectRoot = "${project.rootDir}/../.."
 val jniLibsPath = "${layout.buildDirectory.get()}/jniLibs/"
 val generatedTestResourcesPath = "${layout.buildDirectory.get()}/generatedTestResources/"
 val rustModuleName = "wp_api"
 val nativeLibraryPath =
     "$cargoProjectRoot/target/release/lib${rustModuleName}${getNativeLibraryExtension()}"
+
+rootProject.ext.set("cargoBinaryPath", cargoBinaryPath)
+rootProject.ext.set("rustcBinaryPath", rustcBinaryPath)
 rootProject.ext.set("cargoProjectRoot", cargoProjectRoot)
 rootProject.ext.set("jniLibsPath", jniLibsPath)
 rootProject.ext.set("generatedTestResourcesPath", generatedTestResourcesPath)
@@ -68,7 +73,7 @@ fun setupJniAndBindings() {
 
     val cargoBuildLibraryReleaseTask = tasks.register<Exec>("cargoBuildLibraryRelease") {
         workingDir(rootProject.ext.get("cargoProjectRoot")!!)
-        commandLine("cargo", "build", "--package", rustModuleName, "--release")
+        commandLine(cargoBinaryPath, "build", "--package", rustModuleName, "--release")
         // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
     }
 
@@ -99,6 +104,16 @@ fun setupJniAndBindings() {
         from("$cargoProjectRoot/test-data/integration-test-responses/localhost-json-root.json")
         into(generatedTestResourcesPath)
     }
+}
+
+fun resolveBinary(name: String): String {
+    val process = ProcessBuilder().apply {
+        command(listOf("which", name))
+    }.start()
+
+    process.waitFor()
+
+    return process.inputReader().readText().trim()
 }
 
 fun getNativeLibraryExtension(): String {
