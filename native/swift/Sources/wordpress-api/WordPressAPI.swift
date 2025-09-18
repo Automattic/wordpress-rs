@@ -145,6 +145,10 @@ public actor WordPressAPI {
         self.requestBuilder.categories()
     }
 
+    public var blockEditor: WpBlockEditorRequestExecutor {
+        self.requestBuilder.wpBlockEditor()
+    }
+
 #if PROGRESS_REPORTING_ENABLED
     public func uploadMedia(
         params: MediaCreateParams,
