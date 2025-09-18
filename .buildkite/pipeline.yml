@@ -204,6 +204,27 @@ steps:
         agents:
           queue: android
 
+  # Android Group
+  - group: ":android: Android"
+    key: "android"
+    steps:
+      - label: ":android: Build Example App"
+        plugins: [$CI_TOOLKIT]
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+          make setup-rust-android-targets
+
+          echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
+          ./native/kotlin/gradlew -p native/kotlin :example:composeApp:assembleDebug
+        agents:
+          queue: android
+
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
