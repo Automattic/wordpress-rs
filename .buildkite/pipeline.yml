@@ -204,10 +204,6 @@ steps:
         agents:
           queue: android
 
-  # Android Group
-  - group: ":android: Android"
-    key: "android"
-    steps:
       - label: ":android: Build Example App"
         plugins: [$CI_TOOLKIT]
         command: |
@@ -220,7 +216,7 @@ steps:
           make setup-rust
           make setup-rust-android-targets
 
-          echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
+          echo "--- :android: Building Sample App"
           ./native/kotlin/gradlew -p native/kotlin :example:composeApp:assembleDebug
         agents:
           queue: android
