@@ -71,6 +71,8 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
+wp plugin install gutenberg --activate
+
 # Install custom must-use plugins for integration tests
 mkdir -p wp-content/mu-plugins
 cp /app/scripts/setup-test-site-custom-plugins/*.php wp-content/mu-plugins/

@@ -40,6 +40,7 @@ pub mod uuid;
 pub mod widget_types;
 pub mod widgets;
 pub mod wordpress_org;
+pub mod wp_block_editor;
 pub mod wp_content_macros;
 pub mod wp_site_health_tests;
 
@@ -78,14 +79,19 @@ impl WpContext {
     Copy,
     PartialEq,
     Eq,
+    Serialize,
+    Deserialize,
     uniffi::Enum,
     strum_macros::EnumString,
     strum_macros::Display,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum WpApiParamOrder {
+    #[serde(alias = "asc")]
     #[default]
     Asc,
+
+    #[serde(alias = "desc")]
     Desc,
 }
 
