@@ -6,6 +6,7 @@ use users::*;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
+pub mod cache;
 pub mod jetpack;
 pub mod wp_com;
 

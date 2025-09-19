@@ -32,6 +32,11 @@ extension $error_type: LocalizedError {
 }
 EOF
     done
+
+    # Use sed to replace `import SQLite3` with the wrapped version
+  sed -i.bak 's/^import SQLite3$/#if canImport(SQLite3)\
+import SQLite3\
+#endif/' $swift_binding
 }
 
 for swift_binding in "$output_dir"/*.swift; do
