@@ -101,6 +101,10 @@ public actor WordPressAPI {
         self.requestBuilder.plugins()
     }
 
+    public var apiRoot: ApiRootRequestExecutor {
+        self.requestBuilder.apiRoot()
+    }
+
     public var applicationPasswords: ApplicationPasswordsRequestExecutor {
         self.requestBuilder.applicationPasswords()
     }
