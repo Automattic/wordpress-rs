@@ -94,7 +94,7 @@ pub struct WpEndpointArg {
     #[serde(deserialize_with = "deserialize_string_vec_or_string_as_option")]
     #[serde(default)]
     pub r#type: Option<Vec<String>>,
-    pub r#enum: Option<Vec<String>>,
+    pub r#enum: Option<Vec<JsonValue>>,
     // There are many other fields that are specific to the type of argument. These are not currently supported because
     // they're likely to be of limited value to library users. We're open to adding them if there's a demand for them.
 }
@@ -463,6 +463,7 @@ mod tests {
     #[case("api-details/test-case-01.json")]
     #[case("api-details/test-case-02.json")]
     #[case("api-details/test-case-03.json")]
+    #[case("api-details/test-case-04.json")]
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
