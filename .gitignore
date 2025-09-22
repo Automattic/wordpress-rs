@@ -55,6 +55,7 @@ wp_com_test_credentials.json
 /vendor
 /wp_rs_web/assets
 /wp_rs_web/node_modules
+wprs-build-cache.aar
 
 # Cargo config
 !.cargo/config.toml

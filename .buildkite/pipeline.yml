@@ -60,21 +60,11 @@ steps:
     steps:
       - label: ":swift: :darwin: Build xcframework"
         key: "xcframework"
-        command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "/Users/builder/.cargo/env"
-
-          echo "--- :package: Installing Rust Toolchains"
-          make setup-rust
-
-          echo "--- :swift: Building xcframework"
-          make xcframework
-          zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
+        command: ".buildkite/commands/build-xcframework.sh"
         artifact_paths:
           - target/libwordpressFFI.xcframework.zip
           - native/swift/Sources/wordpress-api-wrapper/*.swift
+        plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
       - label: ":swift: Build Docs"

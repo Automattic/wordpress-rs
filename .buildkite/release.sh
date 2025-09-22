@@ -21,8 +21,9 @@ make setup-rust
 echo "--- :rubygems: Setting up Gems"
 install_gems
 
-echo "--- :rust: Building XCFramework"
-make xcframework-package
+echo "--- :rust: Preparing XCFramework"
+.buildkite/download-xcframework.sh
+make xcframework-package-only
 make xcframework-package-checksum
 
 release_version="$1"

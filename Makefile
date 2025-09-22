@@ -130,7 +130,9 @@ else
 xcframework: xcframework-all
 endif
 
-xcframework-package: xcframework-all
+xcframework-package: xcframework-all xcframework-package-only
+
+xcframework-package-only:
 	rm -rf libwordpressFFI.xcframework.zip
 	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ libwordpressFFI.xcframework.zip
 
