@@ -10,6 +10,7 @@ async fn test_retrieve_wp_block_editor_settings() {
         .await
         .assert_response()
         .data
+        .payload
         .as_json();
 
     if let JsonValue::Object(obj) = &json {

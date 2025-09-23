@@ -1,12 +1,12 @@
-use crate::JsonValue;
-use crate::impl_as_query_value_from_to_string;
-use crate::url_query::AppendUrlQueryPairs;
-use crate::url_query::FromUrlQueryPairs;
-use crate::url_query::QueryPairs;
-use crate::url_query::QueryPairsExtension;
-use crate::url_query::UrlQueryPairsMap;
+use crate::{
+    JsonValue, impl_as_query_value_from_to_string,
+    url_query::{
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
+    },
+};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::sync::Arc;
 use wp_derive::WpDeriveParamsField;
 
 #[derive(Debug, Default, Serialize, uniffi::Record, WpDeriveParamsField)]
@@ -43,15 +43,20 @@ pub enum WpBlockEditorSettingsContext {
 
 impl_as_query_value_from_to_string!(WpBlockEditorSettingsContext);
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
 pub struct WpBlockEditorSettings {
-    #[serde(flatten)]
+    pub payload: Arc<WpBlockEditorSettingsPayload>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Object)]
+#[serde(transparent)]
+pub struct WpBlockEditorSettingsPayload {
     pub payload: Box<RawValue>,
 }
 
 #[uniffi::export]
-impl WpBlockEditorSettings {
+impl WpBlockEditorSettingsPayload {
     pub fn as_bytes(&self) -> Vec<u8> {
         self.payload.get().as_bytes().to_vec()
     }

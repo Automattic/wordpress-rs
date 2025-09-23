@@ -4,7 +4,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum WpBlockEditorRequest {
-    #[get(url = "/settings", params = &WpBlockEditorSettingsParams, output = std::sync::Arc<WpBlockEditorSettings>)]
+    #[get(url = "/settings", params = &WpBlockEditorSettingsParams, output = WpBlockEditorSettings)]
     RetrieveSettings,
 }
 
