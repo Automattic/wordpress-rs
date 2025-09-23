@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.konan.target.linker
-import kotlin.system.exitProcess
-
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
