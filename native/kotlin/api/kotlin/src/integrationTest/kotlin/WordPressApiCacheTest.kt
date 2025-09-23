@@ -1,6 +1,6 @@
 package rs.wordpress.api.cache.kotlin
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
 import org.junit.jupiter.api.parallel.ExecutionMode
@@ -12,12 +12,12 @@ import kotlin.test.assertEquals
 class WordPressApiCacheTest {
 
     @Test
-    fun testThatMigrationsWork() = runBlocking {
+    fun testThatMigrationsWork() = runTest {
         assertEquals(2, WordPressApiCache().performMigrations())
     }
 
     @Test
-    fun testBackgroundUpdateNotificationsWork() = runBlocking {
+    fun testBackgroundUpdateNotificationsWork() = runTest {
         var updateCount = 0
         val delegate = WordPressApiCacheDelegate(
             callback = { updateHook ->
