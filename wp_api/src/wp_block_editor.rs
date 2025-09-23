@@ -41,6 +41,19 @@ pub enum WpBlockEditorSettingsContext {
 
 impl_as_query_value_from_to_string!(WpBlockEditorSettingsContext);
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct RawSettings {
+    pub payload: Vec<u8>,
+}
+
+// #[uniffi::export]
+// impl RawSettings {
+//     pub fn data(&self) -> Vec<u8> {
+//         *self.payload.clone()
+//     }
+// }
+
 #[cfg(test)]
 mod test {
     use crate::JsonValue;
