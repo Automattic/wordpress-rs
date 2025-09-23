@@ -8,7 +8,7 @@ struct BlockSettingsTests {
 
     @Test
     func fetchRawBlockSettings() async throws {
-        let response = try await api.blockEditor.getRawSettings(params: WpBlockEditorSettingsParams())
+        let response = try await api.blockEditor.retrieveSettings(params: WpBlockEditorSettingsParams())
         #expect(!response.data.payload.isEmpty)
 
         let json = try response.data.asJson()
