@@ -55,7 +55,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         self.additionalHttpHeadersForAllRequests = headers
     }
 
-    public func execute(_ request: WpNetworkRequest,) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         await perform(request)
     }
 
