@@ -10,7 +10,7 @@ public actor WordPressApiCache {
         public static let cacheDidUpdate = Notification.Name("WordPressApiCache.cacheDidUpdate")
 
         public static func name(for table: String) -> Notification.Name {
-            Notification.Name(rawValue: "WordPressApiCachce.cacheDidUpdate.\(table)")
+            Notification.Name(rawValue: "WordPressApiCache.cacheDidUpdate.\(table)")
         }
     }
 
