@@ -7,6 +7,7 @@ use crate::{
         RequestExecutor,
         endpoint::{
             ApiUrlResolver,
+            api_root_endpoint::{ApiRootRequestBuilder, ApiRootRequestExecutor},
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
@@ -55,6 +56,7 @@ impl UniffiWpApiRequestBuilder {
 }
 
 pub struct WpApiRequestBuilder {
+    api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     categories: Arc<CategoriesRequestBuilder>,
@@ -85,6 +87,7 @@ impl WpApiRequestBuilder {
         api_client_generate_request_builder!(
             api_url_resolver,
             auth_provider;
+            api_root,
             application_passwords,
             autosaves,
             categories,
@@ -125,6 +128,7 @@ impl UniffiWpApiClient {
 }
 
 pub struct WpApiClient {
+    api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     categories: Arc<CategoriesRequestExecutor>,
@@ -152,6 +156,7 @@ impl WpApiClient {
         api_client_generate_api_client!(
             api_url_resolver,
             delegate;
+            api_root,
             application_passwords,
             autosaves,
             categories,
@@ -189,6 +194,7 @@ pub trait IsWpApiClientDelegate {
     fn get_delegate(&self) -> &WpApiClientDelegate;
 }
 
+api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, categories);

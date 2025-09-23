@@ -3,6 +3,7 @@ use std::sync::Arc;
 use strum_macros::EnumIter;
 use url::Url;
 
+pub mod api_root_endpoint;
 pub mod application_passwords_endpoint;
 pub mod categories_endpoint;
 pub mod comments_endpoint;
@@ -91,6 +92,7 @@ pub trait AsNamespace: Send + Sync {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum WpNamespace {
+    None,
     WpSiteHealthV1,
     WpV2,
 }
@@ -98,6 +100,7 @@ pub enum WpNamespace {
 impl AsNamespace for WpNamespace {
     fn namespace_value(&self) -> &'static str {
         match self {
+            Self::None => "",
             Self::WpSiteHealthV1 => "/wp-site-health/v1",
             Self::WpV2 => "/wp/v2",
         }
