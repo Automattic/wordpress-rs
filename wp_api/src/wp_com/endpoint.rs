@@ -44,11 +44,15 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
                 );
             }
         }
-        
+
         // The API root endpoint needs special handling for WordPress.com
         if namespace == WpNamespace::None.namespace_value() && endpoint_segments.is_empty() {
-            let url_string = format!("https://public-api.wordpress.com/wp-json/?rest_route=/sites/{}/", self.site_id);
-            let parsed_url = ParsedUrl::parse(&url_string).expect("WordPress.com API root URL is valid");
+            let url_string = format!(
+                "https://public-api.wordpress.com/wp-json/?rest_route=/sites/{}/",
+                self.site_id
+            );
+            let parsed_url =
+                ParsedUrl::parse(&url_string).expect("WordPress.com API root URL is valid");
             return Arc::new(parsed_url);
         }
 
