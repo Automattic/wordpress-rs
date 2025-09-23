@@ -239,8 +239,8 @@ fn generate_async_request_executor(
                 #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_url_resolver.clone(), self.delegate.auth_provider.clone()).await
             }
 
-            pub fn request_executor(&self) -> std::sync::Arc<dyn #crate_ident::request::RequestExecutor> {
-                self.delegate.request_executor.clone()
+            pub fn cancel(&self, context: std::sync::Arc<crate::cancellation::RequestContext>) {
+                self.delegate.request_executor.cancel(context);
             }
         }
 

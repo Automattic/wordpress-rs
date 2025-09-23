@@ -356,7 +356,7 @@ class ExtensionGenerator {
                 return try await withTaskCancellationHandler {
                     try await \(raw: cancellationFunctionName)(\(raw: functionCallArgs))
                 } onCancel: {
-                    self.requestExecutor().cancel(context: context)
+                    self.cancel(context: context)
                 }
                 """
             )
