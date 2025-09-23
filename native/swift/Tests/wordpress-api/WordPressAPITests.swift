@@ -80,7 +80,7 @@ private actor CounterMiddleware: Middleware {
         requestExecutor: RequestExecutor,
         response: WpNetworkResponse,
         request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
+        context: RequestContext?
     ) async throws -> WpNetworkResponse {
         count += 1
         return response

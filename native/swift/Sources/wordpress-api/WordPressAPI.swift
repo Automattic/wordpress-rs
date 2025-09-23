@@ -177,8 +177,7 @@ public actor WordPressAPI {
                 params: params,
                 filePath: localFileURL.path,
                 fileContentType: fileContentType,
-                requestId: requestId,
-                cancellationToken: nil
+                requestId: requestId
             )
         }
 

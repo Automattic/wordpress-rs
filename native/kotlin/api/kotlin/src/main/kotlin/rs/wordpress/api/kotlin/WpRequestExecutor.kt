@@ -13,10 +13,10 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import uniffi.wp_api.CancellationToken
 import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
+import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
@@ -39,10 +39,7 @@ class WpRequestExecutor(
     private val fileResolver: FileResolver = DefaultFileResolver(),
     private val uploadListener: UploadListener? = null
 ) : RequestExecutor {
-    override suspend fun execute(
-        request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
-    ): WpNetworkResponse =
+    override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
             val wpNetworkRequestBody = request.body()?.contents()?.toRequestBody()
@@ -88,10 +85,7 @@ class WpRequestExecutor(
             }
         }
 
-    override suspend fun uploadMedia(
-        mediaUploadRequest: MediaUploadRequest,
-        cancellationToken: CancellationToken?
-    ): WpNetworkResponse =
+    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(mediaUploadRequest.url())
             val multipartBodyBuilder = MultipartBody.Builder()
@@ -155,6 +149,10 @@ class WpRequestExecutor(
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
+    }
+
+    override fun cancel(context: RequestContext) {
+        // No-op
     }
 
     private fun File.canBeUploaded() = exists() && isFile && canRead()

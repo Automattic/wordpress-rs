@@ -2,7 +2,7 @@ use std::sync::{
     Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use wp_api::{cancellation::CancellationToken, users::UserListParams};
+use wp_api::{cancellation::RequestContext, users::UserListParams};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -117,23 +117,22 @@ impl RequestExecutor for TrackedRequestExecutor {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
-        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.requested_urls
             .lock()
             .unwrap()
             .push(request.url().0.clone());
-        self.executor.execute(request, cancellation_token).await
+        self.executor.execute(request).await
     }
 
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
-        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        self.upload_media(media_upload_request, cancellation_token)
-            .await
+        self.upload_media(media_upload_request).await
     }
 
     async fn sleep(&self, _: u64) {}
+
+    fn cancel(&self, _: Arc<RequestContext>) {}
 }

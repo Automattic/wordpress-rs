@@ -1,7 +1,6 @@
 use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
 use crate::{
     api_error::WpApiError,
-    cancellation::CancellationToken,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext},
     request::{
         CONTENT_TYPE_MULTIPART, NetworkRequestAccessor, ParsedResponse, RequestMethod,
@@ -189,14 +188,13 @@ impl MediaRequestExecutor {
         file_path: String,
         file_content_type: String,
         request_id: Option<Arc<WpUuid>>,
-        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<MediaRequestCreateResponse, WpApiError> {
         let request = self
             .request_builder
             .create(params, file_path, file_content_type, request_id);
         self.delegate
             .request_executor
-            .upload_media(Arc::new(request), cancellation_token)
+            .upload_media(Arc::new(request))
             .await?
             .parse()
     }

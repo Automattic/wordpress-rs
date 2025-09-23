@@ -19,7 +19,6 @@ struct KnownIssues {
                 filePath: file.path,
                 fileContentType: "image/jpeg",
                 requestId: nil,
-                cancellationToken: nil
             )
         }
 

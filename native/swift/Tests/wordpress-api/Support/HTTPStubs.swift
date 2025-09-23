@@ -26,8 +26,7 @@ final class HTTPStubs: SafeRequestExecutor {
     }
 
     public func execute(
-        _ request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
+        _ request: WpNetworkRequest
     ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
             return .success(response)
@@ -50,8 +49,7 @@ final class HTTPStubs: SafeRequestExecutor {
     }
 
     func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest,
-        cancellationToken: CancellationToken?
+        mediaUploadRequest: MediaUploadRequest
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         preconditionFailure("This method is not yet implemented")
     }
@@ -91,6 +89,10 @@ final class HTTPStubs: SafeRequestExecutor {
     func sleep(millis: UInt64) async {
         // swiftlint:disable:next force_try
         try! await Task.sleep(nanoseconds: millis * 1000)
+    }
+
+    func cancel(context: RequestContext) {
+        // No-op
     }
 }
 

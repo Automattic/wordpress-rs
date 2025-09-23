@@ -65,7 +65,7 @@ fn generate_async_request_executor(
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
-            let fn_signature_cancellable = append_cancellation_token_param(fn_signature.clone());
+            let fn_signature_cancellable = append_context_param(fn_signature.clone());
             let fn_signature_body = invoke_cancellation_variant(fn_signature.clone());
             let response_type_ident = ident_response_type(
                 &parsed_enum.enum_ident,
@@ -86,7 +86,7 @@ fn generate_async_request_executor(
                     let perform_request = async || {
                         #request_from_request_builder
                         let request_url: String = request.url().into();
-                        let response = self.perform(std::sync::Arc::new(request), cancellation_token.clone()).await?;
+                        let response = self.perform(std::sync::Arc::new(request), context.clone()).await?;
                         let response_status_code = response.status_code;
                         let parsed_response = response.parse();
                         let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default());
@@ -237,6 +237,10 @@ fn generate_async_request_executor(
 
             pub async fn fetch_authentication_state(&self) -> Result<#crate_ident::request::AuthenticationState, #error_type> {
                 #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_url_resolver.clone(), self.delegate.auth_provider.clone()).await
+            }
+
+            pub fn request_executor(&self) -> std::sync::Arc<dyn #crate_ident::request::RequestExecutor> {
+                self.delegate.request_executor.clone()
             }
         }
 

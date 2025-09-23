@@ -13,8 +13,7 @@ struct MediaTests {
             params: .init(title: "Image", altText: "This is a test image"),
             filePath: file.path,
             fileContentType: "image/jpeg",
-            requestId: nil,
-            cancellationToken: nil
+            requestId: nil
         )
         #expect(response.data.mimeType == "image/jpeg")
         #expect(response.data.title.raw == "Image")
@@ -92,31 +91,6 @@ struct MediaTests {
                     task.cancel()
                 }
                 defer { cancellable.cancel() }
-
-                try await task.value
-            }
-        )
-
-        try await restoreTestServer()
-    }
-
-    @Test
-    func cancelCreateMediaTask() async throws {
-        let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        await #expect(
-            throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError),
-            performing: {
-                let task = Task {
-                    _ = try await api.media.create(
-                        params: .init(),
-                        filePath: file.path(),
-                        fileContentType: "image/jpg",
-                    )
-                    Issue.record("The creating post function should throw")
-                }
-
-                try await Task.sleep(for: .milliseconds(10))
-                task.cancel()
 
                 try await task.value
             }

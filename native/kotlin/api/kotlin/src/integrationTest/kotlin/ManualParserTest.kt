@@ -24,7 +24,7 @@ class ManualParserTest {
             authProvider
         )
         val userListRequest = requestBuilder.users().listWithEditContext(UserListParams())
-        val userListResponse = requestExecutor.execute(userListRequest, null)
+        val userListResponse = requestExecutor.execute(userListRequest)
         val userList = parseAsUsersRequestListWithEditContextResponse(userListResponse).data
         assertEquals(NUMBER_OF_USERS, userList.count())
     }

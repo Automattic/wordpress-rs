@@ -10,13 +10,9 @@ import Combine
 #endif
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
-    func execute(
-        _ request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
-    ) async -> Result<WpNetworkResponse, RequestExecutionError>
+    func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
     func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest,
-        cancellationToken: CancellationToken?
+        mediaUploadRequest: MediaUploadRequest
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
 
     #if PROGRESS_REPORTING_ENABLED
@@ -27,19 +23,13 @@ public protocol SafeRequestExecutor: RequestExecutor, Sendable {
 }
 
 extension SafeRequestExecutor {
-    public func execute(
-        request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
-    ) async throws -> WpNetworkResponse {
-        let result = await execute(request, cancellationToken: cancellationToken)
+    public func execute(request: WpNetworkRequest) async throws -> WpNetworkResponse {
+        let result = await execute(request)
         return try result.get()
     }
 
-    public func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest,
-        cancellationToken: CancellationToken?
-    ) async throws -> WpNetworkResponse {
-        let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest, cancellationToken: cancellationToken)
+    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
+        let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest)
         return try result.get()
     }
 }
@@ -49,8 +39,6 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     private let executorDelegate: RequestExecutorDelegate
 
     private let additionalHttpHeadersForAllRequests: [String: String]
-
-    private let cancellationHandlers = CancellationHandlers()
 
     public init(
         urlSession: URLSession,
@@ -67,18 +55,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         self.additionalHttpHeadersForAllRequests = headers
     }
 
-    public func execute(
-        _ request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
-    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
-        await perform(request, cancellationToken: cancellationToken)
+    public func execute(_ request: WpNetworkRequest,) async -> Result<WpNetworkResponse, RequestExecutionError> {
+        await perform(request)
     }
 
     public func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest,
-        cancellationToken: CancellationToken?
+        mediaUploadRequest: MediaUploadRequest
     ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        (await perform(mediaUploadRequest, cancellationToken: cancellationToken))
+        (await perform(mediaUploadRequest))
             .mapError { error in
                 switch error {
                 case let .RequestExecutionFailed(statusCode, redirects, reason):
@@ -91,26 +75,12 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             }
     }
 
-    func perform(
-        _ request: NetworkRequestContent,
-        cancellationToken: CancellationToken?
-    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
-        if let cancellationToken {
-            let requestId = request.requestId()
-            await cancellationHandlers.whenCancelling(cancellationToken) {
-                Task { [weak self] in
-                    await self?.cancelRequest(withId: requestId)
-                }
+    public func cancel(context: RequestContext) {
+        for requestId in context.requestIds() {
+            Task {
+                await self.cancelRequest(withId: requestId)
             }
         }
-
-        let result = await perform(request)
-
-        if let cancellationToken {
-            await cancellationHandlers.remove(cancellationToken)
-        }
-
-        return result
     }
 
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -450,38 +420,4 @@ extension MediaUploadRequest: NetworkRequestContent {
         #endif
     }
 
-}
-
-private actor CancellationHandlers {
-    private var handlers: [String /* CancellationToken.uuid */: [RequestCancellationHandler]] = [:]
-
-    func whenCancelling(_ token: CancellationToken, closure: @escaping @Sendable () -> Void) {
-        let handler = RequestCancellationHandler(closure: closure)
-        handlers[token.uuid(), default: []].append(handler)
-        try? token.registerHandler(handler: handler)
-    }
-
-    func remove(_ token: CancellationToken) {
-        handlers.removeValue(forKey: token.uuid())
-    }
-}
-
-private final class RequestCancellationHandler: CancellationHandler, Hashable {
-    let closure: @Sendable () -> Void
-
-    init(closure: @escaping @Sendable () -> Void) {
-        self.closure = closure
-    }
-
-    func cancelled() {
-        self.closure()
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self))
-    }
-
-    static func == (lhs: RequestCancellationHandler, rhs: RequestCancellationHandler) -> Bool {
-        ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
-    }
 }

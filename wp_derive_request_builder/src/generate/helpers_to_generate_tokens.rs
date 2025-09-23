@@ -84,13 +84,14 @@ pub fn fn_signature(
     quote! { fn #fn_name(&self, #url_params #provided_param #fields_param) }
 }
 
-pub fn append_cancellation_token_param(input: TokenStream) -> TokenStream {
+pub fn append_context_param(input: TokenStream) -> TokenStream {
     let mut signature: syn::Signature = syn::parse2(input).unwrap();
 
     let original_name = signature.ident.to_string();
     signature.ident = format_ident!("{}_cancellation", original_name);
 
-    let new_arg: FnArg = parse_quote! { cancellation_token: Option<std::sync::Arc<crate::cancellation::CancellationToken>> };
+    let new_arg: FnArg =
+        parse_quote! { context: Option<std::sync::Arc<crate::cancellation::RequestContext>> };
     signature.inputs.push(new_arg);
 
     quote! { #signature }
@@ -1286,14 +1287,14 @@ mod tests {
     #[rstest]
     #[case(
         quote! { fn list(&self, params: &UserListParams) },
-        "fn list_cancellation (& self , params : & UserListParams , cancellation_token : Option < std :: sync :: Arc < crate :: cancellation :: CancellationToken > >)"
+        "fn list_cancellation (& self , params : & UserListParams , context : Option < std :: sync :: Arc < crate :: cancellation :: RequestContext > >)"
     )]
     #[case(
         quote! { fn list(&self) },
-        "fn list_cancellation (& self , cancellation_token : Option < std :: sync :: Arc < crate :: cancellation :: CancellationToken > >)"
+        "fn list_cancellation (& self , context : Option < std :: sync :: Arc < crate :: cancellation :: RequestContext > >)"
     )]
-    fn test_append_cancellation_token_param(#[case] input: TokenStream, #[case] expected: &str) {
-        let result = append_cancellation_token_param(input);
+    fn test_append_context_param(#[case] input: TokenStream, #[case] expected: &str) {
+        let result = append_context_param(input);
         assert_eq!(result.to_string(), expected);
     }
 

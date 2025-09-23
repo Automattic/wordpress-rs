@@ -3,7 +3,7 @@ use crate::{
         InvalidSslErrorReason, MediaUploadRequestExecutionError, RequestExecutionError,
         RequestExecutionErrorReason,
     },
-    cancellation::CancellationToken,
+    cancellation::RequestContext,
     request::{
         NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
@@ -144,7 +144,6 @@ impl RequestExecutor for ReqwestRequestExecutor {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
-        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.async_request(request).await.map_err(|e| e.into())
     }
@@ -152,7 +151,6 @@ impl RequestExecutor for ReqwestRequestExecutor {
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
-        _cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
         self.upload_media_request(media_upload_request)
             .await
@@ -169,6 +167,10 @@ impl RequestExecutor for ReqwestRequestExecutor {
 
     async fn sleep(&self, millis: u64) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+    }
+
+    fn cancel(&self, _context: Arc<RequestContext>) {
+        // No-op for reqwest
     }
 }
 

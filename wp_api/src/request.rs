@@ -5,7 +5,7 @@ use crate::{
         RequestExecutionErrorReason, WpApiError, WpErrorCode,
     },
     auth::WpAuthenticationProvider,
-    cancellation::CancellationToken,
+    cancellation::RequestContext,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
@@ -144,16 +144,16 @@ pub trait RequestExecutor: Send + Sync {
     async fn execute(
         &self,
         request: Arc<WpNetworkRequest>,
-        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,
-        cancellation_token: Option<Arc<CancellationToken>>,
     ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
 
     async fn sleep(&self, millis: u64);
+
+    fn cancel(&self, context: Arc<RequestContext>);
 }
 
 #[derive(uniffi::Object)]
@@ -790,7 +790,7 @@ pub async fn fetch_authentication_state(
         ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider)
             .retrieve_current_with_edit_context()
             .into();
-    let response = request_executor.execute(request, None).await?;
+    let response = request_executor.execute(request).await?;
     let parsed_res: Result<
         ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
         WpApiError,

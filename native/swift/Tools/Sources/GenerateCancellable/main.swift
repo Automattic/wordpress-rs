@@ -171,7 +171,7 @@ class CancellationAnalyzer: SyntaxVisitor {
         let paramName = lastParam.firstName.text
         let paramType = lastParam.type.description.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return paramName == "cancellationToken" && paramType == "CancellationToken?"
+        return paramName == "context" && paramType == "RequestContext?"
     }
 }
 
@@ -346,21 +346,17 @@ class ExtensionGenerator {
         }.joined(separator: ", ")
 
         let functionCallArgs = parameterArguments.isEmpty ?
-            "cancellationToken: token" :
-            "\(parameterArguments), cancellationToken: token"
+            "context: context" :
+            "\(parameterArguments), context: context"
 
         return CodeBlockSyntax {
             DeclSyntax(
                 """
-                let token = CancellationToken()
+                let context = RequestContext()
                 return try await withTaskCancellationHandler {
                     try await \(raw: cancellationFunctionName)(\(raw: functionCallArgs))
                 } onCancel: {
-                    do {
-                        try token.cancel()
-                    } catch {
-                        NSLog("Failed to cancel \\(#function): \\(error)")
-                    }
+                    self.requestExecutor().cancel(context: context)
                 }
                 """
             )

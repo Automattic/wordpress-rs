@@ -2,8 +2,8 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.delay
 import okio.FileNotFoundException
-import uniffi.wp_api.CancellationToken
 import uniffi.wp_api.MediaUploadRequest
+import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -29,7 +29,7 @@ class NoStubFoundException(message: String) : Exception(message)
 // A class used for testing the request executor.
 class MockRequestExecutor(private var stubs: List<Stub> = listOf()) : RequestExecutor {
 
-    override suspend fun execute(request: WpNetworkRequest, cancellationToken: CancellationToken?): WpNetworkResponse {
+    override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse {
         val stub = stubs.firstOrNull {
             it.evaluator(request)
         }
@@ -41,12 +41,16 @@ class MockRequestExecutor(private var stubs: List<Stub> = listOf()) : RequestExe
         throw NoStubFoundException("No stub found for ${request.url()}")
     }
 
-    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest, cancellationToken: CancellationToken?): WpNetworkResponse {
+    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse {
         TODO("Not yet implemented")
     }
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
+    }
+
+    override fun cancel(context: RequestContext) {
+        // No-op
     }
 }
 

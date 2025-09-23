@@ -1,5 +1,5 @@
 package rs.wordpress.api.kotlin
-import uniffi.wp_api.CancellationToken
+import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpApiMiddleware
 import uniffi.wp_api.WpNetworkRequest
@@ -11,7 +11,7 @@ class DebugMiddleware : WpApiMiddleware {
         requestExecutor: RequestExecutor,
         response: WpNetworkResponse,
         request: WpNetworkRequest,
-        cancellationToken: CancellationToken?
+        context: RequestContext?
     ): WpNetworkResponse {
         println("Request: ${request.url()}")
         println("Response:")
