@@ -44,8 +44,7 @@ public actor WordPressApiCache {
     }
 
     public func startListeningForUpdates() {
-        setGlobalDelegate(delegate: delegate)
-        self.cache.startListeningForUpdates()
+        self.cache.startListeningForUpdates(delegate: self.delegate)
     }
 
     public func stopListeningForUpdates() {

@@ -23,33 +23,33 @@ impl From<rusqlite::Error> for SqliteDbError {
 
 #[derive(uniffi::Object)]
 pub struct WpApiCache {
-    inner: DBManager,
+    inner: DBManager
 }
-
-unsafe impl Sync for WpApiCache {}
-unsafe impl Send for WpApiCache {}
 
 #[uniffi::export]
 impl WpApiCache {
     #[uniffi::constructor]
     pub fn new(path: Option<String>) -> Result<Self, SqliteDbError> {
         Ok(Self {
-            inner: DBManager::new(&path)?,
+            inner: DBManager::new(&path)?
         })
     }
 
     pub fn perform_migrations(&self) -> Result<u64, SqliteDbError> {
-        Ok(MigrationManager::new(&self.inner.connection)?.perform_migrations()?)
+        let connection: &Connection = &self.inner.connection.lock().unwrap();
+        Ok(MigrationManager::new(connection)?.perform_migrations()?)
     }
 
     pub fn flush(&self) -> Result<(), SqliteDbError> {
-        self.inner.connection.execute("commit", ())?;
+        let connection: &Connection = &self.inner.connection.lock().unwrap();
+        connection.execute("commit", ())?;
         Ok(())
     }
 
-    pub fn start_listening_for_updates(&self) {
-        self.inner.connection.update_hook(Some(
-            |action: Action, db_name: &str, table_name: &str, row_id: i64| {
+    pub fn start_listening_for_updates(&self, delegate: Arc<dyn DatabaseDelegate>) {
+        let connection: &Connection = &self.inner.connection.lock().unwrap();
+        connection.update_hook(Some(
+            move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
                 let hook_data = UpdateHook {
                     action: action.into(),
                     db_name: db_name.to_string(),
@@ -57,17 +57,14 @@ impl WpApiCache {
                     row_id,
                 };
 
-                if let Some(delegate) = GLOBAL_QUERY_MONITOR.get_delegate() {
-                    delegate.did_update(hook_data);
-                }
+                delegate.did_update(hook_data);
             },
         ));
     }
 
     pub fn stop_listening_for_updates(&self) {
-        self.inner
-            .connection
-            .update_hook(None::<fn(Action, &str, &str, i64)>)
+        let connection: &Connection = &self.inner.connection.lock().unwrap();
+        connection.update_hook(None::<fn(Action, &str, &str, i64)>);
     }
 }
 
@@ -179,36 +176,8 @@ impl From<Action> for HookAction {
     }
 }
 
-struct GlobalQueryMonitor {
-    rw_lock: Mutex<Option<Arc<dyn DatabaseDelegate>>>,
-}
-
-impl GlobalQueryMonitor {
-    fn get_delegate(&self) -> Option<Arc<dyn DatabaseDelegate>> {
-        self.rw_lock.lock().unwrap().clone()
-    }
-
-    fn set_delegate(&self, delegate: Arc<dyn DatabaseDelegate>) {
-        self.rw_lock.lock().unwrap().replace(delegate);
-    }
-}
-
-static GLOBAL_QUERY_MONITOR: GlobalQueryMonitor = GlobalQueryMonitor {
-    rw_lock: Mutex::new(None),
-};
-
-#[uniffi::export]
-fn get_global_query_monitor() -> Option<Arc<dyn DatabaseDelegate>> {
-    GLOBAL_QUERY_MONITOR.get_delegate()
-}
-
-#[uniffi::export]
-fn set_global_delegate(delegate: Arc<dyn DatabaseDelegate>) {
-    GLOBAL_QUERY_MONITOR.set_delegate(delegate);
-}
-
 struct DBManager {
-    connection: Connection,
+    connection: Mutex<Connection>,
 }
 
 impl DBManager {
@@ -221,6 +190,6 @@ impl DBManager {
             connection = Connection::open_in_memory()?;
         }
 
-        Ok(Self { connection })
+        Ok(Self { connection: Mutex::new(connection) })
     }
 }
