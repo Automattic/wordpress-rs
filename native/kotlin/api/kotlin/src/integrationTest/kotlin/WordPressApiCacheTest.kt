@@ -1,5 +1,3 @@
-package rs.wordpress.api.cache.kotlin
-
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
