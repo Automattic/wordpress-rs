@@ -4,18 +4,37 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum PostsRequest {
-    #[contextual_paged(url = "/posts", params = &PostListParams, output = Vec<crate::posts::SparsePost>, filter_by = crate::posts::SparsePostField)]
+    #[contextual_paged(url = "/<post_endpoint_type>", params = &PostListParams, output = Vec<crate::posts::SparsePost>, filter_by = crate::posts::SparsePostField)]
     List,
-    #[contextual_get(url = "/posts/<post_id>", params = &crate::posts::PostRetrieveParams, output = crate::posts::SparsePost, filter_by = crate::posts::SparsePostField)]
+    #[contextual_get(url = "/<post_endpoint_type>/<post_id>", params = &crate::posts::PostRetrieveParams, output = crate::posts::SparsePost, filter_by = crate::posts::SparsePostField)]
     Retrieve,
-    #[post(url = "/posts", params = &crate::posts::PostCreateParams, output = crate::posts::PostWithEditContext)]
+    #[post(url = "/<post_endpoint_type>", params = &crate::posts::PostCreateParams, output = crate::posts::PostWithEditContext)]
     Create,
-    #[delete(url = "/posts/<post_id>", output = crate::posts::PostDeleteResponse)]
+    #[delete(url = "/<post_endpoint_type>/<post_id>", output = crate::posts::PostDeleteResponse)]
     Delete,
-    #[delete(url = "/posts/<post_id>", output = crate::posts::PostWithEditContext)]
+    #[delete(url = "/<post_endpoint_type>/<post_id>", output = crate::posts::PostWithEditContext)]
     Trash,
-    #[post(url = "/posts/<post_id>", params = &PostUpdateParams, output = PostWithEditContext)]
+    #[post(url = "/<post_endpoint_type>/<post_id>", params = &PostUpdateParams, output = PostWithEditContext)]
     Update,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "snake_case")]
+pub enum PostEndpointType {
+    Posts,
+    Pages,
+    Custom(String),
 }
 
 impl DerivedRequest for PostsRequest {
@@ -58,12 +77,15 @@ mod tests {
 
     #[rstest]
     fn create_post(endpoint: PostsRequestEndpoint) {
-        validate_wp_v2_endpoint(endpoint.create(), "/posts");
+        validate_wp_v2_endpoint(endpoint.create(&PostEndpointType::Posts), "/posts");
     }
 
     #[rstest]
     fn delete_post(endpoint: PostsRequestEndpoint) {
-        validate_wp_v2_endpoint(endpoint.delete(&PostId(54)), "/posts/54?force=true");
+        validate_wp_v2_endpoint(
+            endpoint.delete(&PostEndpointType::Posts, &PostId(54)),
+            "/posts/54?force=true",
+        );
     }
 
     #[rstest]
@@ -128,15 +150,15 @@ mod tests {
             }
         };
         validate_wp_v2_endpoint(
-            endpoint.list_with_edit_context(&params),
+            endpoint.list_with_edit_context(&PostEndpointType::Posts, &params),
             &expected_path("edit"),
         );
         validate_wp_v2_endpoint(
-            endpoint.list_with_embed_context(&params),
+            endpoint.list_with_embed_context(&PostEndpointType::Posts, &params),
             &expected_path("embed"),
         );
         validate_wp_v2_endpoint(
-            endpoint.list_with_view_context(&params),
+            endpoint.list_with_view_context(&PostEndpointType::Posts, &params),
             &expected_path("view"),
         );
     }
@@ -152,7 +174,7 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
-            endpoint.filter_list_with_edit_context(&params, fields),
+            endpoint.filter_list_with_edit_context(&PostEndpointType::Posts, &params, fields),
             expected_path,
         );
     }
@@ -168,7 +190,7 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
-            endpoint.filter_list_with_embed_context(&params, fields),
+            endpoint.filter_list_with_embed_context(&PostEndpointType::Posts, &params, fields),
             expected_path,
         );
     }
@@ -193,15 +215,15 @@ mod tests {
             password: password.map(|p| p.to_string()),
         };
         validate_wp_v2_endpoint(
-            endpoint.retrieve_with_edit_context(&post_id, &params),
+            endpoint.retrieve_with_edit_context(&PostEndpointType::Posts, &post_id, &params),
             &expected_path("edit"),
         );
         validate_wp_v2_endpoint(
-            endpoint.retrieve_with_embed_context(&post_id, &params),
+            endpoint.retrieve_with_embed_context(&PostEndpointType::Posts, &post_id, &params),
             &expected_path("embed"),
         );
         validate_wp_v2_endpoint(
-            endpoint.retrieve_with_view_context(&post_id, &params),
+            endpoint.retrieve_with_view_context(&PostEndpointType::Posts, &post_id, &params),
             &expected_path("view"),
         );
     }
@@ -218,6 +240,7 @@ mod tests {
     ) {
         validate_wp_v2_endpoint(
             endpoint.filter_retrieve_with_view_context(
+                &PostEndpointType::Posts,
                 &PostId(54),
                 &PostRetrieveParams {
                     password: password.map(|p| p.to_string()),
@@ -230,12 +253,18 @@ mod tests {
 
     #[rstest]
     fn trash_post(endpoint: PostsRequestEndpoint) {
-        validate_wp_v2_endpoint(endpoint.trash(&PostId(54)), "/posts/54?force=false");
+        validate_wp_v2_endpoint(
+            endpoint.trash(&PostEndpointType::Posts, &PostId(54)),
+            "/posts/54?force=false",
+        );
     }
 
     #[rstest]
     fn update_post(endpoint: PostsRequestEndpoint) {
-        validate_wp_v2_endpoint(endpoint.update(&PostId(54)), "/posts/54");
+        validate_wp_v2_endpoint(
+            endpoint.update(&PostEndpointType::Posts, &PostId(54)),
+            "/posts/54",
+        );
     }
 
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
