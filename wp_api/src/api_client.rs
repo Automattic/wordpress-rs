@@ -42,19 +42,6 @@ struct UniffiWpApiRequestBuilder {
     inner: WpApiRequestBuilder,
 }
 
-#[uniffi::export]
-impl UniffiWpApiRequestBuilder {
-    #[uniffi::constructor]
-    pub fn new(
-        api_url_resolver: Arc<dyn ApiUrlResolver>,
-        auth_provider: Arc<WpAuthenticationProvider>,
-    ) -> Self {
-        Self {
-            inner: WpApiRequestBuilder::new(api_url_resolver, auth_provider),
-        }
-    }
-}
-
 pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
