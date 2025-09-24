@@ -173,6 +173,9 @@ public typealias SiteSettingsRequestExecutor = WordPressAPIInternal.SiteSettings
 public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteHealthTestsRequestExecutor
 // swiftlint:enable line_length
 
+// MARK: - Block Editor
+public typealias WpBlockEditorSettingsParams = WordPressAPIInternal.WpBlockEditorSettingsParams
+
 // MARK: - WordPress.org
 public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
 

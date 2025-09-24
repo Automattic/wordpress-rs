@@ -23,6 +23,7 @@ pub mod themes_endpoint;
 pub mod users_endpoint;
 pub mod widget_types_endpoint;
 pub mod widgets_endpoint;
+pub mod wp_block_editor_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
 pub const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
@@ -93,6 +94,7 @@ pub trait AsNamespace: Send + Sync {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum WpNamespace {
     None,
+    WpBlockEditorV1,
     WpSiteHealthV1,
     WpV2,
 }
@@ -101,6 +103,7 @@ impl AsNamespace for WpNamespace {
     fn namespace_value(&self) -> &'static str {
         match self {
             Self::None => "",
+            Self::WpBlockEditorV1 => "/wp-block-editor/v1",
             Self::WpSiteHealthV1 => "/wp-site-health/v1",
             Self::WpV2 => "/wp/v2",
         }
