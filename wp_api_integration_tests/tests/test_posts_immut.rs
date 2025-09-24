@@ -1,8 +1,8 @@
 use wp_api::{
     categories::CategoryId,
     posts::{
-        PostId, PostListParams, PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
-        SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
+        PostId, PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
+        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext, WpApiParamPostsOrderBy,
         WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
     },
     request::endpoint::posts_endpoint::PostEndpointType,
@@ -242,16 +242,16 @@ fn list_cases(#[case] params: PostListParams) {}
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_post_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_post_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_post_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_any_post_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_any_post_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_any_post_field_with_view_context_test_cases!();
 
-    #[apply(sparse_post_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostFieldWithEditContext::Id, SparsePostFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEditContext::Id, SparseAnyPostFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_posts_with_edit_context(
-        #[case] fields: &[SparsePostFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostFieldWithEditContext],
         #[values(
             PostListParams::default(),
             generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
@@ -271,12 +271,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostFieldWithEditContext::Id, SparsePostFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEditContext::Id, SparseAnyPostFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_posts_with_edit_context(
-        #[case] fields: &[SparsePostFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostFieldWithEditContext],
     ) {
         let post = api_client()
             .posts()
@@ -292,12 +292,12 @@ mod filter {
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_post_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostFieldWithEmbedContext::Id, SparsePostFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEmbedContext::Id, SparseAnyPostFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_posts_with_embed_context(
-        #[case] fields: &[SparsePostFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
         #[values(
             PostListParams::default(),
             generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
@@ -317,12 +317,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostFieldWithEmbedContext::Id, SparsePostFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEmbedContext::Id, SparseAnyPostFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_posts_with_embed_context(
-        #[case] fields: &[SparsePostFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
     ) {
         let post = api_client()
             .posts()
@@ -338,12 +338,12 @@ mod filter {
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_post_field_with_view_context_test_cases)]
-    #[case(&[SparsePostFieldWithViewContext::Id, SparsePostFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithViewContext::Id, SparseAnyPostFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_posts_with_view_context(
-        #[case] fields: &[SparsePostFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostFieldWithViewContext],
         #[values(
             PostListParams::default(),
             generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
@@ -363,12 +363,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_field_with_view_context_test_cases)]
-    #[case(&[SparsePostFieldWithViewContext::Id, SparsePostFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithViewContext::Id, SparseAnyPostFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_posts_with_view_context(
-        #[case] fields: &[SparsePostFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostFieldWithViewContext],
     ) {
         let post = api_client()
             .posts()

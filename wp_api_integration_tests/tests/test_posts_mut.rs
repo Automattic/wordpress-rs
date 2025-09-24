@@ -3,7 +3,7 @@ use macro_helper::{
 };
 use wp_api::posts::{
     PostCommentStatus, PostCreateParams, PostFootnote, PostFormat, PostMeta, PostPingStatus,
-    PostStatus, PostUpdateParams, PostWithEditContext,
+    PostStatus, PostUpdateParams, AnyPostWithEditContext,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::prelude::*;
@@ -417,7 +417,7 @@ generate_update_post_format_test!(Audio);
 
 async fn test_create_post<F>(params: &PostCreateParams, assert: F)
 where
-    F: Fn(PostWithEditContext, WpCliPost),
+    F: Fn(AnyPostWithEditContext, WpCliPost),
 {
     let created_post = api_client()
         .posts()
@@ -432,7 +432,7 @@ where
 
 async fn test_update_post<F>(params: &PostUpdateParams, assert: F)
 where
-    F: Fn(PostWithEditContext, WpCliPost),
+    F: Fn(AnyPostWithEditContext, WpCliPost),
 {
     let updated_post = api_client()
         .posts()

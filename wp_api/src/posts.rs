@@ -166,7 +166,7 @@ impl AppendUrlQueryPairs for PostRetrieveParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostDeleteResponse {
     pub deleted: bool,
-    pub previous: PostWithEditContext,
+    pub previous: AnyPostWithEditContext,
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -328,7 +328,7 @@ pub struct PostUpdateParams {
 wp_content_i64_id!(PostId);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-pub struct SparsePost {
+pub struct SparseAnyPost {
     #[WpContext(edit, embed, view)]
     pub id: Option<PostId>,
     #[WpContext(edit, embed, view)]
@@ -645,30 +645,30 @@ mod tests {
     }
 
     #[rstest]
-    #[case(SparsePostFieldWithEditContext::Id, "id")]
-    #[case(SparsePostFieldWithEditContext::PostType, "type")]
+    #[case(SparseAnyPostFieldWithEditContext::Id, "id")]
+    #[case(SparseAnyPostFieldWithEditContext::PostType, "type")]
     fn test_as_mapped_field_name_for_edit_context(
-        #[case] field: SparsePostFieldWithEditContext,
+        #[case] field: SparseAnyPostFieldWithEditContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
-    #[case(SparsePostFieldWithEmbedContext::Id, "id")]
-    #[case(SparsePostFieldWithEmbedContext::PostType, "type")]
+    #[case(SparseAnyPostFieldWithEmbedContext::Id, "id")]
+    #[case(SparseAnyPostFieldWithEmbedContext::PostType, "type")]
     fn test_as_mapped_field_name_for_embed_context(
-        #[case] field: SparsePostFieldWithEmbedContext,
+        #[case] field: SparseAnyPostFieldWithEmbedContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
-    #[case(SparsePostFieldWithViewContext::Id, "id")]
-    #[case(SparsePostFieldWithViewContext::PostType, "type")]
+    #[case(SparseAnyPostFieldWithViewContext::Id, "id")]
+    #[case(SparseAnyPostFieldWithViewContext::PostType, "type")]
     fn test_as_mapped_field_name_for_view_context(
-        #[case] field: SparsePostFieldWithViewContext,
+        #[case] field: SparseAnyPostFieldWithViewContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);

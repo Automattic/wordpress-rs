@@ -1,20 +1,20 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::posts::{PostId, PostListParams, PostUpdateParams, PostWithEditContext};
+use crate::posts::{PostId, PostListParams, PostUpdateParams, AnyPostWithEditContext};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum PostsRequest {
-    #[contextual_paged(url = "/<post_endpoint_type>", params = &PostListParams, output = Vec<crate::posts::SparsePost>, filter_by = crate::posts::SparsePostField)]
+    #[contextual_paged(url = "/<post_endpoint_type>", params = &PostListParams, output = Vec<crate::posts::SparseAnyPost>, filter_by = crate::posts::SparseAnyPostField)]
     List,
-    #[contextual_get(url = "/<post_endpoint_type>/<post_id>", params = &crate::posts::PostRetrieveParams, output = crate::posts::SparsePost, filter_by = crate::posts::SparsePostField)]
+    #[contextual_get(url = "/<post_endpoint_type>/<post_id>", params = &crate::posts::PostRetrieveParams, output = crate::posts::SparseAnyPost, filter_by = crate::posts::SparseAnyPostField)]
     Retrieve,
-    #[post(url = "/<post_endpoint_type>", params = &crate::posts::PostCreateParams, output = crate::posts::PostWithEditContext)]
+    #[post(url = "/<post_endpoint_type>", params = &crate::posts::PostCreateParams, output = crate::posts::AnyPostWithEditContext)]
     Create,
     #[delete(url = "/<post_endpoint_type>/<post_id>", output = crate::posts::PostDeleteResponse)]
     Delete,
-    #[delete(url = "/<post_endpoint_type>/<post_id>", output = crate::posts::PostWithEditContext)]
+    #[delete(url = "/<post_endpoint_type>/<post_id>", output = crate::posts::AnyPostWithEditContext)]
     Trash,
-    #[post(url = "/<post_endpoint_type>/<post_id>", params = &PostUpdateParams, output = PostWithEditContext)]
+    #[post(url = "/<post_endpoint_type>/<post_id>", params = &PostUpdateParams, output = AnyPostWithEditContext)]
     Update,
 }
 
@@ -59,8 +59,8 @@ mod tests {
         categories::CategoryId,
         generate,
         posts::{
-            PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
-            SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext,
+            PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
+            SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
             WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
         },
         request::endpoint::{
@@ -165,12 +165,12 @@ mod tests {
 
     #[rstest]
     #[case(PostListParams::default(), &[], "/posts?context=edit&_fields=")]
-    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparsePostFieldWithEditContext::Author], "/posts?context=edit&orderby=author&_fields=author")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseAnyPostFieldWithEditContext::Author], "/posts?context=edit&orderby=author&_fields=author")]
     #[case(post_list_params_with_all_fields(), ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT, &format!("/posts?context=edit&{}&{}", expected_query_pairs_for_post_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT))]
     fn filter_list_post_with_edit_context(
         endpoint: PostsRequestEndpoint,
         #[case] params: PostListParams,
-        #[case] fields: &[SparsePostFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostFieldWithEditContext],
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
@@ -181,12 +181,12 @@ mod tests {
 
     #[rstest]
     #[case(PostListParams::default(), &[], "/posts?context=embed&_fields=")]
-    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparsePostFieldWithEmbedContext::Author], "/posts?context=embed&orderby=author&_fields=author")]
+    #[case(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseAnyPostFieldWithEmbedContext::Author], "/posts?context=embed&orderby=author&_fields=author")]
     #[case(post_list_params_with_all_fields(), ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT, &format!("/posts?context=embed&{}&{}", expected_query_pairs_for_post_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT))]
     fn filter_list_post_with_embed_context(
         endpoint: PostsRequestEndpoint,
         #[case] params: PostListParams,
-        #[case] fields: &[SparsePostFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
@@ -230,12 +230,12 @@ mod tests {
 
     #[rstest]
     #[case(None, &[], "/posts/54?context=view&_fields=")]
-    #[case(Some("foo"), &[SparsePostFieldWithViewContext::Author], "/posts/54?context=view&password=foo&_fields=author")]
+    #[case(Some("foo"), &[SparseAnyPostFieldWithViewContext::Author], "/posts/54?context=view&password=foo&_fields=author")]
     #[case(Some("foo"), ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT, &format!("/posts/54?context=view&password=foo&{EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT}"))]
     fn filter_retrieve_post_with_view_context(
         endpoint: PostsRequestEndpoint,
         #[case] password: Option<&str>,
-        #[case] fields: &[SparsePostFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostFieldWithViewContext],
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
@@ -317,70 +317,70 @@ mod tests {
     }
 
     const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &str = "_fields=id%2Cdate%2Cdate_gmt%2Cguid%2Clink%2Cmodified%2Cmodified_gmt%2Cslug%2Cstatus%2Ctitle%2Ccontent%2Cauthor%2Cexcerpt%2Cfeatured_media%2Ccomment_status%2Cping_status%2Cformat%2Cmeta%2Csticky%2Ctemplate%2Ccategories%2Ctags%2Cpassword%2Cpermalink_template%2Cgenerated_slug";
-    const ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &[SparsePostFieldWithEditContext; 25] = &[
-        SparsePostFieldWithEditContext::Id,
-        SparsePostFieldWithEditContext::Date,
-        SparsePostFieldWithEditContext::DateGmt,
-        SparsePostFieldWithEditContext::Guid,
-        SparsePostFieldWithEditContext::Link,
-        SparsePostFieldWithEditContext::Modified,
-        SparsePostFieldWithEditContext::ModifiedGmt,
-        SparsePostFieldWithEditContext::Slug,
-        SparsePostFieldWithEditContext::Status,
-        SparsePostFieldWithEditContext::Title,
-        SparsePostFieldWithEditContext::Content,
-        SparsePostFieldWithEditContext::Author,
-        SparsePostFieldWithEditContext::Excerpt,
-        SparsePostFieldWithEditContext::FeaturedMedia,
-        SparsePostFieldWithEditContext::CommentStatus,
-        SparsePostFieldWithEditContext::PingStatus,
-        SparsePostFieldWithEditContext::Format,
-        SparsePostFieldWithEditContext::Meta,
-        SparsePostFieldWithEditContext::Sticky,
-        SparsePostFieldWithEditContext::Template,
-        SparsePostFieldWithEditContext::Categories,
-        SparsePostFieldWithEditContext::Tags,
-        SparsePostFieldWithEditContext::Password,
-        SparsePostFieldWithEditContext::PermalinkTemplate,
-        SparsePostFieldWithEditContext::GeneratedSlug,
+    const ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &[SparseAnyPostFieldWithEditContext; 25] = &[
+        SparseAnyPostFieldWithEditContext::Id,
+        SparseAnyPostFieldWithEditContext::Date,
+        SparseAnyPostFieldWithEditContext::DateGmt,
+        SparseAnyPostFieldWithEditContext::Guid,
+        SparseAnyPostFieldWithEditContext::Link,
+        SparseAnyPostFieldWithEditContext::Modified,
+        SparseAnyPostFieldWithEditContext::ModifiedGmt,
+        SparseAnyPostFieldWithEditContext::Slug,
+        SparseAnyPostFieldWithEditContext::Status,
+        SparseAnyPostFieldWithEditContext::Title,
+        SparseAnyPostFieldWithEditContext::Content,
+        SparseAnyPostFieldWithEditContext::Author,
+        SparseAnyPostFieldWithEditContext::Excerpt,
+        SparseAnyPostFieldWithEditContext::FeaturedMedia,
+        SparseAnyPostFieldWithEditContext::CommentStatus,
+        SparseAnyPostFieldWithEditContext::PingStatus,
+        SparseAnyPostFieldWithEditContext::Format,
+        SparseAnyPostFieldWithEditContext::Meta,
+        SparseAnyPostFieldWithEditContext::Sticky,
+        SparseAnyPostFieldWithEditContext::Template,
+        SparseAnyPostFieldWithEditContext::Categories,
+        SparseAnyPostFieldWithEditContext::Tags,
+        SparseAnyPostFieldWithEditContext::Password,
+        SparseAnyPostFieldWithEditContext::PermalinkTemplate,
+        SparseAnyPostFieldWithEditContext::GeneratedSlug,
     ];
 
     const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT: &str =
         "_fields=id%2Clink%2Cslug%2Ctitle%2Cauthor%2Cexcerpt%2Cfeatured_media";
-    const ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT: &[SparsePostFieldWithEmbedContext; 7] = &[
-        SparsePostFieldWithEmbedContext::Id,
-        SparsePostFieldWithEmbedContext::Link,
-        SparsePostFieldWithEmbedContext::Slug,
-        SparsePostFieldWithEmbedContext::Title,
-        SparsePostFieldWithEmbedContext::Author,
-        SparsePostFieldWithEmbedContext::Excerpt,
-        SparsePostFieldWithEmbedContext::FeaturedMedia,
+    const ALL_SPARSE_POST_FIELDS_WITH_EMBED_CONTEXT: &[SparseAnyPostFieldWithEmbedContext; 7] = &[
+        SparseAnyPostFieldWithEmbedContext::Id,
+        SparseAnyPostFieldWithEmbedContext::Link,
+        SparseAnyPostFieldWithEmbedContext::Slug,
+        SparseAnyPostFieldWithEmbedContext::Title,
+        SparseAnyPostFieldWithEmbedContext::Author,
+        SparseAnyPostFieldWithEmbedContext::Excerpt,
+        SparseAnyPostFieldWithEmbedContext::FeaturedMedia,
     ];
 
     const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &str = "_fields=id%2Cdate%2Cdate_gmt%2Cguid%2Clink%2Cmodified%2Cmodified_gmt%2Cslug%2Cstatus%2Ctitle%2Ccontent%2Cauthor%2Cexcerpt%2Cfeatured_media%2Ccomment_status%2Cping_status%2Cformat%2Cmeta%2Csticky%2Ctemplate%2Ccategories%2Ctags";
-    const ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &[SparsePostFieldWithViewContext; 22] = &[
-        SparsePostFieldWithViewContext::Id,
-        SparsePostFieldWithViewContext::Date,
-        SparsePostFieldWithViewContext::DateGmt,
-        SparsePostFieldWithViewContext::Guid,
-        SparsePostFieldWithViewContext::Link,
-        SparsePostFieldWithViewContext::Modified,
-        SparsePostFieldWithViewContext::ModifiedGmt,
-        SparsePostFieldWithViewContext::Slug,
-        SparsePostFieldWithViewContext::Status,
-        SparsePostFieldWithViewContext::Title,
-        SparsePostFieldWithViewContext::Content,
-        SparsePostFieldWithViewContext::Author,
-        SparsePostFieldWithViewContext::Excerpt,
-        SparsePostFieldWithViewContext::FeaturedMedia,
-        SparsePostFieldWithViewContext::CommentStatus,
-        SparsePostFieldWithViewContext::PingStatus,
-        SparsePostFieldWithViewContext::Format,
-        SparsePostFieldWithViewContext::Meta,
-        SparsePostFieldWithViewContext::Sticky,
-        SparsePostFieldWithViewContext::Template,
-        SparsePostFieldWithViewContext::Categories,
-        SparsePostFieldWithViewContext::Tags,
+    const ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &[SparseAnyPostFieldWithViewContext; 22] = &[
+        SparseAnyPostFieldWithViewContext::Id,
+        SparseAnyPostFieldWithViewContext::Date,
+        SparseAnyPostFieldWithViewContext::DateGmt,
+        SparseAnyPostFieldWithViewContext::Guid,
+        SparseAnyPostFieldWithViewContext::Link,
+        SparseAnyPostFieldWithViewContext::Modified,
+        SparseAnyPostFieldWithViewContext::ModifiedGmt,
+        SparseAnyPostFieldWithViewContext::Slug,
+        SparseAnyPostFieldWithViewContext::Status,
+        SparseAnyPostFieldWithViewContext::Title,
+        SparseAnyPostFieldWithViewContext::Content,
+        SparseAnyPostFieldWithViewContext::Author,
+        SparseAnyPostFieldWithViewContext::Excerpt,
+        SparseAnyPostFieldWithViewContext::FeaturedMedia,
+        SparseAnyPostFieldWithViewContext::CommentStatus,
+        SparseAnyPostFieldWithViewContext::PingStatus,
+        SparseAnyPostFieldWithViewContext::Format,
+        SparseAnyPostFieldWithViewContext::Meta,
+        SparseAnyPostFieldWithViewContext::Sticky,
+        SparseAnyPostFieldWithViewContext::Template,
+        SparseAnyPostFieldWithViewContext::Categories,
+        SparseAnyPostFieldWithViewContext::Tags,
     ];
 
     #[fixture]
