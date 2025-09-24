@@ -313,6 +313,9 @@ mod tests {
             tags: vec![TagId(1), TagId(2)],
             tags_exclude: vec![TagId(1), TagId(2)],
             tax_relation: Some(WpApiParamPostsTaxRelation::And),
+            parent: Some(PostId(1)),
+            parent_exclude: vec![PostId(1), PostId(2)],
+            menu_order: Some(1),
         }
     }
 

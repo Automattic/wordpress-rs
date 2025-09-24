@@ -324,7 +324,7 @@ async fn update_sticky_to_true() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert!(updated_post.sticky);
+            assert_eq!(updated_post.sticky, Some(true));
         },
     )
     .await;
@@ -339,7 +339,7 @@ async fn update_sticky_to_false() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert!(!updated_post.sticky);
+            assert_eq!(updated_post.sticky, Some(false));
         },
     )
     .await;
@@ -355,7 +355,7 @@ async fn update_categories() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert_eq!(updated_post.categories, updated_value);
+            assert_eq!(updated_post.categories, Some(updated_value.clone()));
         },
     )
     .await;
@@ -371,7 +371,7 @@ async fn update_tags() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert_eq!(updated_post.tags, updated_value);
+            assert_eq!(updated_post.tags, Some(updated_value.clone()));
         },
     )
     .await;
@@ -500,7 +500,7 @@ mod macro_helper {
                             ..Default::default()
                         },
                         |updated_post, _| {
-                            assert_eq!(updated_post.format, PostFormat::$format);
+                            assert_eq!(updated_post.format, Some(PostFormat::$format));
                         }
                     ).await;
                 }

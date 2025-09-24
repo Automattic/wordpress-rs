@@ -34,6 +34,7 @@ pub enum WpApiParamPostsOrderBy {
     Id,
     Include,
     IncludeSlugs,
+    MenuOrder,
     Modified,
     Parent,
     Relevance,
@@ -148,6 +149,16 @@ pub struct PostListParams {
     /// Limit result set to items that are sticky.
     #[uniffi(default = None)]
     pub sticky: Option<bool>,
+    // Page-specific fields (for hierarchical post types)
+    /// Limit result set to items with a specific parent.
+    #[uniffi(default = None)]
+    pub parent: Option<PostId>,
+    /// Limit result set to items except those of a specific parent.
+    #[uniffi(default = [])]
+    pub parent_exclude: Vec<PostId>,
+    /// Limit result set by menu order.
+    #[uniffi(default = None)]
+    pub menu_order: Option<u32>,
 }
 
 #[derive(Debug, Default, uniffi::Record)]
@@ -245,6 +256,15 @@ pub struct PostCreateParams {
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<TagId>,
+    // Page-specific fields (for hierarchical post types)
+    // The ID for the parent of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<PostId>,
+    // The order of the post in relation to other posts.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub menu_order: Option<u32>,
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -323,6 +343,15 @@ pub struct PostUpdateParams {
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<TagId>,
+    // Page-specific fields (for hierarchical post types)
+    // The ID for the parent of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<PostId>,
+    // The order of the post in relation to other posts.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub menu_order: Option<u32>,
 }
 
 wp_content_i64_id!(PostId);
@@ -375,17 +404,28 @@ pub struct SparseAnyPost {
     #[WpContext(edit, view)]
     pub ping_status: Option<PostPingStatus>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub format: Option<PostFormat>,
     #[WpContext(edit, view)]
     pub meta: Option<PostMeta>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub sticky: Option<bool>,
     #[WpContext(edit, view)]
     pub template: Option<String>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub categories: Option<Vec<CategoryId>>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub tags: Option<Vec<TagId>>,
+    // Page-specific fields (optional for pages, None for posts)
+    #[WpContext(edit, view)]
+    #[WpContextualOption]
+    pub parent: Option<PostId>,
+    #[WpContext(edit, view)]
+    #[WpContextualOption]
+    pub menu_order: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
@@ -720,6 +760,9 @@ mod tests {
             tags: vec![TagId(1), TagId(2)],
             tags_exclude: vec![TagId(1), TagId(2)],
             tax_relation: Some(WpApiParamPostsTaxRelation::And),
+            parent: Some(PostId(1)),
+            parent_exclude: vec![PostId(1), PostId(2)],
+            menu_order: Some(1),
         }
     }
 }

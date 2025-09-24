@@ -1,18 +1,19 @@
 use wp_api::{
-    pages::{
-        PageCreateParams, PageId, PageListParams, PageRetrieveParams, PageUpdateParams,
-        WpApiParamPagesOrderBy,
+    posts::{
+        PostCreateParams, PostId, PostListParams, PostRetrieveParams, PostUpdateParams,
+        WpApiParamPostsOrderBy,
     },
     users::UserId,
 };
+use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]
 async fn create_page_err_cannot_create() {
     api_client_as_subscriber()
-        .pages()
-        .create(&PageCreateParams {
+        .posts()
+        .create(&PostEndpointType::Pages, &PostCreateParams {
             ..Default::default()
         })
         .await
@@ -23,8 +24,8 @@ async fn create_page_err_cannot_create() {
 #[parallel]
 async fn create_page_err_cannot_create2() {
     api_client_as_subscriber()
-        .pages()
-        .create(&PageCreateParams {
+        .posts()
+        .create(&PostEndpointType::Pages, &PostCreateParams {
             title: Some("foo".to_string()),
             ..Default::default()
         })
@@ -36,8 +37,8 @@ async fn create_page_err_cannot_create2() {
 #[parallel]
 async fn delete_page_err_cannot_delete() {
     api_client_as_subscriber()
-        .pages()
-        .delete(&PageId(TestCredentials::instance().first_page_id))
+        .posts()
+        .delete(&PostEndpointType::Pages, &PostId(TestCredentials::instance().first_page_id))
         .await
         .assert_wp_error(WpErrorCode::CannotDelete);
 }
@@ -46,9 +47,9 @@ async fn delete_page_err_cannot_delete() {
 #[parallel]
 async fn list_err_no_search_term_defined() {
     api_client()
-        .pages()
-        .list_with_edit_context(&PageListParams {
-            orderby: Some(WpApiParamPagesOrderBy::Relevance),
+        .posts()
+        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams {
+            orderby: Some(WpApiParamPostsOrderBy::Relevance),
             ..Default::default()
         })
         .await
@@ -59,9 +60,9 @@ async fn list_err_no_search_term_defined() {
 #[parallel]
 async fn list_err_order_by_include_missing_include() {
     api_client()
-        .pages()
-        .list_with_edit_context(&PageListParams {
-            orderby: Some(WpApiParamPagesOrderBy::Include),
+        .posts()
+        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams {
+            orderby: Some(WpApiParamPostsOrderBy::Include),
             ..Default::default()
         })
         .await
@@ -72,8 +73,8 @@ async fn list_err_order_by_include_missing_include() {
 #[parallel]
 async fn list_err_post_invalid_page_number() {
     api_client()
-        .pages()
-        .list_with_edit_context(&PageListParams {
+        .posts()
+        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams {
             page: Some(99999999),
             ..Default::default()
         })
@@ -85,10 +86,11 @@ async fn list_err_post_invalid_page_number() {
 #[parallel]
 async fn retrieve_password_protected_page_err_wrong_password() {
     api_client()
-        .pages()
+        .posts()
         .retrieve_with_view_context(
-            &PageId(TestCredentials::instance().password_protected_page_id),
-            &PageRetrieveParams {
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().password_protected_page_id),
+            &PostRetrieveParams {
                 password: Some("wrong_password".to_string()),
             },
         )
@@ -100,10 +102,11 @@ async fn retrieve_password_protected_page_err_wrong_password() {
 #[parallel]
 async fn retrieve_page_err_forbidden_context() {
     api_client_as_subscriber()
-        .pages()
+        .posts()
         .retrieve_with_edit_context(
-            &PageId(TestCredentials::instance().first_page_id),
-            &PageRetrieveParams::default(),
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            &PostRetrieveParams::default(),
         )
         .await
         .assert_wp_error(WpErrorCode::ForbiddenContext);
@@ -113,8 +116,8 @@ async fn retrieve_page_err_forbidden_context() {
 #[parallel]
 async fn retrieve_page_err_post_invalid_id() {
     api_client()
-        .pages()
-        .retrieve_with_edit_context(&PageId(99999999), &PageRetrieveParams::default())
+        .posts()
+        .retrieve_with_edit_context(&PostEndpointType::Pages, &PostId(99999999), &PostRetrieveParams::default())
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId);
 }
@@ -123,8 +126,8 @@ async fn retrieve_page_err_post_invalid_id() {
 #[parallel]
 async fn trash_page_err_already_trashed() {
     api_client()
-        .pages()
-        .trash(&PageId(TestCredentials::instance().trashed_page_id))
+        .posts()
+        .trash(&PostEndpointType::Pages, &PostId(TestCredentials::instance().trashed_page_id))
         .await
         .assert_wp_error(WpErrorCode::AlreadyTrashed);
 }
@@ -133,10 +136,11 @@ async fn trash_page_err_already_trashed() {
 #[parallel]
 async fn update_page_err_cannot_edit() {
     api_client_as_author()
-        .pages()
+        .posts()
         .update(
-            &PageId(TestCredentials::instance().first_page_id),
-            &PageUpdateParams::default(),
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            &PostUpdateParams::default(),
         )
         .await
         .assert_wp_error(WpErrorCode::CannotEdit);
@@ -146,10 +150,11 @@ async fn update_page_err_cannot_edit() {
 #[parallel]
 async fn update_page_err_invalid_author() {
     api_client()
-        .pages()
+        .posts()
         .update(
-            &PageId(TestCredentials::instance().first_page_id),
-            &PageUpdateParams {
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            &PostUpdateParams {
                 author: Some(UserId(99999999)),
                 ..Default::default()
             },
@@ -162,11 +167,12 @@ async fn update_page_err_invalid_author() {
 #[parallel]
 async fn update_page_err_invalid_parent() {
     api_client()
-        .pages()
+        .posts()
         .update(
-            &PageId(TestCredentials::instance().first_page_id),
-            &PageUpdateParams {
-                parent: Some(PageId(99999999)),
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            &PostUpdateParams {
+                parent: Some(PostId(99999999)),
                 ..Default::default()
             },
         )
@@ -178,10 +184,11 @@ async fn update_page_err_invalid_parent() {
 #[parallel]
 async fn update_page_err_invalid_param() {
     api_client()
-        .pages()
+        .posts()
         .update(
-            &PageId(TestCredentials::instance().first_page_id),
-            &PageUpdateParams {
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            &PostUpdateParams {
                 template: Some("nonexistent-template".to_string()),
                 ..Default::default()
             },
