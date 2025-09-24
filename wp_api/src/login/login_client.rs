@@ -299,6 +299,7 @@ impl WpLoginClient {
                 body: None,
             }
             .into(),
+            None,
         )
         .await
     }
@@ -326,6 +327,7 @@ impl WpLoginClient {
                 body: None,
             }
             .into(),
+            None,
         )
         .await
     }
@@ -411,6 +413,7 @@ impl WpLoginClient {
                 body: Some(Arc::new(WpNetworkRequestBody::new(r#"<?xml version="1.0"?><methodCall><methodName>system.listMethods</methodName></methodCall>"#.as_bytes().to_vec()))),
             }
             .into(),
+            None,
         )
         .await
         // It's very likely xml-rpc is blocked by the hosting provider (the request has not reached to WordPress),
@@ -449,6 +452,7 @@ impl WpLoginClient {
                     body: None,
                 }
                 .into(),
+                None,
             )
             .await
             .map_err(|error| XmlrpcDiscoveryError::FetchHomepage { error })?;
@@ -467,6 +471,7 @@ impl WpLoginClient {
                     body: None,
                 }
                 .into(),
+                None,
             )
             .await
             .map_err(|_| XmlrpcDiscoveryError::Disabled {

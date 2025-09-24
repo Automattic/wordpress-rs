@@ -3,6 +3,7 @@ use wp_api::{
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     prelude::*,
+    request::RequestContext,
     request::endpoint::media_endpoint::MediaUploadRequest,
     users::UserId,
 };
@@ -259,4 +260,6 @@ impl RequestExecutor for MediaErrNetworking {
     async fn sleep(&self, millis: u64) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
     }
+
+    fn cancel(&self, _context: Arc<RequestContext>) {}
 }

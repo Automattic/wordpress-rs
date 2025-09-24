@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use std::sync::Arc;
-use wp_api::{prelude::*, request::endpoint::media_endpoint::MediaUploadRequest};
+use wp_api::{
+    prelude::*, request::RequestContext, request::endpoint::media_endpoint::MediaUploadRequest,
+};
 
 #[derive(Debug)]
 pub struct MockExecutor {
@@ -39,6 +41,8 @@ impl RequestExecutor for MockExecutor {
     }
 
     async fn sleep(&self, _: u64) {}
+
+    fn cancel(&self, _: Arc<RequestContext>) {}
 }
 
 pub mod response_helpers {

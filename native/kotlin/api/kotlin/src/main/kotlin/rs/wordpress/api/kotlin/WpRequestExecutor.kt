@@ -16,6 +16,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.MediaUploadRequestExecutionException
+import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
@@ -148,6 +149,10 @@ class WpRequestExecutor(
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
+    }
+
+    override fun cancel(context: RequestContext) {
+        // No-op
     }
 
     private fun File.canBeUploaded() = exists() && isFile && canRead()

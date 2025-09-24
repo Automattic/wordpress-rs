@@ -412,8 +412,7 @@ end
 
 def xcframework_bindings_file_path
   dir = File.join(PROJECT_ROOT, 'native', 'swift', 'Sources', 'wordpress-api-wrapper')
-  %w[wp_api.swift wp_localization.swift]
-    .map { |file| File.join(dir, file) }
+  Dir.glob(File.join(dir, '*.swift'))
 end
 
 def remove_lane_context_values(names)

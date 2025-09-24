@@ -7,6 +7,8 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
+echo "Generating Swift bindings... (This may take a while when running for the first time.)"
+
 module_name="libwordpressFFI"
 library_path=$1
 output_dir="$(dirname "$library_path")/swift-bindings"
@@ -48,6 +50,15 @@ done
 
 rm -f native/swift/Sources/wordpress-api-wrapper/*.swift
 mv "$output_dir"/*.swift native/swift/Sources/wordpress-api-wrapper/
+
+for swift_file in native/swift/Sources/wordpress-api-wrapper/*.swift; do
+    basename=$(basename "$swift_file" .swift)
+    output_file="native/swift/Sources/wordpress-api-wrapper/${basename}_cancellable.swift"
+
+    swift run -c release --quiet \
+        --package-path native/swift/Tools \
+        generate-cancellable --log-level warning "$swift_file" "$output_file"
+done
 
 header_dir="$output_dir/Headers"
 mkdir -p "$header_dir"

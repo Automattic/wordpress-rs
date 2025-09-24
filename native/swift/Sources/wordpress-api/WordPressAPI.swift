@@ -20,7 +20,7 @@ public actor WordPressAPI {
     }
 
     private let apiUrlResolver: ApiUrlResolver
-    private let requestExecutor: SafeRequestExecutor
+    let requestExecutor: SafeRequestExecutor
     private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 

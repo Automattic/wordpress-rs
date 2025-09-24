@@ -2,7 +2,7 @@ use std::sync::{
     Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use wp_api::users::UserListParams;
+use wp_api::{request::RequestContext, users::UserListParams};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -133,4 +133,6 @@ impl RequestExecutor for TrackedRequestExecutor {
     }
 
     async fn sleep(&self, _: u64) {}
+
+    fn cancel(&self, _: Arc<RequestContext>) {}
 }
