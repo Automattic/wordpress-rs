@@ -9,13 +9,15 @@ struct BlockSettingsTests {
     @Test
     func fetchRawBlockSettings() async throws {
         let response = try await api.blockEditor.retrieveSettings(params: WpBlockEditorSettingsParams())
-        #expect(!response.data.payload.isEmpty)
+        #expect(response.data.payload.asBytes().count > 0)
 
-        let json = try response.data.asJson()
-        if let dict = json as? [String: Any] {
-            #expect(dict["alignWide"] as? Bool == false, "alignWide should be false in test environment")
-        } else {
-            Issue.record("Expected JSON object but got \(type(of: json))")
+        let jsonRoot = response.data.payload.asJson()
+
+        guard case .object(let dictionary) = jsonRoot, case .bool(let value) = dictionary["alignWide"] else {
+            Issue.record("Invalid JSON")
+            return
         }
+
+        #expect(value == false, "alignWide should be false in test environment")
     }
 }
