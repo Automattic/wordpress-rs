@@ -1,7 +1,6 @@
 use serde::{Serialize, de::DeserializeOwned};
 use wp_api::{
-    categories::CategoryId, comments::CommentId, posts::PostId, tags::TagId,
-    users::UserId,
+    categories::CategoryId, comments::CommentId, posts::PostId, tags::TagId, users::UserId,
 };
 use wp_cli::{
     WpCliCategory, WpCliComment, WpCliPage, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser,

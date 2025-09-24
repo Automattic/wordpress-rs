@@ -1,7 +1,7 @@
 use macro_helper::{generate_update_page_status_test, generate_update_test};
 use wp_api::posts::{
-    PostCommentStatus, PostCreateParams, PostFootnote, PostMeta, PostPingStatus, PostStatus,
-    PostUpdateParams, AnyPostWithEditContext,
+    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostMeta,
+    PostPingStatus, PostStatus, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::{PAGE_TEMPLATE_WITH_SIDEBAR, prelude::*};
@@ -108,7 +108,10 @@ async fn delete_page() {
     // Delete the page using the API and ensure it's successful
     let page_delete_response = api_client()
         .posts()
-        .delete(&PostEndpointType::Pages, &PostId(TestCredentials::instance().first_page_id))
+        .delete(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+        )
         .await;
     assert!(page_delete_response.is_ok(), "{page_delete_response:#?}");
     assert!(page_delete_response.unwrap().data.deleted);
@@ -131,7 +134,10 @@ async fn trash_page() {
     // Trash the page using the API and ensure it's successful
     let page_trash_response = api_client()
         .posts()
-        .trash(&PostEndpointType::Pages, &PostId(TestCredentials::instance().first_page_id))
+        .trash(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+        )
         .await;
     assert!(page_trash_response.is_ok(), "{page_trash_response:#?}");
 
@@ -301,7 +307,9 @@ generate_update_test!(
     |updated_page, updated_page_from_wp_cli| {
         assert_eq!(
             updated_page.parent,
-            Some(PostId(TestCredentials::instance().password_protected_page_id))
+            Some(PostId(
+                TestCredentials::instance().password_protected_page_id
+            ))
         );
         assert_eq!(
             updated_page_from_wp_cli.parent,
@@ -393,7 +401,11 @@ where
 {
     let updated_page = api_client()
         .posts()
-        .update(&PostEndpointType::Pages, &PostId(TestCredentials::instance().first_page_id), params)
+        .update(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            params,
+        )
         .await
         .assert_response()
         .data;

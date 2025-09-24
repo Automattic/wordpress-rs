@@ -1,3 +1,4 @@
+use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api::{
     posts::{
         PostCreateParams, PostId, PostListParams, PostRetrieveParams, PostUpdateParams,
@@ -5,7 +6,6 @@ use wp_api::{
     },
     users::UserId,
 };
-use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -13,9 +13,12 @@ use wp_api_integration_tests::prelude::*;
 async fn create_page_err_cannot_create() {
     api_client_as_subscriber()
         .posts()
-        .create(&PostEndpointType::Pages, &PostCreateParams {
-            ..Default::default()
-        })
+        .create(
+            &PostEndpointType::Pages,
+            &PostCreateParams {
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotCreate);
 }
@@ -25,10 +28,13 @@ async fn create_page_err_cannot_create() {
 async fn create_page_err_cannot_create2() {
     api_client_as_subscriber()
         .posts()
-        .create(&PostEndpointType::Pages, &PostCreateParams {
-            title: Some("foo".to_string()),
-            ..Default::default()
-        })
+        .create(
+            &PostEndpointType::Pages,
+            &PostCreateParams {
+                title: Some("foo".to_string()),
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotCreate);
 }
@@ -38,7 +44,10 @@ async fn create_page_err_cannot_create2() {
 async fn delete_page_err_cannot_delete() {
     api_client_as_subscriber()
         .posts()
-        .delete(&PostEndpointType::Pages, &PostId(TestCredentials::instance().first_page_id))
+        .delete(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotDelete);
 }
@@ -48,10 +57,13 @@ async fn delete_page_err_cannot_delete() {
 async fn list_err_no_search_term_defined() {
     api_client()
         .posts()
-        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams {
-            orderby: Some(WpApiParamPostsOrderBy::Relevance),
-            ..Default::default()
-        })
+        .list_with_edit_context(
+            &PostEndpointType::Pages,
+            &PostListParams {
+                orderby: Some(WpApiParamPostsOrderBy::Relevance),
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::NoSearchTermDefined);
 }
@@ -61,10 +73,13 @@ async fn list_err_no_search_term_defined() {
 async fn list_err_order_by_include_missing_include() {
     api_client()
         .posts()
-        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams {
-            orderby: Some(WpApiParamPostsOrderBy::Include),
-            ..Default::default()
-        })
+        .list_with_edit_context(
+            &PostEndpointType::Pages,
+            &PostListParams {
+                orderby: Some(WpApiParamPostsOrderBy::Include),
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::OrderbyIncludeMissingInclude);
 }
@@ -74,10 +89,13 @@ async fn list_err_order_by_include_missing_include() {
 async fn list_err_post_invalid_page_number() {
     api_client()
         .posts()
-        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams {
-            page: Some(99999999),
-            ..Default::default()
-        })
+        .list_with_edit_context(
+            &PostEndpointType::Pages,
+            &PostListParams {
+                page: Some(99999999),
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidPageNumber);
 }
@@ -117,7 +135,11 @@ async fn retrieve_page_err_forbidden_context() {
 async fn retrieve_page_err_post_invalid_id() {
     api_client()
         .posts()
-        .retrieve_with_edit_context(&PostEndpointType::Pages, &PostId(99999999), &PostRetrieveParams::default())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Pages,
+            &PostId(99999999),
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId);
 }
@@ -127,7 +149,10 @@ async fn retrieve_page_err_post_invalid_id() {
 async fn trash_page_err_already_trashed() {
     api_client()
         .posts()
-        .trash(&PostEndpointType::Pages, &PostId(TestCredentials::instance().trashed_page_id))
+        .trash(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().trashed_page_id),
+        )
         .await
         .assert_wp_error(WpErrorCode::AlreadyTrashed);
 }

@@ -22,6 +22,6 @@ pub use std::sync::Arc;
 pub use url::Url;
 pub use wp_api::{
     categories::CategoryId, comments::CommentId, date::WpGmtDateTime, media::MediaId,
-    posts::PostId, prelude::*, reqwest_request_executor::ReqwestRequestExecutor,
-    tags::TagId, users::UserId,
+    posts::PostId, prelude::*, reqwest_request_executor::ReqwestRequestExecutor, tags::TagId,
+    users::UserId,
 };

@@ -1,5 +1,5 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::posts::{PostId, PostListParams, PostUpdateParams, AnyPostWithEditContext};
+use crate::posts::{AnyPostWithEditContext, PostId, PostListParams, PostUpdateParams};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -273,7 +273,7 @@ mod tests {
         let before = unit_test_example_date_as_query_value("before");
         let modified_before = unit_test_example_date_as_query_value("modified_before");
         format!(
-            "page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true"
+            "page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true&parent=1&parent_exclude=1%2C2&menu_order=1"
         )
     }
 
@@ -319,8 +319,8 @@ mod tests {
         }
     }
 
-    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &str = "_fields=id%2Cdate%2Cdate_gmt%2Cguid%2Clink%2Cmodified%2Cmodified_gmt%2Cslug%2Cstatus%2Ctitle%2Ccontent%2Cauthor%2Cexcerpt%2Cfeatured_media%2Ccomment_status%2Cping_status%2Cformat%2Cmeta%2Csticky%2Ctemplate%2Ccategories%2Ctags%2Cpassword%2Cpermalink_template%2Cgenerated_slug";
-    const ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &[SparseAnyPostFieldWithEditContext; 25] = &[
+    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &str = "_fields=id%2Cdate%2Cdate_gmt%2Cguid%2Clink%2Cmodified%2Cmodified_gmt%2Cslug%2Cstatus%2Ctitle%2Ccontent%2Cauthor%2Cexcerpt%2Cfeatured_media%2Ccomment_status%2Cping_status%2Cformat%2Cmeta%2Csticky%2Ctemplate%2Ccategories%2Ctags%2Cparent%2Cmenu_order%2Cpassword%2Cpermalink_template%2Cgenerated_slug";
+    const ALL_SPARSE_POST_FIELDS_WITH_EDIT_CONTEXT: &[SparseAnyPostFieldWithEditContext; 27] = &[
         SparseAnyPostFieldWithEditContext::Id,
         SparseAnyPostFieldWithEditContext::Date,
         SparseAnyPostFieldWithEditContext::DateGmt,
@@ -343,6 +343,8 @@ mod tests {
         SparseAnyPostFieldWithEditContext::Template,
         SparseAnyPostFieldWithEditContext::Categories,
         SparseAnyPostFieldWithEditContext::Tags,
+        SparseAnyPostFieldWithEditContext::Parent,
+        SparseAnyPostFieldWithEditContext::MenuOrder,
         SparseAnyPostFieldWithEditContext::Password,
         SparseAnyPostFieldWithEditContext::PermalinkTemplate,
         SparseAnyPostFieldWithEditContext::GeneratedSlug,
@@ -360,8 +362,8 @@ mod tests {
         SparseAnyPostFieldWithEmbedContext::FeaturedMedia,
     ];
 
-    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &str = "_fields=id%2Cdate%2Cdate_gmt%2Cguid%2Clink%2Cmodified%2Cmodified_gmt%2Cslug%2Cstatus%2Ctitle%2Ccontent%2Cauthor%2Cexcerpt%2Cfeatured_media%2Ccomment_status%2Cping_status%2Cformat%2Cmeta%2Csticky%2Ctemplate%2Ccategories%2Ctags";
-    const ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &[SparseAnyPostFieldWithViewContext; 22] = &[
+    const EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &str = "_fields=id%2Cdate%2Cdate_gmt%2Cguid%2Clink%2Cmodified%2Cmodified_gmt%2Cslug%2Cstatus%2Ctitle%2Ccontent%2Cauthor%2Cexcerpt%2Cfeatured_media%2Ccomment_status%2Cping_status%2Cformat%2Cmeta%2Csticky%2Ctemplate%2Ccategories%2Ctags%2Cparent%2Cmenu_order";
+    const ALL_SPARSE_POST_FIELDS_WITH_VIEW_CONTEXT: &[SparseAnyPostFieldWithViewContext; 24] = &[
         SparseAnyPostFieldWithViewContext::Id,
         SparseAnyPostFieldWithViewContext::Date,
         SparseAnyPostFieldWithViewContext::DateGmt,
@@ -384,6 +386,8 @@ mod tests {
         SparseAnyPostFieldWithViewContext::Template,
         SparseAnyPostFieldWithViewContext::Categories,
         SparseAnyPostFieldWithViewContext::Tags,
+        SparseAnyPostFieldWithViewContext::Parent,
+        SparseAnyPostFieldWithViewContext::MenuOrder,
     ];
 
     #[fixture]

@@ -1,8 +1,8 @@
 use wp_api::{
     posts::{
         PostId, PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
-        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext, WpApiParamPostsOrderBy,
-        WpApiParamPostsSearchColumn,
+        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
+        WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
     },
     request::endpoint::posts_endpoint::PostEndpointType,
 };

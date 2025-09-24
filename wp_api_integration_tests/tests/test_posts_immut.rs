@@ -2,8 +2,8 @@ use wp_api::{
     categories::CategoryId,
     posts::{
         PostId, PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
-        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext, WpApiParamPostsOrderBy,
-        WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
+        WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
     },
     request::endpoint::posts_endpoint::PostEndpointType,
     tags::TagId,
@@ -60,7 +60,11 @@ async fn list_with_view_context(#[case] params: PostListParams) {
 async fn retrieve_with_edit_context() {
     api_client()
         .posts()
-        .retrieve_with_edit_context(&PostEndpointType::Posts, &FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response();
 }
@@ -70,7 +74,11 @@ async fn retrieve_with_edit_context() {
 async fn retrieve_with_embed_context(#[case] params: PostRetrieveParams) {
     api_client()
         .posts()
-        .retrieve_with_embed_context(&PostEndpointType::Posts, &FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_embed_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response();
 }
@@ -80,7 +88,11 @@ async fn retrieve_with_embed_context(#[case] params: PostRetrieveParams) {
 async fn retrieve_with_view_context(#[case] params: PostRetrieveParams) {
     api_client()
         .posts()
-        .retrieve_with_view_context(&PostEndpointType::Posts, &FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_view_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response();
 }
@@ -169,7 +181,11 @@ async fn ensure_date_gmt_is_parsed_correctly() {
     let test_credentials = TestCredentials::instance();
     let post = api_client()
         .posts()
-        .retrieve_with_edit_context(&PostEndpointType::Posts, &FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response()
         .data;

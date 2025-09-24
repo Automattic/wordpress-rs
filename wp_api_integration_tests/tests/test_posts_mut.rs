@@ -2,8 +2,8 @@ use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
 use wp_api::posts::{
-    PostCommentStatus, PostCreateParams, PostFootnote, PostFormat, PostMeta, PostPingStatus,
-    PostStatus, PostUpdateParams, AnyPostWithEditContext,
+    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
+    PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::prelude::*;
@@ -108,7 +108,10 @@ async fn create_post_with_title_content_and_excerpt() {
 #[serial]
 async fn delete_post() {
     // Delete the post using the API and ensure it's successful
-    let post_delete_response = api_client().posts().delete(&PostEndpointType::Posts, &FIRST_POST_ID).await;
+    let post_delete_response = api_client()
+        .posts()
+        .delete(&PostEndpointType::Posts, &FIRST_POST_ID)
+        .await;
     assert!(post_delete_response.is_ok(), "{post_delete_response:#?}");
     assert!(post_delete_response.unwrap().data.deleted);
 
@@ -128,7 +131,10 @@ async fn delete_post() {
 #[serial]
 async fn trash_post() {
     // Trash the post using the API and ensure it's successful
-    let post_trash_response = api_client().posts().trash(&PostEndpointType::Posts, &FIRST_POST_ID).await;
+    let post_trash_response = api_client()
+        .posts()
+        .trash(&PostEndpointType::Posts, &FIRST_POST_ID)
+        .await;
     assert!(post_trash_response.is_ok(), "{post_trash_response:#?}");
 
     // Assert that the post was trashed
