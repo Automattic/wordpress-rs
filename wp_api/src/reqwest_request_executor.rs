@@ -3,7 +3,7 @@ use crate::{
         InvalidSslErrorReason, MediaUploadRequestExecutionError, RequestExecutionError,
         RequestExecutionErrorReason,
     },
-    cancellation::RequestContext,
+    request::RequestContext,
     request::{
         NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,

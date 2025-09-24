@@ -1,7 +1,7 @@
 use crate::{
     api_client::IsWpApiClientDelegate,
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
-    cancellation::RequestContext,
+    request::RequestContext,
     request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};

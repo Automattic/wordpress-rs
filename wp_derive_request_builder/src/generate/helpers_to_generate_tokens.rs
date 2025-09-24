@@ -91,7 +91,7 @@ pub fn append_context_param(input: TokenStream) -> TokenStream {
     signature.ident = format_ident!("{}_cancellation", original_name);
 
     let new_arg: FnArg =
-        parse_quote! { context: Option<std::sync::Arc<crate::cancellation::RequestContext>> };
+        parse_quote! { context: Option<std::sync::Arc<crate::request::RequestContext>> };
     signature.inputs.push(new_arg);
 
     quote! { #signature }
@@ -1287,11 +1287,11 @@ mod tests {
     #[rstest]
     #[case(
         quote! { fn list(&self, params: &UserListParams) },
-        "fn list_cancellation (& self , params : & UserListParams , context : Option < std :: sync :: Arc < crate :: cancellation :: RequestContext > >)"
+        "fn list_cancellation (& self , params : & UserListParams , context : Option < std :: sync :: Arc < crate :: request :: RequestContext > >)"
     )]
     #[case(
         quote! { fn list(&self) },
-        "fn list_cancellation (& self , context : Option < std :: sync :: Arc < crate :: cancellation :: RequestContext > >)"
+        "fn list_cancellation (& self , context : Option < std :: sync :: Arc < crate :: request :: RequestContext > >)"
     )]
     fn test_append_context_param(#[case] input: TokenStream, #[case] expected: &str) {
         let result = append_context_param(input);

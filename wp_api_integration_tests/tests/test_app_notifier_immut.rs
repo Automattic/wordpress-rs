@@ -2,7 +2,7 @@ use std::sync::{
     Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use wp_api::{cancellation::RequestContext, users::UserListParams};
+use wp_api::{request::RequestContext, users::UserListParams};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]

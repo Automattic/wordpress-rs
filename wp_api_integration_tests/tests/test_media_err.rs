@@ -1,9 +1,9 @@
 use wp_api::{
     auth::WpAuthenticationProvider,
-    cancellation::RequestContext,
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     prelude::*,
+    request::RequestContext,
     request::endpoint::media_endpoint::MediaUploadRequest,
     users::UserId,
 };

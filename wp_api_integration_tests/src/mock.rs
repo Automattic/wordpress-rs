@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use wp_api::{
-    cancellation::RequestContext, prelude::*, request::endpoint::media_endpoint::MediaUploadRequest,
+    prelude::*, request::RequestContext, request::endpoint::media_endpoint::MediaUploadRequest,
 };
 
 #[derive(Debug)]
