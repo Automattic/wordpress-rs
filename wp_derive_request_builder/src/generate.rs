@@ -180,7 +180,6 @@ fn generate_async_request_executor(
                     }
                 }
 
-                #[uniffi::export]
                 fn #fn_parse_as_response_type_ident(response: #crate_ident::request::WpNetworkResponse) -> Result<#response_type_ident, #error_type> {
                     response.parse()
                 }
