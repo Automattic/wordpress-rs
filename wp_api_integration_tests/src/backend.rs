@@ -1,6 +1,6 @@
 use serde::{Serialize, de::DeserializeOwned};
 use wp_api::{
-    categories::CategoryId, comments::CommentId, pages::PageId, posts::PostId, tags::TagId,
+    categories::CategoryId, comments::CommentId, posts::PostId, tags::TagId,
     users::UserId,
 };
 use wp_cli::{
@@ -61,7 +61,7 @@ impl Backend {
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await
     }
-    pub async fn page(page_id: &PageId) -> WpCliPage {
+    pub async fn page(page_id: &PostId) -> WpCliPage {
         Self::get(format!("{BACKEND_PATH_PAGE}?page_id={page_id}"))
             .await
             .expect("Failed to parse fetched page from wp_cli")

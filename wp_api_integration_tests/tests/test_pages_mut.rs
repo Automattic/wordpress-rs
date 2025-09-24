@@ -3,7 +3,6 @@ use wp_api::posts::{
     PostCommentStatus, PostCreateParams, PostFootnote, PostMeta, PostPingStatus, PostStatus,
     PostUpdateParams, AnyPostWithEditContext,
 };
-use wp_api::pages::PageId;
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::{PAGE_TEMPLATE_WITH_SIDEBAR, prelude::*};
 use wp_cli::WpCliPage;
@@ -383,7 +382,7 @@ where
         .await
         .assert_response()
         .data;
-    let created_page_from_wp_cli = Backend::page(&PageId(created_page.id.0)).await;
+    let created_page_from_wp_cli = Backend::page(&created_page.id).await;
     assert(created_page, created_page_from_wp_cli);
     RestoreServer::db().await;
 }
@@ -399,7 +398,7 @@ where
         .assert_response()
         .data;
     let updated_page_from_wp_cli =
-        Backend::page(&PageId(TestCredentials::instance().first_page_id)).await;
+        Backend::page(&PostId(TestCredentials::instance().first_page_id)).await;
     assert(updated_page, updated_page_from_wp_cli);
     RestoreServer::db().await;
 }

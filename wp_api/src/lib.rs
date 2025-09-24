@@ -19,7 +19,6 @@ pub mod date;
 pub mod login;
 pub mod media;
 pub mod middleware;
-pub mod pages;
 pub mod parsed_url;
 pub mod plugins;
 pub mod post_revisions;
