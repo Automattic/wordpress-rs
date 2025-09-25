@@ -81,7 +81,6 @@ public typealias PluginWpOrgDirectoryCategory = WordPressAPIInternal.WordPressOr
 public typealias PluginInformation = WordPressAPIInternal.PluginInformation
 public typealias UpdateCheckPluginInfo = WordPressAPIInternal.UpdateCheckPluginInfo
 
-
 // MARK: – Application Passwords
 
 public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicationPassword
@@ -232,4 +231,3 @@ public typealias AddMessageToSupportConversationParams = WordPressAPIInternal.Ad
 
 // MARK: - Jetpack
 public typealias JetpackConnectionClient = WordPressAPIInternal.JetpackConnectionClient
-
