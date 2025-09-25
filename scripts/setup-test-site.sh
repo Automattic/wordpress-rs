@@ -75,7 +75,10 @@ wp plugin install gutenberg --activate
 
 # Install custom must-use plugins for integration tests
 mkdir -p wp-content/mu-plugins
-cp /app/scripts/setup-test-site-custom-plugins/*.php wp-content/mu-plugins/
+cp -v /app/scripts/test-site-mu-plugins/*.php wp-content/mu-plugins/
+cp -v /app/scripts/test-site-plugins/*.php wp-content/plugins/
+
+wp plugin activate books-plugin
 
 # We need an `author` user for some of the integration tests
 wp user create test_author test_author@example.com --role=author
