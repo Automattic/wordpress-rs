@@ -227,6 +227,22 @@ async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
     assert!(!prev_page_response.data.is_empty());
 }
 
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(PostEndpointType::Posts)]
+#[case(PostEndpointType::Pages)]
+// This test ensures that we can list & parse the given post type with default params
+async fn list_with_post_endpoint_type_using_default_params(
+    #[case] post_endpoint_type: PostEndpointType,
+) {
+    api_client()
+        .posts()
+        .list_with_edit_context(&post_endpoint_type, &PostListParams::default())
+        .await
+        .assert_response();
+}
+
 #[template]
 #[rstest]
 #[case::default(PostListParams::default())]
