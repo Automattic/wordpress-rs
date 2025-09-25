@@ -23,6 +23,11 @@ public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddlewar
 public typealias WpApiClientDelegate = WordPressAPIInternal.WpApiClientDelegate
 public typealias WpAppNotifier = WordPressAPIInternal.WpAppNotifier
 public typealias UserAvatarSize = WordPressAPIInternal.UserAvatarSize
+public typealias WpApiDetails = WordPressAPIInternal.WpApiDetails
+public typealias ApiUrlResolver = WordPressAPIInternal.ApiUrlResolver
+public typealias WpComDotOrgApiUrlResolver = WordPressAPIInternal.WpComDotOrgApiUrlResolver
+public typealias WpOrgSiteApiUrlResolver = WordPressAPIInternal.WpOrgSiteApiUrlResolver
+public typealias WpApiParamOrder = WordPressAPIInternal.WpApiParamOrder
 public typealias UserCapability = WordPressAPIInternal.UserCapability
 public typealias UserRole = WordPressAPIInternal.UserRole
 
@@ -32,6 +37,7 @@ public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApp
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias SSLCertificateInfo = WordPressAPIInternal.SslCertificateInfo
 public typealias AutoDiscoveryAttemptSuccess = WordPressAPIInternal.AutoDiscoveryAttemptSuccess
+public typealias WpDynamicAuthenticationProvider = WordPressAPIInternal.WpDynamicAuthenticationProvider
 
 // MARK: - Errors
 public typealias AutoDiscoveryAttemptFailure = WordPressAPIInternal.AutoDiscoveryAttemptFailure
@@ -65,12 +71,17 @@ public typealias PluginWithViewContext = WordPressAPIInternal.PluginWithViewCont
 public typealias PluginWithEditContext = WordPressAPIInternal.PluginWithEditContext
 public typealias PluginWithEmbedContext = WordPressAPIInternal.PluginWithEmbedContext
 public typealias PluginSlug = WordPressAPIInternal.PluginSlug
-public typealias PluginWpOrgDirectorySlug = WordPressAPIInternal.PluginWpOrgDirectorySlug
 public typealias PluginListParams = WordPressAPIInternal.PluginListParams
 public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
 public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
+public typealias PluginStatus = WordPressAPIInternal.PluginStatus
+
+public typealias PluginWpOrgDirectorySlug = WordPressAPIInternal.PluginWpOrgDirectorySlug
+public typealias PluginWpOrgDirectoryCategory = WordPressAPIInternal.WordPressOrgApiPluginDirectoryCategory
+public typealias PluginInformation = WordPressAPIInternal.PluginInformation
+public typealias UpdateCheckPluginInfo = WordPressAPIInternal.UpdateCheckPluginInfo
 
 // MARK: – Application Passwords
 
@@ -134,6 +145,23 @@ public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.
 public typealias MediaRequestListWithViewContextResponse = WordPressAPIInternal.MediaRequestListWithViewContextResponse
 public typealias MediaRequestListWithEmbedContextResponse = WordPressAPIInternal.MediaRequestListWithEmbedContextResponse
 
+// MARK: - Comments
+public typealias SparseComment = WordPressAPIInternal.SparseComment
+public typealias CommentWithEditContext = WordPressAPIInternal.CommentWithEditContext
+public typealias CommentWithViewContext = WordPressAPIInternal.CommentWithViewContext
+public typealias CommentWithEmbedContext = WordPressAPIInternal.CommentWithEmbedContext
+public typealias CommentListParams = WordPressAPIInternal.CommentListParams
+public typealias CommentCreateParams = WordPressAPIInternal.CommentCreateParams
+public typealias CommentUpdateParams = WordPressAPIInternal.CommentUpdateParams
+public typealias CommentDeleteParams = WordPressAPIInternal.CommentDeleteParams
+public typealias CommentStatus = WordPressAPIInternal.CommentStatus
+public typealias CommentType = WordPressAPIInternal.CommentType
+public typealias CommentsRequestExecutor = WordPressAPIInternal.CommentsRequestExecutor
+
+public typealias CommentsRequestListWithEditContextResponse = WordPressAPIInternal.CommentsRequestListWithEditContextResponse
+public typealias CommentsRequestListWithViewContextResponse = WordPressAPIInternal.CommentsRequestListWithViewContextResponse
+public typealias CommentsRequestListWithEmbedContextResponse = WordPressAPIInternal.CommentsRequestListWithEmbedContextResponse
+
 // MARK: - Tags
 public typealias TagId = WordPressAPIInternal.TagId
 public typealias SparseTag = WordPressAPIInternal.SparseTag
@@ -143,6 +171,7 @@ public typealias TagWithEmbedContext = WordPressAPIInternal.TagWithEmbedContext
 public typealias TagCreateParams = WordPressAPIInternal.TagCreateParams
 public typealias TagUpdateParams = WordPressAPIInternal.TagUpdateParams
 public typealias TagListParams = WordPressAPIInternal.TagListParams
+public typealias WpApiParamTagsOrderBy = WordPressAPIInternal.WpApiParamTagsOrderBy
 public typealias TagsRequestExecutor = WordPressAPIInternal.TagsRequestExecutor
 public typealias TagsRequestListWithEditContextResponse = WordPressAPIInternal.TagsRequestListWithEditContextResponse
 public typealias TagsRequestListWithViewContextResponse = WordPressAPIInternal.TagsRequestListWithViewContextResponse
@@ -157,6 +186,7 @@ public typealias CategoryWithEmbedContext = WordPressAPIInternal.CategoryWithEmb
 public typealias CategoryCreateParams = WordPressAPIInternal.CategoryCreateParams
 public typealias CategoryUpdateParams = WordPressAPIInternal.CategoryUpdateParams
 public typealias CategoryListParams = WordPressAPIInternal.CategoryListParams
+public typealias WpApiParamCategoriesOrderBy = WordPressAPIInternal.WpApiParamCategoriesOrderBy
 public typealias CategoriesRequestExecutor = WordPressAPIInternal.CategoriesRequestExecutor
 public typealias CategoriesRequestListWithEditContextResponse = WordPressAPIInternal.CategoriesRequestListWithEditContextResponse
 public typealias CategoriesRequestListWithViewContextResponse = WordPressAPIInternal.CategoriesRequestListWithViewContextResponse
@@ -200,3 +230,6 @@ public typealias CreateBotConversationFeedbackParams = WordPressAPIInternal.Crea
 // MARK: Support Tickets
 public typealias CreateSupportTicketParams = WordPressAPIInternal.CreateSupportTicketParams
 public typealias AddMessageToSupportConversationParams = WordPressAPIInternal.AddMessageToSupportConversationParams
+
+// MARK: - Jetpack
+public typealias JetpackConnectionClient = WordPressAPIInternal.JetpackConnectionClient
