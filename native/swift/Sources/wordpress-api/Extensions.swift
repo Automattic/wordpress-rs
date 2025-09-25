@@ -33,12 +33,22 @@ extension MiddlewarePipeline {
     }
 }
 
+extension WpApiError {
+    public var isCancellationError: Bool {
+        if case .RequestExecutionFailed(statusCode: _, redirects: _, reason: .cancellationError) = self {
+            return true
+        }
+        return false
+    }
+}
+
+// MARK: - Enum initialization and unpacking
 public extension CommentStatus {
     init(_ status: String) {
         self = commentStatusFromString(value: status)
     }
 
-    var status: String {
+    var rawValue: String {
         commentStatusToString(status: self)
     }
 }
@@ -54,22 +64,61 @@ public extension CommentType {
         self = commentTypeFromString(value: type)
     }
 
-    var type: String {
+    var rawValue: String {
         commentTypeToString(commentType: self)
     }
 }
 
 extension CommentType: ExpressibleByStringLiteral {
-    public init(stringLiteral: String) {
+    public init(stringLiteral: StringLiteralType) {
         self.init(stringLiteral)
     }
 }
 
-extension WpApiError {
-    public var isCancellationError: Bool {
-        if case .RequestExecutionFailed(statusCode: _, redirects: _, reason: .cancellationError) = self {
-            return true
-        }
-        return false
+public extension UserRole {
+    init(_ role: String) {
+        self = userRoleFromString(value: role)
+    }
+
+    var rawValue: String {
+        userRoleToString(role: self)
+    }
+}
+
+extension UserRole: ExpressibleByStringLiteral {
+    public init(stringLiteral: StringLiteralType) {
+        self.init(stringLiteral)
+    }
+}
+
+public extension UserCapability {
+    init(_ capability: String) {
+        self = userCapabilityFromString(value: capability)
+    }
+
+    var rawValue: String {
+        userCapabilityToString(capability: self)
+    }
+}
+
+extension UserCapability: ExpressibleByStringLiteral {
+    public init(stringLiteral: StringLiteralType) {
+        self.init(stringLiteral)
+    }
+}
+
+public extension PostType {
+    init (_ type: String) {
+        self = postTypeFromString(value: type)
+    }
+
+    var rawValue: String {
+        postTypeToString(postType: self)
+    }
+}
+
+extension PostType: ExpressibleByStringLiteral {
+    public init(stringLiteral: StringLiteralType) {
+        self.init(stringLiteral)
     }
 }

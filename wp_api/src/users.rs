@@ -259,6 +259,16 @@ pub enum UserCapability {
 
 impl_as_query_value_from_to_string!(UserCapability);
 
+#[uniffi::export]
+fn user_capability_from_string(value: String) -> UserCapability {
+    UserCapability::from_str(value.as_str()).unwrap_or(UserCapability::Custom(value))
+}
+
+#[uniffi::export]
+fn user_capability_to_string(capability: UserCapability) -> String {
+    capability.to_string()
+}
+
 #[derive(
     Debug,
     Clone,
@@ -285,6 +295,16 @@ pub enum UserRole {
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
+}
+
+#[uniffi::export]
+fn user_role_from_string(value: String) -> UserRole {
+    UserRole::from_str(value.as_str()).unwrap_or(UserRole::Custom(value))
+}
+
+#[uniffi::export]
+fn user_role_to_string(role: UserRole) -> String {
+    role.to_string()
 }
 
 impl_as_query_value_from_to_string!(UserRole);

@@ -1,6 +1,7 @@
 use crate::impl_as_query_value_from_to_string;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use wp_contextual::WpContextual;
 
 #[derive(
@@ -36,6 +37,16 @@ pub enum PostType {
 }
 
 impl_as_query_value_from_to_string!(PostType);
+
+#[uniffi::export]
+fn post_type_from_string(value: String) -> PostType {
+    PostType::from_str(value.as_str()).unwrap_or(PostType::Custom(value))
+}
+
+#[uniffi::export]
+fn post_type_to_string(post_type: PostType) -> String {
+    post_type.to_string()
+}
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 #[serde(transparent)]
