@@ -28,6 +28,8 @@ public typealias ApiUrlResolver = WordPressAPIInternal.ApiUrlResolver
 public typealias WpComDotOrgApiUrlResolver = WordPressAPIInternal.WpComDotOrgApiUrlResolver
 public typealias WpOrgSiteApiUrlResolver = WordPressAPIInternal.WpOrgSiteApiUrlResolver
 public typealias WpApiParamOrder = WordPressAPIInternal.WpApiParamOrder
+public typealias UserCapability = WordPressAPIInternal.UserCapability
+public typealias UserRole = WordPressAPIInternal.UserRole
 
 // MARK: - Login
 
