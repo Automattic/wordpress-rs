@@ -23,6 +23,7 @@ public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddlewar
 public typealias WpApiClientDelegate = WordPressAPIInternal.WpApiClientDelegate
 public typealias WpAppNotifier = WordPressAPIInternal.WpAppNotifier
 public typealias UserAvatarSize = WordPressAPIInternal.UserAvatarSize
+public typealias UserCapability = WordPressAPIInternal.UserCapability
 
 // MARK: - Login
 

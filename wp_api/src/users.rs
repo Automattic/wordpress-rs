@@ -161,7 +161,7 @@ pub struct UserListParams {
     pub roles: Vec<String>,
     /// Limit result set to users matching at least one specific capability provided. Accepts csv list or single capability.
     #[uniffi(default = [])]
-    pub capabilities: Vec<String>,
+    pub capabilities: Vec<UserCapability>,
     /// Limit result set to users who are considered authors.
     /// One of: `authors`
     #[uniffi(default = None)]
@@ -172,6 +172,92 @@ pub struct UserListParams {
     #[uniffi(default = None)]
     pub has_published_posts: Option<WpApiParamUsersHasPublishedPosts>,
 }
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum UserCapability {
+    CreateSites,
+    DeleteSites,
+    ManageNetwork,
+    ManageSites,
+    ManageNetworkUsers,
+    ManageNetworkPlugins,
+    ManageNetworkThemes,
+    ManageNetworkOptions,
+    UpgradeNetwork,
+    SetupNetwork,
+    ActivatePlugins,
+    DeleteOthersPages,
+    DeleteOthersPosts,
+    DeletePages,
+    DeletePosts,
+    DeletePrivatePages,
+    DeletePrivatePosts,
+    DeletePublishedPages,
+    DeletePublishedPosts,
+    EditDashboard,
+    EditOthersPages,
+    EditOthersPosts,
+    EditPages,
+    EditPosts,
+    EditPrivatePages,
+    EditPrivatePosts,
+    EditPublishedPages,
+    EditPublishedPosts,
+    EditThemeOptions,
+    Export,
+    Import,
+    ListUsers,
+    ManageCategories,
+    ManageLinks,
+    ManageOptions,
+    ModerateComments,
+    PromoteUsers,
+    PublishPages,
+    PublishPosts,
+    ReadPrivatePages,
+    ReadPrivatePosts,
+    Read,
+    RemoveUseres,
+    SwitchThemes,
+    UploadFiles,
+    Customize,
+    DeleteSite,
+    UpdateCore,
+    UpdatePlugins,
+    UpdateThemes,
+    InstallPlugins,
+    InstallThemes,
+    DeleteThemes,
+    DeletePlugins,
+    EditPlugins,
+    EditThemes,
+    EditFiles,
+    EditUsers,
+    AddUsers,
+    CreateUsers,
+    DeleteUsers,
+    UnfilteredHtml,
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
+}
+
+impl_as_query_value_from_to_string!(UserCapability);
 
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct UserCreateParams {
@@ -360,7 +446,7 @@ pub struct SparseUser {
     #[WpContext(edit)]
     pub roles: Option<Vec<String>>,
     #[WpContext(edit)]
-    pub capabilities: Option<HashMap<String, bool>>,
+    pub capabilities: Option<HashMap<UserCapability, bool>>,
     #[WpContext(edit)]
     pub extra_capabilities: Option<HashMap<String, bool>>,
     #[WpContext(edit, embed, view)]
@@ -394,7 +480,7 @@ mod tests {
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), "slug=foo%2Cbar")]
     #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), "roles=author%2Ceditor")]
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), "slug=foo%2Cbar&roles=author%2Ceditor")]
-    #[case(generate!(UserListParams, (capabilities, vec!["edit_themes".to_string(), "delete_pages".to_string()])), "capabilities=edit_themes%2Cdelete_pages")]
+    #[case(generate!(UserListParams, (capabilities, vec![UserCapability::EditThemes, UserCapability::DeletePages])), "capabilities=edit_themes%2Cdelete_pages")]
     #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), "who=authors")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))), "has_published_posts=true")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::PostTypes(vec!["post".to_string(), "page".to_string()])))), "has_published_posts=post%2Cpage")]
@@ -409,7 +495,7 @@ mod tests {
             orderby: Some(WpApiParamUsersOrderBy::Email),
             slug: vec!["s1".to_string(), "s2".to_string()],
             roles: vec!["r1".to_string(), "r2".to_string()],
-            capabilities: vec!["c1".to_string(), "c2".to_string()],
+            capabilities: vec![UserCapability::Custom("c1".to_string()), UserCapability::Custom("c2".to_string())],
             who: Some(WpApiParamUsersWho::Authors),
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
         }, "page=11&per_page=22&search=s_q&exclude=111%2C112&include=211%2C212&offset=311&order=asc&orderby=email&slug=s1%2Cs2&roles=r1%2Cr2&capabilities=c1%2Cc2&who=authors&has_published_posts=true")]
@@ -436,5 +522,26 @@ mod tests {
     fn test_user_delete_params() {
         let params = UserDeleteParams::new(UserId(987));
         assert_expected_query_pairs(params, "force=true&reassign=987");
+    }
+
+    #[rstest]
+    #[case(UserCapability::Import, "import")]
+    #[case(UserCapability::CreateSites, "create_sites")]
+    #[case(UserCapability::ManageNetworkUsers, "manage_network_users")]
+    #[case(UserCapability::Custom("do_the_thing".to_string()), "do_the_thing")]
+    fn test_user_capability(#[case] capability: UserCapability, #[case] expected_str: &str) {
+        assert_eq!(capability.to_string(), expected_str);
+    }
+
+    #[rstest]
+    #[case(UserCapability::Import, "import")]
+    #[case(UserCapability::CreateSites, "create_sites")]
+    #[case(UserCapability::ManageNetworkUsers, "manage_network_users")]
+    #[case(UserCapability::Custom("do_the_thing".to_string()), "do_the_thing")]
+    fn test_user_capability_from_str(
+        #[case] capability: UserCapability,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(UserCapability::from_str(expected_str), Ok(capability));
     }
 }
