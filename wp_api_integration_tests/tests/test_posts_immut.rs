@@ -1,10 +1,11 @@
 use wp_api::{
     categories::CategoryId,
     posts::{
-        PostId, PostListParams, PostRetrieveParams, PostStatus, SparsePostFieldWithEditContext,
-        SparsePostFieldWithEmbedContext, SparsePostFieldWithViewContext, WpApiParamPostsOrderBy,
-        WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
+        PostId, PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
+        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
+        WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
     },
+    request::endpoint::posts_endpoint::PostEndpointType,
     tags::TagId,
 };
 use wp_api_integration_tests::prelude::*;
@@ -14,7 +15,7 @@ use wp_api_integration_tests::prelude::*;
 async fn list_with_edit_context_number_of_pages() {
     let p = api_client()
         .posts()
-        .list_with_edit_context(&PostListParams::default())
+        .list_with_edit_context(&PostEndpointType::Posts, &PostListParams::default())
         .await
         .assert_response();
     assert_eq!(p.header_map.wp_total(), Some(57));
@@ -27,7 +28,7 @@ async fn list_with_edit_context_number_of_pages() {
 async fn list_with_edit_context(#[case] params: PostListParams) {
     api_client()
         .posts()
-        .list_with_edit_context(&params)
+        .list_with_edit_context(&PostEndpointType::Posts, &params)
         .await
         .assert_response();
 }
@@ -38,7 +39,7 @@ async fn list_with_edit_context(#[case] params: PostListParams) {
 async fn list_with_embed_context(#[case] params: PostListParams) {
     api_client()
         .posts()
-        .list_with_embed_context(&params)
+        .list_with_embed_context(&PostEndpointType::Posts, &params)
         .await
         .assert_response();
 }
@@ -49,7 +50,7 @@ async fn list_with_embed_context(#[case] params: PostListParams) {
 async fn list_with_view_context(#[case] params: PostListParams) {
     api_client()
         .posts()
-        .list_with_view_context(&params)
+        .list_with_view_context(&PostEndpointType::Posts, &params)
         .await
         .assert_response();
 }
@@ -59,7 +60,11 @@ async fn list_with_view_context(#[case] params: PostListParams) {
 async fn retrieve_with_edit_context() {
     api_client()
         .posts()
-        .retrieve_with_edit_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response();
 }
@@ -69,7 +74,11 @@ async fn retrieve_with_edit_context() {
 async fn retrieve_with_embed_context(#[case] params: PostRetrieveParams) {
     api_client()
         .posts()
-        .retrieve_with_embed_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_embed_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response();
 }
@@ -79,7 +88,11 @@ async fn retrieve_with_embed_context(#[case] params: PostRetrieveParams) {
 async fn retrieve_with_view_context(#[case] params: PostRetrieveParams) {
     api_client()
         .posts()
-        .retrieve_with_view_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_view_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response();
 }
@@ -91,6 +104,7 @@ async fn retrieve_password_protected_with_edit_context() {
     let post = api_client()
         .posts()
         .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
             &PostId(test_credentials.password_protected_post_id),
             &PostRetrieveParams {
                 password: Some(
@@ -116,6 +130,7 @@ async fn retrieve_password_protected_with_embed_context() {
     let post = api_client()
         .posts()
         .retrieve_with_embed_context(
+            &PostEndpointType::Posts,
             &PostId(test_credentials.password_protected_post_id),
             &PostRetrieveParams {
                 password: Some(
@@ -141,6 +156,7 @@ async fn retrieve_password_protected_with_view_context() {
     let post = api_client()
         .posts()
         .retrieve_with_view_context(
+            &PostEndpointType::Posts,
             &PostId(test_credentials.password_protected_post_id),
             &PostRetrieveParams {
                 password: Some(
@@ -165,7 +181,11 @@ async fn ensure_date_gmt_is_parsed_correctly() {
     let test_credentials = TestCredentials::instance();
     let post = api_client()
         .posts()
-        .retrieve_with_edit_context(&FIRST_POST_ID, &PostRetrieveParams::default())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
         .await
         .assert_response()
         .data;
@@ -187,24 +207,40 @@ async fn ensure_date_gmt_is_parsed_correctly() {
 async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
     let first_page_response = api_client()
         .posts()
-        .list_with_edit_context(&params)
+        .list_with_edit_context(&PostEndpointType::Posts, &params)
         .await
         .assert_response();
     assert!(!first_page_response.data.is_empty());
     let next_page_params = first_page_response.next_page_params.unwrap();
     let next_page_response = api_client()
         .posts()
-        .list_with_edit_context(&next_page_params)
+        .list_with_edit_context(&PostEndpointType::Posts, &next_page_params)
         .await
         .assert_response();
     assert!(!next_page_response.data.is_empty());
     let prev_page_params = next_page_response.prev_page_params.unwrap();
     let prev_page_response = api_client()
         .posts()
-        .list_with_edit_context(&prev_page_params)
+        .list_with_edit_context(&PostEndpointType::Posts, &prev_page_params)
         .await
         .assert_response();
     assert!(!prev_page_response.data.is_empty());
+}
+
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(PostEndpointType::Posts)]
+#[case(PostEndpointType::Pages)]
+// This test ensures that we can list & parse the given post type with default params
+async fn list_with_post_endpoint_type_using_default_params(
+    #[case] post_endpoint_type: PostEndpointType,
+) {
+    api_client()
+        .posts()
+        .list_with_edit_context(&post_endpoint_type, &PostListParams::default())
+        .await
+        .assert_response();
 }
 
 #[template]
@@ -238,16 +274,16 @@ fn list_cases(#[case] params: PostListParams) {}
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_post_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_post_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_post_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_any_post_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_any_post_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_any_post_field_with_view_context_test_cases!();
 
-    #[apply(sparse_post_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostFieldWithEditContext::Id, SparsePostFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEditContext::Id, SparseAnyPostFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_posts_with_edit_context(
-        #[case] fields: &[SparsePostFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostFieldWithEditContext],
         #[values(
             PostListParams::default(),
             generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
@@ -257,7 +293,7 @@ mod filter {
     ) {
         api_client()
             .posts()
-            .filter_list_with_edit_context(&params, fields)
+            .filter_list_with_edit_context(&PostEndpointType::Posts, &params, fields)
             .await
             .assert_response()
             .data
@@ -267,16 +303,17 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostFieldWithEditContext::Id, SparsePostFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEditContext::Id, SparseAnyPostFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_posts_with_edit_context(
-        #[case] fields: &[SparsePostFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostFieldWithEditContext],
     ) {
         let post = api_client()
             .posts()
             .filter_retrieve_with_edit_context(
+                &PostEndpointType::Posts,
                 &FIRST_POST_ID,
                 &PostRetrieveParams::default(),
                 fields,
@@ -287,12 +324,12 @@ mod filter {
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_post_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostFieldWithEmbedContext::Id, SparsePostFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEmbedContext::Id, SparseAnyPostFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_posts_with_embed_context(
-        #[case] fields: &[SparsePostFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
         #[values(
             PostListParams::default(),
             generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
@@ -302,7 +339,7 @@ mod filter {
     ) {
         api_client()
             .posts()
-            .filter_list_with_embed_context(&params, fields)
+            .filter_list_with_embed_context(&PostEndpointType::Posts, &params, fields)
             .await
             .assert_response()
             .data
@@ -312,16 +349,17 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostFieldWithEmbedContext::Id, SparsePostFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithEmbedContext::Id, SparseAnyPostFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_posts_with_embed_context(
-        #[case] fields: &[SparsePostFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
     ) {
         let post = api_client()
             .posts()
             .filter_retrieve_with_embed_context(
+                &PostEndpointType::Posts,
                 &FIRST_POST_ID,
                 &PostRetrieveParams::default(),
                 fields,
@@ -332,12 +370,12 @@ mod filter {
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_post_field_with_view_context_test_cases)]
-    #[case(&[SparsePostFieldWithViewContext::Id, SparsePostFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithViewContext::Id, SparseAnyPostFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_posts_with_view_context(
-        #[case] fields: &[SparsePostFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostFieldWithViewContext],
         #[values(
             PostListParams::default(),
             generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
@@ -347,7 +385,7 @@ mod filter {
     ) {
         api_client()
             .posts()
-            .filter_list_with_view_context(&params, fields)
+            .filter_list_with_view_context(&PostEndpointType::Posts, &params, fields)
             .await
             .assert_response()
             .data
@@ -357,16 +395,17 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_field_with_view_context_test_cases)]
-    #[case(&[SparsePostFieldWithViewContext::Id, SparsePostFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostFieldWithViewContext::Id, SparseAnyPostFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_posts_with_view_context(
-        #[case] fields: &[SparsePostFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostFieldWithViewContext],
     ) {
         let post = api_client()
             .posts()
             .filter_retrieve_with_view_context(
+                &PostEndpointType::Posts,
                 &FIRST_POST_ID,
                 &PostRetrieveParams::default(),
                 fields,

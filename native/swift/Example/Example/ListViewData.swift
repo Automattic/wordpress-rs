@@ -131,15 +131,9 @@ extension SiteSettingsWithEditContext {
     }
 }
 
-extension PostWithEditContext: ListViewDataConvertable {
+extension AnyPostWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: self.slug, title: self.title.rendered, subtitle: self.slug, fields: [:])
-    }
-}
-
-extension PageWithEditContext: ListViewDataConvertable {
-    var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.title.rendered, subtitle: "", fields: [:])
     }
 }
 
@@ -155,7 +149,7 @@ extension MediaWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension [PostWithEditContext] {
+extension [AnyPostWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }
     }
