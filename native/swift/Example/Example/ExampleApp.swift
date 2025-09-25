@@ -87,7 +87,7 @@ struct ExampleApp: App {
                     .map { $0.asListViewData }
             }),
             RootListData(name: "Post Types", callback: {
-                try await WordPressAPI.globalInstance.postTypes.listWithViewContext().data.postTypes.map { _, value in
+                try await WordPressAPI.globalInstance.postTypes.listWithEditContext().data.postTypes.map { _, value in
                     value.asListViewData
                 }
             }),
@@ -107,6 +107,15 @@ struct ExampleApp: App {
                 ]
 
                 return items.map { $0.asListViewData }
+            }),
+            RootListData(name: "Taxonomies", callback: {
+                try await WordPressAPI.globalInstance.taxonomies
+                    .listWithEditContext(params: TaxonomyListParams())
+                    .data
+                    .taxonomyTypes
+                    .map { (_, value) in
+                        value.asListViewData
+                    }
             }),
             RootListData(name: "Site Settings", callback: {
                 return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().data.asListViewDataItems
