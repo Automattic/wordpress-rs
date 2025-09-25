@@ -181,6 +181,9 @@ public typealias CategoriesRequestListWithEditContextResponse = WordPressAPIInte
 public typealias CategoriesRequestListWithViewContextResponse = WordPressAPIInternal.CategoriesRequestListWithViewContextResponse
 public typealias CategoriesRequestListWithEmbedContextResponse = WordPressAPIInternal.CategoriesRequestListWithEmbedContextResponse
 
+// MARK: - Taxonomies
+public typealias TaxonomyListParams = WordPressAPIInternal.TaxonomyListParams
+
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext

@@ -105,9 +105,22 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
     }
 }
 
-extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
+extension PostTypeDetailsWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
+            "REST Base": self.restBase,
+            "Show in Nav": self.visibility.showInNavMenus.description
+        ])
+    }
+}
+
+extension TaxonomyTypeDetailsWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.restBase, fields: [
+            "REST Base": self.restBase,
+            "Show in Nav": self.visibility.showInNavMenus.description
+
+        ])
     }
 }
 
