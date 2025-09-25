@@ -147,6 +147,165 @@ extension PaginationAwareExecutor {
     }
 }
 
+public protocol TypedPaginationAwareExecutor: Sendable {
+    associatedtype EditContextResponseType: PaginatableResponse
+    associatedtype ViewContextResponseType: PaginatableResponse
+    associatedtype EmbedContextResponseType: PaginatableResponse
+    associatedtype TypeParam: Sendable
+
+    /// Known function signatures for Request Executors
+    func listWithEditContext(
+        type: TypeParam,
+        params: EditContextResponseType.ParamsType
+    ) async throws -> EditContextResponseType
+
+    func listWithViewContext(
+        type: TypeParam,
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> ViewContextResponseType
+
+    func listWithEmbedContext(
+        type: TypeParam,
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> EmbedContextResponseType
+
+    /// Generated implementation
+    func paginatedWithEditContext(
+        type: TypeParam,
+        params: EditContextResponseType.ParamsType
+    ) async throws -> [EditContextResponseType.DataType]
+
+    func paginatedWithViewContext(
+        type: TypeParam,
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> [ViewContextResponseType.DataType]
+
+    func paginatedWithEmbedContext(
+        type: TypeParam,
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> [EmbedContextResponseType.DataType]
+
+    func sequenceWithEditContext(
+        type: TypeParam,
+        params: EditContextResponseType.ParamsType
+    ) -> PaginationSequence<EditContextResponseType>
+
+    func sequenceWithViewContext(
+        type: TypeParam,
+        params: ViewContextResponseType.ParamsType
+    ) -> PaginationSequence<ViewContextResponseType>
+
+    func sequenceWithEmbedContext(
+        type: TypeParam,
+        params: EmbedContextResponseType.ParamsType
+    ) -> PaginationSequence<EmbedContextResponseType>
+
+}
+
+extension TypedPaginationAwareExecutor {
+    /// Fetches all objects from all pages
+    ///
+    /// This method waits until all objects have been downloaded then returns the results. This can have
+    /// unexpected memory and time implications.
+    public func paginatedWithEditContext(
+        type: TypeParam,
+        params: EditContextResponseType.ParamsType
+    ) async throws -> [EditContextResponseType.DataType] {
+        var allObjects: [EditContextResponseType.DataType] = []
+        var mutableParams: EditContextResponseType.ParamsType = params
+
+        repeat {
+            let response = try await self.listWithEditContext(type: type, params: mutableParams)
+            allObjects.append(contentsOf: response.data)
+
+            guard let newParams = response.nextPageParams else {
+                break
+            }
+
+            mutableParams = newParams
+        } while true
+
+        return allObjects
+    }
+
+    /// Fetches all objects from all pages
+    ///
+    /// This method waits until all objects have been downloaded then returns the results. This can have
+    /// unexpected memory and time implications.
+    public func paginatedWithViewContext(
+        type: TypeParam,
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> [ViewContextResponseType.DataType] {
+        var allObjects: [ViewContextResponseType.DataType] = []
+        var mutableParams: ViewContextResponseType.ParamsType = params
+
+        repeat {
+            let response = try await self.listWithViewContext(type: type, params: mutableParams)
+            allObjects.append(contentsOf: response.data)
+
+            guard let newParams = response.nextPageParams else {
+                break
+            }
+
+            mutableParams = newParams
+        } while true
+
+        return allObjects
+    }
+
+    /// Fetches all objects from all pages
+    ///
+    /// This method waits until all objects have been downloaded then returns the results. This can have
+    /// unexpected memory and time implications.
+    public func paginatedWithEmbedContext(
+        type: TypeParam,
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> [EmbedContextResponseType.DataType] {
+        var allObjects: [EmbedContextResponseType.DataType] = []
+        var mutableParams: EmbedContextResponseType.ParamsType = params
+
+        repeat {
+            let response = try await self.listWithEmbedContext(type: type, params: mutableParams)
+            allObjects.append(contentsOf: response.data)
+
+            guard let newParams = response.nextPageParams else {
+                break
+            }
+
+            mutableParams = newParams
+        } while true
+
+        return allObjects
+    }
+
+    public func sequenceWithEditContext(
+        type: TypeParam,
+        params: EditContextResponseType.ParamsType
+    ) -> PaginationSequence<EditContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithEditContext(type: type, params: params)
+        }
+    }
+
+    public func sequenceWithViewContext(
+        type: TypeParam,
+        params: ViewContextResponseType.ParamsType
+    ) -> PaginationSequence<ViewContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithViewContext(type: type, params: params)
+        }
+    }
+
+    public func sequenceWithEmbedContext(
+        type: TypeParam,
+        params: EmbedContextResponseType.ParamsType
+    ) -> PaginationSequence<EmbedContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithEmbedContext(type: type, params: params)
+        }
+    }
+}
+
 public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequence, Sendable {
     public typealias Transformer = @Sendable (ResponseType.ParamsType) async throws -> ResponseType
 
@@ -199,12 +358,33 @@ extension PostsRequestListWithEmbedContextResponse: PaginatableResponse {
     public typealias DataType = AnyPostWithEmbedContext
 }
 
-extension PostsRequestExecutor: PaginationAwareExecutor {
+extension PostsRequestExecutor: TypedPaginationAwareExecutor {
     public typealias EditContextResponseType = PostsRequestListWithEditContextResponse
     public typealias ViewContextResponseType = PostsRequestListWithViewContextResponse
     public typealias EmbedContextResponseType = PostsRequestListWithEmbedContextResponse
-}
+    public typealias TypeParam = PostEndpointType
 
+    public func listWithEditContext(
+        type: TypeParam,
+        params: EditContextResponseType.ParamsType
+    ) async throws -> EditContextResponseType {
+        try await self.listWithEditContext(postEndpointType: type, params: params)
+    }
+
+    public func listWithViewContext(
+        type: TypeParam,
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> ViewContextResponseType {
+        try await self.listWithViewContext(postEndpointType: type, params: params)
+    }
+
+    public func listWithEmbedContext(
+        type: TypeParam,
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> EmbedContextResponseType {
+        try await self.listWithEmbedContext(postEndpointType: type, params: params)
+    }
+}
 
 // MARK: - Media
 extension MediaRequestListWithEditContextResponse: PaginatableResponse {
