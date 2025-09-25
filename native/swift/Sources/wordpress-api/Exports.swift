@@ -24,6 +24,7 @@ public typealias WpApiClientDelegate = WordPressAPIInternal.WpApiClientDelegate
 public typealias WpAppNotifier = WordPressAPIInternal.WpAppNotifier
 public typealias UserAvatarSize = WordPressAPIInternal.UserAvatarSize
 public typealias UserCapability = WordPressAPIInternal.UserCapability
+public typealias UserRole = WordPressAPIInternal.UserRole
 
 // MARK: - Login
 

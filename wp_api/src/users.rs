@@ -158,7 +158,7 @@ pub struct UserListParams {
     pub slug: Vec<String>,
     /// Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
     #[uniffi(default = [])]
-    pub roles: Vec<String>,
+    pub roles: Vec<UserRole>,
     /// Limit result set to users matching at least one specific capability provided. Accepts csv list or single capability.
     #[uniffi(default = [])]
     pub capabilities: Vec<UserCapability>,
@@ -259,6 +259,36 @@ pub enum UserCapability {
 
 impl_as_query_value_from_to_string!(UserCapability);
 
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum UserRole {
+    SuperAdmin,
+    Administrator,
+    Editor,
+    Author,
+    Contributor,
+    Subscriber,
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
+}
+
+impl_as_query_value_from_to_string!(UserRole);
+
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct UserCreateParams {
     /// Login name for the user.
@@ -303,7 +333,7 @@ pub struct UserCreateParams {
     /// Roles assigned to the user.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[uniffi(default = [])]
-    pub roles: Vec<String>,
+    pub roles: Vec<UserRole>,
     /// Meta fields.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -372,7 +402,7 @@ pub struct UserUpdateParams {
     /// Roles assigned to the user.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[uniffi(default = [])]
-    pub roles: Vec<String>,
+    pub roles: Vec<UserRole>,
     /// Password for the user (never included).
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -444,7 +474,7 @@ pub struct SparseUser {
     #[WpContext(edit)]
     pub registered_date: Option<String>,
     #[WpContext(edit)]
-    pub roles: Option<Vec<String>>,
+    pub roles: Option<Vec<UserRole>>,
     #[WpContext(edit)]
     pub capabilities: Option<HashMap<UserCapability, bool>>,
     #[WpContext(edit)]
@@ -478,8 +508,8 @@ mod tests {
     #[case(generate!(UserListParams, (orderby, Some(WpApiParamUsersOrderBy::Id))), "orderby=id")]
     #[case(generate!(UserListParams, (order, Some(WpApiParamOrder::Desc)), (orderby, Some(WpApiParamUsersOrderBy::Email))), "order=desc&orderby=email")]
     #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()])), "slug=foo%2Cbar")]
-    #[case(generate!(UserListParams, (roles, vec!["author".to_string(), "editor".to_string()])), "roles=author%2Ceditor")]
-    #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec!["author".to_string(), "editor".to_string()])), "slug=foo%2Cbar&roles=author%2Ceditor")]
+    #[case(generate!(UserListParams, (roles, vec![UserRole::Author, UserRole::Editor])), "roles=author%2Ceditor")]
+    #[case(generate!(UserListParams, (slug, vec!["foo".to_string(), "bar".to_string()]), (roles, vec![UserRole::Author, UserRole::Editor])), "slug=foo%2Cbar&roles=author%2Ceditor")]
     #[case(generate!(UserListParams, (capabilities, vec![UserCapability::EditThemes, UserCapability::DeletePages])), "capabilities=edit_themes%2Cdelete_pages")]
     #[case(generate!(UserListParams, (who, Some(WpApiParamUsersWho::Authors))), "who=authors")]
     #[case(generate!(UserListParams, (has_published_posts, Some(WpApiParamUsersHasPublishedPosts::True))), "has_published_posts=true")]
@@ -494,7 +524,7 @@ mod tests {
             order: Some(WpApiParamOrder::Asc),
             orderby: Some(WpApiParamUsersOrderBy::Email),
             slug: vec!["s1".to_string(), "s2".to_string()],
-            roles: vec!["r1".to_string(), "r2".to_string()],
+            roles: vec![UserRole::Custom("r1".to_string()), UserRole::Custom("r2".to_string())],
             capabilities: vec![UserCapability::Custom("c1".to_string()), UserCapability::Custom("c2".to_string())],
             who: Some(WpApiParamUsersWho::Authors),
             has_published_posts: Some(WpApiParamUsersHasPublishedPosts::True),
@@ -543,5 +573,29 @@ mod tests {
         #[case] expected_str: &str,
     ) {
         assert_eq!(UserCapability::from_str(expected_str), Ok(capability));
+    }
+
+    #[rstest]
+    #[case(UserRole::SuperAdmin, "super_admin")]
+    #[case(UserRole::Administrator, "administrator")]
+    #[case(UserRole::Editor, "editor")]
+    #[case(UserRole::Author, "author")]
+    #[case(UserRole::Contributor, "contributor")]
+    #[case(UserRole::Subscriber, "subscriber")]
+    #[case(UserRole::Custom("custom".to_string()), "custom")]
+    fn test_user_role(#[case] role: UserRole, #[case] expected_str: &str) {
+        assert_eq!(role.to_string(), expected_str);
+    }
+
+    #[rstest]
+    #[case(UserRole::SuperAdmin, "super_admin")]
+    #[case(UserRole::Administrator, "administrator")]
+    #[case(UserRole::Editor, "editor")]
+    #[case(UserRole::Author, "author")]
+    #[case(UserRole::Contributor, "contributor")]
+    #[case(UserRole::Subscriber, "subscriber")]
+    #[case(UserRole::Custom("custom".to_string()), "custom")]
+    fn test_user_role_from_str(#[case] role: UserRole, #[case] expected_str: &str) {
+        assert_eq!(UserRole::from_str(expected_str), Ok(role));
     }
 }
