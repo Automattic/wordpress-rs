@@ -71,28 +71,29 @@ struct ExampleApp: App {
     }
 
     func loadSiteTypes() async throws -> [RootListData] {
+        let api = try await WordPressAPI.globalInstance
         var baseData = [
             RootListData(name: "Application Passwords", callback: {
-                try await WordPressAPI.globalInstance.applicationPasswords.listWithEditContext(userId: 1)
+                try await api.applicationPasswords.listWithEditContext(userId: 1)
                     .data
                     .map { $0.asListViewData }
             }),
             RootListData(name: "Users", sequence: {
-                let sequence = try await WordPressAPI.globalInstance.users.sequenceWithEditContext(params: userListParams)
+                let sequence = await api.users.sequenceWithEditContext(params: userListParams)
                 return ListViewSequence(underlyingSequence: sequence)
             }),
             RootListData(name: "Plugins", callback: {
-                try await WordPressAPI.globalInstance.plugins.listWithEditContext(params: .init())
+                try await api.plugins.listWithEditContext(params: .init())
                     .data
                     .map { $0.asListViewData }
             }),
             RootListData(name: "Post Types", callback: {
-                try await WordPressAPI.globalInstance.postTypes.listWithEditContext().data.postTypes.map { _, value in
+                try await api.postTypes.listWithEditContext().data.postTypes.map { _, value in
                     value.asListViewData
                 }
             }),
             RootListData(name: "Media", sequence: {
-                let sequence = try await WordPressAPI.globalInstance.media.sequenceWithEditContext(params: mediaListParams)
+                let sequence = await api.media.sequenceWithEditContext(params: mediaListParams)
                 return ListViewSequence(underlyingSequence: sequence)
             }),
             RootListData(name: "Site Health Tests", callback: {
@@ -109,7 +110,7 @@ struct ExampleApp: App {
                 return items.map { $0.asListViewData }
             }),
             RootListData(name: "Taxonomies", callback: {
-                try await WordPressAPI.globalInstance.taxonomies
+                try await api.taxonomies
                     .listWithEditContext(params: TaxonomyListParams())
                     .data
                     .taxonomyTypes
@@ -118,16 +119,17 @@ struct ExampleApp: App {
                     }
             }),
             RootListData(name: "Site Settings", callback: {
-                return try await WordPressAPI.globalInstance.siteSettings.retrieveWithEditContext().data.asListViewDataItems
+                return try await api.siteSettings.retrieveWithEditContext().data.asListViewDataItems
             })
         ]
 
-        let postTypes = try await WordPressAPI.globalInstance.postTypes.listWithEditContext().data.postTypes
+        let postTypes = try await api.postTypes.listWithEditContext().data
+            .postTypes
+            .map(\.value)
+            .filter { $0.visibility.showInNavMenus }
+            .filter { $0.supports.keys.contains(allOf: [.title, .author, .customFields]) }
 
-        for type in postTypes.map(\.value)
-            .filter({ $0.visibility.showInNavMenus })
-            .filter({ $0.supports.keys.contains(allOf: [.title, .author, .customFields]) })
-        {
+        for type in postTypes {
             baseData.append(RootListData(name: type.name, sequence: {
                 let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
                     type: PostEndpointType.custom(type.restBase),
@@ -155,7 +157,6 @@ struct ExampleApp: App {
 
             return ListViewSequence(underlyingSequence: sequence)
         }))
-
 
         return baseData
     }
