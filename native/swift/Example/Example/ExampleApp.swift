@@ -35,11 +35,17 @@ struct ExampleApp: App {
             }
         }),
         RootListData(name: "Posts", sequence: {
-            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(type: .posts, params: postListParams)
+            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
+                type: .posts,
+                params: postListParams
+            )
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Pages", sequence: {
-            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(type: .pages, params: postListParams)
+            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
+                type: .pages,
+                params: postListParams
+            )
             return ListViewSequence(underlyingSequence: sequence)
         }),
         RootListData(name: "Media", sequence: {
