@@ -107,28 +107,18 @@ public typealias PostTypeDetailsWithEmbedContext = WordPressAPIInternal.PostType
 public typealias PostTypesRequestExecutor = WordPressAPIInternal.PostTypesRequestExecutor
 
 // MARK: - Posts
-public typealias SparsePost = WordPressAPIInternal.SparsePost
-public typealias PostWithEditContext = WordPressAPIInternal.PostWithEditContext
-public typealias PostWithViewContext = WordPressAPIInternal.PostWithViewContext
-public typealias PostWithEmbedContext = WordPressAPIInternal.PostWithEmbedContext
+public typealias SparseAnyPost = WordPressAPIInternal.SparseAnyPost
+public typealias AnyPostWithEditContext = WordPressAPIInternal.AnyPostWithEditContext
+public typealias AnyPostWithViewContext = WordPressAPIInternal.AnyPostWithViewContext
+public typealias AnyPostWithEmbedContext = WordPressAPIInternal.AnyPostWithEmbedContext
 public typealias PostListParams = WordPressAPIInternal.PostListParams
 public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
+public typealias PostEndpointType = WordPressAPIInternal.PostEndpointType
 
 public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.PostsRequestListWithEditContextResponse
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
 public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostsRequestListWithEmbedContextResponse
 
-// MARK: - Pages
-public typealias SparsePage = WordPressAPIInternal.SparsePage
-public typealias PageWithEditContext = WordPressAPIInternal.PageWithEditContext
-public typealias PageWithViewContext = WordPressAPIInternal.PageWithViewContext
-public typealias PageWithEmbedContext = WordPressAPIInternal.PageWithEmbedContext
-public typealias PageListParams = WordPressAPIInternal.PageListParams
-public typealias PagesRequestExecutor = WordPressAPIInternal.PagesRequestExecutor
-
-public typealias PagesRequestListWithEditContextResponse = WordPressAPIInternal.PagesRequestListWithEditContextResponse
-public typealias PagesRequestListWithViewContextResponse = WordPressAPIInternal.PagesRequestListWithViewContextResponse
-public typealias PagesRequestListWithEmbedContextResponse = WordPressAPIInternal.PagesRequestListWithEmbedContextResponse
 
 // MARK: - Media
 public typealias SparseMedia = WordPressAPIInternal.SparseMedia

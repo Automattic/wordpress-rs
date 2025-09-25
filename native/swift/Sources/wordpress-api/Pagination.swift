@@ -186,17 +186,17 @@ public struct PaginationSequence<ResponseType: PaginatableResponse>: AsyncSequen
 // MARK: - Posts
 extension PostsRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
-    public typealias DataType = PostWithEditContext
+    public typealias DataType = AnyPostWithEditContext
 }
 
 extension PostsRequestListWithViewContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
-    public typealias DataType = PostWithViewContext
+    public typealias DataType = AnyPostWithViewContext
 }
 
 extension PostsRequestListWithEmbedContextResponse: PaginatableResponse {
     public typealias ParamsType = PostListParams
-    public typealias DataType = PostWithEmbedContext
+    public typealias DataType = AnyPostWithEmbedContext
 }
 
 extension PostsRequestExecutor: PaginationAwareExecutor {
@@ -205,27 +205,6 @@ extension PostsRequestExecutor: PaginationAwareExecutor {
     public typealias EmbedContextResponseType = PostsRequestListWithEmbedContextResponse
 }
 
-// MARK: - Pages
-extension PagesRequestListWithEditContextResponse: PaginatableResponse {
-    public typealias ParamsType = PageListParams
-    public typealias DataType = PageWithEditContext
-}
-
-extension PagesRequestListWithViewContextResponse: PaginatableResponse {
-    public typealias ParamsType = PageListParams
-    public typealias DataType = PageWithViewContext
-}
-
-extension PagesRequestListWithEmbedContextResponse: PaginatableResponse {
-    public typealias ParamsType = PageListParams
-    public typealias DataType = PageWithEmbedContext
-}
-
-extension PagesRequestExecutor: PaginationAwareExecutor {
-    public typealias EditContextResponseType = PagesRequestListWithEditContextResponse
-    public typealias ViewContextResponseType = PagesRequestListWithViewContextResponse
-    public typealias EmbedContextResponseType = PagesRequestListWithEmbedContextResponse
-}
 
 // MARK: - Media
 extension MediaRequestListWithEditContextResponse: PaginatableResponse {
