@@ -1,6 +1,6 @@
 use wp_api::users::{
-    UserCreateParams, UserDeleteParams, UserId, UserListParams, UserUpdateParams,
-    WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
+    UserCapability, UserCreateParams, UserDeleteParams, UserId, UserListParams, UserRole,
+    UserUpdateParams, WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -98,7 +98,7 @@ async fn list_users_err_forbidden_who() {
 #[parallel]
 async fn list_users_with_capabilities_err_user_cannot_view() {
     let params = UserListParams {
-        capabilities: vec!["foo".to_string()],
+        capabilities: vec![UserCapability::Custom("foo".to_string())],
         ..Default::default()
     };
     api_client_as_subscriber()
@@ -112,7 +112,7 @@ async fn list_users_with_capabilities_err_user_cannot_view() {
 #[parallel]
 async fn list_users_with_roles_err_user_cannot_view() {
     let params = UserListParams {
-        roles: vec!["foo".to_string()],
+        roles: vec![UserRole::Custom("foo".to_string())],
         ..Default::default()
     };
     api_client_as_subscriber()
@@ -190,7 +190,7 @@ async fn update_user_err_cannot_edit() {
 #[parallel]
 async fn update_user_err_cannot_edit_roles() {
     let params = UserUpdateParams {
-        roles: vec!["new_role".to_string()],
+        roles: vec![UserRole::Custom("new_role".to_string())],
         ..Default::default()
     };
     // Subscribers can't update their roles
@@ -248,7 +248,7 @@ async fn update_user_password_err_invalid_param() {
 #[parallel]
 async fn update_user_err_user_invalid_role() {
     let params = UserUpdateParams {
-        roles: vec!["doesnt_exist".to_string()],
+        roles: vec![UserRole::Custom("doesnt_exist".to_string())],
         ..Default::default()
     };
     // Can't update user's email to a role that doesn't exist
