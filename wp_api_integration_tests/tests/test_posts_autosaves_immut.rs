@@ -1,7 +1,7 @@
 use wp_api::{
     post_revisions::{
-        PostRevisionId, SparsePostRevisionFieldWithEditContext,
-        SparsePostRevisionFieldWithEmbedContext, SparsePostRevisionFieldWithViewContext,
+        PostRevisionId, SparseAnyPostRevisionFieldWithEditContext,
+        SparseAnyPostRevisionFieldWithEmbedContext, SparseAnyPostRevisionFieldWithViewContext,
     },
     posts::PostId,
 };
@@ -78,16 +78,16 @@ fn autosave_id_for_autosaved_post_id() -> PostRevisionId {
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_post_revision_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_post_revision_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_post_revision_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_any_post_revision_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_any_post_revision_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_any_post_revision_field_with_view_context_test_cases!();
 
-    #[apply(sparse_post_revision_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEditContext::Id, SparsePostRevisionFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEditContext::Id, SparseAnyPostRevisionFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_edit_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEditContext],
     ) {
         api_client()
             .autosaves()
@@ -101,12 +101,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_revision_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEmbedContext::Id, SparsePostRevisionFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEmbedContext::Id, SparseAnyPostRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_embed_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEmbedContext],
     ) {
         api_client()
             .autosaves()
@@ -120,12 +120,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_revision_field_with_view_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithViewContext::Id, SparsePostRevisionFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithViewContext::Id, SparseAnyPostRevisionFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_view_context(
-        #[case] fields: &[SparsePostRevisionFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithViewContext],
     ) {
         api_client()
             .autosaves()
@@ -139,12 +139,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_revision_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEditContext::Id, SparsePostRevisionFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEditContext::Id, SparseAnyPostRevisionFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_edit_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEditContext],
     ) {
         api_client()
             .autosaves()
@@ -159,12 +159,12 @@ mod filter {
             .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
-    #[apply(sparse_post_revision_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEmbedContext::Id, SparsePostRevisionFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEmbedContext::Id, SparseAnyPostRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_embed_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEmbedContext],
     ) {
         api_client()
             .autosaves()
@@ -179,12 +179,12 @@ mod filter {
             .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
-    #[apply(sparse_post_revision_field_with_view_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithViewContext::Id, SparsePostRevisionFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithViewContext::Id, SparseAnyPostRevisionFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_view_context(
-        #[case] fields: &[SparsePostRevisionFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithViewContext],
     ) {
         api_client()
             .autosaves()

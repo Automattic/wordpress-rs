@@ -1,5 +1,5 @@
 use wp_api::{
-    post_revisions::{PostRevisionId, PostRevisionListParams},
+    post_revisions::{AnyPostRevisionListParams, PostRevisionId},
     posts::PostId,
 };
 use wp_api_integration_tests::prelude::*;
@@ -9,7 +9,7 @@ use wp_api_integration_tests::prelude::*;
 async fn list_err_post_invalid_parent() {
     api_client()
         .post_revisions()
-        .list_with_edit_context(&PostId(99999999), &PostRevisionListParams::default())
+        .list_with_edit_context(&PostId(99999999), &AnyPostRevisionListParams::default())
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
 }
@@ -21,7 +21,7 @@ async fn list_err_revision_invalid_offset_number() {
         .post_revisions()
         .list_with_edit_context(
             &revisioned_post_id(),
-            &PostRevisionListParams {
+            &AnyPostRevisionListParams {
                 offset: Some(99999999),
                 ..Default::default()
             },
@@ -37,7 +37,7 @@ async fn list_err_revision_invalid_page_number() {
         .post_revisions()
         .list_with_edit_context(
             &revisioned_post_id(),
-            &PostRevisionListParams {
+            &AnyPostRevisionListParams {
                 page: Some(99999999),
                 ..Default::default()
             },

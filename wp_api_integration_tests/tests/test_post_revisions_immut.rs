@@ -1,7 +1,7 @@
 use wp_api::{
     post_revisions::{
-        PostRevisionId, PostRevisionListParams, SparsePostRevisionFieldWithEditContext,
-        SparsePostRevisionFieldWithEmbedContext, SparsePostRevisionFieldWithViewContext,
+        AnyPostRevisionListParams, PostRevisionId, SparseAnyPostRevisionFieldWithEditContext,
+        SparseAnyPostRevisionFieldWithEmbedContext, SparseAnyPostRevisionFieldWithViewContext,
         WpApiParamPostRevisionsOrderBy,
     },
     posts::PostId,
@@ -11,7 +11,7 @@ use wp_api_integration_tests::prelude::*;
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_edit_context(#[case] params: PostRevisionListParams) {
+async fn list_with_edit_context(#[case] params: AnyPostRevisionListParams) {
     api_client()
         .post_revisions()
         .list_with_edit_context(&revisioned_post_id(), &params)
@@ -22,7 +22,7 @@ async fn list_with_edit_context(#[case] params: PostRevisionListParams) {
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_embed_context(#[case] params: PostRevisionListParams) {
+async fn list_with_embed_context(#[case] params: AnyPostRevisionListParams) {
     api_client()
         .post_revisions()
         .list_with_embed_context(&revisioned_post_id(), &params)
@@ -33,7 +33,7 @@ async fn list_with_embed_context(#[case] params: PostRevisionListParams) {
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_view_context(#[case] params: PostRevisionListParams) {
+async fn list_with_view_context(#[case] params: AnyPostRevisionListParams) {
     api_client()
         .post_revisions()
         .list_with_view_context(&revisioned_post_id(), &params)
@@ -81,36 +81,36 @@ fn revision_id_for_revisioned_post_id() -> PostRevisionId {
 
 #[template]
 #[rstest]
-#[case::default(PostRevisionListParams::default())]
-#[case::page(generate!(PostRevisionListParams, (page, Some(1))))]
-#[case::per_page(generate!(PostRevisionListParams, (per_page, Some(3))))]
-#[case::search(generate!(PostRevisionListParams, (search, Some("foo".to_string()))))]
-#[case::exclude(generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(1), PostRevisionId(2)])))]
-#[case::include(generate!(PostRevisionListParams, (include, vec![PostRevisionId(1)])))]
-#[case::offset(generate!(PostRevisionListParams, (offset, Some(5))))]
-#[case::order(generate!(PostRevisionListParams, (order, Some(WpApiParamOrder::Asc))))]
-#[case::orderby(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Slug))))]
-fn list_cases(#[case] params: PostRevisionListParams) {}
+#[case::default(AnyPostRevisionListParams::default())]
+#[case::page(generate!(AnyPostRevisionListParams, (page, Some(1))))]
+#[case::per_page(generate!(AnyPostRevisionListParams, (per_page, Some(3))))]
+#[case::search(generate!(AnyPostRevisionListParams, (search, Some("foo".to_string()))))]
+#[case::exclude(generate!(AnyPostRevisionListParams, (exclude, vec![PostRevisionId(1), PostRevisionId(2)])))]
+#[case::include(generate!(AnyPostRevisionListParams, (include, vec![PostRevisionId(1)])))]
+#[case::offset(generate!(AnyPostRevisionListParams, (offset, Some(5))))]
+#[case::order(generate!(AnyPostRevisionListParams, (order, Some(WpApiParamOrder::Asc))))]
+#[case::orderby(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Slug))))]
+fn list_cases(#[case] params: AnyPostRevisionListParams) {}
 
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_post_revision_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_post_revision_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_post_revision_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_any_post_revision_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_any_post_revision_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_any_post_revision_field_with_view_context_test_cases!();
 
-    #[apply(sparse_post_revision_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEditContext::Id, SparsePostRevisionFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEditContext::Id, SparseAnyPostRevisionFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_edit_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEditContext],
         #[values(
-            PostRevisionListParams::default(),
-            generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
-            generate!(PostRevisionListParams, (search, Some("foo".to_string())))
+            AnyPostRevisionListParams::default(),
+            generate!(AnyPostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
+            generate!(AnyPostRevisionListParams, (search, Some("foo".to_string())))
         )]
-        params: PostRevisionListParams,
+        params: AnyPostRevisionListParams,
     ) {
         api_client()
             .post_revisions()
@@ -124,18 +124,18 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_revision_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEmbedContext::Id, SparsePostRevisionFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEmbedContext::Id, SparseAnyPostRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_embed_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEmbedContext],
         #[values(
-            PostRevisionListParams::default(),
-            generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
-            generate!(PostRevisionListParams, (search, Some("foo".to_string())))
+            AnyPostRevisionListParams::default(),
+            generate!(AnyPostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
+            generate!(AnyPostRevisionListParams, (search, Some("foo".to_string())))
         )]
-        params: PostRevisionListParams,
+        params: AnyPostRevisionListParams,
     ) {
         api_client()
             .post_revisions()
@@ -149,18 +149,18 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_revision_field_with_view_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithViewContext::Id, SparsePostRevisionFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithViewContext::Id, SparseAnyPostRevisionFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_view_context(
-        #[case] fields: &[SparsePostRevisionFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithViewContext],
         #[values(
-            PostRevisionListParams::default(),
-            generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
-            generate!(PostRevisionListParams, (search, Some("foo".to_string())))
+            AnyPostRevisionListParams::default(),
+            generate!(AnyPostRevisionListParams, (exclude, vec![PostRevisionId(2), PostRevisionId(3)])),
+            generate!(AnyPostRevisionListParams, (search, Some("foo".to_string())))
         )]
-        params: PostRevisionListParams,
+        params: AnyPostRevisionListParams,
     ) {
         api_client()
             .post_revisions()
@@ -174,12 +174,12 @@ mod filter {
             });
     }
 
-    #[apply(sparse_post_revision_field_with_edit_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEditContext::Id, SparsePostRevisionFieldWithEditContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEditContext::Id, SparseAnyPostRevisionFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_edit_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEditContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEditContext],
     ) {
         api_client()
             .post_revisions()
@@ -194,12 +194,12 @@ mod filter {
             .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
-    #[apply(sparse_post_revision_field_with_embed_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithEmbedContext::Id, SparsePostRevisionFieldWithEmbedContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithEmbedContext::Id, SparseAnyPostRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_embed_context(
-        #[case] fields: &[SparsePostRevisionFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithEmbedContext],
     ) {
         api_client()
             .post_revisions()
@@ -214,12 +214,12 @@ mod filter {
             .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
-    #[apply(sparse_post_revision_field_with_view_context_test_cases)]
-    #[case(&[SparsePostRevisionFieldWithViewContext::Id, SparsePostRevisionFieldWithViewContext::Author])]
+    #[apply(sparse_any_post_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyPostRevisionFieldWithViewContext::Id, SparseAnyPostRevisionFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_view_context(
-        #[case] fields: &[SparsePostRevisionFieldWithViewContext],
+        #[case] fields: &[SparseAnyPostRevisionFieldWithViewContext],
     ) {
         api_client()
             .post_revisions()

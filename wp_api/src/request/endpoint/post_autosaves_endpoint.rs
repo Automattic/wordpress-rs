@@ -4,11 +4,11 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum AutosavesRequest {
-    #[contextual_get(url = "/posts/<post_id>/autosaves", output = Vec<crate::post_revisions::SparsePostRevision>, filter_by = crate::post_revisions::SparsePostRevisionField)]
+    #[contextual_get(url = "/posts/<post_id>/autosaves", output = Vec<crate::post_revisions::SparseAnyPostRevision>, filter_by = crate::post_revisions::SparseAnyPostRevisionField)]
     List,
-    #[contextual_get(url = "/posts/<post_id>/autosaves/<post_revision_id>", output = crate::post_revisions::SparsePostRevision, filter_by = crate::post_revisions::SparsePostRevisionField)]
+    #[contextual_get(url = "/posts/<post_id>/autosaves/<post_revision_id>", output = crate::post_revisions::SparseAnyPostRevision, filter_by = crate::post_revisions::SparseAnyPostRevisionField)]
     Retrieve,
-    #[post(url = "/posts/<post_id>/autosaves", params = &crate::posts::PostCreateParams, output = crate::post_revisions::PostRevisionWithEditContext)]
+    #[post(url = "/posts/<post_id>/autosaves", params = &crate::posts::PostCreateParams, output = crate::post_revisions::AnyPostRevisionWithEditContext)]
     Create,
 }
 
