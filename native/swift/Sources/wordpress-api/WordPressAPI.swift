@@ -125,6 +125,10 @@ public actor WordPressAPI {
         self.requestBuilder.postStatuses()
     }
 
+    public var revisions: RevisionsRequestExecutor {
+        self.requestBuilder.postRevisions()
+    }
+
     public var comments: CommentsRequestExecutor {
         self.requestBuilder.comments()
     }
@@ -141,12 +145,8 @@ public actor WordPressAPI {
         self.requestBuilder.taxonomies()
     }
 
-    public var tags: TagsRequestExecutor {
-        self.requestBuilder.tags()
-    }
-
-    public var categories: CategoriesRequestExecutor {
-        self.requestBuilder.categories()
+    public var terms: TermsRequestExecutor {
+        self.requestBuilder.terms()
     }
 
     public var blockEditor: WpBlockEditorRequestExecutor {

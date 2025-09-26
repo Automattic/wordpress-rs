@@ -104,6 +104,20 @@ create_post_autosave() {
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$post_id/autosaves"
 }
 
+create_page_revision() {
+  local revision_number="$1"
+  local page_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$revision_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/pages/$page_id" > /dev/null
+}
+
+create_page_autosave() {
+  local autosave_number="$1"
+  local page_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/pages/$page_id/autosaves"
+}
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME
@@ -180,6 +194,23 @@ create_test_credentials () {
   AUTOSAVE_RESPONSE="$(create_post_autosave "1" "$AUTOSAVED_POST_ID")"
   AUTOSAVE_ID_FOR_AUTOSAVED_POST_ID="$(echo "$AUTOSAVE_RESPONSE" | jq -r '.id')"
 
+  echo "Setting up a page with 10 revisions for integration tests.."
+  REVISIONED_PAGE_ID="$(wp post create --post_type=page --post_title=Revisioned_PAGE_FOR_INTEGRATION_TESTS --porcelain)"
+  # Create revisions
+  for i in {1..10};
+  do
+    create_page_revision "$i" "$REVISIONED_PAGE_ID"
+  done
+  # Generating revisions don't return an id, but since we just created the `REVISIONED_PAGE_ID`, we can use it to calculate the revision id
+  REVISION_ID_FOR_REVISIONED_PAGE_ID=$((REVISIONED_PAGE_ID + 1))
+
+  echo "Setting up a page with autosave for integration tests.."
+  # Create page as author user to enable proper autosave behavior (same requirement as posts)
+  AUTOSAVED_PAGE_ID="$(wp post create --post_type=page --post_title=Autosaved_PAGE_FOR_INTEGRATION_TESTS --post_author="$AUTHOR_USER_ID" --porcelain)"
+  # Create autosave as admin user (different from page author) and capture its ID
+  AUTOSAVE_PAGE_RESPONSE="$(create_page_autosave "1" "$AUTOSAVED_PAGE_ID")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_PAGE_ID="$(echo "$AUTOSAVE_PAGE_RESPONSE" | jq -r '.id')"
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -209,6 +240,10 @@ create_test_credentials () {
     password_protected_page_title="Password_Protected_Page" \
     trashed_page_id="$TRASHED_PAGE_ID" \
     first_page_id="$FIRST_PAGE_ID" \
+    revisioned_page_id="$REVISIONED_PAGE_ID" \
+    revision_id_for_revisioned_page_id="$REVISION_ID_FOR_REVISIONED_PAGE_ID" \
+    autosaved_page_id="$AUTOSAVED_PAGE_ID" \
+    autosave_id_for_autosaved_page_id="$AUTOSAVE_ID_FOR_AUTOSAVED_PAGE_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials

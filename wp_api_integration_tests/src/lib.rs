@@ -36,6 +36,10 @@ pub struct TestCredentials {
     pub password_protected_page_title: &'static str,
     pub trashed_page_id: i64,
     pub first_page_id: i64,
+    pub revisioned_page_id: i64,
+    pub revision_id_for_revisioned_page_id: i64,
+    pub autosaved_page_id: i64,
+    pub autosave_id_for_autosaved_page_id: i64,
 }
 
 impl TestCredentials {
@@ -78,11 +82,10 @@ pub const MEDIA_ID_AUDIO: MediaId = MediaId(821);
 pub const MEDIA_ID_IMAGE: MediaId = MediaId(1692);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test-data/test_media.jpg";
 pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
-pub const CATEGORY_ID_48: CategoryId = CategoryId(48);
-pub const CATEGORY_ID_59: CategoryId = CategoryId(59);
-pub const CATEGORY_ID_INVALID: CategoryId = CategoryId(99999999);
-pub const TAG_ID_100: TagId = TagId(100);
-pub const TAG_ID_INVALID: TagId = TagId(99999999);
+pub const CATEGORY_ID_48: TermId = TermId(48);
+pub const CATEGORY_ID_59: TermId = TermId(59);
+pub const TAG_ID_100: TermId = TermId(100);
+pub const TERM_ID_INVALID: TermId = TermId(99999999);
 pub const TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE: &str = "twentytwentyfour//single";
 pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 pub const PAGE_TEMPLATE_WITH_SIDEBAR: &str = "page-with-sidebar";

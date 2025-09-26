@@ -6,13 +6,13 @@ use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[serial]
-async fn delete_post_revision() {
-    let revision_id = revision_id_for_revisioned_post_id();
+async fn delete_page_revision() {
+    let revision_id = revision_id_for_revisioned_page_id();
     let revision_delete_response = api_client()
         .post_revisions()
         .delete(
-            &PostEndpointType::Posts,
-            &revisioned_post_id(),
+            &PostEndpointType::Pages,
+            &revisioned_page_id(),
             &revision_id,
         )
         .await;
@@ -29,10 +29,10 @@ async fn delete_post_revision() {
     RestoreServer::db().await;
 }
 
-fn revisioned_post_id() -> PostId {
-    PostId(TestCredentials::instance().revisioned_post_id)
+fn revisioned_page_id() -> PostId {
+    PostId(TestCredentials::instance().revisioned_page_id)
 }
 
-fn revision_id_for_revisioned_post_id() -> PostRevisionId {
-    PostRevisionId(TestCredentials::instance().revision_id_for_revisioned_post_id)
+fn revision_id_for_revisioned_page_id() -> PostRevisionId {
+    PostRevisionId(TestCredentials::instance().revision_id_for_revisioned_page_id)
 }

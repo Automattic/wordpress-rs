@@ -56,9 +56,7 @@ impl DerivedRequest for PostsRequest {
 mod tests {
     use super::*;
     use crate::{
-        UserId, WpApiParamOrder,
-        categories::CategoryId,
-        generate,
+        UserId, WpApiParamOrder, generate,
         posts::{
             PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
             SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
@@ -68,7 +66,7 @@ mod tests {
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
-        tags::TagId,
+        terms::TermId,
         unit_test_common::{
             unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
@@ -129,10 +127,10 @@ mod tests {
     #[case(generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Future, PostStatus::Pending, PostStatus::Private, PostStatus::Publish, PostStatus::Custom("foo".to_string())])), "status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))), "tax_relation=AND")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::Or))), "tax_relation=OR")]
-    #[case(generate!(PostListParams, (categories, vec![CategoryId(1), CategoryId(2)])), "categories=1%2C2")]
-    #[case(generate!(PostListParams, (categories_exclude, vec![CategoryId(1), CategoryId(2)])), "categories_exclude=1%2C2")]
-    #[case(generate!(PostListParams, (tags, vec![TagId(1), TagId(2)])), "tags=1%2C2")]
-    #[case(generate!(PostListParams, (tags_exclude, vec![TagId(1), TagId(2)])), "tags_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (categories, vec![TermId(1), TermId(2)])), "categories=1%2C2")]
+    #[case(generate!(PostListParams, (categories_exclude, vec![TermId(1), TermId(2)])), "categories_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (tags, vec![TermId(1), TermId(2)])), "tags=1%2C2")]
+    #[case(generate!(PostListParams, (tags_exclude, vec![TermId(1), TermId(2)])), "tags_exclude=1%2C2")]
     #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
     #[case(
         post_list_params_with_all_fields(),
@@ -284,8 +282,8 @@ mod tests {
             author: vec![UserId(1), UserId(2)],
             author_exclude: vec![UserId(1), UserId(2)],
             before: unit_test_example_date_as_option(),
-            categories: vec![CategoryId(1), CategoryId(2)],
-            categories_exclude: vec![CategoryId(1), CategoryId(2)],
+            categories: vec![TermId(1), TermId(2)],
+            categories_exclude: vec![TermId(1), TermId(2)],
             exclude: vec![PostId(1), PostId(2)],
             include: vec![PostId(1), PostId(2)],
             modified_after: unit_test_example_date_as_option(),
@@ -311,8 +309,8 @@ mod tests {
                 PostStatus::Custom("foo".to_string()),
             ],
             sticky: Some(true),
-            tags: vec![TagId(1), TagId(2)],
-            tags_exclude: vec![TagId(1), TagId(2)],
+            tags: vec![TermId(1), TermId(2)],
+            tags_exclude: vec![TermId(1), TermId(2)],
             tax_relation: Some(WpApiParamPostsTaxRelation::And),
             parent: Some(PostId(1)),
             parent_exclude: vec![PostId(1), PostId(2)],

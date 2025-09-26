@@ -1,5 +1,8 @@
 use macro_helper::generate_update_test;
-use wp_api::categories::{CategoryCreateParams, CategoryUpdateParams, CategoryWithEditContext};
+use wp_api::{
+    request::endpoint::terms_endpoint::TermEndpointType,
+    terms::{AnyTermWithEditContext, TermCreateParams, TermUpdateParams},
+};
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliCategory;
 
@@ -7,7 +10,7 @@ use wp_cli::WpCliCategory;
 #[serial]
 async fn create_category_with_just_name() {
     test_create_category(
-        &CategoryCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: None,
             slug: None,
@@ -25,7 +28,7 @@ async fn create_category_with_just_name() {
 #[serial]
 async fn create_category_with_name_and_description() {
     test_create_category(
-        &CategoryCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: Some("bar".to_string()),
             slug: None,
@@ -44,7 +47,7 @@ async fn create_category_with_name_and_description() {
 #[serial]
 async fn create_category_with_name_and_slug() {
     test_create_category(
-        &CategoryCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: None,
             slug: Some("bar".to_string()),
@@ -63,7 +66,7 @@ async fn create_category_with_name_and_slug() {
 #[serial]
 async fn create_category_with_name_and_parent() {
     test_create_category(
-        &CategoryCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: None,
             slug: None,
@@ -71,7 +74,7 @@ async fn create_category_with_name_and_parent() {
         },
         |created_category, category_from_wp_cli| {
             assert_eq!(created_category.name, "foo");
-            assert_eq!(created_category.parent, CATEGORY_ID_48);
+            assert_eq!(created_category.parent, Some(CATEGORY_ID_48));
             assert_eq!(category_from_wp_cli.parent, CATEGORY_ID_48.0);
         },
     )
@@ -82,7 +85,7 @@ async fn create_category_with_name_and_parent() {
 #[serial]
 async fn create_category_with_name_description_and_slug() {
     test_create_category(
-        &CategoryCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: Some("bar".to_string()),
             slug: Some("quox".to_string()),
@@ -103,7 +106,10 @@ async fn create_category_with_name_description_and_slug() {
 #[serial]
 async fn delete_category() {
     // Delete the category using the API and ensure it's successful
-    let category_delete_response = api_client().categories().delete(&CATEGORY_ID_59).await;
+    let category_delete_response = api_client()
+        .terms()
+        .delete(&TermEndpointType::Categories, &CATEGORY_ID_59)
+        .await;
     assert!(
         category_delete_response.is_ok(),
         "{category_delete_response:#?}"
@@ -157,18 +163,18 @@ generate_update_test!(
     parent,
     CATEGORY_ID_48,
     |updated_category, updated_category_from_wp_cli| {
-        assert_eq!(updated_category.parent, CATEGORY_ID_48);
+        assert_eq!(updated_category.parent, Some(CATEGORY_ID_48));
         assert_eq!(updated_category_from_wp_cli.parent, CATEGORY_ID_48.0);
     }
 );
 
-async fn test_create_category<F>(params: &CategoryCreateParams, assert: F)
+async fn test_create_category<F>(params: &TermCreateParams, assert: F)
 where
-    F: Fn(CategoryWithEditContext, WpCliCategory),
+    F: Fn(AnyTermWithEditContext, WpCliCategory),
 {
     let created_category = api_client()
-        .categories()
-        .create(params)
+        .terms()
+        .create(&TermEndpointType::Categories, params)
         .await
         .assert_response()
         .data;
@@ -177,13 +183,13 @@ where
     RestoreServer::db().await;
 }
 
-async fn test_update_category<F>(params: &CategoryUpdateParams, assert: F)
+async fn test_update_category<F>(params: &TermUpdateParams, assert: F)
 where
-    F: Fn(CategoryWithEditContext, WpCliCategory),
+    F: Fn(AnyTermWithEditContext, WpCliCategory),
 {
     let updated_category = api_client()
-        .categories()
-        .update(&CATEGORY_ID_59, params)
+        .terms()
+        .update(&TermEndpointType::Categories, &CATEGORY_ID_59, params)
         .await
         .assert_response()
         .data;
@@ -201,7 +207,7 @@ mod macro_helper {
                 async fn $ident() {
                     let updated_value = $new_value;
                     test_update_category(
-                        &CategoryUpdateParams {
+                        &TermUpdateParams {
                             $field: Some(updated_value),
                             ..Default::default()
                         }, $assertion)

@@ -5,6 +5,7 @@ import Combine
 private let userListParams = UserListParams(perPage: 5)
 private let postListParams = PostListParams(perPage: 5)
 private let mediaListParams = MediaListParams(perPage: 5)
+private let termListParams = TermListParams(perPage: 5)
 
 @main
 struct ExampleApp: App {
@@ -29,7 +30,7 @@ struct ExampleApp: App {
                         ProgressView()
                     } else {
                         // The first column is the sidebar.
-                        RootListView(items: rootListItems)
+                        RootListView(items: rootListItems.grouped)
                     }
 
                     // Initial content of the second column.
@@ -77,25 +78,25 @@ struct ExampleApp: App {
                 try await api.applicationPasswords.listWithEditContext(userId: 1)
                     .data
                     .map { $0.asListViewData }
-            }),
+            }, category: .system),
             RootListData(name: "Users", sequence: {
                 let sequence = await api.users.sequenceWithEditContext(params: userListParams)
                 return ListViewSequence(underlyingSequence: sequence)
-            }),
+            }, category: .system),
             RootListData(name: "Plugins", callback: {
                 try await api.plugins.listWithEditContext(params: .init())
                     .data
                     .map { $0.asListViewData }
-            }),
+            }, category: .system),
             RootListData(name: "Post Types", callback: {
                 try await api.postTypes.listWithEditContext().data.postTypes.map { _, value in
                     value.asListViewData
                 }
-            }),
+            }, category: .system),
             RootListData(name: "Media", sequence: {
                 let sequence = await api.media.sequenceWithEditContext(params: mediaListParams)
                 return ListViewSequence(underlyingSequence: sequence)
-            }),
+            }, category: .posts),
             RootListData(name: "Site Health Tests", callback: {
                 let items: [any ListViewDataConvertable] = [
                     try await WordPressAPI.globalInstance.siteHealthTests.authorizationHeader().data,
@@ -108,7 +109,7 @@ struct ExampleApp: App {
                 ]
 
                 return items.map { $0.asListViewData }
-            }),
+            }, category: .system),
             RootListData(name: "Taxonomies", callback: {
                 try await api.taxonomies
                     .listWithEditContext(params: TaxonomyListParams())
@@ -117,10 +118,10 @@ struct ExampleApp: App {
                     .map { (_, value) in
                         value.asListViewData
                     }
-            }),
+            }, category: .system),
             RootListData(name: "Site Settings", callback: {
                 return try await api.siteSettings.retrieveWithEditContext().data.asListViewDataItems
-            })
+            }, category: .system)
         ]
 
         let postTypes = try await api.postTypes.listWithEditContext().data
@@ -137,26 +138,24 @@ struct ExampleApp: App {
                 )
 
                 return ListViewSequence(underlyingSequence: sequence)
-            }))
+            }, category: .posts))
         }
 
-        baseData.append(RootListData(name: "Posts (Direct)", sequence: {
-            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
-                type: .posts,
-                params: postListParams
-            )
+        let taxonomyTypes = try await api.taxonomies.listWithEditContext(params: TaxonomyListParams()).data
+            .taxonomyTypes
+            .map(\.value)
+            .filter(\.visibility.showInNavMenus)
 
-            return ListViewSequence(underlyingSequence: sequence)
-        }))
+        for type in taxonomyTypes {
+            baseData.append(RootListData(name: type.name, sequence: {
+                let sequence = try await WordPressAPI.globalInstance.terms.sequenceWithEditContext(
+                    type: .custom(type.restBase),
+                    params: termListParams
+                )
 
-        baseData.append(RootListData(name: "Pages (Direct)", sequence: {
-            let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
-                type: .pages,
-                params: postListParams
-            )
-
-            return ListViewSequence(underlyingSequence: sequence)
-        }))
+                return ListViewSequence(underlyingSequence: sequence)
+            }, category: .taxonomies))
+        }
 
         baseData.append(RootListData(name: "Post Statuses", callback: {
             try await WordPressAPI.globalInstance.postStatuses.listWithEditContext()
