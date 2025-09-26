@@ -2,27 +2,18 @@
 
 ## Core Content Endpoints
 
-- [x] `/wp/v2/posts`
-- [x] `/wp/v2/pages`
-- [x] `/wp/v2/comments`
-- [x] `/wp/v2/media`
-- [x] `/wp/v2/users`
-- [x] `/wp/v2/categories`
-- [x] `/wp/v2/tags`
-- [x] `/wp/v2/taxonomies`
 - [x] `/wp/v2/types`
-- [x] `/wp/v2/search`
-- [x] `/wp/v2/settings`
-- [x] `/wp/v2/themes`
-- [x] `/wp/v2/plugins`
+- [x] `/wp/v2/taxonomies`
 - [x] `/wp/v2/statuses`
 
-## Revision & Autosave Endpoints
+- [x] `/wp/v2/$postType`
+- [x] `/wp/v2/$postType/<id>/revisions`
+- [x] `/wp/v2/$postType/<id>/autosaves`
 
-- [x] `/wp/v2/posts/<id>/revisions`
-- [x] `/wp/v2/pages/<id>/revisions`
-- [x] `/wp/v2/posts/<id>/autosaves`
-- [x] `/wp/v2/pages/<id>/autosaves`
+- [x] `/wp/v2/$term`
+- [x] `/wp/v2/media`
+- [x] `/wp/v2/comments`
+- [x] `/wp/v2/search`
 
 ## Block Editor Endpoints
 
@@ -61,6 +52,14 @@
 - [x] `/wp/v2/widget-types`
 - [ ] `/wp/v2/sidebars`
 
+## System Endpoints
+
+- [x] `/wp/v2/settings`
+- [x] `/wp/v2/themes`
+- [x] `/wp/v2/plugins`
+- [x] `/wp/v2/users`
+- [x] `/wp/v2/users/<user_id>/application-passwords`
+
 ## Global Styles
 
 - [ ] `/wp/v2/global-styles/<id>`
@@ -68,7 +67,6 @@
 
 ## Additional Implemented Endpoints
 
-- [x] `/wp/v2/users/<user_id>/application-passwords`
 - [x] `/wp-block-editor/v1/settings`
 - [x] `/wp-site-health/v1/tests`
 - [x] `/wp/v2` (API root)
