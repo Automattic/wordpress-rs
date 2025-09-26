@@ -4,11 +4,18 @@ import Combine
 
 struct RootListView: View {
 
-    let items: [RootListData]
+    let items: [RootListData.Category: [RootListData]]
 
     var body: some View {
-        List(self.items) { data in
-            RootListViewItem(item: data)
+        List {
+            ForEach(RootListData.Category.allCases) { category in
+                Section(category.name) {
+                    ForEach(items[category] ?? []) { item in
+                        RootListViewItem(item: item)
+                    }
+                }
+            }
+
         }
     }
 }
@@ -18,7 +25,7 @@ struct RootListViewItem: View {
 
     var body: some View {
         switch item {
-        case .callback(let name, let fetchDataTask):
+        case .callback(let name, let fetchDataTask, _):
             VStack(alignment: .leading, spacing: 4.0) {
                 NavigationLink {
                     ListView(
@@ -29,7 +36,7 @@ struct RootListViewItem: View {
                 }
             }
 
-        case .sequence(let name, let sequenceProvider):
+        case .sequence(let name, let sequenceProvider, _):
             VStack(alignment: .leading, spacing: 4.0) {
                 NavigationLink {
                     ListView(
@@ -45,25 +52,66 @@ struct RootListViewItem: View {
 
 enum RootListData: Identifiable, Sendable {
 
-    case callback(String, TaskListViewModel.FetchDataTask)
-    case sequence(String, SequenceListViewModel.SequenceProvider)
+    enum Category: Hashable, Identifiable, CaseIterable {
+        case posts
+        case taxonomies
+        case system
 
-    var id: String {
-        switch self {
-        case .callback(let id, _): id
-        case .sequence(let id, _): id
+        var id: String {
+            name
+        }
+
+        var name: String {
+            return switch self {
+            case .posts: "Posts"
+            case .taxonomies: "Taxonomies"
+            case .system: "System"
+            }
         }
     }
 
-    init(name: String, callback: @escaping TaskListViewModel.FetchDataTask) {
-        self = .callback(name, callback)
+    case callback(String, TaskListViewModel.FetchDataTask, Category)
+    case sequence(String, SequenceListViewModel.SequenceProvider, Category)
+
+    var id: String {
+        switch self {
+        case .callback(let id, _, _): id
+        case .sequence(let id, _, _): id
+        }
     }
 
-    init(name: String, sequence: @escaping SequenceListViewModel.SequenceProvider) {
-        self = .sequence(name, sequence)
+    var category: Category {
+        switch self {
+        case .callback(_, _, let category): category
+        case .sequence(_, _, let category): category
+        }
+    }
+
+    init(name: String, callback: @escaping TaskListViewModel.FetchDataTask, category: Category) {
+        self = .callback(name, callback, category)
+    }
+
+    init(name: String, sequence: @escaping SequenceListViewModel.SequenceProvider, category: Category) {
+        self = .sequence(name, sequence, category)
+    }
+}
+
+extension [RootListData] {
+    var grouped: [RootListData.Category: [RootListData]] {
+        var groups: [RootListData.Category: [RootListData]] = [:]
+
+        for item in self {
+            if groups[item.category] == nil {
+                groups[item.category] = []
+            }
+
+            groups[item.category]?.append(item)
+        }
+
+        return groups
     }
 }
 
 #Preview {
-    RootListView(items: [])
+    RootListView(items: [:])
 }

@@ -1,6 +1,7 @@
 use wp_api::{
     prelude::*,
-    tags::{TagCreateParams, TagListParams, TagUpdateParams},
+    request::endpoint::terms_endpoint::TermEndpointType,
+    terms::{TermCreateParams, TermListParams, TermUpdateParams},
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -8,12 +9,16 @@ use wp_api_integration_tests::prelude::*;
 #[parallel]
 async fn create_err_cannot_create() {
     api_client_as_subscriber()
-        .tags()
-        .create(&TagCreateParams {
-            name: "foo".to_string(),
-            description: None,
-            slug: None,
-        })
+        .terms()
+        .create(
+            &TermEndpointType::Tags,
+            &TermCreateParams {
+                name: "foo".to_string(),
+                description: None,
+                slug: None,
+                parent: None,
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotCreate);
 }
@@ -22,8 +27,8 @@ async fn create_err_cannot_create() {
 #[parallel]
 async fn delete_err_cannot_delete() {
     api_client_as_subscriber()
-        .tags()
-        .delete(&TAG_ID_100)
+        .terms()
+        .delete(&TermEndpointType::Tags, &TAG_ID_100)
         .await
         .assert_wp_error(WpErrorCode::CannotDelete);
 }
@@ -32,8 +37,8 @@ async fn delete_err_cannot_delete() {
 #[parallel]
 async fn list_err_forbidden_context() {
     api_client_as_subscriber()
-        .tags()
-        .list_with_edit_context(&TagListParams::default())
+        .terms()
+        .list_with_edit_context(&TermEndpointType::Tags, &TermListParams::default())
         .await
         .assert_wp_error(WpErrorCode::ForbiddenContext);
 }
@@ -42,11 +47,14 @@ async fn list_err_forbidden_context() {
 #[parallel]
 async fn list_err_post_invalid_id() {
     api_client()
-        .tags()
-        .list_with_edit_context(&TagListParams {
-            post: Some(POST_ID_INVALID),
-            ..Default::default()
-        })
+        .terms()
+        .list_with_edit_context(
+            &TermEndpointType::Tags,
+            &TermListParams {
+                post: Some(POST_ID_INVALID),
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId);
 }
@@ -55,8 +63,8 @@ async fn list_err_post_invalid_id() {
 #[parallel]
 async fn retrieve_err_term_invalid() {
     api_client()
-        .tags()
-        .retrieve_with_edit_context(&TAG_ID_INVALID)
+        .terms()
+        .retrieve_with_edit_context(&TermEndpointType::Tags, &TERM_ID_INVALID)
         .await
         .assert_wp_error(WpErrorCode::TermInvalid);
 }
@@ -65,8 +73,12 @@ async fn retrieve_err_term_invalid() {
 #[parallel]
 async fn update_err_cannot_update() {
     api_client_as_subscriber()
-        .tags()
-        .update(&TAG_ID_100, &TagUpdateParams::default())
+        .terms()
+        .update(
+            &TermEndpointType::Tags,
+            &TAG_ID_100,
+            &TermUpdateParams::default(),
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotUpdate);
 }

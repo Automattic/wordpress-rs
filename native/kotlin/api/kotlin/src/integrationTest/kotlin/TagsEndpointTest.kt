@@ -2,10 +2,11 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import uniffi.wp_api.SparseTagFieldWithEditContext
-import uniffi.wp_api.TagCreateParams
-import uniffi.wp_api.TagListParams
-import uniffi.wp_api.TagUpdateParams
+import uniffi.wp_api.SparseAnyTermFieldWithEditContext
+import uniffi.wp_api.TermCreateParams
+import uniffi.wp_api.TermListParams
+import uniffi.wp_api.TermUpdateParams
+import uniffi.wp_api.TermEndpointType
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -19,7 +20,8 @@ class TagsEndpointTest {
     @Test
     fun testTagListRequest() = runTest {
         val tagList = client.request { requestBuilder ->
-            requestBuilder.tags().listWithEditContext(params = TagListParams())
+            requestBuilder.terms()
+                .listWithEditContext(TermEndpointType.Tags, params = TermListParams())
         }.assertSuccessAndRetrieveData().data
         assert(tagList.isNotEmpty())
     }
@@ -27,11 +29,12 @@ class TagsEndpointTest {
     @Test
     fun testFilterTagListRequest() = runTest {
         val tagList = client.request { requestBuilder ->
-            requestBuilder.tags().filterListWithEditContext(
-                params = TagListParams(),
+            requestBuilder.terms().filterListWithEditContext(
+                TermEndpointType.Tags,
+                params = TermListParams(),
                 fields = listOf(
-                    SparseTagFieldWithEditContext.NAME,
-                    SparseTagFieldWithEditContext.SLUG
+                    SparseAnyTermFieldWithEditContext.NAME,
+                    SparseAnyTermFieldWithEditContext.SLUG
                 )
             )
         }.assertSuccessAndRetrieveData().data
@@ -42,7 +45,7 @@ class TagsEndpointTest {
     @Test
     fun testRetrieveMediaRequest() = runTest {
         val tag = client.request { requestBuilder ->
-            requestBuilder.tags().retrieveWithEditContext(TAG_ID_100)
+            requestBuilder.terms().retrieveWithEditContext(TermEndpointType.Tags, TAG_ID_100)
         }.assertSuccessAndRetrieveData().data
         assertNotNull(tag)
     }
@@ -50,11 +53,12 @@ class TagsEndpointTest {
     @Test
     fun testFilterRetrieveTagRequest() = runTest {
         val tag = client.request { requestBuilder ->
-            requestBuilder.tags().filterRetrieveWithEditContext(
+            requestBuilder.terms().filterRetrieveWithEditContext(
+                TermEndpointType.Tags,
                 TAG_ID_100,
                 fields = listOf(
-                    SparseTagFieldWithEditContext.NAME,
-                    SparseTagFieldWithEditContext.SLUG
+                    SparseAnyTermFieldWithEditContext.NAME,
+                    SparseAnyTermFieldWithEditContext.SLUG
                 )
             )
         }.assertSuccessAndRetrieveData().data
@@ -64,8 +68,11 @@ class TagsEndpointTest {
     @Test
     fun createTagRequest() = runTest {
         val createdTag = client.request { requestBuilder ->
-            requestBuilder.tags()
-                .create(TagCreateParams(name = "foo", description = "bar"))
+            requestBuilder.terms()
+                .create(
+                    TermEndpointType.Tags,
+                    TermCreateParams(name = "foo", description = "bar")
+                )
         }.assertSuccessAndRetrieveData().data
         assertEquals("foo", createdTag.name)
         assertEquals("bar", createdTag.description)
@@ -75,7 +82,7 @@ class TagsEndpointTest {
     @Test
     fun deleteTagRequest() = runTest {
         val deletedTag = client.request { requestBuilder ->
-            requestBuilder.tags().delete(tagId = TAG_ID_100)
+            requestBuilder.terms().delete(TermEndpointType.Tags, termId = TAG_ID_100)
         }.assertSuccessAndRetrieveData().data
         assert(deletedTag.deleted)
         restoreTestServer()
@@ -84,10 +91,11 @@ class TagsEndpointTest {
     @Test
     fun updateTagRequest() = runTest {
         val updatedTag = client.request { requestBuilder ->
-            requestBuilder.tags()
+            requestBuilder.terms()
                 .update(
-                    tagId = TAG_ID_100,
-                    TagUpdateParams(
+                    TermEndpointType.Tags,
+                    termId = TAG_ID_100,
+                    TermUpdateParams(
                         name = "new_name",
                         description = "new_description",
                         slug = "new_slug"
@@ -104,7 +112,8 @@ class TagsEndpointTest {
     fun testErrorTermInvalid() = runTest {
         val result =
             client.request { requestBuilder ->
-                requestBuilder.tags().retrieveWithEditContext(9999999)
+                requestBuilder.terms()
+                    .retrieveWithEditContext(TermEndpointType.Tags, 9999999)
             }
         assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
     }
