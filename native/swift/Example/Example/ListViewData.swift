@@ -162,6 +162,12 @@ extension MediaWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension PostStatusWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [:])
+    }
+}
+
 extension [AnyPostWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }

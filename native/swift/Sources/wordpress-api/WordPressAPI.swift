@@ -121,6 +121,10 @@ public actor WordPressAPI {
         self.requestBuilder.posts()
     }
 
+    public var postStatuses: PostStatusesRequestExecutor {
+        self.requestBuilder.postStatuses()
+    }
+
     public var comments: CommentsRequestExecutor {
         self.requestBuilder.comments()
     }

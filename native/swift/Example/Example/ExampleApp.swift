@@ -158,6 +158,14 @@ struct ExampleApp: App {
             return ListViewSequence(underlyingSequence: sequence)
         }))
 
+        baseData.append(RootListData(name: "Post Statuses", callback: {
+            try await WordPressAPI.globalInstance.postStatuses.listWithEditContext()
+                .data
+                .postStatuses
+                .map(\.value)
+                .map(\.asListViewData)
+        }))
+
         return baseData
     }
 
