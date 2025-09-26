@@ -17,6 +17,7 @@ use crate::{
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
+            post_statuses_endpoint::{PostStatusesRequestBuilder, PostStatusesRequestExecutor},
             post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
             posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
             search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
@@ -51,6 +52,7 @@ pub struct WpApiRequestBuilder {
     media: Arc<MediaRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
+    post_statuses: Arc<PostStatusesRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
     search: Arc<SearchRequestBuilder>,
@@ -82,6 +84,7 @@ impl WpApiRequestBuilder {
             media,
             plugins,
             post_revisions,
+            post_statuses,
             post_types,
             posts,
             search,
@@ -123,6 +126,7 @@ pub struct WpApiClient {
     media: Arc<MediaRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
+    post_statuses: Arc<PostStatusesRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
     search: Arc<SearchRequestExecutor>,
@@ -151,6 +155,7 @@ impl WpApiClient {
             media,
             plugins,
             post_revisions,
+            post_statuses,
             post_types,
             posts,
             search,
@@ -189,6 +194,7 @@ api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
+api_client_generate_endpoint_impl!(WpApi, post_statuses);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);
 api_client_generate_endpoint_impl!(WpApi, search);

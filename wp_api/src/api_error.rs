@@ -198,12 +198,14 @@ pub enum WpErrorCode {
     CannotManageTemplates,
     #[serde(rename = "rest_cannot_manage_widgets")]
     CannotManageWidgets,
-    #[serde(rename = "rest_cannot_read_application_password")]
-    CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_read")]
     CannotRead,
+    #[serde(rename = "rest_cannot_read_application_password")]
+    CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_read_post")]
     CannotReadPost,
+    #[serde(rename = "rest_cannot_read_status")]
+    CannotReadStatus,
     #[serde(rename = "rest_cannot_update")]
     CannotUpdate,
     #[serde(rename = "rest_cannot_view")]
@@ -288,6 +290,8 @@ pub enum WpErrorCode {
     RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_revision_invalid_page_number")]
     RevisionInvalidPageNumber,
+    #[serde(rename = "rest_status_invalid")]
+    StatusInvalid,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
     #[serde(rename = "rest_template_not_found")]

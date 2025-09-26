@@ -106,6 +106,18 @@ public typealias PostTypeDetailsWithViewContext = WordPressAPIInternal.PostTypeD
 public typealias PostTypeDetailsWithEmbedContext = WordPressAPIInternal.PostTypeDetailsWithEmbedContext
 public typealias PostTypesRequestExecutor = WordPressAPIInternal.PostTypesRequestExecutor
 
+// MARK: – Post Statuses
+public typealias PostStatusSlug = WordPressAPIInternal.PostStatusSlug
+public typealias SparsePostStatus = WordPressAPIInternal.SparsePostStatus
+public typealias PostStatusWithEditContext = WordPressAPIInternal.PostStatusWithEditContext
+public typealias PostStatusWithViewContext = WordPressAPIInternal.PostStatusWithViewContext
+public typealias PostStatusWithEmbedContext = WordPressAPIInternal.PostStatusWithEmbedContext
+public typealias PostStatusesRequestExecutor = WordPressAPIInternal.PostStatusesRequestExecutor
+
+public typealias PostStatusesRequestListWithEditContextResponse = WordPressAPIInternal.PostStatusesRequestListWithEditContextResponse
+public typealias PostStatusesRequestListWithViewContextResponse = WordPressAPIInternal.PostStatusesRequestListWithViewContextResponse
+public typealias PostStatusesRequestListWithEmbedContextResponse = WordPressAPIInternal.PostStatusesRequestListWithEmbedContextResponse
+
 // MARK: - Posts
 public typealias SparseAnyPost = WordPressAPIInternal.SparseAnyPost
 public typealias AnyPostWithEditContext = WordPressAPIInternal.AnyPostWithEditContext

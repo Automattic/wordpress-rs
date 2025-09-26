@@ -15,7 +15,7 @@
 - [x] `/wp/v2/settings`
 - [x] `/wp/v2/themes`
 - [x] `/wp/v2/plugins`
-- [ ] `/wp/v2/statuses`
+- [x] `/wp/v2/statuses`
 
 ## Revision & Autosave Endpoints
 
@@ -70,6 +70,5 @@
 
 - [x] `/wp/v2/users/<user_id>/application-passwords`
 - [x] `/wp-block-editor/v1/settings`
-- [ ] `/wp-block-editor/v1/navigation-fallback`
 - [x] `/wp-site-health/v1/tests`
 - [x] `/wp/v2` (API root)
