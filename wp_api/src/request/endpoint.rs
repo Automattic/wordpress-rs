@@ -5,7 +5,6 @@ use url::Url;
 
 pub mod api_root_endpoint;
 pub mod application_passwords_endpoint;
-pub mod categories_endpoint;
 pub mod comments_endpoint;
 pub mod media_endpoint;
 pub mod plugins_endpoint;
@@ -15,9 +14,9 @@ pub mod post_types_endpoint;
 pub mod posts_endpoint;
 pub mod search_endpoint;
 pub mod site_settings_endpoint;
-pub mod tags_endpoint;
 pub mod taxonomies_endpoint;
 pub mod templates_endpoint;
+pub mod terms_endpoint;
 pub mod themes_endpoint;
 pub mod users_endpoint;
 pub mod widget_types_endpoint;

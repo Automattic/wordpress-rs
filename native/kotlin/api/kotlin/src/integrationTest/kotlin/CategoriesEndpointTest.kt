@@ -2,10 +2,11 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import uniffi.wp_api.SparseCategoryFieldWithEditContext
-import uniffi.wp_api.CategoryCreateParams
-import uniffi.wp_api.CategoryListParams
-import uniffi.wp_api.CategoryUpdateParams
+import uniffi.wp_api.TermEndpointType
+import uniffi.wp_api.SparseAnyTermFieldWithEditContext
+import uniffi.wp_api.TermCreateParams
+import uniffi.wp_api.TermListParams
+import uniffi.wp_api.TermUpdateParams
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -20,7 +21,8 @@ class CategoriesEndpointTest {
     @Test
     fun testCategoryListRequest() = runTest {
         val categoryList = client.request { requestBuilder ->
-            requestBuilder.categories().listWithEditContext(params = CategoryListParams())
+            requestBuilder.terms()
+                .listWithEditContext(TermEndpointType.Categories, params = TermListParams())
         }.assertSuccessAndRetrieveData().data
         assert(categoryList.isNotEmpty())
     }
@@ -28,11 +30,12 @@ class CategoriesEndpointTest {
     @Test
     fun testFilterCategoryListRequest() = runTest {
         val categoryList = client.request { requestBuilder ->
-            requestBuilder.categories().filterListWithEditContext(
-                params = CategoryListParams(),
+            requestBuilder.terms().filterListWithEditContext(
+                TermEndpointType.Categories,
+                params = TermListParams(),
                 fields = listOf(
-                    SparseCategoryFieldWithEditContext.NAME,
-                    SparseCategoryFieldWithEditContext.SLUG
+                    SparseAnyTermFieldWithEditContext.NAME,
+                    SparseAnyTermFieldWithEditContext.SLUG
                 )
             )
         }.assertSuccessAndRetrieveData().data
@@ -43,7 +46,8 @@ class CategoriesEndpointTest {
     @Test
     fun testRetrieveCategoryRequest() = runTest {
         val category = client.request { requestBuilder ->
-            requestBuilder.categories().retrieveWithEditContext(CATEGORY_ID_59)
+            requestBuilder.terms()
+                .retrieveWithEditContext(TermEndpointType.Categories, CATEGORY_ID_59)
         }.assertSuccessAndRetrieveData().data
         assertNotNull(category)
     }
@@ -51,11 +55,12 @@ class CategoriesEndpointTest {
     @Test
     fun testFilterRetrieveCategoryRequest() = runTest {
         val category = client.request { requestBuilder ->
-            requestBuilder.categories().filterRetrieveWithEditContext(
-                CATEGORY_ID_59,
+            requestBuilder.terms().filterRetrieveWithEditContext(
+                TermEndpointType.Categories,
+                termId = CATEGORY_ID_59,
                 fields = listOf(
-                    SparseCategoryFieldWithEditContext.NAME,
-                    SparseCategoryFieldWithEditContext.SLUG
+                    SparseAnyTermFieldWithEditContext.NAME,
+                    SparseAnyTermFieldWithEditContext.SLUG
                 )
             )
         }.assertSuccessAndRetrieveData().data
@@ -65,8 +70,11 @@ class CategoriesEndpointTest {
     @Test
     fun createCategoryRequest() = runTest {
         val createdCategory = client.request { requestBuilder ->
-            requestBuilder.categories()
-                .create(CategoryCreateParams(name = "foo", description = "bar"))
+            requestBuilder.terms()
+                .create(
+                    TermEndpointType.Categories,
+                    TermCreateParams(name = "foo", description = "bar")
+                )
         }.assertSuccessAndRetrieveData().data
         assertEquals("foo", createdCategory.name)
         assertEquals("bar", createdCategory.description)
@@ -76,7 +84,8 @@ class CategoriesEndpointTest {
     @Test
     fun deleteCategoryRequest() = runTest {
         val deletedCategory = client.request { requestBuilder ->
-            requestBuilder.categories().delete(categoryId = CATEGORY_ID_59)
+            requestBuilder.terms()
+                .delete(TermEndpointType.Categories, termId = CATEGORY_ID_59)
         }.assertSuccessAndRetrieveData().data
         assert(deletedCategory.deleted)
         restoreTestServer()
@@ -85,10 +94,11 @@ class CategoriesEndpointTest {
     @Test
     fun updateCategoryRequest() = runTest {
         val updatedCategory = client.request { requestBuilder ->
-            requestBuilder.categories()
+            requestBuilder.terms()
                 .update(
-                    categoryId = CATEGORY_ID_59,
-                    CategoryUpdateParams(
+                    TermEndpointType.Categories,
+                    termId = CATEGORY_ID_59,
+                    TermUpdateParams(
                         name = "new_name",
                         description = "new_description",
                         slug = "new_slug",
@@ -107,7 +117,11 @@ class CategoriesEndpointTest {
     fun testErrorTermInvalid() = runTest {
         val result =
             client.request { requestBuilder ->
-                requestBuilder.categories().retrieveWithEditContext(9999999)
+                requestBuilder.terms()
+                    .retrieveWithEditContext(
+                        TermEndpointType.Categories,
+                        termId = 9999999,
+                    )
             }
         assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
     }
@@ -116,8 +130,11 @@ class CategoriesEndpointTest {
     fun testErrorParentTermInvalid() = runTest {
         val result =
             client.request { requestBuilder ->
-                requestBuilder.categories()
-                    .create(CategoryCreateParams(name = "foo", parent = 9999999))
+                requestBuilder.terms()
+                    .create(
+                        TermEndpointType.Categories,
+                        TermCreateParams(name = "foo", parent = 9999999)
+                    )
             }
         assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
     }

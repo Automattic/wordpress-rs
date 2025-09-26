@@ -156,6 +156,15 @@ extension AnyPostRevisionWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension AnyTermWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
+            "Count": "\(self.count)",
+            "Description": self.description
+        ])
+    }
+}
+
 extension MediaWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         let details = self.mediaDetails.parseAsMimeType(mimeType: self.mimeType)
@@ -169,6 +178,12 @@ extension MediaWithEditContext: ListViewDataConvertable {
 }
 
 extension [AnyPostWithEditContext] {
+    func asListViewData() -> [ListViewData] {
+        self.map { $0.asListViewData }
+    }
+}
+
+extension [AnyTermWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }
     }

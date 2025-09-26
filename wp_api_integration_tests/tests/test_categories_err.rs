@@ -1,17 +1,23 @@
-use wp_api::categories::{CategoryCreateParams, CategoryListParams, CategoryUpdateParams};
+use wp_api::{
+    request::endpoint::terms_endpoint::TermEndpointType,
+    terms::{TermCreateParams, TermListParams, TermUpdateParams},
+};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]
 async fn create_err_cannot_create() {
     api_client_as_subscriber()
-        .categories()
-        .create(&CategoryCreateParams {
-            name: "foo".to_string(),
-            description: None,
-            slug: None,
-            parent: None,
-        })
+        .terms()
+        .create(
+            &TermEndpointType::Categories,
+            &TermCreateParams {
+                name: "foo".to_string(),
+                description: None,
+                slug: None,
+                parent: None,
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotCreate);
 }
@@ -20,13 +26,16 @@ async fn create_err_cannot_create() {
 #[parallel]
 async fn create_err_term_invalid() {
     api_client()
-        .categories()
-        .create(&CategoryCreateParams {
-            name: "foo".to_string(),
-            description: None,
-            slug: None,
-            parent: Some(CATEGORY_ID_INVALID),
-        })
+        .terms()
+        .create(
+            &TermEndpointType::Categories,
+            &TermCreateParams {
+                name: "foo".to_string(),
+                description: None,
+                slug: None,
+                parent: Some(TERM_ID_INVALID),
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::TermInvalid);
 }
@@ -35,8 +44,8 @@ async fn create_err_term_invalid() {
 #[parallel]
 async fn delete_err_cannot_delete() {
     api_client_as_subscriber()
-        .categories()
-        .delete(&CATEGORY_ID_59)
+        .terms()
+        .delete(&TermEndpointType::Categories, &CATEGORY_ID_59)
         .await
         .assert_wp_error(WpErrorCode::CannotDelete);
 }
@@ -45,8 +54,8 @@ async fn delete_err_cannot_delete() {
 #[parallel]
 async fn list_err_forbidden_context() {
     api_client_as_subscriber()
-        .categories()
-        .list_with_edit_context(&CategoryListParams::default())
+        .terms()
+        .list_with_edit_context(&TermEndpointType::Categories, &TermListParams::default())
         .await
         .assert_wp_error(WpErrorCode::ForbiddenContext);
 }
@@ -55,11 +64,14 @@ async fn list_err_forbidden_context() {
 #[parallel]
 async fn list_err_post_invalid_id() {
     api_client()
-        .categories()
-        .list_with_edit_context(&CategoryListParams {
-            post: Some(POST_ID_INVALID),
-            ..Default::default()
-        })
+        .terms()
+        .list_with_edit_context(
+            &TermEndpointType::Categories,
+            &TermListParams {
+                post: Some(POST_ID_INVALID),
+                ..Default::default()
+            },
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId);
 }
@@ -68,8 +80,8 @@ async fn list_err_post_invalid_id() {
 #[parallel]
 async fn retrieve_err_term_invalid() {
     api_client()
-        .categories()
-        .retrieve_with_edit_context(&CATEGORY_ID_INVALID)
+        .terms()
+        .retrieve_with_edit_context(&TermEndpointType::Categories, &TERM_ID_INVALID)
         .await
         .assert_wp_error(WpErrorCode::TermInvalid);
 }
@@ -78,8 +90,12 @@ async fn retrieve_err_term_invalid() {
 #[parallel]
 async fn update_err_cannot_update() {
     api_client_as_subscriber()
-        .categories()
-        .update(&CATEGORY_ID_59, &CategoryUpdateParams::default())
+        .terms()
+        .update(
+            &TermEndpointType::Categories,
+            &CATEGORY_ID_59,
+            &TermUpdateParams::default(),
+        )
         .await
         .assert_wp_error(WpErrorCode::CannotUpdate);
 }
@@ -88,11 +104,12 @@ async fn update_err_cannot_update() {
 #[parallel]
 async fn update_err_term_invalid() {
     api_client()
-        .categories()
+        .terms()
         .update(
+            &TermEndpointType::Categories,
             &CATEGORY_ID_59,
-            &CategoryUpdateParams {
-                parent: Some(CATEGORY_ID_INVALID),
+            &TermUpdateParams {
+                parent: Some(TERM_ID_INVALID),
                 ..Default::default()
             },
         )

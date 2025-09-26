@@ -1,10 +1,9 @@
 use crate::{
     UserId, WpApiParamOrder,
-    categories::CategoryId,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     media::MediaId,
-    tags::TagId,
+    terms::TermId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -136,16 +135,16 @@ pub struct PostListParams {
     pub tax_relation: Option<WpApiParamPostsTaxRelation>,
     /// Limit result set to items with specific terms assigned in the categories taxonomy.
     #[uniffi(default = [])]
-    pub categories: Vec<CategoryId>,
+    pub categories: Vec<TermId>,
     /// Limit result set to items except those with specific terms assigned in the categories taxonomy.
     #[uniffi(default = [])]
-    pub categories_exclude: Vec<CategoryId>,
+    pub categories_exclude: Vec<TermId>,
     /// Limit result set to items with specific terms assigned in the tags taxonomy.
     #[uniffi(default = [])]
-    pub tags: Vec<TagId>,
+    pub tags: Vec<TermId>,
     /// Limit result set to items except those with specific terms assigned in the tags taxonomy.
     #[uniffi(default = [])]
-    pub tags_exclude: Vec<TagId>,
+    pub tags_exclude: Vec<TermId>,
     /// Limit result set to items that are sticky.
     #[uniffi(default = None)]
     pub sticky: Option<bool>,
@@ -251,11 +250,11 @@ pub struct PostCreateParams {
     // The terms assigned to the post in the category taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub categories: Vec<CategoryId>,
+    pub categories: Vec<TermId>,
     // The terms assigned to the post in the post_tag taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tags: Vec<TagId>,
+    pub tags: Vec<TermId>,
     // Page-specific fields (for hierarchical post types)
     // The ID for the parent of the post.
     #[uniffi(default = None)]
@@ -338,11 +337,11 @@ pub struct PostUpdateParams {
     // The terms assigned to the post in the category taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub categories: Vec<CategoryId>,
+    pub categories: Vec<TermId>,
     // The terms assigned to the post in the post_tag taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tags: Vec<TagId>,
+    pub tags: Vec<TermId>,
     // Page-specific fields (for hierarchical post types)
     // The ID for the parent of the post.
     #[uniffi(default = None)]
@@ -417,10 +416,10 @@ pub struct SparseAnyPost {
     pub template: Option<String>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub categories: Option<Vec<CategoryId>>,
+    pub categories: Option<Vec<TermId>>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub tags: Option<Vec<TagId>>,
+    pub tags: Option<Vec<TermId>>,
     // Page-specific fields (optional for pages, None for posts)
     #[WpContext(edit, view)]
     #[WpContextualOption]
@@ -622,6 +621,7 @@ mod tests {
     use super::*;
     use crate::{
         SparseField, generate,
+        terms::TermId,
         unit_test_common::{
             assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
             unit_test_example_date_as_query_value,
@@ -672,10 +672,10 @@ mod tests {
     #[case(generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Future, PostStatus::Pending, PostStatus::Private, PostStatus::Publish, PostStatus::Custom("foo".to_string())])), "status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))), "tax_relation=AND")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::Or))), "tax_relation=OR")]
-    #[case(generate!(PostListParams, (categories, vec![CategoryId(1), CategoryId(2)])), "categories=1%2C2")]
-    #[case(generate!(PostListParams, (categories_exclude, vec![CategoryId(1), CategoryId(2)])), "categories_exclude=1%2C2")]
-    #[case(generate!(PostListParams, (tags, vec![TagId(1), TagId(2)])), "tags=1%2C2")]
-    #[case(generate!(PostListParams, (tags_exclude, vec![TagId(1), TagId(2)])), "tags_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (categories, vec![TermId(1), TermId(2)])), "categories=1%2C2")]
+    #[case(generate!(PostListParams, (categories_exclude, vec![TermId(1), TermId(2)])), "categories_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (tags, vec![TermId(1), TermId(2)])), "tags=1%2C2")]
+    #[case(generate!(PostListParams, (tags_exclude, vec![TermId(1), TermId(2)])), "tags_exclude=1%2C2")]
     #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
     #[case(
         post_list_params_with_all_fields(),
@@ -732,8 +732,8 @@ mod tests {
             author: vec![UserId(1), UserId(2)],
             author_exclude: vec![UserId(1), UserId(2)],
             before: unit_test_example_date_as_option(),
-            categories: vec![CategoryId(1), CategoryId(2)],
-            categories_exclude: vec![CategoryId(1), CategoryId(2)],
+            categories: vec![TermId(1), TermId(2)],
+            categories_exclude: vec![TermId(1), TermId(2)],
             exclude: vec![PostId(1), PostId(2)],
             include: vec![PostId(1), PostId(2)],
             modified_after: unit_test_example_date_as_option(),
@@ -759,8 +759,8 @@ mod tests {
                 PostStatus::Custom("foo".to_string()),
             ],
             sticky: Some(true),
-            tags: vec![TagId(1), TagId(2)],
-            tags_exclude: vec![TagId(1), TagId(2)],
+            tags: vec![TermId(1), TermId(2)],
+            tags_exclude: vec![TermId(1), TermId(2)],
             tax_relation: Some(WpApiParamPostsTaxRelation::And),
             parent: Some(PostId(1)),
             parent_exclude: vec![PostId(1), PostId(2)],
