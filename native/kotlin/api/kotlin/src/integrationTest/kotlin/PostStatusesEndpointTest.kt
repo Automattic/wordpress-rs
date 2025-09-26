@@ -10,7 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 const val PUBLISH_STATUS_SLUG: String = "publish"
-const val PUBLISH_STATUS_NAME: String = "published"
+const val PUBLISH_STATUS_NAME: String = "Published"
 
 class PostStatusesEndpointTest {
     private val client = defaultApiClient()
