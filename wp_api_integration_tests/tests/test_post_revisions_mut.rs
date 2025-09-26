@@ -1,4 +1,7 @@
-use wp_api::{post_revisions::PostRevisionId, posts::PostId};
+use wp_api::{
+    post_revisions::PostRevisionId, posts::PostId,
+    request::endpoint::posts_endpoint::PostEndpointType,
+};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -7,7 +10,11 @@ async fn delete_post_revision() {
     let revision_id = revision_id_for_revisioned_post_id();
     let revision_delete_response = api_client()
         .post_revisions()
-        .delete(&revisioned_post_id(), &revision_id)
+        .delete(
+            &PostEndpointType::Posts,
+            &revisioned_post_id(),
+            &revision_id,
+        )
         .await;
 
     assert!(

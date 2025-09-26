@@ -1,6 +1,7 @@
 use wp_api::{
     post_revisions::{AnyPostRevisionListParams, PostRevisionId},
     posts::PostId,
+    request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -9,7 +10,11 @@ use wp_api_integration_tests::prelude::*;
 async fn list_err_post_invalid_parent() {
     api_client()
         .post_revisions()
-        .list_with_edit_context(&PostId(99999999), &AnyPostRevisionListParams::default())
+        .list_with_edit_context(
+            &PostEndpointType::Posts,
+            &PostId(99999999),
+            &AnyPostRevisionListParams::default(),
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
 }
@@ -20,6 +25,7 @@ async fn list_err_revision_invalid_offset_number() {
     api_client()
         .post_revisions()
         .list_with_edit_context(
+            &PostEndpointType::Posts,
             &revisioned_post_id(),
             &AnyPostRevisionListParams {
                 offset: Some(99999999),
@@ -36,6 +42,7 @@ async fn list_err_revision_invalid_page_number() {
     api_client()
         .post_revisions()
         .list_with_edit_context(
+            &PostEndpointType::Posts,
             &revisioned_post_id(),
             &AnyPostRevisionListParams {
                 page: Some(99999999),
@@ -51,7 +58,11 @@ async fn list_err_revision_invalid_page_number() {
 async fn retrieve_err_post_invalid_parent() {
     api_client()
         .post_revisions()
-        .retrieve_with_edit_context(&PostId(99999999), &valid_revision_id())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &PostId(99999999),
+            &valid_revision_id(),
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
 }
@@ -61,7 +72,11 @@ async fn retrieve_err_post_invalid_parent() {
 async fn retrieve_err_post_invalid_id() {
     api_client()
         .post_revisions()
-        .retrieve_with_edit_context(&revisioned_post_id(), &PostRevisionId(99999999))
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &revisioned_post_id(),
+            &PostRevisionId(99999999),
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId)
 }
@@ -71,7 +86,11 @@ async fn retrieve_err_post_invalid_id() {
 async fn delete_err_post_invalid_parent() {
     api_client()
         .post_revisions()
-        .delete(&PostId(99999999), &valid_revision_id())
+        .delete(
+            &PostEndpointType::Posts,
+            &PostId(99999999),
+            &valid_revision_id(),
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
 }
@@ -81,7 +100,11 @@ async fn delete_err_post_invalid_parent() {
 async fn delete_err_post_invalid_id() {
     api_client()
         .post_revisions()
-        .delete(&revisioned_post_id(), &PostRevisionId(99999999))
+        .delete(
+            &PostEndpointType::Posts,
+            &revisioned_post_id(),
+            &PostRevisionId(99999999),
+        )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId)
 }

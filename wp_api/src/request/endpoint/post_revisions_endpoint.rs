@@ -2,16 +2,17 @@ use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::{
     post_revisions::{AnyPostRevisionListParams, PostRevisionId},
     posts::PostId,
+    request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum PostRevisionsRequest {
-    #[contextual_paged(url = "/posts/<post_id>/revisions", params = &AnyPostRevisionListParams, output = Vec<crate::post_revisions::SparseAnyPostRevision>, filter_by = crate::post_revisions::SparseAnyPostRevisionField)]
+    #[contextual_paged(url = "/<post_endpoint_type>/<post_id>/revisions", params = &AnyPostRevisionListParams, output = Vec<crate::post_revisions::SparseAnyPostRevision>, filter_by = crate::post_revisions::SparseAnyPostRevisionField)]
     List,
-    #[contextual_get(url = "/posts/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::SparseAnyPostRevision, filter_by = crate::post_revisions::SparseAnyPostRevisionField)]
+    #[contextual_get(url = "/<post_endpoint_type>/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::SparseAnyPostRevision, filter_by = crate::post_revisions::SparseAnyPostRevisionField)]
     Retrieve,
-    #[delete(url = "/posts/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::AnyPostRevisionDeleteResponse)]
+    #[delete(url = "/<post_endpoint_type>/<post_id>/revisions/<post_revision_id>", output = crate::post_revisions::AnyPostRevisionDeleteResponse)]
     Delete,
 }
 
@@ -78,15 +79,15 @@ mod tests {
             }
         };
         validate_wp_v2_endpoint(
-            endpoint.list_with_edit_context(&post_id, &params),
+            endpoint.list_with_edit_context(&PostEndpointType::Posts, &post_id, &params),
             &expected_path("edit"),
         );
         validate_wp_v2_endpoint(
-            endpoint.list_with_embed_context(&post_id, &params),
+            endpoint.list_with_embed_context(&PostEndpointType::Posts, &post_id, &params),
             &expected_path("embed"),
         );
         validate_wp_v2_endpoint(
-            endpoint.list_with_view_context(&post_id, &params),
+            endpoint.list_with_view_context(&PostEndpointType::Posts, &post_id, &params),
             &expected_path("view"),
         );
     }
@@ -102,7 +103,12 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
-            endpoint.filter_list_with_edit_context(&PostId(777), &params, fields),
+            endpoint.filter_list_with_edit_context(
+                &PostEndpointType::Posts,
+                &PostId(777),
+                &params,
+                fields,
+            ),
             expected_path,
         );
     }
@@ -132,15 +138,15 @@ mod tests {
         let expected_path =
             |context: &str| format!("/posts/{post_id}/revisions/{revision_id}?context={context}");
         validate_wp_v2_endpoint(
-            endpoint.retrieve_with_edit_context(&post_id, &revision_id),
+            endpoint.retrieve_with_edit_context(&PostEndpointType::Posts, &post_id, &revision_id),
             &expected_path("edit"),
         );
         validate_wp_v2_endpoint(
-            endpoint.retrieve_with_embed_context(&post_id, &revision_id),
+            endpoint.retrieve_with_embed_context(&PostEndpointType::Posts, &post_id, &revision_id),
             &expected_path("embed"),
         );
         validate_wp_v2_endpoint(
-            endpoint.retrieve_with_view_context(&post_id, &revision_id),
+            endpoint.retrieve_with_view_context(&PostEndpointType::Posts, &post_id, &revision_id),
             &expected_path("view"),
         );
     }
@@ -154,7 +160,12 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(
-            endpoint.filter_retrieve_with_edit_context(&PostId(777), &PostRevisionId(888), fields),
+            endpoint.filter_retrieve_with_edit_context(
+                &PostEndpointType::Posts,
+                &PostId(777),
+                &PostRevisionId(888),
+                fields,
+            ),
             expected_path,
         );
     }
@@ -164,7 +175,7 @@ mod tests {
         let post_id = PostId(777);
         let revision_id = PostRevisionId(888);
         validate_wp_v2_endpoint(
-            endpoint.delete(&post_id, &revision_id),
+            endpoint.delete(&PostEndpointType::Posts, &post_id, &revision_id),
             &format!("/posts/{post_id}/revisions/{revision_id}?force=true"),
         );
     }

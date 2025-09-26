@@ -4,6 +4,7 @@ use wp_api::{
         SparseAnyPostRevisionFieldWithEmbedContext, SparseAnyPostRevisionFieldWithViewContext,
     },
     posts::PostId,
+    request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -12,7 +13,7 @@ use wp_api_integration_tests::prelude::*;
 async fn list_with_edit_context() {
     api_client()
         .autosaves()
-        .list_with_edit_context(&autosaved_post_id())
+        .list_with_edit_context(&PostEndpointType::Posts, &autosaved_post_id())
         .await
         .assert_response();
 }
@@ -22,7 +23,7 @@ async fn list_with_edit_context() {
 async fn list_with_embed_context() {
     api_client()
         .autosaves()
-        .list_with_embed_context(&autosaved_post_id())
+        .list_with_embed_context(&PostEndpointType::Posts, &autosaved_post_id())
         .await
         .assert_response();
 }
@@ -32,7 +33,7 @@ async fn list_with_embed_context() {
 async fn list_with_view_context() {
     api_client()
         .autosaves()
-        .list_with_view_context(&autosaved_post_id())
+        .list_with_view_context(&PostEndpointType::Posts, &autosaved_post_id())
         .await
         .assert_response();
 }
@@ -42,7 +43,11 @@ async fn list_with_view_context() {
 async fn retrieve_with_edit_context() {
     api_client()
         .autosaves()
-        .retrieve_with_edit_context(&autosaved_post_id(), &autosave_id_for_autosaved_post_id())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &autosaved_post_id(),
+            &autosave_id_for_autosaved_post_id(),
+        )
         .await
         .assert_response();
 }
@@ -52,7 +57,11 @@ async fn retrieve_with_edit_context() {
 async fn retrieve_with_embed_context() {
     api_client()
         .autosaves()
-        .retrieve_with_embed_context(&autosaved_post_id(), &autosave_id_for_autosaved_post_id())
+        .retrieve_with_embed_context(
+            &PostEndpointType::Posts,
+            &autosaved_post_id(),
+            &autosave_id_for_autosaved_post_id(),
+        )
         .await
         .assert_response();
 }
@@ -62,7 +71,11 @@ async fn retrieve_with_embed_context() {
 async fn retrieve_with_view_context() {
     api_client()
         .autosaves()
-        .retrieve_with_view_context(&autosaved_post_id(), &autosave_id_for_autosaved_post_id())
+        .retrieve_with_view_context(
+            &PostEndpointType::Posts,
+            &autosaved_post_id(),
+            &autosave_id_for_autosaved_post_id(),
+        )
         .await
         .assert_response();
 }
@@ -91,7 +104,7 @@ mod filter {
     ) {
         api_client()
             .autosaves()
-            .filter_list_with_edit_context(&autosaved_post_id(), fields)
+            .filter_list_with_edit_context(&PostEndpointType::Posts, &autosaved_post_id(), fields)
             .await
             .assert_response()
             .data
@@ -110,7 +123,7 @@ mod filter {
     ) {
         api_client()
             .autosaves()
-            .filter_list_with_embed_context(&autosaved_post_id(), fields)
+            .filter_list_with_embed_context(&PostEndpointType::Posts, &autosaved_post_id(), fields)
             .await
             .assert_response()
             .data
@@ -129,7 +142,7 @@ mod filter {
     ) {
         api_client()
             .autosaves()
-            .filter_list_with_view_context(&autosaved_post_id(), fields)
+            .filter_list_with_view_context(&PostEndpointType::Posts, &autosaved_post_id(), fields)
             .await
             .assert_response()
             .data
@@ -149,6 +162,7 @@ mod filter {
         api_client()
             .autosaves()
             .filter_retrieve_with_edit_context(
+                &PostEndpointType::Posts,
                 &autosaved_post_id(),
                 &autosave_id_for_autosaved_post_id(),
                 fields,
@@ -169,6 +183,7 @@ mod filter {
         api_client()
             .autosaves()
             .filter_retrieve_with_embed_context(
+                &PostEndpointType::Posts,
                 &autosaved_post_id(),
                 &autosave_id_for_autosaved_post_id(),
                 fields,
@@ -189,6 +204,7 @@ mod filter {
         api_client()
             .autosaves()
             .filter_retrieve_with_view_context(
+                &PostEndpointType::Posts,
                 &autosaved_post_id(),
                 &autosave_id_for_autosaved_post_id(),
                 fields,

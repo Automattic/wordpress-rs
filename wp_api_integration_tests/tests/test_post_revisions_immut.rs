@@ -5,6 +5,7 @@ use wp_api::{
         WpApiParamPostRevisionsOrderBy,
     },
     posts::PostId,
+    request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -14,7 +15,7 @@ use wp_api_integration_tests::prelude::*;
 async fn list_with_edit_context(#[case] params: AnyPostRevisionListParams) {
     api_client()
         .post_revisions()
-        .list_with_edit_context(&revisioned_post_id(), &params)
+        .list_with_edit_context(&PostEndpointType::Posts, &revisioned_post_id(), &params)
         .await
         .assert_response();
 }
@@ -25,7 +26,7 @@ async fn list_with_edit_context(#[case] params: AnyPostRevisionListParams) {
 async fn list_with_embed_context(#[case] params: AnyPostRevisionListParams) {
     api_client()
         .post_revisions()
-        .list_with_embed_context(&revisioned_post_id(), &params)
+        .list_with_embed_context(&PostEndpointType::Posts, &revisioned_post_id(), &params)
         .await
         .assert_response();
 }
@@ -36,7 +37,7 @@ async fn list_with_embed_context(#[case] params: AnyPostRevisionListParams) {
 async fn list_with_view_context(#[case] params: AnyPostRevisionListParams) {
     api_client()
         .post_revisions()
-        .list_with_view_context(&revisioned_post_id(), &params)
+        .list_with_view_context(&PostEndpointType::Posts, &revisioned_post_id(), &params)
         .await
         .assert_response();
 }
@@ -46,7 +47,11 @@ async fn list_with_view_context(#[case] params: AnyPostRevisionListParams) {
 async fn retrieve_with_edit_context() {
     api_client()
         .post_revisions()
-        .retrieve_with_edit_context(&revisioned_post_id(), &revision_id_for_revisioned_post_id())
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &revisioned_post_id(),
+            &revision_id_for_revisioned_post_id(),
+        )
         .await
         .assert_response();
 }
@@ -56,7 +61,11 @@ async fn retrieve_with_edit_context() {
 async fn retrieve_with_embed_context() {
     api_client()
         .post_revisions()
-        .retrieve_with_embed_context(&revisioned_post_id(), &revision_id_for_revisioned_post_id())
+        .retrieve_with_embed_context(
+            &PostEndpointType::Posts,
+            &revisioned_post_id(),
+            &revision_id_for_revisioned_post_id(),
+        )
         .await
         .assert_response();
 }
@@ -66,7 +75,11 @@ async fn retrieve_with_embed_context() {
 async fn retrieve_with_view_context() {
     api_client()
         .post_revisions()
-        .retrieve_with_view_context(&revisioned_post_id(), &revision_id_for_revisioned_post_id())
+        .retrieve_with_view_context(
+            &PostEndpointType::Posts,
+            &revisioned_post_id(),
+            &revision_id_for_revisioned_post_id(),
+        )
         .await
         .assert_response();
 }
@@ -114,7 +127,12 @@ mod filter {
     ) {
         api_client()
             .post_revisions()
-            .filter_list_with_edit_context(&revisioned_post_id(), &params, fields)
+            .filter_list_with_edit_context(
+                &PostEndpointType::Posts,
+                &revisioned_post_id(),
+                &params,
+                fields,
+            )
             .await
             .assert_response()
             .data
@@ -139,7 +157,12 @@ mod filter {
     ) {
         api_client()
             .post_revisions()
-            .filter_list_with_embed_context(&revisioned_post_id(), &params, fields)
+            .filter_list_with_embed_context(
+                &PostEndpointType::Posts,
+                &revisioned_post_id(),
+                &params,
+                fields,
+            )
             .await
             .assert_response()
             .data
@@ -164,7 +187,12 @@ mod filter {
     ) {
         api_client()
             .post_revisions()
-            .filter_list_with_view_context(&revisioned_post_id(), &params, fields)
+            .filter_list_with_view_context(
+                &PostEndpointType::Posts,
+                &revisioned_post_id(),
+                &params,
+                fields,
+            )
             .await
             .assert_response()
             .data
@@ -184,6 +212,7 @@ mod filter {
         api_client()
             .post_revisions()
             .filter_retrieve_with_edit_context(
+                &PostEndpointType::Posts,
                 &revisioned_post_id(),
                 &revision_id_for_revisioned_post_id(),
                 fields,
@@ -204,6 +233,7 @@ mod filter {
         api_client()
             .post_revisions()
             .filter_retrieve_with_embed_context(
+                &PostEndpointType::Posts,
                 &revisioned_post_id(),
                 &revision_id_for_revisioned_post_id(),
                 fields,
@@ -224,6 +254,7 @@ mod filter {
         api_client()
             .post_revisions()
             .filter_retrieve_with_view_context(
+                &PostEndpointType::Posts,
                 &revisioned_post_id(),
                 &revision_id_for_revisioned_post_id(),
                 fields,
