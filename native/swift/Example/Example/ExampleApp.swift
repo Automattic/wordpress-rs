@@ -163,7 +163,7 @@ struct ExampleApp: App {
                 .postStatuses
                 .map(\.value)
                 .map(\.asListViewData)
-        }))
+        }, category: .posts))
 
         return baseData
     }
