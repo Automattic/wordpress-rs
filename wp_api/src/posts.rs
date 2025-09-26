@@ -393,6 +393,7 @@ pub struct SparseAnyPost {
     #[WpContextualField]
     pub content: Option<SparsePostContent>,
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub author: Option<UserId>,
     #[WpContext(edit, embed, view)]
     #[WpContextualField]
@@ -407,6 +408,7 @@ pub struct SparseAnyPost {
     #[WpContextualOption]
     pub format: Option<PostFormat>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub meta: Option<PostMeta>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
