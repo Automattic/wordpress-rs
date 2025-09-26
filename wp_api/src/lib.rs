@@ -21,6 +21,7 @@ pub mod middleware;
 pub mod parsed_url;
 pub mod plugins;
 pub mod post_revisions;
+pub mod post_statuses;
 pub mod post_types;
 pub mod posts;
 pub mod prelude;

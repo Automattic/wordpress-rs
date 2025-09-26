@@ -157,6 +157,14 @@ struct ExampleApp: App {
             }, category: .taxonomies))
         }
 
+        baseData.append(RootListData(name: "Post Statuses", callback: {
+            try await WordPressAPI.globalInstance.postStatuses.listWithEditContext()
+                .data
+                .postStatuses
+                .map(\.value)
+                .map(\.asListViewData)
+        }, category: .posts))
+
         return baseData
     }
 

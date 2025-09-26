@@ -10,6 +10,7 @@ pub mod media_endpoint;
 pub mod plugins_endpoint;
 pub mod post_autosaves_endpoint;
 pub mod post_revisions_endpoint;
+pub mod post_statuses_endpoint;
 pub mod post_types_endpoint;
 pub mod posts_endpoint;
 pub mod search_endpoint;
