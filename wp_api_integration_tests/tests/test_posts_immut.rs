@@ -1,12 +1,11 @@
 use wp_api::{
-    categories::CategoryId,
     posts::{
         PostId, PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
         SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
         WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
     },
     request::endpoint::posts_endpoint::PostEndpointType,
-    tags::TagId,
+    terms::TermId,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -264,10 +263,10 @@ async fn list_with_post_endpoint_type_using_default_params(
 #[case::slug(generate!(PostListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
 #[case::status(generate!(PostListParams, (status, vec![PostStatus::Publish, PostStatus::Pending])))]
 #[case::tax_relation(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))))]
-#[case::categories(generate!(PostListParams, (categories, vec![CategoryId(1)])))]
-#[case::categories_exclude(generate!(PostListParams, (categories_exclude, vec![CategoryId(1)])))]
-#[case::tags(generate!(PostListParams, (tags, vec![TagId(1)])))]
-#[case::tags_exclude(generate!(PostListParams, (tags_exclude, vec![TagId(1)])))]
+#[case::categories(generate!(PostListParams, (categories, vec![TermId(1)])))]
+#[case::categories_exclude(generate!(PostListParams, (categories_exclude, vec![TermId(1)])))]
+#[case::tags(generate!(PostListParams, (tags, vec![TermId(1)])))]
+#[case::tags_exclude(generate!(PostListParams, (tags_exclude, vec![TermId(1)])))]
 #[case::sticky(generate!(PostListParams, (sticky, Some(true))))]
 fn list_cases(#[case] params: PostListParams) {}
 

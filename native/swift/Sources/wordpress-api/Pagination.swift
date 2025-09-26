@@ -455,17 +455,17 @@ extension CommentsRequestExecutor: PaginationAwareExecutor {
 // MARK: - Categories
 
 extension CategoriesRequestListWithEditContextResponse: PaginatableResponse {
-    public typealias ParamsType = CategoryListParams
+    public typealias ParamsType = TermListParams
     public typealias DataType = CategoryWithEditContext
 }
 
 extension CategoriesRequestListWithViewContextResponse: PaginatableResponse {
-    public typealias ParamsType = CategoryListParams
+    public typealias ParamsType = TermListParams
     public typealias DataType = CategoryWithViewContext
 }
 
 extension CategoriesRequestListWithEmbedContextResponse: PaginatableResponse {
-    public typealias ParamsType = CategoryListParams
+    public typealias ParamsType = TermListParams
     public typealias DataType = CategoryWithEmbedContext
 }
 
@@ -478,17 +478,17 @@ extension CategoriesRequestExecutor: PaginationAwareExecutor {
 // MARK: - Tags
 
 extension TagsRequestListWithEditContextResponse: PaginatableResponse {
-    public typealias ParamsType = TagListParams
+    public typealias ParamsType = TermListParams
     public typealias DataType = TagWithEditContext
 }
 
 extension TagsRequestListWithViewContextResponse: PaginatableResponse {
-    public typealias ParamsType = TagListParams
+    public typealias ParamsType = TermListParams
     public typealias DataType = TagWithViewContext
 }
 
 extension TagsRequestListWithEmbedContextResponse: PaginatableResponse {
-    public typealias ParamsType = TagListParams
+    public typealias ParamsType = TermListParams
     public typealias DataType = TagWithEmbedContext
 }
 
