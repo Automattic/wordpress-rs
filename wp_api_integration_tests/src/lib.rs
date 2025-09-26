@@ -38,6 +38,8 @@ pub struct TestCredentials {
     pub first_page_id: i64,
     pub revisioned_page_id: i64,
     pub revision_id_for_revisioned_page_id: i64,
+    pub autosaved_page_id: i64,
+    pub autosave_id_for_autosaved_page_id: i64,
 }
 
 impl TestCredentials {
