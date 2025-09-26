@@ -16,7 +16,7 @@ async fn create_autosave() {
 
     let autosave = api_client()
         .autosaves()
-        .create(&PostEndpointType::Posts, &autosaved_post_id(), &params)
+        .create(&PostEndpointType::Pages, &autosaved_page_id(), &params)
         .await
         .assert_response()
         .data;
@@ -26,6 +26,6 @@ async fn create_autosave() {
     assert_eq!(autosave.content.raw, Some(content));
 }
 
-fn autosaved_post_id() -> PostId {
-    PostId(TestCredentials::instance().autosaved_post_id)
+fn autosaved_page_id() -> PostId {
+    PostId(TestCredentials::instance().autosaved_page_id)
 }

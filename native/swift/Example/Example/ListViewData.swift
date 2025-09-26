@@ -150,6 +150,12 @@ extension AnyPostWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension AnyPostRevisionWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.title.rendered, subtitle: self.slug, fields: [:])
+    }
+}
+
 extension AnyTermWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [

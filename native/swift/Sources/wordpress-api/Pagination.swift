@@ -386,6 +386,83 @@ extension PostsRequestExecutor: TypedPaginationAwareExecutor {
     }
 }
 
+// MARK: – Revisions
+extension RevisionsRequestListWithEditContextResponse: PaginatableResponse {
+    public typealias ParamsType = RevisionListParams
+    public typealias DataType = AnyPostRevisionWithEditContext
+}
+
+extension RevisionsRequestListWithViewContextResponse: PaginatableResponse {
+    public typealias ParamsType = RevisionListParams
+    public typealias DataType = AnyPostRevisionWithViewContext
+}
+
+extension RevisionsRequestListWithEmbedContextResponse: PaginatableResponse {
+    public typealias ParamsType = RevisionListParams
+    public typealias DataType = AnyPostRevisionWithEmbedContext
+}
+
+extension RevisionsRequestExecutor {
+    public typealias EditContextResponseType = RevisionsRequestListWithEditContextResponse
+    public typealias ViewContextResponseType = RevisionsRequestListWithViewContextResponse
+    public typealias EmbedContextResponseType = RevisionsRequestListWithEmbedContextResponse
+    public typealias TypeParam = PostEndpointType
+
+    public func listWithEditContext(
+        type: TypeParam,
+        postId: PostId,
+        params: EditContextResponseType.ParamsType
+    ) async throws -> EditContextResponseType {
+        try await self.listWithEditContext(postEndpointType: type, postId: postId, params: params)
+    }
+
+    public func listWithViewContext(
+        type: TypeParam,
+        postId: PostId,
+        params: ViewContextResponseType.ParamsType
+    ) async throws -> ViewContextResponseType {
+        try await self.listWithViewContext(postEndpointType: type, postId: postId, params: params)
+    }
+
+    public func listWithEmbedContext(
+        type: TypeParam,
+        postId: PostId,
+        params: EmbedContextResponseType.ParamsType
+    ) async throws -> EmbedContextResponseType {
+        try await self.listWithEmbedContext(postEndpointType: type, postId: postId, params: params)
+    }
+
+    public func sequenceWithEditContext(
+        type: TypeParam,
+        postId: PostId,
+        params: EditContextResponseType.ParamsType
+    ) -> PaginationSequence<EditContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithEditContext(type: type, postId: postId, params: params)
+        }
+    }
+
+    public func sequenceWithViewContext(
+        type: TypeParam,
+        postId: PostId,
+        params: ViewContextResponseType.ParamsType
+    ) -> PaginationSequence<ViewContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithViewContext(type: type, postId: postId, params: params)
+        }
+    }
+
+    public func sequenceWithEmbedContext(
+        type: TypeParam,
+        postId: PostId,
+        params: EmbedContextResponseType.ParamsType
+    ) -> PaginationSequence<EmbedContextResponseType> {
+        PaginationSequence(params: params) { params in
+            try await self.listWithEmbedContext(type: type, postId: postId, params: params)
+        }
+    }
+}
+
 // MARK: - Media
 extension MediaRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = MediaListParams

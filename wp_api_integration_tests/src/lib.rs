@@ -36,6 +36,10 @@ pub struct TestCredentials {
     pub password_protected_page_title: &'static str,
     pub trashed_page_id: i64,
     pub first_page_id: i64,
+    pub revisioned_page_id: i64,
+    pub revision_id_for_revisioned_page_id: i64,
+    pub autosaved_page_id: i64,
+    pub autosave_id_for_autosaved_page_id: i64,
 }
 
 impl TestCredentials {

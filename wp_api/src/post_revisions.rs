@@ -41,7 +41,7 @@ impl_as_query_value_from_to_string!(WpApiParamPostRevisionsOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(true)]
-pub struct PostRevisionListParams {
+pub struct AnyPostRevisionListParams {
     /// Current page of the collection.
     /// Default: `1`
     #[uniffi(default = None)]
@@ -75,7 +75,7 @@ pub struct PostRevisionListParams {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-pub struct SparsePostRevision {
+pub struct SparseAnyPostRevision {
     #[WpContext(edit, embed, view)]
     pub id: Option<PostRevisionId>,
     #[WpContext(edit, embed, view)]
@@ -109,9 +109,9 @@ pub struct SparsePostRevision {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct PostRevisionDeleteResponse {
+pub struct AnyPostRevisionDeleteResponse {
     pub deleted: bool,
-    pub previous: PostRevisionWithEditContext,
+    pub previous: AnyPostRevisionWithEditContext,
 }
 
 #[cfg(test)]
@@ -121,29 +121,29 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case(PostRevisionListParams::default(), "")]
-    #[case(generate!(PostRevisionListParams, (page, Some(2))), "page=2")]
-    #[case(generate!(PostRevisionListParams, (per_page, Some(2))), "per_page=2")]
-    #[case(generate!(PostRevisionListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(PostRevisionListParams, (exclude, vec![PostRevisionId(1), PostRevisionId(2)])), "exclude=1%2C2")]
-    #[case(generate!(PostRevisionListParams, (include, vec![PostRevisionId(1), PostRevisionId(2)])), "include=1%2C2")]
-    #[case(generate!(PostRevisionListParams, (offset, Some(2))), "offset=2")]
-    #[case(generate!(PostRevisionListParams, (order, Some(WpApiParamOrder::Asc))), "order=asc")]
-    #[case(generate!(PostRevisionListParams, (order, Some(WpApiParamOrder::Desc))), "order=desc")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Date))), "orderby=date")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Id))), "orderby=id")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Include))), "orderby=include")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::IncludeSlugs))), "orderby=include_slugs")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Relevance))), "orderby=relevance")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Slug))), "orderby=slug")]
-    #[case(generate!(PostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Title))), "orderby=title")]
+    #[case(AnyPostRevisionListParams::default(), "")]
+    #[case(generate!(AnyPostRevisionListParams, (page, Some(2))), "page=2")]
+    #[case(generate!(AnyPostRevisionListParams, (per_page, Some(2))), "per_page=2")]
+    #[case(generate!(AnyPostRevisionListParams, (search, Some("foo".to_string()))), "search=foo")]
+    #[case(generate!(AnyPostRevisionListParams, (exclude, vec![PostRevisionId(1), PostRevisionId(2)])), "exclude=1%2C2")]
+    #[case(generate!(AnyPostRevisionListParams, (include, vec![PostRevisionId(1), PostRevisionId(2)])), "include=1%2C2")]
+    #[case(generate!(AnyPostRevisionListParams, (offset, Some(2))), "offset=2")]
+    #[case(generate!(AnyPostRevisionListParams, (order, Some(WpApiParamOrder::Asc))), "order=asc")]
+    #[case(generate!(AnyPostRevisionListParams, (order, Some(WpApiParamOrder::Desc))), "order=desc")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Date))), "orderby=date")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Id))), "orderby=id")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Include))), "orderby=include")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::IncludeSlugs))), "orderby=include_slugs")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Relevance))), "orderby=relevance")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Slug))), "orderby=slug")]
+    #[case(generate!(AnyPostRevisionListParams, (orderby, Some(WpApiParamPostRevisionsOrderBy::Title))), "orderby=title")]
     #[case(
         post_revision_list_params_with_all_fields(),
         &expected_query_pairs_for_post_revision_list_params_with_all_fields()
     )]
     #[trace]
     fn test_post_list_query_pairs(
-        #[case] params: PostRevisionListParams,
+        #[case] params: AnyPostRevisionListParams,
         #[case] expected_query: &str,
     ) {
         assert_expected_and_from_query_pairs(params, expected_query);
@@ -154,8 +154,8 @@ mod tests {
             .to_string()
     }
 
-    fn post_revision_list_params_with_all_fields() -> PostRevisionListParams {
-        PostRevisionListParams {
+    fn post_revision_list_params_with_all_fields() -> AnyPostRevisionListParams {
+        AnyPostRevisionListParams {
             page: Some(2),
             per_page: Some(2),
             search: Some("foo".to_string()),

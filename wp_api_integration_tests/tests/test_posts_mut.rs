@@ -40,7 +40,8 @@ async fn create_post_with_title_and_meta() {
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
-            let footnote = created_post.meta.footnotes.first().unwrap();
+            let meta = created_post.meta.unwrap();
+            let footnote = meta.footnotes.first().unwrap();
             assert_eq!(created_post.title.raw, Some("foo".to_string()));
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(footnote.id, "bar");
@@ -220,7 +221,7 @@ generate_update_test!(
     author,
     SECOND_USER_ID,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.author, SECOND_USER_ID);
+        assert_eq!(updated_post.author, Some(SECOND_USER_ID));
         assert_eq!(updated_post_from_wp_cli.author, SECOND_USER_ID.0);
     }
 );
@@ -315,7 +316,8 @@ generate_update_test!(
         }]
     },
     |updated_post, _| {
-        let footnote = updated_post.meta.footnotes.first().unwrap();
+        let meta = updated_post.meta.unwrap();
+        let footnote = meta.footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");
     }
