@@ -77,7 +77,7 @@ pub struct NavMenuListParams {
     #[uniffi(default = None)]
     pub post: Option<PostId>,
     /// Limit result set to terms with one or more specific slugs.
-    #[uniffi(default = None)]
+    #[uniffi(default = [])]
     pub slug: Vec<String>,
 }
 
