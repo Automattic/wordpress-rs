@@ -98,7 +98,7 @@ pub struct NavMenuCreateParams {
     /// Required
     pub name: String,
     /// An alphanumeric identifier for the term unique to its type.
-    #[uniffi(default = [])]
+    #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     /// The locations assigned to the menu.
