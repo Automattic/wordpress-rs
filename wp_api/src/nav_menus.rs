@@ -74,6 +74,7 @@ pub struct NavMenuListParams {
     #[uniffi(default = None)]
     pub hide_empty: Option<bool>,
     /// Limit result set to terms assigned to a specific post.
+    /// This param must be a valid nav_menu_item ID.
     #[uniffi(default = None)]
     pub post: Option<PostId>,
     /// Limit result set to terms with one or more specific slugs.
