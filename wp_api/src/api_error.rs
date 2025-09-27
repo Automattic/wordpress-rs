@@ -264,12 +264,16 @@ pub enum WpErrorCode {
     InvalidAuthor,
     #[serde(rename = "rest_invalid_field")]
     InvalidField,
+    #[serde(rename = "rest_invalid_menu_location")]
+    InvalidMenuLocation,
     #[serde(rename = "rest_invalid_param")]
     InvalidParam,
     #[serde(rename = "rest_invalid_template")]
     InvalidTemplate,
     #[serde(rename = "rest_invalid_widget")]
     InvalidWidget,
+    #[serde(rename = "menu_exists")]
+    MenuExists,
     #[serde(rename = "rest_no_search_term_defined")]
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]

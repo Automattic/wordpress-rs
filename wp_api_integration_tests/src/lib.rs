@@ -1,5 +1,8 @@
 use crate::prelude::*;
-use wp_api::wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver};
+use wp_api::{
+    nav_menus::NavMenuId,
+    wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver},
+};
 
 pub mod mock;
 pub mod prelude;
@@ -76,12 +79,14 @@ pub const FIRST_POST_ID: PostId = PostId(1);
 pub const POST_ID_555: PostId = PostId(555);
 pub const POST_ID_DRAFT: PostId = PostId(1164);
 pub const POST_ID_INVALID: PostId = PostId(99999999);
+pub const POST_ID_NAV_MENUS_PARAM: PostId = PostId(1768);
 pub const MEDIA_ID_611: MediaId = MediaId(611);
 pub const MEDIA_ID_VIDEO: MediaId = MediaId(1690);
 pub const MEDIA_ID_AUDIO: MediaId = MediaId(821);
 pub const MEDIA_ID_IMAGE: MediaId = MediaId(1692);
 pub const MEDIA_TEST_FILE_PATH: &str = "../test-data/test_media.jpg";
 pub const MEDIA_TEST_FILE_CONTENT_TYPE: &str = "image/jpeg";
+pub const NAV_MENU_ID_179: NavMenuId = NavMenuId(179);
 pub const CATEGORY_ID_48: TermId = TermId(48);
 pub const CATEGORY_ID_59: TermId = TermId(59);
 pub const TAG_ID_100: TermId = TermId(100);
