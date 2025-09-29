@@ -189,6 +189,12 @@ extension NavMenuWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension MenuLocationWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.name, title: self.name, subtitle: self.description, fields: [:])
+    }
+}
+
 extension [AnyPostWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }

@@ -157,6 +157,10 @@ public actor WordPressAPI {
         self.requestBuilder.navMenus()
     }
 
+    public var menuLocations: MenuLocationsRequestExecutor {
+        self.requestBuilder.menuLocations()
+    }
+
 #if PROGRESS_REPORTING_ENABLED
     public func uploadMedia(
         params: MediaCreateParams,

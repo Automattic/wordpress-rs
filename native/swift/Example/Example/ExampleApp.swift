@@ -161,14 +161,20 @@ struct ExampleApp: App {
             try await WordPressAPI.globalInstance.postStatuses.listWithEditContext()
                 .data
                 .postStatuses
-                .map(\.value)
-                .map(\.asListViewData)
+                .map(\.value.asListViewData)
         }, category: .posts))
 
         baseData.append(RootListData(name: "Menus", callback: {
             try await WordPressAPI.globalInstance.navMenus.listWithEditContext(params: NavMenuListParams())
                 .data
                 .map(\.asListViewData)
+        }, category: .system))
+
+        baseData.append(RootListData(name: "Menu Locations", callback: {
+            try await WordPressAPI.globalInstance.menuLocations.listWithEditContext()
+                .data
+                .locations
+                .map(\.value.asListViewData)
         }, category: .system))
 
         return baseData
