@@ -13,6 +13,7 @@ use crate::{
             },
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
+            menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
             nav_menus_endpoint::{NavMenusRequestBuilder, NavMenusRequestExecutor},
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
@@ -49,6 +50,7 @@ pub struct WpApiRequestBuilder {
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
+    menu_locations: Arc<MenuLocationsRequestBuilder>,
     nav_menus: Arc<NavMenusRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
@@ -81,6 +83,7 @@ impl WpApiRequestBuilder {
             autosaves,
             comments,
             media,
+            menu_locations,
             nav_menus,
             plugins,
             post_revisions,
@@ -123,6 +126,7 @@ pub struct WpApiClient {
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
+    menu_locations: Arc<MenuLocationsRequestExecutor>,
     nav_menus: Arc<NavMenusRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
@@ -152,6 +156,7 @@ impl WpApiClient {
             autosaves,
             comments,
             media,
+            menu_locations,
             nav_menus,
             plugins,
             post_revisions,
@@ -191,6 +196,7 @@ api_client_generate_endpoint_impl!(WpApi, application_passwords);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);
+api_client_generate_endpoint_impl!(WpApi, menu_locations);
 api_client_generate_endpoint_impl!(WpApi, nav_menus);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);

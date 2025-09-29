@@ -203,6 +203,11 @@ public typealias NavMenuWithEditContext = WordPressAPIInternal.NavMenuWithEditCo
 public typealias NavMenuWithViewContext = WordPressAPIInternal.NavMenuWithViewContext
 public typealias NavMenuWithEmbedContext = WordPressAPIInternal.NavMenuWithEmbedContext
 
+// MARK: Menu Locations
+public typealias MenuLocationWithEditContext = WordPressAPIInternal.MenuLocationWithEditContext
+public typealias MenuLocationWithViewContext = WordPressAPIInternal.MenuLocationWithViewContext
+public typealias MenuLocationWithEmbedContext = WordPressAPIInternal.MenuLocationWithEmbedContext
+
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext

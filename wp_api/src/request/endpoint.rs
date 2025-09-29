@@ -7,6 +7,7 @@ pub mod api_root_endpoint;
 pub mod application_passwords_endpoint;
 pub mod comments_endpoint;
 pub mod media_endpoint;
+pub mod menu_locations_endpoint;
 pub mod nav_menus_endpoint;
 pub mod plugins_endpoint;
 pub mod post_autosaves_endpoint;

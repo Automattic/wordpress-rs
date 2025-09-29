@@ -17,6 +17,7 @@ pub mod comments;
 pub mod date;
 pub mod login;
 pub mod media;
+pub mod menu_locations;
 pub mod middleware;
 pub mod nav_menus;
 pub mod parsed_url;

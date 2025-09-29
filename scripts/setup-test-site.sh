@@ -87,6 +87,17 @@ wp user create test_author test_author@example.com --role=author
 # This is used in `/posts` integration tests that updates the `template` field
 wp theme activate twentytwentyfour
 
+# Create menus for integration tests
+# The mu-plugin register-menu-locations.php registers primary and footer menu locations
+PRIMARY_MENU_LOCATION="primary"
+FOOTER_MENU_LOCATION="footer"
+PRIMARY_MENU_ID="$(wp menu create "Primary Menu" --porcelain)"
+FOOTER_MENU_ID="$(wp menu create "Footer Menu" --porcelain)"
+
+# Assign menus to their locations
+wp menu location assign "$PRIMARY_MENU_ID" "$PRIMARY_MENU_LOCATION"
+wp menu location assign "$FOOTER_MENU_ID" "$FOOTER_MENU_LOCATION"
+
 wp comment trash 22
 wp comment spam 23
 
@@ -244,6 +255,8 @@ create_test_credentials () {
     revision_id_for_revisioned_page_id="$REVISION_ID_FOR_REVISIONED_PAGE_ID" \
     autosaved_page_id="$AUTOSAVED_PAGE_ID" \
     autosave_id_for_autosaved_page_id="$AUTOSAVE_ID_FOR_AUTOSAVED_PAGE_ID" \
+    primary_menu_location="$PRIMARY_MENU_LOCATION" \
+    footer_menu_location="$FOOTER_MENU_LOCATION" \
     > /app/test_credentials.json
 }
 create_test_credentials

@@ -60,7 +60,17 @@ macro_rules! wp_content_string_id {
     ($id_type:ident) => {
         ::uniffi::custom_newtype!($id_type, ::std::string::String);
         $crate::impl_as_query_value_from_to_string!($id_type);
-        #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        #[derive(
+            Debug,
+            Clone,
+            Hash,
+            PartialEq,
+            Eq,
+            PartialOrd,
+            Ord,
+            ::serde::Serialize,
+            ::serde::Deserialize,
+        )]
         pub struct $id_type(pub ::std::string::String);
 
         impl ::core::str::FromStr for $id_type {
