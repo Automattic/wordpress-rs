@@ -41,7 +41,7 @@
 - [ ] `/wp/v2/navigation`
 - [ ] `/wp/v2/navigation/<id>/revisions`
 - [ ] `/wp/v2/navigation/<id>/autosaves`
-- [ ] `/wp/v2/menus`
+- [x] `/wp/v2/menus`
 - [ ] `/wp/v2/menu-items`
 - [ ] `/wp/v2/menu-items/<id>/autosaves`
 - [ ] `/wp/v2/menu-locations`

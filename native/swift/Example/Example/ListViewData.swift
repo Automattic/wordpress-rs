@@ -183,6 +183,12 @@ extension PostStatusWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension NavMenuWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id.description, title: self.name, subtitle: self.slug, fields: [:])
+    }
+}
+
 extension [AnyPostWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }

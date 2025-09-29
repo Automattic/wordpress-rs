@@ -153,6 +153,10 @@ public actor WordPressAPI {
         self.requestBuilder.wpBlockEditor()
     }
 
+    public var navMenus: NavMenusRequestExecutor {
+        self.requestBuilder.navMenus()
+    }
+
 #if PROGRESS_REPORTING_ENABLED
     public func uploadMedia(
         params: MediaCreateParams,
