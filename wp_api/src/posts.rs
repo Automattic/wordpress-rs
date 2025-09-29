@@ -115,7 +115,7 @@ pub struct PostListParams {
     pub order: Option<WpApiParamOrder>,
     /// Sort collection by post attribute.
     /// Default: date
-    /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title
+    /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title, menu_order
     #[uniffi(default = None)]
     #[field_name("orderby")]
     pub orderby: Option<WpApiParamPostsOrderBy>,

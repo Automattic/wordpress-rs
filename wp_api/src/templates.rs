@@ -5,21 +5,13 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_string_id,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
 use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
 
-uniffi::custom_newtype!(TemplateId, String);
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TemplateId(pub String);
-
-impl Display for TemplateId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_string_id!(TemplateId);
 
 #[derive(
     Debug,
