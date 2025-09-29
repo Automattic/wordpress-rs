@@ -165,6 +165,12 @@ struct ExampleApp: App {
                 .map(\.asListViewData)
         }, category: .posts))
 
+        baseData.append(RootListData(name: "Menus", callback: {
+            try await WordPressAPI.globalInstance.navMenus.listWithEditContext(params: NavMenuListParams())
+                .data
+                .map(\.asListViewData)
+        }, category: .system))
+
         return baseData
     }
 
