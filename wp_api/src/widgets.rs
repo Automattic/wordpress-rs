@@ -1,22 +1,17 @@
-use crate::JsonValue;
-use crate::url_query::{
-    AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
-};
 use crate::widget_types::WidgetTypeId;
+use crate::{
+    JsonValue,
+    url_query::{
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
+    },
+    wp_content_string_id,
+};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
 
-uniffi::custom_newtype!(WidgetId, String);
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WidgetId(pub String);
-
-impl Display for WidgetId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_string_id!(WidgetId);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseWidget {

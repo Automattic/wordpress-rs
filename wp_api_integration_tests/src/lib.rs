@@ -43,6 +43,8 @@ pub struct TestCredentials {
     pub revision_id_for_revisioned_page_id: i64,
     pub autosaved_page_id: i64,
     pub autosave_id_for_autosaved_page_id: i64,
+    pub primary_menu_location: &'static str,
+    pub footer_menu_location: &'static str,
 }
 
 impl TestCredentials {

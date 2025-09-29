@@ -274,6 +274,8 @@ pub enum WpErrorCode {
     InvalidWidget,
     #[serde(rename = "menu_exists")]
     MenuExists,
+    #[serde(rename = "rest_menu_location_invalid")]
+    MenuLocationInvalid,
     #[serde(rename = "rest_no_search_term_defined")]
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
