@@ -4,7 +4,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum NavMenuItemsRequest {
-    #[contextual_get(url = "/menu-items", params = &crate::nav_menu_items::NavMenuItemListParams, output = Vec<crate::nav_menu_items::SparseNavMenuItem>, filter_by = crate::nav_menu_items::SparseNavMenuItemField)]
+    #[contextual_paged(url = "/menu-items", params = &crate::nav_menu_items::NavMenuItemListParams, output = Vec<crate::nav_menu_items::SparseNavMenuItem>, filter_by = crate::nav_menu_items::SparseNavMenuItemField)]
     List,
     #[contextual_get(url = "/menu-items/<nav_menu_item_id>", output = crate::nav_menu_items::SparseNavMenuItem, filter_by = crate::nav_menu_items::SparseNavMenuItemField)]
     Retrieve,

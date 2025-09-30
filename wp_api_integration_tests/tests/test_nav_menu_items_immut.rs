@@ -72,6 +72,33 @@ async fn retrieve_with_view_context() {
         .assert_response();
 }
 
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(NavMenuItemListParams { per_page: Some(1), ..Default::default() })]
+async fn paginate_list_nav_menu_items_with_edit_context(#[case] params: NavMenuItemListParams) {
+    let first_page_response = api_client()
+        .nav_menu_items()
+        .list_with_edit_context(&params)
+        .await
+        .assert_response();
+    assert!(!first_page_response.data.is_empty());
+    let next_page_params = first_page_response.next_page_params.unwrap();
+    let next_page_response = api_client()
+        .nav_menu_items()
+        .list_with_edit_context(&next_page_params)
+        .await
+        .assert_response();
+    assert!(!next_page_response.data.is_empty());
+    let prev_page_params = next_page_response.prev_page_params.unwrap();
+    let prev_page_response = api_client()
+        .nav_menu_items()
+        .list_with_edit_context(&prev_page_params)
+        .await
+        .assert_response();
+    assert!(!prev_page_response.data.is_empty());
+}
+
 fn nav_menu_item_id_for_retrieve_tests() -> NavMenuItemId {
     NavMenuItemId(TestCredentials::instance().nav_menu_item_id)
 }
