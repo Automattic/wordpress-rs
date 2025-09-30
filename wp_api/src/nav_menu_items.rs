@@ -3,9 +3,7 @@ use crate::{
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     nav_menus::NavMenuId,
-    posts::{
-        PostStatus, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
-    },
+    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation},
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -16,6 +14,37 @@ use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
 
 wp_content_i64_id!(NavMenuItemId);
+
+/// Status of a nav menu item.
+///
+/// WordPress only supports two statuses for nav menu items: `publish` and `draft`.
+/// Any other status values will be coerced to one of these by WordPress core.
+///
+/// See:
+/// https://github.com/WordPress/WordPress/blob/b27e369cb25445784bc014d6fa731558beaf320d/wp-includes/nav-menu.php#L548
+/// https://github.com/WordPress/WordPress/blob/b27e369cb25445784bc014d6fa731558beaf320d/wp-includes/nav-menu.php#L612
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum NavMenuItemStatus {
+    #[default]
+    Publish,
+    Draft,
+}
+
+impl_as_query_value_from_to_string!(NavMenuItemStatus);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(true)]
@@ -72,7 +101,7 @@ pub struct NavMenuItemListParams {
     /// Limit result set to posts assigned one or more statuses.
     /// Default: publish
     #[uniffi(default = [])]
-    pub status: Vec<PostStatus>,
+    pub status: Vec<NavMenuItemStatus>,
     /// Limit result set based on relationship between multiple taxonomies.
     /// One of: AND, OR
     #[uniffi(default = None)]
@@ -109,10 +138,10 @@ pub struct NavMenuItemCreateParams {
     pub nav_menu_item_type: Option<NavMenuItemType>,
     /// A named status for the object.
     /// Default: publish
-    /// One of: publish, future, draft, pending, private
+    /// One of: publish, draft
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<NavMenuItemStatus>,
     /// The ID for the parent of the object.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -175,10 +204,10 @@ pub struct NavMenuItemUpdateParams {
     #[serde(rename = "type")]
     pub nav_menu_item_type: Option<NavMenuItemType>,
     /// A named status for the object.
-    /// One of: publish, future, draft, pending, private
+    /// One of: publish, draft
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<NavMenuItemStatus>,
     /// The ID for the parent of the object.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -265,7 +294,7 @@ pub struct SparseNavMenuItem {
     #[WpContext(edit, embed, view)]
     pub item_type: Option<NavMenuItemType>,
     #[WpContext(edit, embed, view)]
-    pub status: Option<PostStatus>,
+    pub status: Option<NavMenuItemStatus>,
     #[WpContext(edit, embed, view)]
     pub parent: Option<NavMenuItemId>,
     #[WpContext(edit, embed, view)]

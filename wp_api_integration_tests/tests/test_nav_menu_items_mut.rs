@@ -1,10 +1,7 @@
 use macro_helper::{generate_update_nav_menu_item_status_test, generate_update_test};
-use wp_api::{
-    nav_menu_items::{
-        NavMenuItemCreateParams, NavMenuItemId, NavMenuItemType, NavMenuItemUpdateParams,
-        NavMenuItemWithEditContext,
-    },
-    posts::PostStatus,
+use wp_api::nav_menu_items::{
+    NavMenuItemCreateParams, NavMenuItemId, NavMenuItemStatus, NavMenuItemType,
+    NavMenuItemUpdateParams, NavMenuItemWithEditContext,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -321,11 +318,11 @@ mod macro_helper {
                 async fn [<update_nav_menu_item_status_to_ $status:lower>]() {
                     test_update_nav_menu_item(
                         &NavMenuItemUpdateParams {
-                            status: Some(PostStatus::$status),
+                            status: Some(NavMenuItemStatus::$status),
                             ..Default::default()
                         },
                         |updated_item| {
-                            assert_eq!(updated_item.status, PostStatus::$status);
+                            assert_eq!(updated_item.status, NavMenuItemStatus::$status);
                         }
                     ).await;
                 }

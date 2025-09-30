@@ -1,12 +1,11 @@
 use wp_api::{
     WpApiParamOrder,
     nav_menu_items::{
-        NavMenuItemId, NavMenuItemListParams, SparseNavMenuItemFieldWithEditContext,
-        SparseNavMenuItemFieldWithEmbedContext, SparseNavMenuItemFieldWithViewContext,
+        NavMenuItemId, NavMenuItemListParams, NavMenuItemStatus,
+        SparseNavMenuItemFieldWithEditContext, SparseNavMenuItemFieldWithEmbedContext,
+        SparseNavMenuItemFieldWithViewContext,
     },
-    posts::{
-        PostStatus, WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation,
-    },
+    posts::{WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn, WpApiParamPostsTaxRelation},
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -93,7 +92,7 @@ fn nav_menu_item_id_for_retrieve_tests() -> NavMenuItemId {
 #[case::orderby(generate!(NavMenuItemListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))))]
 #[case::search_columns(generate!(NavMenuItemListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt])))]
 #[case::slug(generate!(NavMenuItemListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
-#[case::status(generate!(NavMenuItemListParams, (status, vec![PostStatus::Publish, PostStatus::Pending])))]
+#[case::status(generate!(NavMenuItemListParams, (status, vec![NavMenuItemStatus::Publish, NavMenuItemStatus::Draft])))]
 #[case::tax_relation(generate!(NavMenuItemListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))))]
 #[case::menus(generate!(NavMenuItemListParams, (menus, vec![NAV_MENU_ID_179])))]
 #[case::menus_exclude(generate!(NavMenuItemListParams, (menus_exclude, vec![NAV_MENU_ID_179])))]
@@ -118,7 +117,7 @@ mod filter {
             generate!(NavMenuItemListParams, (per_page, Some(5))),
             generate!(NavMenuItemListParams, (order, Some(WpApiParamOrder::Desc))),
             generate!(NavMenuItemListParams, (menus, vec![NAV_MENU_ID_179])),
-            generate!(NavMenuItemListParams, (status, vec![PostStatus::Publish]))
+            generate!(NavMenuItemListParams, (status, vec![NavMenuItemStatus::Publish]))
         )]
         params: NavMenuItemListParams,
     ) {
@@ -161,7 +160,7 @@ mod filter {
             generate!(NavMenuItemListParams, (per_page, Some(5))),
             generate!(NavMenuItemListParams, (order, Some(WpApiParamOrder::Desc))),
             generate!(NavMenuItemListParams, (menus, vec![NAV_MENU_ID_179])),
-            generate!(NavMenuItemListParams, (status, vec![PostStatus::Publish]))
+            generate!(NavMenuItemListParams, (status, vec![NavMenuItemStatus::Publish]))
         )]
         params: NavMenuItemListParams,
     ) {
@@ -204,7 +203,7 @@ mod filter {
             generate!(NavMenuItemListParams, (per_page, Some(5))),
             generate!(NavMenuItemListParams, (order, Some(WpApiParamOrder::Desc))),
             generate!(NavMenuItemListParams, (menus, vec![NAV_MENU_ID_179])),
-            generate!(NavMenuItemListParams, (status, vec![PostStatus::Publish]))
+            generate!(NavMenuItemListParams, (status, vec![NavMenuItemStatus::Publish]))
         )]
         params: NavMenuItemListParams,
     ) {
