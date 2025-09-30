@@ -529,6 +529,28 @@ extension CommentsRequestExecutor: PaginationAwareExecutor {
     public typealias EmbedContextResponseType = CommentsRequestListWithEmbedContextResponse
 }
 
+// MARK: Menus
+extension NavMenuItemsRequestListWithEditContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavMenuItemListParams
+    public typealias DataType = NavMenuItemWithEditContext
+}
+
+extension NavMenuItemsRequestListWithViewContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavMenuItemListParams
+    public typealias DataType = NavMenuItemWithViewContext
+}
+
+extension NavMenuItemsRequestListWithEmbedContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavMenuItemListParams
+    public typealias DataType = NavMenuItemWithEmbedContext
+}
+
+extension NavMenuItemsRequestExecutor: PaginationAwareExecutor {
+    public typealias EditContextResponseType = NavMenuItemsRequestListWithEditContextResponse
+    public typealias ViewContextResponseType = NavMenuItemsRequestListWithViewContextResponse
+    public typealias EmbedContextResponseType = NavMenuItemsRequestListWithEmbedContextResponse
+}
+
 // MARK: - Terms
 extension TermsRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = TermListParams

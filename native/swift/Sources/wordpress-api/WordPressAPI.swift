@@ -157,6 +157,10 @@ public actor WordPressAPI {
         self.requestBuilder.navMenus()
     }
 
+    public var navMenuItems: NavMenuItemsRequestExecutor {
+        self.requestBuilder.navMenuItems()
+    }
+
     public var menuLocations: MenuLocationsRequestExecutor {
         self.requestBuilder.menuLocations()
     }

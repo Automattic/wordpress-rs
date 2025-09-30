@@ -290,6 +290,8 @@ pub enum WpErrorCode {
     PostInvalidPageNumber,
     #[serde(rename = "rest_post_invalid_parent")]
     PostInvalidParent,
+    #[serde(rename = "rest_post_invalid_type")]
+    PostInvalidType,
     #[serde(rename = "rest_post_no_autosave")]
     PostNoAutosave,
     #[serde(rename = "rest_revision_invalid_offset_number")]
@@ -304,6 +306,10 @@ pub enum WpErrorCode {
     TemplateNotFound,
     #[serde(rename = "rest_term_invalid")]
     TermInvalid,
+    #[serde(rename = "rest_title_required")]
+    TitleRequired,
+    #[serde(rename = "rest_term_invalid_id")]
+    TermInvalidId,
     #[serde(rename = "rest_theme_not_found")]
     ThemeNotFound,
     #[serde(rename = "rest_type_invalid")]
@@ -403,6 +409,8 @@ pub enum WpErrorCode {
     UploadSideloadError,
     #[serde(rename = "rest_upload_user_quota_exceeded")]
     UploadUserQuotaExceeded,
+    #[serde(rename = "rest_url_required")]
+    UrlRequired,
     #[serde(rename = "rest_user_cannot_delete_post")]
     UserCannotDeletePost, // See `rest_cannot_delete` instead
     #[serde(rename = "rest_unknown_attachment")]
@@ -437,6 +445,12 @@ pub enum WpErrorCode {
     // If a `comment_type` parameter is passed while creating / editing a comment.
     #[serde(rename = "rest_invalid_comment_type")]
     InvalidCommentType,
+    // If a menu item URL fails sanitize_url() validation (e.g., javascript: protocol).
+    // Defined in schema validation callback (https://github.com/WordPress/WordPress/blob/6.8/wp-includes/rest-api/endpoints/class-wp-rest-menu-items-controller.php#L881-L884),
+    // but WordPress wraps validation errors in `rest_invalid_param` before returning them.
+    // See: https://github.com/WordPress/WordPress/blob/6.8/wp-includes/rest-api/class-wp-rest-request.php#L936-L953
+    #[serde(rename = "rest_invalid_url")]
+    InvalidUrl,
     // If the create post request includes an id.
     #[serde(rename = "rest_post_exists")]
     PostExists,
