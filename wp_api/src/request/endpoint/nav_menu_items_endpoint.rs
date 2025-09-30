@@ -12,8 +12,6 @@ enum NavMenuItemsRequest {
     Create,
     #[delete(url = "/menu-items/<nav_menu_item_id>", output = crate::nav_menu_items::NavMenuItemDeleteResponse)]
     Delete,
-    #[delete(url = "/menu-items/<nav_menu_item_id>", output = crate::nav_menu_items::NavMenuItemWithEditContext)]
-    Trash,
     #[post(url = "/menu-items/<nav_menu_item_id>", params = &crate::nav_menu_items::NavMenuItemUpdateParams, output = crate::nav_menu_items::NavMenuItemWithEditContext)]
     Update,
 }
@@ -21,8 +19,9 @@ enum NavMenuItemsRequest {
 impl DerivedRequest for NavMenuItemsRequest {
     fn additional_query_pairs(&self) -> Vec<(&str, String)> {
         match self {
+            // Trashing a nav menu item is not supported:
+            // https://github.com/WordPress/WordPress/blob/b27e369cb25445784bc014d6fa731558beaf320d/wp-includes/rest-api/endpoints/class-wp-rest-menu-items-controller.php#L298-L302
             NavMenuItemsRequest::Delete => vec![("force", true.to_string())],
-            NavMenuItemsRequest::Trash => vec![("force", false.to_string())],
             _ => vec![],
         }
     }
