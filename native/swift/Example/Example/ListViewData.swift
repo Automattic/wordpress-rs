@@ -189,6 +189,12 @@ extension NavMenuWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension NavMenuItemWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id.description, title: self.title.rendered, subtitle: self.description, fields: [:])
+    }
+}
+
 extension MenuLocationWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: self.name, title: self.name, subtitle: self.description, fields: [:])
