@@ -42,9 +42,9 @@
 - [ ] `/wp/v2/navigation/<id>/revisions`
 - [ ] `/wp/v2/navigation/<id>/autosaves`
 - [x] `/wp/v2/menus`
-- [ ] `/wp/v2/menu-items`
+- [x] `/wp/v2/menu-items`
 - [ ] `/wp/v2/menu-items/<id>/autosaves`
-- [ ] `/wp/v2/menu-locations`
+- [x] `/wp/v2/menu-locations`
 
 ## Widgets & Sidebars
 
