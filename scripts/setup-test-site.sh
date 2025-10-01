@@ -129,6 +129,13 @@ create_page_autosave() {
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/pages/$page_id/autosaves"
 }
 
+create_nav_menu_item_autosave() {
+  local autosave_number="$1"
+  local nav_menu_item_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"title\":\"nav_menu_item_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/menu-items/$nav_menu_item_id/autosaves"
+}
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME
@@ -223,9 +230,12 @@ create_test_credentials () {
   AUTOSAVE_ID_FOR_AUTOSAVED_PAGE_ID="$(echo "$AUTOSAVE_PAGE_RESPONSE" | jq -r '.id')"
 
   echo "Creating a nav menu item for integration tests.."
-  # First, get the menu ID that we'll use (NAV_MENU_ID_179 from the imported test data)
   NAV_MENU_ITEM_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Nav Menu Item","menus":179,"type":"custom","url":"https://example.com"}' http://localhost/wp-json/wp/v2/menu-items)"
   NAV_MENU_ITEM_ID="$(echo "$NAV_MENU_ITEM_RESPONSE" | jq -r '.id')"
+
+  echo "Setting up a nav menu item with autosave for integration tests.."
+  NAV_MENU_ITEM_AUTOSAVE_RESPONSE="$(create_nav_menu_item_autosave "1" "$NAV_MENU_ITEM_ID")"
+  AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID="$(echo "$NAV_MENU_ITEM_AUTOSAVE_RESPONSE" | jq -r '.id')"
 
   rm -rf /app/test_credentials.json
   jo -p \
@@ -263,6 +273,7 @@ create_test_credentials () {
     primary_menu_location="$PRIMARY_MENU_LOCATION" \
     footer_menu_location="$FOOTER_MENU_LOCATION" \
     nav_menu_item_id="$NAV_MENU_ITEM_ID" \
+    autosave_id_for_nav_menu_item_id="$AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
