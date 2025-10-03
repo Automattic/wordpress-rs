@@ -3,6 +3,7 @@ use serde::{
     de::{self, DeserializeOwned, Unexpected},
     ser,
 };
+use serde_json::Value;
 use std::{fmt, marker::PhantomData};
 
 pub use wp_serde_date::wp_utc_date_format;
@@ -360,6 +361,15 @@ impl<'de> de::Visitor<'de> for DeserializeStringVecOrStringAsOptionVisitor {
     }
 }
 
+pub fn ok_or_default<'a, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Deserialize<'a> + Default,
+    D: Deserializer<'a>,
+{
+    let v: Value = Deserialize::deserialize(deserializer)?;
+    Ok(T::deserialize(v).unwrap_or_default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -490,5 +500,22 @@ mod tests {
         let option_string_vec_or_string: OptionStringVecOrString =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, option_string_vec_or_string.string);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct OptionStringOrBool {
+        #[serde(deserialize_with = "ok_or_default")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "foo"}"#, Some("foo".to_string()))]
+    #[case(r#"{"value": "false"}"#, Some("false".to_string()))]
+    #[case(r#"{"value": false}"#, None)]
+    #[case(r#"{"value": []}"#, None)]
+    fn test_ok_or_default(#[case] test_case: &str, #[case] expected_result: Option<String>) {
+        let option_string_or_bool: OptionStringOrBool =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, option_string_or_bool.value);
     }
 }

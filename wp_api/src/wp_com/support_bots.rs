@@ -7,6 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
+use wp_serde_helper::ok_or_default;
 
 use super::WpComSiteId;
 
@@ -70,11 +71,12 @@ pub struct BotMessageContextSource {
 #[serde(rename_all = "snake_case")]
 pub struct UserMessageContext {
     #[serde(alias = "selectedSiteId")]
-    pub selected_site_id: WpComSiteId,
+    pub selected_site_id: Option<WpComSiteId>,
     pub wpcom_user_id: UserId,
     pub wpcom_user_name: String,
     pub user_paid_support_eligibility: UserPaidSupportEligibility,
-    pub plan: UserPaidSupportPlan,
+    #[serde(deserialize_with = "ok_or_default")]
+    pub plan: Option<UserPaidSupportPlan>,
     pub products: Vec<String>,
     pub plan_interface: bool,
 }
@@ -199,6 +201,9 @@ impl std::fmt::Display for MessageId {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+    use std::io::Read;
+
     use super::*;
 
     #[test]
@@ -209,12 +214,17 @@ mod tests {
         assert_eq!(conversation.chat_id, 1965886);
     }
 
-    #[test]
-    fn test_bot_conversation_deserialization() {
-        let json = include_str!("../../tests/wpcom/support_bots/single-conversation.json");
-        let conversation: BotConversation =
-            serde_json::from_str(json).expect("Failed to deserialize bot conversation");
-        assert_eq!(conversation.chat_id, 1965758);
+    #[rstest]
+    #[case("single-conversation-01.json", 1965758)]
+    #[case("single-conversation-02.json", 2826307)]
+    fn test_bot_conversation_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expected_chat_id: u64,
+    ) {
+        let json = test_json(json_file_path).expect("Failed to read JSON file");
+        let conversation: BotConversation = serde_json::from_slice(json.as_slice())
+            .expect("Failed to deserialize bot conversation");
+        assert_eq!(conversation.chat_id, expected_chat_id);
     }
 
     #[test]
@@ -234,5 +244,22 @@ mod tests {
         let conversation: BotConversation =
             serde_json::from_str(json).expect("Failed to deserialize bot conversation");
         assert_eq!(conversation.chat_id, 1965758);
+    }
+
+    fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+        file_path.push("wp_api");
+        file_path.push("tests");
+        file_path.push("wpcom");
+        file_path.push("support_bots");
+        file_path.push(input);
+
+        let mut f = std::fs::File::open(file_path)?;
+        let mut buffer = Vec::new();
+
+        // read the whole file
+        f.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
     }
 }
