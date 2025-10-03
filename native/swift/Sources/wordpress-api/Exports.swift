@@ -194,6 +194,17 @@ public typealias TermsRequestListWithEmbedContextResponse = WordPressAPIInternal
 // MARK: - Taxonomies
 public typealias TaxonomyListParams = WordPressAPIInternal.TaxonomyListParams
 
+// MARK: Navigation
+public typealias NavigationStatus = WordPressAPIInternal.NavigationStatus
+public typealias NavigationListParams = WordPressAPIInternal.NavigationListParams
+public typealias NavigationCreateParams = WordPressAPIInternal.NavigationCreateParams
+public typealias NavigationUpdateParams = WordPressAPIInternal.NavigationUpdateParams
+public typealias NavigationRetrieveParams = WordPressAPIInternal.NavigationRetrieveParams
+public typealias NavigationRequestExecutor = WordPressAPIInternal.NavigationsRequestExecutor
+public typealias NavigationWithEditContext = WordPressAPIInternal.NavigationWithEditContext
+public typealias NavigationWithViewContext = WordPressAPIInternal.NavigationWithViewContext
+public typealias NavigationWithEmbedContext = WordPressAPIInternal.NavigationWithEmbedContext
+
 // MARK: - Menus
 public typealias SparseNavMenu = WordPressAPIInternal.SparseNavMenu
 public typealias NavMenuListParams = WordPressAPIInternal.NavMenuListParams

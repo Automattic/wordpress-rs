@@ -237,6 +237,10 @@ create_test_credentials () {
   NAV_MENU_ITEM_AUTOSAVE_RESPONSE="$(create_nav_menu_item_autosave "1" "$NAV_MENU_ITEM_ID")"
   AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID="$(echo "$NAV_MENU_ITEM_AUTOSAVE_RESPONSE" | jq -r '.id')"
 
+  echo "Creating a navigation for integration tests.."
+  NAVIGATION_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Navigation","content":"<!-- wp:navigation --><!-- /wp:navigation -->","status":"publish"}' http://localhost/wp-json/wp/v2/navigation)"
+  NAVIGATION_ID="$(echo "$NAVIGATION_RESPONSE" | jq -r '.id')"
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -274,6 +278,7 @@ create_test_credentials () {
     footer_menu_location="$FOOTER_MENU_LOCATION" \
     nav_menu_item_id="$NAV_MENU_ITEM_ID" \
     autosave_id_for_nav_menu_item_id="$AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID" \
+    navigation_id="$NAVIGATION_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials

@@ -382,8 +382,10 @@ pub struct SparseAnyPost {
     #[WpContext(edit)]
     pub password: Option<String>,
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub permalink_template: Option<String>,
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub generated_slug: Option<String>,
     #[WpContext(edit, embed, view)]
     #[WpContextualField]
@@ -395,13 +397,16 @@ pub struct SparseAnyPost {
     #[WpContextualOption]
     pub author: Option<UserId>,
     #[WpContext(edit, embed, view)]
-    #[WpContextualField]
+    #[WpContextualOption]
     pub excerpt: Option<SparsePostExcerpt>,
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub featured_media: Option<MediaId>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub comment_status: Option<PostCommentStatus>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub ping_status: Option<PostPingStatus>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
@@ -462,15 +467,10 @@ pub struct SparsePostContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SparsePostExcerpt {
-    #[WpContext(edit)]
-    #[WpContextualOption]
     pub raw: Option<String>,
-    #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
-    #[WpContext(edit, embed, view)]
-    #[WpContextualOption]
     pub protected: Option<bool>,
 }
 

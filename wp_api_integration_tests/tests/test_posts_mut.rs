@@ -76,7 +76,7 @@ async fn create_post_with_just_excerpt() {
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
-            assert_eq!(created_post.excerpt.raw, Some("foo".to_string()));
+            assert_eq!(created_post.excerpt.unwrap().raw, Some("foo".to_string()));
             assert_eq!(post_from_wp_cli.excerpt, "foo");
         },
     )
@@ -98,7 +98,7 @@ async fn create_post_with_title_content_and_excerpt() {
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(created_post.content.raw, Some("bar".to_string()));
             assert_eq!(post_from_wp_cli.content, "bar");
-            assert_eq!(created_post.excerpt.raw, Some("baz".to_string()));
+            assert_eq!(created_post.excerpt.unwrap().raw, Some("baz".to_string()));
             assert_eq!(post_from_wp_cli.excerpt, "baz");
         },
     )
@@ -231,7 +231,10 @@ generate_update_test!(
     excerpt,
     "new_excerpt".to_string(),
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.excerpt.raw, Some("new_excerpt".to_string()));
+        assert_eq!(
+            updated_post.excerpt.unwrap().raw,
+            Some("new_excerpt".to_string())
+        );
         assert_eq!(updated_post_from_wp_cli.excerpt, "new_excerpt");
     }
 );
@@ -241,7 +244,7 @@ generate_update_test!(
     featured_media,
     MEDIA_ID_611,
     |updated_post, _| {
-        assert_eq!(updated_post.featured_media, MEDIA_ID_611);
+        assert_eq!(updated_post.featured_media, Some(MEDIA_ID_611));
     }
 );
 
@@ -250,7 +253,7 @@ generate_update_test!(
     comment_status,
     PostCommentStatus::Open,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.comment_status, PostCommentStatus::Open);
+        assert_eq!(updated_post.comment_status, Some(PostCommentStatus::Open));
         assert_eq!(
             updated_post_from_wp_cli.comment_status,
             PostCommentStatus::Open.to_string()
@@ -263,7 +266,7 @@ generate_update_test!(
     comment_status,
     PostCommentStatus::Closed,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.comment_status, PostCommentStatus::Closed);
+        assert_eq!(updated_post.comment_status, Some(PostCommentStatus::Closed));
         assert_eq!(
             updated_post_from_wp_cli.comment_status,
             PostCommentStatus::Closed.to_string()
@@ -276,7 +279,7 @@ generate_update_test!(
     ping_status,
     PostPingStatus::Open,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.ping_status, PostPingStatus::Open);
+        assert_eq!(updated_post.ping_status, Some(PostPingStatus::Open));
         assert_eq!(
             updated_post_from_wp_cli.ping_status,
             PostPingStatus::Open.to_string()
@@ -289,7 +292,7 @@ generate_update_test!(
     ping_status,
     PostPingStatus::Closed,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.ping_status, PostPingStatus::Closed);
+        assert_eq!(updated_post.ping_status, Some(PostPingStatus::Closed));
         assert_eq!(
             updated_post_from_wp_cli.ping_status,
             PostPingStatus::Closed.to_string()

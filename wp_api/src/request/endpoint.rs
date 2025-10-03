@@ -11,6 +11,7 @@ pub mod menu_locations_endpoint;
 pub mod nav_menu_item_autosaves_endpoint;
 pub mod nav_menu_items_endpoint;
 pub mod nav_menus_endpoint;
+pub mod navigations_endpoint;
 pub mod plugins_endpoint;
 pub mod post_autosaves_endpoint;
 pub mod post_revisions_endpoint;
