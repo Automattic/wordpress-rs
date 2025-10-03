@@ -19,6 +19,7 @@ use crate::{
             },
             nav_menu_items_endpoint::{NavMenuItemsRequestBuilder, NavMenuItemsRequestExecutor},
             nav_menus_endpoint::{NavMenusRequestBuilder, NavMenusRequestExecutor},
+            navigations_endpoint::{NavigationsRequestBuilder, NavigationsRequestExecutor},
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
@@ -58,6 +59,7 @@ pub struct WpApiRequestBuilder {
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestBuilder>,
     nav_menu_items: Arc<NavMenuItemsRequestBuilder>,
     nav_menus: Arc<NavMenusRequestBuilder>,
+    navigations: Arc<NavigationsRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
     post_statuses: Arc<PostStatusesRequestBuilder>,
@@ -93,6 +95,7 @@ impl WpApiRequestBuilder {
             nav_menu_item_autosaves,
             nav_menu_items,
             nav_menus,
+            navigations,
             plugins,
             post_revisions,
             post_statuses,
@@ -138,6 +141,7 @@ pub struct WpApiClient {
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestExecutor>,
     nav_menu_items: Arc<NavMenuItemsRequestExecutor>,
     nav_menus: Arc<NavMenusRequestExecutor>,
+    navigations: Arc<NavigationsRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
     post_statuses: Arc<PostStatusesRequestExecutor>,
@@ -170,6 +174,7 @@ impl WpApiClient {
             nav_menu_item_autosaves,
             nav_menu_items,
             nav_menus,
+            navigations,
             plugins,
             post_revisions,
             post_statuses,
@@ -212,6 +217,7 @@ api_client_generate_endpoint_impl!(WpApi, menu_locations);
 api_client_generate_endpoint_impl!(WpApi, nav_menu_item_autosaves);
 api_client_generate_endpoint_impl!(WpApi, nav_menu_items);
 api_client_generate_endpoint_impl!(WpApi, nav_menus);
+api_client_generate_endpoint_impl!(WpApi, navigations);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
 api_client_generate_endpoint_impl!(WpApi, post_statuses);

@@ -22,6 +22,7 @@ pub mod middleware;
 pub mod nav_menu_item_revisions;
 pub mod nav_menu_items;
 pub mod nav_menus;
+pub mod navigations;
 pub mod parsed_url;
 pub mod plugins;
 pub mod post_revisions;
