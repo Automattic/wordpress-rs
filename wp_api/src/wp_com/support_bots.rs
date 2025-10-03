@@ -55,6 +55,14 @@ pub struct BotMessageContext {
     pub flags: HashMap<String, bool>,
 }
 
+#[uniffi::export]
+pub fn user_wants_to_talk_to_a_human(context: &BotMessageContext) -> bool {
+    *context
+        .flags
+        .get("forward_to_human_support")
+        .unwrap_or(&false)
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct BotMessageContextSource {
     pub title: String,
