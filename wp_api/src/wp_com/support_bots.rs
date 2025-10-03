@@ -7,7 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
-use wp_serde_helper::ok_or_default;
+use wp_serde_helper::deserialize_empty_vec_or_none;
 
 use super::WpComSiteId;
 
@@ -83,7 +83,7 @@ pub struct UserMessageContext {
     pub wpcom_user_id: UserId,
     pub wpcom_user_name: String,
     pub user_paid_support_eligibility: UserPaidSupportEligibility,
-    #[serde(deserialize_with = "ok_or_default")]
+    #[serde(deserialize_with = "deserialize_empty_vec_or_none")]
     pub plan: Option<UserPaidSupportPlan>,
     pub products: Vec<String>,
     pub plan_interface: bool,

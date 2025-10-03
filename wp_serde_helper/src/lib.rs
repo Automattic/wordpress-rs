@@ -370,6 +370,47 @@ where
     Ok(T::deserialize(v).unwrap_or_default())
 }
 
+struct DeserializeEmptyVecOrNone<T>(PhantomData<T>);
+
+impl<'de, T> de::Visitor<'de> for DeserializeEmptyVecOrNone<T>
+where
+    T: Deserialize<'de>,
+{
+    type Value = Option<T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("empty Vec or T")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        if seq.next_element::<T>()?.is_none() {
+            // It's an empty vec
+            Ok(None)
+        } else {
+            // not an empty vec
+            Err(serde::de::Error::invalid_type(Unexpected::Seq, &self))
+        }
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::MapAccess<'de>,
+    {
+        T::deserialize(de::value::MapAccessDeserializer::new(map)).map(Some)
+    }
+}
+
+pub fn deserialize_empty_vec_or_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    deserializer.deserialize_any(DeserializeEmptyVecOrNone::<T>(PhantomData))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
