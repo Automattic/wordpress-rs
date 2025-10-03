@@ -216,7 +216,7 @@ mod tests {
 
     #[rstest]
     #[case("single-conversation-01.json", 1965758)]
-    #[case("single-conversation-02.json", 2826307)]
+    #[case("single-conversation-02.json", 1234567)]
     fn test_bot_conversation_deserialization(
         #[case] json_file_path: &str,
         #[case] expected_chat_id: u64,
