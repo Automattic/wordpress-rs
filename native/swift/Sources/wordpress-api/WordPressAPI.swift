@@ -153,6 +153,10 @@ public actor WordPressAPI {
         self.requestBuilder.wpBlockEditor()
     }
 
+    public var navigations: NavigationRequestExecutor {
+        self.requestBuilder.navigations()
+    }
+
     public var navMenus: NavMenusRequestExecutor {
         self.requestBuilder.navMenus()
     }

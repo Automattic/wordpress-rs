@@ -55,6 +55,7 @@ enum RootListData: Identifiable, Sendable {
     enum Category: Hashable, Identifiable, CaseIterable {
         case posts
         case taxonomies
+        case navigation
         case system
 
         var id: String {
@@ -65,6 +66,7 @@ enum RootListData: Identifiable, Sendable {
             return switch self {
             case .posts: "Posts"
             case .taxonomies: "Taxonomies"
+            case .navigation: "Navigation"
             case .system: "System"
             }
         }
