@@ -13,7 +13,9 @@ use super::WpComSiteId;
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct CreateBotConversationParams {
     pub message: String,
-    pub user_id: UserId,
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<UserId>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
