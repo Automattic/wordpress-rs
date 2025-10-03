@@ -161,6 +161,10 @@ public actor WordPressAPI {
         self.requestBuilder.navMenuItems()
     }
 
+    public var navMenuAutosaves: NavMenuItemAutosavesRequestExecutor {
+        self.requestBuilder.navMenuItemAutosaves()
+    }
+
     public var menuLocations: MenuLocationsRequestExecutor {
         self.requestBuilder.menuLocations()
     }

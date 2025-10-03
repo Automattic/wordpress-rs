@@ -24,6 +24,8 @@ async fn create_autosave() {
     // Verify the autosave was created successfully
     assert_eq!(autosave.title.raw, Some(title));
     assert_eq!(autosave.content.raw, Some(content));
+
+    RestoreServer::db().await;
 }
 
 fn autosaved_post_id() -> PostId {

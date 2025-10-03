@@ -46,6 +46,7 @@ pub struct TestCredentials {
     pub primary_menu_location: &'static str,
     pub footer_menu_location: &'static str,
     pub nav_menu_item_id: i64,
+    pub autosave_id_for_nav_menu_item_id: i64,
 }
 
 impl TestCredentials {

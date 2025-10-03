@@ -19,6 +19,7 @@ pub mod login;
 pub mod media;
 pub mod menu_locations;
 pub mod middleware;
+pub mod nav_menu_item_revisions;
 pub mod nav_menu_items;
 pub mod nav_menus;
 pub mod parsed_url;
