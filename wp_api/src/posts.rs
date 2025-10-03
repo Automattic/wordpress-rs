@@ -11,7 +11,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
-use wp_derive::WpDeriveParamsField;
+use wp_derive::{WpDeriveParamsField, WpDeserialize};
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
 
 #[derive(
@@ -474,11 +474,11 @@ pub struct SparsePostExcerpt {
     pub protected: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, WpDeserialize, uniffi::Record)]
 pub struct PostMeta {
     #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
     #[serde(serialize_with = "serialize_as_json_string")]
-    pub footnotes: Vec<PostFootnote>,
+    pub footnotes: Option<Vec<PostFootnote>>,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]

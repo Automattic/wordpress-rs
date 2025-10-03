@@ -48,6 +48,7 @@ pub struct TestCredentials {
     pub nav_menu_item_id: i64,
     pub autosave_id_for_nav_menu_item_id: i64,
     pub navigation_id: i64,
+    pub revision_id_for_navigation_id: i64,
 }
 
 impl TestCredentials {

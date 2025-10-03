@@ -105,6 +105,7 @@ pub struct SparseAnyPostRevision {
     #[WpContextualOption]
     pub excerpt: Option<crate::posts::SparsePostExcerpt>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub meta: Option<crate::posts::PostMeta>,
 }
 
