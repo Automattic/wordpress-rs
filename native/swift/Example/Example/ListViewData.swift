@@ -185,12 +185,7 @@ extension PostStatusWithEditContext: ListViewDataConvertable {
 
 extension NavigationWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        let title = switch self.title {
-        case .object(let title): title.rendered
-        case .string(let string): string
-        }
-
-        return ListViewData(id: self.id.description, title: title ?? "Unknown", subtitle: self.slug, fields: [:])
+        return ListViewData(id: self.id.description, title: self.title.rendered, subtitle: self.slug, fields: [:])
     }
 }
 

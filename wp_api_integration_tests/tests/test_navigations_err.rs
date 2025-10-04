@@ -1,9 +1,6 @@
-use wp_api::{
-    posts::{
-        PostCreateParams, PostId, PostListParams, PostRetrieveParams, PostUpdateParams,
-        WpApiParamPostsOrderBy,
-    },
-    request::endpoint::posts_endpoint::PostEndpointType,
+use wp_api::navigations::{
+    NavigationCreateParams, NavigationId, NavigationListParams, NavigationRetrieveParams,
+    NavigationUpdateParams, WpApiParamNavigationsOrderBy,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -11,13 +8,10 @@ use wp_api_integration_tests::prelude::*;
 #[parallel]
 async fn create_navigation_err_cannot_create() {
     api_client_as_subscriber()
-        .posts()
-        .create(
-            &PostEndpointType::Navigation,
-            &PostCreateParams {
-                ..Default::default()
-            },
-        )
+        .navigations()
+        .create(&NavigationCreateParams {
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::CannotCreate);
 }
@@ -26,14 +20,11 @@ async fn create_navigation_err_cannot_create() {
 #[parallel]
 async fn create_navigation_err_cannot_create2() {
     api_client_as_subscriber()
-        .posts()
-        .create(
-            &PostEndpointType::Navigation,
-            &PostCreateParams {
-                title: Some("foo".to_string()),
-                ..Default::default()
-            },
-        )
+        .navigations()
+        .create(&NavigationCreateParams {
+            title: Some("foo".to_string()),
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::CannotCreate);
 }
@@ -42,11 +33,8 @@ async fn create_navigation_err_cannot_create2() {
 #[parallel]
 async fn delete_navigation_err_cannot_delete() {
     api_client_as_subscriber()
-        .posts()
-        .delete(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
-        )
+        .navigations()
+        .delete(&NavigationId(TestCredentials::instance().navigation_id))
         .await
         .assert_wp_error(WpErrorCode::CannotDelete);
 }
@@ -55,14 +43,11 @@ async fn delete_navigation_err_cannot_delete() {
 #[parallel]
 async fn list_err_no_search_term_defined() {
     api_client()
-        .posts()
-        .list_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostListParams {
-                orderby: Some(WpApiParamPostsOrderBy::Relevance),
-                ..Default::default()
-            },
-        )
+        .navigations()
+        .list_with_edit_context(&NavigationListParams {
+            order_by: Some(WpApiParamNavigationsOrderBy::Relevance),
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::NoSearchTermDefined);
 }
@@ -71,14 +56,11 @@ async fn list_err_no_search_term_defined() {
 #[parallel]
 async fn list_err_order_by_include_missing_include() {
     api_client()
-        .posts()
-        .list_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostListParams {
-                orderby: Some(WpApiParamPostsOrderBy::Include),
-                ..Default::default()
-            },
-        )
+        .navigations()
+        .list_with_edit_context(&NavigationListParams {
+            order_by: Some(WpApiParamNavigationsOrderBy::Include),
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::OrderbyIncludeMissingInclude);
 }
@@ -87,14 +69,11 @@ async fn list_err_order_by_include_missing_include() {
 #[parallel]
 async fn list_err_post_invalid_page_number() {
     api_client()
-        .posts()
-        .list_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostListParams {
-                page: Some(99999999),
-                ..Default::default()
-            },
-        )
+        .navigations()
+        .list_with_edit_context(&NavigationListParams {
+            page: Some(99999999),
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::PostInvalidPageNumber);
 }
@@ -103,11 +82,10 @@ async fn list_err_post_invalid_page_number() {
 #[parallel]
 async fn retrieve_navigation_err_forbidden_context() {
     api_client_as_subscriber()
-        .posts()
+        .navigations()
         .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
-            &PostRetrieveParams::default(),
+            &NavigationId(TestCredentials::instance().navigation_id),
+            &NavigationRetrieveParams::default(),
         )
         .await
         .assert_wp_error(WpErrorCode::ForbiddenContext);
@@ -117,11 +95,10 @@ async fn retrieve_navigation_err_forbidden_context() {
 #[parallel]
 async fn retrieve_navigation_err_post_invalid_id() {
     api_client()
-        .posts()
+        .navigations()
         .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostId(99999999),
-            &PostRetrieveParams::default(),
+            &NavigationId(99999999),
+            &NavigationRetrieveParams::default(),
         )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId);
@@ -131,11 +108,10 @@ async fn retrieve_navigation_err_post_invalid_id() {
 #[parallel]
 async fn update_navigation_err_cannot_edit() {
     api_client_as_author()
-        .posts()
+        .navigations()
         .update(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
-            &PostUpdateParams::default(),
+            &NavigationId(TestCredentials::instance().navigation_id),
+            &NavigationUpdateParams::default(),
         )
         .await
         .assert_wp_error(WpErrorCode::CannotEdit);
@@ -145,11 +121,10 @@ async fn update_navigation_err_cannot_edit() {
 #[parallel]
 async fn update_navigation_err_invalid_template() {
     api_client()
-        .posts()
+        .navigations()
         .update(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
-            &PostUpdateParams {
+            &NavigationId(TestCredentials::instance().navigation_id),
+            &NavigationUpdateParams {
                 template: Some("foo".to_string()),
                 ..Default::default()
             },

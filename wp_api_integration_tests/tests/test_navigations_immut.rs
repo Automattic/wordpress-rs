@@ -1,20 +1,17 @@
-use wp_api::{
-    posts::{
-        PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
-        SparseAnyPostFieldWithEmbedContext, SparseAnyPostFieldWithViewContext,
-        WpApiParamPostsOrderBy, WpApiParamPostsSearchColumn,
-    },
-    request::endpoint::posts_endpoint::PostEndpointType,
+use wp_api::navigations::{
+    NavigationId, NavigationListParams, NavigationRetrieveParams, NavigationStatus,
+    SparseNavigationFieldWithEditContext, SparseNavigationFieldWithEmbedContext,
+    SparseNavigationFieldWithViewContext, WpApiParamNavigationsOrderBy,
 };
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_edit_context(#[case] params: PostListParams) {
+async fn list_with_edit_context(#[case] params: NavigationListParams) {
     api_client()
-        .posts()
-        .list_with_edit_context(&PostEndpointType::Navigation, &params)
+        .navigations()
+        .list_with_edit_context(&params)
         .await
         .assert_response();
 }
@@ -22,10 +19,10 @@ async fn list_with_edit_context(#[case] params: PostListParams) {
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_embed_context(#[case] params: PostListParams) {
+async fn list_with_embed_context(#[case] params: NavigationListParams) {
     api_client()
-        .posts()
-        .list_with_embed_context(&PostEndpointType::Navigation, &params)
+        .navigations()
+        .list_with_embed_context(&params)
         .await
         .assert_response();
 }
@@ -33,10 +30,10 @@ async fn list_with_embed_context(#[case] params: PostListParams) {
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_view_context(#[case] params: PostListParams) {
+async fn list_with_view_context(#[case] params: NavigationListParams) {
     api_client()
-        .posts()
-        .list_with_view_context(&PostEndpointType::Navigation, &params)
+        .navigations()
+        .list_with_view_context(&params)
         .await
         .assert_response();
 }
@@ -45,12 +42,8 @@ async fn list_with_view_context(#[case] params: PostListParams) {
 #[parallel]
 async fn retrieve_with_edit_context() {
     api_client()
-        .posts()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &PostRetrieveParams::default(),
-        )
+        .navigations()
+        .retrieve_with_edit_context(&navigation_id(), &NavigationRetrieveParams::default())
         .await
         .assert_response();
 }
@@ -59,12 +52,8 @@ async fn retrieve_with_edit_context() {
 #[parallel]
 async fn retrieve_with_embed_context() {
     api_client()
-        .posts()
-        .retrieve_with_embed_context(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &PostRetrieveParams::default(),
-        )
+        .navigations()
+        .retrieve_with_embed_context(&navigation_id(), &NavigationRetrieveParams::default())
         .await
         .assert_response();
 }
@@ -73,12 +62,8 @@ async fn retrieve_with_embed_context() {
 #[parallel]
 async fn retrieve_with_view_context() {
     api_client()
-        .posts()
-        .retrieve_with_view_context(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &PostRetrieveParams::default(),
-        )
+        .navigations()
+        .retrieve_with_view_context(&navigation_id(), &NavigationRetrieveParams::default())
         .await
         .assert_response();
 }
@@ -86,79 +71,79 @@ async fn retrieve_with_view_context() {
 #[tokio::test]
 #[rstest]
 #[parallel]
-#[case(PostListParams { per_page: Some(1), ..Default::default() })]
-#[case(PostListParams { per_page: Some(1), order: Some(WpApiParamOrder::Desc), ..Default::default() })]
-#[case(PostListParams { per_page: Some(1), orderby: Some(WpApiParamPostsOrderBy::Modified), ..Default::default() })]
-async fn paginate_list_navigations_with_edit_context(#[case] params: PostListParams) {
+#[case(NavigationListParams { per_page: Some(1), ..Default::default() })]
+#[case(NavigationListParams { per_page: Some(1), order: Some(WpApiParamOrder::Desc), ..Default::default() })]
+#[case(NavigationListParams { per_page: Some(1), order_by: Some(WpApiParamNavigationsOrderBy::Modified), ..Default::default() })]
+async fn paginate_list_navigations_with_edit_context(#[case] params: NavigationListParams) {
     let first_page_response = api_client()
-        .posts()
-        .list_with_edit_context(&PostEndpointType::Navigation, &params)
+        .navigations()
+        .list_with_edit_context(&params)
         .await
         .assert_response();
     assert!(!first_page_response.data.is_empty());
     let next_page_params = first_page_response.next_page_params.unwrap();
     let next_page_response = api_client()
-        .posts()
-        .list_with_edit_context(&PostEndpointType::Navigation, &next_page_params)
+        .navigations()
+        .list_with_edit_context(&next_page_params)
         .await
         .assert_response();
     assert!(!next_page_response.data.is_empty());
     let prev_page_params = next_page_response.prev_page_params.unwrap();
     let prev_page_response = api_client()
-        .posts()
-        .list_with_edit_context(&PostEndpointType::Navigation, &prev_page_params)
+        .navigations()
+        .list_with_edit_context(&prev_page_params)
         .await
         .assert_response();
     assert!(!prev_page_response.data.is_empty());
 }
 
-fn navigation_id() -> PostId {
-    PostId(TestCredentials::instance().navigation_id)
+fn navigation_id() -> NavigationId {
+    NavigationId(TestCredentials::instance().navigation_id)
 }
 
 #[template]
 #[rstest]
-#[case::default(PostListParams::default())]
-#[case::page(generate!(PostListParams, (page, Some(1))))]
-#[case::per_page(generate!(PostListParams, (per_page, Some(3))))]
-#[case::search(generate!(PostListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(PostListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
-#[case::modified_after(generate!(PostListParams, (modified_after, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
-#[case::before(generate!(PostListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
-#[case::modified_before(generate!(PostListParams, (modified_before, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0000")))))]
-#[case::exclude(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])))]
-#[case::include(generate!(PostListParams, (include, vec![PostId(1)])))]
-#[case::offset(generate!(PostListParams, (offset, Some(2))))]
-#[case::order(generate!(PostListParams, (order, Some(WpApiParamOrder::Asc))))]
-#[case::orderby(generate!(PostListParams, (orderby, Some(WpApiParamPostsOrderBy::Id))))]
-#[case::search_columns(generate!(PostListParams, (search_columns, vec![WpApiParamPostsSearchColumn::PostContent, WpApiParamPostsSearchColumn::PostExcerpt])))]
-#[case::slug(generate!(PostListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
-#[case::status(generate!(PostListParams, (status, vec![PostStatus::Publish, PostStatus::Draft])))]
-fn list_cases(#[case] params: PostListParams) {}
+#[case::default(NavigationListParams::default())]
+#[case::page(generate!(NavigationListParams, (page, Some(1))))]
+#[case::per_page(generate!(NavigationListParams, (per_page, Some(3))))]
+#[case::search(generate!(NavigationListParams, (search, Some("foo".to_string()))))]
+#[case::after(generate!(NavigationListParams, (after, Some("2020-08-14T17:00:00".to_string()))))]
+#[case::modified_after(generate!(NavigationListParams, (modified_after, Some("2024-01-14T17:00:00".to_string()))))]
+#[case::before(generate!(NavigationListParams, (before, Some("2023-08-14T17:00:00".to_string()))))]
+#[case::modified_before(generate!(NavigationListParams, (modified_before, Some("2024-01-14T17:00:00".to_string()))))]
+#[case::exclude(generate!(NavigationListParams, (exclude, vec![NavigationId(1), NavigationId(2)])))]
+#[case::include(generate!(NavigationListParams, (include, vec![NavigationId(1)])))]
+#[case::offset(generate!(NavigationListParams, (offset, Some(2))))]
+#[case::order(generate!(NavigationListParams, (order, Some(WpApiParamOrder::Asc))))]
+#[case::orderby(generate!(NavigationListParams, (order_by, Some(WpApiParamNavigationsOrderBy::Id))))]
+#[case::search_columns(generate!(NavigationListParams, (search_columns, vec!["post_content".to_string(), "post_excerpt".to_string()])))]
+#[case::slug(generate!(NavigationListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
+#[case::status(generate!(NavigationListParams, (status, vec![NavigationStatus::Publish, NavigationStatus::Draft])))]
+fn list_cases(#[case] params: NavigationListParams) {}
 
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_any_post_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_any_post_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_any_post_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_navigation_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_navigation_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_navigation_field_with_view_context_test_cases!();
 
-    #[apply(sparse_any_post_field_with_edit_context_test_cases)]
-    #[case(&[SparseAnyPostFieldWithEditContext::Id, SparseAnyPostFieldWithEditContext::Slug])]
+    #[apply(sparse_navigation_field_with_edit_context_test_cases)]
+    #[case(&[SparseNavigationFieldWithEditContext::Id, SparseNavigationFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_navigations_with_edit_context(
-        #[case] fields: &[SparseAnyPostFieldWithEditContext],
+        #[case] fields: &[SparseNavigationFieldWithEditContext],
         #[values(
-            PostListParams::default(),
-            generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
-            generate!(PostListParams, (search, Some("foo".to_string())))
+            NavigationListParams::default(),
+            generate!(NavigationListParams, (status, vec![NavigationStatus::Draft, NavigationStatus::Publish])),
+            generate!(NavigationListParams, (search, Some("foo".to_string())))
         )]
-        params: PostListParams,
+        params: NavigationListParams,
     ) {
         api_client()
-            .posts()
-            .filter_list_with_edit_context(&PostEndpointType::Navigation, &params, fields)
+            .navigations()
+            .filter_list_with_edit_context(&params, fields)
             .await
             .assert_response()
             .data
@@ -168,19 +153,18 @@ mod filter {
             });
     }
 
-    #[apply(sparse_any_post_field_with_edit_context_test_cases)]
-    #[case(&[SparseAnyPostFieldWithEditContext::Id, SparseAnyPostFieldWithEditContext::Slug])]
+    #[apply(sparse_navigation_field_with_edit_context_test_cases)]
+    #[case(&[SparseNavigationFieldWithEditContext::Id, SparseNavigationFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_navigations_with_edit_context(
-        #[case] fields: &[SparseAnyPostFieldWithEditContext],
+        #[case] fields: &[SparseNavigationFieldWithEditContext],
     ) {
         let navigation = api_client()
-            .posts()
+            .navigations()
             .filter_retrieve_with_edit_context(
-                &PostEndpointType::Navigation,
                 &navigation_id(),
-                &PostRetrieveParams::default(),
+                &NavigationRetrieveParams::default(),
                 fields,
             )
             .await
@@ -189,22 +173,22 @@ mod filter {
         navigation.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_any_post_field_with_embed_context_test_cases)]
-    #[case(&[SparseAnyPostFieldWithEmbedContext::Id, SparseAnyPostFieldWithEmbedContext::Slug])]
+    #[apply(sparse_navigation_field_with_embed_context_test_cases)]
+    #[case(&[SparseNavigationFieldWithEmbedContext::Id, SparseNavigationFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_navigations_with_embed_context(
-        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
+        #[case] fields: &[SparseNavigationFieldWithEmbedContext],
         #[values(
-            PostListParams::default(),
-            generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
-            generate!(PostListParams, (search, Some("foo".to_string())))
+            NavigationListParams::default(),
+            generate!(NavigationListParams, (status, vec![NavigationStatus::Draft, NavigationStatus::Publish])),
+            generate!(NavigationListParams, (search, Some("foo".to_string())))
         )]
-        params: PostListParams,
+        params: NavigationListParams,
     ) {
         api_client()
-            .posts()
-            .filter_list_with_embed_context(&PostEndpointType::Navigation, &params, fields)
+            .navigations()
+            .filter_list_with_embed_context(&params, fields)
             .await
             .assert_response()
             .data
@@ -214,19 +198,18 @@ mod filter {
             });
     }
 
-    #[apply(sparse_any_post_field_with_embed_context_test_cases)]
-    #[case(&[SparseAnyPostFieldWithEmbedContext::Id, SparseAnyPostFieldWithEmbedContext::Slug])]
+    #[apply(sparse_navigation_field_with_embed_context_test_cases)]
+    #[case(&[SparseNavigationFieldWithEmbedContext::Id, SparseNavigationFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_navigations_with_embed_context(
-        #[case] fields: &[SparseAnyPostFieldWithEmbedContext],
+        #[case] fields: &[SparseNavigationFieldWithEmbedContext],
     ) {
         let navigation = api_client()
-            .posts()
+            .navigations()
             .filter_retrieve_with_embed_context(
-                &PostEndpointType::Navigation,
                 &navigation_id(),
-                &PostRetrieveParams::default(),
+                &NavigationRetrieveParams::default(),
                 fields,
             )
             .await
@@ -235,22 +218,22 @@ mod filter {
         navigation.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_any_post_field_with_view_context_test_cases)]
-    #[case(&[SparseAnyPostFieldWithViewContext::Id, SparseAnyPostFieldWithViewContext::Slug])]
+    #[apply(sparse_navigation_field_with_view_context_test_cases)]
+    #[case(&[SparseNavigationFieldWithViewContext::Id, SparseNavigationFieldWithViewContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_navigations_with_view_context(
-        #[case] fields: &[SparseAnyPostFieldWithViewContext],
+        #[case] fields: &[SparseNavigationFieldWithViewContext],
         #[values(
-            PostListParams::default(),
-            generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Publish])),
-            generate!(PostListParams, (search, Some("foo".to_string())))
+            NavigationListParams::default(),
+            generate!(NavigationListParams, (status, vec![NavigationStatus::Draft, NavigationStatus::Publish])),
+            generate!(NavigationListParams, (search, Some("foo".to_string())))
         )]
-        params: PostListParams,
+        params: NavigationListParams,
     ) {
         api_client()
-            .posts()
-            .filter_list_with_view_context(&PostEndpointType::Navigation, &params, fields)
+            .navigations()
+            .filter_list_with_view_context(&params, fields)
             .await
             .assert_response()
             .data
@@ -260,19 +243,18 @@ mod filter {
             });
     }
 
-    #[apply(sparse_any_post_field_with_view_context_test_cases)]
-    #[case(&[SparseAnyPostFieldWithViewContext::Id, SparseAnyPostFieldWithViewContext::Slug])]
+    #[apply(sparse_navigation_field_with_view_context_test_cases)]
+    #[case(&[SparseNavigationFieldWithViewContext::Id, SparseNavigationFieldWithViewContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_navigations_with_view_context(
-        #[case] fields: &[SparseAnyPostFieldWithViewContext],
+        #[case] fields: &[SparseNavigationFieldWithViewContext],
     ) {
         let navigation = api_client()
-            .posts()
+            .navigations()
             .filter_retrieve_with_view_context(
-                &PostEndpointType::Navigation,
                 &navigation_id(),
-                &PostRetrieveParams::default(),
+                &NavigationRetrieveParams::default(),
                 fields,
             )
             .await

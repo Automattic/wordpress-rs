@@ -49,6 +49,7 @@ pub struct SparseNavigation {
     #[WpContext(edit, view)]
     pub date_gmt: Option<String>,
     #[WpContext(edit, view)]
+    #[WpContextualField]
     pub guid: Option<SparseNavigationGuid>,
     #[WpContext(edit, embed, view)]
     pub id: Option<NavigationId>,
@@ -69,46 +70,47 @@ pub struct SparseNavigation {
     #[WpContextualOption]
     pub password: Option<String>,
     #[WpContext(edit, embed, view)]
-    pub title: Option<SparseNavigationTitleWrapper>,
+    #[WpContextualField]
+    pub title: Option<SparseNavigationTitle>,
     #[WpContext(edit, embed, view)]
-    pub content: Option<SparseNavigationContentWrapper>,
+    #[WpContextualField]
+    pub content: Option<SparseNavigationContent>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
     pub template: Option<String>,
     // _meta field omitted
 }
 
-#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
 pub struct SparseNavigationGuid {
-    pub rendered: Option<String>,
+    #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
+    #[WpContext(edit, view)]
+    pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
-#[serde(untagged)]
-pub enum SparseNavigationTitleWrapper {
-    Object(SparseNavigationTitle),
-    String(String),
-}
-
-#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
 pub struct SparseNavigationTitle {
+    #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
+    #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, Deserialize, uniffi::Enum)]
-#[serde(untagged)]
-pub enum SparseNavigationContentWrapper {
-    Object(SparseNavigationContent),
-    String(String),
-}
-
-#[derive(Debug, Serialize, PartialEq, PartialOrd, Eq, wp_derive::WpDeserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
 pub struct SparseNavigationContent {
+    #[WpContext(edit)]
+    #[WpContextualOption]
     pub raw: Option<String>,
+    #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
+    #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub protected: Option<bool>,
+    #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub block_version: Option<u32>,
 }
 
@@ -151,7 +153,7 @@ pub struct NavigationListParams {
     /// Sort collection by post attribute.
     #[uniffi(default = None)]
     #[field_name("orderby")]
-    pub order_by: Option<NavigationOrderBy>,
+    pub order_by: Option<WpApiParamNavigationsOrderBy>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
     pub search_columns: Vec<String>,
@@ -180,7 +182,7 @@ pub struct NavigationListParams {
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub enum NavigationOrderBy {
+pub enum WpApiParamNavigationsOrderBy {
     Author,
     #[default]
     Date,
@@ -194,7 +196,7 @@ pub enum NavigationOrderBy {
     Title,
 }
 
-impl_as_query_value_from_to_string!(NavigationOrderBy);
+impl_as_query_value_from_to_string!(WpApiParamNavigationsOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)]

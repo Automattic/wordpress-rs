@@ -34,7 +34,6 @@ enum PostsRequest {
 pub enum PostEndpointType {
     Posts,
     Pages,
-    Navigation,
     #[strum(default)]
     Custom(String),
 }

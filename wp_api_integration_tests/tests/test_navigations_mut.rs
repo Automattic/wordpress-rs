@@ -1,13 +1,15 @@
 use macro_helper::{generate_update_navigation_status_test, generate_update_test};
-use wp_api::posts::{AnyPostWithEditContext, PostCreateParams, PostStatus, PostUpdateParams};
-use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
+use wp_api::navigations::{
+    NavigationCreateParams, NavigationId, NavigationStatus, NavigationUpdateParams,
+    NavigationWithEditContext,
+};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[serial]
 async fn create_navigation_with_just_title() {
     test_create_navigation(
-        &PostCreateParams {
+        &NavigationCreateParams {
             title: Some("foo".to_string()),
             ..Default::default()
         },
@@ -22,7 +24,7 @@ async fn create_navigation_with_just_title() {
 #[serial]
 async fn create_navigation_with_just_content() {
     test_create_navigation(
-        &PostCreateParams {
+        &NavigationCreateParams {
             content: Some("foo".to_string()),
             ..Default::default()
         },
@@ -37,7 +39,7 @@ async fn create_navigation_with_just_content() {
 #[serial]
 async fn create_navigation_with_title_and_content() {
     test_create_navigation(
-        &PostCreateParams {
+        &NavigationCreateParams {
             title: Some("foo".to_string()),
             content: Some("bar".to_string()),
             ..Default::default()
@@ -54,11 +56,8 @@ async fn create_navigation_with_title_and_content() {
 #[serial]
 async fn delete_navigation() {
     let navigation_delete_response = api_client()
-        .posts()
-        .delete(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
-        )
+        .navigations()
+        .delete(&NavigationId(TestCredentials::instance().navigation_id))
         .await;
     assert!(
         navigation_delete_response.is_ok(),
@@ -73,11 +72,8 @@ async fn delete_navigation() {
 #[serial]
 async fn trash_navigation() {
     let navigation_trash_response = api_client()
-        .posts()
-        .trash(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
-        )
+        .navigations()
+        .trash(&NavigationId(TestCredentials::instance().navigation_id))
         .await;
     assert!(
         navigation_trash_response.is_ok(),
@@ -99,11 +95,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    "2024-09-09T12:00:00".to_string(),
     |updated_navigation| {
         assert_eq!(
             updated_navigation.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+            "2024-09-09T12:00:00".to_string()
         );
     }
 );
@@ -122,7 +118,10 @@ generate_update_test!(
     password,
     "new_password".to_string(),
     |updated_navigation| {
-        assert_eq!(updated_navigation.password, "new_password");
+        assert_eq!(
+            updated_navigation.password,
+            Some("new_password".to_string())
+        );
     }
 );
 
@@ -151,13 +150,13 @@ generate_update_test!(
 #[serial]
 async fn update_status_to_future() {
     test_update_navigation(
-        &PostUpdateParams {
-            status: Some(PostStatus::Future),
+        &NavigationUpdateParams {
+            status: Some(NavigationStatus::Future),
             date: Some("2026-09-09T12:00:00".to_string()),
             ..Default::default()
         },
         |updated_navigation| {
-            assert_eq!(updated_navigation.status, PostStatus::Future);
+            assert_eq!(updated_navigation.status, NavigationStatus::Future);
         },
     )
     .await;
@@ -168,13 +167,13 @@ generate_update_navigation_status_test!(Pending);
 generate_update_navigation_status_test!(Private);
 generate_update_navigation_status_test!(Publish);
 
-async fn test_create_navigation<F>(params: &PostCreateParams, assert: F)
+async fn test_create_navigation<F>(params: &NavigationCreateParams, assert: F)
 where
-    F: Fn(AnyPostWithEditContext),
+    F: Fn(NavigationWithEditContext),
 {
     let created_navigation = api_client()
-        .posts()
-        .create(&PostEndpointType::Navigation, params)
+        .navigations()
+        .create(params)
         .await
         .assert_response()
         .data;
@@ -182,15 +181,14 @@ where
     RestoreServer::db().await;
 }
 
-async fn test_update_navigation<F>(params: &PostUpdateParams, assert: F)
+async fn test_update_navigation<F>(params: &NavigationUpdateParams, assert: F)
 where
-    F: Fn(AnyPostWithEditContext),
+    F: Fn(NavigationWithEditContext),
 {
     let updated_navigation = api_client()
-        .posts()
+        .navigations()
         .update(
-            &PostEndpointType::Navigation,
-            &PostId(TestCredentials::instance().navigation_id),
+            &NavigationId(TestCredentials::instance().navigation_id),
             params,
         )
         .await
@@ -201,6 +199,8 @@ where
 }
 
 mod macro_helper {
+    use super::*;
+
     macro_rules! generate_update_test {
         ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
             paste::paste! {
@@ -209,7 +209,7 @@ mod macro_helper {
                 async fn $ident() {
                     let updated_value = $new_value;
                     test_update_navigation(
-                        &PostUpdateParams {
+                        &NavigationUpdateParams {
                             $field: Some(updated_value),
                             ..Default::default()
                         }, $assertion)
@@ -226,12 +226,12 @@ mod macro_helper {
                 #[serial]
                 async fn [<update_navigation_status_to_ $status:lower>]() {
                     test_update_navigation(
-                        &PostUpdateParams {
-                            status: Some(PostStatus::$status),
+                        &NavigationUpdateParams {
+                            status: Some(NavigationStatus::$status),
                             ..Default::default()
                         },
                         |updated_navigation| {
-                            assert_eq!(updated_navigation.status, PostStatus::$status);
+                            assert_eq!(updated_navigation.status, NavigationStatus::$status);
                         }
                     ).await;
                 }
