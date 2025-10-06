@@ -5170,7 +5170,7 @@ dependencies = [
  "strum_macros",
  "syn",
  "thiserror 2.0.17",
- "toml 0.8.23",
+ "toml 0.9.7",
  "trybuild",
  "uniffi",
  "url",
