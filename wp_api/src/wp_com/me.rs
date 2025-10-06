@@ -1,4 +1,4 @@
-use crate::date::WpGmtDateTime;
+use crate::{date::WpGmtDateTime, impl_as_query_value_for_new_type};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wp_serde_helper::{
@@ -6,6 +6,18 @@ use wp_serde_helper::{
     deserialize_string_vec_or_string, deserialize_u64_or_none,
     deserialize_u64_or_none_with_negative_as_none, deserialize_u64_or_none_with_zero_as_none,
 };
+
+impl_as_query_value_for_new_type!(WpComUserId);
+uniffi::custom_newtype!(WpComUserId, u64);
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct WpComUserId(pub u64);
+
+impl std::fmt::Display for WpComUserId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComUserInfo {
