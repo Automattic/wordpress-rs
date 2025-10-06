@@ -543,38 +543,14 @@ where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
 {
-    deserializer.deserialize_any(DeserializeNullAsEmptyVec::<T>(PhantomData))
-}
-
-struct DeserializeNullAsEmptyVec<T>(PhantomData<T>);
-
-impl<'de, T> de::Visitor<'de> for DeserializeNullAsEmptyVec<T>
-where
-    T: Deserialize<'de>,
-{
-    type Value = Vec<T>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("empty Vec or T")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        let mut vec = Vec::new();
-        while let Some(elem) = seq.next_element::<T>()? {
-            vec.push(elem);
-        }
-        Ok(vec)
-    }
-
-    fn visit_unit<E>(self) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Vec::new())
-    }
+    Option::<Vec<T>>::deserialize(deserializer)
+        .map(|opt| opt.unwrap_or_default())
+        .map_err(|err| {
+            serde::de::Error::custom(
+                err.to_string()
+                    .replace("expected a sequence", "expected null or a sequence"),
+            )
+        })
 }
 
 pub fn deserialize_empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
@@ -896,5 +872,26 @@ mod tests {
         let null_as_empty_vec: NullAsEmptyVec =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, null_as_empty_vec.value);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"value": false}"#,
+        r#"invalid type: boolean `false`, expected null or a sequence at line 1 column 15"#
+    )]
+    fn test_deserialize_null_as_empty_vec_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let null_as_empty_vec: Result<NullAsEmptyVec, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert!(
+            null_as_empty_vec.is_err(),
+            "The serializer should emit an error"
+        );
+        assert_eq!(
+            null_as_empty_vec.err().unwrap().to_string(),
+            expected_error_message
+        );
     }
 }
