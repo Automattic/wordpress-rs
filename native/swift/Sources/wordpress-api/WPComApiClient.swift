@@ -10,6 +10,10 @@ public class WPComApiClient {
         self.internalClient = UniffiWpComApiClient(delegate: delegate)
     }
 
+    public var me: MeRequestExecutor {
+        internalClient.me()
+    }
+
     public var oauth2: Oauth2RequestExecutor {
         internalClient.oauth2()
     }
