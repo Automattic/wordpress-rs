@@ -135,8 +135,8 @@ pub struct GetBotConversationParams {
 impl AppendUrlQueryPairs for GetBotConversationParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair("page", self.page_number.as_ref())
-            .append_option_query_value_pair("per_page", self.items_per_page.as_ref())
+            .append_option_query_value_pair("page_number", self.page_number.as_ref())
+            .append_option_query_value_pair("items_per_page", self.items_per_page.as_ref())
             .append_query_value_pair("include_feedback", &self.include_feedback.to_string());
     }
 }
