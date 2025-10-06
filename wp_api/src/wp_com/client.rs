@@ -3,6 +3,7 @@ use super::endpoint::{
     jetpack_connection_endpoint::{
         JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
     },
+    me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
@@ -37,6 +38,7 @@ impl UniffiWpComApiRequestBuilder {
 pub struct WpComApiRequestBuilder {
     followers: Arc<FollowersRequestBuilder>,
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
+    me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
@@ -53,6 +55,7 @@ impl WpComApiRequestBuilder {
             auth_provider;
             followers,
             jetpack_connection,
+            me,
             oauth2,
             subscribers,
             support_bots,
@@ -80,6 +83,7 @@ impl UniffiWpComApiClient {
 pub struct WpComApiClient {
     followers: Arc<FollowersRequestExecutor>,
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
+    me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
@@ -97,6 +101,7 @@ impl WpComApiClient {
             delegate;
             followers,
             jetpack_connection,
+            me,
             oauth2,
             subscribers,
             support_bots,
@@ -107,6 +112,7 @@ impl WpComApiClient {
 }
 api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
+api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);

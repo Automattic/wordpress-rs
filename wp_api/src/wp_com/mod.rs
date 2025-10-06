@@ -7,6 +7,7 @@ pub mod client;
 pub mod endpoint;
 pub mod followers;
 pub mod jetpack_connection;
+pub mod me;
 pub mod oauth2;
 pub mod subscribers;
 pub mod support_bots;
