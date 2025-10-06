@@ -273,7 +273,7 @@ impl de::Visitor<'_> for DeserializeU64OrNoneVisitor {
     where
         E: de::Error,
     {
-        if v == false {
+        if !v {
             Ok(None)
         } else {
             Err(E::invalid_value(Unexpected::Bool(v), &self))
@@ -317,7 +317,7 @@ impl de::Visitor<'_> for DeserializeU64OrNoneWithNegativeAsNoneVisitor {
     where
         E: de::Error,
     {
-        if v == false {
+        if !v {
             Ok(None)
         } else {
             Err(E::invalid_value(Unexpected::Bool(v), &self))
@@ -368,7 +368,7 @@ impl de::Visitor<'_> for DeserializeU64OrNoneWithZeroAsNoneVisitor {
     where
         E: de::Error,
     {
-        if v == false {
+        if !v {
             Ok(None)
         } else {
             Err(E::invalid_value(Unexpected::Bool(v), &self))
