@@ -10,6 +10,7 @@ public class WPComApiClient {
         self.internalClient = UniffiWpComApiClient(delegate: delegate)
     }
 
+    // swiftlint:disable:next identifier_name
     public var me: MeRequestExecutor {
         internalClient.me()
     }
