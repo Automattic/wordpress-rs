@@ -1,7 +1,4 @@
-use wp_api::{
-    post_revisions::PostRevisionId, posts::PostId,
-    request::endpoint::posts_endpoint::PostEndpointType,
-};
+use wp_api::{navigation_revisions::NavigationRevisionId, navigations::NavigationId};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -9,12 +6,8 @@ use wp_api_integration_tests::prelude::*;
 async fn delete_navigation_revision() {
     let revision_id = revision_id_for_navigation_id();
     let revision_delete_response = api_client()
-        .post_revisions()
-        .delete(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &revision_id,
-        )
+        .navigation_revisions()
+        .delete(&navigation_id(), &revision_id)
         .await;
 
     assert!(
@@ -29,10 +22,10 @@ async fn delete_navigation_revision() {
     RestoreServer::db().await;
 }
 
-fn navigation_id() -> PostId {
-    PostId(TestCredentials::instance().navigation_id)
+fn navigation_id() -> NavigationId {
+    NavigationId(TestCredentials::instance().navigation_id)
 }
 
-fn revision_id_for_navigation_id() -> PostRevisionId {
-    PostRevisionId(TestCredentials::instance().revision_id_for_navigation_id)
+fn revision_id_for_navigation_id() -> NavigationRevisionId {
+    NavigationRevisionId(TestCredentials::instance().revision_id_for_navigation_id)
 }

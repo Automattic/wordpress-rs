@@ -1,10 +1,10 @@
 use wp_api::{
-    post_revisions::{
-        PostRevisionId, SparseAnyPostRevisionFieldWithEditContext,
-        SparseAnyPostRevisionFieldWithEmbedContext, SparseAnyPostRevisionFieldWithViewContext,
+    navigation_revisions::{
+        NavigationRevisionId, SparseNavigationRevisionFieldWithEditContext,
+        SparseNavigationRevisionFieldWithEmbedContext,
+        SparseNavigationRevisionFieldWithViewContext,
     },
-    posts::PostId,
-    request::endpoint::posts_endpoint::PostEndpointType,
+    navigations::NavigationId,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -12,8 +12,8 @@ use wp_api_integration_tests::prelude::*;
 #[parallel]
 async fn list_with_edit_context() {
     api_client()
-        .autosaves()
-        .list_with_edit_context(&PostEndpointType::Navigation, &autosaved_navigation_id())
+        .navigation_autosaves()
+        .list_with_edit_context(&autosaved_navigation_id())
         .await
         .assert_response();
 }
@@ -22,8 +22,8 @@ async fn list_with_edit_context() {
 #[parallel]
 async fn list_with_embed_context() {
     api_client()
-        .autosaves()
-        .list_with_embed_context(&PostEndpointType::Navigation, &autosaved_navigation_id())
+        .navigation_autosaves()
+        .list_with_embed_context(&autosaved_navigation_id())
         .await
         .assert_response();
 }
@@ -32,8 +32,8 @@ async fn list_with_embed_context() {
 #[parallel]
 async fn list_with_view_context() {
     api_client()
-        .autosaves()
-        .list_with_view_context(&PostEndpointType::Navigation, &autosaved_navigation_id())
+        .navigation_autosaves()
+        .list_with_view_context(&autosaved_navigation_id())
         .await
         .assert_response();
 }
@@ -42,9 +42,8 @@ async fn list_with_view_context() {
 #[parallel]
 async fn retrieve_with_edit_context() {
     api_client()
-        .autosaves()
+        .navigation_autosaves()
         .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
             &autosaved_navigation_id(),
             &autosave_id_for_autosaved_navigation_id(),
         )
@@ -56,9 +55,8 @@ async fn retrieve_with_edit_context() {
 #[parallel]
 async fn retrieve_with_embed_context() {
     api_client()
-        .autosaves()
+        .navigation_autosaves()
         .retrieve_with_embed_context(
-            &PostEndpointType::Navigation,
             &autosaved_navigation_id(),
             &autosave_id_for_autosaved_navigation_id(),
         )
@@ -70,9 +68,8 @@ async fn retrieve_with_embed_context() {
 #[parallel]
 async fn retrieve_with_view_context() {
     api_client()
-        .autosaves()
+        .navigation_autosaves()
         .retrieve_with_view_context(
-            &PostEndpointType::Navigation,
             &autosaved_navigation_id(),
             &autosave_id_for_autosaved_navigation_id(),
         )
@@ -80,35 +77,31 @@ async fn retrieve_with_view_context() {
         .assert_response();
 }
 
-fn autosaved_navigation_id() -> PostId {
-    PostId(TestCredentials::instance().autosaved_navigation_id)
+fn autosaved_navigation_id() -> NavigationId {
+    NavigationId(TestCredentials::instance().autosaved_navigation_id)
 }
 
-fn autosave_id_for_autosaved_navigation_id() -> PostRevisionId {
-    PostRevisionId(TestCredentials::instance().autosave_id_for_autosaved_navigation_id)
+fn autosave_id_for_autosaved_navigation_id() -> NavigationRevisionId {
+    NavigationRevisionId(TestCredentials::instance().autosave_id_for_autosaved_navigation_id)
 }
 
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_any_post_revision_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_any_post_revision_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_any_post_revision_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_navigation_revision_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_navigation_revision_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_navigation_revision_field_with_view_context_test_cases!();
 
-    #[apply(sparse_any_post_revision_field_with_edit_context_test_cases)]
-    #[case(&[SparseAnyPostRevisionFieldWithEditContext::Id, SparseAnyPostRevisionFieldWithEditContext::Author])]
+    #[apply(sparse_navigation_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseNavigationRevisionFieldWithEditContext::Id, SparseNavigationRevisionFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_edit_context(
-        #[case] fields: &[SparseAnyPostRevisionFieldWithEditContext],
+        #[case] fields: &[SparseNavigationRevisionFieldWithEditContext],
     ) {
         api_client()
-            .autosaves()
-            .filter_list_with_edit_context(
-                &PostEndpointType::Navigation,
-                &autosaved_navigation_id(),
-                fields,
-            )
+            .navigation_autosaves()
+            .filter_list_with_edit_context(&autosaved_navigation_id(), fields)
             .await
             .assert_response()
             .data
@@ -118,20 +111,16 @@ mod filter {
             });
     }
 
-    #[apply(sparse_any_post_revision_field_with_embed_context_test_cases)]
-    #[case(&[SparseAnyPostRevisionFieldWithEmbedContext::Id, SparseAnyPostRevisionFieldWithEmbedContext::Author])]
+    #[apply(sparse_navigation_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseNavigationRevisionFieldWithEmbedContext::Id, SparseNavigationRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_embed_context(
-        #[case] fields: &[SparseAnyPostRevisionFieldWithEmbedContext],
+        #[case] fields: &[SparseNavigationRevisionFieldWithEmbedContext],
     ) {
         api_client()
-            .autosaves()
-            .filter_list_with_embed_context(
-                &PostEndpointType::Navigation,
-                &autosaved_navigation_id(),
-                fields,
-            )
+            .navigation_autosaves()
+            .filter_list_with_embed_context(&autosaved_navigation_id(), fields)
             .await
             .assert_response()
             .data
@@ -141,20 +130,16 @@ mod filter {
             });
     }
 
-    #[apply(sparse_any_post_revision_field_with_view_context_test_cases)]
-    #[case(&[SparseAnyPostRevisionFieldWithViewContext::Id, SparseAnyPostRevisionFieldWithViewContext::Author])]
+    #[apply(sparse_navigation_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseNavigationRevisionFieldWithViewContext::Id, SparseNavigationRevisionFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_view_context(
-        #[case] fields: &[SparseAnyPostRevisionFieldWithViewContext],
+        #[case] fields: &[SparseNavigationRevisionFieldWithViewContext],
     ) {
         api_client()
-            .autosaves()
-            .filter_list_with_view_context(
-                &PostEndpointType::Navigation,
-                &autosaved_navigation_id(),
-                fields,
-            )
+            .navigation_autosaves()
+            .filter_list_with_view_context(&autosaved_navigation_id(), fields)
             .await
             .assert_response()
             .data
@@ -164,17 +149,16 @@ mod filter {
             });
     }
 
-    #[apply(sparse_any_post_revision_field_with_edit_context_test_cases)]
-    #[case(&[SparseAnyPostRevisionFieldWithEditContext::Id, SparseAnyPostRevisionFieldWithEditContext::Author])]
+    #[apply(sparse_navigation_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseNavigationRevisionFieldWithEditContext::Id, SparseNavigationRevisionFieldWithEditContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_edit_context(
-        #[case] fields: &[SparseAnyPostRevisionFieldWithEditContext],
+        #[case] fields: &[SparseNavigationRevisionFieldWithEditContext],
     ) {
         api_client()
-            .autosaves()
+            .navigation_autosaves()
             .filter_retrieve_with_edit_context(
-                &PostEndpointType::Navigation,
                 &autosaved_navigation_id(),
                 &autosave_id_for_autosaved_navigation_id(),
                 fields,
@@ -185,17 +169,16 @@ mod filter {
             .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
-    #[apply(sparse_any_post_revision_field_with_embed_context_test_cases)]
-    #[case(&[SparseAnyPostRevisionFieldWithEmbedContext::Id, SparseAnyPostRevisionFieldWithEmbedContext::Author])]
+    #[apply(sparse_navigation_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseNavigationRevisionFieldWithEmbedContext::Id, SparseNavigationRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_embed_context(
-        #[case] fields: &[SparseAnyPostRevisionFieldWithEmbedContext],
+        #[case] fields: &[SparseNavigationRevisionFieldWithEmbedContext],
     ) {
         api_client()
-            .autosaves()
+            .navigation_autosaves()
             .filter_retrieve_with_embed_context(
-                &PostEndpointType::Navigation,
                 &autosaved_navigation_id(),
                 &autosave_id_for_autosaved_navigation_id(),
                 fields,
@@ -206,17 +189,16 @@ mod filter {
             .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
-    #[apply(sparse_any_post_revision_field_with_view_context_test_cases)]
-    #[case(&[SparseAnyPostRevisionFieldWithViewContext::Id, SparseAnyPostRevisionFieldWithViewContext::Author])]
+    #[apply(sparse_navigation_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseNavigationRevisionFieldWithViewContext::Id, SparseNavigationRevisionFieldWithViewContext::Author])]
     #[tokio::test]
     #[parallel]
     async fn filter_retrieve_with_view_context(
-        #[case] fields: &[SparseAnyPostRevisionFieldWithViewContext],
+        #[case] fields: &[SparseNavigationRevisionFieldWithViewContext],
     ) {
         api_client()
-            .autosaves()
+            .navigation_autosaves()
             .filter_retrieve_with_view_context(
-                &PostEndpointType::Navigation,
                 &autosaved_navigation_id(),
                 &autosave_id_for_autosaved_navigation_id(),
                 fields,

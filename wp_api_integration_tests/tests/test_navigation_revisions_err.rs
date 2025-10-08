@@ -1,7 +1,8 @@
 use wp_api::{
-    post_revisions::{AnyPostRevisionListParams, PostRevisionId, WpApiParamPostRevisionsOrderBy},
-    posts::PostId,
-    request::endpoint::posts_endpoint::PostEndpointType,
+    navigation_revisions::{
+        NavigationRevisionId, NavigationRevisionListParams, WpApiParamNavigationRevisionsOrderBy,
+    },
+    navigations::NavigationId,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -9,11 +10,10 @@ use wp_api_integration_tests::prelude::*;
 #[parallel]
 async fn list_err_post_invalid_parent() {
     api_client()
-        .post_revisions()
+        .navigation_revisions()
         .list_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostId(99999999),
-            &AnyPostRevisionListParams::default(),
+            &NavigationId(99999999),
+            &NavigationRevisionListParams::default(),
         )
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
@@ -23,11 +23,10 @@ async fn list_err_post_invalid_parent() {
 #[parallel]
 async fn list_err_revision_invalid_offset_number() {
     api_client()
-        .post_revisions()
+        .navigation_revisions()
         .list_with_edit_context(
-            &PostEndpointType::Navigation,
             &navigation_id(),
-            &AnyPostRevisionListParams {
+            &NavigationRevisionListParams {
                 offset: Some(99999999),
                 ..Default::default()
             },
@@ -40,11 +39,10 @@ async fn list_err_revision_invalid_offset_number() {
 #[parallel]
 async fn list_err_revision_invalid_page_number() {
     api_client()
-        .post_revisions()
+        .navigation_revisions()
         .list_with_edit_context(
-            &PostEndpointType::Navigation,
             &navigation_id(),
-            &AnyPostRevisionListParams {
+            &NavigationRevisionListParams {
                 page: Some(99999999),
                 ..Default::default()
             },
@@ -57,12 +55,8 @@ async fn list_err_revision_invalid_page_number() {
 #[parallel]
 async fn list_err_cannot_read_as_subscriber() {
     api_client_as_subscriber()
-        .post_revisions()
-        .list_with_edit_context(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &AnyPostRevisionListParams::default(),
-        )
+        .navigation_revisions()
+        .list_with_edit_context(&navigation_id(), &NavigationRevisionListParams::default())
         .await
         .assert_wp_error(WpErrorCode::CannotRead)
 }
@@ -71,12 +65,11 @@ async fn list_err_cannot_read_as_subscriber() {
 #[parallel]
 async fn list_err_no_search_term_defined() {
     api_client()
-        .post_revisions()
+        .navigation_revisions()
         .list_with_edit_context(
-            &PostEndpointType::Navigation,
             &navigation_id(),
-            &AnyPostRevisionListParams {
-                orderby: Some(WpApiParamPostRevisionsOrderBy::Relevance),
+            &NavigationRevisionListParams {
+                orderby: Some(WpApiParamNavigationRevisionsOrderBy::Relevance),
                 search: None,
                 ..Default::default()
             },
@@ -89,12 +82,11 @@ async fn list_err_no_search_term_defined() {
 #[parallel]
 async fn list_err_orderby_include_missing_include() {
     api_client()
-        .post_revisions()
+        .navigation_revisions()
         .list_with_edit_context(
-            &PostEndpointType::Navigation,
             &navigation_id(),
-            &AnyPostRevisionListParams {
-                orderby: Some(WpApiParamPostRevisionsOrderBy::Include),
+            &NavigationRevisionListParams {
+                orderby: Some(WpApiParamNavigationRevisionsOrderBy::Include),
                 include: vec![],
                 ..Default::default()
             },
@@ -107,12 +99,8 @@ async fn list_err_orderby_include_missing_include() {
 #[parallel]
 async fn retrieve_err_post_invalid_parent() {
     api_client()
-        .post_revisions()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
-            &PostId(99999999),
-            &revision_id_for_navigation_id(),
-        )
+        .navigation_revisions()
+        .retrieve_with_edit_context(&NavigationId(99999999), &revision_id_for_navigation_id())
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
 }
@@ -121,12 +109,8 @@ async fn retrieve_err_post_invalid_parent() {
 #[parallel]
 async fn retrieve_err_post_invalid_id() {
     api_client()
-        .post_revisions()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &PostRevisionId(99999999),
-        )
+        .navigation_revisions()
+        .retrieve_with_edit_context(&navigation_id(), &NavigationRevisionId(99999999))
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId)
 }
@@ -135,12 +119,8 @@ async fn retrieve_err_post_invalid_id() {
 #[parallel]
 async fn retrieve_err_cannot_read_as_subscriber() {
     api_client_as_subscriber()
-        .post_revisions()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &revision_id_for_navigation_id(),
-        )
+        .navigation_revisions()
+        .retrieve_with_edit_context(&navigation_id(), &revision_id_for_navigation_id())
         .await
         .assert_wp_error(WpErrorCode::CannotRead)
 }
@@ -149,12 +129,8 @@ async fn retrieve_err_cannot_read_as_subscriber() {
 #[parallel]
 async fn delete_err_cannot_delete_as_subscriber() {
     api_client_as_subscriber()
-        .post_revisions()
-        .delete(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &revision_id_for_navigation_id(),
-        )
+        .navigation_revisions()
+        .delete(&navigation_id(), &revision_id_for_navigation_id())
         .await
         .assert_wp_error(WpErrorCode::CannotDelete)
 }
@@ -163,12 +139,8 @@ async fn delete_err_cannot_delete_as_subscriber() {
 #[parallel]
 async fn delete_err_post_invalid_parent() {
     api_client()
-        .post_revisions()
-        .delete(
-            &PostEndpointType::Navigation,
-            &PostId(99999999),
-            &revision_id_for_navigation_id(),
-        )
+        .navigation_revisions()
+        .delete(&NavigationId(99999999), &revision_id_for_navigation_id())
         .await
         .assert_wp_error(WpErrorCode::PostInvalidParent)
 }
@@ -177,20 +149,16 @@ async fn delete_err_post_invalid_parent() {
 #[parallel]
 async fn delete_err_post_invalid_id() {
     api_client()
-        .post_revisions()
-        .delete(
-            &PostEndpointType::Navigation,
-            &navigation_id(),
-            &PostRevisionId(99999999),
-        )
+        .navigation_revisions()
+        .delete(&navigation_id(), &NavigationRevisionId(99999999))
         .await
         .assert_wp_error(WpErrorCode::PostInvalidId)
 }
 
-fn navigation_id() -> PostId {
-    PostId(TestCredentials::instance().navigation_id)
+fn navigation_id() -> NavigationId {
+    NavigationId(TestCredentials::instance().navigation_id)
 }
 
-fn revision_id_for_navigation_id() -> PostRevisionId {
-    PostRevisionId(TestCredentials::instance().revision_id_for_navigation_id)
+fn revision_id_for_navigation_id() -> NavigationRevisionId {
+    NavigationRevisionId(TestCredentials::instance().revision_id_for_navigation_id)
 }
