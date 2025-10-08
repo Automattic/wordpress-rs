@@ -93,7 +93,7 @@ async fn retrieve_post_types_with_edit_context(
     // post types might not support `Title` in which case it's perfectly fine to completely
     // remove this assertion.
     assert_eq!(
-        post_type.supports.get(&PostTypeSupports::Title),
+        post_type.supports.map.get(&PostTypeSupports::Title),
         Some(true).as_ref()
     );
     // All post types in our current testing sites have `EditPost` capability, so we use this
