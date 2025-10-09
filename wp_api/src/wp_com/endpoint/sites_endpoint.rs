@@ -15,7 +15,7 @@ enum SitesRequest {
     GetSiteById,
 
     #[get(url = "/sites/<wp_com_site_slug>", output = WPComSite)]
-    GetSiteByHandle,
+    GetSiteBySlug,
 }
 
 impl DerivedRequest for SitesRequest {

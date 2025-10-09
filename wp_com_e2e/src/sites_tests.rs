@@ -24,7 +24,7 @@ pub async fn sites_test(client: &WpComApiClient) -> anyhow::Result<()> {
     for site in sites.as_slice() {
         if let Err(e) = client
             .sites()
-            .get_site_by_handle(site.slug.as_ref().unwrap())
+            .get_site_by_slug(site.slug.as_ref().unwrap())
             .await
         {
             println!(

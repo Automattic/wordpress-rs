@@ -1,5 +1,5 @@
 use crate::{
-    JsonValue, impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
+    JsonValue, impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
