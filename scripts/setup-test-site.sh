@@ -71,7 +71,9 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-wp plugin install gutenberg --activate
+curl -sSL https://downloads.wordpress.org/plugin/gutenberg.21.7.0.zip -o /tmp/gutenberg.zip
+unzip -q /tmp/gutenberg.zip -d wp-content/plugins/
+wp plugin activate gutenberg
 
 # Install custom must-use plugins for integration tests
 mkdir -p wp-content/mu-plugins
