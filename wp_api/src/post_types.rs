@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 use wp_contextual::WpContextual;
+use wp_serde_helper::deserialize_empty_array_or_hashmap;
 
 #[derive(
     Debug,
@@ -74,7 +75,7 @@ pub struct SparsePostTypeDetails {
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit)]
-    pub supports: Option<HashMap<PostTypeSupports, bool>>,
+    pub supports: Option<PostTypeSupportsMap>,
     #[WpContext(edit, view)]
     pub has_archive: Option<bool>,
     #[WpContext(edit, view)]
@@ -88,6 +89,15 @@ pub struct SparsePostTypeDetails {
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
     pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+#[serde(transparent)]
+pub struct PostTypeSupportsMap {
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(flatten)]
+    #[serde(rename = "supports")]
+    pub map: HashMap<PostTypeSupports, bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]

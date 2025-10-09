@@ -52,7 +52,7 @@ async fn create_template_with_slug_title_and_theme() {
     test_create_template(&params, |created_template| {
         assert_slug(&created_template);
         assert_title(&created_template);
-        assert_eq!(created_template.theme, theme);
+        assert_eq!(created_template.theme, Some(theme.to_string()));
     })
     .await;
 }

@@ -94,6 +94,7 @@ pub struct SparseTemplate {
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub theme: Option<String>,
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]

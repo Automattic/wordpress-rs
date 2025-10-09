@@ -128,7 +128,7 @@ struct ExampleApp: App {
             .postTypes
             .map(\.value)
             .filter { $0.visibility.showInNavMenus }
-            .filter { $0.supports.keys.contains(allOf: [.title, .author, .customFields]) }
+            .filter { $0.supports.map.keys.contains(allOf: [.title, .author, .customFields]) }
 
         for type in postTypes {
             baseData.append(RootListData(name: type.name, sequence: {
