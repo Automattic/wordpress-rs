@@ -44,11 +44,6 @@ use crate::{
 };
 use std::sync::Arc;
 
-#[derive(uniffi::Object)]
-struct UniffiWpApiRequestBuilder {
-    inner: WpApiRequestBuilder,
-}
-
 pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
@@ -239,14 +234,6 @@ api_client_generate_endpoint_impl!(WpApi, wp_site_health_tests);
 macro_rules! api_client_generate_endpoint_impl {
     ($client_name_prefix: ident, $feature:ident) => {
         paste::paste! {
-            #[uniffi::export]
-
-            impl [<Uniffi $client_name_prefix RequestBuilder>] {
-                fn $feature(&self) -> Arc<[<$feature:camel RequestBuilder>]> {
-                    self.inner.$feature.clone()
-                }
-            }
-
             impl [<$client_name_prefix RequestBuilder>] {
                 pub fn $feature(&self) -> &[<$feature:camel RequestBuilder>] {
                     self.$feature.as_ref()

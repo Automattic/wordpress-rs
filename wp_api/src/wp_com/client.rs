@@ -20,21 +20,6 @@ use crate::{
 };
 use std::sync::Arc;
 
-#[derive(uniffi::Object)]
-struct UniffiWpComApiRequestBuilder {
-    inner: WpComApiRequestBuilder,
-}
-
-#[uniffi::export]
-impl UniffiWpComApiRequestBuilder {
-    #[uniffi::constructor]
-    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
-        Self {
-            inner: WpComApiRequestBuilder::new(auth_provider),
-        }
-    }
-}
-
 pub struct WpComApiRequestBuilder {
     followers: Arc<FollowersRequestBuilder>,
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
