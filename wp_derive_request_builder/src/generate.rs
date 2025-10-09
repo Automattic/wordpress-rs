@@ -296,7 +296,6 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     });
 
     quote! {
-        #[derive(uniffi::Object)]
         pub struct #generated_request_builder_ident {
             endpoint: #generated_endpoint_ident,
             inner: #static_inner_request_builder_type,
@@ -309,7 +308,6 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 }
             }
         }
-        #[uniffi::export]
         impl #generated_request_builder_ident {
             #(#functions)*
         }
