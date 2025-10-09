@@ -5,6 +5,7 @@ use crate::{
     },
     users::UserCapability,
     wp_com::{WpComSiteId, me::WpComUserId},
+    wp_content_string_id,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -93,17 +94,7 @@ pub struct WPComSiteListResponse {
     pub sites: Vec<WPComSite>,
 }
 
-impl_as_query_value_for_new_type!(WpComSiteSlug);
-uniffi::custom_newtype!(WpComSiteSlug, String);
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct WpComSiteSlug(pub String);
-
-impl std::fmt::Display for WpComSiteSlug {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_string_id!(WpComSiteSlug);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComSite {
