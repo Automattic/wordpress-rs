@@ -61,8 +61,10 @@ pub struct WPComUserInfo {
     pub token_client_id: Option<u64>,
 
     /// The user's avatar URL as set on WordPress.com or using Gravatar.
+    #[serde(rename = "avatar_URL")]
     pub avatar_url: Option<String>,
 
+    #[serde(rename = "profile_URL")]
     /// The user's Gravatar profile URL.
     pub profile_url: Option<String>,
 
@@ -146,6 +148,8 @@ mod tests {
         let user_info: WPComUserInfo =
             serde_json::from_slice(json.as_slice()).expect("Failed to deserialize user info");
         assert_eq!(user_info.id, expected_id);
+        assert!(user_info.avatar_url.is_some());
+        assert!(user_info.profile_url.is_some());
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
