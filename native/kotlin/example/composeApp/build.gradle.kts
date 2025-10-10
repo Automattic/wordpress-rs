@@ -186,7 +186,8 @@ tasks.named("compileKotlinDesktop").configure {
     dependsOn(generateTestCredentials)
 }
 
-tasks.matching { it.name.startsWith("compileKotlin") && it.name.contains("Android") }.configureEach {
+// Ensure test credentials are generated before any Android compilation
+tasks.named("preBuild").configure {
     dependsOn(generateTestCredentials)
 }
 
