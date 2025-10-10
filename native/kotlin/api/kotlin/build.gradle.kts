@@ -117,6 +117,8 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
     inputs.dir("$cargoProjectRoot/wp_uniffi_bindgen/")
     // Re-generate if our uniffi-bindgen version changes.
     inputs.file("$cargoProjectRoot/Cargo.lock")
+    // Re-generate if the module source code changes
+    inputs.dir("$cargoProjectRoot/$rustPrimaryModule/")
 }
 
 tasks.named("compileKotlin").configure {
