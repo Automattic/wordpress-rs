@@ -84,7 +84,7 @@ dependencies {
 }
 
 val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")!!
-val moduleName = "wp_api"
+val moduleName = rootProject.ext.get("rustPrimaryModule").toString()
 cargo {
     cargoCommand = rootProject.ext.get("cargoBinaryPath").toString()
     rustcCommand = rootProject.ext.get("rustcBinaryPath").toString()
