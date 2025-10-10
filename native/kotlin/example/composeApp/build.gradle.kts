@@ -18,18 +18,25 @@ tasks.withType<KotlinJvmCompile>().configureEach {
   }
 }
 
+// Desktop resources path - separate from integration test resources to avoid IDE conflicts
+val desktopResourcesPath = layout.buildDirectory.dir("desktopResources")
+
+// Copy resources needed for desktop app
+val copyDesktopAppResources = tasks.register<Copy>("copyDesktopAppResources") {
+    dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
+    dependsOn(rootProject.tasks.named("copyTestCredentials"))
+    from(rootProject.ext.get("jniLibsPath"))
+    from(rootProject.ext.get("generatedTestResourcesPath"))
+    into(desktopResourcesPath)
+}
+
 kotlin {
     androidTarget()
     jvm("desktop")
 
     sourceSets {
         val desktopMain by getting {
-            resources.srcDirs(
-                listOf(
-                    rootProject.ext.get("jniLibsPath"),
-                    rootProject.ext.get("generatedTestResourcesPath")
-                )
-            )
+            resources.srcDirs(desktopResourcesPath)
         }
 
         androidMain.dependencies {
@@ -71,7 +78,6 @@ android {
 
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
-    sourceSets["main"].resources.srcDirs("src/commonMain/resources")
 
     defaultConfig {
         applicationId = "rs.wordpress.example"
@@ -106,6 +112,11 @@ compose.desktop {
     application {
         mainClass = "rs.wordpress.example.MainKt"
 
+        jvmArgs += listOf(
+            "-Djna.library.path=.",
+            "-Djava.library.path=."
+        )
+
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "rs.wordpress.example"
@@ -114,7 +125,34 @@ compose.desktop {
     }
 }
 
+// Generate BuildConfig with rust module name
+val generateBuildConfig = tasks.register("generateBuildConfig") {
+    val outputDir = layout.buildDirectory.dir("generated/source/buildConfig")
+    val rustPrimaryModule = rootProject.ext.get("rustPrimaryModule") as String
+
+    outputs.dir(outputDir)
+
+    doLast {
+        val buildConfigFile = outputDir.get().file("rs/wordpress/example/BuildConfig.kt").asFile
+        buildConfigFile.parentFile.mkdirs()
+        buildConfigFile.writeText("""
+            package rs.wordpress.example
+
+            object BuildConfig {
+                const val RUST_PRIMARY_MODULE = "$rustPrimaryModule"
+            }
+        """.trimIndent())
+    }
+}
+
+kotlin.sourceSets.getByName("desktopMain") {
+    kotlin.srcDir(layout.buildDirectory.dir("generated/source/buildConfig"))
+}
+
+tasks.named("compileKotlinDesktop").configure {
+    dependsOn(generateBuildConfig)
+}
+
 tasks.named("desktopProcessResources").configure {
-    dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
-    dependsOn(rootProject.tasks.named("copyTestCredentials"))
+    dependsOn(copyDesktopAppResources)
 }

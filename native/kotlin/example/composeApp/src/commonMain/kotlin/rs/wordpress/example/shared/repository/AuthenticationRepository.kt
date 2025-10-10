@@ -3,6 +3,7 @@ package rs.wordpress.example.shared.repository
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import java.net.URI
 import java.net.URL
 
 class AuthenticationRepository(
@@ -14,8 +15,8 @@ class AuthenticationRepository(
 
     init {
         addAuthenticatedSite(
-            URL(localTestSiteUrl),
-            URL("$localTestSiteUrl/wp-json"),
+            URI(localTestSiteUrl).toURL(),
+            URI("$localTestSiteUrl/wp-json").toURL(),
             localTestSiteUsername,
             localTestSitePassword
         )
