@@ -145,12 +145,49 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
     }
 }
 
+// Generate TestCredentials from test_credentials.json
+val generateTestCredentials = tasks.register("generateTestCredentials") {
+    val outputDir = layout.buildDirectory.dir("generated/source/testCredentials")
+    val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot") as String
+    val credentialsFile = file("$cargoProjectRoot/test_credentials.json")
+
+    inputs.file(credentialsFile)
+    outputs.dir(outputDir)
+
+    doLast {
+        val json = groovy.json.JsonSlurper().parseText(credentialsFile.readText()) as Map<*, *>
+
+        val testCredentialsFile = outputDir.get().file("rs/wordpress/example/TestCredentials.kt").asFile
+        testCredentialsFile.parentFile.mkdirs()
+        testCredentialsFile.writeText("""
+            package rs.wordpress.example
+
+            object TestCredentials {
+                const val SITE_URL = "${json["site_url"]}"
+                const val ADMIN_USERNAME = "${json["admin_username"]}"
+                const val ADMIN_PASSWORD = "${json["admin_password"]}"
+                const val SUBSCRIBER_USERNAME = "${json["subscriber_username"]}"
+                const val SUBSCRIBER_PASSWORD = "${json["subscriber_password"]}"
+            }
+        """.trimIndent())
+    }
+}
+
 kotlin.sourceSets.getByName("desktopMain") {
     kotlin.srcDir(layout.buildDirectory.dir("generated/source/buildConfig"))
 }
 
+kotlin.sourceSets.getByName("commonMain") {
+    kotlin.srcDir(layout.buildDirectory.dir("generated/source/testCredentials"))
+}
+
 tasks.named("compileKotlinDesktop").configure {
     dependsOn(generateBuildConfig)
+    dependsOn(generateTestCredentials)
+}
+
+tasks.matching { it.name.startsWith("compileKotlin") && it.name.contains("Android") }.configureEach {
+    dependsOn(generateTestCredentials)
 }
 
 tasks.named("desktopProcessResources").configure {
