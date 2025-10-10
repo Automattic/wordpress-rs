@@ -3,22 +3,25 @@ package rs.wordpress.example.shared.repository
 import rs.wordpress.example.shared.domain.AuthenticatedSite
 import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import java.net.URI
 import java.net.URL
 
 class AuthenticationRepository(
-    localTestSiteUrl: String,
-    localTestSiteUsername: String,
-    localTestSitePassword: String
+    private val localTestSiteUrl: String,
+    private val localTestSiteUsername: String?,
+    private val localTestSitePassword: String?
 ) {
     private val authenticatedSites = mutableMapOf<AuthenticatedSite, WpAuthentication>()
 
-    init {
-        addAuthenticatedSite(
-            URL(localTestSiteUrl),
-            URL("$localTestSiteUrl/wp-json"),
-            localTestSiteUsername,
-            localTestSitePassword
-        )
+    fun addTestSiteIfAvailable() {
+        if (localTestSiteUsername != null && localTestSitePassword != null) {
+            addAuthenticatedSite(
+                URI(localTestSiteUrl).toURL(),
+                URI("$localTestSiteUrl/wp-json").toURL(),
+                localTestSiteUsername,
+                localTestSitePassword
+            )
+        }
     }
 
     fun addAuthenticatedSite(siteUrl: URL, apiRootUrl: URL, username: String, password: String): Boolean {

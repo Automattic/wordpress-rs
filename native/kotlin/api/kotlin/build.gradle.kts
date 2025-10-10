@@ -84,11 +84,14 @@ sourceSets {
     }
 }
 
+// UniFFI supports generating bindings for multiple crates from a single library file.
+// When wp_mobile is built, it includes wp_api as a dependency, so libwp_mobile contains
+// metadata for both crates. We generate bindings for each crate from the single library.
 val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") {
     val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")
     val uniffiGeneratedPath = "${layout.buildDirectory.get()}/generated/source/uniffi/java"
     val nativeLibraryPath = rootProject.ext.get("nativeLibraryPath")!!
-    val rustModuleName = rootProject.ext.get("rustModuleName")
+    val rustPrimaryModule = rootProject.ext.get("rustPrimaryModule")
 
     dependsOn(rootProject.tasks.named("cargoBuildLibraryRelease"))
     workingDir(project.rootDir)
@@ -115,7 +118,7 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
     // Re-generate if our uniffi-bindgen version changes.
     inputs.file("$cargoProjectRoot/Cargo.lock")
     // Re-generate if the module source code changes
-    inputs.dir("$cargoProjectRoot/$rustModuleName/")
+    inputs.dir("$cargoProjectRoot/$rustPrimaryModule/")
 }
 
 tasks.named("compileKotlin").configure {

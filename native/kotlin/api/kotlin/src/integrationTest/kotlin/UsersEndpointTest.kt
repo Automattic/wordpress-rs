@@ -6,11 +6,17 @@ import uniffi.wp_api.SparseUserFieldWithEditContext
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpApiParamUsersHasPublishedPosts
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_mobile.wpMobileCrateWorks
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class UsersEndpointTest {
     private val client = defaultApiClient()
+
+    @Test
+    fun testThatWpMobileCrateWorks() = runTest {
+        assertEquals("foo is bar", wpMobileCrateWorks("bar"))
+    }
 
     @Test
     fun testUserListRequest() = runTest {
