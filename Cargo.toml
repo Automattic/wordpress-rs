@@ -12,6 +12,7 @@ members = [
   "wp_localization_macro",
   "wp_localization_parser",
   "wp_localization_validation",
+  "wp_mobile",
   "wp_rs_cli",
   "wp_rs_web",
   "wp_serde_helper",
