@@ -1,4 +1,4 @@
-use crate::date::WpGmtDateTime;
+use crate::{date::WpGmtDateTime, wp_content_u64_id};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wp_serde_helper::{
@@ -6,6 +6,8 @@ use wp_serde_helper::{
     deserialize_string_vec_or_string, deserialize_u64_or_none,
     deserialize_u64_or_none_with_negative_as_none, deserialize_u64_or_none_with_zero_as_none,
 };
+
+wp_content_u64_id!(WpComUserId);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComUserInfo {

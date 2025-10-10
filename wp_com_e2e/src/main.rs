@@ -4,7 +4,9 @@ use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use wp_api::{prelude::*, wp_com::client::WpComApiClient};
 
+mod me_tests;
 mod oauth2_tests;
+mod sites_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
 
@@ -18,6 +20,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Test {
+        #[arg(short = 'w', long = "allow-writes", default_value_t = false)]
+        allow_writes: bool,
+
         #[arg(short = 't', long = "token", env = "WP_COM_API_KEY")]
         token: String,
     },
@@ -38,7 +43,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Test { token } => {
+        Commands::Test {
+            token,
+            allow_writes,
+        } => {
             let delegate = WpApiClientDelegate {
                 auth_provider: WpAuthenticationProvider::static_with_auth(
                     WpAuthentication::Bearer {
@@ -53,11 +61,30 @@ async fn main() -> Result<(), anyhow::Error> {
 
             let client = WpComApiClient::new(delegate);
 
-            oauth2_tests::oauth2_test(&client, token.clone()).await?;
-            support_tickets_test::support_tickets_test(&client).await?;
-            support_eligibility_test::support_eligibility_test(&client).await?;
+            println!("== Running Tests ==");
+
+            if let Err(err) = run_tests(&client, token.clone(), allow_writes).await {
+                eprintln!("ERROR: {}", err);
+                err.chain()
+                    .skip(1)
+                    .for_each(|cause| eprintln!("because: {}", cause));
+                std::process::exit(1);
+            }
         }
     }
 
+    Ok(())
+}
+
+async fn run_tests(
+    client: &WpComApiClient,
+    token: String,
+    allow_writes: bool,
+) -> Result<(), anyhow::Error> {
+    me_tests::me_test(client).await?;
+    oauth2_tests::oauth2_test(client, token.clone()).await?;
+    sites_tests::sites_test(client).await?;
+    support_eligibility_test::support_eligibility_test(client).await?;
+    support_tickets_test::support_tickets_test(client, allow_writes).await?;
     Ok(())
 }

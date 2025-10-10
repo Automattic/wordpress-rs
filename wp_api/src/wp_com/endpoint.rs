@@ -11,6 +11,7 @@ pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
+pub mod sites_endpoint;
 pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
 pub mod support_eligibility_endpoint;

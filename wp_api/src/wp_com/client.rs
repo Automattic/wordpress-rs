@@ -13,10 +13,15 @@ use super::endpoint::{
     support_tickets_endpoint::{SupportTicketsRequestBuilder, SupportTicketsRequestExecutor},
 };
 use crate::{
-    api_client::WpApiClientDelegate, api_client_generate_api_client,
-    api_client_generate_endpoint_impl, api_client_generate_request_builder,
-    auth::WpAuthenticationProvider, request::endpoint::ApiUrlResolver,
-    wp_com::endpoint::WpComApiClientInternalUrlResolver,
+    api_client::WpApiClientDelegate,
+    api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder,
+    auth::WpAuthenticationProvider,
+    request::endpoint::ApiUrlResolver,
+    wp_com::endpoint::{
+        WpComApiClientInternalUrlResolver,
+        sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
+    },
 };
 use std::sync::Arc;
 
@@ -25,6 +30,7 @@ pub struct WpComApiRequestBuilder {
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
+    sites: Arc<SitesRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
     support_eligibility: Arc<SupportEligibilityRequestBuilder>,
@@ -42,6 +48,7 @@ impl WpComApiRequestBuilder {
             jetpack_connection,
             me,
             oauth2,
+            sites,
             subscribers,
             support_bots,
             support_eligibility,
@@ -70,6 +77,7 @@ pub struct WpComApiClient {
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
+    sites: Arc<SitesRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
     support_eligibility: Arc<SupportEligibilityRequestExecutor>,
@@ -88,6 +96,7 @@ impl WpComApiClient {
             jetpack_connection,
             me,
             oauth2,
+            sites,
             subscribers,
             support_bots,
             support_eligibility,
@@ -99,6 +108,7 @@ api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
+api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
 api_client_generate_endpoint_impl!(WpComApi, support_eligibility);
