@@ -151,25 +151,40 @@ val generateTestCredentials = tasks.register("generateTestCredentials") {
     val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot") as String
     val credentialsFile = file("$cargoProjectRoot/test_credentials.json")
 
-    inputs.file(credentialsFile)
+    // Only mark as input if file exists - allows build to work without test server running
+    inputs.files(credentialsFile).optional(true)
     outputs.dir(outputDir)
 
     doLast {
-        val json = groovy.json.JsonSlurper().parseText(credentialsFile.readText()) as Map<*, *>
-
         val testCredentialsFile = outputDir.get().file("rs/wordpress/example/TestCredentials.kt").asFile
         testCredentialsFile.parentFile.mkdirs()
-        testCredentialsFile.writeText("""
-            package rs.wordpress.example
 
-            object TestCredentials {
-                const val SITE_URL = "${json["site_url"]}"
-                const val ADMIN_USERNAME = "${json["admin_username"]}"
-                const val ADMIN_PASSWORD = "${json["admin_password"]}"
-                const val SUBSCRIBER_USERNAME = "${json["subscriber_username"]}"
-                const val SUBSCRIBER_PASSWORD = "${json["subscriber_password"]}"
-            }
-        """.trimIndent())
+        if (credentialsFile.exists()) {
+            val json = groovy.json.JsonSlurper().parseText(credentialsFile.readText()) as Map<*, *>
+            testCredentialsFile.writeText("""
+                package rs.wordpress.example
+
+                object TestCredentials {
+                    val SITE_URL: String? = "${json["site_url"]}"
+                    val ADMIN_USERNAME: String? = "${json["admin_username"]}"
+                    val ADMIN_PASSWORD: String? = "${json["admin_password"]}"
+                    val SUBSCRIBER_USERNAME: String? = "${json["subscriber_username"]}"
+                    val SUBSCRIBER_PASSWORD: String? = "${json["subscriber_password"]}"
+                }
+            """.trimIndent())
+        } else {
+            testCredentialsFile.writeText("""
+                package rs.wordpress.example
+
+                object TestCredentials {
+                    val SITE_URL: String? = null
+                    val ADMIN_USERNAME: String? = null
+                    val ADMIN_PASSWORD: String? = null
+                    val SUBSCRIBER_USERNAME: String? = null
+                    val SUBSCRIBER_PASSWORD: String? = null
+                }
+            """.trimIndent())
+        }
     }
 }
 

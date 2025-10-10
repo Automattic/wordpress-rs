@@ -14,7 +14,10 @@ val authModule = module {
             localTestSiteUrl = localTestSiteUrl().siteUrl,
             localTestSiteUsername = TestCredentials.ADMIN_USERNAME,
             localTestSitePassword = TestCredentials.ADMIN_PASSWORD
-        )
+        ).apply {
+            // Add test site if credentials are available
+            addTestSiteIfAvailable()
+        }
     }
 }
 
