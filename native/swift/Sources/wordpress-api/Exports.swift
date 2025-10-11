@@ -23,6 +23,13 @@ public typealias RetryAfterMiddleware = WordPressAPIInternal.RetryAfterMiddlewar
 public typealias WpApiClientDelegate = WordPressAPIInternal.WpApiClientDelegate
 public typealias WpAppNotifier = WordPressAPIInternal.WpAppNotifier
 public typealias UserAvatarSize = WordPressAPIInternal.UserAvatarSize
+public typealias WpApiDetails = WordPressAPIInternal.WpApiDetails
+public typealias ApiUrlResolver = WordPressAPIInternal.ApiUrlResolver
+public typealias WpComDotOrgApiUrlResolver = WordPressAPIInternal.WpComDotOrgApiUrlResolver
+public typealias WpOrgSiteApiUrlResolver = WordPressAPIInternal.WpOrgSiteApiUrlResolver
+public typealias WpApiParamOrder = WordPressAPIInternal.WpApiParamOrder
+public typealias UserCapability = WordPressAPIInternal.UserCapability
+public typealias UserRole = WordPressAPIInternal.UserRole
 
 // MARK: - Login
 
@@ -30,6 +37,7 @@ public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApp
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias SSLCertificateInfo = WordPressAPIInternal.SslCertificateInfo
 public typealias AutoDiscoveryAttemptSuccess = WordPressAPIInternal.AutoDiscoveryAttemptSuccess
+public typealias WpDynamicAuthenticationProvider = WordPressAPIInternal.WpDynamicAuthenticationProvider
 
 // MARK: - Errors
 public typealias AutoDiscoveryAttemptFailure = WordPressAPIInternal.AutoDiscoveryAttemptFailure
@@ -63,12 +71,17 @@ public typealias PluginWithViewContext = WordPressAPIInternal.PluginWithViewCont
 public typealias PluginWithEditContext = WordPressAPIInternal.PluginWithEditContext
 public typealias PluginWithEmbedContext = WordPressAPIInternal.PluginWithEmbedContext
 public typealias PluginSlug = WordPressAPIInternal.PluginSlug
-public typealias PluginWpOrgDirectorySlug = WordPressAPIInternal.PluginWpOrgDirectorySlug
 public typealias PluginListParams = WordPressAPIInternal.PluginListParams
 public typealias PluginUpdateParams = WordPressAPIInternal.PluginUpdateParams
 public typealias PluginCreateParams = WordPressAPIInternal.PluginCreateParams
 public typealias PluginDeleteResponse = WordPressAPIInternal.PluginDeleteResponse
 public typealias PluginsRequestExecutor = WordPressAPIInternal.PluginsRequestExecutor
+public typealias PluginStatus = WordPressAPIInternal.PluginStatus
+
+public typealias PluginWpOrgDirectorySlug = WordPressAPIInternal.PluginWpOrgDirectorySlug
+public typealias PluginWpOrgDirectoryCategory = WordPressAPIInternal.WordPressOrgApiPluginDirectoryCategory
+public typealias PluginInformation = WordPressAPIInternal.PluginInformation
+public typealias UpdateCheckPluginInfo = WordPressAPIInternal.UpdateCheckPluginInfo
 
 // MARK: – Application Passwords
 
@@ -93,29 +106,42 @@ public typealias PostTypeDetailsWithViewContext = WordPressAPIInternal.PostTypeD
 public typealias PostTypeDetailsWithEmbedContext = WordPressAPIInternal.PostTypeDetailsWithEmbedContext
 public typealias PostTypesRequestExecutor = WordPressAPIInternal.PostTypesRequestExecutor
 
+// MARK: – Post Statuses
+public typealias PostStatusSlug = WordPressAPIInternal.PostStatusSlug
+public typealias SparsePostStatus = WordPressAPIInternal.SparsePostStatus
+public typealias PostStatusWithEditContext = WordPressAPIInternal.PostStatusWithEditContext
+public typealias PostStatusWithViewContext = WordPressAPIInternal.PostStatusWithViewContext
+public typealias PostStatusWithEmbedContext = WordPressAPIInternal.PostStatusWithEmbedContext
+public typealias PostStatusesRequestExecutor = WordPressAPIInternal.PostStatusesRequestExecutor
+
+public typealias PostStatusesRequestListWithEditContextResponse = WordPressAPIInternal.PostStatusesRequestListWithEditContextResponse
+public typealias PostStatusesRequestListWithViewContextResponse = WordPressAPIInternal.PostStatusesRequestListWithViewContextResponse
+public typealias PostStatusesRequestListWithEmbedContextResponse = WordPressAPIInternal.PostStatusesRequestListWithEmbedContextResponse
+
 // MARK: - Posts
-public typealias SparsePost = WordPressAPIInternal.SparsePost
-public typealias PostWithEditContext = WordPressAPIInternal.PostWithEditContext
-public typealias PostWithViewContext = WordPressAPIInternal.PostWithViewContext
-public typealias PostWithEmbedContext = WordPressAPIInternal.PostWithEmbedContext
+public typealias SparseAnyPost = WordPressAPIInternal.SparseAnyPost
+public typealias AnyPostWithEditContext = WordPressAPIInternal.AnyPostWithEditContext
+public typealias AnyPostWithViewContext = WordPressAPIInternal.AnyPostWithViewContext
+public typealias AnyPostWithEmbedContext = WordPressAPIInternal.AnyPostWithEmbedContext
 public typealias PostListParams = WordPressAPIInternal.PostListParams
 public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
+public typealias PostEndpointType = WordPressAPIInternal.PostEndpointType
 
 public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.PostsRequestListWithEditContextResponse
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
 public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostsRequestListWithEmbedContextResponse
 
-// MARK: - Pages
-public typealias SparsePage = WordPressAPIInternal.SparsePage
-public typealias PageWithEditContext = WordPressAPIInternal.PageWithEditContext
-public typealias PageWithViewContext = WordPressAPIInternal.PageWithViewContext
-public typealias PageWithEmbedContext = WordPressAPIInternal.PageWithEmbedContext
-public typealias PageListParams = WordPressAPIInternal.PageListParams
-public typealias PagesRequestExecutor = WordPressAPIInternal.PagesRequestExecutor
+// MARK: – Revisions
+public typealias SparseAnyRevision = WordPressAPIInternal.SparseAnyPostRevision
+public typealias RevisionWithEditContext = WordPressAPIInternal.AnyPostRevisionWithEditContext
+public typealias RevisionWithViewContext = WordPressAPIInternal.AnyPostRevisionWithViewContext
+public typealias RevisionWithEmbedContext = WordPressAPIInternal.AnyPostRevisionWithEmbedContext
+public typealias RevisionListParams = WordPressAPIInternal.AnyPostRevisionListParams
+public typealias RevisionsRequestExecutor = WordPressAPIInternal.PostRevisionsRequestExecutor
 
-public typealias PagesRequestListWithEditContextResponse = WordPressAPIInternal.PagesRequestListWithEditContextResponse
-public typealias PagesRequestListWithViewContextResponse = WordPressAPIInternal.PagesRequestListWithViewContextResponse
-public typealias PagesRequestListWithEmbedContextResponse = WordPressAPIInternal.PagesRequestListWithEmbedContextResponse
+public typealias RevisionsRequestListWithEditContextResponse = WordPressAPIInternal.PostRevisionsRequestListWithEditContextResponse
+public typealias RevisionsRequestListWithViewContextResponse = WordPressAPIInternal.PostRevisionsRequestListWithViewContextResponse
+public typealias RevisionsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostRevisionsRequestListWithEmbedContextResponse
 
 // MARK: - Media
 public typealias SparseMedia = WordPressAPIInternal.SparseMedia
@@ -132,33 +158,84 @@ public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.
 public typealias MediaRequestListWithViewContextResponse = WordPressAPIInternal.MediaRequestListWithViewContextResponse
 public typealias MediaRequestListWithEmbedContextResponse = WordPressAPIInternal.MediaRequestListWithEmbedContextResponse
 
-// MARK: - Tags
-public typealias TagId = WordPressAPIInternal.TagId
-public typealias SparseTag = WordPressAPIInternal.SparseTag
-public typealias TagWithEditContext = WordPressAPIInternal.TagWithEditContext
-public typealias TagWithViewContext = WordPressAPIInternal.TagWithViewContext
-public typealias TagWithEmbedContext = WordPressAPIInternal.TagWithEmbedContext
-public typealias TagCreateParams = WordPressAPIInternal.TagCreateParams
-public typealias TagUpdateParams = WordPressAPIInternal.TagUpdateParams
-public typealias TagListParams = WordPressAPIInternal.TagListParams
-public typealias TagsRequestExecutor = WordPressAPIInternal.TagsRequestExecutor
-public typealias TagsRequestListWithEditContextResponse = WordPressAPIInternal.TagsRequestListWithEditContextResponse
-public typealias TagsRequestListWithViewContextResponse = WordPressAPIInternal.TagsRequestListWithViewContextResponse
-public typealias TagsRequestListWithEmbedContextResponse = WordPressAPIInternal.TagsRequestListWithEmbedContextResponse
+// MARK: - Comments
+public typealias SparseComment = WordPressAPIInternal.SparseComment
+public typealias CommentWithEditContext = WordPressAPIInternal.CommentWithEditContext
+public typealias CommentWithViewContext = WordPressAPIInternal.CommentWithViewContext
+public typealias CommentWithEmbedContext = WordPressAPIInternal.CommentWithEmbedContext
+public typealias CommentListParams = WordPressAPIInternal.CommentListParams
+public typealias CommentCreateParams = WordPressAPIInternal.CommentCreateParams
+public typealias CommentUpdateParams = WordPressAPIInternal.CommentUpdateParams
+public typealias CommentDeleteParams = WordPressAPIInternal.CommentDeleteParams
+public typealias CommentStatus = WordPressAPIInternal.CommentStatus
+public typealias CommentType = WordPressAPIInternal.CommentType
+public typealias CommentsRequestExecutor = WordPressAPIInternal.CommentsRequestExecutor
 
-// MARK: - Categories
-public typealias CategoryId = WordPressAPIInternal.CategoryId
-public typealias SparseCategory = WordPressAPIInternal.SparseCategory
-public typealias CategoryWithEditContext = WordPressAPIInternal.CategoryWithEditContext
-public typealias CategoryWithViewContext = WordPressAPIInternal.CategoryWithViewContext
-public typealias CategoryWithEmbedContext = WordPressAPIInternal.CategoryWithEmbedContext
-public typealias CategoryCreateParams = WordPressAPIInternal.CategoryCreateParams
-public typealias CategoryUpdateParams = WordPressAPIInternal.CategoryUpdateParams
-public typealias CategoryListParams = WordPressAPIInternal.CategoryListParams
-public typealias CategoriesRequestExecutor = WordPressAPIInternal.CategoriesRequestExecutor
-public typealias CategoriesRequestListWithEditContextResponse = WordPressAPIInternal.CategoriesRequestListWithEditContextResponse
-public typealias CategoriesRequestListWithViewContextResponse = WordPressAPIInternal.CategoriesRequestListWithViewContextResponse
-public typealias CategoriesRequestListWithEmbedContextResponse = WordPressAPIInternal.CategoriesRequestListWithEmbedContextResponse
+public typealias CommentsRequestListWithEditContextResponse = WordPressAPIInternal.CommentsRequestListWithEditContextResponse
+public typealias CommentsRequestListWithViewContextResponse = WordPressAPIInternal.CommentsRequestListWithViewContextResponse
+public typealias CommentsRequestListWithEmbedContextResponse = WordPressAPIInternal.CommentsRequestListWithEmbedContextResponse
+
+// MARK: - Terms
+public typealias TermId = WordPressAPIInternal.TermId
+public typealias SparseAnyTerm = WordPressAPIInternal.SparseAnyTerm
+public typealias AnyTermWithEditContext = WordPressAPIInternal.AnyTermWithEditContext
+public typealias AnyTermWithViewContext = WordPressAPIInternal.AnyTermWithViewContext
+public typealias AnyTermWithEmbedContext = WordPressAPIInternal.AnyTermWithEmbedContext
+public typealias TermCreateParams = WordPressAPIInternal.TermCreateParams
+public typealias TermUpdateParams = WordPressAPIInternal.TermUpdateParams
+public typealias TermListParams = WordPressAPIInternal.TermListParams
+public typealias WpApiParamTermsOrderBy = WordPressAPIInternal.WpApiParamTermsOrderBy
+public typealias TermEndpointType = WordPressAPIInternal.TermEndpointType
+public typealias TermsRequestExecutor = WordPressAPIInternal.TermsRequestExecutor
+public typealias TermsRequestListWithEditContextResponse = WordPressAPIInternal.TermsRequestListWithEditContextResponse
+public typealias TermsRequestListWithViewContextResponse = WordPressAPIInternal.TermsRequestListWithViewContextResponse
+public typealias TermsRequestListWithEmbedContextResponse = WordPressAPIInternal.TermsRequestListWithEmbedContextResponse
+
+// MARK: - Taxonomies
+public typealias TaxonomyListParams = WordPressAPIInternal.TaxonomyListParams
+
+// MARK: Navigation
+public typealias NavigationStatus = WordPressAPIInternal.NavigationStatus
+public typealias NavigationListParams = WordPressAPIInternal.NavigationListParams
+public typealias NavigationCreateParams = WordPressAPIInternal.NavigationCreateParams
+public typealias NavigationUpdateParams = WordPressAPIInternal.NavigationUpdateParams
+public typealias NavigationRetrieveParams = WordPressAPIInternal.NavigationRetrieveParams
+public typealias NavigationRequestExecutor = WordPressAPIInternal.NavigationsRequestExecutor
+public typealias NavigationWithEditContext = WordPressAPIInternal.NavigationWithEditContext
+public typealias NavigationWithViewContext = WordPressAPIInternal.NavigationWithViewContext
+public typealias NavigationWithEmbedContext = WordPressAPIInternal.NavigationWithEmbedContext
+
+// MARK: - Menus
+public typealias SparseNavMenu = WordPressAPIInternal.SparseNavMenu
+public typealias NavMenuListParams = WordPressAPIInternal.NavMenuListParams
+public typealias NavMenuCreateParams = WordPressAPIInternal.NavMenuCreateParams
+public typealias NavMenuUpdateParams = WordPressAPIInternal.NavMenuUpdateParams
+public typealias NavMenuWithEditContext = WordPressAPIInternal.NavMenuWithEditContext
+public typealias NavMenuWithViewContext = WordPressAPIInternal.NavMenuWithViewContext
+public typealias NavMenuWithEmbedContext = WordPressAPIInternal.NavMenuWithEmbedContext
+
+// MARK: - Menu Items
+public typealias NavMenuItemListParams = WordPressAPIInternal.NavMenuItemListParams
+public typealias NavMenuItemCreateParams = WordPressAPIInternal.NavMenuItemCreateParams
+public typealias NavMenuItemUpdateParams = WordPressAPIInternal.NavMenuItemUpdateParams
+public typealias NavMenuItemWithEditContext = WordPressAPIInternal.NavMenuItemWithEditContext
+public typealias NavMenuItemWithViewContext = WordPressAPIInternal.NavMenuItemWithViewContext
+public typealias NavMenuItemWithEmbedContext = WordPressAPIInternal.NavMenuItemWithEmbedContext
+public typealias NavMenuItemsRequestExecutor = WordPressAPIInternal.NavMenuItemsRequestExecutor
+public typealias NavMenuItemsRequestListWithEditContextResponse = WordPressAPIInternal.NavMenuItemsRequestListWithEditContextResponse
+public typealias NavMenuItemsRequestListWithViewContextResponse = WordPressAPIInternal.NavMenuItemsRequestListWithViewContextResponse
+public typealias NavMenuItemsRequestListWithEmbedContextResponse = WordPressAPIInternal.NavMenuItemsRequestListWithEmbedContextResponse
+
+// MARK: Menu Item Autosaves
+public typealias NavMenuItemRevisionCreateParams = WordPressAPIInternal.NavMenuItemRevisionCreateParams
+public typealias NavMenuItemRevisionWithEditContext = WordPressAPIInternal.NavMenuItemRevisionWithEditContext
+public typealias NavMenuItemRevisionWithViewContext = WordPressAPIInternal.NavMenuItemRevisionWithViewContext
+public typealias NavMenuItemRevisionWithEmbedContext = WordPressAPIInternal.NavMenuItemRevisionWithEmbedContext
+
+// MARK: Menu Locations
+public typealias MenuLocationWithEditContext = WordPressAPIInternal.MenuLocationWithEditContext
+public typealias MenuLocationWithViewContext = WordPressAPIInternal.MenuLocationWithViewContext
+public typealias MenuLocationWithEmbedContext = WordPressAPIInternal.MenuLocationWithEmbedContext
 
 // MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
@@ -172,6 +249,9 @@ public typealias SiteSettingsRequestExecutor = WordPressAPIInternal.SiteSettings
 // MARK: – Site Health Tests
 public typealias WpSiteHealthTestsRequestExecutor = WordPressAPIInternal.WpSiteHealthTestsRequestExecutor
 // swiftlint:enable line_length
+
+// MARK: - Block Editor
+public typealias WpBlockEditorSettingsParams = WordPressAPIInternal.WpBlockEditorSettingsParams
 
 // MARK: - WordPress.org
 public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiClient
@@ -195,3 +275,6 @@ public typealias CreateBotConversationFeedbackParams = WordPressAPIInternal.Crea
 // MARK: Support Tickets
 public typealias CreateSupportTicketParams = WordPressAPIInternal.CreateSupportTicketParams
 public typealias AddMessageToSupportConversationParams = WordPressAPIInternal.AddMessageToSupportConversationParams
+
+// MARK: - Jetpack
+public typealias JetpackConnectionClient = WordPressAPIInternal.JetpackConnectionClient

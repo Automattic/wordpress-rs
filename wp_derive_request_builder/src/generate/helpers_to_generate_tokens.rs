@@ -1,7 +1,7 @@
 use convert_case::{Case, Casing};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote};
-use syn::Ident;
+use syn::{FnArg, Ident, Pat, parse_quote};
 
 use super::{ContextAndFilterHandler, PartOf, WpContext};
 use crate::{
@@ -82,6 +82,46 @@ pub fn fn_signature(
     let provided_param = fn_provided_param(part_of, params_type, request_type);
     let fields_param = fn_fields_param(context_and_filter_handler);
     quote! { fn #fn_name(&self, #url_params #provided_param #fields_param) }
+}
+
+pub fn append_context_param(input: TokenStream) -> TokenStream {
+    let mut signature: syn::Signature = syn::parse2(input).unwrap();
+
+    let original_name = signature.ident.to_string();
+    signature.ident = format_ident!("{}_cancellation", original_name);
+
+    let new_arg: FnArg =
+        parse_quote! { context: Option<std::sync::Arc<crate::request::RequestContext>> };
+    signature.inputs.push(new_arg);
+
+    quote! { #signature }
+}
+
+pub fn invoke_cancellation_variant(input: TokenStream) -> TokenStream {
+    let signature: syn::Signature = syn::parse2(input).unwrap();
+
+    let fn_name = &signature.ident;
+    let fn_name = format_ident!("{}_cancellation", fn_name);
+
+    let param_names: Vec<_> = signature
+        .inputs
+        .iter()
+        .filter_map(|arg| {
+            match arg {
+                FnArg::Typed(pat_type) => match &*pat_type.pat {
+                    Pat::Ident(ident) => Some(ident.ident.clone()),
+                    _ => None,
+                },
+                FnArg::Receiver(_) => None, // Skip 'self' parameter
+            }
+        })
+        .collect();
+
+    if param_names.is_empty() {
+        quote! { self.#fn_name(None).await }
+    } else {
+        quote! { self.#fn_name(#(#param_names),*, None).await }
+    }
 }
 
 pub fn fn_url_params(url_parts: &[UrlPart]) -> TokenStream {
@@ -1242,5 +1282,33 @@ mod tests {
         ContextAndFilterHandler::FilterNoContext(FilterByType {
             tokens: quote! { crate::SparseUserField },
         })
+    }
+
+    #[rstest]
+    #[case(
+        quote! { fn list(&self, params: &UserListParams) },
+        "fn list_cancellation (& self , params : & UserListParams , context : Option < std :: sync :: Arc < crate :: request :: RequestContext > >)"
+    )]
+    #[case(
+        quote! { fn list(&self) },
+        "fn list_cancellation (& self , context : Option < std :: sync :: Arc < crate :: request :: RequestContext > >)"
+    )]
+    fn test_append_context_param(#[case] input: TokenStream, #[case] expected: &str) {
+        let result = append_context_param(input);
+        assert_eq!(result.to_string(), expected);
+    }
+
+    #[rstest]
+    #[case(
+        quote! { fn list(&self, params: &UserListParams, fields: &[SparseUserField]) },
+        "self . list_cancellation (params , fields , None) . await"
+    )]
+    #[case(
+        quote! { fn list(&self) },
+        "self . list_cancellation (None) . await"
+    )]
+    fn test_invoke_cancellation_variant(#[case] input: TokenStream, #[case] expected: &str) {
+        let result = invoke_cancellation_variant(input);
+        assert_eq!(result.to_string(), expected);
     }
 }

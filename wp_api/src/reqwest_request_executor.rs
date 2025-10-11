@@ -3,6 +3,7 @@ use crate::{
         InvalidSslErrorReason, MediaUploadRequestExecutionError, RequestExecutionError,
         RequestExecutionErrorReason,
     },
+    request::RequestContext,
     request::{
         NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
@@ -166,6 +167,10 @@ impl RequestExecutor for ReqwestRequestExecutor {
 
     async fn sleep(&self, millis: u64) {
         tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+    }
+
+    fn cancel(&self, _context: Arc<RequestContext>) {
+        // No-op for reqwest
     }
 }
 

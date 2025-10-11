@@ -1,5 +1,5 @@
 import Foundation
-import WordPressAPI
+@testable import WordPressAPI
 import Testing
 
 @Suite
@@ -55,6 +55,7 @@ struct MediaTests {
                         fromLocalFileURL: file,
                         fulfilling: progress
                     )
+                    Issue.record("The creating post function should throw")
                 }
 
                 let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
@@ -83,6 +84,7 @@ struct MediaTests {
                         fromLocalFileURL: file,
                         fulfilling: progress
                     )
+                    Issue.record("The creating post function should throw")
                 }
 
                 let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in

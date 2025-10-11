@@ -1,16 +1,19 @@
-use wp_api::tags::{
-    SparseTagFieldWithEditContext, SparseTagFieldWithEmbedContext, SparseTagFieldWithViewContext,
-    TagListParams, WpApiParamTagsOrderBy,
+use wp_api::{
+    request::endpoint::terms_endpoint::TermEndpointType,
+    terms::{
+        SparseAnyTermFieldWithEditContext, SparseAnyTermFieldWithEmbedContext,
+        SparseAnyTermFieldWithViewContext, TermListParams, WpApiParamTermsOrderBy,
+    },
 };
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_edit_context(#[case] params: TagListParams) {
+async fn list_with_edit_context(#[case] params: TermListParams) {
     api_client()
-        .tags()
-        .list_with_edit_context(&params)
+        .terms()
+        .list_with_edit_context(&TermEndpointType::Tags, &params)
         .await
         .assert_response();
 }
@@ -18,10 +21,10 @@ async fn list_with_edit_context(#[case] params: TagListParams) {
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_embed_context(#[case] params: TagListParams) {
+async fn list_with_embed_context(#[case] params: TermListParams) {
     api_client()
-        .tags()
-        .list_with_embed_context(&params)
+        .terms()
+        .list_with_embed_context(&TermEndpointType::Tags, &params)
         .await
         .assert_response();
 }
@@ -29,10 +32,10 @@ async fn list_with_embed_context(#[case] params: TagListParams) {
 #[tokio::test]
 #[apply(list_cases)]
 #[parallel]
-async fn list_with_view_context(#[case] params: TagListParams) {
+async fn list_with_view_context(#[case] params: TermListParams) {
     api_client()
-        .tags()
-        .list_with_view_context(&params)
+        .terms()
+        .list_with_view_context(&TermEndpointType::Tags, &params)
         .await
         .assert_response();
 }
@@ -41,8 +44,8 @@ async fn list_with_view_context(#[case] params: TagListParams) {
 #[parallel]
 async fn retrieve_with_edit_context() {
     api_client()
-        .tags()
-        .retrieve_with_edit_context(&TAG_ID_100)
+        .terms()
+        .retrieve_with_edit_context(&TermEndpointType::Tags, &TAG_ID_100)
         .await
         .assert_response();
 }
@@ -51,8 +54,8 @@ async fn retrieve_with_edit_context() {
 #[parallel]
 async fn retrieve_with_embed_context() {
     api_client()
-        .tags()
-        .retrieve_with_embed_context(&TAG_ID_100)
+        .terms()
+        .retrieve_with_embed_context(&TermEndpointType::Tags, &TAG_ID_100)
         .await
         .assert_response();
 }
@@ -61,52 +64,52 @@ async fn retrieve_with_embed_context() {
 #[parallel]
 async fn retrieve_with_view_context() {
     api_client()
-        .tags()
-        .retrieve_with_view_context(&TAG_ID_100)
+        .terms()
+        .retrieve_with_view_context(&TermEndpointType::Tags, &TAG_ID_100)
         .await
         .assert_response();
 }
 
 #[template]
 #[rstest]
-#[case::default(TagListParams::default())]
-#[case::page(generate!(TagListParams, (page, Some(1))))]
-#[case::per_page(generate!(TagListParams, (per_page, Some(3))))]
-#[case::search(generate!(TagListParams, (search, Some("foo".to_string()))))]
-#[case::exclude(generate!(TagListParams, (exclude, vec![TAG_ID_100])))]
-#[case::include(generate!(TagListParams, (include, vec![TAG_ID_100])))]
-#[case::offset(generate!(TagListParams, (offset, Some(2))))]
-#[case::order(generate!(TagListParams, (order, Some(WpApiParamOrder::Asc))))]
-#[case::orderby(generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Id))))]
-#[case::hide_empty_false(generate!(TagListParams, (hide_empty, Some(false))))]
-#[case::hide_empty_true(generate!(TagListParams, (hide_empty, Some(true))))]
-#[case::post(generate!(TagListParams, (post, Some(FIRST_POST_ID))))]
-#[case::slug(generate!(TagListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
-pub fn list_cases(#[case] params: TagListParams) {}
+#[case::default(TermListParams::default())]
+#[case::page(generate!(TermListParams, (page, Some(1))))]
+#[case::per_page(generate!(TermListParams, (per_page, Some(3))))]
+#[case::search(generate!(TermListParams, (search, Some("foo".to_string()))))]
+#[case::exclude(generate!(TermListParams, (exclude, vec![TAG_ID_100])))]
+#[case::include(generate!(TermListParams, (include, vec![TAG_ID_100])))]
+#[case::offset(generate!(TermListParams, (offset, Some(2))))]
+#[case::order(generate!(TermListParams, (order, Some(WpApiParamOrder::Asc))))]
+#[case::orderby(generate!(TermListParams, (orderby, Some(WpApiParamTermsOrderBy::Id))))]
+#[case::hide_empty_false(generate!(TermListParams, (hide_empty, Some(false))))]
+#[case::hide_empty_true(generate!(TermListParams, (hide_empty, Some(true))))]
+#[case::post(generate!(TermListParams, (post, Some(FIRST_POST_ID))))]
+#[case::slug(generate!(TermListParams, (slug, vec!["foo".to_string(), "bar".to_string()])))]
+pub fn list_cases(#[case] params: TermListParams) {}
 
 mod filter {
     use super::*;
 
-    wp_api::generate_sparse_tag_field_with_edit_context_test_cases!();
-    wp_api::generate_sparse_tag_field_with_embed_context_test_cases!();
-    wp_api::generate_sparse_tag_field_with_view_context_test_cases!();
+    wp_api::generate_sparse_any_term_field_with_edit_context_test_cases!();
+    wp_api::generate_sparse_any_term_field_with_embed_context_test_cases!();
+    wp_api::generate_sparse_any_term_field_with_view_context_test_cases!();
 
-    #[apply(sparse_tag_field_with_edit_context_test_cases)]
-    #[case(&[SparseTagFieldWithEditContext::Name, SparseTagFieldWithEditContext::Slug])]
+    #[apply(sparse_any_term_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyTermFieldWithEditContext::Name, SparseAnyTermFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_edit_context(
-        #[case] fields: &[SparseTagFieldWithEditContext],
+        #[case] fields: &[SparseAnyTermFieldWithEditContext],
         #[values(
-            TagListParams::default(),
-            generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Id))),
-            generate!(TagListParams, (search, Some("foo".to_string())))
+            TermListParams::default(),
+            generate!(TermListParams, (orderby, Some(WpApiParamTermsOrderBy::Id))),
+            generate!(TermListParams, (search, Some("foo".to_string())))
         )]
-        params: TagListParams,
+        params: TermListParams,
     ) {
         api_client()
-            .tags()
-            .filter_list_with_edit_context(&params, fields)
+            .terms()
+            .filter_list_with_edit_context(&TermEndpointType::Tags, &params, fields)
             .await
             .assert_response()
             .data
@@ -116,36 +119,38 @@ mod filter {
             });
     }
 
-    #[apply(sparse_tag_field_with_edit_context_test_cases)]
-    #[case(&[SparseTagFieldWithEditContext::Name, SparseTagFieldWithEditContext::Slug])]
+    #[apply(sparse_any_term_field_with_edit_context_test_cases)]
+    #[case(&[SparseAnyTermFieldWithEditContext::Name, SparseAnyTermFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_retrieve_with_edit_context(#[case] fields: &[SparseTagFieldWithEditContext]) {
+    async fn filter_retrieve_with_edit_context(
+        #[case] fields: &[SparseAnyTermFieldWithEditContext],
+    ) {
         let tag = api_client()
-            .tags()
-            .filter_retrieve_with_edit_context(&TAG_ID_100, fields)
+            .terms()
+            .filter_retrieve_with_edit_context(&TermEndpointType::Tags, &TAG_ID_100, fields)
             .await
             .assert_response()
             .data;
         tag.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_tag_field_with_embed_context_test_cases)]
-    #[case(&[SparseTagFieldWithEmbedContext::Name, SparseTagFieldWithEmbedContext::Slug])]
+    #[apply(sparse_any_term_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyTermFieldWithEmbedContext::Name, SparseAnyTermFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_embed_context(
-        #[case] fields: &[SparseTagFieldWithEmbedContext],
+        #[case] fields: &[SparseAnyTermFieldWithEmbedContext],
         #[values(
-            TagListParams::default(),
-            generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Id))),
-            generate!(TagListParams, (search, Some("foo".to_string())))
+            TermListParams::default(),
+            generate!(TermListParams, (orderby, Some(WpApiParamTermsOrderBy::Id))),
+            generate!(TermListParams, (search, Some("foo".to_string())))
         )]
-        params: TagListParams,
+        params: TermListParams,
     ) {
         api_client()
-            .tags()
-            .filter_list_with_embed_context(&params, fields)
+            .terms()
+            .filter_list_with_embed_context(&TermEndpointType::Tags, &params, fields)
             .await
             .assert_response()
             .data
@@ -155,36 +160,38 @@ mod filter {
             });
     }
 
-    #[apply(sparse_tag_field_with_embed_context_test_cases)]
-    #[case(&[SparseTagFieldWithEmbedContext::Name, SparseTagFieldWithEmbedContext::Slug])]
+    #[apply(sparse_any_term_field_with_embed_context_test_cases)]
+    #[case(&[SparseAnyTermFieldWithEmbedContext::Name, SparseAnyTermFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_retrieve_with_embed_context(#[case] fields: &[SparseTagFieldWithEmbedContext]) {
+    async fn filter_retrieve_with_embed_context(
+        #[case] fields: &[SparseAnyTermFieldWithEmbedContext],
+    ) {
         let tag = api_client()
-            .tags()
-            .filter_retrieve_with_embed_context(&TAG_ID_100, fields)
+            .terms()
+            .filter_retrieve_with_embed_context(&TermEndpointType::Tags, &TAG_ID_100, fields)
             .await
             .assert_response()
             .data;
         tag.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
-    #[apply(sparse_tag_field_with_view_context_test_cases)]
-    #[case(&[SparseTagFieldWithViewContext::Name, SparseTagFieldWithViewContext::Slug])]
+    #[apply(sparse_any_term_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyTermFieldWithViewContext::Name, SparseAnyTermFieldWithViewContext::Slug])]
     #[tokio::test]
     #[parallel]
     async fn filter_list_with_view_context(
-        #[case] fields: &[SparseTagFieldWithViewContext],
+        #[case] fields: &[SparseAnyTermFieldWithViewContext],
         #[values(
-            TagListParams::default(),
-            generate!(TagListParams, (orderby, Some(WpApiParamTagsOrderBy::Id))),
-            generate!(TagListParams, (search, Some("foo".to_string())))
+            TermListParams::default(),
+            generate!(TermListParams, (orderby, Some(WpApiParamTermsOrderBy::Id))),
+            generate!(TermListParams, (search, Some("foo".to_string())))
         )]
-        params: TagListParams,
+        params: TermListParams,
     ) {
         api_client()
-            .tags()
-            .filter_list_with_view_context(&params, fields)
+            .terms()
+            .filter_list_with_view_context(&TermEndpointType::Tags, &params, fields)
             .await
             .assert_response()
             .data
@@ -194,14 +201,16 @@ mod filter {
             });
     }
 
-    #[apply(sparse_tag_field_with_view_context_test_cases)]
-    #[case(&[SparseTagFieldWithViewContext::Name, SparseTagFieldWithViewContext::Slug])]
+    #[apply(sparse_any_term_field_with_view_context_test_cases)]
+    #[case(&[SparseAnyTermFieldWithViewContext::Name, SparseAnyTermFieldWithViewContext::Slug])]
     #[tokio::test]
     #[parallel]
-    async fn filter_retrieve_with_view_context(#[case] fields: &[SparseTagFieldWithViewContext]) {
+    async fn filter_retrieve_with_view_context(
+        #[case] fields: &[SparseAnyTermFieldWithViewContext],
+    ) {
         let tag = api_client()
-            .tags()
-            .filter_retrieve_with_view_context(&TAG_ID_100, fields)
+            .terms()
+            .filter_retrieve_with_view_context(&TermEndpointType::Tags, &TAG_ID_100, fields)
             .await
             .assert_response()
             .data;

@@ -8,32 +8,6 @@ use crate::{
 };
 use std::sync::Arc;
 
-#[derive(uniffi::Object)]
-struct UniffiJetpackApiRequestBuilder {
-    inner: JetpackApiRequestBuilder,
-}
-
-#[uniffi::export]
-impl UniffiJetpackApiRequestBuilder {
-    #[uniffi::constructor]
-    pub fn new(
-        api_url_resolver: Arc<dyn ApiUrlResolver>,
-        auth_provider: Arc<WpAuthenticationProvider>,
-    ) -> Self {
-        Self {
-            inner: JetpackApiRequestBuilder::new(api_url_resolver, auth_provider),
-        }
-    }
-
-    #[uniffi::constructor]
-    pub fn with_api_root_url(
-        api_root_url: Arc<ParsedUrl>,
-        auth_provider: Arc<WpAuthenticationProvider>,
-    ) -> Self {
-        Self::new(jetpack_api_url_resolver(api_root_url), auth_provider)
-    }
-}
-
 pub struct JetpackApiRequestBuilder {
     connection: Arc<ConnectionRequestBuilder>,
 }

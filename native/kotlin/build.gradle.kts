@@ -32,6 +32,7 @@ allprojects {
         // Exclude generated bindings
         exclude("**/wp_api.kt")
         exclude("**/wp_localization.kt")
+        exclude("**/wp_mobile.kt")
     }
 
     tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
@@ -40,6 +41,7 @@ allprojects {
         // Exclude generated bindings
         exclude("**/wp_api.kt")
         exclude("**/wp_localization.kt")
+        exclude("**/wp_mobile.kt")
     }
 
     dependencies {
@@ -52,9 +54,9 @@ val rustcBinaryPath = resolveBinary("rustc")
 val cargoProjectRoot = "${project.rootDir}/../.."
 val jniLibsPath = "${layout.buildDirectory.get()}/jniLibs/"
 val generatedTestResourcesPath = "${layout.buildDirectory.get()}/generatedTestResources/"
-val rustModuleName = "wp_api"
+val rustPrimaryModule = "wp_mobile"
 val nativeLibraryPath =
-    "$cargoProjectRoot/target/release/lib${rustModuleName}${getNativeLibraryExtension()}"
+    "$cargoProjectRoot/target/release/lib${rustPrimaryModule}${getNativeLibraryExtension()}"
 
 rootProject.ext.set("cargoBinaryPath", cargoBinaryPath)
 rootProject.ext.set("rustcBinaryPath", rustcBinaryPath)
@@ -62,18 +64,18 @@ rootProject.ext.set("cargoProjectRoot", cargoProjectRoot)
 rootProject.ext.set("jniLibsPath", jniLibsPath)
 rootProject.ext.set("generatedTestResourcesPath", generatedTestResourcesPath)
 rootProject.ext.set("nativeLibraryPath", nativeLibraryPath)
-rootProject.ext.set("rustModuleName", rustModuleName)
+rootProject.ext.set("rustPrimaryModule", rustPrimaryModule)
 
 setupJniAndBindings()
 
 // Separated as a function to have everything in a scope and keep it contained
 fun setupJniAndBindings() {
     val nativeLibraryPath =
-        "$cargoProjectRoot/target/release/lib${rustModuleName}${getNativeLibraryExtension()}"
+        "$cargoProjectRoot/target/release/lib${rustPrimaryModule}${getNativeLibraryExtension()}"
 
     val cargoBuildLibraryReleaseTask = tasks.register<Exec>("cargoBuildLibraryRelease") {
         workingDir(rootProject.ext.get("cargoProjectRoot")!!)
-        commandLine(cargoBinaryPath, "build", "--package", rustModuleName, "--release")
+        commandLine(cargoBinaryPath, "build", "--package", rustPrimaryModule, "--release")
         // No inputs.dir added, because we want to always re-run this task and let Cargo handle caching
     }
 

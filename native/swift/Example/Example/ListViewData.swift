@@ -105,9 +105,22 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
     }
 }
 
-extension PostTypeDetailsWithViewContext: ListViewDataConvertable {
+extension PostTypeDetailsWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
+            "REST Base": self.restBase,
+            "Show in Nav": self.visibility.showInNavMenus.description
+        ])
+    }
+}
+
+extension TaxonomyTypeDetailsWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.restBase, fields: [
+            "REST Base": self.restBase,
+            "Show in Nav": self.visibility.showInNavMenus.description
+
+        ])
     }
 }
 
@@ -131,15 +144,24 @@ extension SiteSettingsWithEditContext {
     }
 }
 
-extension PostWithEditContext: ListViewDataConvertable {
+extension AnyPostWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
         ListViewData(id: self.slug, title: self.title.rendered, subtitle: self.slug, fields: [:])
     }
 }
 
-extension PageWithEditContext: ListViewDataConvertable {
+extension AnyPostRevisionWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.title.rendered, subtitle: "", fields: [:])
+        ListViewData(id: self.slug, title: self.title.rendered, subtitle: self.slug, fields: [:])
+    }
+}
+
+extension AnyTermWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
+            "Count": "\(self.count)",
+            "Description": self.description
+        ])
     }
 }
 
@@ -155,7 +177,43 @@ extension MediaWithEditContext: ListViewDataConvertable {
     }
 }
 
-extension [PostWithEditContext] {
+extension PostStatusWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [:])
+    }
+}
+
+extension NavigationWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        return ListViewData(id: self.id.description, title: self.title.rendered, subtitle: self.slug, fields: [:])
+    }
+}
+
+extension NavMenuWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id.description, title: self.name, subtitle: self.slug, fields: [:])
+    }
+}
+
+extension NavMenuItemWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.id.description, title: self.title.rendered, subtitle: self.description, fields: [:])
+    }
+}
+
+extension MenuLocationWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(id: self.name, title: self.name, subtitle: self.description, fields: [:])
+    }
+}
+
+extension [AnyPostWithEditContext] {
+    func asListViewData() -> [ListViewData] {
+        self.map { $0.asListViewData }
+    }
+}
+
+extension [AnyTermWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }
     }

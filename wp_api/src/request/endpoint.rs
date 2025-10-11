@@ -3,25 +3,31 @@ use std::sync::Arc;
 use strum_macros::EnumIter;
 use url::Url;
 
+pub mod api_root_endpoint;
 pub mod application_passwords_endpoint;
-pub mod categories_endpoint;
 pub mod comments_endpoint;
 pub mod media_endpoint;
-pub mod pages_endpoint;
+pub mod menu_locations_endpoint;
+pub mod nav_menu_item_autosaves_endpoint;
+pub mod nav_menu_items_endpoint;
+pub mod nav_menus_endpoint;
+pub mod navigations_endpoint;
 pub mod plugins_endpoint;
 pub mod post_autosaves_endpoint;
 pub mod post_revisions_endpoint;
+pub mod post_statuses_endpoint;
 pub mod post_types_endpoint;
 pub mod posts_endpoint;
 pub mod search_endpoint;
 pub mod site_settings_endpoint;
-pub mod tags_endpoint;
 pub mod taxonomies_endpoint;
 pub mod templates_endpoint;
+pub mod terms_endpoint;
 pub mod themes_endpoint;
 pub mod users_endpoint;
 pub mod widget_types_endpoint;
 pub mod widgets_endpoint;
+pub mod wp_block_editor_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
 pub const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
@@ -91,6 +97,8 @@ pub trait AsNamespace: Send + Sync {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum WpNamespace {
+    None,
+    WpBlockEditorV1,
     WpSiteHealthV1,
     WpV2,
 }
@@ -98,6 +106,8 @@ pub enum WpNamespace {
 impl AsNamespace for WpNamespace {
     fn namespace_value(&self) -> &'static str {
         match self {
+            Self::None => "",
+            Self::WpBlockEditorV1 => "/wp-block-editor/v1",
             Self::WpSiteHealthV1 => "/wp-site-health/v1",
             Self::WpV2 => "/wp/v2",
         }

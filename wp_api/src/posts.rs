@@ -1,10 +1,9 @@
 use crate::{
     UserId, WpApiParamOrder,
-    categories::CategoryId,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     media::MediaId,
-    tags::TagId,
+    terms::TermId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -34,6 +33,7 @@ pub enum WpApiParamPostsOrderBy {
     Id,
     Include,
     IncludeSlugs,
+    MenuOrder,
     Modified,
     Parent,
     Relevance,
@@ -115,7 +115,7 @@ pub struct PostListParams {
     pub order: Option<WpApiParamOrder>,
     /// Sort collection by post attribute.
     /// Default: date
-    /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title
+    /// One of: author, date, id, include, modified, parent, relevance, slug, include_slugs, title, menu_order
     #[uniffi(default = None)]
     #[field_name("orderby")]
     pub orderby: Option<WpApiParamPostsOrderBy>,
@@ -135,19 +135,29 @@ pub struct PostListParams {
     pub tax_relation: Option<WpApiParamPostsTaxRelation>,
     /// Limit result set to items with specific terms assigned in the categories taxonomy.
     #[uniffi(default = [])]
-    pub categories: Vec<CategoryId>,
+    pub categories: Vec<TermId>,
     /// Limit result set to items except those with specific terms assigned in the categories taxonomy.
     #[uniffi(default = [])]
-    pub categories_exclude: Vec<CategoryId>,
+    pub categories_exclude: Vec<TermId>,
     /// Limit result set to items with specific terms assigned in the tags taxonomy.
     #[uniffi(default = [])]
-    pub tags: Vec<TagId>,
+    pub tags: Vec<TermId>,
     /// Limit result set to items except those with specific terms assigned in the tags taxonomy.
     #[uniffi(default = [])]
-    pub tags_exclude: Vec<TagId>,
+    pub tags_exclude: Vec<TermId>,
     /// Limit result set to items that are sticky.
     #[uniffi(default = None)]
     pub sticky: Option<bool>,
+    // Page-specific fields (for hierarchical post types)
+    /// Limit result set to items with a specific parent.
+    #[uniffi(default = None)]
+    pub parent: Option<PostId>,
+    /// Limit result set to items except those of a specific parent.
+    #[uniffi(default = [])]
+    pub parent_exclude: Vec<PostId>,
+    /// Limit result set by menu order.
+    #[uniffi(default = None)]
+    pub menu_order: Option<u32>,
 }
 
 #[derive(Debug, Default, uniffi::Record)]
@@ -166,7 +176,7 @@ impl AppendUrlQueryPairs for PostRetrieveParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct PostDeleteResponse {
     pub deleted: bool,
-    pub previous: PostWithEditContext,
+    pub previous: AnyPostWithEditContext,
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -240,11 +250,20 @@ pub struct PostCreateParams {
     // The terms assigned to the post in the category taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub categories: Vec<CategoryId>,
+    pub categories: Vec<TermId>,
     // The terms assigned to the post in the post_tag taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tags: Vec<TagId>,
+    pub tags: Vec<TermId>,
+    // Page-specific fields (for hierarchical post types)
+    // The ID for the parent of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<PostId>,
+    // The order of the post in relation to other posts.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub menu_order: Option<u32>,
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -318,17 +337,26 @@ pub struct PostUpdateParams {
     // The terms assigned to the post in the category taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub categories: Vec<CategoryId>,
+    pub categories: Vec<TermId>,
     // The terms assigned to the post in the post_tag taxonomy.
     #[uniffi(default = [])]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tags: Vec<TagId>,
+    pub tags: Vec<TermId>,
+    // Page-specific fields (for hierarchical post types)
+    // The ID for the parent of the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<PostId>,
+    // The order of the post in relation to other posts.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub menu_order: Option<u32>,
 }
 
 wp_content_i64_id!(PostId);
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-pub struct SparsePost {
+pub struct SparseAnyPost {
     #[WpContext(edit, embed, view)]
     pub id: Option<PostId>,
     #[WpContext(edit, embed, view)]
@@ -354,8 +382,10 @@ pub struct SparsePost {
     #[WpContext(edit)]
     pub password: Option<String>,
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub permalink_template: Option<String>,
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub generated_slug: Option<String>,
     #[WpContext(edit, embed, view)]
     #[WpContextualField]
@@ -364,28 +394,44 @@ pub struct SparsePost {
     #[WpContextualField]
     pub content: Option<SparsePostContent>,
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub author: Option<UserId>,
     #[WpContext(edit, embed, view)]
-    #[WpContextualField]
+    #[WpContextualOption]
     pub excerpt: Option<SparsePostExcerpt>,
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub featured_media: Option<MediaId>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub comment_status: Option<PostCommentStatus>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub ping_status: Option<PostPingStatus>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub format: Option<PostFormat>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub meta: Option<PostMeta>,
     #[WpContext(edit, view)]
+    #[WpContextualOption]
     pub sticky: Option<bool>,
     #[WpContext(edit, view)]
     pub template: Option<String>,
     #[WpContext(edit, view)]
-    pub categories: Option<Vec<CategoryId>>,
+    #[WpContextualOption]
+    pub categories: Option<Vec<TermId>>,
     #[WpContext(edit, view)]
-    pub tags: Option<Vec<TagId>>,
+    #[WpContextualOption]
+    pub tags: Option<Vec<TermId>>,
+    // Page-specific fields (optional for pages, None for posts)
+    #[WpContext(edit, view)]
+    #[WpContextualOption]
+    pub parent: Option<PostId>,
+    #[WpContext(edit, view)]
+    #[WpContextualOption]
+    pub menu_order: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
@@ -421,15 +467,10 @@ pub struct SparsePostContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct SparsePostExcerpt {
-    #[WpContext(edit)]
-    #[WpContextualOption]
     pub raw: Option<String>,
-    #[WpContext(edit, embed, view)]
     pub rendered: Option<String>,
-    #[WpContext(edit, embed, view)]
-    #[WpContextualOption]
     pub protected: Option<bool>,
 }
 
@@ -580,6 +621,7 @@ mod tests {
     use super::*;
     use crate::{
         SparseField, generate,
+        terms::TermId,
         unit_test_common::{
             assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
             unit_test_example_date_as_query_value,
@@ -630,10 +672,10 @@ mod tests {
     #[case(generate!(PostListParams, (status, vec![PostStatus::Draft, PostStatus::Future, PostStatus::Pending, PostStatus::Private, PostStatus::Publish, PostStatus::Custom("foo".to_string())])), "status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::And))), "tax_relation=AND")]
     #[case(generate!(PostListParams, (tax_relation, Some(WpApiParamPostsTaxRelation::Or))), "tax_relation=OR")]
-    #[case(generate!(PostListParams, (categories, vec![CategoryId(1), CategoryId(2)])), "categories=1%2C2")]
-    #[case(generate!(PostListParams, (categories_exclude, vec![CategoryId(1), CategoryId(2)])), "categories_exclude=1%2C2")]
-    #[case(generate!(PostListParams, (tags, vec![TagId(1), TagId(2)])), "tags=1%2C2")]
-    #[case(generate!(PostListParams, (tags_exclude, vec![TagId(1), TagId(2)])), "tags_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (categories, vec![TermId(1), TermId(2)])), "categories=1%2C2")]
+    #[case(generate!(PostListParams, (categories_exclude, vec![TermId(1), TermId(2)])), "categories_exclude=1%2C2")]
+    #[case(generate!(PostListParams, (tags, vec![TermId(1), TermId(2)])), "tags=1%2C2")]
+    #[case(generate!(PostListParams, (tags_exclude, vec![TermId(1), TermId(2)])), "tags_exclude=1%2C2")]
     #[case(generate!(PostListParams, (sticky, Some(true))), "sticky=true")]
     #[case(
         post_list_params_with_all_fields(),
@@ -645,30 +687,30 @@ mod tests {
     }
 
     #[rstest]
-    #[case(SparsePostFieldWithEditContext::Id, "id")]
-    #[case(SparsePostFieldWithEditContext::PostType, "type")]
+    #[case(SparseAnyPostFieldWithEditContext::Id, "id")]
+    #[case(SparseAnyPostFieldWithEditContext::PostType, "type")]
     fn test_as_mapped_field_name_for_edit_context(
-        #[case] field: SparsePostFieldWithEditContext,
+        #[case] field: SparseAnyPostFieldWithEditContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
-    #[case(SparsePostFieldWithEmbedContext::Id, "id")]
-    #[case(SparsePostFieldWithEmbedContext::PostType, "type")]
+    #[case(SparseAnyPostFieldWithEmbedContext::Id, "id")]
+    #[case(SparseAnyPostFieldWithEmbedContext::PostType, "type")]
     fn test_as_mapped_field_name_for_embed_context(
-        #[case] field: SparsePostFieldWithEmbedContext,
+        #[case] field: SparseAnyPostFieldWithEmbedContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
-    #[case(SparsePostFieldWithViewContext::Id, "id")]
-    #[case(SparsePostFieldWithViewContext::PostType, "type")]
+    #[case(SparseAnyPostFieldWithViewContext::Id, "id")]
+    #[case(SparseAnyPostFieldWithViewContext::PostType, "type")]
     fn test_as_mapped_field_name_for_view_context(
-        #[case] field: SparsePostFieldWithViewContext,
+        #[case] field: SparseAnyPostFieldWithViewContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
@@ -680,7 +722,7 @@ mod tests {
         let before = unit_test_example_date_as_query_value("before");
         let modified_before = unit_test_example_date_as_query_value("modified_before");
         format!(
-            "page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true"
+            "page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true&parent=1&parent_exclude=1%2C2&menu_order=1"
         )
     }
 
@@ -690,8 +732,8 @@ mod tests {
             author: vec![UserId(1), UserId(2)],
             author_exclude: vec![UserId(1), UserId(2)],
             before: unit_test_example_date_as_option(),
-            categories: vec![CategoryId(1), CategoryId(2)],
-            categories_exclude: vec![CategoryId(1), CategoryId(2)],
+            categories: vec![TermId(1), TermId(2)],
+            categories_exclude: vec![TermId(1), TermId(2)],
             exclude: vec![PostId(1), PostId(2)],
             include: vec![PostId(1), PostId(2)],
             modified_after: unit_test_example_date_as_option(),
@@ -717,9 +759,12 @@ mod tests {
                 PostStatus::Custom("foo".to_string()),
             ],
             sticky: Some(true),
-            tags: vec![TagId(1), TagId(2)],
-            tags_exclude: vec![TagId(1), TagId(2)],
+            tags: vec![TermId(1), TermId(2)],
+            tags_exclude: vec![TermId(1), TermId(2)],
             tax_relation: Some(WpApiParamPostsTaxRelation::And),
+            parent: Some(PostId(1)),
+            parent_exclude: vec![PostId(1), PostId(2)],
+            menu_order: Some(1),
         }
     }
 }

@@ -9,7 +9,9 @@ use strum::IntoEnumIterator;
 pub mod extensions;
 pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
+pub mod me_endpoint;
 pub mod oauth2;
+pub mod sites_endpoint;
 pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
 pub mod support_eligibility_endpoint;
@@ -44,6 +46,18 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
                 );
             }
         }
+
+        // The API root endpoint needs special handling for WordPress.com
+        if namespace == WpNamespace::None.namespace_value() && endpoint_segments.is_empty() {
+            let url_string = format!(
+                "https://public-api.wordpress.com/wp-json/?rest_route=/sites/{}/",
+                self.site_id
+            );
+            let parsed_url =
+                ParsedUrl::parse(&url_string).expect("WordPress.com API root URL is valid");
+            return Arc::new(parsed_url);
+        }
+
         Arc::new(
             self.base_url
                 .by_extending_and_splitting_by_forward_slash(

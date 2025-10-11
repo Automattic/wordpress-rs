@@ -20,7 +20,7 @@ public actor WordPressAPI {
     }
 
     private let apiUrlResolver: ApiUrlResolver
-    private let requestExecutor: SafeRequestExecutor
+    let requestExecutor: SafeRequestExecutor
     private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 
@@ -101,6 +101,10 @@ public actor WordPressAPI {
         self.requestBuilder.plugins()
     }
 
+    public var apiRoot: ApiRootRequestExecutor {
+        self.requestBuilder.apiRoot()
+    }
+
     public var applicationPasswords: ApplicationPasswordsRequestExecutor {
         self.requestBuilder.applicationPasswords()
     }
@@ -117,8 +121,12 @@ public actor WordPressAPI {
         self.requestBuilder.posts()
     }
 
-    public var pages: PagesRequestExecutor {
-        self.requestBuilder.pages()
+    public var postStatuses: PostStatusesRequestExecutor {
+        self.requestBuilder.postStatuses()
+    }
+
+    public var revisions: RevisionsRequestExecutor {
+        self.requestBuilder.postRevisions()
     }
 
     public var comments: CommentsRequestExecutor {
@@ -137,12 +145,32 @@ public actor WordPressAPI {
         self.requestBuilder.taxonomies()
     }
 
-    public var tags: TagsRequestExecutor {
-        self.requestBuilder.tags()
+    public var terms: TermsRequestExecutor {
+        self.requestBuilder.terms()
     }
 
-    public var categories: CategoriesRequestExecutor {
-        self.requestBuilder.categories()
+    public var blockEditor: WpBlockEditorRequestExecutor {
+        self.requestBuilder.wpBlockEditor()
+    }
+
+    public var navigations: NavigationRequestExecutor {
+        self.requestBuilder.navigations()
+    }
+
+    public var navMenus: NavMenusRequestExecutor {
+        self.requestBuilder.navMenus()
+    }
+
+    public var navMenuItems: NavMenuItemsRequestExecutor {
+        self.requestBuilder.navMenuItems()
+    }
+
+    public var navMenuAutosaves: NavMenuItemAutosavesRequestExecutor {
+        self.requestBuilder.navMenuItemAutosaves()
+    }
+
+    public var menuLocations: MenuLocationsRequestExecutor {
+        self.requestBuilder.menuLocations()
     }
 
 #if PROGRESS_REPORTING_ENABLED

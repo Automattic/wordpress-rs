@@ -9,7 +9,7 @@ use wp_api::{
     comments::CommentListParams,
     parsed_url::ParsedUrl,
     posts::{PostId, PostRetrieveParams},
-    request::endpoint::WpOrgSiteApiUrlResolver,
+    request::endpoint::{WpOrgSiteApiUrlResolver, posts_endpoint::PostEndpointType},
     wp_com::{WpComBaseUrl, endpoint::WpComDotOrgApiUrlResolver},
 };
 use wp_api::{
@@ -459,7 +459,10 @@ async fn resolve_post_id(client: &WpApiClient, post_url: &str) -> Result<PostId>
         per_page: Some(1),
         ..Default::default()
     };
-    let resp = client.posts().list_with_view_context(&params).await?;
+    let resp = client
+        .posts()
+        .list_with_view_context(&PostEndpointType::Posts, &params)
+        .await?;
     if let Some(p) = resp.data.into_iter().map(|sp| sp.id).next() {
         return Ok(p);
     }
@@ -487,6 +490,7 @@ async fn fetch_post_and_comments(args: FetchPostArgs) -> Result<()> {
     let post = client
         .posts()
         .retrieve_with_view_context(
+            &PostEndpointType::Posts,
             &post_id,
             &PostRetrieveParams {
                 password: args.post_password.clone(),

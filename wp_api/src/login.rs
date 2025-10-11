@@ -1,5 +1,6 @@
 use crate::{
-    login::url_discovery::is_local_dev_environment_url, parsed_url::ParsedUrl, uuid::WpUuid,
+    JsonValue, login::url_discovery::is_local_dev_environment_url, parsed_url::ParsedUrl,
+    uuid::WpUuid,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str, sync::Arc};
@@ -7,6 +8,7 @@ use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 use wp_serde_helper::{
     deserialize_empty_array_or_hashmap, deserialize_false_or_string, deserialize_offset,
+    deserialize_string_vec_or_string_as_option,
 };
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
@@ -66,6 +68,35 @@ pub struct WpApiDetails {
     pub authentication: WpApiDetailsAuthenticationMap,
     #[serde(default, deserialize_with = "deserialize_false_or_string")]
     pub site_icon_url: Option<String>,
+    pub routes: HashMap<String, WpRoute>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+pub struct WpRoute {
+    pub namespace: String,
+    pub methods: Vec<String>,
+    pub endpoints: Vec<WpEndpoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+pub struct WpEndpoint {
+    pub methods: Vec<String>,
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    pub args: HashMap<String, WpEndpointArg>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+pub struct WpEndpointArg {
+    pub required: bool,
+
+    pub default: Option<JsonValue>,
+    pub description: Option<String>,
+    #[serde(deserialize_with = "deserialize_string_vec_or_string_as_option")]
+    #[serde(default)]
+    pub r#type: Option<Vec<String>>,
+    pub r#enum: Option<Vec<JsonValue>>,
+    // There are many other fields that are specific to the type of argument. These are not currently supported because
+    // they're likely to be of limited value to library users. We're open to adding them if there's a demand for them.
 }
 
 impl TryFrom<&[u8]> for WpApiDetails {
@@ -137,6 +168,16 @@ impl WpApiDetails {
     pub fn site_url_is_local_development_environment(&self) -> bool {
         ParsedUrl::parse(self.url.as_str())
             .is_ok_and(|parsed_url| is_local_dev_environment_url(&parsed_url))
+    }
+
+    /// Returns `true` if the site has routes matching the given namespace.
+    pub fn has_namespace(&self, namespace: String) -> bool {
+        self.namespaces.contains(&namespace)
+    }
+
+    /// Returns `true` if the site has the given route.
+    pub fn has_route(&self, route: String) -> bool {
+        self.routes.contains_key(&route)
     }
 }
 
@@ -421,6 +462,8 @@ mod tests {
     #[rstest]
     #[case("api-details/test-case-01.json")]
     #[case("api-details/test-case-02.json")]
+    #[case("api-details/test-case-03.json")]
+    #[case("api-details/test-case-04.json")]
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
@@ -430,6 +473,69 @@ mod tests {
             result.is_ok(),
             "Failed to parse json as `WpApiDetails`: {result:#?}"
         );
+    }
+
+    #[test]
+    fn test_has_namespace() {
+        let json: Vec<u8> =
+            test_json("api-details/test-case-03.json").expect("Failed to read test resource");
+        let result = WpApiDetails::try_from(json.as_slice());
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetails`: {result:#?}"
+        );
+
+        let unwrapped_result = result.unwrap();
+
+        assert!(unwrapped_result.has_namespace("jetpack/v4".to_string()));
+        assert!(!unwrapped_result.has_namespace("jetpack/v2".to_string()));
+    }
+
+    #[rstest]
+    #[case("context", Some(JsonValue::String("edit".to_string())))]
+    #[case("jetpack_blocks_disabled", Some(JsonValue::Bool(false)))]
+    #[case("jetpack_portfolio_posts_per_page", Some(JsonValue::Int(10)))]
+    #[case("show", Some(JsonValue::Array(vec![JsonValue::String("post".to_string())])))]
+    #[case("sharing_services", Some(JsonValue::Object(HashMap::from([("visible".to_string(), JsonValue::Array(vec![JsonValue::String("facebook".to_string()), JsonValue::String("x".to_string())])), ("hidden".to_string(), JsonValue::Array(vec![]))]))))]
+    fn test_route_args(#[case] argument_name: &str, #[case] expected_result: Option<JsonValue>) {
+        let json: Vec<u8> =
+            test_json("api-details/test-case-03.json").expect("Failed to read test resource");
+        let result = WpApiDetails::try_from(json.as_slice());
+
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetails`: {result:#?}"
+        );
+
+        let unwrapped_result = result.unwrap();
+
+        assert!(unwrapped_result.has_route("/jetpack/v4/settings".to_string()));
+        let route = unwrapped_result.routes.get("/jetpack/v4/settings").unwrap();
+
+        let argument = route
+            .endpoints
+            .first()
+            .unwrap()
+            .args
+            .get(argument_name)
+            .unwrap();
+        assert_eq!(argument.default, expected_result);
+    }
+
+    #[test]
+    fn test_has_route() {
+        let json: Vec<u8> =
+            test_json("api-details/test-case-03.json").expect("Failed to read test resource");
+        let result = WpApiDetails::try_from(json.as_slice());
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetails`: {result:#?}"
+        );
+
+        let unwrapped_result = result.unwrap();
+
+        assert!(unwrapped_result.has_route("/jetpack/v4/backup-helper-script".to_string()));
+        assert!(!unwrapped_result.has_route("/jetpack/v4/fake-endpoint".to_string()));
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {

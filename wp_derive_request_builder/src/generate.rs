@@ -39,17 +39,17 @@ fn generate_async_request_executor(
     let generated_request_builder_ident = &config.generated_idents.request_builder;
     let generated_request_executor_ident = &config.generated_idents.request_executor;
 
-    let functions = parsed_enum.variants.iter().map(|variant| {
+    let (exported_functions, unexported_functions) = parsed_enum.variants.iter().fold((vec![], vec![]), |(mut exported, mut unexported), variant| {
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
 
-        ContextAndFilterHandler::from_request_type(
+        (exported, unexported) = ContextAndFilterHandler::from_request_type(
             variant.attr.request_type,
             variant.attr.filter_by.clone(),
             &variant.attr.available_contexts,
         )
         .into_iter()
-        .map(|context_and_filter_handler| {
+        .fold((exported, unexported), |(mut exported, mut unexported), context_and_filter_handler| {
             let request_from_request_builder = fn_body_get_request_from_request_builder(
                 &variant.variant_ident,
                 url_parts,
@@ -65,20 +65,28 @@ fn generate_async_request_executor(
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
+            let fn_signature_cancellable = append_context_param(fn_signature.clone());
+            let fn_signature_body = invoke_cancellation_variant(fn_signature.clone());
             let response_type_ident = ident_response_type(
                 &parsed_enum.enum_ident,
                 &variant.variant_ident,
                 &context_and_filter_handler,
             );
-            quote! {
+
+            let uncancellable = quote! {
                 pub async #fn_signature -> Result<#response_type_ident, #error_type> {
+                    #fn_signature_body
+                }
+            };
+            let cancellable = quote! {
+                pub async #fn_signature_cancellable -> Result<#response_type_ident, #error_type> {
                     use #crate_ident::api_error::MaybeWpError;
                     use #crate_ident::middleware::PerformsRequests;
                     use #crate_ident::request::NetworkRequestAccessor;
                     let perform_request = async || {
                         #request_from_request_builder
                         let request_url: String = request.url().into();
-                        let response = self.perform(std::sync::Arc::new(request)).await?;
+                        let response = self.perform(std::sync::Arc::new(request), context.clone()).await?;
                         let response_status_code = response.status_code;
                         let parsed_response = response.parse();
                         let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default());
@@ -106,9 +114,20 @@ fn generate_async_request_executor(
 
                     parsed_response
                }
+            };
+
+            if cfg!(feature = "export-uncancellable-endpoints") {
+                exported.push(cancellable);
+                unexported.push(uncancellable);
+            } else {
+                unexported.push(cancellable);
+                exported.push(uncancellable);
             }
-        })
-        .collect::<TokenStream>()
+
+            (exported, unexported)
+        });
+
+        (exported, unexported)
     });
 
     let generated_return_types = parsed_enum.variants.iter().map(|variant| {
@@ -180,7 +199,6 @@ fn generate_async_request_executor(
                     }
                 }
 
-                #[uniffi::export]
                 fn #fn_parse_as_response_type_ident(response: #crate_ident::request::WpNetworkResponse) -> Result<#response_type_ident, #error_type> {
                     response.parse()
                 }
@@ -214,11 +232,19 @@ fn generate_async_request_executor(
         }
         #[uniffi::export]
         impl #generated_request_executor_ident {
-            #(#functions)*
+            #(#exported_functions)*
 
             pub async fn fetch_authentication_state(&self) -> Result<#crate_ident::request::AuthenticationState, #error_type> {
                 #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_url_resolver.clone(), self.delegate.auth_provider.clone()).await
             }
+
+            pub fn cancel(&self, context: std::sync::Arc<crate::request::RequestContext>) {
+                self.delegate.request_executor.cancel(context);
+            }
+        }
+
+        impl #generated_request_executor_ident {
+            #(#unexported_functions)*
         }
     }
 }
@@ -270,7 +296,6 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     });
 
     quote! {
-        #[derive(uniffi::Object)]
         pub struct #generated_request_builder_ident {
             endpoint: #generated_endpoint_ident,
             inner: #static_inner_request_builder_type,
@@ -283,7 +308,6 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 }
             }
         }
-        #[uniffi::export]
         impl #generated_request_builder_ident {
             #(#functions)*
         }

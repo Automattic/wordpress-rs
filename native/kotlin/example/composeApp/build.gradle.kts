@@ -18,18 +18,25 @@ tasks.withType<KotlinJvmCompile>().configureEach {
   }
 }
 
+// Desktop resources path - separate from integration test resources to avoid IDE conflicts
+val desktopResourcesPath = layout.buildDirectory.dir("desktopResources")
+
+// Copy resources needed for desktop app
+val copyDesktopAppResources = tasks.register<Copy>("copyDesktopAppResources") {
+    dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
+    dependsOn(rootProject.tasks.named("copyTestCredentials"))
+    from(rootProject.ext.get("jniLibsPath"))
+    from(rootProject.ext.get("generatedTestResourcesPath"))
+    into(desktopResourcesPath)
+}
+
 kotlin {
     androidTarget()
     jvm("desktop")
 
     sourceSets {
         val desktopMain by getting {
-            resources.srcDirs(
-                listOf(
-                    rootProject.ext.get("jniLibsPath"),
-                    rootProject.ext.get("generatedTestResourcesPath")
-                )
-            )
+            resources.srcDirs(desktopResourcesPath)
         }
 
         androidMain.dependencies {
@@ -71,7 +78,6 @@ android {
 
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
-    sourceSets["main"].resources.srcDirs("src/commonMain/resources")
 
     defaultConfig {
         applicationId = "rs.wordpress.example"
@@ -106,6 +112,11 @@ compose.desktop {
     application {
         mainClass = "rs.wordpress.example.MainKt"
 
+        jvmArgs += listOf(
+            "-Djna.library.path=.",
+            "-Djava.library.path=."
+        )
+
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "rs.wordpress.example"
@@ -114,7 +125,87 @@ compose.desktop {
     }
 }
 
+// Generate BuildConfig with rust module name
+val generateBuildConfig = tasks.register("generateBuildConfig") {
+    val outputDir = layout.buildDirectory.dir("generated/source/buildConfig")
+    val rustPrimaryModule = rootProject.ext.get("rustPrimaryModule") as String
+
+    outputs.dir(outputDir)
+
+    doLast {
+        val buildConfigFile = outputDir.get().file("rs/wordpress/example/BuildConfig.kt").asFile
+        buildConfigFile.parentFile.mkdirs()
+        buildConfigFile.writeText("""
+            package rs.wordpress.example
+
+            object BuildConfig {
+                const val RUST_PRIMARY_MODULE = "$rustPrimaryModule"
+            }
+        """.trimIndent())
+    }
+}
+
+// Generate TestCredentials from test_credentials.json
+val generateTestCredentials = tasks.register("generateTestCredentials") {
+    val outputDir = layout.buildDirectory.dir("generated/source/testCredentials")
+    val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot") as String
+    val credentialsFile = file("$cargoProjectRoot/test_credentials.json")
+
+    // Only mark as input if file exists - allows build to work without test server running
+    inputs.files(credentialsFile).optional(true)
+    outputs.dir(outputDir)
+
+    doLast {
+        val testCredentialsFile = outputDir.get().file("rs/wordpress/example/TestCredentials.kt").asFile
+        testCredentialsFile.parentFile.mkdirs()
+
+        if (credentialsFile.exists()) {
+            val json = groovy.json.JsonSlurper().parseText(credentialsFile.readText()) as Map<*, *>
+            testCredentialsFile.writeText("""
+                package rs.wordpress.example
+
+                object TestCredentials {
+                    val SITE_URL: String? = "${json["site_url"]}"
+                    val ADMIN_USERNAME: String? = "${json["admin_username"]}"
+                    val ADMIN_PASSWORD: String? = "${json["admin_password"]}"
+                    val SUBSCRIBER_USERNAME: String? = "${json["subscriber_username"]}"
+                    val SUBSCRIBER_PASSWORD: String? = "${json["subscriber_password"]}"
+                }
+            """.trimIndent())
+        } else {
+            testCredentialsFile.writeText("""
+                package rs.wordpress.example
+
+                object TestCredentials {
+                    val SITE_URL: String? = null
+                    val ADMIN_USERNAME: String? = null
+                    val ADMIN_PASSWORD: String? = null
+                    val SUBSCRIBER_USERNAME: String? = null
+                    val SUBSCRIBER_PASSWORD: String? = null
+                }
+            """.trimIndent())
+        }
+    }
+}
+
+kotlin.sourceSets.getByName("desktopMain") {
+    kotlin.srcDir(layout.buildDirectory.dir("generated/source/buildConfig"))
+}
+
+kotlin.sourceSets.getByName("commonMain") {
+    kotlin.srcDir(layout.buildDirectory.dir("generated/source/testCredentials"))
+}
+
+tasks.named("compileKotlinDesktop").configure {
+    dependsOn(generateBuildConfig)
+    dependsOn(generateTestCredentials)
+}
+
+// Ensure test credentials are generated before any Android compilation
+tasks.named("preBuild").configure {
+    dependsOn(generateTestCredentials)
+}
+
 tasks.named("desktopProcessResources").configure {
-    dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
-    dependsOn(rootProject.tasks.named("copyTestCredentials"))
+    dependsOn(copyDesktopAppResources)
 }

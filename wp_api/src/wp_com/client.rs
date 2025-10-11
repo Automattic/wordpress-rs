@@ -3,6 +3,7 @@ use super::endpoint::{
     jetpack_connection_endpoint::{
         JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
     },
+    me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
@@ -12,32 +13,24 @@ use super::endpoint::{
     support_tickets_endpoint::{SupportTicketsRequestBuilder, SupportTicketsRequestExecutor},
 };
 use crate::{
-    api_client::WpApiClientDelegate, api_client_generate_api_client,
-    api_client_generate_endpoint_impl, api_client_generate_request_builder,
-    auth::WpAuthenticationProvider, request::endpoint::ApiUrlResolver,
-    wp_com::endpoint::WpComApiClientInternalUrlResolver,
+    api_client::WpApiClientDelegate,
+    api_client_generate_api_client, api_client_generate_endpoint_impl,
+    api_client_generate_request_builder,
+    auth::WpAuthenticationProvider,
+    request::endpoint::ApiUrlResolver,
+    wp_com::endpoint::{
+        WpComApiClientInternalUrlResolver,
+        sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
+    },
 };
 use std::sync::Arc;
-
-#[derive(uniffi::Object)]
-struct UniffiWpComApiRequestBuilder {
-    inner: WpComApiRequestBuilder,
-}
-
-#[uniffi::export]
-impl UniffiWpComApiRequestBuilder {
-    #[uniffi::constructor]
-    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
-        Self {
-            inner: WpComApiRequestBuilder::new(auth_provider),
-        }
-    }
-}
 
 pub struct WpComApiRequestBuilder {
     followers: Arc<FollowersRequestBuilder>,
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
+    me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
+    sites: Arc<SitesRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
     support_eligibility: Arc<SupportEligibilityRequestBuilder>,
@@ -53,7 +46,9 @@ impl WpComApiRequestBuilder {
             auth_provider;
             followers,
             jetpack_connection,
+            me,
             oauth2,
+            sites,
             subscribers,
             support_bots,
             support_eligibility,
@@ -80,7 +75,9 @@ impl UniffiWpComApiClient {
 pub struct WpComApiClient {
     followers: Arc<FollowersRequestExecutor>,
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
+    me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
+    sites: Arc<SitesRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
     support_eligibility: Arc<SupportEligibilityRequestExecutor>,
@@ -97,7 +94,9 @@ impl WpComApiClient {
             delegate;
             followers,
             jetpack_connection,
+            me,
             oauth2,
+            sites,
             subscribers,
             support_bots,
             support_eligibility,
@@ -107,7 +106,9 @@ impl WpComApiClient {
 }
 api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
+api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
+api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
 api_client_generate_endpoint_impl!(WpComApi, support_eligibility);

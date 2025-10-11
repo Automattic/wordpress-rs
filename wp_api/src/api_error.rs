@@ -198,12 +198,14 @@ pub enum WpErrorCode {
     CannotManageTemplates,
     #[serde(rename = "rest_cannot_manage_widgets")]
     CannotManageWidgets,
-    #[serde(rename = "rest_cannot_read_application_password")]
-    CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_read")]
     CannotRead,
+    #[serde(rename = "rest_cannot_read_application_password")]
+    CannotReadApplicationPassword,
     #[serde(rename = "rest_cannot_read_post")]
     CannotReadPost,
+    #[serde(rename = "rest_cannot_read_status")]
+    CannotReadStatus,
     #[serde(rename = "rest_cannot_update")]
     CannotUpdate,
     #[serde(rename = "rest_cannot_view")]
@@ -262,12 +264,18 @@ pub enum WpErrorCode {
     InvalidAuthor,
     #[serde(rename = "rest_invalid_field")]
     InvalidField,
+    #[serde(rename = "rest_invalid_menu_location")]
+    InvalidMenuLocation,
     #[serde(rename = "rest_invalid_param")]
     InvalidParam,
     #[serde(rename = "rest_invalid_template")]
     InvalidTemplate,
     #[serde(rename = "rest_invalid_widget")]
     InvalidWidget,
+    #[serde(rename = "menu_exists")]
+    MenuExists,
+    #[serde(rename = "rest_menu_location_invalid")]
+    MenuLocationInvalid,
     #[serde(rename = "rest_no_search_term_defined")]
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
@@ -282,18 +290,26 @@ pub enum WpErrorCode {
     PostInvalidPageNumber,
     #[serde(rename = "rest_post_invalid_parent")]
     PostInvalidParent,
+    #[serde(rename = "rest_post_invalid_type")]
+    PostInvalidType,
     #[serde(rename = "rest_post_no_autosave")]
     PostNoAutosave,
     #[serde(rename = "rest_revision_invalid_offset_number")]
     RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_revision_invalid_page_number")]
     RevisionInvalidPageNumber,
+    #[serde(rename = "rest_status_invalid")]
+    StatusInvalid,
     #[serde(rename = "rest_taxonomy_invalid")]
     TaxonomyInvalid,
     #[serde(rename = "rest_template_not_found")]
     TemplateNotFound,
     #[serde(rename = "rest_term_invalid")]
     TermInvalid,
+    #[serde(rename = "rest_title_required")]
+    TitleRequired,
+    #[serde(rename = "rest_term_invalid_id")]
+    TermInvalidId,
     #[serde(rename = "rest_theme_not_found")]
     ThemeNotFound,
     #[serde(rename = "rest_type_invalid")]
@@ -393,6 +409,8 @@ pub enum WpErrorCode {
     UploadSideloadError,
     #[serde(rename = "rest_upload_user_quota_exceeded")]
     UploadUserQuotaExceeded,
+    #[serde(rename = "rest_url_required")]
+    UrlRequired,
     #[serde(rename = "rest_user_cannot_delete_post")]
     UserCannotDeletePost, // See `rest_cannot_delete` instead
     #[serde(rename = "rest_unknown_attachment")]
@@ -427,6 +445,12 @@ pub enum WpErrorCode {
     // If a `comment_type` parameter is passed while creating / editing a comment.
     #[serde(rename = "rest_invalid_comment_type")]
     InvalidCommentType,
+    // If a menu item URL fails sanitize_url() validation (e.g., javascript: protocol).
+    // Defined in schema validation callback (https://github.com/WordPress/WordPress/blob/6.8/wp-includes/rest-api/endpoints/class-wp-rest-menu-items-controller.php#L881-L884),
+    // but WordPress wraps validation errors in `rest_invalid_param` before returning them.
+    // See: https://github.com/WordPress/WordPress/blob/6.8/wp-includes/rest-api/class-wp-rest-request.php#L936-L953
+    #[serde(rename = "rest_invalid_url")]
+    InvalidUrl,
     // If the create post request includes an id.
     #[serde(rename = "rest_post_exists")]
     PostExists,

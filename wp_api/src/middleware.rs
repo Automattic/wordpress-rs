@@ -1,6 +1,7 @@
 use crate::{
     api_client::IsWpApiClientDelegate,
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
+    request::RequestContext,
     request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
@@ -22,12 +23,18 @@ impl WpApiMiddlewarePipeline {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
         for middleware in &self.middlewares {
             response = middleware
-                .process(request_executor.clone(), response, request.clone())
+                .process(
+                    request_executor.clone(),
+                    response,
+                    request.clone(),
+                    context.clone(),
+                )
                 .await?;
         }
 
@@ -71,6 +78,7 @@ pub trait WpApiMiddleware: Send + Sync + Debug {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 }
 
@@ -84,7 +92,12 @@ pub trait PerformsRequests {
     async fn perform(
         &self,
         request: Arc<WpNetworkRequest>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        if let Some(context) = &context {
+            context.add_request_id(request.uuid.clone());
+        }
+
         let pipeline = &self.get_middleware_pipeline();
         let response = self.get_request_executor().execute(request.clone()).await?;
 
@@ -93,6 +106,7 @@ pub trait PerformsRequests {
                 self.get_request_executor().clone(),
                 response,
                 request.clone(),
+                context.clone(),
             )
             .await?;
 
@@ -153,6 +167,7 @@ impl WpApiMiddleware for RetryAfterMiddleware {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut response = response;
 
@@ -176,8 +191,12 @@ impl WpApiMiddleware for RetryAfterMiddleware {
                 )
                 .await;
             let new_request = Arc::new(request.clone_with_incremented_retry_count());
+            if let Some(context) = &context {
+                context.add_request_id(new_request.uuid.clone());
+            }
             response = request_executor.execute(new_request.clone()).await?;
-            self.process(request_executor, response, new_request).await
+            self.process(request_executor, response, new_request, context)
+                .await
         } else {
             // We have no idea how long to wait so we shouldn't try
             Ok(response)
@@ -210,6 +229,7 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
         request_executor: Arc<dyn RequestExecutor>,
         response: WpNetworkResponse,
         request: Arc<WpNetworkRequest>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         if response.request_header_map.has_http_authentication() {
             // Request was already authenticated
@@ -218,6 +238,10 @@ impl WpApiMiddleware for ApiDiscoveryAuthenticationMiddleware {
 
         if response.status_code != 401 && response.status_code != 403 {
             return Ok(response);
+        }
+
+        if let Some(context) = &context {
+            context.add_request_id(request.uuid.clone());
         }
 
         request_executor
@@ -276,6 +300,8 @@ mod tests {
             }
 
             async fn sleep(&self, _: u64) {}
+
+            fn cancel(&self, _: Arc<RequestContext>) {}
         }
 
         #[tokio::test]
@@ -364,6 +390,7 @@ mod tests {
                         request_header_map: Arc::new(map.into()),
                     },
                     WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
+                    None,
                 )
                 .await
         }
@@ -424,6 +451,8 @@ mod tests {
             }
 
             async fn sleep(&self, _: u64) {}
+
+            fn cancel(&self, _: Arc<RequestContext>) {}
         }
 
         #[tokio::test]
@@ -460,6 +489,7 @@ mod tests {
                     Arc::new(foo_executor),
                     rate_limit_exceeded_response(),
                     WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
+                    None,
                 )
                 .await
         }

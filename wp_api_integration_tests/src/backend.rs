@@ -1,8 +1,5 @@
 use serde::{Serialize, de::DeserializeOwned};
-use wp_api::{
-    categories::CategoryId, comments::CommentId, pages::PageId, posts::PostId, tags::TagId,
-    users::UserId,
-};
+use wp_api::{comments::CommentId, posts::PostId, terms::TermId, users::UserId};
 use wp_cli::{
     WpCliCategory, WpCliComment, WpCliPage, WpCliPost, WpCliSiteSettings, WpCliTag, WpCliUser,
     WpCliUserMeta,
@@ -33,7 +30,7 @@ impl Backend {
         let url = format!("{}{}", BACKEND_ADDRESS, path.as_ref());
         reqwest::get(url).await?.json().await
     }
-    pub async fn category(category_id: &CategoryId) -> WpCliCategory {
+    pub async fn category(category_id: &TermId) -> WpCliCategory {
         Self::get(format!("{BACKEND_PATH_CATEGORY}?category_id={category_id}"))
             .await
             .expect("Failed to parse fetched category from wp_cli")
@@ -61,7 +58,7 @@ impl Backend {
     pub async fn site_settings() -> Result<WpCliSiteSettings, reqwest::Error> {
         Self::get(BACKEND_PATH_SITE_SETTINGS).await
     }
-    pub async fn page(page_id: &PageId) -> WpCliPage {
+    pub async fn page(page_id: &PostId) -> WpCliPage {
         Self::get(format!("{BACKEND_PATH_PAGE}?page_id={page_id}"))
             .await
             .expect("Failed to parse fetched page from wp_cli")
@@ -91,7 +88,7 @@ impl Backend {
             .await
             .expect("Failed to parse fetched posts from wp_cli")
     }
-    pub async fn tag(tag_id: &TagId) -> WpCliTag {
+    pub async fn tag(tag_id: &TermId) -> WpCliTag {
         Self::get(format!("{BACKEND_PATH_TAG}?tag_id={tag_id}"))
             .await
             .expect("Failed to parse fetched tag from wp_cli")

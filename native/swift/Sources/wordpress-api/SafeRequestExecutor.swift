@@ -75,6 +75,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             }
     }
 
+    public func cancel(context: RequestContext) {
+        for requestId in context.requestIds() {
+            Task {
+                await self.cancelRequest(withId: requestId)
+            }
+        }
+    }
+
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
             let (data, response) = try await request.perform(
@@ -130,6 +138,26 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .eraseToAnyPublisher()
     }
 #endif
+
+    private func cancelRequest(withId requestId: String) async {
+#if canImport(Combine)
+        var task = (await self.session.allTasks).first {
+            $0.originalRequest?.requestId == requestId
+        }
+
+        if task == nil {
+            task = await NotificationCenter.default
+                .publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
+                .compactMap { $0.object as? URLSessionTask }
+                .first { $0.originalRequest?.requestId == requestId }
+                .timeout(.seconds(1), scheduler: DispatchQueue.global())
+                .values
+                .first { _ in true }
+        }
+
+        task?.cancel()
+#endif
+    }
 
     private func handleHttpsError(
         _ error: Error,

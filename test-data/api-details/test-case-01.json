@@ -9,6 +9,7 @@
     "oembed/1.0"
   ],
   "authentication": [],
+  "routes": {},
   "site_logo": 0,
   "site_icon": 26343,
   "site_icon_url": false

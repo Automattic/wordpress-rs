@@ -1,8 +1,9 @@
 use macro_helper::{generate_update_page_status_test, generate_update_test};
-use wp_api::pages::{
-    PageCommentStatus, PageCreateParams, PageFootnote, PageMeta, PagePingStatus, PageStatus,
-    PageUpdateParams, PageWithEditContext,
+use wp_api::posts::{
+    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostMeta,
+    PostPingStatus, PostStatus, PostUpdateParams,
 };
+use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::{PAGE_TEMPLATE_WITH_SIDEBAR, prelude::*};
 use wp_cli::WpCliPage;
 
@@ -10,7 +11,7 @@ use wp_cli::WpCliPage;
 #[serial]
 async fn create_page_with_just_title() {
     test_create_page(
-        &PageCreateParams {
+        &PostCreateParams {
             title: Some("foo".to_string()),
             ..Default::default()
         },
@@ -26,10 +27,10 @@ async fn create_page_with_just_title() {
 #[serial]
 async fn create_page_with_title_and_meta() {
     test_create_page(
-        &PageCreateParams {
+        &PostCreateParams {
             title: Some("foo".to_string()),
-            meta: Some(PageMeta {
-                footnotes: vec![PageFootnote {
+            meta: Some(PostMeta {
+                footnotes: vec![PostFootnote {
                     id: "bar".to_string(),
                     content: "baz".to_string(),
                 }],
@@ -37,7 +38,8 @@ async fn create_page_with_title_and_meta() {
             ..Default::default()
         },
         |created_page, page_from_wp_cli| {
-            let footnote = created_page.meta.footnotes.first().unwrap();
+            let meta = created_page.meta.unwrap();
+            let footnote = meta.footnotes.first().unwrap();
             assert_eq!(created_page.title.raw, Some("foo".to_string()));
             assert_eq!(page_from_wp_cli.title, "foo");
             assert_eq!(footnote.id, "bar");
@@ -51,7 +53,7 @@ async fn create_page_with_title_and_meta() {
 #[serial]
 async fn create_page_with_just_content() {
     test_create_page(
-        &PageCreateParams {
+        &PostCreateParams {
             content: Some("foo".to_string()),
             ..Default::default()
         },
@@ -67,12 +69,12 @@ async fn create_page_with_just_content() {
 #[serial]
 async fn create_page_with_just_excerpt() {
     test_create_page(
-        &PageCreateParams {
+        &PostCreateParams {
             excerpt: Some("foo".to_string()),
             ..Default::default()
         },
         |created_page, page_from_wp_cli| {
-            assert_eq!(created_page.excerpt.raw, Some("foo".to_string()));
+            assert_eq!(created_page.excerpt.unwrap().raw, Some("foo".to_string()));
             assert_eq!(page_from_wp_cli.excerpt, "foo");
         },
     )
@@ -83,7 +85,7 @@ async fn create_page_with_just_excerpt() {
 #[serial]
 async fn create_page_with_title_content_and_excerpt() {
     test_create_page(
-        &PageCreateParams {
+        &PostCreateParams {
             title: Some("foo".to_string()),
             content: Some("bar".to_string()),
             excerpt: Some("baz".to_string()),
@@ -94,7 +96,7 @@ async fn create_page_with_title_content_and_excerpt() {
             assert_eq!(page_from_wp_cli.title, "foo");
             assert_eq!(created_page.content.raw, Some("bar".to_string()));
             assert_eq!(page_from_wp_cli.content, "bar");
-            assert_eq!(created_page.excerpt.raw, Some("baz".to_string()));
+            assert_eq!(created_page.excerpt.unwrap().raw, Some("baz".to_string()));
             assert_eq!(page_from_wp_cli.excerpt, "baz");
         },
     )
@@ -106,8 +108,11 @@ async fn create_page_with_title_content_and_excerpt() {
 async fn delete_page() {
     // Delete the page using the API and ensure it's successful
     let page_delete_response = api_client()
-        .pages()
-        .delete(&PageId(TestCredentials::instance().first_page_id))
+        .posts()
+        .delete(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+        )
         .await;
     assert!(page_delete_response.is_ok(), "{page_delete_response:#?}");
     assert!(page_delete_response.unwrap().data.deleted);
@@ -117,7 +122,7 @@ async fn delete_page() {
         !Backend::pages(None)
             .await
             .into_iter()
-            .any(|p| p.id == PageId(TestCredentials::instance().first_page_id).0),
+            .any(|p| p.id == PostId(TestCredentials::instance().first_page_id).0),
         "Page wasn't deleted"
     );
 
@@ -129,8 +134,11 @@ async fn delete_page() {
 async fn trash_page() {
     // Trash the page using the API and ensure it's successful
     let page_trash_response = api_client()
-        .pages()
-        .trash(&PageId(TestCredentials::instance().first_page_id))
+        .posts()
+        .trash(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+        )
         .await;
     assert!(page_trash_response.is_ok(), "{page_trash_response:#?}");
 
@@ -138,7 +146,7 @@ async fn trash_page() {
     let trashed_page = Backend::pages(Some("trash"))
         .await
         .into_iter()
-        .find(|p| p.id == PageId(TestCredentials::instance().first_page_id).0);
+        .find(|p| p.id == PostId(TestCredentials::instance().first_page_id).0);
     assert!(trashed_page.is_some(), "Can't find the trashed page");
     assert_eq!(
         trashed_page.unwrap().post_status,
@@ -217,7 +225,7 @@ generate_update_test!(
     author,
     SECOND_USER_ID,
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.author, SECOND_USER_ID);
+        assert_eq!(updated_page.author, Some(SECOND_USER_ID));
         assert_eq!(updated_page_from_wp_cli.author, SECOND_USER_ID.0);
     }
 );
@@ -227,7 +235,10 @@ generate_update_test!(
     excerpt,
     "new_excerpt".to_string(),
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.excerpt.raw, Some("new_excerpt".to_string()));
+        assert_eq!(
+            updated_page.excerpt.unwrap().raw,
+            Some("new_excerpt".to_string())
+        );
         assert_eq!(updated_page_from_wp_cli.excerpt, "new_excerpt");
     }
 );
@@ -237,19 +248,19 @@ generate_update_test!(
     featured_media,
     MEDIA_ID_611,
     |updated_page, _| {
-        assert_eq!(updated_page.featured_media, MEDIA_ID_611);
+        assert_eq!(updated_page.featured_media, Some(MEDIA_ID_611));
     }
 );
 
 generate_update_test!(
     update_comment_status_to_open,
     comment_status,
-    PageCommentStatus::Open,
+    PostCommentStatus::Open,
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.comment_status, PageCommentStatus::Open);
+        assert_eq!(updated_page.comment_status, Some(PostCommentStatus::Open));
         assert_eq!(
             updated_page_from_wp_cli.comment_status,
-            PageCommentStatus::Open.to_string()
+            PostCommentStatus::Open.to_string()
         );
     }
 );
@@ -257,12 +268,12 @@ generate_update_test!(
 generate_update_test!(
     update_comment_status_to_closed,
     comment_status,
-    PageCommentStatus::Closed,
+    PostCommentStatus::Closed,
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.comment_status, PageCommentStatus::Closed);
+        assert_eq!(updated_page.comment_status, Some(PostCommentStatus::Closed));
         assert_eq!(
             updated_page_from_wp_cli.comment_status,
-            PageCommentStatus::Closed.to_string()
+            PostCommentStatus::Closed.to_string()
         );
     }
 );
@@ -270,12 +281,12 @@ generate_update_test!(
 generate_update_test!(
     update_ping_status_to_open,
     ping_status,
-    PagePingStatus::Open,
+    PostPingStatus::Open,
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.ping_status, PagePingStatus::Open);
+        assert_eq!(updated_page.ping_status, Some(PostPingStatus::Open));
         assert_eq!(
             updated_page_from_wp_cli.ping_status,
-            PagePingStatus::Open.to_string()
+            PostPingStatus::Open.to_string()
         );
     }
 );
@@ -283,12 +294,12 @@ generate_update_test!(
 generate_update_test!(
     update_ping_status_to_closed,
     ping_status,
-    PagePingStatus::Closed,
+    PostPingStatus::Closed,
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.ping_status, PagePingStatus::Closed);
+        assert_eq!(updated_page.ping_status, Some(PostPingStatus::Closed));
         assert_eq!(
             updated_page_from_wp_cli.ping_status,
-            PagePingStatus::Closed.to_string()
+            PostPingStatus::Closed.to_string()
         );
     }
 );
@@ -296,15 +307,17 @@ generate_update_test!(
 generate_update_test!(
     update_parent,
     parent,
-    PageId(TestCredentials::instance().password_protected_page_id),
+    PostId(TestCredentials::instance().password_protected_page_id),
     |updated_page, updated_page_from_wp_cli| {
         assert_eq!(
             updated_page.parent,
-            PageId(TestCredentials::instance().password_protected_page_id)
+            Some(PostId(
+                TestCredentials::instance().password_protected_page_id
+            ))
         );
         assert_eq!(
             updated_page_from_wp_cli.parent,
-            PageId(TestCredentials::instance().password_protected_page_id).0
+            PostId(TestCredentials::instance().password_protected_page_id).0
         );
     }
 );
@@ -314,7 +327,7 @@ generate_update_test!(
     menu_order,
     5u32,
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.menu_order, 5);
+        assert_eq!(updated_page.menu_order, Some(5));
         assert_eq!(updated_page_from_wp_cli.menu_order, 5);
     }
 );
@@ -331,14 +344,15 @@ generate_update_test!(
 generate_update_test!(
     update_meta_to_add_footnote,
     meta,
-    PageMeta {
-        footnotes: vec![PageFootnote {
+    PostMeta {
+        footnotes: vec![PostFootnote {
             id: "foo".to_string(),
             content: "bar".to_string()
         }]
     },
     |updated_page, _| {
-        let footnote = updated_page.meta.footnotes.first().unwrap();
+        let meta = updated_page.meta.unwrap();
+        let footnote = meta.footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");
     }
@@ -348,36 +362,36 @@ generate_update_test!(
 #[serial]
 async fn update_status_to_future() {
     test_update_page(
-        &PageUpdateParams {
-            status: Some(PageStatus::Future),
+        &PostUpdateParams {
+            status: Some(PostStatus::Future),
             // Publish date has to be in the future
             date: Some("2026-09-09T12:00:00".to_string()),
             ..Default::default()
         },
         |updated_page, updated_page_from_wp_cli| {
-            assert_eq!(updated_page.status, PageStatus::Future);
+            assert_eq!(updated_page.status, PostStatus::Future);
             assert_eq!(
                 updated_page_from_wp_cli.post_status,
-                PageStatus::Future.to_string()
+                PostStatus::Future.to_string()
             );
         },
     )
     .await;
 }
 
-// See `update_status_to_future` test case for `PageStatus::Future`
+// See `update_status_to_future` test case for `PostStatus::Future`
 generate_update_page_status_test!(Draft);
 generate_update_page_status_test!(Pending);
 generate_update_page_status_test!(Private);
 generate_update_page_status_test!(Publish);
 
-async fn test_create_page<F>(params: &PageCreateParams, assert: F)
+async fn test_create_page<F>(params: &PostCreateParams, assert: F)
 where
-    F: Fn(PageWithEditContext, WpCliPage),
+    F: Fn(AnyPostWithEditContext, WpCliPage),
 {
     let created_page = api_client()
-        .pages()
-        .create(params)
+        .posts()
+        .create(&PostEndpointType::Pages, params)
         .await
         .assert_response()
         .data;
@@ -386,18 +400,22 @@ where
     RestoreServer::db().await;
 }
 
-async fn test_update_page<F>(params: &PageUpdateParams, assert: F)
+async fn test_update_page<F>(params: &PostUpdateParams, assert: F)
 where
-    F: Fn(PageWithEditContext, WpCliPage),
+    F: Fn(AnyPostWithEditContext, WpCliPage),
 {
     let updated_page = api_client()
-        .pages()
-        .update(&PageId(TestCredentials::instance().first_page_id), params)
+        .posts()
+        .update(
+            &PostEndpointType::Pages,
+            &PostId(TestCredentials::instance().first_page_id),
+            params,
+        )
         .await
         .assert_response()
         .data;
     let updated_page_from_wp_cli =
-        Backend::page(&PageId(TestCredentials::instance().first_page_id)).await;
+        Backend::page(&PostId(TestCredentials::instance().first_page_id)).await;
     assert(updated_page, updated_page_from_wp_cli);
     RestoreServer::db().await;
 }
@@ -411,7 +429,7 @@ mod macro_helper {
                 async fn $ident() {
                     let updated_value = $new_value;
                     test_update_page(
-                        &PageUpdateParams {
+                        &PostUpdateParams {
                             $field: Some(updated_value),
                             ..Default::default()
                         }, $assertion)
@@ -428,15 +446,15 @@ mod macro_helper {
                 #[serial]
                 async fn [<update_page_status_to_ $status:lower>]() {
                     test_update_page(
-                        &PageUpdateParams {
-                            status: Some(PageStatus::$status),
+                        &PostUpdateParams {
+                            status: Some(PostStatus::$status),
                             ..Default::default()
                         },
                         |updated_page, updated_page_from_wp_cli| {
-                            assert_eq!(updated_page.status, PageStatus::$status);
+                            assert_eq!(updated_page.status, PostStatus::$status);
                             assert_eq!(
                                 updated_page_from_wp_cli.post_status,
-                                PageStatus::$status.to_string()
+                                PostStatus::$status.to_string()
                             );
                         }
                     ).await;

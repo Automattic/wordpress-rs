@@ -7,27 +7,35 @@ use crate::{
         RequestExecutor,
         endpoint::{
             ApiUrlResolver,
+            api_root_endpoint::{ApiRootRequestBuilder, ApiRootRequestExecutor},
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
-            categories_endpoint::{CategoriesRequestBuilder, CategoriesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
-            pages_endpoint::{PagesRequestBuilder, PagesRequestExecutor},
+            menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
+            nav_menu_item_autosaves_endpoint::{
+                NavMenuItemAutosavesRequestBuilder, NavMenuItemAutosavesRequestExecutor,
+            },
+            nav_menu_items_endpoint::{NavMenuItemsRequestBuilder, NavMenuItemsRequestExecutor},
+            nav_menus_endpoint::{NavMenusRequestBuilder, NavMenusRequestExecutor},
+            navigations_endpoint::{NavigationsRequestBuilder, NavigationsRequestExecutor},
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
+            post_statuses_endpoint::{PostStatusesRequestBuilder, PostStatusesRequestExecutor},
             post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
             posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
             search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
             site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
-            tags_endpoint::{TagsRequestBuilder, TagsRequestExecutor},
             taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
             templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
+            terms_endpoint::{TermsRequestBuilder, TermsRequestExecutor},
             themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
             users_endpoint::{UsersRequestBuilder, UsersRequestExecutor},
             widget_types_endpoint::{WidgetTypesRequestBuilder, WidgetTypesRequestExecutor},
             widgets_endpoint::{WidgetsRequestBuilder, WidgetsRequestExecutor},
+            wp_block_editor_endpoint::{WpBlockEditorRequestBuilder, WpBlockEditorRequestExecutor},
             wp_site_health_tests_endpoint::{
                 WpSiteHealthTestsRequestBuilder, WpSiteHealthTestsRequestExecutor,
             },
@@ -36,44 +44,32 @@ use crate::{
 };
 use std::sync::Arc;
 
-#[derive(uniffi::Object)]
-struct UniffiWpApiRequestBuilder {
-    inner: WpApiRequestBuilder,
-}
-
-#[uniffi::export]
-impl UniffiWpApiRequestBuilder {
-    #[uniffi::constructor]
-    pub fn new(
-        api_url_resolver: Arc<dyn ApiUrlResolver>,
-        auth_provider: Arc<WpAuthenticationProvider>,
-    ) -> Self {
-        Self {
-            inner: WpApiRequestBuilder::new(api_url_resolver, auth_provider),
-        }
-    }
-}
-
 pub struct WpApiRequestBuilder {
+    api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
-    categories: Arc<CategoriesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
-    pages: Arc<PagesRequestBuilder>,
+    menu_locations: Arc<MenuLocationsRequestBuilder>,
+    nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestBuilder>,
+    nav_menu_items: Arc<NavMenuItemsRequestBuilder>,
+    nav_menus: Arc<NavMenusRequestBuilder>,
+    navigations: Arc<NavigationsRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
+    post_statuses: Arc<PostStatusesRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
     search: Arc<SearchRequestBuilder>,
     site_settings: Arc<SiteSettingsRequestBuilder>,
-    tags: Arc<TagsRequestBuilder>,
     taxonomies: Arc<TaxonomiesRequestBuilder>,
+    terms: Arc<TermsRequestBuilder>,
     templates: Arc<TemplatesRequestBuilder>,
     themes: Arc<ThemesRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
     widget_types: Arc<WidgetTypesRequestBuilder>,
     widgets: Arc<WidgetsRequestBuilder>,
+    wp_block_editor: Arc<WpBlockEditorRequestBuilder>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestBuilder>,
 }
 
@@ -85,25 +81,31 @@ impl WpApiRequestBuilder {
         api_client_generate_request_builder!(
             api_url_resolver,
             auth_provider;
+            api_root,
             application_passwords,
             autosaves,
-            categories,
             comments,
             media,
-            pages,
+            menu_locations,
+            nav_menu_item_autosaves,
+            nav_menu_items,
+            nav_menus,
+            navigations,
             plugins,
             post_revisions,
+            post_statuses,
             post_types,
             posts,
             search,
             site_settings,
-            tags,
             taxonomies,
+            terms,
             templates,
             themes,
             users,
             widget_types,
             widgets,
+            wp_block_editor,
             wp_site_health_tests
         )
     }
@@ -125,25 +127,31 @@ impl UniffiWpApiClient {
 }
 
 pub struct WpApiClient {
+    api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
-    categories: Arc<CategoriesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
-    pages: Arc<PagesRequestExecutor>,
+    menu_locations: Arc<MenuLocationsRequestExecutor>,
+    nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestExecutor>,
+    nav_menu_items: Arc<NavMenuItemsRequestExecutor>,
+    nav_menus: Arc<NavMenusRequestExecutor>,
+    navigations: Arc<NavigationsRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
+    post_statuses: Arc<PostStatusesRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
     search: Arc<SearchRequestExecutor>,
     site_settings: Arc<SiteSettingsRequestExecutor>,
-    tags: Arc<TagsRequestExecutor>,
     taxonomies: Arc<TaxonomiesRequestExecutor>,
+    terms: Arc<TermsRequestExecutor>,
     templates: Arc<TemplatesRequestExecutor>,
     themes: Arc<ThemesRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
     widget_types: Arc<WidgetTypesRequestExecutor>,
     widgets: Arc<WidgetsRequestExecutor>,
+    wp_block_editor: Arc<WpBlockEditorRequestExecutor>,
     wp_site_health_tests: Arc<WpSiteHealthTestsRequestExecutor>,
 }
 
@@ -152,25 +160,31 @@ impl WpApiClient {
         api_client_generate_api_client!(
             api_url_resolver,
             delegate;
+            api_root,
             application_passwords,
             autosaves,
-            categories,
             comments,
             media,
-            pages,
+            menu_locations,
+            nav_menu_item_autosaves,
+            nav_menu_items,
+            nav_menus,
+            navigations,
             plugins,
             post_revisions,
+            post_statuses,
             post_types,
             posts,
             search,
             site_settings,
-            tags,
             taxonomies,
+            terms,
             templates,
             themes,
             users,
             widget_types,
             widgets,
+            wp_block_editor,
             wp_site_health_tests
         )
     }
@@ -189,39 +203,37 @@ pub trait IsWpApiClientDelegate {
     fn get_delegate(&self) -> &WpApiClientDelegate;
 }
 
+api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
-api_client_generate_endpoint_impl!(WpApi, categories);
 api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);
-api_client_generate_endpoint_impl!(WpApi, pages);
+api_client_generate_endpoint_impl!(WpApi, menu_locations);
+api_client_generate_endpoint_impl!(WpApi, nav_menu_item_autosaves);
+api_client_generate_endpoint_impl!(WpApi, nav_menu_items);
+api_client_generate_endpoint_impl!(WpApi, nav_menus);
+api_client_generate_endpoint_impl!(WpApi, navigations);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
+api_client_generate_endpoint_impl!(WpApi, post_statuses);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);
 api_client_generate_endpoint_impl!(WpApi, search);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
-api_client_generate_endpoint_impl!(WpApi, tags);
 api_client_generate_endpoint_impl!(WpApi, taxonomies);
+api_client_generate_endpoint_impl!(WpApi, terms);
 api_client_generate_endpoint_impl!(WpApi, templates);
 api_client_generate_endpoint_impl!(WpApi, themes);
 api_client_generate_endpoint_impl!(WpApi, users);
 api_client_generate_endpoint_impl!(WpApi, widget_types);
 api_client_generate_endpoint_impl!(WpApi, widgets);
+api_client_generate_endpoint_impl!(WpApi, wp_block_editor);
 api_client_generate_endpoint_impl!(WpApi, wp_site_health_tests);
 
 #[macro_export]
 macro_rules! api_client_generate_endpoint_impl {
     ($client_name_prefix: ident, $feature:ident) => {
         paste::paste! {
-            #[uniffi::export]
-
-            impl [<Uniffi $client_name_prefix RequestBuilder>] {
-                fn $feature(&self) -> Arc<[<$feature:camel RequestBuilder>]> {
-                    self.inner.$feature.clone()
-                }
-            }
-
             impl [<$client_name_prefix RequestBuilder>] {
                 pub fn $feature(&self) -> &[<$feature:camel RequestBuilder>] {
                     self.$feature.as_ref()

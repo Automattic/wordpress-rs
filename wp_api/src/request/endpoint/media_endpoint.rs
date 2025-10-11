@@ -154,7 +154,6 @@ impl NetworkRequestAccessor for MediaUploadRequest {
     }
 }
 
-#[uniffi::export]
 impl MediaRequestBuilder {
     pub fn create(
         &self,

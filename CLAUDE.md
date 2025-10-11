@@ -97,26 +97,21 @@ WordPress REST API returns different fields depending on the `context` parameter
 
 3. **Define parameter types** for list/create/update operations:
    ```rust
-   #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+   #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+   #[supports_pagination(true)]  // or false if endpoint doesn't support pagination
    pub struct UserListParams {
        #[uniffi(default = None)]
        pub page: Option<u32>,
+       #[uniffi(default = [])]
+       pub exclude: Vec<UserId>,
        // ... other fields
    }
    ```
-
-4. **Implement query parameter handling**:
-   - Create a `{Type}ListParamsField` enum:
-     ```rust
-     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, IntoStaticStr)]
-     enum UserListParamsField {
-         #[strum(serialize = "page")]
-         Page,
-         // ... other fields
-     }
-     ```
-   - Implement `AppendUrlQueryPairs` and `FromUrlQueryPairs` traits
-   - Import helpers: `crate::url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap}`
+   - Use `WpDeriveParamsField` macro to automatically generate field enum and query parameter handling
+   - Add `#[supports_pagination(true/false)]` attribute to indicate pagination support
+   - Use `#[field_name("custom_name")]` attribute if the API field name differs from the struct field name
+   - **IMPORTANT**: For array/list parameters, use `Vec<T>` with `#[uniffi(default = [])]`, NOT `Option<Vec<T>>` with `#[uniffi(default = None)]`
+   - Import: `use wp_derive::WpDeriveParamsField;`
 
 **Special parameter types:**
 

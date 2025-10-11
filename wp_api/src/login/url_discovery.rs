@@ -1134,6 +1134,7 @@ mod tests {
                 gmt_offset: None,
                 timezone_string: None,
                 namespaces: vec![],
+                routes: HashMap::new(),
                 authentication: WpApiDetailsAuthenticationMap(HashMap::new()),
                 site_icon_url: None,
             }

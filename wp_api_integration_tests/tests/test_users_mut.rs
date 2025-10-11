@@ -1,4 +1,4 @@
-use wp_api::users::{UserCreateParams, UserDeleteParams, UserUpdateParams};
+use wp_api::users::{UserCreateParams, UserDeleteParams, UserRole, UserUpdateParams};
 use wp_api_integration_tests::prelude::*;
 use wp_cli::{WpCliUser, WpCliUserMeta};
 
@@ -201,9 +201,9 @@ async fn update_user_slug() {
 #[tokio::test]
 #[serial]
 async fn update_user_roles() {
-    let new_role = "author";
+    let new_role: &'static str = "author";
     let params = UserUpdateParams {
-        roles: vec![new_role.to_string()],
+        roles: vec![UserRole::Author],
         ..Default::default()
     };
 

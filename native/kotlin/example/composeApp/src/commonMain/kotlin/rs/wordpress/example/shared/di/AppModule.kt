@@ -1,6 +1,7 @@
 package rs.wordpress.example.shared.di
 
 import org.koin.dsl.module
+import rs.wordpress.example.TestCredentials
 import rs.wordpress.example.shared.localTestSiteUrl
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
@@ -9,15 +10,14 @@ import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 
 val authModule = module {
     single {
-        // TODO: Read from test credentials file
         AuthenticationRepository(
             localTestSiteUrl = localTestSiteUrl().siteUrl,
-            localTestSiteUsername = "test@example.com",
-            // Until this works with the included test credentials, you can grab it from the
-            // `test_credentials.json` file `make test-server` will generate in the root of the repo
-            // The key is `admin_password`
-            localTestSitePassword = "s3N7vlbdrFPDDI3MbyFUvS3P"
-        )
+            localTestSiteUsername = TestCredentials.ADMIN_USERNAME,
+            localTestSitePassword = TestCredentials.ADMIN_PASSWORD
+        ).apply {
+            // Add test site if credentials are available
+            addTestSiteIfAvailable()
+        }
     }
 }
 

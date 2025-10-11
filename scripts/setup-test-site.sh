@@ -71,9 +71,16 @@ wp import /tmp/testdata.xml --authors=create
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
+curl -sSL https://downloads.wordpress.org/plugin/gutenberg.21.7.0.zip -o /tmp/gutenberg.zip
+unzip -q /tmp/gutenberg.zip -d wp-content/plugins/
+wp plugin activate gutenberg
+
 # Install custom must-use plugins for integration tests
 mkdir -p wp-content/mu-plugins
-cp /app/scripts/setup-test-site-custom-plugins/*.php wp-content/mu-plugins/
+cp -v /app/scripts/test-site-mu-plugins/*.php wp-content/mu-plugins/
+cp -v /app/scripts/test-site-plugins/*.php wp-content/plugins/
+
+wp plugin activate books-plugin
 
 # We need an `author` user for some of the integration tests
 wp user create test_author test_author@example.com --role=author
@@ -81,6 +88,17 @@ wp user create test_author test_author@example.com --role=author
 # Switch to `twentytwentyfour` which supports post templates
 # This is used in `/posts` integration tests that updates the `template` field
 wp theme activate twentytwentyfour
+
+# Create menus for integration tests
+# The mu-plugin register-menu-locations.php registers primary and footer menu locations
+PRIMARY_MENU_LOCATION="primary"
+FOOTER_MENU_LOCATION="footer"
+PRIMARY_MENU_ID="$(wp menu create "Primary Menu" --porcelain)"
+FOOTER_MENU_ID="$(wp menu create "Footer Menu" --porcelain)"
+
+# Assign menus to their locations
+wp menu location assign "$PRIMARY_MENU_ID" "$PRIMARY_MENU_LOCATION"
+wp menu location assign "$FOOTER_MENU_ID" "$FOOTER_MENU_LOCATION"
 
 wp comment trash 22
 wp comment spam 23
@@ -97,6 +115,27 @@ create_post_autosave() {
   local post_id="$2"
 
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/posts/$post_id/autosaves"
+}
+
+create_page_revision() {
+  local revision_number="$1"
+  local page_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$revision_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/pages/$page_id" > /dev/null
+}
+
+create_page_autosave() {
+  local autosave_number="$1"
+  local page_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/pages/$page_id/autosaves"
+}
+
+create_nav_menu_item_autosave() {
+  local autosave_number="$1"
+  local nav_menu_item_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"title\":\"nav_menu_item_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/menu-items/$nav_menu_item_id/autosaves"
 }
 
 create_test_credentials () {
@@ -175,6 +214,35 @@ create_test_credentials () {
   AUTOSAVE_RESPONSE="$(create_post_autosave "1" "$AUTOSAVED_POST_ID")"
   AUTOSAVE_ID_FOR_AUTOSAVED_POST_ID="$(echo "$AUTOSAVE_RESPONSE" | jq -r '.id')"
 
+  echo "Setting up a page with 10 revisions for integration tests.."
+  REVISIONED_PAGE_ID="$(wp post create --post_type=page --post_title=Revisioned_PAGE_FOR_INTEGRATION_TESTS --porcelain)"
+  # Create revisions
+  for i in {1..10};
+  do
+    create_page_revision "$i" "$REVISIONED_PAGE_ID"
+  done
+  # Generating revisions don't return an id, but since we just created the `REVISIONED_PAGE_ID`, we can use it to calculate the revision id
+  REVISION_ID_FOR_REVISIONED_PAGE_ID=$((REVISIONED_PAGE_ID + 1))
+
+  echo "Setting up a page with autosave for integration tests.."
+  # Create page as author user to enable proper autosave behavior (same requirement as posts)
+  AUTOSAVED_PAGE_ID="$(wp post create --post_type=page --post_title=Autosaved_PAGE_FOR_INTEGRATION_TESTS --post_author="$AUTHOR_USER_ID" --porcelain)"
+  # Create autosave as admin user (different from page author) and capture its ID
+  AUTOSAVE_PAGE_RESPONSE="$(create_page_autosave "1" "$AUTOSAVED_PAGE_ID")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_PAGE_ID="$(echo "$AUTOSAVE_PAGE_RESPONSE" | jq -r '.id')"
+
+  echo "Creating a nav menu item for integration tests.."
+  NAV_MENU_ITEM_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Nav Menu Item","menus":179,"type":"custom","url":"https://example.com"}' http://localhost/wp-json/wp/v2/menu-items)"
+  NAV_MENU_ITEM_ID="$(echo "$NAV_MENU_ITEM_RESPONSE" | jq -r '.id')"
+
+  echo "Setting up a nav menu item with autosave for integration tests.."
+  NAV_MENU_ITEM_AUTOSAVE_RESPONSE="$(create_nav_menu_item_autosave "1" "$NAV_MENU_ITEM_ID")"
+  AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID="$(echo "$NAV_MENU_ITEM_AUTOSAVE_RESPONSE" | jq -r '.id')"
+
+  echo "Creating a navigation for integration tests.."
+  NAVIGATION_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Navigation","content":"<!-- wp:navigation --><!-- /wp:navigation -->","status":"publish"}' http://localhost/wp-json/wp/v2/navigation)"
+  NAVIGATION_ID="$(echo "$NAVIGATION_RESPONSE" | jq -r '.id')"
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -204,6 +272,15 @@ create_test_credentials () {
     password_protected_page_title="Password_Protected_Page" \
     trashed_page_id="$TRASHED_PAGE_ID" \
     first_page_id="$FIRST_PAGE_ID" \
+    revisioned_page_id="$REVISIONED_PAGE_ID" \
+    revision_id_for_revisioned_page_id="$REVISION_ID_FOR_REVISIONED_PAGE_ID" \
+    autosaved_page_id="$AUTOSAVED_PAGE_ID" \
+    autosave_id_for_autosaved_page_id="$AUTOSAVE_ID_FOR_AUTOSAVED_PAGE_ID" \
+    primary_menu_location="$PRIMARY_MENU_LOCATION" \
+    footer_menu_location="$FOOTER_MENU_LOCATION" \
+    nav_menu_item_id="$NAV_MENU_ITEM_ID" \
+    autosave_id_for_nav_menu_item_id="$AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID" \
+    navigation_id="$NAVIGATION_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials

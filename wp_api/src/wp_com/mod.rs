@@ -7,7 +7,9 @@ pub mod client;
 pub mod endpoint;
 pub mod followers;
 pub mod jetpack_connection;
+pub mod me;
 pub mod oauth2;
+pub mod sites;
 pub mod subscribers;
 pub mod support_bots;
 pub mod support_eligibility;
@@ -35,6 +37,7 @@ impl std::fmt::Display for WpComSiteId {
 pub(crate) enum WpComNamespace {
     Oauth2,
     RestV1_1,
+    RestV1_2,
     V2,
 }
 
@@ -43,6 +46,7 @@ impl AsNamespace for WpComNamespace {
         match self {
             WpComNamespace::Oauth2 => "/oauth2",
             WpComNamespace::RestV1_1 => "/rest/v1.1",
+            WpComNamespace::RestV1_2 => "/rest/v1.2",
             WpComNamespace::V2 => "/wpcom/v2",
         }
     }

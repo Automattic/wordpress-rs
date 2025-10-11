@@ -1,4 +1,5 @@
 package rs.wordpress.api.kotlin
+import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpApiMiddleware
 import uniffi.wp_api.WpNetworkRequest
@@ -9,7 +10,8 @@ class DebugMiddleware : WpApiMiddleware {
     override suspend fun process(
         requestExecutor: RequestExecutor,
         response: WpNetworkResponse,
-        request: WpNetworkRequest
+        request: WpNetworkRequest,
+        context: RequestContext?
     ): WpNetworkResponse {
         println("Request: ${request.url()}")
         println("Response:")

@@ -25,7 +25,9 @@ final class HTTPStubs: SafeRequestExecutor {
         self
     }
 
-    public func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+    public func execute(
+        _ request: WpNetworkRequest
+    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
             return .success(response)
         }
@@ -87,6 +89,10 @@ final class HTTPStubs: SafeRequestExecutor {
     func sleep(millis: UInt64) async {
         // swiftlint:disable:next force_try
         try! await Task.sleep(nanoseconds: millis * 1000)
+    }
+
+    func cancel(context: RequestContext) {
+        // No-op
     }
 }
 

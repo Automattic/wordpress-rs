@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.delay
 import okio.FileNotFoundException
 import uniffi.wp_api.MediaUploadRequest
+import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -46,6 +47,10 @@ class MockRequestExecutor(private var stubs: List<Stub> = listOf()) : RequestExe
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
+    }
+
+    override fun cancel(context: RequestContext) {
+        // No-op
     }
 }
 

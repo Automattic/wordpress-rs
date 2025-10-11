@@ -12,6 +12,7 @@ members = [
   "wp_localization_macro",
   "wp_localization_parser",
   "wp_localization_validation",
+  "wp_mobile",
   "wp_rs_cli",
   "wp_rs_web",
   "wp_serde_helper",
@@ -44,7 +45,7 @@ itertools = "0.14.0"
 linkify = "0.10.0"
 parse_link_header = "0.4"
 paste = "1.0"
-proc-macro-crate = "3.3.0"
+proc-macro-crate = "3.4.0"
 proc-macro2 = "1.0"
 quote = "1.0"
 regex = "1.11"
@@ -54,7 +55,7 @@ rocket_dyn_templates = "0.2.0"
 roxmltree = "0.20"
 rstest = "0.24"
 rstest_reuse = "0.7.0"
-rustls = "0.23.31"
+rustls = "0.23.32"
 scraper = "0.22"
 semver = "1.0"
 serde = "1.0"
@@ -67,7 +68,7 @@ syn = "2.0"
 thiserror = "2.0"
 tokio = "1.47"
 tokio-stream = "0.1.17"
-toml = "0.8"
+toml = "0.9"
 trybuild = "1.0"
 unic-langid = "0.9"
 uniffi = "0.29.4"

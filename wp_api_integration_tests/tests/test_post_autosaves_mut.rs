@@ -1,4 +1,7 @@
-use wp_api::{posts::PostCreateParams, posts::PostId};
+use wp_api::{
+    posts::{PostCreateParams, PostId},
+    request::endpoint::posts_endpoint::PostEndpointType,
+};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -13,7 +16,7 @@ async fn create_autosave() {
 
     let autosave = api_client()
         .autosaves()
-        .create(&autosaved_post_id(), &params)
+        .create(&PostEndpointType::Posts, &autosaved_post_id(), &params)
         .await
         .assert_response()
         .data;
@@ -21,6 +24,8 @@ async fn create_autosave() {
     // Verify the autosave was created successfully
     assert_eq!(autosave.title.raw, Some(title));
     assert_eq!(autosave.content.raw, Some(content));
+
+    RestoreServer::db().await;
 }
 
 fn autosaved_post_id() -> PostId {

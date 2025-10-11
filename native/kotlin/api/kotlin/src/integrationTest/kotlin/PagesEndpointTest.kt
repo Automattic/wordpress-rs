@@ -3,9 +3,10 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
-import uniffi.wp_api.PageListParams
-import uniffi.wp_api.PageRetrieveParams
-import uniffi.wp_api.SparsePageFieldWithEditContext
+import uniffi.wp_api.PostListParams
+import uniffi.wp_api.PostRetrieveParams
+import uniffi.wp_api.SparseAnyPostFieldWithEditContext
+import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -17,7 +18,7 @@ class PagesEndpointTest {
     @Test
     fun testPageListRequest() = runTest {
         val postList = client.request { requestBuilder ->
-            requestBuilder.pages().listWithEditContext(params = PageListParams())
+            requestBuilder.posts().listWithEditContext(PostEndpointType.Pages, PostListParams())
         }.assertSuccessAndRetrieveData().data
         assert(postList.isNotEmpty())
     }
@@ -25,7 +26,8 @@ class PagesEndpointTest {
     @Test
     fun testRetrievePageRequest() = runTest {
         val post = client.request { requestBuilder ->
-            requestBuilder.pages().retrieveWithEditContext(2, PageRetrieveParams())
+            requestBuilder.posts()
+                .retrieveWithEditContext(PostEndpointType.Pages, 2, PostRetrieveParams())
         }.assertSuccessAndRetrieveData().data
         assertNotNull(post)
     }
@@ -33,11 +35,12 @@ class PagesEndpointTest {
     @Test
     fun testFilterPageListRequest() = runTest {
         val pageList = client.request { requestBuilder ->
-            requestBuilder.pages().filterListWithEditContext(
-                params = PageListParams(),
-                fields = listOf(
-                    SparsePageFieldWithEditContext.TITLE,
-                    SparsePageFieldWithEditContext.CONTENT
+            requestBuilder.posts().filterListWithEditContext(
+                PostEndpointType.Pages,
+                PostListParams(),
+                listOf(
+                    SparseAnyPostFieldWithEditContext.TITLE,
+                    SparseAnyPostFieldWithEditContext.CONTENT
                 )
             )
         }.assertSuccessAndRetrieveData().data
@@ -48,12 +51,13 @@ class PagesEndpointTest {
     @Test
     fun testFilterRetrievePageRequest() = runTest {
         val sparsePage = client.request { requestBuilder ->
-            requestBuilder.pages().filterRetrieveWithEditContext(
-                pageId = 2,
-                params = PageRetrieveParams(),
-                fields = listOf(
-                    SparsePageFieldWithEditContext.TITLE,
-                    SparsePageFieldWithEditContext.CONTENT
+            requestBuilder.posts().filterRetrieveWithEditContext(
+                PostEndpointType.Pages,
+                2,
+                PostRetrieveParams(),
+                listOf(
+                    SparseAnyPostFieldWithEditContext.TITLE,
+                    SparseAnyPostFieldWithEditContext.CONTENT
                 )
             )
         }.assertSuccessAndRetrieveData().data
@@ -63,24 +67,29 @@ class PagesEndpointTest {
 
     @Test
     fun testErrorPageListRequestInvalidPageNumber() = runTest {
-        val params = PageListParams(page = 99999999u)
+        val params = PostListParams(page = 99999999u)
         val result =
-            client.request { requestBuilder -> requestBuilder.pages().listWithEditContext(params) }
+            client.request { requestBuilder ->
+                requestBuilder.posts().listWithEditContext(PostEndpointType.Pages, params)
+            }
         assert(result.wpErrorCode() is WpErrorCode.PostInvalidPageNumber)
     }
 
     @Test
     fun testPageListPagination() = runTest {
         val firstPageResponse = client.request { requestBuilder ->
-            requestBuilder.pages().listWithEditContext(params = PageListParams(perPage = 1u))
+            requestBuilder.posts()
+                .listWithEditContext(PostEndpointType.Pages, PostListParams(perPage = 1u))
         }.assertSuccessAndRetrieveData()
         assert(firstPageResponse.data.isNotEmpty())
         val nextPageResponse = client.request { requestBuilder ->
-            requestBuilder.pages().listWithEditContext(firstPageResponse.nextPageParams!!)
+            requestBuilder.posts()
+                .listWithEditContext(PostEndpointType.Pages, firstPageResponse.nextPageParams!!)
         }.assertSuccessAndRetrieveData()
         assert(nextPageResponse.data.isNotEmpty())
         val prevPageResponse = client.request { requestBuilder ->
-            requestBuilder.pages().listWithEditContext(nextPageResponse.prevPageParams!!)
+            requestBuilder.posts()
+                .listWithEditContext(PostEndpointType.Pages, nextPageResponse.prevPageParams!!)
         }.assertSuccessAndRetrieveData()
         assert(prevPageResponse.data.isNotEmpty())
     }
@@ -88,7 +97,8 @@ class PagesEndpointTest {
     @Test
     fun ensureDateGmtIsParsedCorrectly() = runTest {
         val page = client.request { requestBuilder ->
-            requestBuilder.pages().retrieveWithEditContext(2, PageRetrieveParams())
+            requestBuilder.posts()
+                .retrieveWithEditContext(PostEndpointType.Pages, 2, PostRetrieveParams())
         }.assertSuccessAndRetrieveData().data
         assertEquals(
             testCredentials.firstPostDateGmt,

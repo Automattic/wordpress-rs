@@ -71,6 +71,22 @@ struct WordPressAPITests {
         _ = try await api.users.retrieveWithViewContext(userId: 1)
         await #expect(counter.count == 1)
     }
+
+    @Test
+    func testRoot() async throws {
+        let api = try WordPressAPI(
+            apiUrlResolver: WpOrgSiteApiUrlResolver(
+                apiRootUrl: ParsedUrl.parse(input: "https://vanilla.wpmt.co/wp-json")
+            ),
+            authenticationProvider: .none(),
+            executor: WpRequestExecutor(urlSession: .shared),
+            middlewarePipeline: .default,
+            appNotifier: nil
+        )
+
+        let details = try await api.apiRoot.get()
+        #expect(details.data.siteUrlString() == "https://vanilla.wpmt.co")
+    }
 }
 
 private actor CounterMiddleware: Middleware {
@@ -79,7 +95,8 @@ private actor CounterMiddleware: Middleware {
     func process(
         requestExecutor: RequestExecutor,
         response: WpNetworkResponse,
-        request: WpNetworkRequest
+        request: WpNetworkRequest,
+        context: RequestContext?
     ) async throws -> WpNetworkResponse {
         count += 1
         return response

@@ -2,9 +2,10 @@ use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
 use wp_api::posts::{
-    PostCommentStatus, PostCreateParams, PostFootnote, PostFormat, PostMeta, PostPingStatus,
-    PostStatus, PostUpdateParams, PostWithEditContext,
+    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
+    PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
 };
+use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliPost;
 
@@ -39,7 +40,8 @@ async fn create_post_with_title_and_meta() {
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
-            let footnote = created_post.meta.footnotes.first().unwrap();
+            let meta = created_post.meta.unwrap();
+            let footnote = meta.footnotes.first().unwrap();
             assert_eq!(created_post.title.raw, Some("foo".to_string()));
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(footnote.id, "bar");
@@ -74,7 +76,7 @@ async fn create_post_with_just_excerpt() {
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
-            assert_eq!(created_post.excerpt.raw, Some("foo".to_string()));
+            assert_eq!(created_post.excerpt.unwrap().raw, Some("foo".to_string()));
             assert_eq!(post_from_wp_cli.excerpt, "foo");
         },
     )
@@ -96,7 +98,7 @@ async fn create_post_with_title_content_and_excerpt() {
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(created_post.content.raw, Some("bar".to_string()));
             assert_eq!(post_from_wp_cli.content, "bar");
-            assert_eq!(created_post.excerpt.raw, Some("baz".to_string()));
+            assert_eq!(created_post.excerpt.unwrap().raw, Some("baz".to_string()));
             assert_eq!(post_from_wp_cli.excerpt, "baz");
         },
     )
@@ -107,7 +109,10 @@ async fn create_post_with_title_content_and_excerpt() {
 #[serial]
 async fn delete_post() {
     // Delete the post using the API and ensure it's successful
-    let post_delete_response = api_client().posts().delete(&FIRST_POST_ID).await;
+    let post_delete_response = api_client()
+        .posts()
+        .delete(&PostEndpointType::Posts, &FIRST_POST_ID)
+        .await;
     assert!(post_delete_response.is_ok(), "{post_delete_response:#?}");
     assert!(post_delete_response.unwrap().data.deleted);
 
@@ -127,7 +132,10 @@ async fn delete_post() {
 #[serial]
 async fn trash_post() {
     // Trash the post using the API and ensure it's successful
-    let post_trash_response = api_client().posts().trash(&FIRST_POST_ID).await;
+    let post_trash_response = api_client()
+        .posts()
+        .trash(&PostEndpointType::Posts, &FIRST_POST_ID)
+        .await;
     assert!(post_trash_response.is_ok(), "{post_trash_response:#?}");
 
     // Assert that the post was trashed
@@ -213,7 +221,7 @@ generate_update_test!(
     author,
     SECOND_USER_ID,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.author, SECOND_USER_ID);
+        assert_eq!(updated_post.author, Some(SECOND_USER_ID));
         assert_eq!(updated_post_from_wp_cli.author, SECOND_USER_ID.0);
     }
 );
@@ -223,7 +231,10 @@ generate_update_test!(
     excerpt,
     "new_excerpt".to_string(),
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.excerpt.raw, Some("new_excerpt".to_string()));
+        assert_eq!(
+            updated_post.excerpt.unwrap().raw,
+            Some("new_excerpt".to_string())
+        );
         assert_eq!(updated_post_from_wp_cli.excerpt, "new_excerpt");
     }
 );
@@ -233,7 +244,7 @@ generate_update_test!(
     featured_media,
     MEDIA_ID_611,
     |updated_post, _| {
-        assert_eq!(updated_post.featured_media, MEDIA_ID_611);
+        assert_eq!(updated_post.featured_media, Some(MEDIA_ID_611));
     }
 );
 
@@ -242,7 +253,7 @@ generate_update_test!(
     comment_status,
     PostCommentStatus::Open,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.comment_status, PostCommentStatus::Open);
+        assert_eq!(updated_post.comment_status, Some(PostCommentStatus::Open));
         assert_eq!(
             updated_post_from_wp_cli.comment_status,
             PostCommentStatus::Open.to_string()
@@ -255,7 +266,7 @@ generate_update_test!(
     comment_status,
     PostCommentStatus::Closed,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.comment_status, PostCommentStatus::Closed);
+        assert_eq!(updated_post.comment_status, Some(PostCommentStatus::Closed));
         assert_eq!(
             updated_post_from_wp_cli.comment_status,
             PostCommentStatus::Closed.to_string()
@@ -268,7 +279,7 @@ generate_update_test!(
     ping_status,
     PostPingStatus::Open,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.ping_status, PostPingStatus::Open);
+        assert_eq!(updated_post.ping_status, Some(PostPingStatus::Open));
         assert_eq!(
             updated_post_from_wp_cli.ping_status,
             PostPingStatus::Open.to_string()
@@ -281,7 +292,7 @@ generate_update_test!(
     ping_status,
     PostPingStatus::Closed,
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.ping_status, PostPingStatus::Closed);
+        assert_eq!(updated_post.ping_status, Some(PostPingStatus::Closed));
         assert_eq!(
             updated_post_from_wp_cli.ping_status,
             PostPingStatus::Closed.to_string()
@@ -308,7 +319,8 @@ generate_update_test!(
         }]
     },
     |updated_post, _| {
-        let footnote = updated_post.meta.footnotes.first().unwrap();
+        let meta = updated_post.meta.unwrap();
+        let footnote = meta.footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");
     }
@@ -323,7 +335,7 @@ async fn update_sticky_to_true() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert!(updated_post.sticky);
+            assert_eq!(updated_post.sticky, Some(true));
         },
     )
     .await;
@@ -338,7 +350,7 @@ async fn update_sticky_to_false() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert!(!updated_post.sticky);
+            assert_eq!(updated_post.sticky, Some(false));
         },
     )
     .await;
@@ -354,7 +366,7 @@ async fn update_categories() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert_eq!(updated_post.categories, updated_value);
+            assert_eq!(updated_post.categories, Some(updated_value.clone()));
         },
     )
     .await;
@@ -370,7 +382,7 @@ async fn update_tags() {
             ..Default::default()
         },
         |updated_post, _| {
-            assert_eq!(updated_post.tags, updated_value);
+            assert_eq!(updated_post.tags, Some(updated_value.clone()));
         },
     )
     .await;
@@ -416,11 +428,11 @@ generate_update_post_format_test!(Audio);
 
 async fn test_create_post<F>(params: &PostCreateParams, assert: F)
 where
-    F: Fn(PostWithEditContext, WpCliPost),
+    F: Fn(AnyPostWithEditContext, WpCliPost),
 {
     let created_post = api_client()
         .posts()
-        .create(params)
+        .create(&PostEndpointType::Posts, params)
         .await
         .assert_response()
         .data;
@@ -431,11 +443,11 @@ where
 
 async fn test_update_post<F>(params: &PostUpdateParams, assert: F)
 where
-    F: Fn(PostWithEditContext, WpCliPost),
+    F: Fn(AnyPostWithEditContext, WpCliPost),
 {
     let updated_post = api_client()
         .posts()
-        .update(&FIRST_POST_ID, params)
+        .update(&PostEndpointType::Posts, &FIRST_POST_ID, params)
         .await
         .assert_response()
         .data;
@@ -499,7 +511,7 @@ mod macro_helper {
                             ..Default::default()
                         },
                         |updated_post, _| {
-                            assert_eq!(updated_post.format, PostFormat::$format);
+                            assert_eq!(updated_post.format, Some(PostFormat::$format));
                         }
                     ).await;
                 }

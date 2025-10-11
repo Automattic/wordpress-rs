@@ -14,16 +14,20 @@ pub mod api_client;
 pub mod api_error;
 pub mod application_passwords;
 pub mod auth;
-pub mod categories;
 pub mod comments;
 pub mod date;
 pub mod login;
 pub mod media;
+pub mod menu_locations;
 pub mod middleware;
-pub mod pages;
+pub mod nav_menu_item_revisions;
+pub mod nav_menu_items;
+pub mod nav_menus;
+pub mod navigations;
 pub mod parsed_url;
 pub mod plugins;
 pub mod post_revisions;
+pub mod post_statuses;
 pub mod post_types;
 pub mod posts;
 pub mod prelude;
@@ -31,9 +35,9 @@ pub mod request;
 pub mod search_results;
 pub mod site_settings;
 pub mod ssl;
-pub mod tags;
 pub mod taxonomies;
 pub mod templates;
+pub mod terms;
 pub mod themes;
 pub mod url_query;
 pub mod users;
@@ -41,6 +45,7 @@ pub mod uuid;
 pub mod widget_types;
 pub mod widgets;
 pub mod wordpress_org;
+pub mod wp_block_editor;
 pub mod wp_content_macros;
 pub mod wp_site_health_tests;
 
@@ -79,14 +84,19 @@ impl WpContext {
     Copy,
     PartialEq,
     Eq,
+    Serialize,
+    Deserialize,
     uniffi::Enum,
     strum_macros::EnumString,
     strum_macros::Display,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum WpApiParamOrder {
+    #[serde(alias = "asc")]
     #[default]
     Asc,
+
+    #[serde(alias = "desc")]
     Desc,
 }
 
@@ -110,7 +120,7 @@ pub enum EnumFromStrParsingError {
     UnknownVariant { value: String },
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum JsonValue {
     Null,

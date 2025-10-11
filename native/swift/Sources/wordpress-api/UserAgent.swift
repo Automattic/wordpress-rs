@@ -87,7 +87,7 @@ public struct UserAgent {
             }
 
             return string.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch let err {
+        } catch {
             return "unknown"
         }
     }

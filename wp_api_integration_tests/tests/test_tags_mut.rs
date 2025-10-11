@@ -1,5 +1,8 @@
 use macro_helper::generate_update_test;
-use wp_api::tags::{TagCreateParams, TagUpdateParams, TagWithEditContext};
+use wp_api::{
+    request::endpoint::terms_endpoint::TermEndpointType,
+    terms::{AnyTermWithEditContext, TermCreateParams, TermUpdateParams},
+};
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliTag;
 
@@ -7,10 +10,11 @@ use wp_cli::WpCliTag;
 #[serial]
 async fn create_tag_with_just_name() {
     test_create_tag(
-        &TagCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: None,
             slug: None,
+            parent: None,
         },
         |created_tag, tag_from_wp_cli| {
             assert_eq!(created_tag.name, "foo");
@@ -24,10 +28,11 @@ async fn create_tag_with_just_name() {
 #[serial]
 async fn create_tag_with_name_and_description() {
     test_create_tag(
-        &TagCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: Some("bar".to_string()),
             slug: None,
+            parent: None,
         },
         |created_tag, tag_from_wp_cli| {
             assert_eq!(created_tag.name, "foo");
@@ -42,10 +47,11 @@ async fn create_tag_with_name_and_description() {
 #[serial]
 async fn create_tag_with_name_and_slug() {
     test_create_tag(
-        &TagCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: None,
             slug: Some("bar".to_string()),
+            parent: None,
         },
         |created_tag, tag_from_wp_cli| {
             assert_eq!(created_tag.name, "foo");
@@ -60,10 +66,11 @@ async fn create_tag_with_name_and_slug() {
 #[serial]
 async fn create_tag_with_name_description_and_slug() {
     test_create_tag(
-        &TagCreateParams {
+        &TermCreateParams {
             name: "foo".to_string(),
             description: Some("bar".to_string()),
             slug: Some("quox".to_string()),
+            parent: None,
         },
         |created_tag, tag_from_wp_cli| {
             assert_eq!(created_tag.name, "foo");
@@ -80,7 +87,10 @@ async fn create_tag_with_name_description_and_slug() {
 #[serial]
 async fn delete_tag() {
     // Delete the tag using the API and ensure it's successful
-    let tag_delete_response = api_client().tags().delete(&TAG_ID_100).await;
+    let tag_delete_response = api_client()
+        .terms()
+        .delete(&TermEndpointType::Tags, &TAG_ID_100)
+        .await;
     assert!(tag_delete_response.is_ok(), "{tag_delete_response:#?}");
     assert!(tag_delete_response.unwrap().data.deleted);
 
@@ -126,13 +136,13 @@ generate_update_test!(
     }
 );
 
-async fn test_create_tag<F>(params: &TagCreateParams, assert: F)
+async fn test_create_tag<F>(params: &TermCreateParams, assert: F)
 where
-    F: Fn(TagWithEditContext, WpCliTag),
+    F: Fn(AnyTermWithEditContext, WpCliTag),
 {
     let created_tag = api_client()
-        .tags()
-        .create(params)
+        .terms()
+        .create(&TermEndpointType::Tags, params)
         .await
         .assert_response()
         .data;
@@ -141,13 +151,13 @@ where
     RestoreServer::db().await;
 }
 
-async fn test_update_tag<F>(params: &TagUpdateParams, assert: F)
+async fn test_update_tag<F>(params: &TermUpdateParams, assert: F)
 where
-    F: Fn(TagWithEditContext, WpCliTag),
+    F: Fn(AnyTermWithEditContext, WpCliTag),
 {
     let updated_tag = api_client()
-        .tags()
-        .update(&TAG_ID_100, params)
+        .terms()
+        .update(&TermEndpointType::Tags, &TAG_ID_100, params)
         .await
         .assert_response()
         .data;
@@ -165,7 +175,7 @@ mod macro_helper {
                 async fn $ident() {
                     let updated_value = $new_value;
                     test_update_tag(
-                        &TagUpdateParams {
+                        &TermUpdateParams {
                             $field: Some(updated_value),
                             ..Default::default()
                         }, $assertion)

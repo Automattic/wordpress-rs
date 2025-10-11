@@ -253,6 +253,143 @@ where
     deserializer.deserialize_any(DeserializeFalseOrStringVisitor)
 }
 
+pub fn deserialize_u64_or_none<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeU64OrNoneVisitor)
+}
+
+struct DeserializeU64OrNoneVisitor;
+
+impl de::Visitor<'_> for DeserializeU64OrNoneVisitor {
+    type Value = Option<u64>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("u64, false, or null")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if !v {
+            Ok(None)
+        } else {
+            Err(E::invalid_value(Unexpected::Bool(v), &self))
+        }
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(v))
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+}
+
+pub fn deserialize_u64_or_none_with_negative_as_none<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeU64OrNoneWithNegativeAsNoneVisitor)
+}
+
+struct DeserializeU64OrNoneWithNegativeAsNoneVisitor;
+
+impl de::Visitor<'_> for DeserializeU64OrNoneWithNegativeAsNoneVisitor {
+    type Value = Option<u64>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("u64, false, null, or negative number")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if !v {
+            Ok(None)
+        } else {
+            Err(E::invalid_value(Unexpected::Bool(v), &self))
+        }
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(v))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v < 0 { Ok(None) } else { Ok(Some(v as u64)) }
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+}
+
+pub fn deserialize_u64_or_none_with_zero_as_none<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeU64OrNoneWithZeroAsNoneVisitor)
+}
+
+struct DeserializeU64OrNoneWithZeroAsNoneVisitor;
+
+impl de::Visitor<'_> for DeserializeU64OrNoneWithZeroAsNoneVisitor {
+    type Value = Option<u64>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("u64, false, or null")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if !v {
+            Ok(None)
+        } else {
+            Err(E::invalid_value(Unexpected::Bool(v), &self))
+        }
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v == 0 { Ok(None) } else { Ok(Some(v)) }
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+}
+
 struct DeserializeEmptyArrayOrHashMapVisitor<K, V>(PhantomData<(K, V)>);
 
 impl<'de, K, V> de::Visitor<'de> for DeserializeEmptyArrayOrHashMapVisitor<K, V>
@@ -296,6 +433,152 @@ where
     V: DeserializeOwned,
 {
     deserializer.deserialize_any(DeserializeEmptyArrayOrHashMapVisitor::<K, V>(PhantomData))
+}
+
+pub fn deserialize_string_vec_or_string<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if let Some(vec) = deserialize_string_vec_or_string_as_option(deserializer)? {
+        Ok(vec)
+    } else {
+        Err(serde::de::Error::custom(
+            "Expected a string or vector of strings",
+        ))
+    }
+}
+
+pub fn deserialize_string_vec_or_string_as_option<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeStringVecOrStringAsOptionVisitor)
+}
+
+struct DeserializeStringVecOrStringAsOptionVisitor;
+
+impl<'de> de::Visitor<'de> for DeserializeStringVecOrStringAsOptionVisitor {
+    type Value = Option<Vec<String>>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("string or a vector of strings")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(vec![v.to_string()]))
+    }
+
+    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        Ok(Some(Deserialize::deserialize(
+            de::value::SeqAccessDeserializer::new(seq),
+        )?))
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+}
+
+struct DeserializeEmptyVecOrNone<T>(PhantomData<T>);
+
+impl<'de, T> de::Visitor<'de> for DeserializeEmptyVecOrNone<T>
+where
+    T: Deserialize<'de>,
+{
+    type Value = Option<T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("empty Vec or T")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        if seq.next_element::<T>()?.is_none() {
+            // It's an empty vec
+            Ok(None)
+        } else {
+            // not an empty vec
+            Err(serde::de::Error::invalid_type(Unexpected::Seq, &self))
+        }
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::MapAccess<'de>,
+    {
+        T::deserialize(de::value::MapAccessDeserializer::new(map)).map(Some)
+    }
+}
+
+pub fn deserialize_empty_vec_or_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    deserializer.deserialize_any(DeserializeEmptyVecOrNone::<T>(PhantomData))
+}
+
+pub fn deserialize_null_as_empty_vec<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<Vec<T>>::deserialize(deserializer)
+        .map(|opt| opt.unwrap_or_default())
+        .map_err(|err| {
+            serde::de::Error::custom(
+                err.to_string()
+                    .replace("expected a sequence", "expected null or a sequence"),
+            )
+        })
+}
+
+pub fn deserialize_empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeEmptyStringAsNoneVisitor)
+}
+
+struct DeserializeEmptyStringAsNoneVisitor;
+
+impl<'de> de::Visitor<'de> for DeserializeEmptyStringAsNoneVisitor {
+    type Value = Option<String>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("String")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if v.trim().is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(v.to_string()))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -387,5 +670,228 @@ mod tests {
         let wrapper: HashMapWrapper =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, wrapper.map);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct U64OrNone {
+        #[serde(deserialize_with = "deserialize_u64_or_none")]
+        pub u64: Option<u64>,
+    }
+
+    #[rstest]
+    #[case(r#"{"u64": 1}"#, Some(1))]
+    #[case(r#"{"u64": false}"#, None)]
+    #[case(r#"{"u64": null}"#, None)]
+    fn test_deserialize_u64_or_none(#[case] test_case: &str, #[case] expected_result: Option<u64>) {
+        let u64_or_none: U64OrNone =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, u64_or_none.u64);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"u64": -1}"#,
+        r#"invalid type: integer `-1`, expected u64, false, or null at line 1 column 10"#
+    )]
+    #[case(
+        r#"{"u64": "1"}"#,
+        r#"invalid type: string "1", expected u64, false, or null at line 1 column 11"#
+    )]
+    #[case(
+        r#"{"u64": true}"#,
+        r#"invalid value: boolean `true`, expected u64, false, or null at line 1 column 12"#
+    )]
+    fn test_deserialize_u64_or_none_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let u64_or_none: Result<U64OrNone, serde_json::Error> = serde_json::from_str(test_case);
+        assert!(u64_or_none.is_err(), "The serializer should emit an error");
+        assert_eq!(
+            u64_or_none.err().unwrap().to_string(),
+            expected_error_message
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct U64OrNoneWithZeroAsNone {
+        #[serde(deserialize_with = "deserialize_u64_or_none_with_zero_as_none")]
+        pub u64: Option<u64>,
+    }
+
+    #[rstest]
+    #[case(r#"{"u64": 1}"#, Some(1))]
+    #[case(r#"{"u64": false}"#, None)]
+    #[case(r#"{"u64": null}"#, None)]
+    #[case(r#"{"u64": 0}"#, None)]
+    fn test_deserialize_u64_or_none_with_zero_as_none(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<u64>,
+    ) {
+        let u64_or_none: U64OrNoneWithZeroAsNone =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, u64_or_none.u64);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"u64": "1"}"#,
+        r#"invalid type: string "1", expected u64, false, or null at line 1 column 11"#
+    )]
+    #[case(
+        r#"{"u64": true}"#,
+        r#"invalid value: boolean `true`, expected u64, false, or null at line 1 column 12"#
+    )]
+    fn test_deserialize_u64_or_none_with_zero_as_none_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let u64_or_none: Result<U64OrNoneWithZeroAsNone, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert!(u64_or_none.is_err(), "The serializer should emit an error");
+        assert_eq!(
+            u64_or_none.err().unwrap().to_string(),
+            expected_error_message
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct U64OrNoneWithNegativeAsNone {
+        #[serde(deserialize_with = "deserialize_u64_or_none_with_negative_as_none")]
+        pub u64: Option<u64>,
+    }
+
+    #[rstest]
+    #[case(r#"{"u64": 1}"#, Some(1))]
+    #[case(r#"{"u64": false}"#, None)]
+    #[case(r#"{"u64": null}"#, None)]
+    #[case(r#"{"u64": -1}"#, None)]
+    fn test_deserialize_u64_or_none_with_negative_as_none(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<u64>,
+    ) {
+        let u64_or_none: U64OrNoneWithNegativeAsNone =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, u64_or_none.u64);
+    }
+
+    #[rstest]
+    #[case(r#"{"u64": "1"}"#, r#"invalid type: string "1", expected u64, false, null, or negative number at line 1 column 11"#)]
+    #[case(r#"{"u64": true}"#, r#"invalid value: boolean `true`, expected u64, false, null, or negative number at line 1 column 12"#)]
+    fn test_deserialize_u64_or_none_with_negative_as_none_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let u64_or_none: Result<U64OrNoneWithNegativeAsNone, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert!(u64_or_none.is_err(), "The serializer should emit an error");
+        assert_eq!(
+            u64_or_none.err().unwrap().to_string(),
+            expected_error_message
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct StringVecOrString {
+        #[serde(deserialize_with = "deserialize_string_vec_or_string")]
+        pub string: Vec<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"string": "string"}"#, vec!["string".to_string()])]
+    #[case(r#"{"string": ["string", "string2"]}"#, vec!["string".to_string(), "string2".to_string()])]
+    #[case(r#"{"string": []}"#, vec![])]
+    fn test_deserialize_string_vec_or_string(
+        #[case] test_case: &str,
+        #[case] expected_result: Vec<String>,
+    ) {
+        let string_vec_or_string: StringVecOrString =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, string_vec_or_string.string);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct OptionStringVecOrString {
+        #[serde(deserialize_with = "deserialize_string_vec_or_string_as_option")]
+        #[serde(default)]
+        pub string: Option<Vec<String>>,
+    }
+
+    #[rstest]
+    #[case(r#"{"string": "string"}"#, Some(vec!["string".to_string()]))]
+    #[case(r#"{"string": ["string", "string2"]}"#, Some(vec!["string".to_string(), "string2".to_string()]))]
+    #[case(r#"{"string": []}"#, Some(vec![]))]
+    #[case(r#"{"string": null}"#, None)]
+    #[case(r#"{}"#, None)]
+    fn test_deserialize_string_vec_or_string_as_option(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<Vec<String>>,
+    ) {
+        let option_string_vec_or_string: OptionStringVecOrString =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, option_string_vec_or_string.string);
+    }
+
+    #[derive(Debug, Deserialize, PartialEq, Eq)]
+    pub struct OptionStructOrEmptyArray {
+        #[serde(deserialize_with = "deserialize_empty_vec_or_none")]
+        pub value: Option<OptionStructOrEmptyArrayInner>,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq, Eq)]
+    pub struct OptionStructOrEmptyArrayInner {
+        foo: String,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": {"foo": "bar"}}"#, Some(OptionStructOrEmptyArrayInner { foo: "bar".to_string() }))]
+    #[case(r#"{"value": []}"#, None)]
+    fn test_deserialize_empty_vec_or_none(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<OptionStructOrEmptyArrayInner>,
+    ) {
+        let option_struct: OptionStructOrEmptyArray =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, option_struct.value);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct NullAsEmptyVec {
+        #[serde(deserialize_with = "deserialize_null_as_empty_vec")]
+        pub value: Vec<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": ["string", "string2"]}"#, vec!["string".to_string(), "string2".to_string()])]
+    #[case(r#"{"value": []}"#, vec![])]
+    #[case(r#"{"value": null}"#, vec![])]
+    fn test_deserialize_null_as_empty_vec(
+        #[case] test_case: &str,
+        #[case] expected_result: Vec<String>,
+    ) {
+        let null_as_empty_vec: NullAsEmptyVec =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, null_as_empty_vec.value);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"value": false}"#,
+        r#"invalid type: boolean `false`, expected null or a sequence at line 1 column 15"#
+    )]
+    fn test_deserialize_null_as_empty_vec_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let null_as_empty_vec: Result<NullAsEmptyVec, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert!(
+            null_as_empty_vec.is_err(),
+            "The serializer should emit an error"
+        );
+        assert_eq!(
+            null_as_empty_vec.err().unwrap().to_string(),
+            expected_error_message
+        );
     }
 }

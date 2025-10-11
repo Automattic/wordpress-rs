@@ -49,6 +49,10 @@ data class TestCredentials(
     val integrationTestCustomTemplateId: String,
     @SerialName("revisioned_post_id")
     val revisionedPostId: Long,
+    @SerialName("primary_menu_location")
+    val primaryMenuLocation: String,
+    @SerialName("nav_menu_item_id")
+    val navMenuItemId: Long,
 ) {
     companion object {
         private val json by lazy {

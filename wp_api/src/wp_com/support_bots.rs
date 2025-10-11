@@ -7,13 +7,16 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
+use wp_serde_helper::deserialize_empty_vec_or_none;
 
 use super::WpComSiteId;
 
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct CreateBotConversationParams {
     pub message: String,
-    pub user_id: UserId,
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<UserId>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
@@ -54,6 +57,14 @@ pub struct BotMessageContext {
     pub flags: HashMap<String, bool>,
 }
 
+#[uniffi::export]
+pub fn user_wants_to_talk_to_a_human(context: &BotMessageContext) -> bool {
+    *context
+        .flags
+        .get("forward_to_human_support")
+        .unwrap_or(&false)
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct BotMessageContextSource {
     pub title: String,
@@ -70,11 +81,12 @@ pub struct BotMessageContextSource {
 #[serde(rename_all = "snake_case")]
 pub struct UserMessageContext {
     #[serde(alias = "selectedSiteId")]
-    pub selected_site_id: WpComSiteId,
+    pub selected_site_id: Option<WpComSiteId>,
     pub wpcom_user_id: UserId,
     pub wpcom_user_name: String,
     pub user_paid_support_eligibility: UserPaidSupportEligibility,
-    pub plan: UserPaidSupportPlan,
+    #[serde(deserialize_with = "deserialize_empty_vec_or_none")]
+    pub plan: Option<UserPaidSupportPlan>,
     pub products: Vec<String>,
     pub plan_interface: bool,
 }
@@ -123,8 +135,8 @@ pub struct GetBotConversationParams {
 impl AppendUrlQueryPairs for GetBotConversationParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
         query_pairs_mut
-            .append_option_query_value_pair("page", self.page_number.as_ref())
-            .append_option_query_value_pair("per_page", self.items_per_page.as_ref())
+            .append_option_query_value_pair("page_number", self.page_number.as_ref())
+            .append_option_query_value_pair("items_per_page", self.items_per_page.as_ref())
             .append_query_value_pair("include_feedback", &self.include_feedback.to_string());
     }
 }
@@ -199,6 +211,9 @@ impl std::fmt::Display for MessageId {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+    use std::io::Read;
+
     use super::*;
 
     #[test]
@@ -209,12 +224,17 @@ mod tests {
         assert_eq!(conversation.chat_id, 1965886);
     }
 
-    #[test]
-    fn test_bot_conversation_deserialization() {
-        let json = include_str!("../../tests/wpcom/support_bots/single-conversation.json");
-        let conversation: BotConversation =
-            serde_json::from_str(json).expect("Failed to deserialize bot conversation");
-        assert_eq!(conversation.chat_id, 1965758);
+    #[rstest]
+    #[case("single-conversation-01.json", 1965758)]
+    #[case("single-conversation-02.json", 1234567)]
+    fn test_bot_conversation_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expected_chat_id: u64,
+    ) {
+        let json = test_json(json_file_path).expect("Failed to read JSON file");
+        let conversation: BotConversation = serde_json::from_slice(json.as_slice())
+            .expect("Failed to deserialize bot conversation");
+        assert_eq!(conversation.chat_id, expected_chat_id);
     }
 
     #[test]
@@ -234,5 +254,22 @@ mod tests {
         let conversation: BotConversation =
             serde_json::from_str(json).expect("Failed to deserialize bot conversation");
         assert_eq!(conversation.chat_id, 1965758);
+    }
+
+    fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+        file_path.push("wp_api");
+        file_path.push("tests");
+        file_path.push("wpcom");
+        file_path.push("support_bots");
+        file_path.push(input);
+
+        let mut f = std::fs::File::open(file_path)?;
+        let mut buffer = Vec::new();
+
+        // read the whole file
+        f.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
     }
 }

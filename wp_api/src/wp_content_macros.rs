@@ -43,6 +43,48 @@ macro_rules! wp_content_i64_id {
     };
 }
 
+/// Generates a WordPress content ID type based on u64 with standard implementations
+///
+/// This macro creates:
+/// - The ID struct with uniffi support
+/// - AsQueryValue implementation  
+/// - FromStr, Display, and From implementations
+///
+/// # Example
+/// ```rust,ignore
+/// wp_api::wp_content_u64_id!(PostId);
+/// // Generates: PostId(u64) with all required traits
+/// ```
+#[macro_export]
+macro_rules! wp_content_u64_id {
+    ($id_type:ident) => {
+        $crate::impl_as_query_value_for_new_type!($id_type);
+        ::uniffi::custom_newtype!($id_type, u64);
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        pub struct $id_type(pub u64);
+
+        impl ::core::str::FromStr for $id_type {
+            type Err = ::core::num::ParseIntError;
+
+            fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
+                s.parse().map(Self)
+            }
+        }
+
+        impl ::core::fmt::Display for $id_type {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
+        impl From<u64> for $id_type {
+            fn from(value: u64) -> Self {
+                Self(value)
+            }
+        }
+    };
+}
+
 /// Generates a WordPress content identifier type based on String with standard implementations
 ///
 /// This macro creates:
@@ -60,7 +102,17 @@ macro_rules! wp_content_string_id {
     ($id_type:ident) => {
         ::uniffi::custom_newtype!($id_type, ::std::string::String);
         $crate::impl_as_query_value_from_to_string!($id_type);
-        #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        #[derive(
+            Debug,
+            Clone,
+            Hash,
+            PartialEq,
+            Eq,
+            PartialOrd,
+            Ord,
+            ::serde::Serialize,
+            ::serde::Deserialize,
+        )]
         pub struct $id_type(pub ::std::string::String);
 
         impl ::core::str::FromStr for $id_type {

@@ -40,7 +40,7 @@ protocol ListViewModel {
                 }
             }
         } catch {
-            self.error = .init(underlyingError: error)
+            self.error = MyError(underlyingError: error)
             self.shouldPresentAlert = true
         }
     }

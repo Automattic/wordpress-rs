@@ -4,7 +4,7 @@
 docker_container_repo_dir=/app
 
 # Common docker options
-rust_docker_container := public.ecr.aws/docker/library/rust:1.89.0
+rust_docker_container := public.ecr.aws/docker/library/rust:1.90.0
 
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e TEST_ALL_PLUGINS -e CARGO_HOME=/app/.cargo $(rust_docker_container)
@@ -102,7 +102,7 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 
 # Build the library for a specific target
 _build-apple-%:
-	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --package wp_api --profile $(CARGO_PROFILE) --no-default-features
+	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --features export-uncancellable-endpoints --package wp_api --profile $(CARGO_PROFILE) --no-default-features
 	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libwp_api.a
 
 # Build the library for one single platform, including real device and simulator.
@@ -141,7 +141,7 @@ docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
 
 swift-linux-library:
-	cargo build --release --package wp_api
+	cargo build --release --features export-uncancellable-endpoints --package wp_api
 	./scripts/swift-bindings.sh target/release/libwp_api.a
 	mkdir -p target/release/libwordpressFFI-linux
 	cp target/release/swift-bindings/Headers/* target/release/libwordpressFFI-linux/
@@ -272,7 +272,7 @@ validate-localizations:
 	@# Help: Validate localization files using `wp_localization_validation` crate
 	$(rust_docker_run) /bin/bash -c "cargo run --bin wp_localization_validation -- --localization-folder ./wp_localization/localization/"
 
-format-swift:
+fmt-swift:
 	@# Help: Format the Swift binding code
 	xcrun swift format -i -r native/swift/Sources/wordpress-api-wrapper
 
