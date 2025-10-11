@@ -23,7 +23,7 @@ impl From<rusqlite::Error> for SqliteDbError {
 
 #[derive(uniffi::Object)]
 pub struct WpApiCache {
-    inner: DBManager
+    inner: DBManager,
 }
 
 #[uniffi::export]
@@ -31,19 +31,13 @@ impl WpApiCache {
     #[uniffi::constructor]
     pub fn new(path: Option<String>) -> Result<Self, SqliteDbError> {
         Ok(Self {
-            inner: DBManager::new(&path)?
+            inner: DBManager::new(&path)?,
         })
     }
 
     pub fn perform_migrations(&self) -> Result<u64, SqliteDbError> {
         let connection: &Connection = &self.inner.connection.lock().unwrap();
         Ok(MigrationManager::new(connection)?.perform_migrations()?)
-    }
-
-    pub fn flush(&self) -> Result<(), SqliteDbError> {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        connection.execute("commit", ())?;
-        Ok(())
     }
 
     pub fn start_listening_for_updates(&self, delegate: Arc<dyn DatabaseDelegate>) {
@@ -106,7 +100,8 @@ impl<'a> MigrationManager<'a> {
                 self.connection.execute(query, ())?;
             }
 
-            self.insert_migration((index + 1) as u64)?;
+            // `.enumerate` will start the indexes from 0, so we need to add `next_migration_id`
+            self.insert_migration((next_migration_id + index + 1) as u64)?;
         }
 
         Ok(MIGRATION_QUERIES[next_migration_id..].len() as u64)
@@ -190,6 +185,46 @@ impl DBManager {
             connection = Connection::open_in_memory()?;
         }
 
-        Ok(Self { connection: Mutex::new(connection) })
+        Ok(Self {
+            connection: Mutex::new(connection),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_migration_numbering_should_be_sequential() {
+        let connection = Connection::open_in_memory().unwrap();
+        let mut migration_manager = MigrationManager::new(&connection).unwrap();
+
+        // Create migrations table and run first migration manually
+        migration_manager.create_migrations_table().unwrap();
+        migration_manager.insert_migration(1).unwrap();
+
+        migration_manager
+            .perform_migrations()
+            .expect("Migrations should succeed");
+
+        // Verify migration IDs are sequential
+        let mut stmt = connection
+            .prepare("SELECT migration_id FROM _migrations ORDER BY migration_id")
+            .unwrap();
+        let migration_ids: Vec<u64> = stmt
+            .query_map([], |row| row.get::<_, u64>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        // Verify migration IDs are sequential and complete
+        let expected_ids: Vec<u64> = (1..=MIGRATION_QUERIES.len() as u64).collect();
+        assert_eq!(
+            migration_ids,
+            expected_ids,
+            "Migration IDs should be sequential from 1 to {}",
+            MIGRATION_QUERIES.len()
+        );
     }
 }
