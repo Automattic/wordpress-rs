@@ -8,7 +8,7 @@ import uniffi.wp_api.WpApiCache
 import java.nio.file.Path
 import java.util.concurrent.Executors
 
-class WordPressApiCacheLoggingDelegate: DatabaseDelegate {
+class WordPressApiCacheLoggingDelegate : DatabaseDelegate {
     override fun didUpdate(updateHook: UpdateHook) {
         println("Received update: $updateHook")
     }
