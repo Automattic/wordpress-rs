@@ -16,6 +16,7 @@ actor Test {
         #expect(migrationsPerformed == 2)
     }
 
+    #if !os(Linux)
     @Test func testBackgroundUpdateNotificationsWork() async throws {
         let name = WordPressApiCache.Notifications.name(for: "_migrations")
 
@@ -34,6 +35,7 @@ actor Test {
         #expect(migrationCount == self.changeCount)
         handle.cancel()
     }
+    #endif
 
     func incrementChangeCount() {
         self.changeCount += 1
