@@ -32,16 +32,17 @@ async fn create_post_with_title_and_meta() {
         &PostCreateParams {
             title: Some("foo".to_string()),
             meta: Some(PostMeta {
-                footnotes: vec![PostFootnote {
+                footnotes: Some(vec![PostFootnote {
                     id: "bar".to_string(),
                     content: "baz".to_string(),
-                }],
+                }]),
             }),
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
             let meta = created_post.meta.unwrap();
-            let footnote = meta.footnotes.first().unwrap();
+            let footnotes = meta.footnotes.unwrap();
+            let footnote = footnotes.first().unwrap();
             assert_eq!(created_post.title.raw, Some("foo".to_string()));
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(footnote.id, "bar");
@@ -313,14 +314,15 @@ generate_update_test!(
     update_meta_to_add_footnote,
     meta,
     PostMeta {
-        footnotes: vec![PostFootnote {
+        footnotes: Some(vec![PostFootnote {
             id: "foo".to_string(),
             content: "bar".to_string()
-        }]
+        }])
     },
     |updated_post, _| {
         let meta = updated_post.meta.unwrap();
-        let footnote = meta.footnotes.first().unwrap();
+        let footnotes = meta.footnotes.unwrap();
+        let footnote = footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");
     }

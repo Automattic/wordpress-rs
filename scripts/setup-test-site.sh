@@ -138,6 +138,20 @@ create_nav_menu_item_autosave() {
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"title\":\"nav_menu_item_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/menu-items/$nav_menu_item_id/autosaves"
 }
 
+create_navigation_revision() {
+  local revision_number="$1"
+  local navigation_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$revision_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/navigation/$navigation_id" > /dev/null
+}
+
+create_navigation_autosave() {
+  local autosave_number="$1"
+  local navigation_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/navigation/$navigation_id/autosaves"
+}
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME
@@ -243,6 +257,22 @@ create_test_credentials () {
   NAVIGATION_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Navigation","content":"<!-- wp:navigation --><!-- /wp:navigation -->","status":"publish"}' http://localhost/wp-json/wp/v2/navigation)"
   NAVIGATION_ID="$(echo "$NAVIGATION_RESPONSE" | jq -r '.id')"
 
+  echo "Setting up navigation with 10 revisions for integration tests.."
+  # Create revisions for the navigation
+  for i in {1..10};
+  do
+    create_navigation_revision "$i" "$NAVIGATION_ID"
+  done
+  # Generating revisions don't return an id, but since we just created the `NAVIGATION_ID`, we can use it to calculate the revision id
+  REVISION_ID_FOR_NAVIGATION_ID=$((NAVIGATION_ID + 1))
+
+  echo "Setting up navigation with autosave for integration tests.."
+  # Create navigation as author user to enable proper autosave behavior (same requirement as posts/pages)
+  AUTOSAVED_NAVIGATION_ID="$(wp post create --post_type=wp_navigation --post_title='Autosaved Navigation FOR INTEGRATION TESTS' --post_content='<!-- wp:navigation --><!-- /wp:navigation -->' --post_status=publish --post_author="$AUTHOR_USER_ID" --porcelain)"
+  # Create autosave as admin user (different from navigation author) and capture its ID
+  AUTOSAVE_NAVIGATION_RESPONSE="$(create_navigation_autosave "1" "$AUTOSAVED_NAVIGATION_ID")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID="$(echo "$AUTOSAVE_NAVIGATION_RESPONSE" | jq -r '.id')"
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -281,6 +311,9 @@ create_test_credentials () {
     nav_menu_item_id="$NAV_MENU_ITEM_ID" \
     autosave_id_for_nav_menu_item_id="$AUTOSAVE_ID_FOR_NAV_MENU_ITEM_ID" \
     navigation_id="$NAVIGATION_ID" \
+    revision_id_for_navigation_id="$REVISION_ID_FOR_NAVIGATION_ID" \
+    autosaved_navigation_id="$AUTOSAVED_NAVIGATION_ID" \
+    autosave_id_for_autosaved_navigation_id="$AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials

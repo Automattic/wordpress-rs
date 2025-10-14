@@ -24,7 +24,7 @@ where
 struct StringOfJsonArrayVisitor<T>(PhantomData<T>);
 
 impl<T: DeserializeOwned> de::Visitor<'_> for StringOfJsonArrayVisitor<T> {
-    type Value = Vec<T>;
+    type Value = Option<Vec<T>>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str("a string containing json array")
@@ -35,14 +35,16 @@ impl<T: DeserializeOwned> de::Visitor<'_> for StringOfJsonArrayVisitor<T> {
         E: de::Error,
     {
         if v.is_empty() {
-            Ok(vec![])
+            Ok(None)
         } else {
             serde_json::from_str(v).map_err(E::custom)
         }
     }
 }
 
-pub fn deserialize_from_string_of_json_array<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+pub fn deserialize_from_string_of_json_array<'de, T, D>(
+    deserializer: D,
+) -> Result<Option<Vec<T>>, D::Error>
 where
     T: DeserializeOwned,
     D: de::Deserializer<'de>,
