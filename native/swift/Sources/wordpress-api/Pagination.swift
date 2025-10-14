@@ -530,6 +530,36 @@ extension CommentsRequestExecutor: PaginationAwareExecutor {
 }
 
 // MARK: Menus
+extension NavigationsRequestFilterListWithEditContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavigationListParams
+    public typealias DataType = SparseNavigationWithEditContext
+}
+
+extension NavigationsRequestFilterListWithViewContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavigationListParams
+    public typealias DataType = SparseNavigationWithViewContext
+}
+
+extension NavigationsRequestFilterListWithEmbedContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavigationListParams
+    public typealias DataType = SparseNavigationWithEmbedContext
+}
+
+extension NavigationRevisionsRequestFilterListWithEditContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavigationRevisionListParams
+    public typealias DataType = SparseNavigationRevisionWithEditContext
+}
+
+extension NavigationRevisionsRequestFilterListWithViewContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavigationRevisionListParams
+    public typealias DataType = SparseNavigationRevisionWithViewContext
+}
+
+extension NavigationRevisionsRequestFilterListWithEmbedContextResponse: PaginatableResponse {
+    public typealias ParamsType = NavigationRevisionListParams
+    public typealias DataType = SparseNavigationRevisionWithEmbedContext
+}
+
 extension NavMenuItemsRequestListWithEditContextResponse: PaginatableResponse {
     public typealias ParamsType = NavMenuItemListParams
     public typealias DataType = NavMenuItemWithEditContext

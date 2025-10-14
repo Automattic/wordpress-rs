@@ -205,6 +205,11 @@ public typealias NavigationWithEditContext = WordPressAPIInternal.NavigationWith
 public typealias NavigationWithViewContext = WordPressAPIInternal.NavigationWithViewContext
 public typealias NavigationWithEmbedContext = WordPressAPIInternal.NavigationWithEmbedContext
 
+public typealias NavigationRevisionListParams = WordPressAPIInternal.NavigationRevisionListParams
+public typealias NavigationRevisionWithEditContext = WordPressAPIInternal.NavigationRevisionWithEditContext
+public typealias NavigationRevisionWithViewContext = WordPressAPIInternal.NavigationRevisionWithViewContext
+public typealias NavigationRevisionWithEmbedContext = WordPressAPIInternal.NavigationRevisionWithEmbedContext
+
 // MARK: - Menus
 public typealias SparseNavMenu = WordPressAPIInternal.SparseNavMenu
 public typealias NavMenuListParams = WordPressAPIInternal.NavMenuListParams
