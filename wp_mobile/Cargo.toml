@@ -13,6 +13,7 @@ name = "wp_mobile"
 [dependencies]
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
+wp_mobile_cache = { path = "../wp_mobile_cache" }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

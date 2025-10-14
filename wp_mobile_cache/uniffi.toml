@@ -1,0 +1,13 @@
+[bindings.kotlin]
+android = false
+android_cleaner = false
+cdylib_name = "wp_mobile"
+generate_immutable_records = true
+
+[bindings.swift]
+ffi_module_name = "libwordpressFFI"
+ffi_module_filename = "wp_mobile_cache_uniffi"
+generate_module_map = false
+generate_immutable_records = true
+experimental_sendable_value_types = true
+omit_localized_error_conformance = true
