@@ -117,7 +117,7 @@ pub struct BotMessageSummary {
     pub created_at: WpGmtDateTime,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, uniffi::Record)]
+#[derive(Debug, Default, PartialEq, Eq, Deserialize, uniffi::Record)]
 pub struct GetBotConversationParams {
     // The number of the page to retrieve, limited to 100.
     #[uniffi(default = None)]
