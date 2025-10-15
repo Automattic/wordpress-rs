@@ -150,7 +150,7 @@ pub enum PluginStatus {
 
 impl_as_query_value_from_to_string!(PluginStatus);
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct PluginDescription {
     pub raw: String,
     pub rendered: String,

@@ -32,7 +32,7 @@ pub struct SparseWidget {
     pub form_data: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct WidgetInstance {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoded: Option<String>,

@@ -142,7 +142,7 @@ pub struct AnyJson {
 }
 
 uniffi::custom_newtype!(WpResponseString, Option<String>);
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "BoolOrString")]
 pub struct WpResponseString(pub Option<String>);
 

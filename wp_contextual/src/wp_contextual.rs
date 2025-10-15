@@ -7,6 +7,16 @@ use syn::{DeriveInput, Ident, spanned::Spanned};
 
 const IDENT_PREFIX: &str = "Sparse";
 
+/// Checks if the type has #[WpContextualDontDerivePartialEq] attribute.
+///
+/// When present, PartialEq won't be added to the generated types.
+/// This is useful for types that contain fields that don't support PartialEq.
+fn has_dont_derive_partial_eq_attr(attrs: &[syn::Attribute]) -> bool {
+    attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("WpContextualDontDerivePartialEq"))
+}
+
 pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     let original_ident = &ast.ident;
     let original_ident_name = original_ident.to_string();
@@ -19,17 +29,37 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
         struct_fields(&ast.data).map_err(|err| err.into_syn_error(original_ident.span()))?;
     let parsed_fields = parse_fields(fields)?;
 
+    // Check if PartialEq should be derived
+    let should_derive_partial_eq = !has_dont_derive_partial_eq_attr(&ast.attrs);
+
     let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
         let generate_type = |is_sparse, ident, generated_fields: &Vec<GeneratedContextualField>| {
             if !generated_fields.is_empty() {
-                let deserialize_derive = if is_sparse {
-                    quote! { wp_derive::WpDeserialize }
+                // Build the hardcoded derives
+                let mut derives: Vec<syn::Path> = vec![syn::parse_quote!(Debug)];
+
+                // Add PartialEq unless explicitly disabled
+                // Note: We only derive PartialEq, not Eq, because we can't guarantee
+                // that all field types will satisfy Eq's stricter requirements
+                // (e.g., floating point types where NaN != NaN)
+                if should_derive_partial_eq {
+                    derives.push(syn::parse_quote!(PartialEq));
+                }
+
+                derives.push(syn::parse_quote!(serde::Serialize));
+
+                // For sparse types use WpDeserialize, for non-sparse use Deserialize
+                if is_sparse {
+                    derives.push(syn::parse_quote!(wp_derive::WpDeserialize));
                 } else {
-                    quote! { serde::Deserialize }
-                };
+                    derives.push(syn::parse_quote!(serde::Deserialize));
+                }
+
+                derives.push(syn::parse_quote!(uniffi::Record));
+
                 let fields_to_add = generated_fields.iter().map(|f| &f.field);
                 quote! {
-                    #[derive(Debug, serde::Serialize, #deserialize_derive, uniffi::Record)]
+                    #[derive(#(#derives),*)]
                     pub struct #ident {
                         #(#fields_to_add,)*
                     }

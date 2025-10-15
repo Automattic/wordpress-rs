@@ -110,49 +110,49 @@ impl Display for ThemeStylesheet {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeAuthor {
     pub raw: String,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeAuthorName {
     pub raw: String,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeAuthorUri {
     pub raw: String,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeAuthorDescription {
     pub raw: String,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeDescription {
     pub raw: String,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeName {
     pub raw: String,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeTags {
     pub raw: Vec<String>,
     pub rendered: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ThemeUri {
     pub raw: String,
     pub rendered: String,
