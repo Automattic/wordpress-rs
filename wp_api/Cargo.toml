@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+default = ["rusqlite/bundled"]
 export-uncancellable-endpoints = ["wp_derive_request_builder/export-uncancellable-endpoints"]
 integration-tests = []
 reqwest-request-executor = ["dep:reqwest", "dep:tokio", "dep:hyper-util", "dep:rustls", "dep:hickory-resolver", "dep:hyper", "dep:h2"]
@@ -48,6 +49,7 @@ wp_localization = { path = "../wp_localization" }
 wp_localization_macro = { path = "../wp_localization_macro" }
 wp_serde_helper = { path = "../wp_serde_helper" }
 x509-cert = { workspace = true }
+rusqlite = { version = "0.37.0", features = ["hooks"] }
 
 [dev-dependencies]
 rstest = { workspace = true }

@@ -26,6 +26,10 @@ var package = Package(
         .library(
             name: "WordPressAPI",
             targets: ["WordPressAPI"]
+        ),
+        .library(
+            name: "WordPressApiCache",
+            targets: ["WordPressApiCache"]
         )
     ],
     dependencies: [
@@ -56,6 +60,13 @@ var package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
+        .target(
+            name: "WordPressApiCache",
+            dependencies: [
+                .target(name: "WordPressAPIInternal")
+            ],
+            path: "native/swift/Sources/wordpress-api-cache"
+        ),
         libwordpressFFI,
         .testTarget(
             name: "WordPressAPITests",
@@ -68,6 +79,14 @@ var package = Package(
             swiftSettings: [
                 .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]
+        ),
+        .testTarget(
+            name: "WordPressApiCacheTests",
+            dependencies: [
+                .target(name: "WordPressApiCache"),
+                .target(name: "WordPressAPIInternal")
+            ],
+            path: "native/swift/Tests/wordpress-api-cache"
         )
     ].addingIntegrationTests()
 )

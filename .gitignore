@@ -6,6 +6,10 @@
 /docs
 /docs.tar.gz
 
+# Test DB Files
+kotlin.db
+swift.db
+
 # Ignore Gradle project-specific cache directory
 .gradle
 
@@ -32,7 +36,6 @@ DerivedData
 fastlane/report.xml
 libwordPressFFI.xcframework*
 /swift-docs.tar.gz
-
 
 # Auto-generated Swift Files
 native/swift/Sources/wordpress-api-wrapper/*.swift

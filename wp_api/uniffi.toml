@@ -12,7 +12,7 @@ from_custom = "{}.toInstant().epochSecond"
 
 [bindings.swift.custom_types.WpGmtDateTime]
 type_name = "Date"
-imports = ["Foundation"]
+imports = ["SQLite3"]
 into_custom = "Date(timeIntervalSince1970: TimeInterval({}))"
 from_custom = "Int64({}.timeIntervalSince1970)"
 
