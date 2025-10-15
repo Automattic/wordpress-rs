@@ -512,7 +512,8 @@ mod wp_contextual;
         WpContext,
         WpContextualField,
         WpContextualOption,
-        WpContextualExcludeFromFields
+        WpContextualExcludeFromFields,
+        WpContextualDontDerivePartialEq
     )
 )]
 pub fn derive(input: TokenStream) -> TokenStream {

@@ -467,14 +467,14 @@ pub struct SparsePostContent {
     pub block_version: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct SparsePostExcerpt {
     pub raw: Option<String>,
     pub rendered: Option<String>,
     pub protected: Option<bool>,
 }
 
-#[derive(Debug, Serialize, WpDeserialize, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, Serialize, WpDeserialize, uniffi::Record)]
 pub struct PostMeta {
     #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
     #[serde(serialize_with = "serialize_as_json_string")]

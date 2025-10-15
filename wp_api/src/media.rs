@@ -341,6 +341,7 @@ impl From<MediaCreateParams> for HashMap<String, String> {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
+#[WpContextualDontDerivePartialEq]
 pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub id: Option<MediaId>,
