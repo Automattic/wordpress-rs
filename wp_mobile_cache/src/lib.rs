@@ -4,6 +4,11 @@ use std::sync::{Arc, Mutex};
 
 pub mod mappings;
 
+#[cfg(test)]
+pub mod test_fixtures;
+#[cfg(test)]
+pub mod unit_test_common;
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),

@@ -1,5 +1,5 @@
-use rusqlite::{Connection, Row};
 use crate::SqliteDbError;
+use rusqlite::{Connection, Row};
 
 pub mod helpers;
 pub mod posts;
