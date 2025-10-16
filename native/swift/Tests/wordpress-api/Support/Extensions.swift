@@ -19,14 +19,6 @@ extension PaginatableResponse {
     }
 }
 
-// These `Sendable` conformances are **NOT** safe – they're for the test suite only.
-//
-// Until or unless `WpNetworkRequest` and `WpNetworkRequest` become `uniffi::Record` (thus Structs)
-// we can't guarantee that they're thread-safe
-
-extension WpNetworkRequest: @unchecked Sendable {}
-extension WpNetworkResponse: @unchecked Sendable {}
-
 // This is only for testing – it's not production-ready
 // extension WordPressLoginClientError: Equatable {
 //    public static func == (lhs: WordPressLoginClientError, rhs: WordPressLoginClientError) -> Bool {

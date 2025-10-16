@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const XCFRAMEWORK_OUTPUT_PATH: &str = "target/libwordpressFFI.xcframework";
-const LIBRARY_FILENAME: &str = "libwordpress.a";
+const LIBRARY_FILENAME: &str = "libwp_mobile.a";
 
 fn main() -> Result<()> {
     CreateXCFramework::parse().run()
@@ -217,7 +217,7 @@ impl Slice {
 
         // If there are more static libraries (a.k.a cargo packages), we'll
         // need to bundle them together into one static library.
-        // At the moment, we only have one libwp_api, so we can just copy it.
+        // At the moment, we only have one libwp_mobile, so we can just copy it.
         assert!(
             libs.len() == 1,
             "Expected exactly one library for each slice"
@@ -251,7 +251,7 @@ impl Slice {
     }
 
     fn built_libraries(&self) -> Vec<PathBuf> {
-        vec![self.built_product_dir().join("libwp_api.a")]
+        vec![self.built_product_dir().join(LIBRARY_FILENAME)]
     }
 }
 

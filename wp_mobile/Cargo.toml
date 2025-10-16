@@ -5,6 +5,7 @@ edition = "2024"
 
 [features]
 reqwest-request-executor = ["wp_api/reqwest-request-executor"]
+export-uncancellable-endpoints = ["wp_api/export-uncancellable-endpoints"]
 
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]

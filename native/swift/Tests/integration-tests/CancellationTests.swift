@@ -19,7 +19,12 @@ struct CancellationTests {
             throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError),
             performing: {
                 let task = Task {
-                    _ = try await api.posts.create(params: .init(title: title, content: content, meta: nil))
+                    let params = PostCreateParams(
+                        title: title,
+                        content: content,
+                        meta: nil
+                    )
+                    _ = try await api.posts.create(postEndpointType: .posts, params: params)
                     Issue.record("The creating post function should throw")
                 }
 
