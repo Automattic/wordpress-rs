@@ -33,6 +33,7 @@ allprojects {
         exclude("**/wp_api.kt")
         exclude("**/wp_localization.kt")
         exclude("**/wp_mobile.kt")
+        exclude("**/wp_mobile_cache.kt")
     }
 
     tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
@@ -42,6 +43,7 @@ allprojects {
         exclude("**/wp_api.kt")
         exclude("**/wp_localization.kt")
         exclude("**/wp_mobile.kt")
+        exclude("**/wp_mobile_cache.kt")
     }
 
     dependencies {

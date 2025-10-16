@@ -1,0 +1,13 @@
+[package]
+name = "wp_mobile_cache"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["rusqlite/bundled"]
+
+[dependencies]
+rusqlite = { version = "0.37.0", features = ["hooks"] }
+thiserror = { workspace = true }
+uniffi = { workspace = true }
+wp_api = { path = "../wp_api" }

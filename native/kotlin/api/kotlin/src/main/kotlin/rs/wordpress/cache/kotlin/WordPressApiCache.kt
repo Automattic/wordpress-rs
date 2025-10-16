@@ -2,9 +2,9 @@ package rs.wordpress.cache.kotlin
 
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
-import uniffi.wp_api.DatabaseDelegate
-import uniffi.wp_api.UpdateHook
-import uniffi.wp_api.WpApiCache
+import uniffi.wp_mobile_cache.DatabaseDelegate
+import uniffi.wp_mobile_cache.UpdateHook
+import uniffi.wp_mobile_cache.WpApiCache
 import java.nio.file.Path
 import java.util.concurrent.Executors
 
@@ -13,6 +13,7 @@ class WordPressApiCacheLoggingDelegate : DatabaseDelegate {
         println("Received update: $updateHook")
     }
 }
+
 class WordPressApiCacheDelegate(
     private val callback: (updateHook: UpdateHook) -> Unit
 ) : DatabaseDelegate {
@@ -31,7 +32,10 @@ class WordPressApiCache {
     constructor(delegate: WordPressApiCacheDelegate? = null) : this(":memory:", delegate)
 
     // Creates a new cache at the specified file system URL
-    constructor(path: Path, delegate: WordPressApiCacheDelegate? = null) : this(path.toString(), delegate)
+    constructor(path: Path, delegate: WordPressApiCacheDelegate? = null) : this(
+        path.toString(),
+        delegate
+    )
 
     // Creates a new cache at the specified path
     constructor(string: String, delegate: WordPressApiCacheDelegate? = null) {
@@ -42,6 +46,7 @@ class WordPressApiCache {
     suspend fun performMigrations(): Int = withContext(internalDispatcher) {
         cache.performMigrations().toInt()
     }
+
     fun startListeningForUpdates() {
         if (this.delegate != null) {
             this.cache.startListeningForUpdates(this.delegate)

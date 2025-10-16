@@ -5,6 +5,7 @@ edition = "2024"
 
 [features]
 reqwest-request-executor = ["wp_api/reqwest-request-executor"]
+export-uncancellable-endpoints = ["wp_api/export-uncancellable-endpoints"]
 
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
@@ -13,6 +14,7 @@ name = "wp_mobile"
 [dependencies]
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
+wp_mobile_cache = { path = "../wp_mobile_cache" }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }
