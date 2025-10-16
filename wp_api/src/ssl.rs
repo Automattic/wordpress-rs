@@ -12,12 +12,12 @@ use crate::date::WpGmtDateTime;
 //
 // If this returns `None`, we weren't able to parse the certificate
 #[uniffi::export]
-pub fn parse_certificate(data: &[u8]) -> Option<Arc<SSLCertificateInfo>> {
+pub fn parse_certificate(data: &[u8]) -> Option<Arc<SslCertificateInfo>> {
     let certificate = Certificate::from_der(data).ok()?;
     let certificate: &x509_cert::certificate::TbsCertificateInner = certificate.tbs_certificate();
 
     Some(
-        SSLCertificateInfo {
+        SslCertificateInfo {
             valid_at: certificate.validity().not_before.into(),
             expires_at: certificate.validity().not_after.into(),
             common_name: extract_data_as_string(certificate.subject().common_name())?,
@@ -55,7 +55,7 @@ fn extract_alternative_names(cert: &x509_cert::certificate::TbsCertificateInner)
 
 #[derive(Debug, PartialEq, Eq, Hash, uniffi::Object)]
 #[uniffi::export(Eq, Hash)]
-pub struct SSLCertificateInfo {
+pub struct SslCertificateInfo {
     /// The domain this certificate is valid for (or the signer's name, if this is an intermediate or root certificate)
     pub common_name: String,
     /// Other domains this certificate is valid for
@@ -69,7 +69,7 @@ pub struct SSLCertificateInfo {
 }
 
 #[uniffi::export]
-impl SSLCertificateInfo {
+impl SslCertificateInfo {
     fn common_name(&self) -> String {
         self.common_name.clone()
     }
