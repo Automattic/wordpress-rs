@@ -254,7 +254,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
-    private func getPeerCertificateChain(_ error: Error) -> [SSLCertificateInfo]? {
+    private func getPeerCertificateChain(_ error: Error) -> [SslCertificateInfo]? {
         let nserror = error as NSError
         let info = nserror.userInfo
 
