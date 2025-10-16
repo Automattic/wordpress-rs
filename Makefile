@@ -137,6 +137,9 @@ xcframework-package: xcframework-all
 xcframework-package-checksum:
 	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
 
+xcframework-sign:
+	codesign --timestamp -v --sign "Apple Development: Created via API (886NX39KP6)" target/libwordpressFFI.xcframework
+
 docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
 

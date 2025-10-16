@@ -24,6 +24,21 @@ PROJECT_NAME = 'wordpress-rs'
 # GlotPress configuration
 GLOTPRESS_PROJECT_BASE_URL = 'https://translate.wordpress.com/projects/mobile/wordpress-rs'
 
+# Code Signing
+APPLE_TEAM_ID = 'PZYM8XX95Q'
+APPLE_BUNDLE_IDENTIFIER = 'com.automattic.hostmgr'
+
+ASC_API_KEY_ENV_VARS = %w[
+  APP_STORE_CONNECT_API_KEY_KEY_ID
+  APP_STORE_CONNECT_API_KEY_ISSUER_ID
+  APP_STORE_CONNECT_API_KEY_KEY
+].freeze
+
+CODE_SIGNING_STORAGE_ENV_VARS = %w[
+  MATCH_S3_ACCESS_KEY
+  MATCH_S3_SECRET_ACCESS_KEY
+].freeze
+
 # Supported locales mapping between GlotPress and project locale codes
 # This list combines locales supported in the iOS and Android apps
 SUPPORTED_LOCALES = [
@@ -90,7 +105,7 @@ lane :release do |options|
 
   validate
   update_swift_package
-  publish_github_release
+  publish_release_to_github
   publish_to_s3
 end
 
@@ -124,7 +139,7 @@ lane :update_swift_package do
   File.open(file_path, 'w') { |file| file.puts lines }
 end
 
-lane :publish_github_release do
+lane :publish_release_to_github do
   version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
   github_token = lane_context[LANE_VALUE_GITHUB_TOKEN] || UI.user_error!('Missing github token lane context')
 
@@ -396,6 +411,27 @@ lane :generate_fluent_file_from_po do |file_path:|
   fluent_file_path
 end
 
+desc 'Download the development signing certificates to this machine'
+lane :set_up_signing do |readonly: true|
+  require_env_vars!(*ASC_API_KEY_ENV_VARS, *CODE_SIGNING_STORAGE_ENV_VARS)
+
+  sync_code_signing(
+    platform: 'macos',
+    app_identifier: APPLE_BUNDLE_IDENTIFIER,
+    team_id: APPLE_TEAM_ID,
+    api_key: app_store_connect_api_key,
+    type: 'development',
+    certificate_id: 'Apple Development: Created via API (886NX39KP6)',
+
+    storage_mode: 's3',
+    s3_region: 'us-east-2',
+    s3_bucket: 'a8c-fastlane-match',
+
+    readonly: readonly
+  )
+end
+
+
 # Utils
 
 def xcframework_checksum
@@ -462,4 +498,18 @@ def only_date_headers_changed?(file_path)
   end
 
   changed_lines.all? { |l| l.include?('"POT-Creation-Date:') || l.include?('"PO-Revision-Date:') }
+end
+
+# Use this to ensure all env vars a lane requires are set.
+#
+# The best place to call this is at the start of a lane, to fail early.
+def require_env_vars!(*keys)
+  keys.each { |key| get_required_env!(key) }
+end
+
+# Use this instead of getting values from `ENV` directly. It will throw an error if the requested value is missing.
+def get_required_env!(key)
+  return ENV.fetch(key) if ENV.key?(key)
+
+  UI.user_error!("Environment variable `#{key}` is not set.")
 end

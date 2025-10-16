@@ -70,11 +70,18 @@ steps:
           make setup-rust
 
           echo "--- :swift: Building xcframework"
-          make xcframework
-          zip -r target/libwordpressFFI.xcframework.zip target/libwordpressFFI.xcframework
+          install_gems
+          bundle exec fastlane set_up_signing
+
+          make xcframework-package
+          make xcframework-package-checksum
+          make xcframework-sign
+
         artifact_paths:
-          - target/libwordpressFFI.xcframework.zip
+          - libwordpressFFI.xcframework.zip
+          - libwordpressFFI.xcframework.zip.checksum.txt
           - native/swift/Sources/wordpress-api-wrapper/*.swift
+        plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
       - label: ":swift: Build Docs"
