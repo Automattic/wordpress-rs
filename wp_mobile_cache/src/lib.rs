@@ -2,6 +2,8 @@ use rusqlite::hooks::Action;
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::{Arc, Mutex};
 
+pub mod mappings;
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),

@@ -1,0 +1,197 @@
+use crate::{
+    SqliteDbError,
+    mappings::{
+        ColumnIndex, InsertIntoDb, RowExt, TryFromDbRow,
+        helpers::{
+            bool_to_integer, deserialize_json_id_array, deserialize_json_value, get_id,
+            get_optional_id, integer_to_bool, parse_datetime, parse_enum, parse_optional_enum,
+            serialize_json_id_array, serialize_value_to_json,
+        },
+    },
+};
+use rusqlite::Row;
+use wp_api::posts::{
+    AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext,
+    PostTitleWithEditContext, SparsePostExcerpt,
+};
+
+/// Column indexes for posts_edit_context table.
+/// These must match the order of columns in the CREATE TABLE statement.
+#[repr(usize)]
+#[derive(Debug, Clone, Copy)]
+enum PostEditContextColumn {
+    Rowid = 0,
+    Id = 1,
+    Date = 2,
+    DateGmt = 3,
+    Link = 4,
+    Modified = 5,
+    ModifiedGmt = 6,
+    Slug = 7,
+    Status = 8,
+    PostType = 9,
+    Password = 10,
+    Template = 11,
+    PermalinkTemplate = 12,
+    GeneratedSlug = 13,
+    Author = 14,
+    FeaturedMedia = 15,
+    Sticky = 16,
+    Parent = 17,
+    MenuOrder = 18,
+    CommentStatus = 19,
+    PingStatus = 20,
+    Format = 21,
+    Meta = 22,
+    Categories = 23,
+    Tags = 24,
+    GuidRaw = 25,
+    GuidRendered = 26,
+    TitleRaw = 27,
+    TitleRendered = 28,
+    ContentRaw = 29,
+    ContentRendered = 30,
+    ContentProtected = 31,
+    ContentBlockVersion = 32,
+    ExcerptRaw = 33,
+    ExcerptRendered = 34,
+    ExcerptProtected = 35,
+}
+
+impl ColumnIndex for PostEditContextColumn {
+    fn as_index(&self) -> usize {
+        *self as usize
+    }
+}
+
+pub struct DbAnyPostWithEditContext {
+    pub row_id: i64,
+    pub post: AnyPostWithEditContext,
+}
+
+impl TryFromDbRow for DbAnyPostWithEditContext {
+    fn try_from_row(row: &Row) -> Result<Self, SqliteDbError> {
+        use PostEditContextColumn::*;
+
+        let row_id: i64 = row.get_column(Rowid)?;
+
+        let post = AnyPostWithEditContext {
+            id: get_id(row, Id)?,
+            date: row.get_column(Date)?,
+            date_gmt: parse_datetime(row, DateGmt)?,
+            guid: PostGuidWithEditContext {
+                raw: row.get_column(GuidRaw)?,
+                rendered: row.get_column(GuidRendered)?,
+            },
+            link: row.get_column(Link)?,
+            modified: row.get_column(Modified)?,
+            modified_gmt: parse_datetime(row, ModifiedGmt)?,
+            slug: row.get_column(Slug)?,
+            status: parse_enum(row, Status)?,
+            post_type: row.get_column(PostType)?,
+            password: row.get_column(Password)?,
+            permalink_template: row.get_column(PermalinkTemplate)?,
+            generated_slug: row.get_column(GeneratedSlug)?,
+            title: PostTitleWithEditContext {
+                raw: row.get_column(TitleRaw)?,
+                rendered: row.get_column(TitleRendered)?,
+            },
+            content: PostContentWithEditContext {
+                raw: row.get_column(ContentRaw)?,
+                rendered: row.get_column(ContentRendered)?,
+                protected: row.get_column(ContentProtected)?,
+                block_version: row.get_column(ContentBlockVersion)?,
+            },
+            author: get_optional_id(row, Author)?,
+            excerpt: {
+                // Presence of excerpt is determined by excerpt_rendered being Some
+                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                if excerpt_rendered.is_some() {
+                    Some(SparsePostExcerpt {
+                        raw: row.get_column(ExcerptRaw)?,
+                        rendered: excerpt_rendered,
+                        protected: row.get_column(ExcerptProtected)?,
+                    })
+                } else {
+                    None
+                }
+            },
+            featured_media: get_optional_id(row, FeaturedMedia)?,
+            comment_status: parse_optional_enum(row, CommentStatus)?,
+            ping_status: parse_optional_enum(row, PingStatus)?,
+            format: parse_optional_enum(row, Format)?,
+            meta: deserialize_json_value(row.get_column(Meta)?)?,
+            sticky: integer_to_bool(row.get_column(Sticky)?),
+            template: row.get_column(Template)?,
+            categories: deserialize_json_id_array(row.get_column(Categories)?)?,
+            tags: deserialize_json_id_array(row.get_column(Tags)?)?,
+            parent: get_optional_id(row, Parent)?,
+            menu_order: row.get_column(MenuOrder)?,
+        };
+
+        Ok(Self { row_id, post })
+    }
+}
+
+impl InsertIntoDb for AnyPostWithEditContext {
+    fn insert_into_db(&self, conn: &rusqlite::Connection) -> Result<i64, SqliteDbError> {
+        conn.execute(
+            r#"
+            INSERT INTO posts_edit_context (
+                id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
+                password, template, permalink_template, generated_slug, author, featured_media,
+                sticky, parent, menu_order, comment_status, ping_status, format, meta,
+                categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
+                content_raw, content_rendered, content_protected, content_block_version,
+                excerpt_raw, excerpt_rendered, excerpt_protected
+            ) VALUES (
+                :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
+                :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
+                :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
+                :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
+                :content_raw, :content_rendered, :content_protected, :content_block_version,
+                :excerpt_raw, :excerpt_rendered, :excerpt_protected
+            )
+            "#,
+            rusqlite::named_params! {
+                ":id": self.id.0,
+                ":date": self.date,
+                ":date_gmt": self.date_gmt.to_string(),
+                ":link": self.link,
+                ":modified": self.modified,
+                ":modified_gmt": self.modified_gmt.to_string(),
+                ":slug": self.slug,
+                ":status": self.status.to_string(),
+                ":post_type": self.post_type,
+                ":password": self.password,
+                ":template": self.template,
+                ":permalink_template": self.permalink_template,
+                ":generated_slug": self.generated_slug,
+                ":author": self.author.map(|u| u.0),
+                ":featured_media": self.featured_media.map(|m| m.0),
+                ":sticky": bool_to_integer(self.sticky),
+                ":parent": self.parent.map(|p| p.0),
+                ":menu_order": self.menu_order,
+                ":comment_status": self.comment_status.as_ref().map(|s| s.to_string()),
+                ":ping_status": self.ping_status.as_ref().map(|s| s.to_string()),
+                ":format": self.format.as_ref().map(|f| f.to_string()),
+                ":meta": serialize_value_to_json(&self.meta)?,
+                ":categories": serialize_json_id_array(&self.categories, |t| t.0)?,
+                ":tags": serialize_json_id_array(&self.tags, |t| t.0)?,
+                ":guid_raw": self.guid.raw,
+                ":guid_rendered": self.guid.rendered,
+                ":title_raw": self.title.raw,
+                ":title_rendered": self.title.rendered,
+                ":content_raw": self.content.raw,
+                ":content_rendered": self.content.rendered,
+                ":content_protected": self.content.protected,
+                ":content_block_version": self.content.block_version,
+                ":excerpt_raw": self.excerpt.as_ref().and_then(|e| e.raw.clone()),
+                ":excerpt_rendered": self.excerpt.as_ref().and_then(|e| e.rendered.clone()),
+                ":excerpt_protected": self.excerpt.as_ref().and_then(|e| e.protected),
+            },
+        )?;
+
+        Ok(conn.last_insert_rowid())
+    }
+}

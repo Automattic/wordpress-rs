@@ -1,22 +1,57 @@
-CREATE TABLE `posts` (
+CREATE TABLE `posts_edit_context` (
+  -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
-  `post_id` INTEGER NOT NULL,
-  `context` TEXT COLLATE NOCASE NOT NULL,
-  `post_author` INTEGER NOT NULL,
-  `post_date` TEXT COLLATE NOCASE NOT NULL,
-  `post_content` TEXT COLLATE NOCASE NOT NULL,
-  `post_title` TEXT COLLATE NOCASE NOT NULL,
-  `post_excerpt` TEXT COLLATE NOCASE NOT NULL,
-  `post_status` TEXT COLLATE NOCASE NOT NULL,
-  `comment_status` TEXT COLLATE NOCASE NOT NULL,
-  `ping_status` TEXT COLLATE NOCASE NOT NULL,
-  `post_password` TEXT COLLATE NOCASE DEFAULT NULL,
-  `post_modified` TEXT COLLATE NOCASE NOT NULL,
-  `post_parent` INTEGER,
-  `guid` TEXT COLLATE NOCASE NOT NULL,
-  `menu_order` INTEGER NOT NULL DEFAULT '0',
-  `post_type` TEXT COLLATE NOCASE NOT NULL,
-  `comment_count` INTEGER NOT NULL
+
+  -- Top-level non-nullable fields
+  `id` INTEGER NOT NULL,
+  `date` TEXT NOT NULL,
+  `date_gmt` TEXT NOT NULL,
+  `link` TEXT NOT NULL,
+  `modified` TEXT NOT NULL,
+  `modified_gmt` TEXT NOT NULL,
+  `slug` TEXT NOT NULL,
+  `status` TEXT NOT NULL,
+  `post_type` TEXT NOT NULL,
+  `password` TEXT NOT NULL,
+  `template` TEXT NOT NULL,
+
+  -- Top-level optional fields
+  `permalink_template` TEXT,
+  `generated_slug` TEXT,
+  `author` INTEGER,
+  `featured_media` INTEGER,
+  `sticky` INTEGER,
+  `parent` INTEGER,
+  `menu_order` INTEGER,
+
+  -- Optional enums (stored as TEXT)
+  `comment_status` TEXT,
+  `ping_status` TEXT,
+  `format` TEXT,
+
+  -- Complex optional fields (JSON)
+  `meta` TEXT,
+  `categories` TEXT,
+  `tags` TEXT,
+
+  -- Nested: guid (guid is non-optional, but guid.raw is optional)
+  `guid_raw` TEXT,
+  `guid_rendered` TEXT NOT NULL,
+
+  -- Nested: title (title is non-optional, but title.raw is optional)
+  `title_raw` TEXT,
+  `title_rendered` TEXT NOT NULL,
+
+  -- Nested: content (content is non-optional, but some fields are optional)
+  `content_raw` TEXT,
+  `content_rendered` TEXT NOT NULL,
+  `content_protected` INTEGER,
+  `content_block_version` INTEGER,
+
+  -- Nested: excerpt (entire struct is optional)
+  `excerpt_raw` TEXT,
+  `excerpt_rendered` TEXT,
+  `excerpt_protected` INTEGER
 ) STRICT;
 
-CREATE UNIQUE INDEX idx_posts_have_unique_post_id_and_context ON posts(post_id, context);
+CREATE UNIQUE INDEX idx_posts_edit_context_unique_id ON posts_edit_context(id);
