@@ -8,6 +8,7 @@ use crate::{
             serialize_json_id_array, serialize_value_to_json,
         },
     },
+    repository::DbEntity,
 };
 use rusqlite::Row;
 use wp_api::posts::{
@@ -133,6 +134,10 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
     }
 }
 
+impl DbEntity for AnyPostWithEditContext {
+    const TABLE_NAME: &'static str = "posts_edit_context";
+}
+
 impl InsertIntoDb for AnyPostWithEditContext {
     fn insert_into_db(&self, conn: &rusqlite::Connection) -> Result<i64, SqliteDbError> {
         conn.execute(
@@ -198,8 +203,8 @@ impl InsertIntoDb for AnyPostWithEditContext {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{
+        repository::{Repository, posts::PostRepository},
         test_fixtures::posts::{create_full_post, create_minimal_post},
         unit_test_common::setup_test_db,
     };
@@ -208,22 +213,17 @@ mod tests {
     #[test]
     fn test_round_trip_with_minimal_fields() {
         let conn = setup_test_db();
+        let repo = PostRepository;
         let original_post = create_minimal_post();
 
-        // Insert into database
-        let rowid = original_post
-            .insert_into_db(&conn)
+        // Insert into database using repository
+        let rowid = repo
+            .insert(&conn, &original_post)
             .expect("Failed to insert post");
 
-        // Read back from database
-        let mut stmt = conn
-            .prepare("SELECT * FROM posts_edit_context WHERE rowid = ?")
-            .unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
+        // Read back from database using PostRepository's select_by_rowid
+        let retrieved = repo
+            .select_by_rowid(&conn, rowid)
             .expect("Failed to read post");
 
         // Verify round-trip
@@ -234,22 +234,17 @@ mod tests {
     #[test]
     fn test_round_trip_with_all_fields() {
         let conn = setup_test_db();
+        let repo = PostRepository;
         let original_post = create_full_post();
 
-        // Insert into database
-        let rowid = original_post
-            .insert_into_db(&conn)
+        // Insert into database using repository
+        let rowid = repo
+            .insert(&conn, &original_post)
             .expect("Failed to insert post");
 
-        // Read back from database
-        let mut stmt = conn
-            .prepare("SELECT * FROM posts_edit_context WHERE rowid = ?")
-            .unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
+        // Read back from database using repository
+        let retrieved = repo
+            .select_by_rowid(&conn, rowid)
             .expect("Failed to read post");
 
         // Verify round-trip for all fields
@@ -260,6 +255,7 @@ mod tests {
     #[test]
     fn test_round_trip_with_optional_fields_none() {
         let conn = setup_test_db();
+        let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(99);
 
@@ -279,17 +275,10 @@ mod tests {
         post.parent = None;
         post.menu_order = None;
 
-        // Insert and retrieve
-        let rowid = post.insert_into_db(&conn).expect("Failed to insert post");
-
-        let mut stmt = conn
-            .prepare("SELECT * FROM posts_edit_context WHERE rowid = ?")
-            .unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
+        // Insert and retrieve using repository
+        let rowid = repo.insert(&conn, &post).expect("Failed to insert post");
+        let retrieved = repo
+            .select_by_rowid(&conn, rowid)
             .expect("Failed to read post");
 
         // All optional fields should still be None
@@ -299,6 +288,7 @@ mod tests {
     #[test]
     fn test_round_trip_with_different_enum_variants() {
         let conn = setup_test_db();
+        let repo = PostRepository;
 
         // Test with different status variants
         let statuses = [
@@ -315,16 +305,8 @@ mod tests {
             post.id = PostId((100 + i) as i64);
             post.status = status.clone();
 
-            let rowid = post.insert_into_db(&conn).unwrap();
-            let mut stmt = conn
-                .prepare("SELECT * FROM posts_edit_context WHERE rowid = ?")
-                .unwrap();
-            let retrieved = stmt
-                .query_row([rowid], |row| {
-                    DbAnyPostWithEditContext::try_from_row(row)
-                        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-                })
-                .unwrap();
+            let rowid = repo.insert(&conn, &post).unwrap();
+            let retrieved = repo.select_by_rowid(&conn, rowid).unwrap();
 
             assert_eq!(retrieved.post.status, *status);
         }
@@ -333,21 +315,14 @@ mod tests {
     #[test]
     fn test_round_trip_with_empty_json_arrays() {
         let conn = setup_test_db();
+        let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(200);
         post.categories = Some(vec![]);
         post.tags = Some(vec![]);
 
-        let rowid = post.insert_into_db(&conn).unwrap();
-        let mut stmt = conn
-            .prepare("SELECT * FROM posts_edit_context WHERE rowid = ?")
-            .unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
-            .unwrap();
+        let rowid = repo.insert(&conn, &post).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, rowid).unwrap();
 
         assert_eq!(retrieved.post.categories, Some(vec![]));
         assert_eq!(retrieved.post.tags, Some(vec![]));
@@ -356,22 +331,15 @@ mod tests {
     #[test]
     fn test_round_trip_with_sticky_boolean_variants() {
         let conn = setup_test_db();
+        let repo = PostRepository;
 
         // Test sticky = Some(true)
         let mut post = create_minimal_post();
         post.id = PostId(300);
         post.sticky = Some(true);
 
-        let rowid = post.insert_into_db(&conn).unwrap();
-        let mut stmt = conn
-            .prepare("SELECT * FROM posts_edit_context WHERE rowid = ?")
-            .unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
-            .unwrap();
+        let rowid = repo.insert(&conn, &post).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(true));
 
         // Test sticky = Some(false)
@@ -379,13 +347,8 @@ mod tests {
         post.id = PostId(301);
         post.sticky = Some(false);
 
-        let rowid = post.insert_into_db(&conn).unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
-            .unwrap();
+        let rowid = repo.insert(&conn, &post).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(false));
 
         // Test sticky = None
@@ -393,13 +356,8 @@ mod tests {
         post.id = PostId(302);
         post.sticky = None;
 
-        let rowid = post.insert_into_db(&conn).unwrap();
-        let retrieved = stmt
-            .query_row([rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
-            .unwrap();
+        let rowid = repo.insert(&conn, &post).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, None);
     }
 }

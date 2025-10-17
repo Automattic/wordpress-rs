@@ -3,6 +3,7 @@ use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::{Arc, Mutex};
 
 pub mod mappings;
+pub mod repository;
 
 #[cfg(test)]
 pub mod test_fixtures;
