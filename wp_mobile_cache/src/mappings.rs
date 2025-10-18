@@ -38,5 +38,9 @@ pub trait TryFromDbRow: Sized {
 /// Trait for types that can be inserted into the database.
 /// Returns the rowid of the inserted row on success.
 pub trait InsertIntoDb {
-    fn insert_into_db(&self, conn: &Connection) -> Result<i64, SqliteDbError>;
+    fn insert_into_db(
+        &self,
+        conn: &Connection,
+        site_id: crate::SiteId,
+    ) -> Result<i64, SqliteDbError>;
 }

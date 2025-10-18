@@ -84,8 +84,13 @@ pub trait Repository {
     /// Note: This method requires a Connection because the underlying InsertIntoDb
     /// trait is implemented for Connection. This is a known limitation that can be
     /// refactored in the future if needed.
-    fn insert(&self, conn: &Connection, item: &Self::Entity) -> Result<i64, SqliteDbError> {
-        item.insert_into_db(conn)
+    fn insert(
+        &self,
+        conn: &Connection,
+        item: &Self::Entity,
+        site_id: crate::SiteId,
+    ) -> Result<i64, SqliteDbError> {
+        item.insert_into_db(conn, site_id)
     }
 
     /// Insert multiple entities in a single transaction.
@@ -96,12 +101,13 @@ pub trait Repository {
         &self,
         conn: &mut Connection,
         items: &[Self::Entity],
+        site_id: crate::SiteId,
     ) -> Result<Vec<i64>, SqliteDbError> {
         let tx = conn.transaction().map_err(SqliteDbError::from)?;
         let mut rowids = Vec::with_capacity(items.len());
 
         for item in items {
-            let rowid = InsertIntoDb::insert_into_db(item, &tx)?;
+            let rowid = InsertIntoDb::insert_into_db(item, &tx, site_id)?;
             rowids.push(rowid);
         }
 
@@ -130,7 +136,11 @@ mod tests {
     }
 
     impl InsertIntoDb for TestEntity {
-        fn insert_into_db(&self, conn: &Connection) -> Result<i64, SqliteDbError> {
+        fn insert_into_db(
+            &self,
+            conn: &Connection,
+            _site_id: crate::SiteId,
+        ) -> Result<i64, SqliteDbError> {
             conn.execute("INSERT INTO test_table (value) VALUES (?)", [&self.value])
                 .map_err(SqliteDbError::from)?;
             Ok(conn.last_insert_rowid())

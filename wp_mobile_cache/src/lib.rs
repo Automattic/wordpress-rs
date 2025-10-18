@@ -29,6 +29,10 @@ impl From<rusqlite::Error> for SqliteDbError {
     }
 }
 
+/// Represents a WordPress site ID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct SiteId(pub i64);
+
 #[derive(uniffi::Object)]
 pub struct WpApiCache {
     inner: DBManager,

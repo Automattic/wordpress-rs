@@ -2,6 +2,9 @@ CREATE TABLE `posts_edit_context` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
+  -- Site identifier
+  `site_id` INTEGER NOT NULL,
+
   -- Top-level non-nullable fields
   `id` INTEGER NOT NULL,
   `date` TEXT NOT NULL,
@@ -54,4 +57,4 @@ CREATE TABLE `posts_edit_context` (
   `excerpt_protected` INTEGER
 ) STRICT;
 
-CREATE UNIQUE INDEX idx_posts_edit_context_unique_id ON posts_edit_context(id);
+CREATE UNIQUE INDEX idx_posts_edit_context_unique_site_id_and_id ON posts_edit_context(site_id, id);

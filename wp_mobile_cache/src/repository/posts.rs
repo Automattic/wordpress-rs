@@ -1,5 +1,5 @@
 use crate::{
-    SqliteDbError,
+    SiteId, SqliteDbError,
     mappings::{TryFromDbRow, posts::DbAnyPostWithEditContext},
     repository::{QueryExecutor, Repository},
 };
@@ -16,33 +16,35 @@ impl Repository for PostRepository {
 }
 
 impl PostRepository {
-    /// Select a post by its SQLite rowid (returns wrapper with rowid).
+    /// Select a post by its SQLite rowid and site_id (returns wrapper with rowid).
     ///
-    /// Returns an error if no post with the given rowid exists.
+    /// Returns an error if no post with the given rowid and site_id exists.
     pub fn select_by_rowid(
         &self,
         executor: &impl QueryExecutor,
+        site_id: SiteId,
         rowid: i64,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE rowid = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND rowid = ?";
         let mut stmt = executor.prepare(sql)?;
-        stmt.query_row([rowid], |row| {
+        stmt.query_row([site_id.0, rowid], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .map_err(SqliteDbError::from)
     }
 
-    /// Select all posts from the table (returns wrappers with rowids).
+    /// Select all posts for a given site (returns wrappers with rowids).
     ///
-    /// Returns an empty vector if the table is empty.
+    /// Returns an empty vector if no posts exist for the site.
     pub fn select_all(
         &self,
         executor: &impl QueryExecutor,
+        site_id: SiteId,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context";
+        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ?";
         let mut stmt = executor.prepare(sql)?;
-        let rows = stmt.query_map([], |row| {
+        let rows = stmt.query_map([site_id.0], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
@@ -51,37 +53,39 @@ impl PostRepository {
             .map_err(SqliteDbError::from)
     }
 
-    /// Select a post by its WordPress post ID (returns wrapper with rowid).
+    /// Select a post by its WordPress post ID and site_id (returns wrapper with rowid).
     ///
     /// This is different from `select_by_rowid` which uses the SQLite rowid.
     /// The post_id is the WordPress post ID from the REST API.
     ///
-    /// Returns an error if no post with the given ID exists.
+    /// Returns an error if no post with the given ID and site_id exists.
     pub fn select_by_post_id(
         &self,
         executor: &impl QueryExecutor,
+        site_id: SiteId,
         post_id: PostId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE id = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND id = ?";
         let mut stmt = executor.prepare(sql)?;
-        stmt.query_row([post_id.0], |row| {
+        stmt.query_row([site_id.0, post_id.0], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .map_err(SqliteDbError::from)
     }
 
-    /// Select posts by author user ID (returns wrappers with rowids).
+    /// Select posts by author user ID for a given site (returns wrappers with rowids).
     ///
-    /// Returns an empty vector if no posts by the given author exist.
+    /// Returns an empty vector if no posts by the given author exist for the site.
     pub fn select_by_author(
         &self,
         executor: &impl QueryExecutor,
+        site_id: SiteId,
         author_id: wp_api::users::UserId,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE author = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND author = ?";
         let mut stmt = executor.prepare(sql)?;
-        let rows = stmt.query_map([author_id.0], |row| {
+        let rows = stmt.query_map([site_id.0, author_id.0], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
@@ -90,17 +94,18 @@ impl PostRepository {
             .map_err(SqliteDbError::from)
     }
 
-    /// Select posts by status (e.g., "publish", "draft").
+    /// Select posts by status for a given site (e.g., "publish", "draft").
     ///
-    /// Returns an empty vector if no posts with the given status exist.
+    /// Returns an empty vector if no posts with the given status exist for the site.
     pub fn select_by_status(
         &self,
         executor: &impl QueryExecutor,
+        site_id: SiteId,
         status: &str,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE status = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND status = ?";
         let mut stmt = executor.prepare(sql)?;
-        let rows = stmt.query_map([status], |row| {
+        let rows = stmt.query_map([site_id.0.to_string(), status.to_string()], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
@@ -109,22 +114,23 @@ impl PostRepository {
             .map_err(SqliteDbError::from)
     }
 
-    /// Delete a post by its WordPress post ID.
+    /// Delete a post by its WordPress post ID and site_id.
     ///
     /// Returns the number of rows deleted (0 or 1).
     pub fn delete_by_post_id(
         &self,
         executor: &impl QueryExecutor,
+        site_id: SiteId,
         post_id: PostId,
     ) -> Result<usize, SqliteDbError> {
-        let sql = "DELETE FROM posts_edit_context WHERE id = ?";
-        executor.execute(sql, [post_id.0])
+        let sql = "DELETE FROM posts_edit_context WHERE site_id = ? AND id = ?";
+        executor.execute(sql, [site_id.0, post_id.0])
     }
 
-    /// Upsert a post (insert or update) by its WordPress post ID.
+    /// Upsert a post (insert or update) by its WordPress post ID and site_id.
     ///
     /// This uses SQLite's INSERT ... ON CONFLICT ... DO UPDATE syntax to either
-    /// insert a new post or update an existing one based on the post_id.
+    /// insert a new post or update an existing one based on the (site_id, post_id) pair.
     /// This ensures the database observer sees a single INSERT or UPDATE action,
     /// not a DELETE followed by INSERT.
     ///
@@ -132,6 +138,7 @@ impl PostRepository {
     pub fn upsert(
         &self,
         conn: &rusqlite::Connection,
+        site_id: SiteId,
         post: &AnyPostWithEditContext,
     ) -> Result<i64, SqliteDbError> {
         use crate::mappings::helpers::{
@@ -141,21 +148,21 @@ impl PostRepository {
         conn.execute(
             r#"
             INSERT INTO posts_edit_context (
-                id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
+                site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
                 password, template, permalink_template, generated_slug, author, featured_media,
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
                 categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
                 content_raw, content_rendered, content_protected, content_block_version,
                 excerpt_raw, excerpt_rendered, excerpt_protected
             ) VALUES (
-                :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
+                :site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
                 :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
                 :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
                 :content_raw, :content_rendered, :content_protected, :content_block_version,
                 :excerpt_raw, :excerpt_rendered, :excerpt_protected
             )
-            ON CONFLICT(id) DO UPDATE SET
+            ON CONFLICT(site_id, id) DO UPDATE SET
                 date = excluded.date,
                 date_gmt = excluded.date_gmt,
                 link = excluded.link,
@@ -192,6 +199,7 @@ impl PostRepository {
                 excerpt_protected = excluded.excerpt_protected
             "#,
             rusqlite::named_params! {
+                ":site_id": site_id.0,
                 ":id": post.id.0,
                 ":date": post.date,
                 ":date_gmt": post.date_gmt.to_string(),
@@ -233,11 +241,15 @@ impl PostRepository {
         Ok(conn.last_insert_rowid())
     }
 
-    /// Get the total count of posts in the database.
-    pub fn count(&self, executor: &impl QueryExecutor) -> Result<i64, SqliteDbError> {
-        let sql = "SELECT COUNT(*) FROM posts_edit_context";
+    /// Get the total count of posts for a given site.
+    pub fn count(
+        &self,
+        executor: &impl QueryExecutor,
+        site_id: SiteId,
+    ) -> Result<i64, SqliteDbError> {
+        let sql = "SELECT COUNT(*) FROM posts_edit_context WHERE site_id = ?";
         let mut stmt = executor.prepare(sql)?;
-        stmt.query_row([], |row| row.get(0))
+        stmt.query_row([site_id.0], |row| row.get(0))
             .map_err(SqliteDbError::from)
     }
 }
@@ -252,6 +264,8 @@ mod tests {
     use wp_api::posts::PostStatus;
     use wp_api::users::UserId;
 
+    const TEST_SITE_ID: SiteId = SiteId(1);
+
     #[test]
     fn test_repository_insert_and_select_by_rowid() {
         let conn = setup_test_db();
@@ -259,14 +273,17 @@ mod tests {
         let post = create_minimal_post();
 
         // Insert using repository
-        let rowid = repo.insert(&conn, &post).expect("Failed to insert");
+        let rowid = repo
+            .insert(&conn, &post, TEST_SITE_ID)
+            .expect("Failed to insert");
 
         // Select by rowid
         let retrieved = repo
-            .select_by_rowid(&conn, rowid)
+            .select_by_rowid(&conn, TEST_SITE_ID, rowid)
             .expect("Failed to select");
 
         assert_eq!(retrieved.row_id, rowid);
+        assert_eq!(retrieved.site_id, TEST_SITE_ID);
         assert_eq!(retrieved.post, post);
     }
 
@@ -278,14 +295,16 @@ mod tests {
         post.id = PostId(42);
 
         // Insert
-        repo.insert(&conn, &post).expect("Failed to insert");
+        repo.insert(&conn, &post, TEST_SITE_ID)
+            .expect("Failed to insert");
 
         // Select by post_id
         let retrieved = repo
-            .select_by_post_id(&conn, PostId(42))
+            .select_by_post_id(&conn, TEST_SITE_ID, PostId(42))
             .expect("Failed to select by post_id");
 
         assert_eq!(retrieved.post.id, PostId(42));
+        assert_eq!(retrieved.site_id, TEST_SITE_ID);
         assert_eq!(retrieved.post, post);
     }
 
@@ -295,7 +314,7 @@ mod tests {
         let repo = PostRepository;
 
         // Try to select non-existent post
-        let result = repo.select_by_post_id(&conn, PostId(999));
+        let result = repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(999));
 
         assert!(result.is_err());
     }
@@ -318,12 +337,12 @@ mod tests {
         post3.id = PostId(3);
         post3.author = Some(UserId(20));
 
-        repo.insert(&conn, &post1).unwrap();
-        repo.insert(&conn, &post2).unwrap();
-        repo.insert(&conn, &post3).unwrap();
+        repo.insert(&conn, &post1, TEST_SITE_ID).unwrap();
+        repo.insert(&conn, &post2, TEST_SITE_ID).unwrap();
+        repo.insert(&conn, &post3, TEST_SITE_ID).unwrap();
 
         // Select by author
-        let author_10_posts = repo.select_by_author(&conn, UserId(10)).unwrap();
+        let author_10_posts = repo.select_by_author(&conn, TEST_SITE_ID, UserId(10)).unwrap();
         assert_eq!(author_10_posts.len(), 2);
         assert!(
             author_10_posts
@@ -331,7 +350,7 @@ mod tests {
                 .all(|p| p.post.author == Some(UserId(10)))
         );
 
-        let author_20_posts = repo.select_by_author(&conn, UserId(20)).unwrap();
+        let author_20_posts = repo.select_by_author(&conn, TEST_SITE_ID, UserId(20)).unwrap();
         assert_eq!(author_20_posts.len(), 1);
         assert_eq!(author_20_posts[0].post.author, Some(UserId(20)));
     }
@@ -354,15 +373,15 @@ mod tests {
         post3.id = PostId(3);
         post3.status = PostStatus::Publish;
 
-        repo.insert(&conn, &post1).unwrap();
-        repo.insert(&conn, &post2).unwrap();
-        repo.insert(&conn, &post3).unwrap();
+        repo.insert(&conn, &post1, TEST_SITE_ID).unwrap();
+        repo.insert(&conn, &post2, TEST_SITE_ID).unwrap();
+        repo.insert(&conn, &post3, TEST_SITE_ID).unwrap();
 
         // Select by status
-        let published = repo.select_by_status(&conn, "publish").unwrap();
+        let published = repo.select_by_status(&conn, TEST_SITE_ID, "publish").unwrap();
         assert_eq!(published.len(), 2);
 
-        let drafts = repo.select_by_status(&conn, "draft").unwrap();
+        let drafts = repo.select_by_status(&conn, TEST_SITE_ID, "draft").unwrap();
         assert_eq!(drafts.len(), 1);
     }
 
@@ -372,7 +391,7 @@ mod tests {
         let repo = PostRepository;
 
         // Initially empty
-        let all = repo.select_all(&conn).unwrap();
+        let all = repo.select_all(&conn, TEST_SITE_ID).unwrap();
         assert_eq!(all.len(), 0);
 
         // Insert posts
@@ -381,11 +400,11 @@ mod tests {
         let mut post2 = create_minimal_post();
         post2.id = PostId(2);
 
-        repo.insert(&conn, &post1).unwrap();
-        repo.insert(&conn, &post2).unwrap();
+        repo.insert(&conn, &post1, TEST_SITE_ID).unwrap();
+        repo.insert(&conn, &post2, TEST_SITE_ID).unwrap();
 
         // Select all
-        let all = repo.select_all(&conn).unwrap();
+        let all = repo.select_all(&conn, TEST_SITE_ID).unwrap();
         assert_eq!(all.len(), 2);
     }
 
@@ -394,19 +413,19 @@ mod tests {
         let conn = setup_test_db();
         let repo = PostRepository;
 
-        assert_eq!(repo.count(&conn).unwrap(), 0);
+        assert_eq!(repo.count(&conn, TEST_SITE_ID).unwrap(), 0);
 
         let mut post1 = create_minimal_post();
         post1.id = PostId(1);
-        repo.insert(&conn, &post1).unwrap();
+        repo.insert(&conn, &post1, TEST_SITE_ID).unwrap();
 
-        assert_eq!(repo.count(&conn).unwrap(), 1);
+        assert_eq!(repo.count(&conn, TEST_SITE_ID).unwrap(), 1);
 
         let mut post2 = create_minimal_post();
         post2.id = PostId(2);
-        repo.insert(&conn, &post2).unwrap();
+        repo.insert(&conn, &post2, TEST_SITE_ID).unwrap();
 
-        assert_eq!(repo.count(&conn).unwrap(), 2);
+        assert_eq!(repo.count(&conn, TEST_SITE_ID).unwrap(), 2);
     }
 
     #[test]
@@ -424,15 +443,16 @@ mod tests {
         let posts = vec![post1, post2, post3];
 
         // Insert batch
-        let rowids = repo.insert_batch(&mut conn, &posts).unwrap();
+        let rowids = repo.insert_batch(&mut conn, &posts, TEST_SITE_ID).unwrap();
         assert_eq!(rowids.len(), 3);
 
         // Verify all were inserted
-        assert_eq!(repo.count(&conn).unwrap(), 3);
+        assert_eq!(repo.count(&conn, TEST_SITE_ID).unwrap(), 3);
 
         // Verify can retrieve each
         for rowid in rowids {
-            repo.select_by_rowid(&conn, rowid).expect("Should exist");
+            repo.select_by_rowid(&conn, TEST_SITE_ID, rowid)
+                .expect("Should exist");
         }
     }
 
@@ -443,22 +463,22 @@ mod tests {
 
         let mut post = create_minimal_post();
         post.id = PostId(42);
-        repo.insert(&conn, &post).unwrap();
+        repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
 
         // Verify exists
-        repo.select_by_post_id(&conn, PostId(42))
+        repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(42))
             .expect("Post should exist");
 
         // Delete
-        let deleted = repo.delete_by_post_id(&conn, PostId(42)).unwrap();
+        let deleted = repo.delete_by_post_id(&conn, TEST_SITE_ID, PostId(42)).unwrap();
         assert_eq!(deleted, 1);
 
         // Verify no longer exists
-        let result = repo.select_by_post_id(&conn, PostId(42));
+        let result = repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(42));
         assert!(result.is_err());
 
         // Delete non-existent should return 0
-        let deleted = repo.delete_by_post_id(&conn, PostId(999)).unwrap();
+        let deleted = repo.delete_by_post_id(&conn, TEST_SITE_ID, PostId(999)).unwrap();
         assert_eq!(deleted, 0);
     }
 
@@ -472,14 +492,15 @@ mod tests {
         post.status = PostStatus::Draft;
 
         // Verify post doesn't exist
-        assert!(repo.select_by_post_id(&conn, PostId(100)).is_err());
+        assert!(repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(100)).is_err());
 
         // Upsert should insert
-        let rowid = repo.upsert(&conn, &post).unwrap();
+        let rowid = repo.upsert(&conn, TEST_SITE_ID, &post).unwrap();
 
         // Verify it was inserted
-        let retrieved = repo.select_by_post_id(&conn, PostId(100)).unwrap();
+        let retrieved = repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(100)).unwrap();
         assert_eq!(retrieved.row_id, rowid);
+        assert_eq!(retrieved.site_id, TEST_SITE_ID);
         assert_eq!(retrieved.post.status, PostStatus::Draft);
     }
 
@@ -494,7 +515,7 @@ mod tests {
         post.status = PostStatus::Draft;
         post.slug = "original-slug".to_string();
 
-        let original_rowid = repo.insert(&conn, &post).unwrap();
+        let original_rowid = repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
 
         // Upsert with updated data
         let mut updated_post = create_minimal_post();
@@ -502,17 +523,17 @@ mod tests {
         updated_post.status = PostStatus::Publish;
         updated_post.slug = "updated-slug".to_string();
 
-        let new_rowid = repo.upsert(&conn, &updated_post).unwrap();
+        let new_rowid = repo.upsert(&conn, TEST_SITE_ID, &updated_post).unwrap();
 
         // Rowid should be the same (it's an update, not delete+insert)
         assert_eq!(original_rowid, new_rowid);
 
         // Verify the update
-        let retrieved = repo.select_by_post_id(&conn, PostId(200)).unwrap();
+        let retrieved = repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(200)).unwrap();
         assert_eq!(retrieved.post.status, PostStatus::Publish);
         assert_eq!(retrieved.post.slug, "updated-slug");
 
         // Verify only one post exists with this ID
-        assert_eq!(repo.count(&conn).unwrap(), 1);
+        assert_eq!(repo.count(&conn, TEST_SITE_ID).unwrap(), 1);
     }
 }
