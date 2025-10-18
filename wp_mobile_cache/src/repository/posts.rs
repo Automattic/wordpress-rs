@@ -1,6 +1,6 @@
 use crate::{
     SqliteDbError,
-    mappings::{InsertIntoDb, TryFromDbRow, posts::DbAnyPostWithEditContext},
+    mappings::{TryFromDbRow, posts::DbAnyPostWithEditContext},
     repository::{QueryExecutor, Repository},
 };
 use wp_api::posts::{AnyPostWithEditContext, PostId};
@@ -121,23 +121,116 @@ impl PostRepository {
         executor.execute(sql, [post_id.0])
     }
 
-    /// Update an existing post by its WordPress post ID.
+    /// Upsert a post (insert or update) by its WordPress post ID.
     ///
-    /// Returns the number of rows affected (should be 1 if successful, 0 if not found).
-    pub fn update_by_post_id(
+    /// This uses SQLite's INSERT ... ON CONFLICT ... DO UPDATE syntax to either
+    /// insert a new post or update an existing one based on the post_id.
+    /// This ensures the database observer sees a single INSERT or UPDATE action,
+    /// not a DELETE followed by INSERT.
+    ///
+    /// Returns the rowid of the inserted or updated row.
+    pub fn upsert(
         &self,
         conn: &rusqlite::Connection,
         post: &AnyPostWithEditContext,
-    ) -> Result<usize, SqliteDbError> {
-        // Delete the old post and insert the new one
-        // This is simpler than a full UPDATE statement with all fields
-        let deleted = self.delete_by_post_id(conn, post.id)?;
-        if deleted > 0 {
-            InsertIntoDb::insert_into_db(post, conn)?;
-            Ok(1)
-        } else {
-            Ok(0)
-        }
+    ) -> Result<i64, SqliteDbError> {
+        use crate::mappings::helpers::{
+            bool_to_integer, serialize_json_id_array, serialize_value_to_json,
+        };
+
+        conn.execute(
+            r#"
+            INSERT INTO posts_edit_context (
+                id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
+                password, template, permalink_template, generated_slug, author, featured_media,
+                sticky, parent, menu_order, comment_status, ping_status, format, meta,
+                categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
+                content_raw, content_rendered, content_protected, content_block_version,
+                excerpt_raw, excerpt_rendered, excerpt_protected
+            ) VALUES (
+                :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
+                :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
+                :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
+                :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
+                :content_raw, :content_rendered, :content_protected, :content_block_version,
+                :excerpt_raw, :excerpt_rendered, :excerpt_protected
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                date = excluded.date,
+                date_gmt = excluded.date_gmt,
+                link = excluded.link,
+                modified = excluded.modified,
+                modified_gmt = excluded.modified_gmt,
+                slug = excluded.slug,
+                status = excluded.status,
+                post_type = excluded.post_type,
+                password = excluded.password,
+                template = excluded.template,
+                permalink_template = excluded.permalink_template,
+                generated_slug = excluded.generated_slug,
+                author = excluded.author,
+                featured_media = excluded.featured_media,
+                sticky = excluded.sticky,
+                parent = excluded.parent,
+                menu_order = excluded.menu_order,
+                comment_status = excluded.comment_status,
+                ping_status = excluded.ping_status,
+                format = excluded.format,
+                meta = excluded.meta,
+                categories = excluded.categories,
+                tags = excluded.tags,
+                guid_raw = excluded.guid_raw,
+                guid_rendered = excluded.guid_rendered,
+                title_raw = excluded.title_raw,
+                title_rendered = excluded.title_rendered,
+                content_raw = excluded.content_raw,
+                content_rendered = excluded.content_rendered,
+                content_protected = excluded.content_protected,
+                content_block_version = excluded.content_block_version,
+                excerpt_raw = excluded.excerpt_raw,
+                excerpt_rendered = excluded.excerpt_rendered,
+                excerpt_protected = excluded.excerpt_protected
+            "#,
+            rusqlite::named_params! {
+                ":id": post.id.0,
+                ":date": post.date,
+                ":date_gmt": post.date_gmt.to_string(),
+                ":link": post.link,
+                ":modified": post.modified,
+                ":modified_gmt": post.modified_gmt.to_string(),
+                ":slug": post.slug,
+                ":status": post.status.to_string(),
+                ":post_type": post.post_type,
+                ":password": post.password,
+                ":template": post.template,
+                ":permalink_template": post.permalink_template,
+                ":generated_slug": post.generated_slug,
+                ":author": post.author.map(|u| u.0),
+                ":featured_media": post.featured_media.map(|m| m.0),
+                ":sticky": bool_to_integer(post.sticky),
+                ":parent": post.parent.map(|p| p.0),
+                ":menu_order": post.menu_order,
+                ":comment_status": post.comment_status.as_ref().map(|s| s.to_string()),
+                ":ping_status": post.ping_status.as_ref().map(|s| s.to_string()),
+                ":format": post.format.as_ref().map(|f| f.to_string()),
+                ":meta": serialize_value_to_json(&post.meta)?,
+                ":categories": serialize_json_id_array(&post.categories, |t| t.0)?,
+                ":tags": serialize_json_id_array(&post.tags, |t| t.0)?,
+                ":guid_raw": post.guid.raw,
+                ":guid_rendered": post.guid.rendered,
+                ":title_raw": post.title.raw,
+                ":title_rendered": post.title.rendered,
+                ":content_raw": post.content.raw,
+                ":content_rendered": post.content.rendered,
+                ":content_protected": post.content.protected,
+                ":content_block_version": post.content.block_version,
+                ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
+                ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
+                ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
+            },
+        )?;
+
+        Ok(conn.last_insert_rowid())
     }
 
     /// Get the total count of posts in the database.
@@ -370,34 +463,56 @@ mod tests {
     }
 
     #[test]
-    fn test_repository_update_by_post_id() {
+    fn test_repository_upsert_inserts_new_post() {
         let conn = setup_test_db();
         let repo = PostRepository;
 
         let mut post = create_minimal_post();
-        post.id = PostId(42);
+        post.id = PostId(100);
         post.status = PostStatus::Draft;
 
-        repo.insert(&conn, &post).unwrap();
+        // Verify post doesn't exist
+        assert!(repo.select_by_post_id(&conn, PostId(100)).is_err());
 
-        // Create an updated version of the post
+        // Upsert should insert
+        let rowid = repo.upsert(&conn, &post).unwrap();
+
+        // Verify it was inserted
+        let retrieved = repo.select_by_post_id(&conn, PostId(100)).unwrap();
+        assert_eq!(retrieved.row_id, rowid);
+        assert_eq!(retrieved.post.status, PostStatus::Draft);
+    }
+
+    #[test]
+    fn test_repository_upsert_updates_existing_post() {
+        let conn = setup_test_db();
+        let repo = PostRepository;
+
+        // Insert initial post
+        let mut post = create_minimal_post();
+        post.id = PostId(200);
+        post.status = PostStatus::Draft;
+        post.slug = "original-slug".to_string();
+
+        let original_rowid = repo.insert(&conn, &post).unwrap();
+
+        // Upsert with updated data
         let mut updated_post = create_minimal_post();
-        updated_post.id = PostId(42);
+        updated_post.id = PostId(200);
         updated_post.status = PostStatus::Publish;
         updated_post.slug = "updated-slug".to_string();
 
-        let affected = repo.update_by_post_id(&conn, &updated_post).unwrap();
-        assert_eq!(affected, 1);
+        let new_rowid = repo.upsert(&conn, &updated_post).unwrap();
 
-        // Verify update
-        let retrieved = repo.select_by_post_id(&conn, PostId(42)).unwrap();
+        // Rowid should be the same (it's an update, not delete+insert)
+        assert_eq!(original_rowid, new_rowid);
+
+        // Verify the update
+        let retrieved = repo.select_by_post_id(&conn, PostId(200)).unwrap();
         assert_eq!(retrieved.post.status, PostStatus::Publish);
         assert_eq!(retrieved.post.slug, "updated-slug");
 
-        // Update non-existent should return 0
-        let mut non_existent = create_minimal_post();
-        non_existent.id = PostId(999);
-        let affected = repo.update_by_post_id(&conn, &non_existent).unwrap();
-        assert_eq!(affected, 0);
+        // Verify only one post exists with this ID
+        assert_eq!(repo.count(&conn).unwrap(), 1);
     }
 }
