@@ -1,5 +1,5 @@
 use crate::{
-    SiteId, SqliteDbError,
+    DbSite, RowId, SqliteDbError,
     mappings::{
         ColumnIndex, InsertIntoDb, RowExt, TryFromDbRow,
         helpers::{
@@ -67,8 +67,8 @@ impl ColumnIndex for PostEditContextColumn {
 }
 
 pub struct DbAnyPostWithEditContext {
-    pub row_id: i64,
-    pub site_id: SiteId,
+    pub row_id: RowId,
+    pub site: DbSite,
     pub post: AnyPostWithEditContext,
 }
 
@@ -76,8 +76,10 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
     fn try_from_row(row: &Row) -> Result<Self, SqliteDbError> {
         use PostEditContextColumn::*;
 
-        let row_id: i64 = row.get_column(Rowid)?;
-        let site_id = crate::SiteId(row.get_column(PostEditContextColumn::SiteId)?);
+        let row_id: RowId = row.get_column(Rowid)?;
+        let site = DbSite {
+            row_id: row.get_column(PostEditContextColumn::SiteId)?,
+        };
 
         let post = AnyPostWithEditContext {
             id: get_id(row, Id)?,
@@ -133,11 +135,7 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
             menu_order: row.get_column(MenuOrder)?,
         };
 
-        Ok(Self {
-            row_id,
-            site_id,
-            post,
-        })
+        Ok(Self { row_id, site, post })
     }
 }
 
@@ -149,7 +147,7 @@ impl InsertIntoDb for AnyPostWithEditContext {
     fn insert_into_db(
         &self,
         conn: &rusqlite::Connection,
-        site_id: SiteId,
+        site: &DbSite,
     ) -> Result<i64, SqliteDbError> {
         conn.execute(
             r#"
@@ -170,7 +168,7 @@ impl InsertIntoDb for AnyPostWithEditContext {
             )
             "#,
             rusqlite::named_params! {
-                ":site_id": site_id.0,
+                ":site_id": site.row_id,
                 ":id": self.id.0,
                 ":date": self.date,
                 ":date_gmt": self.date_gmt.to_string(),
@@ -216,14 +214,14 @@ impl InsertIntoDb for AnyPostWithEditContext {
 #[cfg(test)]
 mod tests {
     use crate::{
-        SiteId,
+        DbSite, RowId,
         repository::{Repository, posts::PostRepository},
         test_fixtures::posts::{create_full_post, create_minimal_post},
         unit_test_common::setup_test_db,
     };
     use wp_api::posts::{PostId, PostStatus};
 
-    const TEST_SITE_ID: SiteId = SiteId(1);
+    const TEST_SITE: DbSite = DbSite { row_id: RowId(1) };
 
     #[test]
     fn test_round_trip_with_minimal_fields() {
@@ -233,17 +231,17 @@ mod tests {
 
         // Insert into database using repository
         let rowid = repo
-            .insert(&conn, &original_post, TEST_SITE_ID)
+            .insert(&conn, &original_post, &TEST_SITE)
             .expect("Failed to insert post");
 
         // Read back from database using PostRepository's select_by_rowid
         let retrieved = repo
-            .select_by_rowid(&conn, TEST_SITE_ID, rowid)
+            .select_by_rowid(&conn, &TEST_SITE, rowid)
             .expect("Failed to read post");
 
         // Verify round-trip
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site_id, TEST_SITE_ID);
+        assert_eq!(retrieved.site, TEST_SITE);
         assert_eq!(retrieved.post, original_post);
     }
 
@@ -255,17 +253,17 @@ mod tests {
 
         // Insert into database using repository
         let rowid = repo
-            .insert(&conn, &original_post, TEST_SITE_ID)
+            .insert(&conn, &original_post, &TEST_SITE)
             .expect("Failed to insert post");
 
         // Read back from database using repository
         let retrieved = repo
-            .select_by_rowid(&conn, TEST_SITE_ID, rowid)
+            .select_by_rowid(&conn, &TEST_SITE, rowid)
             .expect("Failed to read post");
 
         // Verify round-trip for all fields
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site_id, TEST_SITE_ID);
+        assert_eq!(retrieved.site, TEST_SITE);
         assert_eq!(retrieved.post, original_post);
     }
 
@@ -294,10 +292,10 @@ mod tests {
 
         // Insert and retrieve using repository
         let rowid = repo
-            .insert(&conn, &post, TEST_SITE_ID)
+            .insert(&conn, &post, &TEST_SITE)
             .expect("Failed to insert post");
         let retrieved = repo
-            .select_by_rowid(&conn, TEST_SITE_ID, rowid)
+            .select_by_rowid(&conn, &TEST_SITE, rowid)
             .expect("Failed to read post");
 
         // All optional fields should still be None
@@ -324,8 +322,8 @@ mod tests {
             post.id = PostId((100 + i) as i64);
             post.status = status.clone();
 
-            let rowid = repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
-            let retrieved = repo.select_by_rowid(&conn, TEST_SITE_ID, rowid).unwrap();
+            let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+            let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
 
             assert_eq!(retrieved.post.status, *status);
         }
@@ -340,8 +338,8 @@ mod tests {
         post.categories = Some(vec![]);
         post.tags = Some(vec![]);
 
-        let rowid = repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, TEST_SITE_ID, rowid).unwrap();
+        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
 
         assert_eq!(retrieved.post.categories, Some(vec![]));
         assert_eq!(retrieved.post.tags, Some(vec![]));
@@ -357,8 +355,8 @@ mod tests {
         post.id = PostId(300);
         post.sticky = Some(true);
 
-        let rowid = repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, TEST_SITE_ID, rowid).unwrap();
+        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(true));
 
         // Test sticky = Some(false)
@@ -366,8 +364,8 @@ mod tests {
         post.id = PostId(301);
         post.sticky = Some(false);
 
-        let rowid = repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, TEST_SITE_ID, rowid).unwrap();
+        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(false));
 
         // Test sticky = None
@@ -375,8 +373,8 @@ mod tests {
         post.id = PostId(302);
         post.sticky = None;
 
-        let rowid = repo.insert(&conn, &post, TEST_SITE_ID).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, TEST_SITE_ID, rowid).unwrap();
+        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, None);
     }
 }

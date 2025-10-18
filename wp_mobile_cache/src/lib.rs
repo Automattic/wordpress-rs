@@ -29,9 +29,79 @@ impl From<rusqlite::Error> for SqliteDbError {
     }
 }
 
-/// Represents a WordPress site ID.
+/// Represents a database row ID (autoincrement field).
+/// SQLite rowids are guaranteed to be non-negative, so we use u64.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct SiteId(pub i64);
+pub struct RowId(pub u64);
+
+impl rusqlite::types::ToSql for RowId {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        Ok(rusqlite::types::ToSqlOutput::from(self.0 as i64))
+    }
+}
+
+impl rusqlite::types::FromSql for RowId {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i64::column_result(value).map(|i| {
+            debug_assert!(i >= 0, "RowId should be non-negative, got: {}", i);
+            RowId(i as u64)
+        })
+    }
+}
+
+impl From<i64> for RowId {
+    fn from(value: i64) -> Self {
+        debug_assert!(value >= 0, "RowId should be non-negative, got: {}", value);
+        RowId(value as u64)
+    }
+}
+
+impl From<RowId> for i64 {
+    fn from(row_id: RowId) -> Self {
+        row_id.0 as i64
+    }
+}
+
+/// Represents a cached WordPress site in the database.
+///
+/// # Design Rationale
+///
+/// This is intentionally a database-specific type (hence the `Db` prefix) rather than
+/// a domain type representing a WordPress site. This design choice prevents confusion:
+///
+/// - **Not a WordPress.com site ID**: The `row_id` has no relationship to WordPress.com site IDs
+/// - **Not a self-hosted site identifier**: Self-hosted sites don't have numeric IDs
+/// - **Internal cache identifier only**: This ID exists only for our local database's multi-site support
+///
+/// # Future Extension
+///
+/// When site type tables are added (e.g., `self_hosted_sites`, `wordpress_com_sites`), this
+/// struct will gain additional fields:
+///
+/// ```ignore
+/// pub struct DbSite {
+///     pub row_id: RowId,
+///     pub site_type: SiteType,      // SelfHosted | WordPressCom
+///     pub mapped_site_id: RowId,    // Foreign key to specific site type table
+/// }
+/// ```
+///
+/// # Why Take `&DbSite` Instead of Just `RowId`?
+///
+/// Repository methods require `&DbSite` rather than just a `RowId` for several reasons:
+///
+/// 1. **Prevents invalid queries**: Callers must fetch a valid `DbSite` from the database first,
+///    ensuring they can't query with an arbitrary ID that doesn't exist
+/// 2. **Future-proof for joins**: When site type fields are added, they'll be available for
+///    joining with `self_hosted_sites` or `wordpress_com_sites` tables without API changes
+/// 3. **Zero cost**: `DbSite` is `Copy` (all fields are primitives), so passing by reference
+///    has no performance overhead
+/// 4. **Better semantics**: `repo.select_all(&conn, &site)` is clearer than `repo.select_all(&conn, id)`
+///
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct DbSite {
+    pub row_id: RowId,
+}
 
 #[derive(uniffi::Object)]
 pub struct WpApiCache {

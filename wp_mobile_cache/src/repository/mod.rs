@@ -1,4 +1,4 @@
-use crate::{SqliteDbError, mappings::InsertIntoDb};
+use crate::{RowId, SqliteDbError, mappings::InsertIntoDb};
 use rusqlite::Connection;
 
 pub mod posts;
@@ -15,7 +15,7 @@ pub trait QueryExecutor {
     fn execute(&self, sql: &str, params: impl rusqlite::Params) -> Result<usize, SqliteDbError>;
 
     /// Get the rowid of the last inserted row.
-    fn last_insert_rowid(&self) -> i64;
+    fn last_insert_rowid(&self) -> RowId;
 
     /// Begin a database transaction (requires mutable access).
     fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, SqliteDbError>;
@@ -30,8 +30,8 @@ impl QueryExecutor for Connection {
         self.execute(sql, params).map_err(SqliteDbError::from)
     }
 
-    fn last_insert_rowid(&self) -> i64 {
-        self.last_insert_rowid()
+    fn last_insert_rowid(&self) -> RowId {
+        self.last_insert_rowid().into()
     }
 
     fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, SqliteDbError> {
@@ -88,9 +88,9 @@ pub trait Repository {
         &self,
         conn: &Connection,
         item: &Self::Entity,
-        site_id: crate::SiteId,
-    ) -> Result<i64, SqliteDbError> {
-        item.insert_into_db(conn, site_id)
+        site: &crate::DbSite,
+    ) -> Result<RowId, SqliteDbError> {
+        item.insert_into_db(conn, site).map(RowId::from)
     }
 
     /// Insert multiple entities in a single transaction.
@@ -101,14 +101,14 @@ pub trait Repository {
         &self,
         conn: &mut Connection,
         items: &[Self::Entity],
-        site_id: crate::SiteId,
-    ) -> Result<Vec<i64>, SqliteDbError> {
+        site: &crate::DbSite,
+    ) -> Result<Vec<RowId>, SqliteDbError> {
         let tx = conn.transaction().map_err(SqliteDbError::from)?;
         let mut rowids = Vec::with_capacity(items.len());
 
         for item in items {
-            let rowid = InsertIntoDb::insert_into_db(item, &tx, site_id)?;
-            rowids.push(rowid);
+            let rowid = InsertIntoDb::insert_into_db(item, &tx, site)?;
+            rowids.push(RowId::from(rowid));
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
@@ -139,7 +139,7 @@ mod tests {
         fn insert_into_db(
             &self,
             conn: &Connection,
-            _site_id: crate::SiteId,
+            _site: &crate::DbSite,
         ) -> Result<i64, SqliteDbError> {
             conn.execute("INSERT INTO test_table (value) VALUES (?)", [&self.value])
                 .map_err(SqliteDbError::from)?;
@@ -180,6 +180,6 @@ mod tests {
 
         // Test last_insert_rowid
         let rowid = QueryExecutor::last_insert_rowid(&conn);
-        assert_eq!(rowid, 1);
+        assert_eq!(rowid, RowId(1));
     }
 }

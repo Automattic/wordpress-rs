@@ -76,12 +76,12 @@ Provides common operations with default implementations.
 pub trait Repository {
     type Entity: DbEntity;
 
-    fn insert(&self, conn: &Connection, item: &Self::Entity, site_id: SiteId)
+    fn insert(&self, conn: &Connection, item: &Self::Entity, site: &DbSite)
         -> Result<i64, SqliteDbError> {
         item.insert_into_db(conn, site_id)
     }
 
-    fn insert_batch(&self, conn: &mut Connection, items: &[Self::Entity], site_id: SiteId)
+    fn insert_batch(&self, conn: &mut Connection, items: &[Self::Entity], site: &DbSite)
         -> Result<Vec<i64>, SqliteDbError> {
         // Default implementation uses a transaction
     }
@@ -93,10 +93,10 @@ pub trait Repository {
 - `insert_batch`: Wraps inserts in a transaction for atomicity
 
 **Multi-Site Design:**
-- All insert operations require a `site_id` parameter to scope data to a specific site
-- The `site_id` is passed through to the database layer where it's stored with the entity
+- All insert operations require a `site` parameter to scope data to a specific site
+- The `site.row_id` is passed through to the database layer where it's stored with the entity
 
-**Note:** Query methods (`select_by_rowid`, `select_all`, etc.) are NOT part of the trait because they need to return wrapper types (e.g., `DbAnyPostWithEditContext`) that include the database rowid and site_id. Concrete repositories implement these directly.
+**Note:** Query methods (`select_by_rowid`, `select_all`, etc.) are NOT part of the trait because they need to return wrapper types (e.g., `DbAnyPostWithEditContext`) that include the database rowid and site. Concrete repositories implement these directly.
 
 #### 4. Concrete Repositories
 
@@ -111,31 +111,31 @@ impl Repository for PostRepository {
 
 impl PostRepository {
     // Query methods return DbAnyPostWithEditContext (includes rowid and site_id)
-    pub fn select_by_rowid(&self, executor: &impl QueryExecutor, site_id: SiteId, rowid: i64)
+    pub fn select_by_rowid(&self, executor: &impl QueryExecutor, site: &DbSite, rowid: i64)
         -> Result<DbAnyPostWithEditContext, SqliteDbError> { /* ... */ }
 
-    pub fn select_all(&self, executor: &impl QueryExecutor, site_id: SiteId)
+    pub fn select_all(&self, executor: &impl QueryExecutor, site: &DbSite)
         -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> { /* ... */ }
 
-    pub fn select_by_post_id(&self, executor: &impl QueryExecutor, site_id: SiteId, post_id: PostId)
+    pub fn select_by_post_id(&self, executor: &impl QueryExecutor, site: &DbSite, post_id: PostId)
         -> Result<DbAnyPostWithEditContext, SqliteDbError> { /* ... */ }
 
-    pub fn select_by_author(&self, executor: &impl QueryExecutor, site_id: SiteId, author_id: UserId)
+    pub fn select_by_author(&self, executor: &impl QueryExecutor, site: &DbSite, author_id: UserId)
         -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> { /* ... */ }
 
-    pub fn select_by_status(&self, executor: &impl QueryExecutor, site_id: SiteId, status: &str)
+    pub fn select_by_status(&self, executor: &impl QueryExecutor, site: &DbSite, status: &str)
         -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> { /* ... */ }
 
     // Upsert (insert or update) using SQLite's ON CONFLICT
-    pub fn upsert(&self, conn: &Connection, site_id: SiteId, post: &AnyPostWithEditContext)
+    pub fn upsert(&self, conn: &Connection, site: &DbSite, post: &AnyPostWithEditContext)
         -> Result<i64, SqliteDbError> { /* ... */ }
 
     // Delete by WordPress post ID and site
-    pub fn delete_by_post_id(&self, executor: &impl QueryExecutor, site_id: SiteId, post_id: PostId)
+    pub fn delete_by_post_id(&self, executor: &impl QueryExecutor, site: &DbSite, post_id: PostId)
         -> Result<usize, SqliteDbError> { /* ... */ }
 
     // Count total posts for a site
-    pub fn count(&self, executor: &impl QueryExecutor, site_id: SiteId)
+    pub fn count(&self, executor: &impl QueryExecutor, site: &DbSite)
         -> Result<i64, SqliteDbError> { /* ... */ }
 }
 ```
@@ -155,7 +155,7 @@ impl PostRepository {
 **Example:**
 ```rust
 let repo = PostRepository;
-let site_id = SiteId(1);
+let site_id = DbSite(1);
 let post = repo.select_by_rowid(&conn, site_id, 42)?;
 let post = repo.select_by_post_id(&conn, site_id, PostId(123))?;
 ```
@@ -247,8 +247,8 @@ pub struct AnyPostWithEditContext {
 
 // Database wrapper (includes rowid and site_id)
 pub struct DbAnyPostWithEditContext {
-    pub row_id: i64,  // SQLite rowid
-    pub site_id: SiteId,  // Site identifier
+    pub row_id: RowId,  // SQLite rowid
+    pub site: DbSite,  // Site identifier
     pub post: AnyPostWithEditContext,
 }
 ```
@@ -265,7 +265,7 @@ pub struct DbAnyPostWithEditContext {
 
 **Implementation:**
 ```rust
-pub fn upsert(&self, conn: &Connection, site_id: SiteId, post: &AnyPostWithEditContext)
+pub fn upsert(&self, conn: &Connection, site: &DbSite, post: &AnyPostWithEditContext)
     -> Result<i64, SqliteDbError> {
     conn.execute(
         r#"
@@ -285,15 +285,44 @@ pub fn upsert(&self, conn: &Connection, site_id: SiteId, post: &AnyPostWithEditC
 }
 ```
 
-### Decision 7: Multi-Site Architecture
+### Decision 7: Multi-Site Architecture with DbSite
 
-**Decision:** All entities are scoped to a site via `site_id` with foreign key constraints.
+**Decision:** All entities are scoped to a site via `DbSite` parameter with foreign key constraints.
 
 **Rationale:**
 - **Data isolation**: Posts from different sites cannot conflict (same WordPress post ID allowed per site)
 - **Referential integrity**: Foreign key ensures posts cannot exist without a valid site
 - **Query scoping**: All queries automatically filter by site, preventing cross-site data leaks
 - **Cascade deletion**: Deleting a site automatically removes all associated posts
+- **Type safety**: `DbSite` prevents confusion with WordPress.com site IDs or domain identifiers
+
+**Why `DbSite` Instead of a Simple ID?**
+
+Repository methods take `&DbSite` rather than just a numeric ID for several critical reasons:
+
+1. **Prevents confusion with WordPress identifiers**:
+   - `DbSite` is clearly a database-internal type (hence the `Db` prefix)
+   - Cannot be confused with WordPress.com site IDs
+   - Self-hosted sites don't have numeric IDs, making a generic "site ID" misleading
+
+2. **Forces valid site references**:
+   - Callers must fetch a valid `DbSite` from a site repository first
+   - Prevents arbitrary ID construction like `DbSite { row_id: RowId(999) }`
+   - Ensures the site exists in the cache before querying for its posts
+
+3. **Future-proof for site polymorphism**:
+   - When site type tables are added (`self_hosted_sites`, `wordpress_com_sites`), `DbSite` will gain fields:
+   ```rust
+   pub struct DbSite {
+       pub row_id: RowId,
+       pub site_type: SiteType,      // SelfHosted | WordPressCom
+       pub mapped_site_id: RowId,    // FK to specific site type table
+   }
+   ```
+   - These fields enable joins without changing repository APIs
+
+4. **Zero-cost abstraction**:
+   - `DbSite` is `Copy` (all primitives), so `&DbSite` has no runtime overhead
 
 **Database Schema:**
 ```sql
@@ -350,33 +379,33 @@ CREATE INDEX idx_posts_edit_context_site_id
 
 ```rust
 use wp_mobile_cache::repository::{Repository, PostRepository};
-use wp_mobile_cache::SiteId;
+use wp_mobile_cache::{DbSite, RowId};
 
 let conn = Connection::open("cache.db")?;
 let repo = PostRepository;
-let site_id = SiteId(1);
+let site = DbSite { row_id: RowId(1) };
 
 // Insert operation (from trait)
 let post = create_post();
-let rowid = repo.insert(&conn, &post, site_id)?;
+let rowid = repo.insert(&conn, &post, &site)?;
 
-// Query operations (return DbAnyPostWithEditContext with rowid and site_id)
-let db_post = repo.select_by_rowid(&conn, site_id, 42)?;
-let all_posts = repo.select_all(&conn, site_id)?;
+// Query operations (return DbAnyPostWithEditContext with rowid and site)
+let db_post = repo.select_by_rowid(&conn, &site, RowId(42))?;
+let all_posts = repo.select_all(&conn, &site)?;
 
 // Custom query operations
-let db_post = repo.select_by_post_id(&conn, site_id, PostId(123))?;
-let author_posts = repo.select_by_author(&conn, site_id, UserId(1))?;
-let draft_posts = repo.select_by_status(&conn, site_id, "draft")?;
+let db_post = repo.select_by_post_id(&conn, &site, PostId(123))?;
+let author_posts = repo.select_by_author(&conn, &site, UserId(1))?;
+let draft_posts = repo.select_by_status(&conn, &site, "draft")?;
 
 // Upsert (insert or update)
-let rowid = repo.upsert(&conn, site_id, &updated_post)?;
+let rowid = repo.upsert(&conn, &site, &updated_post)?;
 
 // Delete
-let deleted_count = repo.delete_by_post_id(&conn, site_id, PostId(123))?;
+let deleted_count = repo.delete_by_post_id(&conn, &site, PostId(123))?;
 
 // Count
-let total = repo.count(&conn, site_id)?;
+let total = repo.count(&conn, &site)?;
 ```
 
 ### Batch Operations
@@ -384,8 +413,8 @@ let total = repo.count(&conn, site_id)?;
 ```rust
 let posts = vec![post1, post2, post3];
 let mut conn = Connection::open("cache.db")?;
-let site_id = SiteId(1);
-let rowids = repo.insert_batch(&mut conn, &posts, site_id)?;
+let site = DbSite { row_id: RowId(1) };
+let rowids = repo.insert_batch(&mut conn, &posts, &site)?;
 ```
 
 **Note:** `insert_batch` requires a mutable connection because it uses a transaction internally. All posts in the batch are inserted for the same site.
@@ -423,7 +452,7 @@ wp_mobile_cache/
 │   ├── mappings/
 │   │   ├── posts.rs         # DbEntity implementations
 │   │   └── ...
-│   └── lib.rs               # SiteId, migration management
+│   └── lib.rs               # DbSite, migration management
 └── REPOSITORY_PATTERN_DESIGN.md
 ```
 
