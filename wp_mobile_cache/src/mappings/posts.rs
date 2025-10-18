@@ -152,14 +152,14 @@ impl InsertIntoDb for AnyPostWithEditContext {
         executor.execute(
             r#"
             INSERT INTO posts_edit_context (
-                site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
+                db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
                 password, template, permalink_template, generated_slug, author, featured_media,
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
                 categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
                 content_raw, content_rendered, content_protected, content_block_version,
                 excerpt_raw, excerpt_rendered, excerpt_protected
             ) VALUES (
-                :site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
+                :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
                 :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
                 :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
@@ -168,7 +168,7 @@ impl InsertIntoDb for AnyPostWithEditContext {
             )
             "#,
             rusqlite::named_params! {
-                ":site_id": site.row_id,
+                ":db_site_id": site.row_id,
                 ":id": self.id.0,
                 ":date": self.date,
                 ":date_gmt": self.date_gmt.to_string(),

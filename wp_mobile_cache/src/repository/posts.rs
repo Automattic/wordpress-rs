@@ -25,7 +25,7 @@ impl PostRepository {
         site: &DbSite,
         rowid: RowId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND rowid = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND rowid = ?";
         let mut stmt = executor.prepare(sql)?;
         stmt.query_row([site.row_id, rowid], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
@@ -42,7 +42,7 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ?";
         let mut stmt = executor.prepare(sql)?;
         let rows = stmt.query_map([site.row_id], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
@@ -65,7 +65,7 @@ impl PostRepository {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND id = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
         let mut stmt = executor.prepare(sql)?;
         stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
@@ -83,7 +83,7 @@ impl PostRepository {
         site: &DbSite,
         author_id: wp_api::users::UserId,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND author = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND author = ?";
         let mut stmt = executor.prepare(sql)?;
         let rows = stmt.query_map(rusqlite::params![site.row_id, author_id.0], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
@@ -103,7 +103,7 @@ impl PostRepository {
         site: &DbSite,
         status: &str,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE site_id = ? AND status = ?";
+        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND status = ?";
         let mut stmt = executor.prepare(sql)?;
         let rows = stmt.query_map(rusqlite::params![site.row_id, status], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
@@ -123,14 +123,14 @@ impl PostRepository {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<usize, SqliteDbError> {
-        let sql = "DELETE FROM posts_edit_context WHERE site_id = ? AND id = ?";
+        let sql = "DELETE FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
         executor.execute(sql, rusqlite::params![site.row_id, post_id.0])
     }
 
     /// Upsert a post (insert or update) by its WordPress post ID for a given site.
     ///
     /// This uses SQLite's INSERT ... ON CONFLICT ... DO UPDATE syntax to either
-    /// insert a new post or update an existing one based on the (site_id, post_id) pair.
+    /// insert a new post or update an existing one based on the (db_site_id, post_id) pair.
     /// This ensures the database observer sees a single INSERT or UPDATE action,
     /// not a DELETE followed by INSERT.
     ///
@@ -148,21 +148,21 @@ impl PostRepository {
         executor.execute(
             r#"
             INSERT INTO posts_edit_context (
-                site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
+                db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
                 password, template, permalink_template, generated_slug, author, featured_media,
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
                 categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
                 content_raw, content_rendered, content_protected, content_block_version,
                 excerpt_raw, excerpt_rendered, excerpt_protected
             ) VALUES (
-                :site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
+                :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
                 :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
                 :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
                 :content_raw, :content_rendered, :content_protected, :content_block_version,
                 :excerpt_raw, :excerpt_rendered, :excerpt_protected
             )
-            ON CONFLICT(site_id, id) DO UPDATE SET
+            ON CONFLICT(db_site_id, id) DO UPDATE SET
                 date = excluded.date,
                 date_gmt = excluded.date_gmt,
                 link = excluded.link,
@@ -199,7 +199,7 @@ impl PostRepository {
                 excerpt_protected = excluded.excerpt_protected
             "#,
             rusqlite::named_params! {
-                ":site_id": site.row_id,
+                ":db_site_id": site.row_id,
                 ":id": post.id.0,
                 ":date": post.date,
                 ":date_gmt": post.date_gmt.to_string(),
@@ -247,7 +247,7 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<i64, SqliteDbError> {
-        let sql = "SELECT COUNT(*) FROM posts_edit_context WHERE site_id = ?";
+        let sql = "SELECT COUNT(*) FROM posts_edit_context WHERE db_site_id = ?";
         let mut stmt = executor.prepare(sql)?;
         stmt.query_row([site.row_id], |row| row.get(0))
             .map_err(SqliteDbError::from)

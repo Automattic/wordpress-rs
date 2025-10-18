@@ -3,7 +3,7 @@ CREATE TABLE `posts_edit_context` (
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
   -- Site identifier (foreign key to sites table)
-  `site_id` INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  `db_site_id` INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
 
   -- Top-level non-nullable fields
   `id` INTEGER NOT NULL,
@@ -56,8 +56,8 @@ CREATE TABLE `posts_edit_context` (
   `excerpt_rendered` TEXT,
   `excerpt_protected` INTEGER,
 
-  FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+  FOREIGN KEY (db_site_id) REFERENCES sites(id) ON DELETE CASCADE
 ) STRICT;
 
-CREATE UNIQUE INDEX idx_posts_edit_context_unique_site_id_and_id ON posts_edit_context(site_id, id);
-CREATE INDEX idx_posts_edit_context_site_id ON posts_edit_context(site_id);
+CREATE UNIQUE INDEX idx_posts_edit_context_unique_db_site_id_and_id ON posts_edit_context(db_site_id, id);
+CREATE INDEX idx_posts_edit_context_db_site_id ON posts_edit_context(db_site_id);

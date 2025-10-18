@@ -271,7 +271,7 @@ pub struct DbAnyPostWithEditContext {
 - **Database observers**: Ensures observers see a single INSERT or UPDATE action, not DELETE + INSERT
 - **DRY principle**: Write SQL field list only once (shared between INSERT and UPDATE)
 - **Rowid preservation**: Updates keep the same rowid (important for consistency)
-- **Natural key**: Uses composite key `(site_id, id)` for conflict detection (unique index)
+- **Natural key**: Uses composite key `(db_site_id, id)` for conflict detection (unique index)
 
 **Implementation:**
 ```rust
@@ -279,14 +279,14 @@ pub fn upsert(&self, executor: &impl QueryExecutor, site: &DbSite, post: &AnyPos
     -> Result<RowId, SqliteDbError> {
     executor.execute(
         r#"
-        INSERT INTO posts_edit_context (site_id, id, date, ...)
-        VALUES (:site_id, :id, :date, ...)
-        ON CONFLICT(site_id, id) DO UPDATE SET
+        INSERT INTO posts_edit_context (db_site_id, id, date, ...)
+        VALUES (:db_site_id, :id, :date, ...)
+        ON CONFLICT(db_site_id, id) DO UPDATE SET
             date = excluded.date,
             ...
         "#,
         named_params! {
-            ":site_id": site.row_id,
+            ":db_site_id": site.row_id,
             ":id": post.id.0,
             ...
         }
@@ -344,19 +344,19 @@ CREATE TABLE `sites` (
 -- Posts table with foreign key to sites
 CREATE TABLE `posts_edit_context` (
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
-  `site_id` INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  `db_site_id` INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
   `id` INTEGER NOT NULL,  -- WordPress post ID
   -- ... other fields
-  FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+  FOREIGN KEY (db_site_id) REFERENCES sites(id) ON DELETE CASCADE
 ) STRICT;
 
--- Composite unique index on (site_id, id)
-CREATE UNIQUE INDEX idx_posts_edit_context_unique_site_id_and_id
-  ON posts_edit_context(site_id, id);
+-- Composite unique index on (db_site_id, id)
+CREATE UNIQUE INDEX idx_posts_edit_context_unique_db_site_id_and_id
+  ON posts_edit_context(db_site_id, id);
 
--- Index on site_id for query performance
-CREATE INDEX idx_posts_edit_context_site_id
-  ON posts_edit_context(site_id);
+-- Index on db_site_id for query performance
+CREATE INDEX idx_posts_edit_context_db_site_id
+  ON posts_edit_context(db_site_id);
 ```
 
 ### Decision 8: Split QueryExecutor and TransactionManager Traits
