@@ -391,6 +391,189 @@ pub fn insert_batch(&self, transaction_manager: &mut impl TransactionManager, ..
 - Slightly more complex trait hierarchy, but gains compile-time safety
 - Makes the API intent clearer: methods requiring transactions are explicit about it
 
+### Decision 9: Term Relationships Normalization
+
+**Decision:** Store post terms (categories, tags, custom taxonomies) in a normalized `term_relationships` table instead of JSON arrays.
+
+**Rationale:**
+- **Better queryability**: Enable efficient queries like "find all posts with tag X"
+- **Referential integrity**: Foreign key on `db_site_id` ensures site-level data consistency
+- **Matches WordPress**: Table name mirrors `wp_term_relationships` for familiarity
+- **Extensible**: Supports any taxonomy type and object type (posts, pages, nav items, etc.)
+- **Observer-friendly**: Sync approach only generates events for actual changes
+
+**Database Schema:**
+```sql
+CREATE TABLE `term_relationships` (
+  `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `db_site_id` INTEGER NOT NULL,
+  `object_id` INTEGER NOT NULL,      -- rowid of post/page/nav_menu_item/etc
+  `term_id` INTEGER NOT NULL,         -- WordPress term ID
+  `taxonomy_type` TEXT NOT NULL,      -- 'category', 'post_tag', or custom taxonomy
+
+  FOREIGN KEY (db_site_id) REFERENCES sites(id) ON DELETE CASCADE
+  -- Note: No FK to object_id since it could reference different tables (posts, pages, etc.)
+) STRICT;
+
+-- Prevent duplicate associations (same object can't have same term twice in same taxonomy)
+CREATE UNIQUE INDEX idx_term_relationships_unique
+  ON term_relationships(db_site_id, object_id, term_id, taxonomy_type);
+
+-- Query: "Find all objects with taxonomy X and term Y"
+CREATE INDEX idx_term_relationships_by_term
+  ON term_relationships(db_site_id, taxonomy_type, term_id);
+
+-- Query: "Find all terms for object X" (used in joins when reading posts)
+CREATE INDEX idx_term_relationships_by_object
+  ON term_relationships(db_site_id, object_id);
+```
+
+**Type Design:**
+```rust
+use wp_api::terms::TermId;
+use wp_api::taxonomies::TaxonomyType;
+
+pub struct DbTermRelationship {
+    pub row_id: RowId,
+    pub site: DbSite,
+    pub object_id: RowId,           // rowid of post/page/etc
+    pub term_id: TermId,             // WordPress term ID
+    pub taxonomy_type: TaxonomyType, // Category, PostTag, or Custom
+}
+```
+
+**Repository Design:**
+
+`TermRelationshipRepository` provides generic term management (reusable for posts, pages, etc.):
+
+```rust
+pub struct TermRelationshipRepository;
+
+impl TermRelationshipRepository {
+    /// Synchronize terms for an object (only insert new, delete removed, keep unchanged)
+    /// This approach is observer-friendly: unchanged terms generate no DB events.
+    pub fn sync_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: RowId,
+        taxonomy_type: &TaxonomyType,
+        new_term_ids: &[TermId],
+    ) -> Result<(), SqliteDbError> {
+        // 1. Get existing terms
+        // 2. Calculate diff (to_delete, to_insert)
+        // 3. Delete only removed terms
+        // 4. Insert only new terms
+        // Unchanged terms: no operations = no observer events
+    }
+
+    /// Get all term IDs for an object's taxonomy
+    pub fn get_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: RowId,
+        taxonomy_type: &TaxonomyType,
+    ) -> Result<Vec<TermId>, SqliteDbError>;
+
+    /// Get all term IDs grouped by taxonomy for an object (for post reads with joins)
+    pub fn get_all_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: RowId,
+    ) -> Result<HashMap<TaxonomyType, Vec<TermId>>, SqliteDbError>;
+
+    /// Delete all terms for an object (called when deleting the object itself)
+    pub fn delete_all_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: RowId,
+    ) -> Result<usize, SqliteDbError>;
+}
+```
+
+**PostRepository Integration:**
+
+`PostRepository` composes `TermRelationshipRepository` for term management:
+
+```rust
+impl PostRepository {
+    pub fn upsert_with_terms(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        post: &AnyPostWithEditContext,
+    ) -> Result<RowId, SqliteDbError> {
+        let tx = transaction_manager.transaction()?;
+
+        // Upsert the post
+        let post_rowid = self.upsert(&tx, site, post)?;
+
+        // Sync term relationships (only changes what's different)
+        let term_repo = TermRelationshipRepository;
+
+        if let Some(ref categories) = post.categories {
+            term_repo.sync_terms_for_object(
+                &tx, site, post_rowid, &TaxonomyType::Category, categories
+            )?;
+        }
+
+        if let Some(ref tags) = post.tags {
+            term_repo.sync_terms_for_object(
+                &tx, site, post_rowid, &TaxonomyType::PostTag, tags
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(post_rowid)
+    }
+
+    pub fn select_by_rowid(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        rowid: RowId,
+    ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
+        // 1. SELECT from posts_edit_context
+        // 2. Join term relationships to populate categories/tags
+        let term_repo = TermRelationshipRepository;
+        let terms_map = term_repo.get_all_terms_for_object(executor, site, rowid)?;
+
+        // 3. Populate post.categories and post.tags from terms_map
+        // 4. Return DbAnyPostWithEditContext
+    }
+
+    pub fn delete_by_post_id(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        post_id: PostId,
+    ) -> Result<usize, SqliteDbError> {
+        // 1. Get the rowid
+        let db_post = self.select_by_post_id(executor, site, post_id)?;
+
+        // 2. Delete term relationships
+        let term_repo = TermRelationshipRepository;
+        term_repo.delete_all_terms_for_object(executor, site, db_post.row_id)?;
+
+        // 3. Delete the post
+        executor.execute(
+            "DELETE FROM posts_edit_context WHERE db_site_id = ? AND id = ?",
+            rusqlite::params![site.row_id, post_id.0],
+        )
+    }
+}
+```
+
+**Key Benefits:**
+- **Sync approach preserves observer pattern**: Only actual changes generate events (no spurious delete+insert)
+- **Reusable repository**: `TermRelationshipRepository` can be used for pages, nav items, etc.
+- **Type safety**: Uses `TermId` and `TaxonomyType` from `wp_api` crate
+- **Preserves API**: `AnyPostWithEditContext` keeps `categories`/`tags` fields via joins
+- **Efficient queries**: Indexes support both "posts by term" and "terms by post" queries
+
 ## Implementation Plan
 
 ### Phase 1: Core Traits
@@ -461,6 +644,40 @@ let rowids: Vec<RowId> = repo.insert_batch(&mut conn, &posts, &site)?;
 
 **Note:** `insert_batch` requires a mutable `TransactionManager` (Connection) because it uses a transaction internally. All posts in the batch are inserted for the same site.
 
+### Upsert with Terms
+
+```rust
+use wp_mobile_cache::repository::{PostRepository, TermRelationshipRepository};
+use wp_mobile_cache::{DbSite, RowId};
+use wp_api::posts::AnyPostWithEditContext;
+use wp_api::terms::TermId;
+
+let mut conn = Connection::open("cache.db")?;
+let repo = PostRepository;
+let site = DbSite { row_id: RowId(1) };
+
+// Create post with terms
+let mut post = create_post();
+post.categories = Some(vec![TermId(1), TermId(2)]);
+post.tags = Some(vec![TermId(10), TermId(20), TermId(30)]);
+
+// Upsert post with terms (atomic transaction)
+let post_rowid = repo.upsert_with_terms(&mut conn, &site, &post)?;
+
+// Reading automatically includes terms via join
+let db_post = repo.select_by_rowid(&conn, &site, post_rowid)?;
+assert_eq!(db_post.post.categories, Some(vec![TermId(1), TermId(2)]));
+assert_eq!(db_post.post.tags, Some(vec![TermId(10), TermId(20), TermId(30)]));
+
+// Update with different terms - only changes are written to DB
+post.categories = Some(vec![TermId(1), TermId(3)])); // Removed 2, added 3
+post.tags = Some(vec![TermId(10)]));                  // Removed 20, 30
+
+repo.upsert_with_terms(&mut conn, &site, &post)?;
+// Observer sees: DELETE for term 2, INSERT for term 3, DELETE for terms 20 & 30
+// Observer does NOT see: any events for term 1 or 10 (unchanged)
+```
+
 ## Future Enhancements
 
 ### Possible Additions
@@ -483,18 +700,22 @@ If we need to support other databases:
 ```
 wp_mobile_cache/
 ├── migrations/
-│   ├── 0001-create-sites-table.sql     # Sites table (foundation)
-│   ├── 0002-create-posts-table.sql     # Posts table with FK to sites
-│   └── ...                              # Future migrations
+│   ├── 0001-create-sites-table.sql           # Sites table (foundation)
+│   ├── 0002-create-posts-table.sql           # Posts table with FK to sites
+│   ├── 0003-create-term-relationships.sql    # Term relationships table
+│   └── ...                                    # Future migrations
 ├── src/
 │   ├── repository/
-│   │   ├── mod.rs           # QueryExecutor, DbEntity, Repository traits
-│   │   ├── posts.rs         # PostRepository
-│   │   └── ...              # Future repositories
+│   │   ├── mod.rs                 # QueryExecutor, TransactionManager, DbEntity, Repository traits
+│   │   ├── posts.rs               # PostRepository
+│   │   ├── term_relationships.rs  # TermRelationshipRepository
+│   │   └── ...                    # Future repositories
 │   ├── mappings/
-│   │   ├── posts.rs         # DbEntity implementations
+│   │   ├── posts.rs               # Post DbEntity implementations
+│   │   ├── term_relationships.rs  # TermRelationship ToSql/FromSql for TaxonomyType
 │   │   └── ...
-│   └── lib.rs               # DbSite, migration management
+│   ├── term_relationships.rs      # DbTermRelationship type
+│   └── lib.rs                     # DbSite, RowId, migration management
 └── REPOSITORY_PATTERN_DESIGN.md
 ```
 
@@ -502,4 +723,6 @@ wp_mobile_cache/
 
 This design provides a clean, simple abstraction for database operations while maintaining flexibility for type-specific customization. The explicit executor passing keeps the design simple and allows clients to add their own convenience layers as needed.
 
-The multi-site architecture ensures data isolation through foreign key constraints and composite unique indexes, allowing the same WordPress post IDs across different sites without conflicts. All repository methods require a `site_id` parameter, enforcing proper data scoping at the API level.
+The multi-site architecture ensures data isolation through foreign key constraints and composite unique indexes, allowing the same WordPress post IDs across different sites without conflicts. All repository methods require a `DbSite` parameter, enforcing proper data scoping at the API level.
+
+Term relationships are normalized in a separate table, enabling efficient queries while preserving the WordPress REST API structure through joins. The sync-based approach ensures database observers only see actual changes, maintaining compatibility with reactive architectures.
