@@ -342,7 +342,9 @@ mod tests {
         repo.insert(&conn, &post3, TEST_SITE_ID).unwrap();
 
         // Select by author
-        let author_10_posts = repo.select_by_author(&conn, TEST_SITE_ID, UserId(10)).unwrap();
+        let author_10_posts = repo
+            .select_by_author(&conn, TEST_SITE_ID, UserId(10))
+            .unwrap();
         assert_eq!(author_10_posts.len(), 2);
         assert!(
             author_10_posts
@@ -350,7 +352,9 @@ mod tests {
                 .all(|p| p.post.author == Some(UserId(10)))
         );
 
-        let author_20_posts = repo.select_by_author(&conn, TEST_SITE_ID, UserId(20)).unwrap();
+        let author_20_posts = repo
+            .select_by_author(&conn, TEST_SITE_ID, UserId(20))
+            .unwrap();
         assert_eq!(author_20_posts.len(), 1);
         assert_eq!(author_20_posts[0].post.author, Some(UserId(20)));
     }
@@ -378,7 +382,9 @@ mod tests {
         repo.insert(&conn, &post3, TEST_SITE_ID).unwrap();
 
         // Select by status
-        let published = repo.select_by_status(&conn, TEST_SITE_ID, "publish").unwrap();
+        let published = repo
+            .select_by_status(&conn, TEST_SITE_ID, "publish")
+            .unwrap();
         assert_eq!(published.len(), 2);
 
         let drafts = repo.select_by_status(&conn, TEST_SITE_ID, "draft").unwrap();
@@ -470,7 +476,9 @@ mod tests {
             .expect("Post should exist");
 
         // Delete
-        let deleted = repo.delete_by_post_id(&conn, TEST_SITE_ID, PostId(42)).unwrap();
+        let deleted = repo
+            .delete_by_post_id(&conn, TEST_SITE_ID, PostId(42))
+            .unwrap();
         assert_eq!(deleted, 1);
 
         // Verify no longer exists
@@ -478,7 +486,9 @@ mod tests {
         assert!(result.is_err());
 
         // Delete non-existent should return 0
-        let deleted = repo.delete_by_post_id(&conn, TEST_SITE_ID, PostId(999)).unwrap();
+        let deleted = repo
+            .delete_by_post_id(&conn, TEST_SITE_ID, PostId(999))
+            .unwrap();
         assert_eq!(deleted, 0);
     }
 
@@ -492,13 +502,18 @@ mod tests {
         post.status = PostStatus::Draft;
 
         // Verify post doesn't exist
-        assert!(repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(100)).is_err());
+        assert!(
+            repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(100))
+                .is_err()
+        );
 
         // Upsert should insert
         let rowid = repo.upsert(&conn, TEST_SITE_ID, &post).unwrap();
 
         // Verify it was inserted
-        let retrieved = repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(100)).unwrap();
+        let retrieved = repo
+            .select_by_post_id(&conn, TEST_SITE_ID, PostId(100))
+            .unwrap();
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site_id, TEST_SITE_ID);
         assert_eq!(retrieved.post.status, PostStatus::Draft);
@@ -529,7 +544,9 @@ mod tests {
         assert_eq!(original_rowid, new_rowid);
 
         // Verify the update
-        let retrieved = repo.select_by_post_id(&conn, TEST_SITE_ID, PostId(200)).unwrap();
+        let retrieved = repo
+            .select_by_post_id(&conn, TEST_SITE_ID, PostId(200))
+            .unwrap();
         assert_eq!(retrieved.post.status, PostStatus::Publish);
         assert_eq!(retrieved.post.slug, "updated-slug");
 

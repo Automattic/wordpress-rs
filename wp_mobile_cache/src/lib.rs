@@ -75,8 +75,8 @@ impl WpApiCache {
 }
 
 static MIGRATION_QUERIES: [&str; 2] = [
-    include_str!("../migrations/0001-create-posts-table.sql"),
-    include_str!("../migrations/0002-create-users-table.sql"),
+    include_str!("../migrations/0001-create-sites-table.sql"),
+    include_str!("../migrations/0002-create-posts-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

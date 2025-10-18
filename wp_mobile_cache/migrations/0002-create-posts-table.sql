@@ -2,8 +2,8 @@ CREATE TABLE `posts_edit_context` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
-  -- Site identifier
-  `site_id` INTEGER NOT NULL,
+  -- Site identifier (foreign key to sites table)
+  `site_id` INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
 
   -- Top-level non-nullable fields
   `id` INTEGER NOT NULL,
@@ -54,7 +54,10 @@ CREATE TABLE `posts_edit_context` (
   -- Nested: excerpt (entire struct is optional)
   `excerpt_raw` TEXT,
   `excerpt_rendered` TEXT,
-  `excerpt_protected` INTEGER
+  `excerpt_protected` INTEGER,
+
+  FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
 ) STRICT;
 
 CREATE UNIQUE INDEX idx_posts_edit_context_unique_site_id_and_id ON posts_edit_context(site_id, id);
+CREATE INDEX idx_posts_edit_context_site_id ON posts_edit_context(site_id);
