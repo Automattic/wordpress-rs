@@ -137,7 +137,7 @@ impl PostRepository {
     /// Returns the rowid of the inserted or updated row.
     pub fn upsert(
         &self,
-        conn: &rusqlite::Connection,
+        executor: &impl QueryExecutor,
         site: &DbSite,
         post: &AnyPostWithEditContext,
     ) -> Result<RowId, SqliteDbError> {
@@ -145,7 +145,7 @@ impl PostRepository {
             bool_to_integer, serialize_json_id_array, serialize_value_to_json,
         };
 
-        conn.execute(
+        executor.execute(
             r#"
             INSERT INTO posts_edit_context (
                 site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
@@ -238,7 +238,7 @@ impl PostRepository {
             },
         )?;
 
-        Ok(conn.last_insert_rowid().into())
+        Ok(QueryExecutor::last_insert_rowid(executor))
     }
 
     /// Get the total count of posts for a given site.

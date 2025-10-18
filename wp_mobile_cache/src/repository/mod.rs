@@ -16,7 +16,13 @@ pub trait QueryExecutor {
 
     /// Get the rowid of the last inserted row.
     fn last_insert_rowid(&self) -> RowId;
+}
 
+/// Trait for types that can manage database transactions.
+///
+/// This is separate from QueryExecutor because not all query executors can create transactions
+/// (e.g., a Transaction itself cannot create nested transactions in our design).
+pub trait TransactionManager: QueryExecutor {
     /// Begin a database transaction (requires mutable access).
     fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, SqliteDbError>;
 }
@@ -33,15 +39,27 @@ impl QueryExecutor for Connection {
     fn last_insert_rowid(&self) -> RowId {
         self.last_insert_rowid().into()
     }
+}
 
+impl TransactionManager for Connection {
     fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, SqliteDbError> {
         rusqlite::Connection::transaction(self).map_err(SqliteDbError::from)
     }
 }
 
-// Note: Transaction doesn't implement QueryExecutor because it requires mutable access
-// for nested transactions. In practice, you'd use the Connection's transaction method
-// and work within that transaction.
+impl<'conn> QueryExecutor for rusqlite::Transaction<'conn> {
+    fn prepare(&self, sql: &str) -> Result<rusqlite::Statement<'_>, SqliteDbError> {
+        rusqlite::Connection::prepare(self, sql).map_err(Into::into)
+    }
+
+    fn execute(&self, sql: &str, params: impl rusqlite::Params) -> Result<usize, SqliteDbError> {
+        rusqlite::Connection::execute(self, sql, params).map_err(Into::into)
+    }
+
+    fn last_insert_rowid(&self) -> RowId {
+        rusqlite::Connection::last_insert_rowid(self).into()
+    }
+}
 
 /// Marker trait for database entities.
 ///
@@ -80,17 +98,13 @@ pub trait Repository {
     /// Insert a single entity into the database.
     ///
     /// Returns the rowid of the newly inserted row.
-    ///
-    /// Note: This method requires a Connection because the underlying InsertIntoDb
-    /// trait is implemented for Connection. This is a known limitation that can be
-    /// refactored in the future if needed.
     fn insert(
         &self,
-        conn: &Connection,
+        executor: &impl QueryExecutor,
         item: &Self::Entity,
         site: &crate::DbSite,
     ) -> Result<RowId, SqliteDbError> {
-        item.insert_into_db(conn, site).map(RowId::from)
+        item.insert_into_db(executor, site)
     }
 
     /// Insert multiple entities in a single transaction.
@@ -99,16 +113,16 @@ pub trait Repository {
     /// If any insert fails, the entire transaction is rolled back.
     fn insert_batch(
         &self,
-        conn: &mut Connection,
+        transaction_manager: &mut impl TransactionManager,
         items: &[Self::Entity],
         site: &crate::DbSite,
     ) -> Result<Vec<RowId>, SqliteDbError> {
-        let tx = conn.transaction().map_err(SqliteDbError::from)?;
+        let tx = transaction_manager.transaction()?;
         let mut rowids = Vec::with_capacity(items.len());
 
         for item in items {
             let rowid = InsertIntoDb::insert_into_db(item, &tx, site)?;
-            rowids.push(RowId::from(rowid));
+            rowids.push(rowid);
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
@@ -138,12 +152,11 @@ mod tests {
     impl InsertIntoDb for TestEntity {
         fn insert_into_db(
             &self,
-            conn: &Connection,
+            executor: &impl QueryExecutor,
             _site: &crate::DbSite,
-        ) -> Result<i64, SqliteDbError> {
-            conn.execute("INSERT INTO test_table (value) VALUES (?)", [&self.value])
-                .map_err(SqliteDbError::from)?;
-            Ok(conn.last_insert_rowid())
+        ) -> Result<RowId, SqliteDbError> {
+            executor.execute("INSERT INTO test_table (value) VALUES (?)", [&self.value])?;
+            Ok(QueryExecutor::last_insert_rowid(executor))
         }
     }
 

@@ -23,22 +23,30 @@ This document outlines the design for a Repository pattern to abstract database 
 
 ### Core Components
 
-#### 1. QueryExecutor Trait
+#### 1. QueryExecutor and TransactionManager Traits
 
 Abstracts database query execution to decouple from `rusqlite`.
 
+**QueryExecutor** - Core query operations:
 ```rust
 pub trait QueryExecutor {
     fn prepare(&self, sql: &str) -> Result<rusqlite::Statement<'_>, SqliteDbError>;
     fn execute(&self, sql: &str, params: impl rusqlite::Params) -> Result<usize, SqliteDbError>;
-    fn last_insert_rowid(&self) -> i64;
+    fn last_insert_rowid(&self) -> RowId;
+}
+```
+
+**TransactionManager** - Transaction management:
+```rust
+pub trait TransactionManager: QueryExecutor {
     fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, SqliteDbError>;
 }
 ```
 
 **Implementation:**
-- `rusqlite::Connection` implements `QueryExecutor`
-- Note: `Transaction` does not implement `QueryExecutor` because it requires mutable access for nested transactions
+- `rusqlite::Connection` implements both `QueryExecutor` and `TransactionManager`
+- `rusqlite::Transaction` implements only `QueryExecutor` (cannot create nested transactions)
+- This design prevents nested transactions at the type level (compile-time safety)
 
 **Trade-offs:**
 - Still references `rusqlite` types (Statement, Params) to avoid over-abstraction
@@ -76,21 +84,22 @@ Provides common operations with default implementations.
 pub trait Repository {
     type Entity: DbEntity;
 
-    fn insert(&self, conn: &Connection, item: &Self::Entity, site: &DbSite)
-        -> Result<i64, SqliteDbError> {
-        item.insert_into_db(conn, site_id)
+    fn insert(&self, executor: &impl QueryExecutor, item: &Self::Entity, site: &DbSite)
+        -> Result<RowId, SqliteDbError> {
+        item.insert_into_db(executor, site)
     }
 
-    fn insert_batch(&self, conn: &mut Connection, items: &[Self::Entity], site: &DbSite)
-        -> Result<Vec<i64>, SqliteDbError> {
+    fn insert_batch(&self, transaction_manager: &mut impl TransactionManager,
+                    items: &[Self::Entity], site: &DbSite)
+        -> Result<Vec<RowId>, SqliteDbError> {
         // Default implementation uses a transaction
     }
 }
 ```
 
 **Default Implementations:**
-- `insert`: Delegates to `InsertIntoDb::insert_into_db` with `site_id`
-- `insert_batch`: Wraps inserts in a transaction for atomicity
+- `insert`: Delegates to `InsertIntoDb::insert_into_db`, accepts any `QueryExecutor`
+- `insert_batch`: Uses `TransactionManager` to wrap inserts in a transaction for atomicity
 
 **Multi-Site Design:**
 - All insert operations require a `site` parameter to scope data to a specific site
@@ -111,7 +120,7 @@ impl Repository for PostRepository {
 
 impl PostRepository {
     // Query methods return DbAnyPostWithEditContext (includes rowid and site_id)
-    pub fn select_by_rowid(&self, executor: &impl QueryExecutor, site: &DbSite, rowid: i64)
+    pub fn select_by_rowid(&self, executor: &impl QueryExecutor, site: &DbSite, rowid: RowId)
         -> Result<DbAnyPostWithEditContext, SqliteDbError> { /* ... */ }
 
     pub fn select_all(&self, executor: &impl QueryExecutor, site: &DbSite)
@@ -127,8 +136,8 @@ impl PostRepository {
         -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> { /* ... */ }
 
     // Upsert (insert or update) using SQLite's ON CONFLICT
-    pub fn upsert(&self, conn: &Connection, site: &DbSite, post: &AnyPostWithEditContext)
-        -> Result<i64, SqliteDbError> { /* ... */ }
+    pub fn upsert(&self, executor: &impl QueryExecutor, site: &DbSite, post: &AnyPostWithEditContext)
+        -> Result<RowId, SqliteDbError> { /* ... */ }
 
     // Delete by WordPress post ID and site
     pub fn delete_by_post_id(&self, executor: &impl QueryExecutor, site: &DbSite, post_id: PostId)
@@ -155,9 +164,9 @@ impl PostRepository {
 **Example:**
 ```rust
 let repo = PostRepository;
-let site_id = DbSite(1);
-let post = repo.select_by_rowid(&conn, site_id, 42)?;
-let post = repo.select_by_post_id(&conn, site_id, PostId(123))?;
+let site = DbSite { row_id: RowId(1) };
+let post = repo.select_by_rowid(&conn, &site, RowId(42))?;
+let post = repo.select_by_post_id(&conn, &site, PostId(123))?;
 ```
 
 **Client Convenience (Optional):**
@@ -166,11 +175,12 @@ If clients want convenience, they can create their own wrappers:
 struct PostRepositoryWithExecutor<E> {
     executor: E,
     repo: PostRepository,
+    site: DbSite,
 }
 
 impl<E: QueryExecutor> PostRepositoryWithExecutor<E> {
-    pub fn select_by_rowid(&self, rowid: i64) -> Result<...> {
-        self.repo.select_by_rowid(&self.executor, rowid)
+    pub fn select_by_rowid(&self, rowid: RowId) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
+        self.repo.select_by_rowid(&self.executor, &self.site, rowid)
     }
 }
 ```
@@ -265,9 +275,9 @@ pub struct DbAnyPostWithEditContext {
 
 **Implementation:**
 ```rust
-pub fn upsert(&self, conn: &Connection, site: &DbSite, post: &AnyPostWithEditContext)
-    -> Result<i64, SqliteDbError> {
-    conn.execute(
+pub fn upsert(&self, executor: &impl QueryExecutor, site: &DbSite, post: &AnyPostWithEditContext)
+    -> Result<RowId, SqliteDbError> {
+    executor.execute(
         r#"
         INSERT INTO posts_edit_context (site_id, id, date, ...)
         VALUES (:site_id, :id, :date, ...)
@@ -276,12 +286,12 @@ pub fn upsert(&self, conn: &Connection, site: &DbSite, post: &AnyPostWithEditCon
             ...
         "#,
         named_params! {
-            ":site_id": site_id.0,
+            ":site_id": site.row_id,
             ":id": post.id.0,
             ...
         }
     )?;
-    Ok(conn.last_insert_rowid())
+    Ok(QueryExecutor::last_insert_rowid(executor))
 }
 ```
 
@@ -349,6 +359,38 @@ CREATE INDEX idx_posts_edit_context_site_id
   ON posts_edit_context(site_id);
 ```
 
+### Decision 8: Split QueryExecutor and TransactionManager Traits
+
+**Decision:** Separate transaction management from query execution with two distinct traits.
+
+**Rationale:**
+- **Type-level safety**: Prevents nested transactions at compile time
+- **Clear separation of concerns**: Query execution vs transaction management
+- **Flexible usage**: Repository methods can accept `QueryExecutor` for read operations, or `TransactionManager` when transactions are needed
+- **No runtime overhead**: Compiler enforces the rules, no panics or runtime checks
+
+**Implementation:**
+- `QueryExecutor`: Core trait with `prepare()`, `execute()`, `last_insert_rowid()`
+- `TransactionManager`: Extends `QueryExecutor`, adds `transaction()` method
+- `Connection` implements both traits (can execute queries and create transactions)
+- `Transaction` implements only `QueryExecutor` (can execute queries but cannot create nested transactions)
+
+**Example:**
+```rust
+// Repository methods that only need to execute queries
+pub fn select_by_rowid(&self, executor: &impl QueryExecutor, ...) { }
+
+// Repository methods that need transaction support
+pub fn insert_batch(&self, transaction_manager: &mut impl TransactionManager, ...) {
+    let tx = transaction_manager.transaction()?;
+    // ... work with tx (which implements QueryExecutor)
+}
+```
+
+**Trade-offs:**
+- Slightly more complex trait hierarchy, but gains compile-time safety
+- Makes the API intent clearer: methods requiring transactions are explicit about it
+
 ## Implementation Plan
 
 ### Phase 1: Core Traits
@@ -385,9 +427,9 @@ let conn = Connection::open("cache.db")?;
 let repo = PostRepository;
 let site = DbSite { row_id: RowId(1) };
 
-// Insert operation (from trait)
+// Insert operation (from trait, returns RowId)
 let post = create_post();
-let rowid = repo.insert(&conn, &post, &site)?;
+let rowid: RowId = repo.insert(&conn, &post, &site)?;
 
 // Query operations (return DbAnyPostWithEditContext with rowid and site)
 let db_post = repo.select_by_rowid(&conn, &site, RowId(42))?;
@@ -398,8 +440,8 @@ let db_post = repo.select_by_post_id(&conn, &site, PostId(123))?;
 let author_posts = repo.select_by_author(&conn, &site, UserId(1))?;
 let draft_posts = repo.select_by_status(&conn, &site, "draft")?;
 
-// Upsert (insert or update)
-let rowid = repo.upsert(&conn, &site, &updated_post)?;
+// Upsert (insert or update, returns RowId)
+let rowid: RowId = repo.upsert(&conn, &site, &updated_post)?;
 
 // Delete
 let deleted_count = repo.delete_by_post_id(&conn, &site, PostId(123))?;
@@ -414,10 +456,10 @@ let total = repo.count(&conn, &site)?;
 let posts = vec![post1, post2, post3];
 let mut conn = Connection::open("cache.db")?;
 let site = DbSite { row_id: RowId(1) };
-let rowids = repo.insert_batch(&mut conn, &posts, &site)?;
+let rowids: Vec<RowId> = repo.insert_batch(&mut conn, &posts, &site)?;
 ```
 
-**Note:** `insert_batch` requires a mutable connection because it uses a transaction internally. All posts in the batch are inserted for the same site.
+**Note:** `insert_batch` requires a mutable `TransactionManager` (Connection) because it uses a transaction internally. All posts in the batch are inserted for the same site.
 
 ## Future Enhancements
 

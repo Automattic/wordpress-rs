@@ -1,5 +1,5 @@
 use crate::SqliteDbError;
-use rusqlite::{Connection, Row};
+use rusqlite::Row;
 
 pub mod helpers;
 pub mod posts;
@@ -38,6 +38,9 @@ pub trait TryFromDbRow: Sized {
 /// Trait for types that can be inserted into the database.
 /// Returns the rowid of the inserted row on success.
 pub trait InsertIntoDb {
-    fn insert_into_db(&self, conn: &Connection, site: &crate::DbSite)
-    -> Result<i64, SqliteDbError>;
+    fn insert_into_db(
+        &self,
+        executor: &impl crate::repository::QueryExecutor,
+        site: &crate::DbSite,
+    ) -> Result<crate::RowId, SqliteDbError>;
 }

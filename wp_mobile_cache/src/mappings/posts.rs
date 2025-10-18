@@ -8,7 +8,7 @@ use crate::{
             serialize_json_id_array, serialize_value_to_json,
         },
     },
-    repository::DbEntity,
+    repository::{DbEntity, QueryExecutor},
 };
 use rusqlite::Row;
 use wp_api::posts::{
@@ -146,10 +146,10 @@ impl DbEntity for AnyPostWithEditContext {
 impl InsertIntoDb for AnyPostWithEditContext {
     fn insert_into_db(
         &self,
-        conn: &rusqlite::Connection,
+        executor: &impl crate::repository::QueryExecutor,
         site: &DbSite,
-    ) -> Result<i64, SqliteDbError> {
-        conn.execute(
+    ) -> Result<RowId, SqliteDbError> {
+        executor.execute(
             r#"
             INSERT INTO posts_edit_context (
                 site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
@@ -207,7 +207,7 @@ impl InsertIntoDb for AnyPostWithEditContext {
             },
         )?;
 
-        Ok(conn.last_insert_rowid())
+        Ok(QueryExecutor::last_insert_rowid(executor))
     }
 }
 
