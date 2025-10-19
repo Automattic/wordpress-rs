@@ -2,6 +2,7 @@ use crate::{RowId, SqliteDbError, mappings::InsertIntoDb};
 use rusqlite::Connection;
 
 pub mod posts;
+pub mod term_relationships;
 
 /// Abstraction over database query execution.
 ///

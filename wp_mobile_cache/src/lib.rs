@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 pub mod mappings;
 pub mod repository;
+pub mod term_relationships;
 
 #[cfg(test)]
 pub mod test_fixtures;
@@ -144,9 +145,10 @@ impl WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 2] = [
+static MIGRATION_QUERIES: [&str; 3] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
+    include_str!("../migrations/0003-create-term-relationships.sql"),
 ];
 
 pub struct MigrationManager<'a> {

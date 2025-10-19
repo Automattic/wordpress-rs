@@ -1,9 +1,13 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
     mappings::{TryFromDbRow, posts::DbAnyPostWithEditContext},
-    repository::{QueryExecutor, Repository},
+    repository::{
+        QueryExecutor, Repository, TransactionManager,
+        term_relationships::TermRelationshipRepository,
+    },
 };
 use wp_api::posts::{AnyPostWithEditContext, PostId};
+use wp_api::taxonomies::TaxonomyType;
 
 /// Repository for managing posts in the database.
 ///
@@ -19,6 +23,7 @@ impl PostRepository {
     /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
     ///
     /// Returns an error if no post with the given rowid exists for this site.
+    /// Automatically populates categories and tags from term_relationships table.
     pub fn select_by_rowid(
         &self,
         executor: &impl QueryExecutor,
@@ -27,16 +32,23 @@ impl PostRepository {
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
         let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND rowid = ?";
         let mut stmt = executor.prepare(sql)?;
-        stmt.query_row([site.row_id, rowid], |row| {
-            DbAnyPostWithEditContext::try_from_row(row)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })
-        .map_err(SqliteDbError::from)
+        let mut db_post = stmt
+            .query_row([site.row_id, rowid], |row| {
+                DbAnyPostWithEditContext::try_from_row(row)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            })
+            .map_err(SqliteDbError::from)?;
+
+        // Populate terms from term_relationships table
+        self.populate_terms(executor, site, &mut db_post)?;
+
+        Ok(db_post)
     }
 
     /// Select all posts for a given site (returns wrappers with rowids).
     ///
     /// Returns an empty vector if no posts exist for the site.
+    /// Automatically populates categories and tags from term_relationships table.
     pub fn select_all(
         &self,
         executor: &impl QueryExecutor,
@@ -49,8 +61,16 @@ impl PostRepository {
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
 
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)
+        let mut posts: Vec<DbAnyPostWithEditContext> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
+
+        // Populate terms for all posts
+        for db_post in &mut posts {
+            self.populate_terms(executor, site, db_post)?;
+        }
+
+        Ok(posts)
     }
 
     /// Select a post by its WordPress post ID for a given site (returns wrapper with rowid).
@@ -59,6 +79,7 @@ impl PostRepository {
     /// The post_id is the WordPress post ID from the REST API.
     ///
     /// Returns an error if no post with the given WordPress post ID exists for this site.
+    /// Automatically populates categories and tags from term_relationships table.
     pub fn select_by_post_id(
         &self,
         executor: &impl QueryExecutor,
@@ -67,16 +88,23 @@ impl PostRepository {
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
         let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
         let mut stmt = executor.prepare(sql)?;
-        stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
-            DbAnyPostWithEditContext::try_from_row(row)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })
-        .map_err(SqliteDbError::from)
+        let mut db_post = stmt
+            .query_row(rusqlite::params![site.row_id, post_id.0], |row| {
+                DbAnyPostWithEditContext::try_from_row(row)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            })
+            .map_err(SqliteDbError::from)?;
+
+        // Populate terms from term_relationships table
+        self.populate_terms(executor, site, &mut db_post)?;
+
+        Ok(db_post)
     }
 
     /// Select posts by author user ID for a given site (returns wrappers with rowids).
     ///
     /// Returns an empty vector if no posts by the given author exist for the site.
+    /// Automatically populates categories and tags from term_relationships table.
     pub fn select_by_author(
         &self,
         executor: &impl QueryExecutor,
@@ -90,13 +118,22 @@ impl PostRepository {
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
 
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)
+        let mut posts: Vec<DbAnyPostWithEditContext> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
+
+        // Populate terms for all posts
+        for db_post in &mut posts {
+            self.populate_terms(executor, site, db_post)?;
+        }
+
+        Ok(posts)
     }
 
     /// Select posts by status for a given site (e.g., "publish", "draft").
     ///
     /// Returns an empty vector if no posts with the given status exist for the site.
+    /// Automatically populates categories and tags from term_relationships table.
     pub fn select_by_status(
         &self,
         executor: &impl QueryExecutor,
@@ -110,19 +147,39 @@ impl PostRepository {
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
 
-        rows.collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)
+        let mut posts: Vec<DbAnyPostWithEditContext> = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
+
+        // Populate terms for all posts
+        for db_post in &mut posts {
+            self.populate_terms(executor, site, db_post)?;
+        }
+
+        Ok(posts)
     }
 
     /// Delete a post by its WordPress post ID for a given site.
     ///
     /// Returns the number of rows deleted (0 or 1).
+    /// Automatically deletes associated term relationships.
     pub fn delete_by_post_id(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
     ) -> Result<usize, SqliteDbError> {
+        // First, try to get the rowid (if post doesn't exist, return 0)
+        let db_post = match self.select_by_post_id(executor, site, post_id) {
+            Ok(post) => post,
+            Err(_) => return Ok(0), // Post doesn't exist
+        };
+
+        // Delete term relationships
+        let term_repo = TermRelationshipRepository;
+        term_repo.delete_all_terms_for_object(executor, site, db_post.row_id)?;
+
+        // Delete the post
         let sql = "DELETE FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
         executor.execute(sql, rusqlite::params![site.row_id, post_id.0])
     }
@@ -238,7 +295,14 @@ impl PostRepository {
             },
         )?;
 
-        Ok(QueryExecutor::last_insert_rowid(executor))
+        // Note: last_insert_rowid() doesn't change on UPDATE (ON CONFLICT DO UPDATE),
+        // so we need to query for the rowid after upsert to get the correct value.
+        let sql = "SELECT rowid FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
+        let mut stmt = executor.prepare(sql)?;
+        let rowid: i64 = stmt
+            .query_row(rusqlite::params![site.row_id, post.id.0], |row| row.get(0))
+            .map_err(SqliteDbError::from)?;
+        Ok(RowId(rowid as u64))
     }
 
     /// Get the total count of posts for a given site.
@@ -251,6 +315,66 @@ impl PostRepository {
         let mut stmt = executor.prepare(sql)?;
         stmt.query_row([site.row_id], |row| row.get(0))
             .map_err(SqliteDbError::from)
+    }
+
+    /// Populate categories and tags from term_relationships table.
+    ///
+    /// This is a helper method used by select methods to join term data.
+    fn populate_terms(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        db_post: &mut DbAnyPostWithEditContext,
+    ) -> Result<(), SqliteDbError> {
+        let term_repo = TermRelationshipRepository;
+        let terms_map = term_repo.get_all_terms_for_object(executor, site, db_post.row_id)?;
+
+        // Only overwrite categories/tags if there are entries in term_relationships.
+        // This preserves backward compatibility with posts that only have JSON storage.
+        if let Some(categories) = terms_map.get(&TaxonomyType::Category) {
+            db_post.post.categories = Some(categories.clone());
+        }
+        if let Some(tags) = terms_map.get(&TaxonomyType::PostTag) {
+            db_post.post.tags = Some(tags.clone());
+        }
+
+        Ok(())
+    }
+
+    /// Upsert a post with its term relationships (atomic transaction).
+    ///
+    /// This method combines post upsert with term synchronization in a single transaction.
+    /// Term relationships are synced using a diff approach - only changes generate DB events.
+    pub fn upsert_with_terms(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        post: &AnyPostWithEditContext,
+    ) -> Result<RowId, SqliteDbError> {
+        let tx = transaction_manager.transaction()?;
+
+        // Upsert the post
+        let post_rowid = self.upsert(&tx, site, post)?;
+
+        // Sync term relationships (only changes what's different)
+        let term_repo = TermRelationshipRepository;
+
+        if let Some(ref categories) = post.categories {
+            term_repo.sync_terms_for_object(
+                &tx,
+                site,
+                post_rowid,
+                &TaxonomyType::Category,
+                categories,
+            )?;
+        }
+
+        if let Some(ref tags) = post.tags {
+            term_repo.sync_terms_for_object(&tx, site, post_rowid, &TaxonomyType::PostTag, tags)?;
+        }
+
+        tx.commit().map_err(SqliteDbError::from)?;
+        Ok(post_rowid)
     }
 }
 
@@ -550,5 +674,189 @@ mod tests {
 
         // Verify only one post exists with this ID
         assert_eq!(repo.count(&conn, &TEST_SITE).unwrap(), 1);
+    }
+
+    #[test]
+    fn test_upsert_with_terms_inserts_post_and_terms() {
+        let mut conn = setup_test_db();
+        let repo = PostRepository;
+
+        let mut post = create_minimal_post();
+        post.id = PostId(300);
+        post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)]);
+        post.tags = Some(vec![wp_api::terms::TermId(10), wp_api::terms::TermId(20)]);
+
+        // Upsert with terms
+        let rowid = repo
+            .upsert_with_terms(&mut conn, &TEST_SITE, &post)
+            .unwrap();
+
+        // Verify post was inserted
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+        assert_eq!(retrieved.post.id, PostId(300));
+
+        // Verify categories were inserted
+        assert_eq!(retrieved.post.categories.as_ref().unwrap().len(), 2);
+        assert!(
+            retrieved
+                .post
+                .categories
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(1))
+        );
+        assert!(
+            retrieved
+                .post
+                .categories
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(2))
+        );
+
+        // Verify tags were inserted
+        assert_eq!(retrieved.post.tags.as_ref().unwrap().len(), 2);
+        assert!(
+            retrieved
+                .post
+                .tags
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(10))
+        );
+        assert!(
+            retrieved
+                .post
+                .tags
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(20))
+        );
+    }
+
+    #[test]
+    fn test_upsert_with_terms_updates_existing_terms() {
+        let mut conn = setup_test_db();
+        let repo = PostRepository;
+
+        // Insert post with initial terms
+        let mut post = create_minimal_post();
+        post.id = PostId(400);
+        post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)]);
+        post.tags = Some(vec![
+            wp_api::terms::TermId(10),
+            wp_api::terms::TermId(20),
+            wp_api::terms::TermId(30),
+        ]);
+
+        repo.upsert_with_terms(&mut conn, &TEST_SITE, &post)
+            .unwrap();
+
+        // Update with different terms
+        post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(3)]); // Remove 2, add 3
+        post.tags = Some(vec![wp_api::terms::TermId(10)]); // Remove 20, 30
+
+        repo.upsert_with_terms(&mut conn, &TEST_SITE, &post)
+            .unwrap();
+
+        // Verify updated terms
+        let retrieved = repo
+            .select_by_post_id(&conn, &TEST_SITE, PostId(400))
+            .unwrap();
+
+        // Categories: should have 1, 3 (not 2)
+        assert_eq!(retrieved.post.categories.as_ref().unwrap().len(), 2);
+        assert!(
+            retrieved
+                .post
+                .categories
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(1))
+        );
+        assert!(
+            retrieved
+                .post
+                .categories
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(3))
+        );
+        assert!(
+            !retrieved
+                .post
+                .categories
+                .as_ref()
+                .unwrap()
+                .contains(&wp_api::terms::TermId(2))
+        );
+
+        // Tags: should only have 10 (not 20, 30)
+        assert_eq!(retrieved.post.tags.as_ref().unwrap().len(), 1);
+        assert_eq!(
+            retrieved.post.tags.as_ref().unwrap()[0],
+            wp_api::terms::TermId(10)
+        );
+    }
+
+    #[test]
+    fn test_delete_by_post_id_deletes_terms() {
+        let conn = setup_test_db();
+        let repo = PostRepository;
+        let term_repo = crate::repository::term_relationships::TermRelationshipRepository;
+
+        // Insert post without terms (to avoid transaction issues in this test)
+        let mut post = create_minimal_post();
+        post.id = PostId(500);
+        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+
+        // Manually add terms
+        term_repo
+            .sync_terms_for_object(
+                &conn,
+                &TEST_SITE,
+                rowid,
+                &wp_api::taxonomies::TaxonomyType::Category,
+                &[wp_api::terms::TermId(1), wp_api::terms::TermId(2)],
+            )
+            .unwrap();
+
+        // Verify terms exist
+        let terms = term_repo
+            .get_all_terms_for_object(&conn, &TEST_SITE, rowid)
+            .unwrap();
+        assert!(!terms.is_empty());
+
+        // Delete post
+        repo.delete_by_post_id(&conn, &TEST_SITE, PostId(500))
+            .unwrap();
+
+        // Verify terms were also deleted
+        let terms_after = term_repo
+            .get_all_terms_for_object(&conn, &TEST_SITE, rowid)
+            .unwrap();
+        assert!(terms_after.is_empty());
+    }
+
+    #[test]
+    fn test_select_by_rowid_populates_terms() {
+        let mut conn = setup_test_db();
+        let repo = PostRepository;
+
+        // Insert post with terms
+        let mut post = create_minimal_post();
+        post.id = PostId(600);
+        post.categories = Some(vec![wp_api::terms::TermId(5)]);
+
+        let rowid = repo
+            .upsert_with_terms(&mut conn, &TEST_SITE, &post)
+            .unwrap();
+
+        // Select by rowid should populate terms
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+        assert_eq!(
+            retrieved.post.categories,
+            Some(vec![wp_api::terms::TermId(5)])
+        );
     }
 }
