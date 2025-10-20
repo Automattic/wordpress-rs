@@ -946,11 +946,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fe0a21ee80050c678013f82edf4b705fe2f26f1f9877593d13198612503f493"
 dependencies = [
  "fluent-langneg",
- "fluent-syntax",
+ "fluent-syntax 0.11.1",
  "intl-memoizer",
  "intl_pluralrules",
  "rustc-hash 1.1.0",
  "self_cell 0.10.3",
+ "smallvec",
+ "unic-langid",
+]
+
+[[package]]
+name = "fluent-bundle"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01203cb8918f5711e73891b347816d932046f95f54207710bda99beaeb423bf4"
+dependencies = [
+ "fluent-langneg",
+ "fluent-syntax 0.12.0",
+ "intl-memoizer",
+ "intl_pluralrules",
+ "rustc-hash 2.1.1",
+ "self_cell 1.2.0",
  "smallvec",
  "unic-langid",
 ]
@@ -974,6 +990,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fluent-syntax"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54f0d287c53ffd184d04d8677f590f4ac5379785529e5e08b1c8083acdd5c198"
+dependencies = [
+ "memchr",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "fluent-template-macros"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -993,9 +1019,9 @@ version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69855a5fe87629495efca79aec72adfa97954f1006f928e3a2ec750cb3e85386"
 dependencies = [
- "fluent-bundle",
+ "fluent-bundle 0.15.3",
  "fluent-langneg",
- "fluent-syntax",
+ "fluent-syntax 0.11.1",
  "fluent-template-macros",
  "flume",
  "ignore",
@@ -1895,9 +1921,9 @@ dependencies = [
 
 [[package]]
 name = "intl-memoizer"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe22e020fce238ae18a6d5d8c502ee76a52a6e880d99477657e6acc30ec57bda"
+checksum = "310da2e345f5eb861e7a07ee182262e94975051db9e4223e909ba90f392f163f"
 dependencies = [
  "type-map",
  "unic-langid",
@@ -3359,14 +3385,14 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e14e4d63b804dc0c7ec4a1e52bcb63f02c7ac94476755aa579edac21e01f915d"
 dependencies = [
- "self_cell 1.1.0",
+ "self_cell 1.2.0",
 ]
 
 [[package]]
 name = "self_cell"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2fdfc24bc566f839a2da4c4295b82db7d25a24253867d5c64355abb5799bdbe"
+checksum = "0f7d95a54511e0c7be3f51e8867aa8cf35148d7b9445d44de2f943e2b206e749"
 
 [[package]]
 name = "semver"
@@ -5226,7 +5252,7 @@ dependencies = [
 name = "wp_localization"
 version = "0.1.0"
 dependencies = [
- "fluent-bundle",
+ "fluent-bundle 0.16.0",
  "fluent-langneg",
  "fluent-templates",
  "paste",
@@ -5244,7 +5270,7 @@ name = "wp_localization_macro"
 version = "0.1.0"
 dependencies = [
  "convert_case",
- "fluent-syntax",
+ "fluent-syntax 0.11.1",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
@@ -5260,7 +5286,7 @@ dependencies = [
 name = "wp_localization_parser"
 version = "0.1.0"
 dependencies = [
- "fluent-syntax",
+ "fluent-syntax 0.11.1",
  "thiserror 2.0.17",
 ]
 
@@ -5269,7 +5295,7 @@ name = "wp_localization_validation"
 version = "0.1.0"
 dependencies = [
  "clap",
- "fluent-syntax",
+ "fluent-syntax 0.11.1",
  "itertools 0.14.0",
  "thiserror 2.0.17",
  "wp_localization_parser",
