@@ -56,6 +56,9 @@ CREATE TABLE `posts_edit_context` (
   `excerpt_rendered` TEXT,
   `excerpt_protected` INTEGER,
 
+  -- Client-side cache metadata: when this post was last fetched from the WordPress API
+  `last_fetched_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
   FOREIGN KEY (db_site_id) REFERENCES sites(id) ON DELETE CASCADE
 ) STRICT;
 

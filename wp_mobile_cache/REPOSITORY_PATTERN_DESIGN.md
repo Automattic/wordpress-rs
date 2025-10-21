@@ -574,6 +574,71 @@ impl PostRepository {
 - **Preserves API**: `AnyPostWithEditContext` keeps `categories`/`tags` fields via joins
 - **Efficient queries**: Indexes support both "posts by term" and "terms by post" queries
 
+### Decision 10: Cache Freshness Tracking with `last_fetched_at`
+
+**Decision:** Add `last_fetched_at` timestamp field to cached data (posts) to track when data was fetched from the WordPress API.
+
+**Rationale:**
+- **Cache staleness detection**: Enables logic to determine when cached data should be refreshed
+- **Offline UX**: Display "Last updated X time ago" in UI when network is unavailable (e.g., pull-to-refresh header)
+- **Sync foundation**: Critical metadata for implementing intelligent sync strategies
+- **Debug/monitoring**: Helps diagnose cache issues and data freshness problems
+
+**Implementation:**
+- Field added to `posts_edit_context` table only (not `sites` table)
+- `DbSite` is just an internal identifier - actual site data will have its own timestamps when site tables are added
+- SQLite automatically manages the timestamp using `DEFAULT` and explicit UPDATE
+- Format: ISO 8601 UTC timestamp (e.g., `2025-10-21T19:49:22.667Z`)
+
+**Schema:**
+```sql
+CREATE TABLE `posts_edit_context` (
+  -- ... existing fields ...
+  `last_fetched_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  -- ...
+) STRICT;
+```
+
+**Automatic Timestamp Behavior:**
+- **INSERT**: SQLite default automatically sets to current UTC time
+- **UPDATE** (via upsert): Explicitly set in `ON CONFLICT DO UPDATE` clause:
+  ```sql
+  ON CONFLICT(...) DO UPDATE SET
+    -- ... other fields ...
+    last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  ```
+
+**Type Design:**
+```rust
+pub struct DbAnyPostWithEditContext {
+    pub row_id: RowId,
+    pub site: DbSite,
+    pub post: AnyPostWithEditContext,
+    pub last_fetched_at: String,  // ISO 8601 UTC: "2025-10-21T19:49:22.667Z"
+}
+```
+
+**Usage Example:**
+```rust
+// Fetch post from cache
+let cached_post = repo.select_by_post_id(&conn, &site, post_id)?;
+
+// Check freshness
+let age = calculate_age(&cached_post.last_fetched_at);
+if age > Duration::from_hours(1) {
+    // Refresh from API
+}
+
+// Display in UI
+header.subtitle = format!("Last updated {}", humanize_timestamp(&cached_post.last_fetched_at));
+```
+
+**Key Benefits:**
+- **Zero boilerplate**: Developers never pass timestamps - SQLite handles it automatically
+- **Always accurate**: Timestamp reflects actual cache time, not API server time
+- **Offline-friendly UX**: Users see when data was last synced
+- **Future-proof**: Foundation for intelligent sync/refresh strategies
+
 ## Implementation Plan
 
 ### Phase 1: Core Traits

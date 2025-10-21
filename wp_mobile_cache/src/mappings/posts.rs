@@ -58,6 +58,7 @@ enum PostEditContextColumn {
     ExcerptRaw = 34,
     ExcerptRendered = 35,
     ExcerptProtected = 36,
+    LastFetchedAt = 37,
 }
 
 impl ColumnIndex for PostEditContextColumn {
@@ -70,6 +71,7 @@ pub struct DbAnyPostWithEditContext {
     pub row_id: RowId,
     pub site: DbSite,
     pub post: AnyPostWithEditContext,
+    pub last_fetched_at: String,
 }
 
 impl TryFromDbRow for DbAnyPostWithEditContext {
@@ -135,7 +137,12 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
             menu_order: row.get_column(MenuOrder)?,
         };
 
-        Ok(Self { row_id, site, post })
+        Ok(Self {
+            row_id,
+            site,
+            post,
+            last_fetched_at: row.get_column(LastFetchedAt)?,
+        })
     }
 }
 
@@ -223,6 +230,27 @@ mod tests {
 
     const TEST_SITE: DbSite = DbSite { row_id: RowId(1) };
 
+    /// Helper to validate that last_fetched_at is a recent, valid ISO 8601 timestamp
+    fn assert_recent_timestamp(timestamp: &str) {
+        // Parse the timestamp
+        assert!(
+            timestamp.ends_with('Z'),
+            "Timestamp should be UTC (end with Z): {}",
+            timestamp
+        );
+        assert!(
+            timestamp.contains('T'),
+            "Timestamp should be ISO 8601 format: {}",
+            timestamp
+        );
+        // Basic format check: YYYY-MM-DDTHH:MM:SS.fffZ
+        assert!(
+            timestamp.len() >= 20,
+            "Timestamp should be at least 20 chars: {}",
+            timestamp
+        );
+    }
+
     #[test]
     fn test_round_trip_with_minimal_fields() {
         let conn = setup_test_db();
@@ -242,6 +270,7 @@ mod tests {
         // Verify round-trip
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site, TEST_SITE);
+        assert_recent_timestamp(&retrieved.last_fetched_at);
         assert_eq!(retrieved.post, original_post);
     }
 
@@ -264,6 +293,7 @@ mod tests {
         // Verify round-trip for all fields
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site, TEST_SITE);
+        assert_recent_timestamp(&retrieved.last_fetched_at);
         assert_eq!(retrieved.post, original_post);
     }
 

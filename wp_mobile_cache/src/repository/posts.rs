@@ -253,7 +253,8 @@ impl PostRepository {
                 content_block_version = excluded.content_block_version,
                 excerpt_raw = excluded.excerpt_raw,
                 excerpt_rendered = excluded.excerpt_rendered,
-                excerpt_protected = excluded.excerpt_protected
+                excerpt_protected = excluded.excerpt_protected,
+                last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             "#,
             rusqlite::named_params! {
                 ":db_site_id": site.row_id,
@@ -858,5 +859,63 @@ mod tests {
             retrieved.post.categories,
             Some(vec![wp_api::terms::TermId(5)])
         );
+    }
+
+    #[test]
+    fn test_insert_sets_last_fetched_at() {
+        let conn = setup_test_db();
+        let repo = PostRepository;
+        let mut post = create_minimal_post();
+        post.id = PostId(100);
+
+        // Insert post
+        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
+
+        // Retrieve and validate last_fetched_at
+        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+
+        // Validate ISO 8601 UTC format
+        assert!(retrieved.last_fetched_at.ends_with('Z'));
+        assert!(retrieved.last_fetched_at.contains('T'));
+        assert!(retrieved.last_fetched_at.len() >= 20);
+
+        // Validate it's a recent timestamp (within last second)
+        // Format: 2024-01-01T00:00:00.000Z
+        assert!(retrieved.last_fetched_at.starts_with("2025"));
+    }
+
+    #[test]
+    fn test_upsert_updates_last_fetched_at_on_update() {
+        let conn = setup_test_db();
+        let repo = PostRepository;
+        let mut post = create_minimal_post();
+        post.id = PostId(200);
+        post.title.rendered = "Original Title".to_string();
+
+        // Initial insert
+        repo.upsert(&conn, &TEST_SITE, &post).unwrap();
+        let first_fetch = repo
+            .select_by_post_id(&conn, &TEST_SITE, PostId(200))
+            .unwrap()
+            .last_fetched_at
+            .clone();
+
+        // Sleep a tiny bit to ensure timestamp changes
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Update post
+        post.title.rendered = "Updated Title".to_string();
+        repo.upsert(&conn, &TEST_SITE, &post).unwrap();
+        let second_fetch = repo
+            .select_by_post_id(&conn, &TEST_SITE, PostId(200))
+            .unwrap()
+            .last_fetched_at;
+
+        // last_fetched_at should be updated (different)
+        assert_ne!(first_fetch, second_fetch);
+
+        // Both should be valid timestamps
+        assert!(first_fetch.ends_with('Z'));
+        assert!(second_fetch.ends_with('Z'));
     }
 }
