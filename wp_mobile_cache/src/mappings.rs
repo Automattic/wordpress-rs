@@ -35,13 +35,3 @@ impl RowExt for Row<'_> {
 pub trait TryFromDbRow: Sized {
     fn try_from_row(row: &Row) -> Result<Self, SqliteDbError>;
 }
-
-/// Trait for types that can be inserted into the database.
-/// Returns the rowid of the inserted row on success.
-pub trait InsertIntoDb {
-    fn insert_into_db(
-        &self,
-        executor: &impl crate::repository::QueryExecutor,
-        site: &crate::DbSite,
-    ) -> Result<crate::RowId, SqliteDbError>;
-}

@@ -1,13 +1,13 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
     mappings::{
-        ColumnIndex, InsertIntoDb, RowExt, TryFromDbRow,
+        ColumnIndex, RowExt, TryFromDbRow,
         helpers::{
-            bool_to_integer, deserialize_json_value, get_id, get_optional_id, integer_to_bool,
-            parse_datetime, parse_enum, parse_optional_enum, serialize_value_to_json,
+            deserialize_json_value, get_id, get_optional_id, integer_to_bool, parse_datetime,
+            parse_enum, parse_optional_enum,
         },
     },
-    repository::{DbEntity, QueryExecutor},
+    repository::DbEntity,
 };
 use rusqlite::Row;
 use wp_api::posts::{
@@ -145,72 +145,6 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
 
 impl DbEntity for AnyPostWithEditContext {
     const TABLE_NAME: &'static str = "posts_edit_context";
-}
-
-impl InsertIntoDb for AnyPostWithEditContext {
-    fn insert_into_db(
-        &self,
-        executor: &impl crate::repository::QueryExecutor,
-        site: &DbSite,
-    ) -> Result<RowId, SqliteDbError> {
-        executor.execute(
-            r#"
-            INSERT INTO posts_edit_context (
-                db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
-                password, template, permalink_template, generated_slug, author, featured_media,
-                sticky, parent, menu_order, comment_status, ping_status, format, meta,
-                guid_raw, guid_rendered, title_raw, title_rendered,
-                content_raw, content_rendered, content_protected, content_block_version,
-                excerpt_raw, excerpt_rendered, excerpt_protected
-            ) VALUES (
-                :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
-                :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
-                :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
-                :guid_raw, :guid_rendered, :title_raw, :title_rendered,
-                :content_raw, :content_rendered, :content_protected, :content_block_version,
-                :excerpt_raw, :excerpt_rendered, :excerpt_protected
-            )
-            "#,
-            rusqlite::named_params! {
-                ":db_site_id": site.row_id,
-                ":id": self.id.0,
-                ":date": self.date,
-                ":date_gmt": self.date_gmt.to_string(),
-                ":link": self.link,
-                ":modified": self.modified,
-                ":modified_gmt": self.modified_gmt.to_string(),
-                ":slug": self.slug,
-                ":status": self.status.to_string(),
-                ":post_type": self.post_type,
-                ":password": self.password,
-                ":template": self.template,
-                ":permalink_template": self.permalink_template,
-                ":generated_slug": self.generated_slug,
-                ":author": self.author.map(|u| u.0),
-                ":featured_media": self.featured_media.map(|m| m.0),
-                ":sticky": bool_to_integer(self.sticky),
-                ":parent": self.parent.map(|p| p.0),
-                ":menu_order": self.menu_order,
-                ":comment_status": self.comment_status.as_ref().map(|s| s.to_string()),
-                ":ping_status": self.ping_status.as_ref().map(|s| s.to_string()),
-                ":format": self.format.as_ref().map(|f| f.to_string()),
-                ":meta": serialize_value_to_json(&self.meta)?,
-                ":guid_raw": self.guid.raw,
-                ":guid_rendered": self.guid.rendered,
-                ":title_raw": self.title.raw,
-                ":title_rendered": self.title.rendered,
-                ":content_raw": self.content.raw,
-                ":content_rendered": self.content.rendered,
-                ":content_protected": self.content.protected,
-                ":content_block_version": self.content.block_version,
-                ":excerpt_raw": self.excerpt.as_ref().and_then(|e| e.raw.clone()),
-                ":excerpt_rendered": self.excerpt.as_ref().and_then(|e| e.rendered.clone()),
-                ":excerpt_protected": self.excerpt.as_ref().and_then(|e| e.protected),
-            },
-        )?;
-
-        Ok(QueryExecutor::last_insert_rowid(executor))
-    }
 }
 
 #[cfg(test)]

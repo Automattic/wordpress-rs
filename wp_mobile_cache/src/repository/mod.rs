@@ -1,4 +1,4 @@
-use crate::{RowId, SqliteDbError, mappings::InsertIntoDb};
+use crate::{RowId, SqliteDbError};
 use rusqlite::Connection;
 
 pub mod posts;
@@ -73,9 +73,9 @@ impl<'conn> QueryExecutor for rusqlite::Transaction<'conn> {
 
 /// Marker trait for database entities.
 ///
-/// Types implementing this trait can be persisted to the database.
-/// They must specify their table name and implement serialization.
-pub trait DbEntity: InsertIntoDb {
+/// Types implementing this trait represent entities stored in the database.
+/// They must specify their table name.
+pub trait DbEntity {
     /// The name of the database table for this entity.
     const TABLE_NAME: &'static str;
 }
@@ -122,17 +122,6 @@ mod tests {
             Ok(TestEntity {
                 value: row.get(0).map_err(SqliteDbError::from)?,
             })
-        }
-    }
-
-    impl InsertIntoDb for TestEntity {
-        fn insert_into_db(
-            &self,
-            executor: &impl QueryExecutor,
-            _site: &crate::DbSite,
-        ) -> Result<RowId, SqliteDbError> {
-            executor.execute("INSERT INTO test_table (value) VALUES (?)", [&self.value])?;
-            Ok(QueryExecutor::last_insert_rowid(executor))
         }
     }
 
