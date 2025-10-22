@@ -87,19 +87,6 @@ impl From<RowId> for i64 {
 ///     pub mapped_site_id: RowId,    // Foreign key to specific site type table
 /// }
 /// ```
-///
-/// # Why Take `&DbSite` Instead of Just `RowId`?
-///
-/// Repository methods require `&DbSite` rather than just a `RowId` for several reasons:
-///
-/// 1. **Prevents invalid queries**: Callers must fetch a valid `DbSite` from the database first,
-///    ensuring they can't query with an arbitrary ID that doesn't exist
-/// 2. **Future-proof for joins**: When site type fields are added, they'll be available for
-///    joining with `self_hosted_sites` or `wordpress_com_sites` tables without API changes
-/// 3. **Zero cost**: `DbSite` is `Copy` (all fields are primitives), so passing by reference
-///    has no performance overhead
-/// 4. **Better semantics**: `repo.select_all(&conn, &site)` is clearer than `repo.select_all(&conn, id)`
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DbSite {
     pub row_id: RowId,
