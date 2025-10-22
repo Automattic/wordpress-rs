@@ -25,6 +25,7 @@ pub struct ParsedVariantAttribute {
     pub output: Vec<TokenTree>,
     pub filter_by: Option<FilterByType>,
     pub available_contexts: Vec<WpContext>,
+    pub multipart: bool,
 }
 
 impl ParsedVariantAttribute {
@@ -35,6 +36,7 @@ impl ParsedVariantAttribute {
         output: Vec<TokenTree>,
         filter_by: Option<Vec<TokenTree>>,
         available_contexts: Vec<WpContext>,
+        multipart: bool,
     ) -> Result<Self, ItemVariantAttributeParseError> {
         let non_empty_token_tree_or_none =
             |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
@@ -63,6 +65,7 @@ impl ParsedVariantAttribute {
                 tokens: TokenStream::from_iter(tokens),
             }),
             available_contexts,
+            multipart,
         })
     }
 
@@ -232,6 +235,39 @@ impl ParsedVariantAttribute {
             .collect()
     }
 
+    fn parse_bool_flag(
+        bool_tokens: Option<&Vec<TokenTree>>,
+        error_span: Span,
+    ) -> syn::Result<bool> {
+        if let Some(bool_tokens) = bool_tokens {
+            if bool_tokens.len() != 1 {
+                return Err(ItemVariantAttributeParseError::BoolFlagShouldBeASingleValue
+                    .into_syn_error(error_span));
+            }
+            let first_token = bool_tokens
+                .first()
+                .expect("Already verified that there is only one token");
+
+            match first_token {
+                TokenTree::Ident(ident) => {
+                    let ident_str = ident.to_string();
+                    match ident_str.as_str() {
+                        "true" => Ok(true),
+                        "false" => Ok(false),
+                        _ => Err(ItemVariantAttributeParseError::BoolFlagUnexpectedValue {
+                            unexpected_value: ident_str,
+                        }
+                        .into_syn_error(error_span)),
+                    }
+                }
+                _ => Err(ItemVariantAttributeParseError::BoolFlagUnexpectedTokens
+                    .into_syn_error(error_span)),
+            }
+        } else {
+            Ok(false)
+        }
+    }
+
     fn available_contexts(
         available_contexts_tokens: Option<&Vec<TokenTree>>,
         error_span: Span,
@@ -305,6 +341,7 @@ impl Parse for ParsedVariantAttribute {
         let mut output_tokens = None;
         let mut filter_by_tokens = None;
         let mut available_contexts_tokens = None;
+        let mut multipart_tokens = None;
 
         for (ident, tokens) in pair_vec.into_iter() {
             match ident.to_string().as_str() {
@@ -313,6 +350,7 @@ impl Parse for ParsedVariantAttribute {
                 "output" => output_tokens = Some(tokens),
                 "filter_by" => filter_by_tokens = Some(tokens),
                 "available_contexts" => available_contexts_tokens = Some(tokens),
+                "multipart" => multipart_tokens = Some(tokens),
                 _ => {
                     return Err(ItemVariantAttributeParseError::ExpectingKeyValuePairs
                         .into_syn_error(meta_list_span));
@@ -351,6 +389,8 @@ impl Parse for ParsedVariantAttribute {
             available_contexts_tokens.as_ref(),
             input.span(),
         )?;
+        let multipart =
+            ParsedVariantAttribute::parse_bool_flag(multipart_tokens.as_ref(), input.span())?;
 
         ParsedVariantAttribute::new(
             request_type,
@@ -359,6 +399,7 @@ impl Parse for ParsedVariantAttribute {
             output,
             filter_by_tokens,
             available_contexts,
+            multipart,
         )
         .map_err(|e| e.into_syn_error(meta_list_span))
     }
@@ -403,6 +444,15 @@ enum ItemVariantAttributeParseError {
     AvailableContextShouldBeLiteral,
     #[error("Only 'contextual_get', 'contextual_paged', 'get', 'post' & 'delete' are supported")]
     UnsupportedRequestType,
+    #[error("Boolean flag contains unexpected tokens. It should be either 'true' or 'false'")]
+    BoolFlagUnexpectedTokens,
+    #[error("Boolean flag should be a single value: 'true' or 'false'")]
+    BoolFlagShouldBeASingleValue,
+    #[error(
+        "Boolean flag contains unexpected value: '{}'. Expected 'true' or 'false'",
+        unexpected_value
+    )]
+    BoolFlagUnexpectedValue { unexpected_value: String },
 }
 
 impl ItemVariantAttributeParseError {
@@ -465,5 +515,28 @@ mod tests {
             UrlPart::split(input.into(), &proc_macro2::Span::call_site()).unwrap(),
             expected_url_parts
         );
+    }
+
+    #[test]
+    fn test_multipart_flag_default() {
+        let parsed: ParsedVariantAttribute =
+            syn::parse_str(r#"#[post(url = "/test", output = TestOutput)]"#).unwrap();
+        assert_eq!(parsed.multipart, false);
+    }
+
+    #[test]
+    fn test_multipart_flag_true() {
+        let parsed: ParsedVariantAttribute =
+            syn::parse_str(r#"#[post(url = "/test", output = TestOutput, multipart = true)]"#)
+                .unwrap();
+        assert_eq!(parsed.multipart, true);
+    }
+
+    #[test]
+    fn test_multipart_flag_false() {
+        let parsed: ParsedVariantAttribute =
+            syn::parse_str(r#"#[post(url = "/test", output = TestOutput, multipart = false)]"#)
+                .unwrap();
+        assert_eq!(parsed.multipart, false);
     }
 }
