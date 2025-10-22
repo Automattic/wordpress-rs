@@ -37,6 +37,24 @@ impl Display for TaxonomyType {
     }
 }
 
+impl From<&str> for TaxonomyType {
+    fn from(s: &str) -> Self {
+        match s {
+            "category" => Self::Category,
+            "post_tag" => Self::PostTag,
+            "nav_menu" => Self::NavMenu,
+            "wp_pattern_category" => Self::WpPatternCategory,
+            _ => Self::Custom(s.to_string()),
+        }
+    }
+}
+
+impl From<String> for TaxonomyType {
+    fn from(s: String) -> Self {
+        Self::from(s.as_str())
+    }
+}
+
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
 )]

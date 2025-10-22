@@ -35,13 +35,7 @@ impl TryFromDbRow for DbTermRelationship {
             },
             object_id: row.get_column(Col::ObjectId)?,
             term_id: TermId(row.get_column(Col::TermId)?),
-            taxonomy_type: {
-                let s: String = row.get_column(Col::TaxonomyType)?;
-                // Use serde to deserialize (handles snake_case and Custom variant)
-                serde_json::from_value(serde_json::Value::String(s.clone())).map_err(|e| {
-                    SqliteDbError::SqliteError(format!("Invalid taxonomy_type '{}': {}", s, e))
-                })?
-            },
+            taxonomy_type: row.get_column::<String, _>(Col::TaxonomyType)?.into(),
         })
     }
 }
