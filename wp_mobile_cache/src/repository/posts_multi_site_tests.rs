@@ -1,6 +1,6 @@
 //! Multi-site isolation tests for PostRepository.
 
-use super::{Repository, posts::PostRepository};
+use super::posts::PostRepository;
 use crate::{
     DbSite,
     test_fixtures::posts::PostBuilder,
@@ -11,13 +11,13 @@ use rusqlite::Connection;
 use wp_api::posts::PostId;
 
 #[rstest]
-fn test_posts_in_site_1_invisible_to_site_2(test_db: Connection, test_site: DbSite) {
+fn test_posts_in_site_1_invisible_to_site_2(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
     let site2 = create_test_site(&test_db, 2);
 
     // Insert post in site 1
     let post = PostBuilder::new().with_id(PostId(100)).build();
-    repo.insert(&test_db, &post, &test_site).unwrap();
+    repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
     // Site 2 should not see site 1's post
     let result = repo.select_by_post_id(&test_db, &site2, PostId(100));
@@ -28,7 +28,7 @@ fn test_posts_in_site_1_invisible_to_site_2(test_db: Connection, test_site: DbSi
 }
 
 #[rstest]
-fn test_same_post_id_can_exist_in_different_sites(test_db: Connection, test_site: DbSite) {
+fn test_same_post_id_can_exist_in_different_sites(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
     let site2 = create_test_site(&test_db, 2);
 
@@ -44,9 +44,9 @@ fn test_same_post_id_can_exist_in_different_sites(test_db: Connection, test_site
         .build();
 
     // Both inserts should succeed
-    repo.insert(&test_db, &post1, &test_site)
+    repo.upsert(&mut test_db, &test_site, &post1)
         .expect("Site 1 insert should succeed");
-    repo.insert(&test_db, &post2, &site2)
+    repo.upsert(&mut test_db, &site2, &post2)
         .expect("Site 2 insert should succeed - same post ID in different site");
 
     // Verify each site sees its own post
@@ -60,22 +60,25 @@ fn test_same_post_id_can_exist_in_different_sites(test_db: Connection, test_site
 }
 
 #[rstest]
-fn test_select_all_only_returns_posts_for_requested_site(test_db: Connection, test_site: DbSite) {
+fn test_select_all_only_returns_posts_for_requested_site(
+    mut test_db: Connection,
+    test_site: DbSite,
+) {
     let repo = PostRepository;
     let site2 = create_test_site(&test_db, 2);
 
     // Insert posts in site 1
-    repo.insert(&test_db, &PostBuilder::new().build(), &test_site)
+    repo.upsert(&mut test_db, &test_site, &PostBuilder::new().build())
         .unwrap();
-    repo.insert(&test_db, &PostBuilder::new().build(), &test_site)
+    repo.upsert(&mut test_db, &test_site, &PostBuilder::new().build())
         .unwrap();
 
     // Insert posts in site 2
-    repo.insert(&test_db, &PostBuilder::new().build(), &site2)
+    repo.upsert(&mut test_db, &site2, &PostBuilder::new().build())
         .unwrap();
-    repo.insert(&test_db, &PostBuilder::new().build(), &site2)
+    repo.upsert(&mut test_db, &site2, &PostBuilder::new().build())
         .unwrap();
-    repo.insert(&test_db, &PostBuilder::new().build(), &site2)
+    repo.upsert(&mut test_db, &site2, &PostBuilder::new().build())
         .unwrap();
 
     // Verify counts
@@ -87,17 +90,17 @@ fn test_select_all_only_returns_posts_for_requested_site(test_db: Connection, te
 }
 
 #[rstest]
-fn test_count_only_counts_posts_for_requested_site(test_db: Connection, test_site: DbSite) {
+fn test_count_only_counts_posts_for_requested_site(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
     let site2 = create_test_site(&test_db, 2);
 
     // Insert posts in both sites
-    repo.insert(&test_db, &PostBuilder::new().build(), &test_site)
+    repo.upsert(&mut test_db, &test_site, &PostBuilder::new().build())
         .unwrap();
-    repo.insert(&test_db, &PostBuilder::new().build(), &test_site)
+    repo.upsert(&mut test_db, &test_site, &PostBuilder::new().build())
         .unwrap();
 
-    repo.insert(&test_db, &PostBuilder::new().build(), &site2)
+    repo.upsert(&mut test_db, &site2, &PostBuilder::new().build())
         .unwrap();
 
     assert_eq!(repo.count(&test_db, &test_site).unwrap(), 2);
@@ -105,23 +108,26 @@ fn test_count_only_counts_posts_for_requested_site(test_db: Connection, test_sit
 }
 
 #[rstest]
-fn test_delete_by_post_id_only_deletes_from_specified_site(test_db: Connection, test_site: DbSite) {
+fn test_delete_by_post_id_only_deletes_from_specified_site(
+    mut test_db: Connection,
+    test_site: DbSite,
+) {
     let repo = PostRepository;
     let site2 = create_test_site(&test_db, 2);
 
     let post_id = PostId(999);
 
     // Create post with same ID in both sites
-    repo.insert(
-        &test_db,
-        &PostBuilder::new().with_id(post_id).build(),
+    repo.upsert(
+        &mut test_db,
         &test_site,
+        &PostBuilder::new().with_id(post_id).build(),
     )
     .unwrap();
-    repo.insert(
-        &test_db,
-        &PostBuilder::new().with_id(post_id).build(),
+    repo.upsert(
+        &mut test_db,
         &site2,
+        &PostBuilder::new().with_id(post_id).build(),
     )
     .unwrap();
 
@@ -142,13 +148,13 @@ fn test_delete_by_post_id_only_deletes_from_specified_site(test_db: Connection, 
 }
 
 #[rstest]
-fn test_site_isolation_basic_verification(test_db: Connection, test_site: DbSite) {
+fn test_site_isolation_basic_verification(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
     let site2 = create_test_site(&test_db, 2);
 
     // Insert post in site1
     let post = PostBuilder::new().with_id(PostId(777)).build();
-    repo.insert(&test_db, &post, &test_site).unwrap();
+    repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
     // site2 should not see site1's post
     let result = repo.select_by_post_id(&test_db, &site2, PostId(777));

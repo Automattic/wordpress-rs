@@ -3,9 +3,8 @@ use crate::{
     mappings::{
         ColumnIndex, InsertIntoDb, RowExt, TryFromDbRow,
         helpers::{
-            bool_to_integer, deserialize_json_id_array, deserialize_json_value, get_id,
-            get_optional_id, integer_to_bool, parse_datetime, parse_enum, parse_optional_enum,
-            serialize_json_id_array, serialize_value_to_json,
+            bool_to_integer, deserialize_json_value, get_id, get_optional_id, integer_to_bool,
+            parse_datetime, parse_enum, parse_optional_enum, serialize_value_to_json,
         },
     },
     repository::{DbEntity, QueryExecutor},
@@ -45,20 +44,18 @@ enum PostEditContextColumn {
     PingStatus = 21,
     Format = 22,
     Meta = 23,
-    Categories = 24,
-    Tags = 25,
-    GuidRaw = 26,
-    GuidRendered = 27,
-    TitleRaw = 28,
-    TitleRendered = 29,
-    ContentRaw = 30,
-    ContentRendered = 31,
-    ContentProtected = 32,
-    ContentBlockVersion = 33,
-    ExcerptRaw = 34,
-    ExcerptRendered = 35,
-    ExcerptProtected = 36,
-    LastFetchedAt = 37,
+    GuidRaw = 24,
+    GuidRendered = 25,
+    TitleRaw = 26,
+    TitleRendered = 27,
+    ContentRaw = 28,
+    ContentRendered = 29,
+    ContentProtected = 30,
+    ContentBlockVersion = 31,
+    ExcerptRaw = 32,
+    ExcerptRendered = 33,
+    ExcerptProtected = 34,
+    LastFetchedAt = 35,
 }
 
 impl ColumnIndex for PostEditContextColumn {
@@ -131,8 +128,8 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
             meta: deserialize_json_value(row.get_column(Meta)?)?,
             sticky: integer_to_bool(row.get_column(Sticky)?),
             template: row.get_column(Template)?,
-            categories: deserialize_json_id_array(row.get_column(Categories)?)?,
-            tags: deserialize_json_id_array(row.get_column(Tags)?)?,
+            categories: None,
+            tags: None,
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
         };
@@ -162,14 +159,14 @@ impl InsertIntoDb for AnyPostWithEditContext {
                 db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
                 password, template, permalink_template, generated_slug, author, featured_media,
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
-                categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
+                guid_raw, guid_rendered, title_raw, title_rendered,
                 content_raw, content_rendered, content_protected, content_block_version,
                 excerpt_raw, excerpt_rendered, excerpt_protected
             ) VALUES (
                 :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
                 :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
-                :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
+                :guid_raw, :guid_rendered, :title_raw, :title_rendered,
                 :content_raw, :content_rendered, :content_protected, :content_block_version,
                 :excerpt_raw, :excerpt_rendered, :excerpt_protected
             )
@@ -198,8 +195,6 @@ impl InsertIntoDb for AnyPostWithEditContext {
                 ":ping_status": self.ping_status.as_ref().map(|s| s.to_string()),
                 ":format": self.format.as_ref().map(|f| f.to_string()),
                 ":meta": serialize_value_to_json(&self.meta)?,
-                ":categories": serialize_json_id_array(&self.categories, |t| t.0)?,
-                ":tags": serialize_json_id_array(&self.tags, |t| t.0)?,
                 ":guid_raw": self.guid.raw,
                 ":guid_rendered": self.guid.rendered,
                 ":title_raw": self.title.raw,
@@ -222,7 +217,7 @@ impl InsertIntoDb for AnyPostWithEditContext {
 mod tests {
     use crate::{
         DbSite,
-        repository::{Repository, posts::PostRepository},
+        repository::posts::PostRepository,
         test_fixtures::posts::{create_full_post, create_minimal_post},
         test_helpers::{test_db, test_site},
     };
@@ -252,13 +247,13 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_minimal_fields(test_db: Connection, test_site: DbSite) {
+    fn test_round_trip_with_minimal_fields(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let original_post = create_minimal_post();
 
         // Insert into database using repository
         let rowid = repo
-            .insert(&test_db, &original_post, &test_site)
+            .upsert(&mut test_db, &test_site, &original_post)
             .expect("Failed to insert post");
 
         // Read back from database using PostRepository's select_by_rowid
@@ -274,13 +269,13 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_all_fields(test_db: Connection, test_site: DbSite) {
+    fn test_round_trip_with_all_fields(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let original_post = create_full_post();
 
         // Insert into database using repository
         let rowid = repo
-            .insert(&test_db, &original_post, &test_site)
+            .upsert(&mut test_db, &test_site, &original_post)
             .expect("Failed to insert post");
 
         // Read back from database using repository
@@ -296,7 +291,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_optional_fields_none(test_db: Connection, test_site: DbSite) {
+    fn test_round_trip_with_optional_fields_none(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(99);
@@ -319,7 +314,7 @@ mod tests {
 
         // Insert and retrieve using repository
         let rowid = repo
-            .insert(&test_db, &post, &test_site)
+            .upsert(&mut test_db, &test_site, &post)
             .expect("Failed to insert post");
         let retrieved = repo
             .select_by_rowid(&test_db, &test_site, rowid)
@@ -330,7 +325,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_different_enum_variants(test_db: Connection, test_site: DbSite) {
+    fn test_round_trip_with_different_enum_variants(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Test with different status variants
@@ -348,7 +343,7 @@ mod tests {
             post.id = PostId((100 + i) as i64);
             post.status = status.clone();
 
-            let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+            let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
             let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
 
             assert_eq!(retrieved.post.status, *status);
@@ -356,22 +351,22 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_empty_json_arrays(test_db: Connection, test_site: DbSite) {
+    fn test_round_trip_with_empty_json_arrays(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(200);
         post.categories = Some(vec![]);
         post.tags = Some(vec![]);
 
-        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
 
-        assert_eq!(retrieved.post.categories, Some(vec![]));
-        assert_eq!(retrieved.post.tags, Some(vec![]));
+        assert_eq!(retrieved.post.categories, None);
+        assert_eq!(retrieved.post.tags, None);
     }
 
     #[rstest]
-    fn test_round_trip_with_sticky_boolean_variants(test_db: Connection, test_site: DbSite) {
+    fn test_round_trip_with_sticky_boolean_variants(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Test sticky = Some(true)
@@ -379,7 +374,7 @@ mod tests {
         post.id = PostId(300);
         post.sticky = Some(true);
 
-        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(true));
 
@@ -388,7 +383,7 @@ mod tests {
         post.id = PostId(301);
         post.sticky = Some(false);
 
-        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(false));
 
@@ -397,7 +392,7 @@ mod tests {
         post.id = PostId(302);
         post.sticky = None;
 
-        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, None);
     }

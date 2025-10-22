@@ -104,40 +104,6 @@ pub trait DbEntity: InsertIntoDb {
 pub trait Repository {
     /// The database entity type this repository manages.
     type Entity: DbEntity;
-
-    /// Insert a single entity into the database.
-    ///
-    /// Returns the rowid of the newly inserted row.
-    fn insert(
-        &self,
-        executor: &impl QueryExecutor,
-        item: &Self::Entity,
-        site: &crate::DbSite,
-    ) -> Result<RowId, SqliteDbError> {
-        item.insert_into_db(executor, site)
-    }
-
-    /// Insert multiple entities in a single transaction.
-    ///
-    /// Returns a vector of rowids for the inserted entities in the same order.
-    /// If any insert fails, the entire transaction is rolled back.
-    fn insert_batch(
-        &self,
-        transaction_manager: &mut impl TransactionManager,
-        items: &[Self::Entity],
-        site: &crate::DbSite,
-    ) -> Result<Vec<RowId>, SqliteDbError> {
-        let tx = transaction_manager.transaction()?;
-        let mut rowids = Vec::with_capacity(items.len());
-
-        for item in items {
-            let rowid = InsertIntoDb::insert_into_db(item, &tx, site)?;
-            rowids.push(rowid);
-        }
-
-        tx.commit().map_err(SqliteDbError::from)?;
-        Ok(rowids)
-    }
 }
 
 #[cfg(test)]

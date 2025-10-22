@@ -12,7 +12,7 @@
 //! #[rstest]
 //! fn test_something(test_db: Connection, test_site: DbSite, post_repo: PostRepository) {
 //!     let post = PostBuilder::new().with_author(UserId(10)).build();
-//!     post_repo.insert(&test_db, &post, &test_site).unwrap();
+//!     post_repo.upsert(&mut test_db, &test_site, &post, &test_site).unwrap();
 //! }
 //! ```
 

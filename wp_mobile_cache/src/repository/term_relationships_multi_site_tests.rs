@@ -23,17 +23,13 @@ fn test_term_relationships_isolated_by_site(mut test_db: Connection) {
     let post1 = PostBuilder::new()
         .with_categories(vec![TermId(1), TermId(2)])
         .build();
-    let rowid1 = post_repo
-        .upsert_with_terms(&mut test_db, &site1, &post1)
-        .unwrap();
+    let rowid1 = post_repo.upsert(&mut test_db, &site1, &post1).unwrap();
 
     // Insert post in site 2 with same categories
     let post2 = PostBuilder::new()
         .with_categories(vec![TermId(1), TermId(2)])
         .build();
-    let rowid2 = post_repo
-        .upsert_with_terms(&mut test_db, &site2, &post2)
-        .unwrap();
+    let rowid2 = post_repo.upsert(&mut test_db, &site2, &post2).unwrap();
 
     // Verify site 1's terms
     let site1_terms = term_repo

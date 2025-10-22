@@ -3,7 +3,7 @@
 //! These tests verify that database constraints are enforced correctly
 //! and that error cases are handled appropriately.
 
-use super::{Repository, posts::PostRepository};
+use super::posts::PostRepository;
 use crate::{
     DbSite,
     test_fixtures::posts::PostBuilder,
@@ -14,42 +14,49 @@ use rusqlite::Connection;
 use wp_api::posts::PostId;
 
 #[rstest]
-fn test_duplicate_post_id_in_same_site_fails_on_insert(test_db: Connection, test_site: DbSite) {
+fn test_duplicate_post_id_in_same_site_updates_on_upsert(
+    mut test_db: Connection,
+    test_site: DbSite,
+) {
     let repo = PostRepository;
     let post_id = PostId(42);
 
     // Insert first post
-    let post1 = PostBuilder::new().with_id(post_id).build();
-    repo.insert(&test_db, &post1, &test_site).unwrap();
+    let post1 = PostBuilder::new()
+        .with_id(post_id)
+        .with_title("Original Title")
+        .build();
+    let rowid1 = repo.upsert(&mut test_db, &test_site, &post1).unwrap();
 
-    // Attempt to insert second post with same ID in same site - should fail
-    let post2 = PostBuilder::new().with_id(post_id).build();
-    let result = repo.insert(&test_db, &post2, &test_site);
+    // Upsert second post with same ID - should update existing post
+    let post2 = PostBuilder::new()
+        .with_id(post_id)
+        .with_title("Updated Title")
+        .build();
+    let rowid2 = repo.upsert(&mut test_db, &test_site, &post2).unwrap();
 
-    assert!(
-        result.is_err(),
-        "Should fail to insert duplicate post ID in same site"
-    );
+    // Should return same rowid (updated existing row)
+    assert_eq!(rowid1, rowid2, "Upsert should update existing post");
 
-    // Verify error is a constraint violation
-    let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("UNIQUE constraint failed")
-            || err.to_string().contains("constraint"),
-        "Error should mention constraint violation, got: {}",
-        err
-    );
+    // Verify only one post exists
+    assert_eq!(repo.count(&test_db, &test_site).unwrap(), 1);
+
+    // Verify the title was updated
+    let retrieved = repo
+        .select_by_post_id(&test_db, &test_site, post_id)
+        .unwrap();
+    assert_eq!(retrieved.post.title.rendered, "Updated Title");
 }
 
 #[rstest]
-fn test_invalid_site_id_fails_foreign_key_constraint(test_db: Connection) {
+fn test_invalid_site_id_fails_foreign_key_constraint(mut test_db: Connection) {
     let repo = PostRepository;
     let non_existent_site = DbSite {
         row_id: crate::RowId(999),
     }; // Site doesn't exist
 
     let post = PostBuilder::new().build();
-    let result = repo.insert(&test_db, &post, &non_existent_site);
+    let result = repo.upsert(&mut test_db, &non_existent_site, &post);
 
     assert!(
         result.is_err(),

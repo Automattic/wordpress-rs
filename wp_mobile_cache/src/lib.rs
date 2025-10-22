@@ -1,4 +1,5 @@
 use rusqlite::hooks::Action;
+use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::{Arc, Mutex};
 
@@ -35,14 +36,14 @@ impl From<rusqlite::Error> for SqliteDbError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RowId(pub u64);
 
-impl rusqlite::types::ToSql for RowId {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        Ok(rusqlite::types::ToSqlOutput::from(self.0 as i64))
+impl ToSql for RowId {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0 as i64))
     }
 }
 
-impl rusqlite::types::FromSql for RowId {
-    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+impl FromSql for RowId {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
         i64::column_result(value).map(|i| {
             debug_assert!(i >= 0, "RowId should be non-negative, got: {}", i);
             RowId(i as u64)

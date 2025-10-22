@@ -3,7 +3,7 @@
 //! These tests verify that transaction failures properly rollback database state
 //! without leaving partial writes or corrupted data.
 
-use super::{Repository, posts::PostRepository};
+use super::posts::PostRepository;
 use crate::{
     DbSite,
     test_fixtures::posts::PostBuilder,
@@ -14,102 +14,81 @@ use rusqlite::Connection;
 use wp_api::posts::PostId;
 
 #[rstest]
-fn test_insert_batch_rolls_back_on_constraint_violation(
-    mut test_db: Connection,
-    test_site: DbSite,
-) {
+fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
 
-    // Pre-insert a post with ID 200 to create conflict
-    let existing_post = PostBuilder::new().with_id(PostId(200)).build();
-    repo.insert(&test_db, &existing_post, &test_site).unwrap();
+    // Pre-insert a post with ID 200
+    let existing_post = PostBuilder::new()
+        .with_id(PostId(200))
+        .with_title("Original")
+        .build();
+    repo.upsert(&mut test_db, &test_site, &existing_post)
+        .unwrap();
 
-    // Create batch where 2nd post has duplicate ID (200)
+    // Create batch where 2nd post has duplicate ID (200) with different title
     let post1 = PostBuilder::new().with_id(PostId(100)).build();
-    let post2 = PostBuilder::new().with_id(PostId(200)).build(); // Duplicate!
+    let post2 = PostBuilder::new()
+        .with_id(PostId(200))
+        .with_title("Updated")
+        .build();
     let post3 = PostBuilder::new().with_id(PostId(300)).build();
 
     let posts = vec![post1, post2, post3];
 
-    // Batch insert should fail due to duplicate ID
-    let result = repo.insert_batch(&mut test_db, &posts, &test_site);
+    // Batch upsert should succeed - duplicate is updated
+    let rowids = repo.upsert_batch(&mut test_db, &test_site, &posts).unwrap();
+    assert_eq!(rowids.len(), 3);
 
-    assert!(
-        result.is_err(),
-        "insert_batch should fail when constraint violated"
-    );
-
-    // Verify rollback: Only the pre-existing post should remain (count = 1)
-    // Posts 100 and 300 should NOT have been inserted
+    // Verify all 3 posts exist (100, 200 updated, 300)
     let count = repo.count(&test_db, &test_site).unwrap();
-    assert_eq!(
-        count, 1,
-        "Transaction should have rolled back - only pre-existing post should remain"
-    );
+    assert_eq!(count, 3, "Should have 3 posts total");
 
-    // Verify specifically that post 100 was NOT inserted (rollback worked)
-    let result = repo.select_by_post_id(&test_db, &test_site, PostId(100));
+    // Verify post 100 was inserted
     assert!(
-        result.is_err(),
-        "Post 100 should not exist - transaction rolled back"
+        repo.select_by_post_id(&test_db, &test_site, PostId(100))
+            .is_ok()
     );
 
-    // Verify post 300 was NOT inserted either
-    let result = repo.select_by_post_id(&test_db, &test_site, PostId(300));
+    // Verify post 200 was updated
+    let post200 = repo
+        .select_by_post_id(&test_db, &test_site, PostId(200))
+        .unwrap();
+    assert_eq!(post200.post.title.rendered, "Updated");
+
+    // Verify post 300 was inserted
     assert!(
-        result.is_err(),
-        "Post 300 should not exist - transaction rolled back"
+        repo.select_by_post_id(&test_db, &test_site, PostId(300))
+            .is_ok()
     );
-
-    // Verify only original post exists
-    let result = repo.select_by_post_id(&test_db, &test_site, PostId(200));
-    assert!(result.is_ok(), "Original post 200 should still exist");
 }
 
 #[rstest]
-fn test_insert_batch_rolls_back_on_foreign_key_violation(
-    mut test_db: Connection,
-    test_site: DbSite,
-) {
+fn test_upsert_batch_fails_on_foreign_key_violation(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
     let invalid_site = DbSite {
         row_id: crate::RowId(999),
-    }; // Non-existent site
-
-    // Create batch where 2nd post references invalid site
-    // Note: We can't mix sites in a single batch call, but we can verify
-    // that a batch to an invalid site doesn't leave partial state
+    };
 
     let post1 = PostBuilder::new().with_id(PostId(100)).build();
     let post2 = PostBuilder::new().with_id(PostId(200)).build();
 
     let posts = vec![post1, post2];
 
-    // Batch insert to invalid site should fail
-    let result = repo.insert_batch(&mut test_db, &posts, &invalid_site);
+    // Batch upsert to invalid site should fail on first post
+    let result = repo.upsert_batch(&mut test_db, &invalid_site, &posts);
 
     assert!(
         result.is_err(),
-        "insert_batch should fail with foreign key constraint"
+        "upsert_batch should fail with foreign key constraint"
     );
 
-    // Verify rollback: No posts should have been inserted in the valid site either
+    // Verify no posts were inserted (fails fast on first error)
     let count = repo.count(&test_db, &test_site).unwrap();
-    assert_eq!(count, 0, "No posts should exist after rollback");
-
-    // Verify specifically that neither post was inserted
-    let result = repo.select_by_post_id(&test_db, &test_site, PostId(100));
-    assert!(result.is_err(), "Post 100 should not exist");
-
-    let result = repo.select_by_post_id(&test_db, &test_site, PostId(200));
-    assert!(result.is_err(), "Post 200 should not exist");
+    assert_eq!(count, 0, "No posts should exist after failure");
 }
 
 #[rstest]
-fn test_upsert_with_terms_maintains_consistency_on_success(
-    mut test_db: Connection,
-    test_site: DbSite,
-) {
+fn test_upsert_maintains_consistency_on_success(mut test_db: Connection, test_site: DbSite) {
     let repo = PostRepository;
 
     // Create post with terms
@@ -120,9 +99,7 @@ fn test_upsert_with_terms_maintains_consistency_on_success(
         .build();
 
     // Upsert should succeed
-    let rowid = repo
-        .upsert_with_terms(&mut test_db, &test_site, &post)
-        .unwrap();
+    let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
     // Verify post exists
     let retrieved = repo
@@ -146,7 +123,7 @@ fn test_upsert_with_terms_maintains_consistency_on_success(
         .build();
 
     // Upsert again
-    repo.upsert_with_terms(&mut test_db, &test_site, &updated_post)
+    repo.upsert(&mut test_db, &test_site, &updated_post)
         .unwrap();
 
     // Verify terms were updated correctly
@@ -157,7 +134,7 @@ fn test_upsert_with_terms_maintains_consistency_on_success(
         retrieved.post.categories,
         Some(vec![wp_api::terms::TermId(3)])
     );
-    assert_eq!(retrieved.post.tags, Some(vec![]));
+    assert_eq!(retrieved.post.tags, None);
 
     // Verify old terms are gone (no orphaned relationships)
     // The term_relationships table should only have the new category term
@@ -191,7 +168,7 @@ fn test_insert_batch_succeeds_with_valid_posts(mut test_db: Connection, test_sit
     let posts = vec![post1, post2, post3];
 
     // Should succeed
-    let rowids = repo.insert_batch(&mut test_db, &posts, &test_site).unwrap();
+    let rowids = repo.upsert_batch(&mut test_db, &test_site, &posts).unwrap();
 
     assert_eq!(rowids.len(), 3, "All 3 posts should be inserted");
 

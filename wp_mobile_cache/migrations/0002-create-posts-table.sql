@@ -34,8 +34,6 @@ CREATE TABLE `posts_edit_context` (
 
   -- Complex optional fields (JSON)
   `meta` TEXT,
-  `categories` TEXT,
-  `tags` TEXT,
 
   -- Nested: guid (guid is non-optional, but guid.raw is optional)
   `guid_raw` TEXT,

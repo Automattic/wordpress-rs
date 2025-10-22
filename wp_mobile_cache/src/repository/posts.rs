@@ -184,38 +184,39 @@ impl PostRepository {
         executor.execute(sql, rusqlite::params![site.row_id, post_id.0])
     }
 
-    /// Upsert a post (insert or update) by its WordPress post ID for a given site.
+    /// Upsert a post with its term relationships (atomic transaction).
     ///
     /// This uses SQLite's INSERT ... ON CONFLICT ... DO UPDATE syntax to either
     /// insert a new post or update an existing one based on the (db_site_id, post_id) pair.
-    /// This ensures the database observer sees a single INSERT or UPDATE action,
-    /// not a DELETE followed by INSERT.
+    /// This ensures the database observer sees a single INSERT or UPDATE action.
+    ///
+    /// Term relationships are synced using a diff approach - only changes generate DB events.
     ///
     /// Returns the rowid of the inserted or updated row.
     pub fn upsert(
         &self,
-        executor: &impl QueryExecutor,
+        transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         post: &AnyPostWithEditContext,
     ) -> Result<RowId, SqliteDbError> {
-        use crate::mappings::helpers::{
-            bool_to_integer, serialize_json_id_array, serialize_value_to_json,
-        };
+        use crate::mappings::helpers::{bool_to_integer, serialize_value_to_json};
 
-        executor.execute(
+        let tx = transaction_manager.transaction()?;
+
+        tx.execute(
             r#"
             INSERT INTO posts_edit_context (
                 db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
                 password, template, permalink_template, generated_slug, author, featured_media,
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
-                categories, tags, guid_raw, guid_rendered, title_raw, title_rendered,
+                guid_raw, guid_rendered, title_raw, title_rendered,
                 content_raw, content_rendered, content_protected, content_block_version,
                 excerpt_raw, excerpt_rendered, excerpt_protected
             ) VALUES (
                 :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
                 :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
-                :categories, :tags, :guid_raw, :guid_rendered, :title_raw, :title_rendered,
+                :guid_raw, :guid_rendered, :title_raw, :title_rendered,
                 :content_raw, :content_rendered, :content_protected, :content_block_version,
                 :excerpt_raw, :excerpt_rendered, :excerpt_protected
             )
@@ -241,8 +242,6 @@ impl PostRepository {
                 ping_status = excluded.ping_status,
                 format = excluded.format,
                 meta = excluded.meta,
-                categories = excluded.categories,
-                tags = excluded.tags,
                 guid_raw = excluded.guid_raw,
                 guid_rendered = excluded.guid_rendered,
                 title_raw = excluded.title_raw,
@@ -280,8 +279,6 @@ impl PostRepository {
                 ":ping_status": post.ping_status.as_ref().map(|s| s.to_string()),
                 ":format": post.format.as_ref().map(|f| f.to_string()),
                 ":meta": serialize_value_to_json(&post.meta)?,
-                ":categories": serialize_json_id_array(&post.categories, |t| t.0)?,
-                ":tags": serialize_json_id_array(&post.tags, |t| t.0)?,
                 ":guid_raw": post.guid.raw,
                 ":guid_rendered": post.guid.rendered,
                 ":title_raw": post.title.raw,
@@ -296,14 +293,53 @@ impl PostRepository {
             },
         )?;
 
-        // Note: last_insert_rowid() doesn't change on UPDATE (ON CONFLICT DO UPDATE),
-        // so we need to query for the rowid after upsert to get the correct value.
         let sql = "SELECT rowid FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
-        let mut stmt = executor.prepare(sql)?;
-        let rowid: i64 = stmt
-            .query_row(rusqlite::params![site.row_id, post.id.0], |row| row.get(0))
-            .map_err(SqliteDbError::from)?;
-        Ok(RowId(rowid as u64))
+        let post_rowid: i64 = {
+            let mut stmt = tx.prepare(sql)?;
+            stmt.query_row(rusqlite::params![site.row_id, post.id.0], |row| row.get(0))
+                .map_err(SqliteDbError::from)?
+        };
+        let post_rowid = RowId(post_rowid as u64);
+
+        // Sync term relationships
+        let term_repo = TermRelationshipRepository;
+
+        if let Some(ref categories) = post.categories {
+            term_repo.sync_terms_for_object(
+                &tx,
+                site,
+                post_rowid,
+                &TaxonomyType::Category,
+                categories,
+            )?;
+        }
+
+        if let Some(ref tags) = post.tags {
+            term_repo.sync_terms_for_object(&tx, site, post_rowid, &TaxonomyType::PostTag, tags)?;
+        }
+
+        tx.commit().map_err(SqliteDbError::from)?;
+        Ok(post_rowid)
+    }
+
+    /// Upsert multiple posts with their term relationships.
+    ///
+    /// Each post is upserted in its own transaction. If any upsert fails,
+    /// previously successful upserts remain in the database.
+    ///
+    /// Returns a vector of rowids for successfully upserted posts.
+    pub fn upsert_batch(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        posts: &[AnyPostWithEditContext],
+    ) -> Result<Vec<RowId>, SqliteDbError> {
+        let mut rowids = Vec::with_capacity(posts.len());
+        for post in posts {
+            let rowid = self.upsert(transaction_manager, site, post)?;
+            rowids.push(rowid);
+        }
+        Ok(rowids)
     }
 
     /// Get the total count of posts for a given site.
@@ -341,42 +377,6 @@ impl PostRepository {
 
         Ok(())
     }
-
-    /// Upsert a post with its term relationships (atomic transaction).
-    ///
-    /// This method combines post upsert with term synchronization in a single transaction.
-    /// Term relationships are synced using a diff approach - only changes generate DB events.
-    pub fn upsert_with_terms(
-        &self,
-        transaction_manager: &mut impl TransactionManager,
-        site: &DbSite,
-        post: &AnyPostWithEditContext,
-    ) -> Result<RowId, SqliteDbError> {
-        let tx = transaction_manager.transaction()?;
-
-        // Upsert the post
-        let post_rowid = self.upsert(&tx, site, post)?;
-
-        // Sync term relationships (only changes what's different)
-        let term_repo = TermRelationshipRepository;
-
-        if let Some(ref categories) = post.categories {
-            term_repo.sync_terms_for_object(
-                &tx,
-                site,
-                post_rowid,
-                &TaxonomyType::Category,
-                categories,
-            )?;
-        }
-
-        if let Some(ref tags) = post.tags {
-            term_repo.sync_terms_for_object(&tx, site, post_rowid, &TaxonomyType::PostTag, tags)?;
-        }
-
-        tx.commit().map_err(SqliteDbError::from)?;
-        Ok(post_rowid)
-    }
 }
 
 #[cfg(test)]
@@ -392,13 +392,13 @@ mod tests {
     use wp_api::users::UserId;
 
     #[rstest]
-    fn test_repository_insert_and_select_by_rowid(test_db: Connection, test_site: DbSite) {
+    fn test_repository_insert_and_select_by_rowid(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let post = create_minimal_post();
 
         // Insert using repository
         let rowid = repo
-            .insert(&test_db, &post, &test_site)
+            .upsert(&mut test_db, &test_site, &post)
             .expect("Failed to insert");
 
         // Select by rowid
@@ -412,13 +412,13 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_select_by_post_id(test_db: Connection, test_site: DbSite) {
+    fn test_repository_select_by_post_id(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(42);
 
         // Insert
-        repo.insert(&test_db, &post, &test_site)
+        repo.upsert(&mut test_db, &test_site, &post)
             .expect("Failed to insert");
 
         // Select by post_id
@@ -442,7 +442,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_select_by_author(test_db: Connection, test_site: DbSite) {
+    fn test_repository_select_by_author(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Insert posts with different authors
@@ -458,9 +458,9 @@ mod tests {
         post3.id = PostId(3);
         post3.author = Some(UserId(20));
 
-        repo.insert(&test_db, &post1, &test_site).unwrap();
-        repo.insert(&test_db, &post2, &test_site).unwrap();
-        repo.insert(&test_db, &post3, &test_site).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post1).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post2).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post3).unwrap();
 
         // Select by author
         let author_10_posts = repo
@@ -481,7 +481,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_select_by_status(test_db: Connection, test_site: DbSite) {
+    fn test_repository_select_by_status(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Insert posts with different statuses
@@ -497,9 +497,9 @@ mod tests {
         post3.id = PostId(3);
         post3.status = PostStatus::Publish;
 
-        repo.insert(&test_db, &post1, &test_site).unwrap();
-        repo.insert(&test_db, &post2, &test_site).unwrap();
-        repo.insert(&test_db, &post3, &test_site).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post1).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post2).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post3).unwrap();
 
         // Select by status
         let published = repo
@@ -514,7 +514,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_select_all(test_db: Connection, test_site: DbSite) {
+    fn test_repository_select_all(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Initially empty
@@ -527,8 +527,8 @@ mod tests {
         let mut post2 = create_minimal_post();
         post2.id = PostId(2);
 
-        repo.insert(&test_db, &post1, &test_site).unwrap();
-        repo.insert(&test_db, &post2, &test_site).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post1).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post2).unwrap();
 
         // Select all
         let all = repo.select_all(&test_db, &test_site).unwrap();
@@ -536,20 +536,20 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_count(test_db: Connection, test_site: DbSite) {
+    fn test_repository_count(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         assert_eq!(repo.count(&test_db, &test_site).unwrap(), 0);
 
         let mut post1 = create_minimal_post();
         post1.id = PostId(1);
-        repo.insert(&test_db, &post1, &test_site).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post1).unwrap();
 
         assert_eq!(repo.count(&test_db, &test_site).unwrap(), 1);
 
         let mut post2 = create_minimal_post();
         post2.id = PostId(2);
-        repo.insert(&test_db, &post2, &test_site).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post2).unwrap();
 
         assert_eq!(repo.count(&test_db, &test_site).unwrap(), 2);
     }
@@ -568,7 +568,7 @@ mod tests {
         let posts = vec![post1, post2, post3];
 
         // Insert batch
-        let rowids = repo.insert_batch(&mut test_db, &posts, &test_site).unwrap();
+        let rowids = repo.upsert_batch(&mut test_db, &test_site, &posts).unwrap();
         assert_eq!(rowids.len(), 3);
 
         // Verify all were inserted
@@ -582,12 +582,12 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_delete_by_post_id(test_db: Connection, test_site: DbSite) {
+    fn test_repository_delete_by_post_id(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         let mut post = create_minimal_post();
         post.id = PostId(42);
-        repo.insert(&test_db, &post, &test_site).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Verify exists
         repo.select_by_post_id(&test_db, &test_site, PostId(42))
@@ -611,7 +611,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_upsert_inserts_new_post(test_db: Connection, test_site: DbSite) {
+    fn test_repository_upsert_inserts_new_post(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         let mut post = create_minimal_post();
@@ -625,7 +625,7 @@ mod tests {
         );
 
         // Upsert should insert
-        let rowid = repo.upsert(&test_db, &test_site, &post).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Verify it was inserted
         let retrieved = repo
@@ -637,7 +637,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_upsert_updates_existing_post(test_db: Connection, test_site: DbSite) {
+    fn test_repository_upsert_updates_existing_post(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Insert initial post
@@ -646,7 +646,7 @@ mod tests {
         post.status = PostStatus::Draft;
         post.slug = "original-slug".to_string();
 
-        let original_rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let original_rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Upsert with updated data
         let mut updated_post = create_minimal_post();
@@ -654,7 +654,9 @@ mod tests {
         updated_post.status = PostStatus::Publish;
         updated_post.slug = "updated-slug".to_string();
 
-        let new_rowid = repo.upsert(&test_db, &test_site, &updated_post).unwrap();
+        let new_rowid = repo
+            .upsert(&mut test_db, &test_site, &updated_post)
+            .unwrap();
 
         // Rowid should be the same (it's an update, not delete+insert)
         assert_eq!(original_rowid, new_rowid);
@@ -671,7 +673,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_upsert_with_terms_inserts_post_and_terms(mut test_db: Connection, test_site: DbSite) {
+    fn test_upsert_inserts_post_and_terms(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         let mut post = create_minimal_post();
@@ -680,9 +682,7 @@ mod tests {
         post.tags = Some(vec![wp_api::terms::TermId(10), wp_api::terms::TermId(20)]);
 
         // Upsert with terms
-        let rowid = repo
-            .upsert_with_terms(&mut test_db, &test_site, &post)
-            .unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Verify post was inserted
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
@@ -728,7 +728,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_upsert_with_terms_updates_existing_terms(mut test_db: Connection, test_site: DbSite) {
+    fn test_upsert_updates_existing_terms(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Insert post with initial terms
@@ -741,15 +741,13 @@ mod tests {
             wp_api::terms::TermId(30),
         ]);
 
-        repo.upsert_with_terms(&mut test_db, &test_site, &post)
-            .unwrap();
+        repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Update with different terms
         post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(3)]); // Remove 2, add 3
         post.tags = Some(vec![wp_api::terms::TermId(10)]); // Remove 20, 30
 
-        repo.upsert_with_terms(&mut test_db, &test_site, &post)
-            .unwrap();
+        repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Verify updated terms
         let retrieved = repo
@@ -792,14 +790,14 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_by_post_id_deletes_terms(test_db: Connection, test_site: DbSite) {
+    fn test_delete_by_post_id_deletes_terms(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let term_repo = crate::repository::term_relationships::TermRelationshipRepository;
 
         // Insert post without terms (to avoid transaction issues in this test)
         let mut post = create_minimal_post();
         post.id = PostId(500);
-        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Manually add terms
         term_repo
@@ -838,9 +836,7 @@ mod tests {
         post.id = PostId(600);
         post.categories = Some(vec![wp_api::terms::TermId(5)]);
 
-        let rowid = repo
-            .upsert_with_terms(&mut test_db, &test_site, &post)
-            .unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Select by rowid should populate terms
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
@@ -851,13 +847,13 @@ mod tests {
     }
 
     #[rstest]
-    fn test_insert_sets_last_fetched_at(test_db: Connection, test_site: DbSite) {
+    fn test_insert_sets_last_fetched_at(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(100);
 
         // Insert post
-        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
 
         // Retrieve and validate last_fetched_at
         let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
@@ -873,14 +869,14 @@ mod tests {
     }
 
     #[rstest]
-    fn test_upsert_updates_last_fetched_at_on_update(test_db: Connection, test_site: DbSite) {
+    fn test_upsert_updates_last_fetched_at_on_update(mut test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(200);
         post.title.rendered = "Original Title".to_string();
 
         // Initial insert
-        repo.upsert(&test_db, &test_site, &post).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post).unwrap();
         let first_fetch = repo
             .select_by_post_id(&test_db, &test_site, PostId(200))
             .unwrap()
@@ -892,7 +888,7 @@ mod tests {
 
         // Update post
         post.title.rendered = "Updated Title".to_string();
-        repo.upsert(&test_db, &test_site, &post).unwrap();
+        repo.upsert(&mut test_db, &test_site, &post).unwrap();
         let second_fetch = repo
             .select_by_post_id(&test_db, &test_site, PostId(200))
             .unwrap()
