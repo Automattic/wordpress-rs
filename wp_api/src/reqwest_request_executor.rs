@@ -5,9 +5,9 @@ use crate::{
     },
     request::RequestContext,
     request::{
-        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
-        WpNetworkRequest, WpNetworkResponse, endpoint::media_endpoint::MediaUploadRequest,
-        user_agent,
+        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpMultipartFormRequest,
+        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
+        endpoint::media_endpoint::MediaUploadRequest, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -146,6 +146,13 @@ impl RequestExecutor for ReqwestRequestExecutor {
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.async_request(request).await.map_err(|e| e.into())
+    }
+
+    async fn upload(
+        &self,
+        _request: Arc<WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        unimplemented!()
     }
 
     async fn upload_media(

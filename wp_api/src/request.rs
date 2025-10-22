@@ -170,6 +170,11 @@ pub trait RequestExecutor: Send + Sync {
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
 
+    async fn upload(
+        &self,
+        request: Arc<WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError>;
+
     async fn upload_media(
         &self,
         media_upload_request: Arc<MediaUploadRequest>,

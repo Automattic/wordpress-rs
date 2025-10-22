@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use wp_api::{
-    prelude::*, request::RequestContext, request::endpoint::media_endpoint::MediaUploadRequest,
+    prelude::*,
+    request::endpoint::media_endpoint::MediaUploadRequest,
+    request::{RequestContext, WpMultipartFormRequest},
 };
 
 #[derive(Debug)]
@@ -31,6 +33,13 @@ impl RequestExecutor for MockExecutor {
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         (self.execute_fn)(request)
+    }
+
+    async fn upload(
+        &self,
+        _request: Arc<WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        unimplemented!()
     }
 
     async fn upload_media(
