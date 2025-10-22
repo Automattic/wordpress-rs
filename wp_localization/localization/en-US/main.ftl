@@ -1,6 +1,6 @@
 wp_api_error_generic_error = Something went wrong.
 
-site_error_message = Your site sent an error message: {$error_message}.
+site_error_message = {$error_message}
 
 url_parsing_error = URL is invalid.
 
