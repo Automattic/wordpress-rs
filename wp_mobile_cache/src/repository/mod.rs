@@ -80,32 +80,6 @@ pub trait DbEntity {
     const TABLE_NAME: &'static str;
 }
 
-/// Repository trait providing common CRUD operations for database entities.
-///
-/// This trait provides default implementations for common operations. Concrete
-/// repositories can add type-specific methods as needed.
-///
-/// # Example
-///
-/// ```ignore
-/// struct PostRepository;
-///
-/// impl Repository for PostRepository {
-///     type Entity = DbAnyPostWithEditContext;
-/// }
-///
-/// impl PostRepository {
-///     pub fn select_by_post_id(&self, executor: &impl QueryExecutor, post_id: PostId)
-///         -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-///         // Custom implementation
-///     }
-/// }
-/// ```
-pub trait Repository {
-    /// The database entity type this repository manages.
-    type Entity: DbEntity;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,13 +101,6 @@ mod tests {
 
     impl DbEntity for TestEntity {
         const TABLE_NAME: &'static str = "test_table";
-    }
-
-    #[allow(dead_code)]
-    struct TestRepository;
-
-    impl Repository for TestRepository {
-        type Entity = TestEntity;
     }
 
     #[test]

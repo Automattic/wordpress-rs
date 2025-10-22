@@ -1,23 +1,15 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
     mappings::{TryFromDbRow, posts::DbAnyPostWithEditContext},
-    repository::{
-        QueryExecutor, Repository, TransactionManager,
-        term_relationships::TermRelationshipRepository,
-    },
+    repository::{QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository},
 };
 use wp_api::posts::{AnyPostWithEditContext, PostId};
 use wp_api::taxonomies::TaxonomyType;
 
 /// Repository for managing posts in the database.
 ///
-/// Provides both common CRUD operations (via Repository trait) and
-/// post-specific query methods.
+/// Provides CRUD operations and post-specific query methods.
 pub struct PostRepository;
-
-impl Repository for PostRepository {
-    type Entity = AnyPostWithEditContext;
-}
 
 impl PostRepository {
     /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
