@@ -9,6 +9,8 @@ pub mod term_relationships;
 #[cfg(test)]
 pub mod test_fixtures;
 #[cfg(test)]
+pub mod test_helpers;
+#[cfg(test)]
 pub mod unit_test_common;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]

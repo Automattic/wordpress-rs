@@ -13,3 +13,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
+
+[dev-dependencies]
+rstest = "0.18"

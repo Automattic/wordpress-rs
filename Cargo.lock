@@ -3088,14 +3088,43 @@ checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 
 [[package]]
 name = "rstest"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97eeab2f3c0a199bc4be135c36c924b6590b88c377d416494288c14f2db30199"
+dependencies = [
+ "futures",
+ "futures-timer",
+ "rstest_macros 0.18.2",
+ "rustc_version",
+]
+
+[[package]]
+name = "rstest"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03e905296805ab93e13c1ec3a03f4b6c4f35e9498a3d5fa96dc626d22c03cd89"
 dependencies = [
  "futures-timer",
  "futures-util",
- "rstest_macros",
+ "rstest_macros 0.24.0",
  "rustc_version",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d428f8247852f894ee1be110b375111b586d4fa431f6c46e64ba5a0dcccbe605"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version",
+ "syn",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -5083,7 +5112,7 @@ dependencies = [
  "regex",
  "reqwest",
  "roxmltree",
- "rstest",
+ "rstest 0.24.0",
  "rstest_reuse",
  "rustls",
  "scraper",
@@ -5118,7 +5147,7 @@ dependencies = [
  "http 1.3.1",
  "paste",
  "reqwest",
- "rstest",
+ "rstest 0.24.0",
  "rstest_reuse",
  "serde",
  "serde_json",
@@ -5191,7 +5220,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "rstest",
+ "rstest 0.24.0",
  "serde",
  "serde_json",
  "strum",
@@ -5210,7 +5239,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "rstest",
+ "rstest 0.24.0",
  "serde",
  "strum",
  "strum_macros",
@@ -5230,7 +5259,7 @@ dependencies = [
  "fluent-langneg",
  "fluent-templates",
  "paste",
- "rstest",
+ "rstest 0.24.0",
  "strum",
  "strum_macros",
  "thiserror 2.0.17",
@@ -5248,7 +5277,7 @@ dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "rstest",
+ "rstest 0.24.0",
  "serde_json",
  "syn",
  "trybuild",
@@ -5288,6 +5317,7 @@ dependencies = [
 name = "wp_mobile_cache"
 version = "0.1.0"
 dependencies = [
+ "rstest 0.18.2",
  "rusqlite",
  "serde",
  "serde_json",
@@ -5311,7 +5341,7 @@ name = "wp_serde_helper"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "rstest",
+ "rstest 0.24.0",
  "serde",
  "serde_json",
 ]

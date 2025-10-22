@@ -4,6 +4,15 @@ use rusqlite::Connection;
 pub mod posts;
 pub mod term_relationships;
 
+#[cfg(test)]
+mod posts_constraint_tests;
+#[cfg(test)]
+mod posts_multi_site_tests;
+#[cfg(test)]
+mod posts_transaction_tests;
+#[cfg(test)]
+mod term_relationships_multi_site_tests;
+
 /// Abstraction over database query execution.
 ///
 /// This trait decouples the repository layer from specific database implementations,

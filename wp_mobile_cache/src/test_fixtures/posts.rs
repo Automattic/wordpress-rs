@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicI64, Ordering};
 use wp_api::{
     media::MediaId,
     posts::{
@@ -110,5 +111,113 @@ pub fn create_full_post() -> AnyPostWithEditContext {
         tags: Some(vec![TermId(10), TermId(20)]),
         parent: Some(PostId(5)),
         menu_order: Some(3),
+    }
+}
+
+/// Builder for creating test posts with automatic ID management.
+///
+/// Reduces boilerplate and prevents ID collisions in tests by auto-incrementing IDs.
+///
+/// # Example
+///
+/// ```rust
+/// let post1 = PostBuilder::new().with_author(UserId(10)).build();
+/// let post2 = PostBuilder::new().with_status(PostStatus::Draft).build();
+/// // IDs are automatically unique (1000, 1001, ...)
+/// ```
+pub struct PostBuilder {
+    post: AnyPostWithEditContext,
+}
+
+impl PostBuilder {
+    /// Create a new builder with auto-incremented ID starting from 1000.
+    ///
+    /// Uses thread-safe atomic counter to ensure unique IDs across tests.
+    pub fn new() -> Self {
+        static COUNTER: AtomicI64 = AtomicI64::new(1000);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+
+        let mut post = create_minimal_post();
+        post.id = PostId(id);
+        Self { post }
+    }
+
+    /// Set a specific post ID (overrides auto-increment).
+    pub fn with_id(mut self, id: PostId) -> Self {
+        self.post.id = id;
+        self
+    }
+
+    /// Set the post author.
+    pub fn with_author(mut self, author: UserId) -> Self {
+        self.post.author = Some(author);
+        self
+    }
+
+    /// Set the post status.
+    pub fn with_status(mut self, status: PostStatus) -> Self {
+        self.post.status = status;
+        self
+    }
+
+    /// Set the post title.
+    pub fn with_title(mut self, title: &str) -> Self {
+        self.post.title.rendered = title.to_string();
+        self.post.title.raw = Some(title.to_string());
+        self
+    }
+
+    /// Set the post slug.
+    pub fn with_slug(mut self, slug: &str) -> Self {
+        self.post.slug = slug.to_string();
+        self
+    }
+
+    /// Set post categories.
+    pub fn with_categories(mut self, categories: Vec<TermId>) -> Self {
+        self.post.categories = Some(categories);
+        self
+    }
+
+    /// Set post tags.
+    pub fn with_tags(mut self, tags: Vec<TermId>) -> Self {
+        self.post.tags = Some(tags);
+        self
+    }
+
+    /// Set both categories and tags.
+    pub fn with_terms(mut self, categories: Vec<TermId>, tags: Vec<TermId>) -> Self {
+        self.post.categories = Some(categories);
+        self.post.tags = Some(tags);
+        self
+    }
+
+    /// Set featured media.
+    pub fn with_featured_media(mut self, media_id: MediaId) -> Self {
+        self.post.featured_media = Some(media_id);
+        self
+    }
+
+    /// Set parent post.
+    pub fn with_parent(mut self, parent_id: PostId) -> Self {
+        self.post.parent = Some(parent_id);
+        self
+    }
+
+    /// Set sticky status.
+    pub fn with_sticky(mut self, sticky: bool) -> Self {
+        self.post.sticky = Some(sticky);
+        self
+    }
+
+    /// Build the final AnyPostWithEditContext.
+    pub fn build(self) -> AnyPostWithEditContext {
+        self.post
+    }
+}
+
+impl Default for PostBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
