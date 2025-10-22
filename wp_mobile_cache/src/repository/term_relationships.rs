@@ -185,23 +185,22 @@ impl TermRelationshipRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::unit_test_common::setup_test_db;
+    use crate::test_helpers::{test_db, test_site};
+    use rstest::*;
+    use rusqlite::Connection;
 
-    const TEST_SITE: DbSite = DbSite { row_id: RowId(1) };
-    const TEST_OBJECT_ID: RowId = RowId(42);
-
-    #[test]
-    fn test_sync_terms_insert_new() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_sync_terms_insert_new(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         let term_ids = vec![TermId(1), TermId(2), TermId(3)];
 
         // Sync terms (should insert all)
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::Category,
             &term_ids,
         )
@@ -209,7 +208,12 @@ mod tests {
 
         // Verify all were inserted
         let retrieved = repo
-            .get_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID, &TaxonomyType::Category)
+            .get_terms_for_object(
+                &test_db,
+                &test_site,
+                test_object_id,
+                &TaxonomyType::Category,
+            )
             .unwrap();
 
         assert_eq!(retrieved.len(), 3);
@@ -218,17 +222,17 @@ mod tests {
         assert!(retrieved.contains(&TermId(3)));
     }
 
-    #[test]
-    fn test_sync_terms_remove_old() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_sync_terms_remove_old(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         // Insert initial terms
         let initial_terms = vec![TermId(1), TermId(2), TermId(3)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &initial_terms,
         )
@@ -237,9 +241,9 @@ mod tests {
         // Sync with fewer terms (remove 2 and 3)
         let updated_terms = vec![TermId(1)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &updated_terms,
         )
@@ -247,24 +251,24 @@ mod tests {
 
         // Verify only term 1 remains
         let retrieved = repo
-            .get_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID, &TaxonomyType::PostTag)
+            .get_terms_for_object(&test_db, &test_site, test_object_id, &TaxonomyType::PostTag)
             .unwrap();
 
         assert_eq!(retrieved.len(), 1);
         assert_eq!(retrieved[0], TermId(1));
     }
 
-    #[test]
-    fn test_sync_terms_add_new_keep_existing() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_sync_terms_add_new_keep_existing(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         // Insert initial terms
         let initial_terms = vec![TermId(1), TermId(2)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::Category,
             &initial_terms,
         )
@@ -273,9 +277,9 @@ mod tests {
         // Sync with additional terms (keep 1, 2, add 3, 4)
         let updated_terms = vec![TermId(1), TermId(2), TermId(3), TermId(4)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::Category,
             &updated_terms,
         )
@@ -283,7 +287,12 @@ mod tests {
 
         // Verify all four are present
         let retrieved = repo
-            .get_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID, &TaxonomyType::Category)
+            .get_terms_for_object(
+                &test_db,
+                &test_site,
+                test_object_id,
+                &TaxonomyType::Category,
+            )
             .unwrap();
 
         assert_eq!(retrieved.len(), 4);
@@ -293,17 +302,17 @@ mod tests {
         assert!(retrieved.contains(&TermId(4)));
     }
 
-    #[test]
-    fn test_sync_terms_no_changes() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_sync_terms_no_changes(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         // Insert initial terms
         let terms = vec![TermId(1), TermId(2), TermId(3)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &terms,
         )
@@ -311,9 +320,9 @@ mod tests {
 
         // Sync with same terms (no changes)
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &terms,
         )
@@ -321,23 +330,23 @@ mod tests {
 
         // Verify terms unchanged
         let retrieved = repo
-            .get_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID, &TaxonomyType::PostTag)
+            .get_terms_for_object(&test_db, &test_site, test_object_id, &TaxonomyType::PostTag)
             .unwrap();
 
         assert_eq!(retrieved.len(), 3);
     }
 
-    #[test]
-    fn test_get_all_terms_for_object() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_get_all_terms_for_object(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         // Add categories
         let categories = vec![TermId(1), TermId(2)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::Category,
             &categories,
         )
@@ -346,9 +355,9 @@ mod tests {
         // Add tags
         let tags = vec![TermId(10), TermId(20), TermId(30)];
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &tags,
         )
@@ -356,7 +365,7 @@ mod tests {
 
         // Get all terms
         let all_terms = repo
-            .get_all_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID)
+            .get_all_terms_for_object(&test_db, &test_site, test_object_id)
             .unwrap();
 
         // Verify categories
@@ -396,24 +405,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_delete_all_terms_for_object() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_delete_all_terms_for_object(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         // Add terms
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::Category,
             &[TermId(1)],
         )
         .unwrap();
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &[TermId(10)],
         )
@@ -421,35 +430,35 @@ mod tests {
 
         // Delete all terms
         let deleted = repo
-            .delete_all_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID)
+            .delete_all_terms_for_object(&test_db, &test_site, test_object_id)
             .unwrap();
         assert_eq!(deleted, 2);
 
         // Verify all deleted
         let all_terms = repo
-            .get_all_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID)
+            .get_all_terms_for_object(&test_db, &test_site, test_object_id)
             .unwrap();
         assert!(all_terms.is_empty());
     }
 
-    #[test]
-    fn test_different_taxonomy_types_are_isolated() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_different_taxonomy_types_are_isolated(test_db: Connection, test_site: DbSite) {
         let repo = TermRelationshipRepository;
+        let test_object_id = RowId(42);
 
         // Add same term ID to different taxonomies
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::Category,
             &[TermId(1)],
         )
         .unwrap();
         repo.sync_terms_for_object(
-            &conn,
-            &TEST_SITE,
-            TEST_OBJECT_ID,
+            &test_db,
+            &test_site,
+            test_object_id,
             &TaxonomyType::PostTag,
             &[TermId(1)],
         )
@@ -457,10 +466,15 @@ mod tests {
 
         // Verify both exist independently
         let categories = repo
-            .get_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID, &TaxonomyType::Category)
+            .get_terms_for_object(
+                &test_db,
+                &test_site,
+                test_object_id,
+                &TaxonomyType::Category,
+            )
             .unwrap();
         let tags = repo
-            .get_terms_for_object(&conn, &TEST_SITE, TEST_OBJECT_ID, &TaxonomyType::PostTag)
+            .get_terms_for_object(&test_db, &test_site, test_object_id, &TaxonomyType::PostTag)
             .unwrap();
 
         assert_eq!(categories.len(), 1);

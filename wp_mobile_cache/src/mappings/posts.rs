@@ -221,14 +221,14 @@ impl InsertIntoDb for AnyPostWithEditContext {
 #[cfg(test)]
 mod tests {
     use crate::{
-        DbSite, RowId,
+        DbSite,
         repository::{Repository, posts::PostRepository},
         test_fixtures::posts::{create_full_post, create_minimal_post},
-        unit_test_common::setup_test_db,
+        test_helpers::{test_db, test_site},
     };
+    use rstest::*;
+    use rusqlite::Connection;
     use wp_api::posts::{PostId, PostStatus};
-
-    const TEST_SITE: DbSite = DbSite { row_id: RowId(1) };
 
     /// Helper to validate that last_fetched_at is a recent, valid ISO 8601 timestamp
     fn assert_recent_timestamp(timestamp: &str) {
@@ -251,55 +251,52 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_round_trip_with_minimal_fields() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_round_trip_with_minimal_fields(test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let original_post = create_minimal_post();
 
         // Insert into database using repository
         let rowid = repo
-            .insert(&conn, &original_post, &TEST_SITE)
+            .insert(&test_db, &original_post, &test_site)
             .expect("Failed to insert post");
 
         // Read back from database using PostRepository's select_by_rowid
         let retrieved = repo
-            .select_by_rowid(&conn, &TEST_SITE, rowid)
+            .select_by_rowid(&test_db, &test_site, rowid)
             .expect("Failed to read post");
 
         // Verify round-trip
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site, TEST_SITE);
+        assert_eq!(retrieved.site, test_site);
         assert_recent_timestamp(&retrieved.last_fetched_at);
         assert_eq!(retrieved.post, original_post);
     }
 
-    #[test]
-    fn test_round_trip_with_all_fields() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_round_trip_with_all_fields(test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let original_post = create_full_post();
 
         // Insert into database using repository
         let rowid = repo
-            .insert(&conn, &original_post, &TEST_SITE)
+            .insert(&test_db, &original_post, &test_site)
             .expect("Failed to insert post");
 
         // Read back from database using repository
         let retrieved = repo
-            .select_by_rowid(&conn, &TEST_SITE, rowid)
+            .select_by_rowid(&test_db, &test_site, rowid)
             .expect("Failed to read post");
 
         // Verify round-trip for all fields
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site, TEST_SITE);
+        assert_eq!(retrieved.site, test_site);
         assert_recent_timestamp(&retrieved.last_fetched_at);
         assert_eq!(retrieved.post, original_post);
     }
 
-    #[test]
-    fn test_round_trip_with_optional_fields_none() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_round_trip_with_optional_fields_none(test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(99);
@@ -322,19 +319,18 @@ mod tests {
 
         // Insert and retrieve using repository
         let rowid = repo
-            .insert(&conn, &post, &TEST_SITE)
+            .insert(&test_db, &post, &test_site)
             .expect("Failed to insert post");
         let retrieved = repo
-            .select_by_rowid(&conn, &TEST_SITE, rowid)
+            .select_by_rowid(&test_db, &test_site, rowid)
             .expect("Failed to read post");
 
         // All optional fields should still be None
         assert_eq!(retrieved.post, post);
     }
 
-    #[test]
-    fn test_round_trip_with_different_enum_variants() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_round_trip_with_different_enum_variants(test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Test with different status variants
@@ -352,32 +348,30 @@ mod tests {
             post.id = PostId((100 + i) as i64);
             post.status = status.clone();
 
-            let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
-            let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+            let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+            let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
 
             assert_eq!(retrieved.post.status, *status);
         }
     }
 
-    #[test]
-    fn test_round_trip_with_empty_json_arrays() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_round_trip_with_empty_json_arrays(test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
         let mut post = create_minimal_post();
         post.id = PostId(200);
         post.categories = Some(vec![]);
         post.tags = Some(vec![]);
 
-        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
 
         assert_eq!(retrieved.post.categories, Some(vec![]));
         assert_eq!(retrieved.post.tags, Some(vec![]));
     }
 
-    #[test]
-    fn test_round_trip_with_sticky_boolean_variants() {
-        let conn = setup_test_db();
+    #[rstest]
+    fn test_round_trip_with_sticky_boolean_variants(test_db: Connection, test_site: DbSite) {
         let repo = PostRepository;
 
         // Test sticky = Some(true)
@@ -385,8 +379,8 @@ mod tests {
         post.id = PostId(300);
         post.sticky = Some(true);
 
-        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(true));
 
         // Test sticky = Some(false)
@@ -394,8 +388,8 @@ mod tests {
         post.id = PostId(301);
         post.sticky = Some(false);
 
-        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, Some(false));
 
         // Test sticky = None
@@ -403,8 +397,8 @@ mod tests {
         post.id = PostId(302);
         post.sticky = None;
 
-        let rowid = repo.insert(&conn, &post, &TEST_SITE).unwrap();
-        let retrieved = repo.select_by_rowid(&conn, &TEST_SITE, rowid).unwrap();
+        let rowid = repo.insert(&test_db, &post, &test_site).unwrap();
+        let retrieved = repo.select_by_rowid(&test_db, &test_site, rowid).unwrap();
         assert_eq!(retrieved.post.sticky, None);
     }
 }
