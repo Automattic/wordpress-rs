@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{date::WpGmtDateTime, impl_as_query_value_for_new_type};
+use crate::{
+    date::WpGmtDateTime, impl_as_query_value_for_new_type, request::RequiresMultipartForm,
+};
 
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct CreateSupportTicketParams {
@@ -15,7 +17,14 @@ pub struct CreateSupportTicketParams {
     #[uniffi(default = [])]
     pub tags: Vec<String>,
     #[uniffi(default = [])]
+    #[serde(skip)]
     pub attachments: Vec<String>,
+}
+
+impl RequiresMultipartForm for CreateSupportTicketParams {
+    fn multipart_form_files(&self) -> Vec<String> {
+        self.attachments.clone()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]

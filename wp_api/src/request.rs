@@ -115,6 +115,31 @@ impl InnerRequestBuilder {
         }
     }
 
+    pub fn post_multipart<T>(&self, url: ApiEndpointUrl, params: &T) -> WpMultipartFormRequest
+    where
+        T: ?Sized + Serialize + RequiresMultipartForm,
+    {
+        let mut fields = HashMap::new();
+        if let Ok(serde_json::Value::Object(object)) = serde_json::to_value(params) {
+            for (key, value) in object {
+                if let serde_json::Value::String(s) = value {
+                    fields.insert(key, s);
+                } else {
+                    fields.insert(key, value.to_string());
+                }
+            }
+        }
+
+        WpMultipartFormRequest {
+            uuid: Uuid::new_v4().into(),
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: self.header_map().into(),
+            fields,
+            files: params.multipart_form_files(),
+        }
+    }
+
     fn header_map(&self) -> WpNetworkHeaderMap {
         let mut header_map = HeaderMap::new();
         header_map.insert(
@@ -286,6 +311,69 @@ pub trait NetworkRequestAccessor: Send + Sync {
 
 #[uniffi::export]
 impl NetworkRequestAccessor for WpNetworkRequest {
+    fn request_id(&self) -> String {
+        self.uuid.clone()
+    }
+
+    fn method(&self) -> RequestMethod {
+        self.method.clone()
+    }
+
+    fn url(&self) -> WpEndpointUrl {
+        self.url.clone()
+    }
+
+    fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
+        self.header_map.clone()
+    }
+}
+
+pub trait RequiresMultipartForm {
+    fn multipart_form_files(&self) -> Vec<String>;
+}
+
+#[derive(uniffi::Object)]
+pub struct WpMultipartFormRequest {
+    pub(crate) uuid: String,
+    pub(crate) method: RequestMethod,
+    pub(crate) url: WpEndpointUrl,
+    pub(crate) header_map: Arc<WpNetworkHeaderMap>,
+    pub(crate) fields: HashMap<String, String>,
+    pub(crate) files: Vec<String>,
+}
+
+#[uniffi::export]
+impl WpMultipartFormRequest {
+    pub fn fields(&self) -> HashMap<String, String> {
+        self.fields.clone()
+    }
+
+    pub fn files(&self) -> Vec<String> {
+        self.files.clone()
+    }
+}
+
+impl std::fmt::Debug for WpMultipartFormRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = format!(
+            indoc::indoc! {"
+                WpMultipartFormRequest {{
+                    method: '{:?}',
+                    url: '{:?}',
+                    header_map: '{:?}',
+                    fields: '{:?}',
+                    files: '{:?}'
+                }}
+                "},
+            self.method, self.url, self.header_map, self.fields, self.files
+        );
+        s.pop(); // Remove the new line at the end
+        write!(f, "{s}")
+    }
+}
+
+#[uniffi::export]
+impl NetworkRequestAccessor for WpMultipartFormRequest {
     fn request_id(&self) -> String {
         self.uuid.clone()
     }
