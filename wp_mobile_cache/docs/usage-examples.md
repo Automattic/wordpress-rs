@@ -1,6 +1,6 @@
 # Usage Examples
 
-> **Last Updated:** 2025-10-21
+> **Last Updated:** 2025-10-22
 
 Common usage patterns and examples for the wp_mobile_cache repository system.
 
@@ -8,7 +8,7 @@ Common usage patterns and examples for the wp_mobile_cache repository system.
 
 - [Basic Operations](#basic-operations)
 - [Batch Operations](#batch-operations)
-- [Upsert with Terms](#upsert-with-terms)
+- [Working with Terms](#working-with-terms)
 - [Transaction Management](#transaction-management)
 - [Multi-Site Operations](#multi-site-operations)
 - [Cache Freshness](#cache-freshness)
@@ -20,7 +20,7 @@ Common usage patterns and examples for the wp_mobile_cache repository system.
 
 ```rust
 use wp_mobile_cache::{WpApiCache, DbSite, RowId};
-use wp_mobile_cache::repository::{PostRepository, Repository};
+use wp_mobile_cache::repository::PostRepository;
 use wp_api::posts::AnyPostWithEditContext;
 
 // Open database
@@ -41,9 +41,10 @@ let post = AnyPostWithEditContext {
     // ... other fields
 };
 
-// Insert
-let rowid = repo.insert(&conn, &post, &site)?;
-println!("Inserted with rowid: {}", rowid.0);
+// Upsert (insert or update)
+let mut conn = cache.connection();
+let rowid = repo.upsert(&mut conn, &site, &post)?;
+println!("Upserted with rowid: {}", rowid.0);
 
 // Query by rowid
 let db_post = repo.select_by_rowid(&conn, &site, rowid)?;
@@ -128,7 +129,7 @@ println!("Total posts in cache: {}", total);
 
 ## Batch Operations
 
-### Insert Multiple Posts
+### Upsert Multiple Posts
 
 ```rust
 let repo = PostRepository;
@@ -140,11 +141,11 @@ let posts = vec![
     create_post(PostId(3), "Third Post"),
 ];
 
-// Batch insert (atomic transaction)
+// Batch upsert (atomic transaction)
 let mut conn = Connection::open("cache.db")?;
-let rowids = repo.insert_batch(&mut conn, &posts, &site)?;
+let rowids = repo.upsert_batch(&mut conn, &site, &posts)?;
 
-println!("Inserted {} posts", rowids.len());
+println!("Upserted {} posts", rowids.len());
 for (post, rowid) in posts.iter().zip(rowids.iter()) {
     println!("- {} => rowid {}", post.title.raw, rowid.0);
 }
@@ -162,20 +163,24 @@ let api_posts = api_client.get_posts().await?;
 // Upsert all posts (insert new, update existing)
 let repo = PostRepository;
 let site = DbSite { row_id: RowId(1) };
+let mut conn = Connection::open("cache.db")?;
 
 for post in api_posts {
-    let rowid = repo.upsert(&conn, &site, &post)?;
+    let rowid = repo.upsert(&mut conn, &site, &post)?;
     println!("Upserted post {} => rowid {}", post.id.0, rowid.0);
 }
 ```
 
-## Upsert with Terms
+## Working with Terms
 
-### Basic Upsert with Categories and Tags
+### Automatic Term Syncing
+
+`PostRepository::upsert()` automatically syncs categories and tags in a single atomic transaction:
 
 ```rust
 let repo = PostRepository;
 let site = DbSite { row_id: RowId(1) };
+let mut conn = Connection::open("cache.db")?;
 
 // Create post with terms
 let mut post = AnyPostWithEditContext {
@@ -187,8 +192,7 @@ let mut post = AnyPostWithEditContext {
 };
 
 // Upsert post with terms (atomic transaction)
-let mut conn = Connection::open("cache.db")?;
-let post_rowid = repo.upsert_with_terms(&mut conn, &site, &post)?;
+let post_rowid = repo.upsert(&mut conn, &site, &post)?;
 println!("Upserted post with rowid: {}", post_rowid.0);
 
 // Reading automatically includes terms
@@ -204,7 +208,7 @@ assert_eq!(db_post.post.tags, Some(vec![TermId(10), TermId(20), TermId(30)]));
 post.categories = Some(vec![TermId(1), TermId(3)]);  // Removed 2, added 3
 post.tags = Some(vec![TermId(10)]);                   // Removed 20, 30
 
-repo.upsert_with_terms(&mut conn, &site, &post)?;
+repo.upsert(&mut conn, &site, &post)?;
 
 // Observer sees only changes:
 // - DELETE for term 2 (category)
@@ -215,31 +219,26 @@ repo.upsert_with_terms(&mut conn, &site, &post)?;
 
 ### Manual Term Management
 
+For advanced cases or custom taxonomies, use `TermRelationshipRepository` directly:
+
 ```rust
 use wp_mobile_cache::repository::TermRelationshipRepository;
 
 let post_repo = PostRepository;
 let term_repo = TermRelationshipRepository;
 let site = DbSite { row_id: RowId(1) };
+let mut conn = Connection::open("cache.db")?;
 
-// Upsert post without terms
-let post_rowid = post_repo.upsert(&conn, &site, &post)?;
+// Upsert post (categories/tags from post are still synced)
+let post_rowid = post_repo.upsert(&mut conn, &site, &post)?;
 
-// Manually sync terms
+// Manually sync additional custom taxonomy
 term_repo.sync_terms_for_object(
     &conn,
     &site,
     post_rowid,
-    &TaxonomyType::Category,
-    &[TermId(1), TermId(2), TermId(3)],
-)?;
-
-term_repo.sync_terms_for_object(
-    &conn,
-    &site,
-    post_rowid,
-    &TaxonomyType::PostTag,
-    &[TermId(10), TermId(20)],
+    &TaxonomyType::Custom("custom_taxonomy".into()),
+    &[TermId(100), TermId(101)],
 )?;
 ```
 
@@ -279,8 +278,8 @@ let site = DbSite { row_id: RowId(1) };
 let tx = conn.transaction()?;
 
 // Multiple operations in transaction
-let rowid1 = repo.insert(&tx, &post1, &site)?;
-let rowid2 = repo.insert(&tx, &post2, &site)?;
+let rowid1 = repo.upsert(&mut tx, &site, &post1)?;
+let rowid2 = repo.upsert(&mut tx, &site, &post2)?;
 repo.delete_by_post_id(&tx, &site, PostId(999))?;
 
 // Commit all or rollback all
@@ -294,8 +293,8 @@ println!("All operations succeeded");
 let tx = conn.transaction()?;
 
 let result = (|| -> Result<(), SqliteDbError> {
-    repo.insert(&tx, &post1, &site)?;
-    repo.insert(&tx, &post2, &site)?;
+    repo.upsert(&mut tx, &site, &post1)?;
+    repo.upsert(&mut tx, &site, &post2)?;
 
     // Simulate error
     if some_condition {
@@ -317,30 +316,25 @@ match result {
 }
 ```
 
-### Generic Functions with QueryExecutor
+### Generic Functions with TransactionManager
 
 ```rust
-fn sync_posts<E: QueryExecutor>(
-    executor: &E,
+fn sync_posts<T: TransactionManager>(
+    transaction_manager: &mut T,
     site: &DbSite,
     posts: Vec<AnyPostWithEditContext>,
 ) -> Result<()> {
     let repo = PostRepository;
 
     for post in posts {
-        repo.upsert(executor, site, &post)?;
+        repo.upsert(transaction_manager, site, &post)?;
     }
 
     Ok(())
 }
 
 // Works with Connection
-sync_posts(&conn, &site, posts.clone())?;
-
-// Also works with Transaction
-let tx = conn.transaction()?;
-sync_posts(&tx, &site, posts)?;
-tx.commit()?;
+sync_posts(&mut conn, &site, posts)?;
 ```
 
 ## Multi-Site Operations
@@ -348,13 +342,15 @@ tx.commit()?;
 ### Managing Multiple Sites
 
 ```rust
+let mut conn = Connection::open("cache.db")?;
+
 // Site 1
 let site1 = DbSite { row_id: RowId(1) };
-repo.insert(&conn, &post1, &site1)?;
+repo.upsert(&mut conn, &site1, &post1)?;
 
 // Site 2
 let site2 = DbSite { row_id: RowId(2) };
-repo.insert(&conn, &post2, &site2)?;
+repo.upsert(&mut conn, &site2, &post2)?;
 
 // Queries are scoped to site
 let site1_posts = repo.select_all(&conn, &site1)?;
@@ -384,8 +380,9 @@ let post_site2 = AnyPostWithEditContext {
 };
 
 // Both succeed - different sites
-repo.insert(&conn, &post_site1, &site1)?;
-repo.insert(&conn, &post_site2, &site2)?;
+let mut conn = Connection::open("cache.db")?;
+repo.upsert(&mut conn, &site1, &post_site1)?;
+repo.upsert(&mut conn, &site2, &post_site2)?;
 
 // Query by site + post ID
 let db_post1 = repo.select_by_post_id(&conn, &site1, PostId(123))?;
@@ -425,7 +422,8 @@ let cached_post = repo.select_by_post_id(&conn, &site, post_id)?;
 if is_stale(&cached_post, Duration::hours(1))? {
     // Refresh from WordPress API
     let fresh_post = api_client.get_post(post_id).await?;
-    repo.upsert(&conn, &site, &fresh_post)?;
+    let mut conn = cache.connection();
+    repo.upsert(&mut conn, &site, &fresh_post)?;
 }
 ```
 
@@ -481,9 +479,10 @@ impl PostRepository {
 let cutoff = Utc::now() - Duration::hours(24);
 let stale_posts = repo.select_posts_older_than(&conn, &site, cutoff)?;
 
+let mut conn = cache.connection();
 for db_post in stale_posts {
     let fresh = api_client.get_post(db_post.post.id).await?;
-    repo.upsert(&conn, &site, &fresh)?;
+    repo.upsert(&mut conn, &site, &fresh)?;
 }
 ```
 
@@ -530,7 +529,8 @@ fn get_post_with_fallback(
             let post = api_client.get_post(post_id).await?;
 
             // Cache for next time
-            repo.upsert(conn, site, &post)?;
+            let mut conn = cache.connection();
+            repo.upsert(&mut conn, site, &post)?;
 
             Ok(post)
         }
@@ -559,7 +559,7 @@ fn bulk_upsert_with_validation(
             return Err(SqliteDbError::Query("Empty title".into()));
         }
 
-        rowids.push(repo.upsert(&tx, &site, &post)?);
+        rowids.push(repo.upsert(&mut tx, &site, &post)?);
     }
 
     tx.commit()?;

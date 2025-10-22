@@ -121,7 +121,7 @@ let repo = PostRepository;
 ```rust
 // Obvious what this is
 let repo = PostRepository;
-repo.insert(&conn, &post, &site)?;
+repo.upsert(&conn, &post, &site)?;
 ```
 
 ## Example Usage
@@ -135,7 +135,7 @@ fn cache_posts(posts: Vec<AnyPostWithEditContext>) -> Result<()> {
     let site = DbSite { row_id: RowId(1) };
 
     for post in posts {
-        repo.insert(&conn, &post, &site)?;
+        repo.upsert(&conn, &post, &site)?;
     }
 
     Ok(())
@@ -255,7 +255,7 @@ impl PostRepository for SqlitePostRepository {
 ```rust
 pub mod post_repository {
     pub fn select_by_id(...) -> Result<Post> { }
-    pub fn insert(...) -> Result<RowId> { }
+    pub fn upsert(...) -> Result<RowId> { }
 }
 ```
 
@@ -316,5 +316,5 @@ fn repository_is_zero_sized() {
 
 ## See Also
 
-- [Core Traits](../architecture/core-traits.md) - Repository trait definition
+- [Core Traits](../architecture/core-traits.md) - Core trait definitions
 - [Usage Examples](../usage-examples.md) - Practical usage patterns

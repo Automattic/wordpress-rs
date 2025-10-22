@@ -1,6 +1,6 @@
 # Migration Guide
 
-> **Last Updated:** 2025-10-21
+> **Last Updated:** 2025-10-22
 
 Guide for adding new WordPress entities to the wp_mobile_cache system.
 
@@ -102,49 +102,7 @@ impl DbEntity for PageWithEditContext {
 
 ### Phase 3: Database Mappings
 
-#### 1. Implement InsertIntoDb
-
-In `src/mappings/{entity}.rs`:
-
-```rust
-use crate::repository::{InsertIntoDb, QueryExecutor};
-use wp_api::pages::PageWithEditContext;
-
-impl InsertIntoDb for PageWithEditContext {
-    fn insert_into_db(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-    ) -> Result<RowId, SqliteDbError> {
-        executor.execute(
-            r#"
-            INSERT INTO pages_edit_context (
-                db_site_id, id, date, modified, slug, status, type,
-                title_raw, content_raw, author, parent, menu_order
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#,
-            rusqlite::params![
-                site.row_id.0,
-                self.id.0,
-                self.date,
-                self.modified,
-                self.slug,
-                self.status,
-                self.type_,
-                self.title.raw,
-                self.content.raw,
-                self.author.0,
-                self.parent.map(|p| p.0),
-                self.menu_order,
-            ],
-        )?;
-        Ok(executor.last_insert_rowid())
-    }
-}
-```
-
-#### 2. Implement TryFromDbRow
+#### 1. Implement TryFromDbRow
 
 ```rust
 use crate::mappings::TryFromDbRow;
@@ -186,14 +144,10 @@ In `src/repository/{entity}.rs`:
 
 ```rust
 use crate::{DbSite, RowId};
-use crate::repository::{Repository, QueryExecutor, TransactionManager};
+use crate::repository::{QueryExecutor, TransactionManager};
 use wp_api::pages::{PageWithEditContext, PageId};
 
 pub struct PageRepository;
-
-impl Repository for PageRepository {
-    type Entity = PageWithEditContext;
-}
 ```
 
 #### 2. Implement Common Query Methods
@@ -283,15 +237,19 @@ impl PageRepository {
 
 #### 4. Implement UPSERT
 
+If the entity does NOT have term relationships, implement a simple upsert:
+
 ```rust
 impl PageRepository {
     pub fn upsert(
         &self,
-        executor: &impl QueryExecutor,
+        transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         page: &PageWithEditContext,
     ) -> Result<RowId, SqliteDbError> {
-        executor.execute(
+        let tx = transaction_manager.transaction()?;
+
+        tx.execute(
             r#"
             INSERT INTO pages_edit_context (
                 db_site_id, id, date, modified, slug, status, type,
@@ -328,10 +286,15 @@ impl PageRepository {
                 page.menu_order,
             ],
         )?;
-        Ok(executor.last_insert_rowid())
+
+        let rowid = tx.last_insert_rowid();
+        tx.commit()?;
+        Ok(rowid)
     }
 }
 ```
+
+**Note:** If the entity has term relationships (categories, tags, etc.), see "Adding Entity with Terms" section below for the full implementation.
 
 #### 5. Implement Delete and Count
 
@@ -395,15 +358,15 @@ mod tests {
     use rusqlite::Connection;
 
     #[test]
-    fn test_page_insert_and_select() {
-        let conn = Connection::open_in_memory().unwrap();
+    fn test_page_upsert_and_select() {
+        let mut conn = Connection::open_in_memory().unwrap();
         // Run migrations...
 
         let repo = PageRepository;
         let site = DbSite { row_id: RowId(1) };
 
         let page = create_test_page();
-        let rowid = repo.insert(&conn, &page, &site).unwrap();
+        let rowid = repo.upsert(&mut conn, &site, &page).unwrap();
 
         let db_page = repo.select_by_rowid(&conn, &site, rowid).unwrap();
         assert_eq!(db_page.page.id, page.id);
@@ -461,11 +424,13 @@ pub struct PageWithEditContext {
 }
 ```
 
-### 2. Implement upsert_with_terms
+### 2. Extend upsert() to Handle Terms
+
+Modify your `upsert()` implementation to sync term relationships automatically:
 
 ```rust
 impl PageRepository {
-    pub fn upsert_with_terms(
+    pub fn upsert(
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
@@ -474,7 +439,16 @@ impl PageRepository {
         let tx = transaction_manager.transaction()?;
 
         // Upsert the page
-        let page_rowid = self.upsert(&tx, site, page)?;
+        tx.execute(
+            r#"
+            INSERT INTO pages_edit_context (...)
+            VALUES (...)
+            ON CONFLICT(db_site_id, id) DO UPDATE SET ...
+            "#,
+            rusqlite::params![/* params */],
+        )?;
+
+        let page_rowid = tx.last_insert_rowid();
 
         // Sync term relationships
         let term_repo = TermRelationshipRepository;
@@ -591,10 +565,8 @@ When adding a new entity, ensure:
 - [ ] Migration file created with proper schema
 - [ ] Wrapper type defined (`Db{Entity}`)
 - [ ] `DbEntity` trait implemented
-- [ ] `InsertIntoDb` trait implemented
 - [ ] `TryFromDbRow` trait implemented
-- [ ] Repository struct created
-- [ ] `Repository` trait implemented
+- [ ] Repository struct created (zero-sized)
 - [ ] Query methods implemented (select_by_rowid, select_all, select_by_id)
 - [ ] Entity-specific methods implemented
 - [ ] UPSERT method implemented
@@ -611,7 +583,7 @@ Files to create/modify:
 
 - [ ] `migrations/000X-create-{entity}-table.sql`
 - [ ] `src/{entity}.rs` - Wrapper type
-- [ ] `src/mappings/{entity}.rs` - InsertIntoDb, TryFromDbRow
+- [ ] `src/mappings/{entity}.rs` - TryFromDbRow
 - [ ] `src/repository/{entity}.rs` - Repository implementation
 - [ ] `src/lib.rs` - Module exports
 - [ ] `tests/test_{entity}.rs` - Integration tests

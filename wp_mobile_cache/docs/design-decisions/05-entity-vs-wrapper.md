@@ -90,7 +90,7 @@ impl Repository for PostRepository {
 
 impl PostRepository {
     // Insert takes domain entity
-    pub fn insert(
+    pub fn upsert(
         &self,
         executor: &impl QueryExecutor,
         item: &AnyPostWithEditContext,  // Domain entity
@@ -150,7 +150,7 @@ let post = AnyPostWithEditContext {
 
 // Insert domain entity
 let repo = PostRepository;
-let rowid = repo.insert(&conn, &post, &site)?;
+let rowid = repo.upsert(&conn, &post, &site)?;
 // Database generates: rowid, last_fetched_at
 
 // Later, query returns wrapper with metadata
@@ -267,16 +267,6 @@ Domain entity implements `DbEntity`:
 impl DbEntity for AnyPostWithEditContext {
     const TABLE_NAME: &'static str = "posts_edit_context";
 }
-
-impl InsertIntoDb for AnyPostWithEditContext {
-    fn insert_into_db(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-    ) -> Result<RowId> {
-        // SQL INSERT with self fields + site
-    }
-}
 ```
 
 ### TryFromDbRow Trait
@@ -323,7 +313,7 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
 ## Related Decisions
 
 - [Type System](../architecture/type-system.md) - Full type definitions
-- [Core Traits](../architecture/core-traits.md) - DbEntity and Repository traits
+- [Core Traits](../architecture/core-traits.md) - DbEntity trait
 - [Cache Freshness](10-cache-freshness.md) - Why last_fetched_at is in wrapper
 
 ## See Also

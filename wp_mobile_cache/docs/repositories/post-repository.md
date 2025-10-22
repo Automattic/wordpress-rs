@@ -1,6 +1,6 @@
 # PostRepository API
 
-> **Last Updated:** 2025-10-21
+> **Last Updated:** 2025-10-22
 
 Complete API documentation for the `PostRepository` type, which manages cached WordPress posts.
 
@@ -8,8 +8,7 @@ Complete API documentation for the `PostRepository` type, which manages cached W
 
 `PostRepository` provides type-safe database operations for WordPress posts with:
 - Multi-site scoping
-- UPSERT operations (insert or update)
-- Term relationship management
+- Atomic UPSERT operations with term relationship management
 - Custom query methods
 - Transaction support
 
@@ -17,91 +16,11 @@ Complete API documentation for the `PostRepository` type, which manages cached W
 
 ```rust
 pub struct PostRepository;
-
-impl Repository for PostRepository {
-    type Entity = AnyPostWithEditContext;
-}
 ```
 
 **Zero-sized struct** - No fields, no construction overhead.
 
 See [Zero-Sized Repositories](../design-decisions/03-zero-sized-repos.md) for rationale.
-
-## Common Operations
-
-### insert
-
-Insert a new post into the cache.
-
-```rust
-fn insert(
-    &self,
-    executor: &impl QueryExecutor,
-    item: &AnyPostWithEditContext,
-    site: &DbSite,
-) -> Result<RowId, SqliteDbError>
-```
-
-**Parameters:**
-- `executor` - Database connection or transaction
-- `item` - WordPress post (domain entity)
-- `site` - Site scope for multi-site support
-
-**Returns:**
-- `RowId` - Database rowid of inserted post
-
-**Example:**
-```rust
-let repo = PostRepository;
-let post = AnyPostWithEditContext { /* ... */ };
-let site = DbSite { row_id: RowId(1) };
-
-let rowid = repo.insert(&conn, &post, &site)?;
-println!("Inserted post with rowid: {}", rowid.0);
-```
-
-**Notes:**
-- Provided by `Repository` trait (default implementation)
-- Delegates to `InsertIntoDb::insert_into_db`
-- `last_fetched_at` automatically set to current time
-- Fails if `(db_site_id, id)` already exists (use `upsert` instead)
-
-### insert_batch
-
-Insert multiple posts atomically in a transaction.
-
-```rust
-fn insert_batch(
-    &self,
-    transaction_manager: &mut impl TransactionManager,
-    items: &[AnyPostWithEditContext],
-    site: &DbSite,
-) -> Result<Vec<RowId>, SqliteDbError>
-```
-
-**Parameters:**
-- `transaction_manager` - Mutable connection (creates transaction internally)
-- `items` - Slice of WordPress posts
-- `site` - Site scope (all posts inserted for same site)
-
-**Returns:**
-- `Vec<RowId>` - Database rowids in same order as input
-
-**Example:**
-```rust
-let posts = vec![post1, post2, post3];
-let mut conn = Connection::open("cache.db")?;
-let site = DbSite { row_id: RowId(1) };
-
-let rowids = repo.insert_batch(&mut conn, &posts, &site)?;
-println!("Inserted {} posts", rowids.len());
-```
-
-**Notes:**
-- Provided by `Repository` trait (default implementation)
-- Uses transaction for atomicity (all or nothing)
-- More efficient than individual inserts
-- Requires mutable `TransactionManager` (Connection)
 
 ## Query Operations
 
@@ -277,57 +196,10 @@ println!("Drafts: {}, Published: {}", drafts.len(), published.len());
 
 ### upsert
 
-Insert or update a post atomically using SQLite's ON CONFLICT.
+Insert or update a post with its term relationships in a single atomic transaction.
 
 ```rust
 pub fn upsert(
-    &self,
-    executor: &impl QueryExecutor,
-    site: &DbSite,
-    post: &AnyPostWithEditContext,
-) -> Result<RowId, SqliteDbError>
-```
-
-**Parameters:**
-- `executor` - Database connection or transaction
-- `site` - Site scope
-- `post` - WordPress post (domain entity)
-
-**Returns:**
-- `RowId` - Database rowid (same for insert and update)
-
-**Example:**
-```rust
-let post = AnyPostWithEditContext {
-    id: PostId(123),
-    title: PostTitleWithEditContext { raw: "Hello".into() },
-    // ...
-};
-
-// First call - inserts
-let rowid1 = repo.upsert(&conn, &site, &post)?;
-
-// Second call - updates
-post.title.raw = "Hello World".into();
-let rowid2 = repo.upsert(&conn, &site, &post)?;
-
-assert_eq!(rowid1, rowid2);  // Same rowid!
-```
-
-**Notes:**
-- Preserves rowid on update (important for foreign keys)
-- Uses composite unique index `(db_site_id, id)` for conflict detection
-- `last_fetched_at` updated to current time on both insert and update
-- Database observers see INSERT or UPDATE action (not DELETE + INSERT)
-
-See [UPSERT Pattern](../design-decisions/06-upsert-pattern.md) for rationale.
-
-### upsert_with_terms
-
-Upsert post with term relationships atomically.
-
-```rust
-pub fn upsert_with_terms(
     &self,
     transaction_manager: &mut impl TransactionManager,
     site: &DbSite,
@@ -341,40 +213,76 @@ pub fn upsert_with_terms(
 - `post` - WordPress post with categories/tags populated
 
 **Returns:**
-- `RowId` - Database rowid of post
+- `RowId` - Database rowid (same for insert and update)
 
 **Example:**
 ```rust
 let mut post = AnyPostWithEditContext {
     id: PostId(123),
     categories: Some(vec![TermId(1), TermId(2)]),
-    tags: Some(vec![TermId(10), TermId(20), TermId(30)]),
+    tags: Some(vec![TermId(10), TermId(20)]),
     // ...
 };
 
-// Upsert post with terms
-let rowid = repo.upsert_with_terms(&mut conn, &site, &post)?;
+// First call - inserts post and term relationships
+let rowid1 = repo.upsert(&mut conn, &site, &post)?;
 
 // Later, update with different terms
 post.categories = Some(vec![TermId(1), TermId(3)]);  // Removed 2, added 3
-post.tags = Some(vec![TermId(10)]);                   // Removed 20, 30
+post.tags = Some(vec![TermId(10)]);                   // Removed 20
 
-repo.upsert_with_terms(&mut conn, &site, &post)?;
-// Only changed terms generate database events
+let rowid2 = repo.upsert(&mut conn, &site, &post)?;
+assert_eq!(rowid1, rowid2);  // Same rowid!
 ```
 
 **Notes:**
-- Atomic operation (post + terms in single transaction)
-- Syncs term relationships (only changes what's different)
-- Observer-friendly (only actual changes generate events)
+- Atomic transaction (post + terms committed together)
+- Preserves rowid on update (important for foreign keys)
+- Uses composite unique index `(db_site_id, id)` for conflict detection
+- `last_fetched_at` updated to current time on both insert and update
+- Syncs term relationships (only changes generate database events)
+- Database observers see INSERT or UPDATE action (not DELETE + INSERT)
+
+**Term sync behavior:**
+- INSERT for new term relationships
+- DELETE for removed term relationships
+- No operation for unchanged relationships (minimizes database events)
 - Uses `TermRelationshipRepository` internally
 
-**Sync behavior:**
-- INSERT for new terms
-- DELETE for removed terms
-- No events for unchanged terms
+See [UPSERT Pattern](../design-decisions/06-upsert-pattern.md) and [Term Normalization](../design-decisions/09-term-normalization.md) for rationale.
 
-See [Term Normalization](../design-decisions/09-term-normalization.md) for details.
+### upsert_batch
+
+Upsert multiple posts with their term relationships.
+
+```rust
+pub fn upsert_batch(
+    &self,
+    transaction_manager: &mut impl TransactionManager,
+    site: &DbSite,
+    posts: &[AnyPostWithEditContext],
+) -> Result<Vec<RowId>, SqliteDbError>
+```
+
+**Parameters:**
+- `transaction_manager` - Mutable connection
+- `site` - Site scope (all posts upserted for same site)
+- `posts` - Slice of WordPress posts with terms
+
+**Returns:**
+- `Vec<RowId>` - Database rowids in same order as input
+
+**Example:**
+```rust
+let posts = vec![post1, post2, post3];
+let rowids = repo.upsert_batch(&mut conn, &site, &posts)?;
+println!("Upserted {} posts", rowids.len());
+```
+
+**Notes:**
+- Each post is upserted in its own transaction
+- Partial success is allowed (if post 2 fails, post 1 remains)
+- Each successful upsert is atomic (post + terms committed together)
 
 ## Delete Operations
 
@@ -471,8 +379,8 @@ See [Multi-Site with DbSite](../design-decisions/07-multi-site-dbsite.md) for ra
 let tx = conn.transaction()?;
 
 // Multiple operations in transaction
-let rowid1 = repo.insert(&tx, &post1, &site)?;
-let rowid2 = repo.insert(&tx, &post2, &site)?;
+let rowid1 = repo.upsert(&mut tx, &site, &post1)?;
+let rowid2 = repo.upsert(&mut tx, &site, &post2)?;
 repo.delete_by_post_id(&tx, &site, PostId(999))?;
 
 tx.commit()?;
@@ -509,9 +417,9 @@ tx.commit()?;
 
 ### Domain Entity vs Wrapper
 
-**Insert operations** accept domain entity:
+**Upsert operations** accept domain entity:
 ```rust
-fn insert(&self, ..., item: &AnyPostWithEditContext, ...) -> Result<RowId>
+fn upsert(&self, ..., post: &AnyPostWithEditContext, ...) -> Result<RowId>
 ```
 
 **Query operations** return wrapper type:
@@ -576,16 +484,16 @@ CREATE INDEX idx_posts_edit_context_db_site_id
 
 ### Batch Operations
 
-Use `insert_batch` or transactions for multiple operations:
+Use `upsert_batch` or transactions for multiple operations:
 
 ```rust
-// ❌ Slow - individual inserts
+// ❌ Slow - individual upserts
 for post in posts {
-    repo.insert(&conn, &post, &site)?;
+    repo.upsert(&mut conn, &site, &post)?;
 }
 
 // ✅ Fast - batch with transaction
-repo.insert_batch(&mut conn, &posts, &site)?;
+repo.upsert_batch(&mut conn, &site, &posts)?;
 ```
 
 ### Term Relationships

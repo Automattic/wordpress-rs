@@ -1,7 +1,9 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
     mappings::{TryFromDbRow, posts::DbAnyPostWithEditContext},
-    repository::{QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository},
+    repository::{
+        QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository,
+    },
 };
 use wp_api::posts::{AnyPostWithEditContext, PostId};
 use wp_api::taxonomies::TaxonomyType;

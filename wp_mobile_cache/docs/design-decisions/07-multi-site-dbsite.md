@@ -64,12 +64,12 @@ CREATE TABLE `posts_edit_context` (
 ```rust
 // ❌ This fails - site doesn't exist
 let fake_site = DbSite { row_id: RowId(999) };
-repo.insert(&conn, &post, &fake_site)?;
+repo.upsert(&conn, &post, &fake_site)?;
 // Error: FOREIGN KEY constraint failed
 
 // ✅ Must use valid site
 let site = site_repo.get_or_create(&conn, &site_info)?;
-repo.insert(&conn, &post, &site)?;
+repo.upsert(&conn, &post, &site)?;
 ```
 
 ### Query Scoping
@@ -153,11 +153,11 @@ fn select_all(site: &DbSite) -> Result<Vec<Post>> { }
 ```rust
 // ❌ Bad practice - arbitrary ID construction
 let site = DbSite { row_id: RowId(999) };  // Does site 999 exist?
-repo.insert(&conn, &post, &site)?;  // Might fail with FK error
+repo.upsert(&conn, &post, &site)?;  // Might fail with FK error
 
 // ✅ Correct approach - fetch valid site
 let site = site_repo.get_or_create(&conn, &site_info)?;
-repo.insert(&conn, &post, &site)?;  // Guaranteed to succeed (if post valid)
+repo.upsert(&conn, &post, &site)?;  // Guaranteed to succeed (if post valid)
 ```
 
 **Benefits:**
@@ -247,7 +247,7 @@ impl Clone for DbSite {}
 
 // Passing &DbSite has no overhead
 let site = DbSite { row_id: RowId(1) };
-repo.insert(&conn, &post, &site)?;  // &DbSite is just a pointer
+repo.upsert(&conn, &post, &site)?;  // &DbSite is just a pointer
 ```
 
 **Memory layout:**
@@ -343,7 +343,7 @@ let site = site_repo.get_or_create(&conn, &site_info)?;
 // All operations scoped to this site
 let posts = post_repo.select_all(&conn, &site)?;
 let post = post_repo.select_by_post_id(&conn, &site, PostId(123))?;
-post_repo.insert(&conn, &new_post, &site)?;
+post_repo.upsert(&conn, &new_post, &site)?;
 
 // Cannot accidentally use wrong site
 let other_site = site_repo.get_or_create(&conn, &other_site_info)?;

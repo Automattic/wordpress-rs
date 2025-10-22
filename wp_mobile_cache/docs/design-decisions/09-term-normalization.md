@@ -352,39 +352,7 @@ See [TermRelationshipRepository API](../repositories/term-relationship-repositor
 
 ### PostRepository Integration
 
-```rust
-impl PostRepository {
-    pub fn upsert_with_terms(
-        &self,
-        transaction_manager: &mut impl TransactionManager,
-        site: &DbSite,
-        post: &AnyPostWithEditContext,
-    ) -> Result<RowId> {
-        let tx = transaction_manager.transaction()?;
-
-        // Upsert the post
-        let post_rowid = self.upsert(&tx, site, post)?;
-
-        // Sync term relationships
-        let term_repo = TermRelationshipRepository;
-
-        if let Some(ref categories) = post.categories {
-            term_repo.sync_terms_for_object(
-                &tx, site, post_rowid, &TaxonomyType::Category, categories
-            )?;
-        }
-
-        if let Some(ref tags) = post.tags {
-            term_repo.sync_terms_for_object(
-                &tx, site, post_rowid, &TaxonomyType::PostTag, tags
-            )?;
-        }
-
-        tx.commit()?;
-        Ok(post_rowid)
-    }
-}
-```
+`PostRepository::upsert()` automatically handles term synchronization internally. The implementation uses `TermRelationshipRepository::sync_terms_for_object()` to ensure categories and tags are properly synced in a single atomic transaction.
 
 ## Example Usage
 
@@ -398,8 +366,8 @@ let mut post = AnyPostWithEditContext {
     // ...
 };
 
-// First upsert - inserts terms
-let post_rowid = repo.upsert_with_terms(&mut conn, &site, &post)?;
+// First upsert - inserts post and terms atomically
+let post_rowid = repo.upsert(&mut conn, &site, &post)?;
 // Database now has:
 // - term_relationships: (object_id=post_rowid, term_id=1, taxonomy=Category)
 // - term_relationships: (object_id=post_rowid, term_id=2, taxonomy=Category)
@@ -411,7 +379,7 @@ let post_rowid = repo.upsert_with_terms(&mut conn, &site, &post)?;
 post.categories = Some(vec![TermId(1), TermId(3)]);  // Removed 2, added 3
 post.tags = Some(vec![TermId(10)]);                   // Removed 20, 30
 
-repo.upsert_with_terms(&mut conn, &site, &post)?;
+repo.upsert(&mut conn, &site, &post)?;
 // Observer sees:
 // - DELETE for term 2 (category)
 // - INSERT for term 3 (category)

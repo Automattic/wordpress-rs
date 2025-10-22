@@ -12,7 +12,7 @@ When caching data from WordPress, we need to handle both new posts and updates t
 
 ```rust
 // Option 1: Separate insert and update (rejected)
-pub fn insert(...) -> Result<RowId> { }
+pub fn upsert(...) -> Result<RowId> { }
 pub fn update(...) -> Result<()> { }
 
 // Option 2: Upsert (chosen)
@@ -79,7 +79,7 @@ pub fn upsert(...) -> Result<RowId> {
 }
 
 // ❌ Separate methods - field list duplicated
-pub fn insert(...) -> Result<RowId> {
+pub fn upsert(...) -> Result<RowId> {
     executor.execute(
         "INSERT INTO posts (db_site_id, id, title, content, author, ...) VALUES (?, ?, ?, ?, ?, ...)",
         params![...]
@@ -273,7 +273,7 @@ for post in posts {
 ### Alternative 1: Separate Insert and Update Methods
 
 ```rust
-pub fn insert(&self, executor: &impl QueryExecutor, post: &Post) -> Result<RowId> { }
+pub fn upsert(&self, executor: &impl QueryExecutor, post: &Post) -> Result<RowId> { }
 pub fn update(&self, executor: &impl QueryExecutor, post: &Post) -> Result<()> { }
 ```
 

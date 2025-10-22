@@ -76,7 +76,7 @@ impl PostRepository {
     }
 
     // Batch operations - need TransactionManager
-    pub fn insert_batch(
+    pub fn upsert_batch(
         &self,
         transaction_manager: &mut impl TransactionManager,  // Only Connection
         items: &[AnyPostWithEditContext],
@@ -191,8 +191,8 @@ let mut conn = Connection::open("cache.db")?;
 let tx = conn.transaction()?;
 
 // Use transaction for multiple operations
-repo.insert(&tx, &post1, &site)?;
-repo.insert(&tx, &post2, &site)?;
+repo.upsert(&tx, &post1, &site)?;
+repo.upsert(&tx, &post2, &site)?;
 
 tx.commit()?;
 ```
@@ -201,7 +201,7 @@ tx.commit()?;
 
 ```rust
 impl Repository for PostRepository {
-    fn insert_batch(
+    fn upsert_batch(
         &self,
         transaction_manager: &mut impl TransactionManager,
         items: &[Self::Entity],
@@ -221,7 +221,7 @@ impl Repository for PostRepository {
 
 // Called with Connection
 let mut conn = Connection::open("cache.db")?;
-let rowids = repo.insert_batch(&mut conn, &posts, &site)?;
+let rowids = repo.upsert_batch(&mut conn, &posts, &site)?;
 ```
 
 ### Preventing Nested Transactions
@@ -309,7 +309,7 @@ impl PostRepository {
 ```rust
 impl PostRepository {
     // Always take connection, create transaction internally if needed
-    pub fn insert_batch(&self, conn: &mut Connection, ...) -> Result<Vec<RowId>> {
+    pub fn upsert_batch(&self, conn: &mut Connection, ...) -> Result<Vec<RowId>> {
         let tx = conn.transaction()?;
         // ...
     }

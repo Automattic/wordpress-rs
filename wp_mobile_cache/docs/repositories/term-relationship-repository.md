@@ -1,6 +1,6 @@
 # TermRelationshipRepository API
 
-> **Last Updated:** 2025-10-21
+> **Last Updated:** 2025-10-22
 
 Complete API documentation for the `TermRelationshipRepository` type, which manages term associations for WordPress objects (posts, pages, etc.).
 
@@ -19,8 +19,6 @@ pub struct TermRelationshipRepository;
 ```
 
 **Zero-sized struct** - No fields, no construction overhead.
-
-**Note:** This repository does NOT implement the `Repository` trait because it manages relationships, not a primary entity type.
 
 ## Core Type
 
@@ -258,102 +256,6 @@ println!("Deleted {} term relationships", deleted);
 - Returns 0 if no relationships exist (not an error)
 - Used by `PostRepository::delete_by_post_id` before deleting post
 
-## Integration with PostRepository
-
-### Upsert with Terms
-
-```rust
-impl PostRepository {
-    pub fn upsert_with_terms(
-        &self,
-        transaction_manager: &mut impl TransactionManager,
-        site: &DbSite,
-        post: &AnyPostWithEditContext,
-    ) -> Result<RowId, SqliteDbError> {
-        let tx = transaction_manager.transaction()?;
-
-        // Upsert the post
-        let post_rowid = self.upsert(&tx, site, post)?;
-
-        // Sync term relationships
-        let term_repo = TermRelationshipRepository;
-
-        if let Some(ref categories) = post.categories {
-            term_repo.sync_terms_for_object(
-                &tx, site, post_rowid, &TaxonomyType::Category, categories
-            )?;
-        }
-
-        if let Some(ref tags) = post.tags {
-            term_repo.sync_terms_for_object(
-                &tx, site, post_rowid, &TaxonomyType::PostTag, tags
-            )?;
-        }
-
-        tx.commit()?;
-        Ok(post_rowid)
-    }
-}
-```
-
-### Read with Terms
-
-```rust
-impl PostRepository {
-    pub fn select_by_rowid(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        rowid: RowId,
-    ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        // 1. SELECT post from posts_edit_context
-        let mut post = /* query post */;
-
-        // 2. Get all terms
-        let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_all_terms_for_object(executor, site, rowid)?;
-
-        // 3. Populate post fields
-        post.categories = terms_map.get(&TaxonomyType::Category).cloned();
-        post.tags = terms_map.get(&TaxonomyType::PostTag).cloned();
-
-        // 4. Return wrapper
-        Ok(DbAnyPostWithEditContext {
-            row_id: rowid,
-            site: *site,
-            post,
-            last_fetched_at,
-        })
-    }
-}
-```
-
-### Delete with Terms
-
-```rust
-impl PostRepository {
-    pub fn delete_by_post_id(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        post_id: PostId,
-    ) -> Result<usize, SqliteDbError> {
-        // 1. Get the rowid
-        let db_post = self.select_by_post_id(executor, site, post_id)?;
-
-        // 2. Delete term relationships
-        let term_repo = TermRelationshipRepository;
-        term_repo.delete_all_terms_for_object(executor, site, db_post.row_id)?;
-
-        // 3. Delete the post
-        executor.execute(
-            "DELETE FROM posts_edit_context WHERE db_site_id = ? AND id = ?",
-            params![site.row_id.0, post_id.0],
-        )
-    }
-}
-```
-
 ## Custom Taxonomies
 
 ### Registering Custom Taxonomy
@@ -492,25 +394,11 @@ tx.commit()?;
 ### Post + Terms in Transaction
 
 ```rust
-let tx = conn.transaction()?;
-
-// Upsert post
-let post_rowid = post_repo.upsert(&tx, &site, &post)?;
-
-// Sync terms
-let term_repo = TermRelationshipRepository;
-term_repo.sync_terms_for_object(&tx, &site, post_rowid, &TaxonomyType::Category, &categories)?;
-term_repo.sync_terms_for_object(&tx, &site, post_rowid, &TaxonomyType::PostTag, &tags)?;
-
-tx.commit()?;
+// PostRepository.upsert() handles term syncing automatically
+let post_rowid = post_repo.upsert(&mut conn, &site, &post)?;
 ```
 
-**Or use the convenience method:**
-
-```rust
-// Equivalent to above, but cleaner
-post_repo.upsert_with_terms(&mut conn, &site, &post)?;
-```
+**Note:** `PostRepository::upsert()` creates a transaction internally and syncs both the post and its term relationships atomically. The categories and tags from `post.categories` and `post.tags` are automatically synchronized using `TermRelationshipRepository::sync_terms_for_object()`.
 
 ## Extensibility
 

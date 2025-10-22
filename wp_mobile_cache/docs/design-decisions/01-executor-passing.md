@@ -74,8 +74,8 @@ let post = repo.select_by_rowid(&conn, &site, RowId(42))?;
 // Use transaction for atomic operations
 let mut conn = Connection::open("cache.db")?;
 let tx = conn.transaction()?;
-repo.insert(&tx, &new_post, &site)?;
-repo.insert(&tx, &another_post, &site)?;
+repo.upsert(&tx, &new_post, &site)?;
+repo.upsert(&tx, &another_post, &site)?;
 tx.commit()?;
 ```
 
@@ -137,8 +137,8 @@ let site = DbSite { row_id: RowId(1) };
 // Explicit transaction management
 let tx = conn.transaction()?;
 
-let rowid1 = repo.insert(&tx, &post1, &site)?;
-let rowid2 = repo.insert(&tx, &post2, &site)?;
+let rowid1 = repo.upsert(&tx, &post1, &site)?;
+let rowid2 = repo.upsert(&tx, &post2, &site)?;
 
 tx.commit()?;
 ```

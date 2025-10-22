@@ -1,6 +1,8 @@
 # Design Decision 2: Associated Types Over Generic Parameters
 
-> **Last Updated:** 2025-10-21
+> **Last Updated:** 2025-10-22
+
+> **Historical Note:** The `Repository` trait referenced in this document was removed as a premature abstraction (as of 2025-10-22). Each repository now defines its own API directly. This document is preserved for educational purposes to explain the associated types pattern, should a shared repository trait be needed in the future.
 
 ## Decision
 
@@ -61,7 +63,7 @@ impl Repository for UserRepository {
 ```rust
 // ✅ With associated type
 let repo = PostRepository;
-repo.insert(&conn, &post, &site)?;
+repo.upsert(&conn, &post, &site)?;
 
 // ❌ With generic parameter
 let repo = PostRepository;
@@ -92,7 +94,7 @@ fn process_repo<T: DbEntity>(repo: &impl Repository<T>) {
 impl Repository for PostRepository {
     type Entity = AnyPostWithEditContext;
 
-    fn insert(&self, executor: &impl QueryExecutor,
+    fn upsert(&self, executor: &impl QueryExecutor,
               item: &Self::Entity, site: &DbSite) -> Result<RowId> {
         // Compiler knows Self::Entity is AnyPostWithEditContext
         item.insert_into_db(executor, site)
@@ -149,7 +151,7 @@ fn cache_posts(posts: Vec<AnyPostWithEditContext>) -> Result<()> {
 
     for post in posts {
         // Clean call - no type annotations needed
-        repo.insert(&conn, &post, &site)?;
+        repo.upsert(&conn, &post, &site)?;
     }
 
     Ok(())
@@ -175,12 +177,12 @@ fn count_entities<R: Repository>(
 
 ```rust
 trait Repository<T: DbEntity> {
-    fn insert(&self, executor: &impl QueryExecutor,
+    fn upsert(&self, executor: &impl QueryExecutor,
               item: &T, site: &DbSite) -> Result<RowId>;
 }
 
 impl Repository<AnyPostWithEditContext> for PostRepository {
-    fn insert(&self, executor: &impl QueryExecutor,
+    fn upsert(&self, executor: &impl QueryExecutor,
               item: &AnyPostWithEditContext, site: &DbSite) -> Result<RowId> {
         // ...
     }
@@ -200,7 +202,7 @@ impl Repository<AnyPostWithEditContext> for PostRepository {
 pub struct PostRepository;
 
 impl PostRepository {
-    pub fn insert(
+    pub fn upsert(
         &self,
         executor: &impl QueryExecutor,
         item: &AnyPostWithEditContext,
