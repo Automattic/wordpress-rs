@@ -521,7 +521,7 @@ mod tests {
     fn test_multipart_flag_default() {
         let parsed: ParsedVariantAttribute =
             syn::parse_str(r#"#[post(url = "/test", output = TestOutput)]"#).unwrap();
-        assert_eq!(parsed.multipart, false);
+        assert!(!parsed.multipart);
     }
 
     #[test]
@@ -529,7 +529,7 @@ mod tests {
         let parsed: ParsedVariantAttribute =
             syn::parse_str(r#"#[post(url = "/test", output = TestOutput, multipart = true)]"#)
                 .unwrap();
-        assert_eq!(parsed.multipart, true);
+        assert!(parsed.multipart);
     }
 
     #[test]
@@ -537,6 +537,6 @@ mod tests {
         let parsed: ParsedVariantAttribute =
             syn::parse_str(r#"#[post(url = "/test", output = TestOutput, multipart = false)]"#)
                 .unwrap();
-        assert_eq!(parsed.multipart, false);
+        assert!(!parsed.multipart);
     }
 }

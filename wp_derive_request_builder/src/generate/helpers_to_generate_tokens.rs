@@ -419,15 +419,13 @@ pub fn fn_body_build_request_from_url(
                         compile_error!("multipart POST requires params")
                     }
                 }
+            } else if params_type.is_some() {
+                quote! {
+                    self.inner.post(url, Some(params))
+                }
             } else {
-                if params_type.is_some() {
-                    quote! {
-                        self.inner.post(url, Some(params))
-                    }
-                } else {
-                    quote! {
-                        self.inner.post(url, None::<&()>)
-                    }
+                quote! {
+                    self.inner.post(url, None::<&()>)
                 }
             }
         }
