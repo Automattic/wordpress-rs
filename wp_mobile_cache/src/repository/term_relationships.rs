@@ -10,6 +10,8 @@ use wp_api::terms::TermId;
 pub struct TermRelationshipRepository;
 
 impl TermRelationshipRepository {
+    const TABLE_NAME: &'static str = "term_relationships";
+
     /// Synchronize terms for an object (only insert new, delete removed, keep unchanged).
     ///
     /// This approach is observer-friendly: unchanged terms generate no DB events.
@@ -68,7 +70,8 @@ impl TermRelationshipRepository {
         // Build placeholders for IN clause
         let placeholders: Vec<_> = (0..term_ids.len()).map(|_| "?").collect();
         let sql = format!(
-            "DELETE FROM term_relationships WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ? AND term_id IN ({})",
+            "DELETE FROM {} WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ? AND term_id IN ({})",
+            Self::TABLE_NAME,
             placeholders.join(", ")
         );
 
@@ -100,9 +103,14 @@ impl TermRelationshipRepository {
             return Ok(());
         }
 
+        let insert_sql = format!(
+            "INSERT INTO {} (db_site_id, object_id, term_id, taxonomy_type) VALUES (?, ?, ?, ?)",
+            Self::TABLE_NAME
+        );
+
         for term_id in term_ids {
             executor.execute(
-                "INSERT INTO term_relationships (db_site_id, object_id, term_id, taxonomy_type) VALUES (?, ?, ?, ?)",
+                &insert_sql,
                 rusqlite::params![site.row_id, object_id, term_id.0, taxonomy_type.to_string()],
             )?;
         }
@@ -117,8 +125,11 @@ impl TermRelationshipRepository {
         object_id: RowId,
         taxonomy_type: &TaxonomyType,
     ) -> Result<Vec<TermId>, SqliteDbError> {
-        let sql = "SELECT term_id FROM term_relationships WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ?";
-        let mut stmt = executor.prepare(sql)?;
+        let sql = format!(
+            "SELECT term_id FROM {} WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map(
             rusqlite::params![site.row_id, object_id, taxonomy_type.to_string()],
             |row| {
@@ -138,8 +149,11 @@ impl TermRelationshipRepository {
         site: &DbSite,
         object_id: RowId,
     ) -> Result<HashMap<TaxonomyType, Vec<TermId>>, SqliteDbError> {
-        let sql = "SELECT taxonomy_type, term_id FROM term_relationships WHERE db_site_id = ? AND object_id = ?";
-        let mut stmt = executor.prepare(sql)?;
+        let sql = format!(
+            "SELECT taxonomy_type, term_id FROM {} WHERE db_site_id = ? AND object_id = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map(rusqlite::params![site.row_id, object_id], |row| {
             let taxonomy_str: String = row.get(0)?;
             let term_id: i64 = row.get(1)?;
@@ -175,10 +189,11 @@ impl TermRelationshipRepository {
         site: &DbSite,
         object_id: RowId,
     ) -> Result<usize, SqliteDbError> {
-        executor.execute(
-            "DELETE FROM term_relationships WHERE db_site_id = ? AND object_id = ?",
-            rusqlite::params![site.row_id, object_id],
-        )
+        let sql = format!(
+            "DELETE FROM {} WHERE db_site_id = ? AND object_id = ?",
+            Self::TABLE_NAME
+        );
+        executor.execute(&sql, rusqlite::params![site.row_id, object_id])
     }
 }
 

@@ -14,6 +14,8 @@ use wp_api::taxonomies::TaxonomyType;
 pub struct PostRepository;
 
 impl PostRepository {
+    const TABLE_NAME: &'static str = "posts_edit_context";
+
     /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
     ///
     /// Returns an error if no post with the given rowid exists for this site.
@@ -24,8 +26,11 @@ impl PostRepository {
         site: &DbSite,
         rowid: RowId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND rowid = ?";
-        let mut stmt = executor.prepare(sql)?;
+        let sql = format!(
+            "SELECT * FROM {} WHERE db_site_id = ? AND rowid = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
         let mut db_post = stmt
             .query_row([site.row_id, rowid], |row| {
                 DbAnyPostWithEditContext::try_from_row(row)
@@ -48,8 +53,8 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ?";
-        let mut stmt = executor.prepare(sql)?;
+        let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
+        let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map([site.row_id], |row| {
             DbAnyPostWithEditContext::try_from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
@@ -80,8 +85,11 @@ impl PostRepository {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
-        let mut stmt = executor.prepare(sql)?;
+        let sql = format!(
+            "SELECT * FROM {} WHERE db_site_id = ? AND id = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
         let mut db_post = stmt
             .query_row(rusqlite::params![site.row_id, post_id.0], |row| {
                 DbAnyPostWithEditContext::try_from_row(row)
@@ -116,8 +124,11 @@ impl PostRepository {
         term_repo.delete_all_terms_for_object(executor, site, db_post.row_id)?;
 
         // Delete the post
-        let sql = "DELETE FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
-        executor.execute(sql, rusqlite::params![site.row_id, post_id.0])
+        let sql = format!(
+            "DELETE FROM {} WHERE db_site_id = ? AND id = ?",
+            Self::TABLE_NAME
+        );
+        executor.execute(&sql, rusqlite::params![site.row_id, post_id.0])
     }
 
     /// Upsert a post with its term relationships (atomic transaction).
@@ -139,9 +150,9 @@ impl PostRepository {
 
         let tx = transaction_manager.transaction()?;
 
-        tx.execute(
+        let upsert_sql = format!(
             r#"
-            INSERT INTO posts_edit_context (
+            INSERT INTO {} (
                 db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
                 password, template, permalink_template, generated_slug, author, featured_media,
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
@@ -191,6 +202,11 @@ impl PostRepository {
                 excerpt_protected = excluded.excerpt_protected,
                 last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             "#,
+            Self::TABLE_NAME
+        );
+
+        tx.execute(
+            &upsert_sql,
             rusqlite::named_params! {
                 ":db_site_id": site.row_id,
                 ":id": post.id.0,
@@ -229,9 +245,12 @@ impl PostRepository {
             },
         )?;
 
-        let sql = "SELECT rowid FROM posts_edit_context WHERE db_site_id = ? AND id = ?";
+        let sql = format!(
+            "SELECT rowid FROM {} WHERE db_site_id = ? AND id = ?",
+            Self::TABLE_NAME
+        );
         let post_rowid: i64 = {
-            let mut stmt = tx.prepare(sql)?;
+            let mut stmt = tx.prepare(&sql)?;
             stmt.query_row(rusqlite::params![site.row_id, post.id.0], |row| row.get(0))
                 .map_err(SqliteDbError::from)?
         };
@@ -284,8 +303,11 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<i64, SqliteDbError> {
-        let sql = "SELECT COUNT(*) FROM posts_edit_context WHERE db_site_id = ?";
-        let mut stmt = executor.prepare(sql)?;
+        let sql = format!(
+            "SELECT COUNT(*) FROM {} WHERE db_site_id = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
         stmt.query_row([site.row_id], |row| row.get(0))
             .map_err(SqliteDbError::from)
     }

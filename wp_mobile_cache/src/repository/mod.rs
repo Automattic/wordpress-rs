@@ -71,37 +71,9 @@ impl<'conn> QueryExecutor for rusqlite::Transaction<'conn> {
     }
 }
 
-/// Marker trait for database entities.
-///
-/// Types implementing this trait represent entities stored in the database.
-/// They must specify their table name.
-pub trait DbEntity {
-    /// The name of the database table for this entity.
-    const TABLE_NAME: &'static str;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mappings::TryFromDbRow;
-    use rusqlite::{Connection, Row};
-
-    #[allow(dead_code)]
-    struct TestEntity {
-        value: String,
-    }
-
-    impl TryFromDbRow for TestEntity {
-        fn try_from_row(row: &Row) -> Result<Self, SqliteDbError> {
-            Ok(TestEntity {
-                value: row.get(0).map_err(SqliteDbError::from)?,
-            })
-        }
-    }
-
-    impl DbEntity for TestEntity {
-        const TABLE_NAME: &'static str = "test_table";
-    }
 
     #[test]
     fn test_query_executor_for_connection() {

@@ -10,16 +10,12 @@ use wp_api::terms::TermId;
 pub struct DbTermRelationship {
     /// SQLite rowid of this relationship
     pub row_id: RowId,
-
     /// Site this relationship belongs to
     pub site: DbSite,
-
     /// Row ID of the object (post, page, etc.) in its respective table
     pub object_id: RowId,
-
     /// WordPress term ID
     pub term_id: TermId,
-
     /// Taxonomy type (category, post_tag, or custom)
     pub taxonomy_type: TaxonomyType,
 }

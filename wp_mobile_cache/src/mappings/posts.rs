@@ -7,7 +7,6 @@ use crate::{
             parse_enum, parse_optional_enum,
         },
     },
-    repository::DbEntity,
 };
 use rusqlite::Row;
 use wp_api::posts::{
@@ -141,10 +140,6 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
     }
-}
-
-impl DbEntity for AnyPostWithEditContext {
-    const TABLE_NAME: &'static str = "posts_edit_context";
 }
 
 #[cfg(test)]
