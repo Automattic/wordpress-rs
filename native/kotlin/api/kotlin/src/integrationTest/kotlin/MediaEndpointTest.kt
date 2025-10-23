@@ -67,10 +67,7 @@ class MediaEndpointTest {
         val title = "Testing media upload from Kotlin"
         val response = client.request { requestBuilder ->
             requestBuilder.media().create(
-                params = MediaCreateParams(title = title),
-                "test_media.jpg",
-                "image/jpeg",
-                null
+                params = MediaCreateParams(title = title, filePath = "test_media.jpg")
             )
         }.assertSuccessAndRetrieveData().data
         assertEquals(title, response.title.rendered)
