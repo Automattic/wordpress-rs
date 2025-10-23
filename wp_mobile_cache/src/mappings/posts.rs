@@ -181,7 +181,7 @@ impl DbAnyPostWithEditContext {
 mod tests {
     use crate::test_fixtures::{TestContext, posts::PostBuilder, test_ctx};
     use rstest::*;
-    use wp_api::posts::PostStatus;
+    use wp_api::posts::{AnyPostWithEditContext, PostStatus};
 
     /// Helper to validate that last_fetched_at is a recent, valid ISO 8601 timestamp
     fn assert_recent_timestamp(timestamp: &str) {
@@ -205,9 +205,9 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_minimal_fields(mut test_ctx: TestContext) {
-        let original_post = PostBuilder::minimal().build();
-
+    #[case(PostBuilder::minimal().build())]
+    #[case(PostBuilder::full().build())]
+    fn test_round_trip(mut test_ctx: TestContext, #[case] original_post: AnyPostWithEditContext) {
         // Insert into database using repository
         let rowid = test_ctx
             .post_repo
@@ -221,29 +221,6 @@ mod tests {
             .expect("Failed to read post");
 
         // Verify round-trip
-        assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site, test_ctx.site);
-        assert_recent_timestamp(&retrieved.last_fetched_at);
-        assert_eq!(retrieved.post, original_post);
-    }
-
-    #[rstest]
-    fn test_round_trip_with_all_fields(mut test_ctx: TestContext) {
-        let original_post = PostBuilder::full().build();
-
-        // Insert into database using repository
-        let rowid = test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &original_post)
-            .expect("Failed to insert post");
-
-        // Read back from database using repository
-        let retrieved = test_ctx
-            .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to read post");
-
-        // Verify round-trip for all fields
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site, test_ctx.site);
         assert_recent_timestamp(&retrieved.last_fetched_at);
