@@ -5317,6 +5317,7 @@ dependencies = [
 name = "wp_mobile_cache"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "rstest 0.18.2",
  "rusqlite",
  "serde",

@@ -2,6 +2,7 @@ use crate::{
     DbSite, MigrationManager, RowId,
     repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
 };
+use chrono::{DateTime, Utc};
 use rstest::*;
 use rusqlite::Connection;
 
@@ -61,4 +62,40 @@ pub fn create_test_site(conn: &Connection, id: i64) -> DbSite {
     DbSite {
         row_id: RowId(id as u64),
     }
+}
+
+/// Validates that a timestamp is a recent, valid ISO 8601 UTC timestamp.
+///
+/// Checks that the timestamp:
+/// - Is in valid ISO 8601 format
+/// - Is in UTC (ends with 'Z')
+/// - Is within the last 5 seconds of the current time
+///
+/// # Panics
+///
+/// Panics if the timestamp is invalid or not recent.
+pub fn assert_recent_timestamp(timestamp: &str) {
+    // Parse the timestamp
+    let parsed = DateTime::parse_from_rfc3339(timestamp)
+        .unwrap_or_else(|e| panic!("Failed to parse timestamp '{}': {}", timestamp, e));
+
+    // Verify it's UTC (ends with Z)
+    assert!(
+        timestamp.ends_with('Z'),
+        "Timestamp should be UTC (end with Z): {}",
+        timestamp
+    );
+
+    // Check that it's recent (within last 5 seconds)
+    let now = Utc::now();
+    let timestamp_utc = parsed.with_timezone(&Utc);
+    let diff = now.signed_duration_since(timestamp_utc);
+
+    assert!(
+        diff.num_seconds() >= 0 && diff.num_seconds() <= 5,
+        "Timestamp should be within last 5 seconds. Now: {}, Timestamp: {}, Diff: {} seconds",
+        now,
+        timestamp_utc,
+        diff.num_seconds()
+    );
 }

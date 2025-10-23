@@ -179,30 +179,11 @@ impl DbAnyPostWithEditContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_fixtures::{TestContext, posts::PostBuilder, test_ctx};
+    use crate::test_fixtures::{
+        TestContext, assert_recent_timestamp, posts::PostBuilder, test_ctx,
+    };
     use rstest::*;
     use wp_api::posts::{AnyPostWithEditContext, PostStatus};
-
-    /// Helper to validate that last_fetched_at is a recent, valid ISO 8601 timestamp
-    fn assert_recent_timestamp(timestamp: &str) {
-        // Parse the timestamp
-        assert!(
-            timestamp.ends_with('Z'),
-            "Timestamp should be UTC (end with Z): {}",
-            timestamp
-        );
-        assert!(
-            timestamp.contains('T'),
-            "Timestamp should be ISO 8601 format: {}",
-            timestamp
-        );
-        // Basic format check: YYYY-MM-DDTHH:MM:SS.fffZ
-        assert!(
-            timestamp.len() >= 20,
-            "Timestamp should be at least 20 chars: {}",
-            timestamp
-        );
-    }
 
     #[rstest]
     #[case(PostBuilder::minimal().build())]

@@ -340,7 +340,9 @@ impl PostRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::{TestContext, posts::PostBuilder, test_ctx};
+    use crate::test_fixtures::{
+        TestContext, assert_recent_timestamp, posts::PostBuilder, test_ctx,
+    };
     use rstest::*;
     use wp_api::posts::PostStatus;
 
@@ -828,14 +830,8 @@ mod tests {
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
             .unwrap();
 
-        // Validate ISO 8601 UTC format
-        assert!(retrieved.last_fetched_at.ends_with('Z'));
-        assert!(retrieved.last_fetched_at.contains('T'));
-        assert!(retrieved.last_fetched_at.len() >= 20);
-
-        // Validate it's a recent timestamp (within last second)
-        // Format: 2024-01-01T00:00:00.000Z
-        assert!(retrieved.last_fetched_at.starts_with("2025"));
+        // Validate timestamp is recent and valid
+        assert_recent_timestamp(&retrieved.last_fetched_at);
     }
 
     #[rstest]
