@@ -2,7 +2,7 @@ use std::sync::{
     Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use wp_api::{request::RequestContext, users::UserListParams};
+use wp_api::{request::{RequestContext, WpMultipartFormRequest}, users::UserListParams};
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -123,6 +123,13 @@ impl RequestExecutor for TrackedRequestExecutor {
             .unwrap()
             .push(request.url().0.clone());
         self.executor.execute(request).await
+    }
+
+    async fn upload(
+        &self,
+        _request: Arc<WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        unimplemented!()
     }
 
     async fn upload_media(
