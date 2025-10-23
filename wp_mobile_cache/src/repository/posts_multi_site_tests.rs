@@ -9,7 +9,7 @@ fn test_posts_in_site_1_invisible_to_site_2(mut test_ctx: TestContext) {
     let site2 = create_test_site(&test_ctx.conn, 2);
 
     // Insert post in site 1
-    let post = PostBuilder::new().with_id(PostId(100)).build();
+    let post = PostBuilder::minimal().with_id(100).build();
     test_ctx
         .post_repo
         .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
@@ -31,12 +31,12 @@ fn test_same_post_id_can_exist_in_different_sites(mut test_ctx: TestContext) {
 
     // Create post with same ID in both sites
     let post_id = PostId(42);
-    let post1 = PostBuilder::new()
-        .with_id(post_id)
+    let post1 = PostBuilder::minimal()
+        .with_id(42)
         .with_title("Site 1 Post")
         .build();
-    let post2 = PostBuilder::new()
-        .with_id(post_id)
+    let post2 = PostBuilder::minimal()
+        .with_id(42)
         .with_title("Site 2 Post")
         .build();
 
@@ -74,7 +74,7 @@ fn test_select_all_only_returns_posts_for_requested_site(mut test_ctx: TestConte
         .upsert(
             &mut test_ctx.conn,
             &test_ctx.site,
-            &PostBuilder::new().build(),
+            &PostBuilder::minimal().build(),
         )
         .unwrap();
     test_ctx
@@ -82,22 +82,22 @@ fn test_select_all_only_returns_posts_for_requested_site(mut test_ctx: TestConte
         .upsert(
             &mut test_ctx.conn,
             &test_ctx.site,
-            &PostBuilder::new().build(),
+            &PostBuilder::minimal().build(),
         )
         .unwrap();
 
     // Insert posts in site 2
     test_ctx
         .post_repo
-        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::new().build())
+        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::minimal().build())
         .unwrap();
     test_ctx
         .post_repo
-        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::new().build())
+        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::minimal().build())
         .unwrap();
     test_ctx
         .post_repo
-        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::new().build())
+        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::minimal().build())
         .unwrap();
 
     // Verify counts
@@ -124,7 +124,7 @@ fn test_count_only_counts_posts_for_requested_site(mut test_ctx: TestContext) {
         .upsert(
             &mut test_ctx.conn,
             &test_ctx.site,
-            &PostBuilder::new().build(),
+            &PostBuilder::minimal().build(),
         )
         .unwrap();
     test_ctx
@@ -132,13 +132,13 @@ fn test_count_only_counts_posts_for_requested_site(mut test_ctx: TestContext) {
         .upsert(
             &mut test_ctx.conn,
             &test_ctx.site,
-            &PostBuilder::new().build(),
+            &PostBuilder::minimal().build(),
         )
         .unwrap();
 
     test_ctx
         .post_repo
-        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::new().build())
+        .upsert(&mut test_ctx.conn, &site2, &PostBuilder::minimal().build())
         .unwrap();
 
     assert_eq!(
@@ -163,7 +163,7 @@ fn test_delete_by_post_id_only_deletes_from_specified_site(mut test_ctx: TestCon
         .upsert(
             &mut test_ctx.conn,
             &test_ctx.site,
-            &PostBuilder::new().with_id(post_id).build(),
+            &PostBuilder::minimal().with_id(999).build(),
         )
         .unwrap();
     test_ctx
@@ -171,7 +171,7 @@ fn test_delete_by_post_id_only_deletes_from_specified_site(mut test_ctx: TestCon
         .upsert(
             &mut test_ctx.conn,
             &site2,
-            &PostBuilder::new().with_id(post_id).build(),
+            &PostBuilder::minimal().with_id(999).build(),
         )
         .unwrap();
 

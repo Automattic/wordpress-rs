@@ -1,12 +1,17 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
-    mappings::posts::DbAnyPostWithEditContext,
+    mappings::{
+        helpers::{bool_to_integer, serialize_value_to_json},
+        posts::DbAnyPostWithEditContext,
+    },
     repository::{
         QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository,
     },
 };
-use wp_api::posts::{AnyPostWithEditContext, PostId};
-use wp_api::taxonomies::TaxonomyType;
+use wp_api::{
+    posts::{AnyPostWithEditContext, PostId},
+    taxonomies::TaxonomyType,
+};
 
 /// Repository for managing posts in the database.
 ///
@@ -169,8 +174,6 @@ impl PostRepository {
         site: &DbSite,
         post: &AnyPostWithEditContext,
     ) -> Result<RowId, SqliteDbError> {
-        use crate::mappings::helpers::{bool_to_integer, serialize_value_to_json};
-
         let tx = transaction_manager.transaction()?;
 
         let upsert_sql = format!(
@@ -339,17 +342,13 @@ impl PostRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::{
-        TestContext,
-        posts::{create_full_post, create_minimal_post},
-        test_ctx,
-    };
+    use crate::test_fixtures::{TestContext, posts::PostBuilder, test_ctx};
     use rstest::*;
     use wp_api::posts::PostStatus;
 
     #[rstest]
     fn test_repository_insert_and_select_by_rowid(mut test_ctx: TestContext) {
-        let post = create_minimal_post();
+        let post = PostBuilder::minimal().build();
 
         // Insert using repository
         let rowid = test_ctx
@@ -370,8 +369,7 @@ mod tests {
 
     #[rstest]
     fn test_repository_select_by_post_id(mut test_ctx: TestContext) {
-        let mut post = create_minimal_post();
-        post.id = PostId(42);
+        let post = PostBuilder::minimal().with_id(42).build();
 
         // Insert
         test_ctx
@@ -411,10 +409,8 @@ mod tests {
         assert_eq!(all.len(), 0);
 
         // Insert posts
-        let mut post1 = create_minimal_post();
-        post1.id = PostId(1);
-        let mut post2 = create_minimal_post();
-        post2.id = PostId(2);
+        let post1 = PostBuilder::minimal().build();
+        let post2 = PostBuilder::minimal().build();
 
         test_ctx
             .post_repo
@@ -443,8 +439,7 @@ mod tests {
             0
         );
 
-        let mut post1 = create_minimal_post();
-        post1.id = PostId(1);
+        let post1 = PostBuilder::minimal().build();
         test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post1)
@@ -458,8 +453,7 @@ mod tests {
             1
         );
 
-        let mut post2 = create_minimal_post();
-        post2.id = PostId(2);
+        let post2 = PostBuilder::minimal().build();
         test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post2)
@@ -476,12 +470,9 @@ mod tests {
 
     #[rstest]
     fn test_repository_insert_batch(mut test_ctx: TestContext) {
-        let mut post1 = create_minimal_post();
-        post1.id = PostId(1);
-        let mut post2 = create_full_post();
-        post2.id = PostId(2);
-        let mut post3 = create_minimal_post();
-        post3.id = PostId(3);
+        let post1 = PostBuilder::minimal().build();
+        let post2 = PostBuilder::full().build();
+        let post3 = PostBuilder::minimal().build();
 
         let posts = vec![post1, post2, post3];
 
@@ -512,8 +503,7 @@ mod tests {
 
     #[rstest]
     fn test_repository_delete_by_post_id(mut test_ctx: TestContext) {
-        let mut post = create_minimal_post();
-        post.id = PostId(42);
+        let post = PostBuilder::minimal().with_id(42).build();
         test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
@@ -549,9 +539,10 @@ mod tests {
 
     #[rstest]
     fn test_repository_upsert_inserts_new_post(mut test_ctx: TestContext) {
-        let mut post = create_minimal_post();
-        post.id = PostId(100);
-        post.status = PostStatus::Draft;
+        let post = PostBuilder::minimal()
+            .with_id(100)
+            .with_status(PostStatus::Draft)
+            .build();
 
         // Verify post doesn't exist
         assert!(
@@ -580,10 +571,11 @@ mod tests {
     #[rstest]
     fn test_repository_upsert_updates_existing_post(mut test_ctx: TestContext) {
         // Insert initial post
-        let mut post = create_minimal_post();
-        post.id = PostId(200);
-        post.status = PostStatus::Draft;
-        post.slug = "original-slug".to_string();
+        let post = PostBuilder::minimal()
+            .with_id(200)
+            .with_status(PostStatus::Draft)
+            .with_slug("original-slug")
+            .build();
 
         let original_rowid = test_ctx
             .post_repo
@@ -591,10 +583,11 @@ mod tests {
             .unwrap();
 
         // Upsert with updated data
-        let mut updated_post = create_minimal_post();
-        updated_post.id = PostId(200);
-        updated_post.status = PostStatus::Publish;
-        updated_post.slug = "updated-slug".to_string();
+        let updated_post = PostBuilder::minimal()
+            .with_id(200)
+            .with_status(PostStatus::Publish)
+            .with_slug("updated-slug")
+            .build();
 
         let new_rowid = test_ctx
             .post_repo
@@ -624,10 +617,11 @@ mod tests {
 
     #[rstest]
     fn test_upsert_inserts_post_and_terms(mut test_ctx: TestContext) {
-        let mut post = create_minimal_post();
-        post.id = PostId(300);
-        post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)]);
-        post.tags = Some(vec![wp_api::terms::TermId(10), wp_api::terms::TermId(20)]);
+        let post = PostBuilder::minimal()
+            .with_id(300)
+            .with_categories(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)])
+            .with_tags(vec![wp_api::terms::TermId(10), wp_api::terms::TermId(20)])
+            .build();
 
         // Upsert with terms
         let rowid = test_ctx
@@ -684,14 +678,15 @@ mod tests {
     #[rstest]
     fn test_upsert_updates_existing_terms(mut test_ctx: TestContext) {
         // Insert post with initial terms
-        let mut post = create_minimal_post();
-        post.id = PostId(400);
-        post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)]);
-        post.tags = Some(vec![
-            wp_api::terms::TermId(10),
-            wp_api::terms::TermId(20),
-            wp_api::terms::TermId(30),
-        ]);
+        let post = PostBuilder::minimal()
+            .with_id(400)
+            .with_categories(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)])
+            .with_tags(vec![
+                wp_api::terms::TermId(10),
+                wp_api::terms::TermId(20),
+                wp_api::terms::TermId(30),
+            ])
+            .build();
 
         test_ctx
             .post_repo
@@ -699,12 +694,15 @@ mod tests {
             .unwrap();
 
         // Update with different terms
-        post.categories = Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(3)]); // Remove 2, add 3
-        post.tags = Some(vec![wp_api::terms::TermId(10)]); // Remove 20, 30
+        let updated_post = PostBuilder::minimal()
+            .with_id(400)
+            .with_categories(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(3)]) // Remove 2, add 3
+            .with_tags(vec![wp_api::terms::TermId(10)]) // Remove 20, 30
+            .build();
 
         test_ctx
             .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &updated_post)
             .unwrap();
 
         // Verify updated terms
@@ -753,8 +751,7 @@ mod tests {
         let term_repo = crate::repository::term_relationships::TermRelationshipRepository;
 
         // Insert post without terms (to avoid transaction issues in this test)
-        let mut post = create_minimal_post();
-        post.id = PostId(500);
+        let post = PostBuilder::minimal().with_id(500).build();
         test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
@@ -795,9 +792,10 @@ mod tests {
     #[rstest]
     fn test_select_by_rowid_populates_terms(mut test_ctx: TestContext) {
         // Insert post with terms
-        let mut post = create_minimal_post();
-        post.id = PostId(600);
-        post.categories = Some(vec![wp_api::terms::TermId(5)]);
+        let post = PostBuilder::minimal()
+            .with_id(600)
+            .with_categories(vec![wp_api::terms::TermId(5)])
+            .build();
 
         let rowid = test_ctx
             .post_repo
@@ -817,8 +815,7 @@ mod tests {
 
     #[rstest]
     fn test_insert_sets_last_fetched_at(mut test_ctx: TestContext) {
-        let mut post = create_minimal_post();
-        post.id = PostId(100);
+        let post = PostBuilder::minimal().build();
 
         // Insert post
         let rowid = test_ctx
@@ -844,9 +841,10 @@ mod tests {
 
     #[rstest]
     fn test_upsert_updates_last_fetched_at_on_update(mut test_ctx: TestContext) {
-        let mut post = create_minimal_post();
-        post.id = PostId(200);
-        post.title.rendered = "Original Title".to_string();
+        let post = PostBuilder::minimal()
+            .with_id(200)
+            .with_title("Original Title")
+            .build();
 
         // Initial insert
         test_ctx
@@ -864,10 +862,13 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
 
         // Update post
-        post.title.rendered = "Updated Title".to_string();
+        let updated_post = PostBuilder::minimal()
+            .with_id(200)
+            .with_title("Updated Title")
+            .build();
         test_ctx
             .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &updated_post)
             .unwrap();
         let second_fetch = test_ctx
             .post_repo

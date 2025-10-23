@@ -11,8 +11,8 @@ fn test_term_relationships_isolated_by_site(mut test_ctx: TestContext) {
     let site2 = create_test_site(&test_ctx.conn, 2);
 
     // Insert post in site 1 with categories
-    let post1 = PostBuilder::new()
-        .with_id(wp_api::posts::PostId(100))
+    let post1 = PostBuilder::minimal()
+        .with_id(100)
         .with_categories(vec![TermId(1), TermId(2)])
         .build();
     test_ctx
@@ -21,8 +21,8 @@ fn test_term_relationships_isolated_by_site(mut test_ctx: TestContext) {
         .unwrap();
 
     // Insert post in site 2 with same categories
-    let post2 = PostBuilder::new()
-        .with_id(wp_api::posts::PostId(200))
+    let post2 = PostBuilder::minimal()
+        .with_id(200)
         .with_categories(vec![TermId(1), TermId(2)])
         .build();
     test_ctx

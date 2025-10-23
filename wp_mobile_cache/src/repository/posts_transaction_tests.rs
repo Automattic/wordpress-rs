@@ -13,8 +13,8 @@ use wp_api::posts::PostId;
 #[rstest]
 fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext) {
     // Pre-insert a post with ID 200
-    let existing_post = PostBuilder::new()
-        .with_id(PostId(200))
+    let existing_post = PostBuilder::minimal()
+        .with_id(200)
         .with_title("Original")
         .build();
     test_ctx
@@ -23,12 +23,12 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         .unwrap();
 
     // Create batch where 2nd post has duplicate ID (200) with different title
-    let post1 = PostBuilder::new().with_id(PostId(100)).build();
-    let post2 = PostBuilder::new()
-        .with_id(PostId(200))
+    let post1 = PostBuilder::minimal().with_id(100).build();
+    let post2 = PostBuilder::minimal()
+        .with_id(200)
         .with_title("Updated")
         .build();
-    let post3 = PostBuilder::new().with_id(PostId(300)).build();
+    let post3 = PostBuilder::minimal().with_id(300).build();
 
     let posts = vec![post1, post2, post3];
 
@@ -74,8 +74,8 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
 fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
     let invalid_site = DbSite { row_id: RowId(999) };
 
-    let post1 = PostBuilder::new().with_id(PostId(100)).build();
-    let post2 = PostBuilder::new().with_id(PostId(200)).build();
+    let post1 = PostBuilder::minimal().build();
+    let post2 = PostBuilder::minimal().build();
 
     let posts = vec![post1, post2];
 
@@ -100,8 +100,8 @@ fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
 #[rstest]
 fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     // Create post with terms
-    let post = PostBuilder::new()
-        .with_id(PostId(500))
+    let post = PostBuilder::minimal()
+        .with_id(500)
         .with_categories(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)])
         .with_tags(vec![wp_api::terms::TermId(10)])
         .build();
@@ -128,8 +128,8 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     assert_eq!(retrieved.post.tags, Some(vec![wp_api::terms::TermId(10)]));
 
     // Update the post with different terms
-    let updated_post = PostBuilder::new()
-        .with_id(PostId(500))
+    let updated_post = PostBuilder::minimal()
+        .with_id(500)
         .with_categories(vec![wp_api::terms::TermId(3)]) // Changed
         .with_tags(vec![]) // Cleared
         .build();
@@ -174,9 +174,9 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
 #[rstest]
 fn test_insert_batch_succeeds_with_valid_posts(mut test_ctx: TestContext) {
     // Create valid batch
-    let post1 = PostBuilder::new().with_id(PostId(100)).build();
-    let post2 = PostBuilder::new().with_id(PostId(200)).build();
-    let post3 = PostBuilder::new().with_id(PostId(300)).build();
+    let post1 = PostBuilder::minimal().with_id(100).build();
+    let post2 = PostBuilder::minimal().with_id(200).build();
+    let post3 = PostBuilder::minimal().with_id(300).build();
 
     let posts = vec![post1, post2, post3];
 

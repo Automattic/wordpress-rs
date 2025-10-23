@@ -15,8 +15,8 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
     let post_id = PostId(42);
 
     // Insert first post
-    let post1 = PostBuilder::new()
-        .with_id(post_id)
+    let post1 = PostBuilder::minimal()
+        .with_id(42)
         .with_title("Original Title")
         .build();
     let rowid1 = test_ctx
@@ -25,8 +25,8 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
         .unwrap();
 
     // Upsert second post with same ID - should update existing post
-    let post2 = PostBuilder::new()
-        .with_id(post_id)
+    let post2 = PostBuilder::minimal()
+        .with_id(42)
         .with_title("Updated Title")
         .build();
     let rowid2 = test_ctx
@@ -58,7 +58,7 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
 fn test_invalid_site_id_fails_foreign_key_constraint(mut test_ctx: TestContext) {
     let non_existent_site = DbSite { row_id: RowId(999) }; // Site doesn't exist
 
-    let post = PostBuilder::new().build();
+    let post = PostBuilder::minimal().build();
     let result = test_ctx
         .post_repo
         .upsert(&mut test_ctx.conn, &non_existent_site, &post);

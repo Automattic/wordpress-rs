@@ -181,14 +181,10 @@ impl DbAnyPostWithEditContext {
 mod tests {
     use crate::{
         repository::posts::PostRepository,
-        test_fixtures::{
-            TestContext,
-            posts::{create_full_post, create_minimal_post},
-            test_ctx,
-        },
+        test_fixtures::{TestContext, posts::PostBuilder, test_ctx},
     };
     use rstest::*;
-    use wp_api::posts::{PostId, PostStatus};
+    use wp_api::posts::PostStatus;
 
     /// Helper to validate that last_fetched_at is a recent, valid ISO 8601 timestamp
     fn assert_recent_timestamp(timestamp: &str) {
@@ -214,7 +210,7 @@ mod tests {
     #[rstest]
     fn test_round_trip_with_minimal_fields(mut test_ctx: TestContext) {
         let repo = PostRepository;
-        let original_post = create_minimal_post();
+        let original_post = PostBuilder::minimal().build();
 
         // Insert into database using repository
         let rowid = repo
@@ -236,7 +232,7 @@ mod tests {
     #[rstest]
     fn test_round_trip_with_all_fields(mut test_ctx: TestContext) {
         let repo = PostRepository;
-        let original_post = create_full_post();
+        let original_post = PostBuilder::full().build();
 
         // Insert into database using repository
         let rowid = repo
@@ -256,42 +252,39 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_different_enum_variants(mut test_ctx: TestContext) {
-        let repo = PostRepository;
+    #[case(PostStatus::Publish)]
+    #[case(PostStatus::Draft)]
+    #[case(PostStatus::Pending)]
+    #[case(PostStatus::Private)]
+    #[case(PostStatus::Future)]
+    #[case(PostStatus::Custom("custom-status".to_string()))]
+    fn test_round_trip_with_different_enum_variants(
+        mut test_ctx: TestContext,
+        #[case] post_status: PostStatus,
+    ) {
+        let post = PostBuilder::minimal()
+            .with_status(post_status.clone())
+            .build();
 
-        // Test with different status variants
-        let statuses = [
-            PostStatus::Publish,
-            PostStatus::Draft,
-            PostStatus::Pending,
-            PostStatus::Private,
-            PostStatus::Future,
-            PostStatus::Custom("custom-status".to_string()),
-        ];
+        let rowid = test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .unwrap();
+        let retrieved = test_ctx
+            .post_repo
+            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+            .unwrap();
 
-        for (i, status) in statuses.iter().enumerate() {
-            let mut post = create_minimal_post();
-            post.id = PostId((100 + i) as i64);
-            post.status = status.clone();
-
-            let rowid = repo
-                .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-                .unwrap();
-            let retrieved = repo
-                .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-                .unwrap();
-
-            assert_eq!(retrieved.post.status, *status);
-        }
+        assert_eq!(retrieved.post.status, post_status);
     }
 
     #[rstest]
     fn test_round_trip_with_empty_json_arrays(mut test_ctx: TestContext) {
         let repo = PostRepository;
-        let mut post = create_minimal_post();
-        post.id = PostId(200);
-        post.categories = Some(vec![]);
-        post.tags = Some(vec![]);
+        let post = PostBuilder::minimal()
+            .with_categories(vec![])
+            .with_tags(vec![])
+            .build();
 
         let rowid = repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
