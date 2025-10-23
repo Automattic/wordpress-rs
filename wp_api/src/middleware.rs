@@ -2,7 +2,7 @@ use crate::{
     api_client::IsWpApiClientDelegate,
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
     request::RequestContext,
-    request::{RequestExecutor, WpNetworkRequest, WpNetworkResponse},
+    request::{RequestExecutor, WpMultipartFormRequest, WpNetworkRequest, WpNetworkResponse},
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};
 
@@ -114,6 +114,28 @@ pub trait PerformsRequests {
         // correct way to handle these errors, because neither implementation is "central" enough.
         // Since there isn't a great place to handle this at the moment, and it's not clear whether
         // we'll include middleware in `WpApiClient`, we are including this logic here for now.
+        if let Some(reason) = RequestExecutionErrorReason::try_from_response(&response) {
+            return Err(RequestExecutionError::RequestExecutionFailed {
+                status_code: Some(response.status_code),
+                redirects: None,
+                reason,
+            });
+        }
+
+        Ok(response)
+    }
+
+    async fn perform_upload(
+        &self,
+        request: Arc<WpMultipartFormRequest>,
+        context: Option<Arc<RequestContext>>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        if let Some(context) = &context {
+            context.add_request_id(request.uuid.clone());
+        }
+
+        let response = self.get_request_executor().upload(request.clone()).await?;
+
         if let Some(reason) = RequestExecutionErrorReason::try_from_response(&response) {
             return Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: Some(response.status_code),
@@ -259,13 +281,7 @@ mod tests {
     use super::*;
 
     mod api_discovery_authentication_middleware {
-        use crate::{
-            api_error::MediaUploadRequestExecutionError,
-            request::{
-                WpNetworkHeaderMap,
-                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
-            },
-        };
+        use crate::request::{WpNetworkHeaderMap, endpoint::WpEndpointUrl};
 
         use super::*;
         use async_trait::async_trait;
@@ -286,17 +302,11 @@ mod tests {
                 (self.execute_fn)(request)
             }
 
-            async fn upload_media(
+            async fn upload(
                 &self,
-                _: Arc<MediaUploadRequest>,
-            ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-                Err(MediaUploadRequestExecutionError::RequestExecutionFailed {
-                    status_code: None,
-                    redirects: None,
-                    reason: RequestExecutionErrorReason::GenericError {
-                        error_message: "upload_media is not used".to_string(),
-                    },
-                })
+                _request: Arc<WpMultipartFormRequest>,
+            ) -> Result<WpNetworkResponse, RequestExecutionError> {
+                unimplemented!()
             }
 
             async fn sleep(&self, _: u64) {}
@@ -398,13 +408,7 @@ mod tests {
 
     mod retry_after_middleware {
         use super::*;
-        use crate::{
-            api_error::MediaUploadRequestExecutionError,
-            request::{
-                WpNetworkHeaderMap,
-                endpoint::{WpEndpointUrl, media_endpoint::MediaUploadRequest},
-            },
-        };
+        use crate::request::{WpNetworkHeaderMap, endpoint::WpEndpointUrl};
         use async_trait::async_trait;
         use http::HeaderMap;
         use std::sync::atomic::{AtomicBool, Ordering};
@@ -437,11 +441,11 @@ mod tests {
                 }
             }
 
-            async fn upload_media(
+            async fn upload(
                 &self,
-                _: Arc<MediaUploadRequest>,
-            ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-                Err(MediaUploadRequestExecutionError::RequestExecutionFailed {
+                _request: Arc<WpMultipartFormRequest>,
+            ) -> Result<WpNetworkResponse, RequestExecutionError> {
+                Err(RequestExecutionError::RequestExecutionFailed {
                     status_code: None,
                     redirects: None,
                     reason: RequestExecutionErrorReason::GenericError {

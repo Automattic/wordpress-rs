@@ -11,15 +11,11 @@ async fn upload_media() {
     let title = "Foo media";
     let created_media = api_client()
         .media()
-        .create(
-            MediaCreateParams {
-                title: Some(title.to_string()),
-                ..Default::default()
-            },
-            MEDIA_TEST_FILE_PATH.to_string(),
-            MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
-            None,
-        )
+        .create(&MediaCreateParams {
+            title: Some(title.to_string()),
+            file_path: MEDIA_TEST_FILE_PATH.to_string(),
+            ..Default::default()
+        })
         .await
         .assert_response();
     assert_eq!(created_media.data.title.rendered.as_str(), title);

@@ -1,8 +1,8 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
     api_error::{
-        MediaUploadRequestExecutionError, ParsedRequestError, RequestExecutionError,
-        RequestExecutionErrorReason, WpApiError, WpErrorCode,
+        ParsedRequestError, RequestExecutionError, RequestExecutionErrorReason, WpApiError,
+        WpErrorCode,
     },
     auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
@@ -15,7 +15,6 @@ use endpoint::{
         ApplicationPasswordsRequestBuilder,
         ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
     },
-    media_endpoint::MediaUploadRequest,
 };
 use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
@@ -130,11 +129,17 @@ impl InnerRequestBuilder {
             }
         }
 
+        let mut header_map = self.header_map_for_post_request();
+        header_map.inner.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
+        );
+
         WpMultipartFormRequest {
             uuid: Uuid::new_v4().into(),
             method: RequestMethod::POST,
             url: url.into(),
-            header_map: self.header_map().into(),
+            header_map: header_map.into(),
             fields,
             files: params.multipart_form_files(),
         }
@@ -174,11 +179,6 @@ pub trait RequestExecutor: Send + Sync {
         &self,
         request: Arc<WpMultipartFormRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError>;
-
-    async fn upload_media(
-        &self,
-        media_upload_request: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>;
 
     async fn sleep(&self, millis: u64);
 
@@ -333,8 +333,15 @@ impl NetworkRequestAccessor for WpNetworkRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct MultipartFormFile {
+    pub file_path: String,
+    pub mime_type: Option<String>,
+    pub file_name: Option<String>,
+}
+
 pub trait RequiresMultipartForm {
-    fn multipart_form_files(&self) -> Vec<String>;
+    fn multipart_form_files(&self) -> HashMap<String, MultipartFormFile>;
 }
 
 #[derive(uniffi::Object)]
@@ -344,7 +351,7 @@ pub struct WpMultipartFormRequest {
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
     pub(crate) fields: HashMap<String, String>,
-    pub(crate) files: Vec<String>,
+    pub(crate) files: HashMap<String, MultipartFormFile>,
 }
 
 #[uniffi::export]
@@ -353,7 +360,7 @@ impl WpMultipartFormRequest {
         self.fields.clone()
     }
 
-    pub fn files(&self) -> Vec<String> {
+    pub fn files(&self) -> HashMap<String, MultipartFormFile> {
         self.files.clone()
     }
 }

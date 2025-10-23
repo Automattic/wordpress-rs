@@ -399,6 +399,7 @@ pub fn fn_body_context_query_pairs(
 pub fn fn_body_build_request_from_url(
     params_type: Option<&ParamsType>,
     request_type: RequestType,
+    multipart: bool,
 ) -> TokenStream {
     match request_type {
         RequestType::ContextualGet | RequestType::ContextualPaged | RequestType::Get => quote! {
@@ -408,13 +409,25 @@ pub fn fn_body_build_request_from_url(
             self.inner.delete(url)
         },
         RequestType::Post => {
-            if params_type.is_some() {
-                quote! {
-                    self.inner.post(url, Some(params))
+            if multipart {
+                if params_type.is_some() {
+                    quote! {
+                        self.inner.post_multipart(url, params)
+                    }
+                } else {
+                    quote! {
+                        compile_error!("multipart POST requires params")
+                    }
                 }
             } else {
-                quote! {
-                    self.inner.post(url, None::<&()>)
+                if params_type.is_some() {
+                    quote! {
+                        self.inner.post(url, Some(params))
+                    }
+                } else {
+                    quote! {
+                        self.inner.post(url, None::<&()>)
+                    }
                 }
             }
         }
@@ -1081,35 +1094,46 @@ mod tests {
     }
 
     #[rstest]
-    #[case(None, RequestType::ContextualGet, "self . inner . get (url)")]
+    #[case(None, RequestType::ContextualGet, false, "self . inner . get (url)")]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
+        false,
         "self . inner . get (url)"
     )]
-    #[case(None, RequestType::Delete, "self . inner . delete (url)")]
+    #[case(None, RequestType::Delete, false, "self . inner . delete (url)")]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Delete,
+        false,
         "self . inner . delete (url)"
     )]
     #[case(
         None,
         RequestType::Post,
+        false,
         "self . inner . post (url , None :: < & () >)"
     )]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Post,
+        false,
         "self . inner . post (url , Some (params))"
+    )]
+    #[case(
+        referenced_params_type("UserListParams"),
+        RequestType::Post,
+        true,
+        "self . inner . post_multipart (url , params)"
     )]
     fn test_fn_body_build_request_from_url(
         #[case] params: Option<ParamsType>,
         #[case] request_type: RequestType,
+        #[case] multipart: bool,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_build_request_from_url(params.as_ref(), request_type).to_string(),
+            fn_body_build_request_from_url(params.as_ref(), request_type, multipart).to_string(),
             expected_str
         );
     }

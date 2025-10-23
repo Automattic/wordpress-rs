@@ -1,13 +1,9 @@
 use crate::{
-    api_error::{
-        InvalidSslErrorReason, MediaUploadRequestExecutionError, RequestExecutionError,
-        RequestExecutionErrorReason,
-    },
+    api_error::{InvalidSslErrorReason, RequestExecutionError, RequestExecutionErrorReason},
     request::RequestContext,
     request::{
         NetworkRequestAccessor, RequestExecutor, RequestMethod, WpMultipartFormRequest,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse,
-        endpoint::media_endpoint::MediaUploadRequest, user_agent,
+        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -87,47 +83,6 @@ impl ReqwestRequestExecutor {
         })
     }
 
-    pub async fn upload_media_request(
-        &self,
-        media_upload_request: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, reqwest::Error> {
-        let request = self
-            .client
-            .request(
-                Self::request_method(media_upload_request.method()),
-                media_upload_request.url().0.as_str(),
-            )
-            .headers(media_upload_request.header_map().to_header_map());
-        let file_path = media_upload_request.file_path();
-        let mut file_header_map = HeaderMap::new();
-        file_header_map.insert(
-            http::header::CONTENT_TYPE,
-            HeaderValue::from_str(&media_upload_request.file_content_type()).unwrap(),
-        );
-        let mut form = reqwest::multipart::Form::new().part(
-            "file",
-            Part::file(file_path)
-                .await
-                .unwrap()
-                .headers(file_header_map),
-        );
-        for (k, v) in media_upload_request.media_params() {
-            form = form.text(k, v)
-        }
-
-        let request = request.multipart(form);
-        let mut response = request.send().await?;
-
-        let header_map = std::mem::take(response.headers_mut());
-        Ok(WpNetworkResponse {
-            status_code: response.status().as_u16(),
-            body: response.bytes().await.unwrap().to_vec(),
-            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
-            request_url: media_upload_request.url(),
-            request_header_map: media_upload_request.header_map(),
-        })
-    }
-
     pub fn request_method(method: RequestMethod) -> http::Method {
         match method {
             RequestMethod::GET => reqwest::Method::GET,
@@ -150,26 +105,48 @@ impl RequestExecutor for ReqwestRequestExecutor {
 
     async fn upload(
         &self,
-        _request: Arc<WpMultipartFormRequest>,
+        upload_request: Arc<WpMultipartFormRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        unimplemented!()
-    }
-
-    async fn upload_media(
-        &self,
-        media_upload_request: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        self.upload_media_request(media_upload_request)
-            .await
-            .map_err(
-                |err| MediaUploadRequestExecutionError::RequestExecutionFailed {
-                    status_code: err.status().map(|s| s.as_u16()),
-                    redirects: None,
-                    reason: RequestExecutionErrorReason::GenericError {
-                        error_message: err.to_string(),
-                    },
-                },
+        let request = self
+            .client
+            .request(
+                Self::request_method(upload_request.method()),
+                upload_request.url().0.as_str(),
             )
+            .headers(upload_request.header_map().to_header_map());
+        let mut form = reqwest::multipart::Form::new();
+
+        for (name, file) in upload_request.files() {
+            let file_path = file.file_path;
+            let mut file_header_map = HeaderMap::new();
+            if let Some(mime_type) = &file.mime_type {
+                file_header_map.insert(
+                    http::header::CONTENT_TYPE,
+                    HeaderValue::from_str(mime_type).unwrap(),
+                );
+            }
+            let part = Part::file(file_path)
+                .await
+                .unwrap()
+                .headers(file_header_map);
+            form = form.part(name, part);
+        }
+
+        for (k, v) in upload_request.fields() {
+            form = form.text(k, v)
+        }
+
+        let request = request.multipart(form);
+        let mut response = request.send().await?;
+
+        let header_map = std::mem::take(response.headers_mut());
+        Ok(WpNetworkResponse {
+            status_code: response.status().as_u16(),
+            body: response.bytes().await.unwrap().to_vec(),
+            response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
+            request_url: upload_request.url(),
+            request_header_map: upload_request.header_map(),
+        })
     }
 
     async fn sleep(&self, millis: u64) {

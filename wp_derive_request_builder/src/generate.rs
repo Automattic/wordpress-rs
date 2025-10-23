@@ -78,6 +78,12 @@ fn generate_async_request_executor(
                     #fn_signature_body
                 }
             };
+            let perform_call = if variant.attr.multipart {
+                quote! { self.perform_upload(std::sync::Arc::new(request), context.clone()).await? }
+            } else {
+                quote! { self.perform(std::sync::Arc::new(request), context.clone()).await? }
+            };
+
             let cancellable = quote! {
                 pub async #fn_signature_cancellable -> Result<#response_type_ident, #error_type> {
                     use #crate_ident::api_error::MaybeWpError;
@@ -86,7 +92,7 @@ fn generate_async_request_executor(
                     let perform_request = async || {
                         #request_from_request_builder
                         let request_url: String = request.url().into();
-                        let response = self.perform(std::sync::Arc::new(request), context.clone()).await?;
+                        let response = #perform_call;
                         let response_status_code = response.status_code;
                         let parsed_response = response.parse();
                         let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default());
@@ -254,6 +260,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let static_inner_request_builder_type = &config.static_types.inner_request_builder;
     let static_auth_provider_type = &config.static_types.auth_provider;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
+    let static_wp_multipart_form_request_type = &config.static_types.wp_multipart_form_request;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
 
@@ -283,10 +290,18 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 variant.attr.request_type,
                 &context_and_filter_handler,
             );
-            let fn_body_build_request_from_url =
-                fn_body_build_request_from_url(params_type.as_ref(), variant.attr.request_type);
+            let fn_body_build_request_from_url = fn_body_build_request_from_url(
+                params_type.as_ref(),
+                variant.attr.request_type,
+                variant.attr.multipart,
+            );
+            let return_type = if variant.attr.multipart {
+                static_wp_multipart_form_request_type
+            } else {
+                static_wp_network_request_type
+            };
             quote! {
-                pub #fn_signature -> #static_wp_network_request_type {
+                pub #fn_signature -> #return_type {
                     #url_from_endpoint
                     #fn_body_build_request_from_url
                 }
@@ -503,6 +518,7 @@ pub struct ConfigStaticTypes {
     pub inner_request_builder: TokenStream,
     pub auth_provider: TokenStream,
     pub wp_network_request: TokenStream,
+    pub wp_multipart_form_request: TokenStream,
 }
 
 impl ConfigStaticTypes {
@@ -513,6 +529,7 @@ impl ConfigStaticTypes {
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
             auth_provider: quote! { std::sync::Arc<#crate_ident::auth::WpAuthenticationProvider> },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
+            wp_multipart_form_request: quote! { #crate_ident::request::WpMultipartFormRequest },
         }
     }
 }

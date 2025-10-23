@@ -2,27 +2,19 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use wp_api::{
     prelude::*,
-    request::endpoint::media_endpoint::MediaUploadRequest,
     request::{RequestContext, WpMultipartFormRequest},
 };
 
 #[derive(Debug)]
 pub struct MockExecutor {
     execute_fn: fn(Arc<WpNetworkRequest>) -> Result<WpNetworkResponse, RequestExecutionError>,
-    upload_media_fn:
-        fn(Arc<MediaUploadRequest>) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>,
 }
 
 impl MockExecutor {
     pub fn with_execute_fn(
         execute_fn: fn(Arc<WpNetworkRequest>) -> Result<WpNetworkResponse, RequestExecutionError>,
     ) -> Self {
-        Self {
-            execute_fn,
-            upload_media_fn: |_: Arc<MediaUploadRequest>| {
-                panic!("Upload media is not implemented for `MockExecutor`")
-            },
-        }
+        Self { execute_fn }
     }
 }
 
@@ -40,13 +32,6 @@ impl RequestExecutor for MockExecutor {
         _request: Arc<WpMultipartFormRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         unimplemented!()
-    }
-
-    async fn upload_media(
-        &self,
-        media_upload_request: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        (self.upload_media_fn)(media_upload_request)
     }
 
     async fn sleep(&self, _: u64) {}
