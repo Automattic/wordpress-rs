@@ -3,26 +3,24 @@
 //! These tests verify that transaction failures properly rollback database state
 //! without leaving partial writes or corrupted data.
 
-use super::posts::PostRepository;
 use crate::{
-    DbSite,
+    DbSite, RowId,
     test_fixtures::posts::PostBuilder,
-    test_helpers::{test_db, test_site},
+    test_helpers::{TestContext, test_ctx},
 };
 use rstest::*;
-use rusqlite::Connection;
 use wp_api::posts::PostId;
 
 #[rstest]
-fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_db: Connection, test_site: DbSite) {
-    let repo = PostRepository;
-
+fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext) {
     // Pre-insert a post with ID 200
     let existing_post = PostBuilder::new()
         .with_id(PostId(200))
         .with_title("Original")
         .build();
-    repo.upsert(&mut test_db, &test_site, &existing_post)
+    test_ctx
+        .post_repo
+        .upsert(&mut test_ctx.conn, &test_ctx.site, &existing_post)
         .unwrap();
 
     // Create batch where 2nd post has duplicate ID (200) with different title
@@ -36,38 +34,46 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_db: Connection, 
     let posts = vec![post1, post2, post3];
 
     // Batch upsert should succeed - duplicate is updated
-    let rowids = repo.upsert_batch(&mut test_db, &test_site, &posts).unwrap();
+    let rowids = test_ctx
+        .post_repo
+        .upsert_batch(&mut test_ctx.conn, &test_ctx.site, &posts)
+        .unwrap();
     assert_eq!(rowids.len(), 3);
 
     // Verify all 3 posts exist (100, 200 updated, 300)
-    let count = repo.count(&test_db, &test_site).unwrap();
+    let count = test_ctx
+        .post_repo
+        .count(&test_ctx.conn, &test_ctx.site)
+        .unwrap();
     assert_eq!(count, 3, "Should have 3 posts total");
 
     // Verify post 100 was inserted
     assert!(
-        repo.select_by_post_id(&test_db, &test_site, PostId(100))
+        test_ctx
+            .post_repo
+            .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
             .is_ok()
     );
 
     // Verify post 200 was updated
-    let post200 = repo
-        .select_by_post_id(&test_db, &test_site, PostId(200))
+    let post200 = test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
         .unwrap();
     assert_eq!(post200.post.title.rendered, "Updated");
 
     // Verify post 300 was inserted
     assert!(
-        repo.select_by_post_id(&test_db, &test_site, PostId(300))
+        test_ctx
+            .post_repo
+            .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(300))
             .is_ok()
     );
 }
 
 #[rstest]
-fn test_upsert_batch_fails_on_foreign_key_violation(mut test_db: Connection, test_site: DbSite) {
-    let repo = PostRepository;
-    let invalid_site = DbSite {
-        row_id: crate::RowId(999),
-    };
+fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
+    let invalid_site = DbSite { row_id: RowId(999) };
 
     let post1 = PostBuilder::new().with_id(PostId(100)).build();
     let post2 = PostBuilder::new().with_id(PostId(200)).build();
@@ -75,7 +81,9 @@ fn test_upsert_batch_fails_on_foreign_key_violation(mut test_db: Connection, tes
     let posts = vec![post1, post2];
 
     // Batch upsert to invalid site should fail on first post
-    let result = repo.upsert_batch(&mut test_db, &invalid_site, &posts);
+    let result = test_ctx
+        .post_repo
+        .upsert_batch(&mut test_ctx.conn, &invalid_site, &posts);
 
     assert!(
         result.is_err(),
@@ -83,14 +91,15 @@ fn test_upsert_batch_fails_on_foreign_key_violation(mut test_db: Connection, tes
     );
 
     // Verify no posts were inserted (fails fast on first error)
-    let count = repo.count(&test_db, &test_site).unwrap();
+    let count = test_ctx
+        .post_repo
+        .count(&test_ctx.conn, &test_ctx.site)
+        .unwrap();
     assert_eq!(count, 0, "No posts should exist after failure");
 }
 
 #[rstest]
-fn test_upsert_maintains_consistency_on_success(mut test_db: Connection, test_site: DbSite) {
-    let repo = PostRepository;
-
+fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     // Create post with terms
     let post = PostBuilder::new()
         .with_id(PostId(500))
@@ -99,11 +108,15 @@ fn test_upsert_maintains_consistency_on_success(mut test_db: Connection, test_si
         .build();
 
     // Upsert should succeed
-    let rowid = repo.upsert(&mut test_db, &test_site, &post).unwrap();
+    let rowid = test_ctx
+        .post_repo
+        .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+        .unwrap();
 
     // Verify post exists
-    let retrieved = repo
-        .select_by_post_id(&test_db, &test_site, PostId(500))
+    let retrieved = test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(500))
         .unwrap();
     assert_eq!(retrieved.post.id, PostId(500));
     assert_eq!(retrieved.row_id, rowid);
@@ -123,12 +136,15 @@ fn test_upsert_maintains_consistency_on_success(mut test_db: Connection, test_si
         .build();
 
     // Upsert again
-    repo.upsert(&mut test_db, &test_site, &updated_post)
+    test_ctx
+        .post_repo
+        .upsert(&mut test_ctx.conn, &test_ctx.site, &updated_post)
         .unwrap();
 
     // Verify terms were updated correctly
-    let retrieved = repo
-        .select_by_post_id(&test_db, &test_site, PostId(500))
+    let retrieved = test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(500))
         .unwrap();
     assert_eq!(
         retrieved.post.categories,
@@ -138,9 +154,9 @@ fn test_upsert_maintains_consistency_on_success(mut test_db: Connection, test_si
 
     // Verify old terms are gone (no orphaned relationships)
     // The term_relationships table should only have the new category term
-    let term_repo = super::term_relationships::TermRelationshipRepository;
-    let all_terms = term_repo
-        .get_all_terms_for_object(&test_db, &test_site, rowid)
+    let all_terms = test_ctx
+        .term_repo
+        .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, rowid)
         .unwrap();
 
     // Should only have one entry (Category with term 3)
@@ -157,9 +173,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_db: Connection, test_si
 }
 
 #[rstest]
-fn test_insert_batch_succeeds_with_valid_posts(mut test_db: Connection, test_site: DbSite) {
-    let repo = PostRepository;
-
+fn test_insert_batch_succeeds_with_valid_posts(mut test_ctx: TestContext) {
     // Create valid batch
     let post1 = PostBuilder::new().with_id(PostId(100)).build();
     let post2 = PostBuilder::new().with_id(PostId(200)).build();
@@ -168,19 +182,31 @@ fn test_insert_batch_succeeds_with_valid_posts(mut test_db: Connection, test_sit
     let posts = vec![post1, post2, post3];
 
     // Should succeed
-    let rowids = repo.upsert_batch(&mut test_db, &test_site, &posts).unwrap();
+    let rowids = test_ctx
+        .post_repo
+        .upsert_batch(&mut test_ctx.conn, &test_ctx.site, &posts)
+        .unwrap();
 
     assert_eq!(rowids.len(), 3, "All 3 posts should be inserted");
 
     // Verify all posts exist
-    let count = repo.count(&test_db, &test_site).unwrap();
+    let count = test_ctx
+        .post_repo
+        .count(&test_ctx.conn, &test_ctx.site)
+        .unwrap();
     assert_eq!(count, 3);
 
     // Verify each post can be retrieved
-    repo.select_by_post_id(&test_db, &test_site, PostId(100))
+    test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
         .expect("Post 100 should exist");
-    repo.select_by_post_id(&test_db, &test_site, PostId(200))
+    test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
         .expect("Post 200 should exist");
-    repo.select_by_post_id(&test_db, &test_site, PostId(300))
+    test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(300))
         .expect("Post 300 should exist");
 }

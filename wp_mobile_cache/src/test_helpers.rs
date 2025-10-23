@@ -16,7 +16,10 @@
 //! }
 //! ```
 
-use crate::{DbSite, MigrationManager, RowId, repository::posts::PostRepository};
+use crate::{
+    DbSite, MigrationManager, RowId,
+    repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
+};
 use rstest::*;
 use rusqlite::Connection;
 
@@ -55,9 +58,17 @@ pub fn post_repo() -> PostRepository {
     PostRepository
 }
 
+/// Fixture: TermRelationshipRepository instance.
+///
+/// Zero-cost abstraction since TermRelationshipRepository is zero-sized.
+#[fixture]
+pub fn term_repo() -> TermRelationshipRepository {
+    TermRelationshipRepository
+}
+
 /// Test context bundling common test dependencies.
 ///
-/// Reduces boilerplate when you need all three: connection, site, and repository.
+/// Reduces boilerplate when you need connection, site, and repositories.
 ///
 /// # Example
 ///
@@ -65,21 +76,28 @@ pub fn post_repo() -> PostRepository {
 /// #[rstest]
 /// fn test_something(test_ctx: TestContext) {
 ///     let post = PostBuilder::new().build();
-///     test_ctx.repo.insert(&test_ctx.conn, &post, &test_ctx.site).unwrap();
+///     test_ctx.post_repo.upsert(&mut test_ctx.conn, &test_ctx.site, &post).unwrap();
 /// }
 /// ```
 pub struct TestContext {
     pub conn: Connection,
     pub site: DbSite,
-    pub repo: PostRepository,
+    pub post_repo: PostRepository,
+    pub term_repo: TermRelationshipRepository,
 }
 
 #[fixture]
-pub fn test_ctx(test_db: Connection, test_site: DbSite, post_repo: PostRepository) -> TestContext {
+pub fn test_ctx(
+    test_db: Connection,
+    test_site: DbSite,
+    post_repo: PostRepository,
+    term_repo: TermRelationshipRepository,
+) -> TestContext {
     TestContext {
         conn: test_db,
         site: test_site,
-        repo: post_repo,
+        post_repo,
+        term_repo,
     }
 }
 
