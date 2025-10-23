@@ -170,7 +170,10 @@ public actor WordPressAPI {
     }
 
 #if PROGRESS_REPORTING_ENABLED
-    public func uploadMedia(params: MediaCreateParams, fulfilling progress: Progress) async throws -> MediaRequestCreateResponse {
+    public func uploadMedia(
+        params: MediaCreateParams,
+        fulfilling progress: Progress
+    ) async throws -> MediaRequestCreateResponse {
         precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
         precondition(progress.cancellationHandler == nil)
 

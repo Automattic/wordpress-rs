@@ -9,7 +9,9 @@ struct MediaTests {
     @Test
     func uploadImage() async throws {
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        let response = try await api.media.create(params: .init(title: "Image", altText: "This is a test image", filePath: file.path))
+        let response = try await api.media.create(
+            params: .init(title: "Image", altText: "This is a test image", filePath: file.path)
+        )
         #expect(response.data.mimeType == "image/jpeg")
         #expect(response.data.title.raw == "Image")
         #expect(response.data.altText == "This is a test image")
@@ -23,9 +25,7 @@ struct MediaTests {
         await #expect(
             throws: WpApiError.MediaFileNotFound(filePath: file),
             performing: {
-                let _ = try await api.media.create(
-                    params: .init(filePath: file)
-                )
+                _ = try await api.media.create(params: .init(filePath: file))
             }
         )
 

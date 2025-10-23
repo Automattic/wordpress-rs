@@ -396,12 +396,21 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 
             #if canImport(UniformTypeIdentifiers)
             if mimeType == nil {
-                mimeType = UTType(filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension)?.preferredMIMEType
+                mimeType = UTType(
+                    filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
+                )?.preferredMIMEType
             }
             #endif
 
             do {
-                try form.append(.init(fileAtPath: file.filePath, name: name, filename: file.fileName, mimeType: mimeType))
+                try form.append(
+                    .init(
+                        fileAtPath: file.filePath,
+                        name: name,
+                        filename: file.fileName,
+                        mimeType: mimeType
+                    )
+                )
             } catch {
                 throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
             }
@@ -429,4 +438,3 @@ extension WpMultipartFormRequest: NetworkRequestContent {
     }
 
 }
-
