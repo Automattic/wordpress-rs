@@ -155,7 +155,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     // The term_relationships table should only have the new category term
     let all_terms = test_ctx
         .term_repo
-        .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, rowid)
+        .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, 500)
         .unwrap();
 
     // Should only have one entry (Category with term 3)

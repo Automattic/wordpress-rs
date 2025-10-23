@@ -1,5 +1,5 @@
 use crate::{
-    DbSite, RowId, SqliteDbError, repository::QueryExecutor, term_relationships::DbTermRelationship,
+    DbSite, SqliteDbError, repository::QueryExecutor, term_relationships::DbTermRelationship,
 };
 use std::collections::HashMap;
 use wp_api::taxonomies::TaxonomyType;
@@ -21,11 +21,14 @@ impl TermRelationshipRepository {
     ///
     /// **IMPORTANT**: This method must be called within a transaction to ensure atomicity.
     /// The transaction parameter enforces this requirement at compile-time.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     pub fn sync_terms_for_object(
         &self,
         transaction: &rusqlite::Transaction<'_>,
         site: &DbSite,
-        object_id: RowId,
+        object_id: i64,
         taxonomy_type: &TaxonomyType,
         new_term_ids: &[TermId],
     ) -> Result<(), SqliteDbError> {
@@ -61,11 +64,14 @@ impl TermRelationshipRepository {
     }
 
     /// Delete specific terms for an object.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     fn delete_terms(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        object_id: RowId,
+        object_id: i64,
         taxonomy_type: &TaxonomyType,
         term_ids: &[TermId],
     ) -> Result<(), SqliteDbError> {
@@ -97,11 +103,14 @@ impl TermRelationshipRepository {
     }
 
     /// Insert new terms for an object.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     fn insert_terms(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        object_id: RowId,
+        object_id: i64,
         taxonomy_type: &TaxonomyType,
         term_ids: &[TermId],
     ) -> Result<(), SqliteDbError> {
@@ -124,11 +133,14 @@ impl TermRelationshipRepository {
     }
 
     /// Get all term IDs for an object's taxonomy.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     pub fn get_terms_for_object(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        object_id: RowId,
+        object_id: i64,
         taxonomy_type: &TaxonomyType,
     ) -> Result<Vec<TermId>, SqliteDbError> {
         let sql = format!(
@@ -149,11 +161,14 @@ impl TermRelationshipRepository {
     }
 
     /// Get all term IDs grouped by taxonomy for an object (for post reads with joins).
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     pub fn get_all_terms_for_object(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        object_id: RowId,
+        object_id: i64,
     ) -> Result<HashMap<TaxonomyType, Vec<TermId>>, SqliteDbError> {
         let sql = format!(
             "SELECT taxonomy_type, term_id FROM {} WHERE db_site_id = ? AND object_id = ?",
@@ -189,11 +204,14 @@ impl TermRelationshipRepository {
     }
 
     /// Delete all terms for an object (called when deleting the object itself).
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     pub fn delete_all_terms_for_object(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        object_id: RowId,
+        object_id: i64,
     ) -> Result<usize, SqliteDbError> {
         let sql = format!(
             "DELETE FROM {} WHERE db_site_id = ? AND object_id = ?",
@@ -208,21 +226,30 @@ impl TermRelationshipRepository {
     /// for the specified objects. Domain-specific logic (e.g., separating categories
     /// from tags) should be handled in the mapping layer.
     ///
-    /// Returns a HashMap mapping object_id to its term relationships.
+    /// # Arguments
+    /// * `object_ids` - WordPress object IDs (e.g., post.id, page.id), NOT SQLite rowids
+    ///
+    /// Returns a HashMap mapping object_id (as i64) to its term relationships.
     pub fn get_terms_for_objects(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        object_ids: &[RowId],
-    ) -> Result<HashMap<RowId, Vec<DbTermRelationship>>, SqliteDbError> {
+        object_ids: &[i64],
+    ) -> Result<HashMap<i64, Vec<DbTermRelationship>>, SqliteDbError> {
         if object_ids.is_empty() {
             return Ok(HashMap::new());
         }
 
+        let ids_str = object_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND object_id IN ({})",
             Self::TABLE_NAME,
-            RowId::to_sql_list(object_ids)
+            ids_str
         );
 
         let mut stmt = executor.prepare(&sql)?;
@@ -234,9 +261,9 @@ impl TermRelationshipRepository {
         // Group term relationships by object_id
         rows.try_fold(
             HashMap::new(),
-            |mut acc: HashMap<RowId, Vec<DbTermRelationship>>, row_result| {
+            |mut acc: HashMap<i64, Vec<DbTermRelationship>>, row_result| {
                 let relationship = row_result.map_err(SqliteDbError::from)?;
-                acc.entry(relationship.object_id)
+                acc.entry(relationship.object_id.0 as i64)
                     .or_default()
                     .push(relationship);
                 Ok::<_, SqliteDbError>(acc)
@@ -253,7 +280,7 @@ mod tests {
 
     #[rstest]
     fn test_sync_terms_insert_new(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         let term_ids = vec![TermId(1), TermId(2), TermId(3)];
 
@@ -290,7 +317,7 @@ mod tests {
 
     #[rstest]
     fn test_sync_terms_remove_old(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         // Insert initial terms
         let initial_terms = vec![TermId(1), TermId(2), TermId(3)];
@@ -339,7 +366,7 @@ mod tests {
 
     #[rstest]
     fn test_sync_terms_add_new_keep_existing(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         // Insert initial terms
         let initial_terms = vec![TermId(1), TermId(2)];
@@ -391,7 +418,7 @@ mod tests {
 
     #[rstest]
     fn test_sync_terms_no_changes(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         // Insert initial terms
         let terms = vec![TermId(1), TermId(2), TermId(3)];
@@ -438,7 +465,7 @@ mod tests {
 
     #[rstest]
     fn test_get_all_terms_for_object(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         // Add categories
         let categories = vec![TermId(1), TermId(2)];
@@ -515,7 +542,7 @@ mod tests {
 
     #[rstest]
     fn test_delete_all_terms_for_object(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         // Add terms
         let tx = test_ctx.conn.transaction().unwrap();
@@ -558,7 +585,7 @@ mod tests {
 
     #[rstest]
     fn test_different_taxonomy_types_are_isolated(mut test_ctx: TestContext) {
-        let test_object_id = RowId(42);
+        let test_object_id = 42;
 
         // Add same term ID to different taxonomies
         let tx = test_ctx.conn.transaction().unwrap();

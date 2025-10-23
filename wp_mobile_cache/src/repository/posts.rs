@@ -26,10 +26,20 @@ impl PostRepository {
         site: &DbSite,
         rowid: RowId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        // Load term relationships
+        // First get the post.id (WordPress ID) from the rowid
+        let sql = format!(
+            "SELECT id FROM {} WHERE db_site_id = ? AND rowid = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let post_id: i64 = stmt
+            .query_row([site.row_id, rowid], |row| row.get(0))
+            .map_err(SqliteDbError::from)?;
+
+        // Load term relationships using the WordPress post ID
         let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_terms_for_objects(executor, site, &[rowid])?;
-        let term_relationships = terms_map.get(&rowid).cloned().unwrap_or_default();
+        let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id])?;
+        let term_relationships = terms_map.get(&post_id).cloned().unwrap_or_default();
 
         // Query and construct post with term relationships
         let sql = format!(
@@ -53,32 +63,29 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        // First pass: extract row_ids
-        let sql = format!(
-            "SELECT rowid FROM {} WHERE db_site_id = ?",
-            Self::TABLE_NAME
-        );
+        // First pass: extract post IDs (WordPress IDs, not SQLite rowids)
+        let sql = format!("SELECT id FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
         let mut stmt = executor.prepare(&sql)?;
-        let row_ids: Vec<RowId> = stmt
+        let post_ids: Vec<i64> = stmt
             .query_map([site.row_id], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(SqliteDbError::from)?;
 
-        if row_ids.is_empty() {
+        if post_ids.is_empty() {
             return Ok(Vec::new());
         }
 
-        // Batch load term relationships for all posts
+        // Batch load term relationships for all posts using WordPress post IDs
         let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_terms_for_objects(executor, site, &row_ids)?;
+        let terms_map = term_repo.get_terms_for_objects(executor, site, &post_ids)?;
 
         // Second pass: construct posts with term relationships
         let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
         let mut stmt = executor.prepare(&sql)?;
         let posts = stmt
             .query_map([site.row_id], |row| {
-                let row_id: RowId = row.get(0)?;
-                let term_relationships = terms_map.get(&row_id).cloned().unwrap_or_default();
+                let post_id: i64 = row.get("id")?;
+                let term_relationships = terms_map.get(&post_id).cloned().unwrap_or_default();
                 DbAnyPostWithEditContext::from_row_with_terms(row, term_relationships)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
             })?
@@ -101,20 +108,10 @@ impl PostRepository {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
-        // First get the rowid
-        let sql = format!(
-            "SELECT rowid FROM {} WHERE db_site_id = ? AND id = ?",
-            Self::TABLE_NAME
-        );
-        let mut stmt = executor.prepare(&sql)?;
-        let rowid: RowId = stmt
-            .query_row(rusqlite::params![site.row_id, post_id.0], |row| row.get(0))
-            .map_err(SqliteDbError::from)?;
-
-        // Load term relationships
+        // Load term relationships using the WordPress post ID
         let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_terms_for_objects(executor, site, &[rowid])?;
-        let term_relationships = terms_map.get(&rowid).cloned().unwrap_or_default();
+        let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
+        let term_relationships = terms_map.get(&post_id.0).cloned().unwrap_or_default();
 
         // Query and construct post with term relationships
         let sql = format!(
@@ -145,9 +142,9 @@ impl PostRepository {
             Err(_) => return Ok(0), // Post doesn't exist
         };
 
-        // Delete term relationships
+        // Delete term relationships using WordPress post ID
         let term_repo = TermRelationshipRepository;
-        term_repo.delete_all_terms_for_object(executor, site, db_post.row_id)?;
+        term_repo.delete_all_terms_for_object(executor, site, db_post.post.id.0)?;
 
         // Delete the post
         let sql = format!(
@@ -282,21 +279,21 @@ impl PostRepository {
         };
         let post_rowid = RowId(post_rowid as u64);
 
-        // Sync term relationships
+        // Sync term relationships using WordPress post ID, not SQLite rowid
         let term_repo = TermRelationshipRepository;
 
         if let Some(ref categories) = post.categories {
             term_repo.sync_terms_for_object(
                 &tx,
                 site,
-                post_rowid,
+                post.id.0,
                 &TaxonomyType::Category,
                 categories,
             )?;
         }
 
         if let Some(ref tags) = post.tags {
-            term_repo.sync_terms_for_object(&tx, site, post_rowid, &TaxonomyType::PostTag, tags)?;
+            term_repo.sync_terms_for_object(&tx, site, post.id.0, &TaxonomyType::PostTag, tags)?;
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
@@ -758,18 +755,18 @@ mod tests {
         // Insert post without terms (to avoid transaction issues in this test)
         let mut post = create_minimal_post();
         post.id = PostId(500);
-        let rowid = test_ctx
+        test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
 
-        // Manually add terms
+        // Manually add terms using WordPress post ID
         let tx = test_ctx.conn.transaction().unwrap();
         term_repo
             .sync_terms_for_object(
                 &tx,
                 &test_ctx.site,
-                rowid,
+                post.id.0,
                 &wp_api::taxonomies::TaxonomyType::Category,
                 &[wp_api::terms::TermId(1), wp_api::terms::TermId(2)],
             )
@@ -778,7 +775,7 @@ mod tests {
 
         // Verify terms exist
         let terms = term_repo
-            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, rowid)
+            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post.id.0)
             .unwrap();
         assert!(!terms.is_empty());
 
@@ -790,7 +787,7 @@ mod tests {
 
         // Verify terms were also deleted
         let terms_after = term_repo
-            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, rowid)
+            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post.id.0)
             .unwrap();
         assert!(terms_after.is_empty());
     }
