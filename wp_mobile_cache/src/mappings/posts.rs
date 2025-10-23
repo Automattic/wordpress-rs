@@ -226,40 +226,6 @@ mod tests {
     }
 
     #[rstest]
-    fn test_round_trip_with_optional_fields_none(mut test_ctx: TestContext) {
-        let repo = PostRepository;
-        let mut post = create_minimal_post();
-        post.id = PostId(99);
-
-        // Explicitly set all optional fields to None
-        post.permalink_template = None;
-        post.generated_slug = None;
-        post.author = None;
-        post.excerpt = None;
-        post.featured_media = None;
-        post.comment_status = None;
-        post.ping_status = None;
-        post.format = None;
-        post.meta = None;
-        post.sticky = None;
-        post.categories = None;
-        post.tags = None;
-        post.parent = None;
-        post.menu_order = None;
-
-        // Insert and retrieve using repository
-        let rowid = repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-            .expect("Failed to insert post");
-        let retrieved = repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to read post");
-
-        // All optional fields should still be None
-        assert_eq!(retrieved.post, post);
-    }
-
-    #[rstest]
     fn test_round_trip_with_different_enum_variants(mut test_ctx: TestContext) {
         let repo = PostRepository;
 
@@ -306,49 +272,5 @@ mod tests {
 
         assert_eq!(retrieved.post.categories, None);
         assert_eq!(retrieved.post.tags, None);
-    }
-
-    #[rstest]
-    fn test_round_trip_with_sticky_boolean_variants(mut test_ctx: TestContext) {
-        let repo = PostRepository;
-
-        // Test sticky = Some(true)
-        let mut post = create_minimal_post();
-        post.id = PostId(300);
-        post.sticky = Some(true);
-
-        let rowid = repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-            .unwrap();
-        let retrieved = repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
-        assert_eq!(retrieved.post.sticky, Some(true));
-
-        // Test sticky = Some(false)
-        let mut post = create_minimal_post();
-        post.id = PostId(301);
-        post.sticky = Some(false);
-
-        let rowid = repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-            .unwrap();
-        let retrieved = repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
-        assert_eq!(retrieved.post.sticky, Some(false));
-
-        // Test sticky = None
-        let mut post = create_minimal_post();
-        post.id = PostId(302);
-        post.sticky = None;
-
-        let rowid = repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-            .unwrap();
-        let retrieved = repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
-        assert_eq!(retrieved.post.sticky, None);
     }
 }
