@@ -1,8 +1,9 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
-    mappings::{TryFromDbRow, posts::DbAnyPostWithEditContext},
+    mappings::posts::DbAnyPostWithEditContext,
     repository::{
-        QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository,
+        QueryExecutor, TransactionManager,
+        term_relationships::{PostTerms, TermRelationshipRepository},
     },
 };
 use wp_api::posts::{AnyPostWithEditContext, PostId};
@@ -16,6 +17,17 @@ pub struct PostRepository;
 impl PostRepository {
     const TABLE_NAME: &'static str = "posts_edit_context";
 
+    /// Private helper: Load a single post's terms given its rowid.
+    fn load_terms_for_post(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        row_id: RowId,
+    ) -> Result<PostTerms, SqliteDbError> {
+        let term_repo = TermRelationshipRepository;
+        term_repo.get_post_terms(executor, site, row_id)
+    }
+
     /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
     ///
     /// Returns an error if no post with the given rowid exists for this site.
@@ -26,22 +38,20 @@ impl PostRepository {
         site: &DbSite,
         rowid: RowId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
+        // Load terms first
+        let terms = self.load_terms_for_post(executor, site, rowid)?;
+
+        // Query and construct post with terms
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND rowid = ?",
             Self::TABLE_NAME
         );
         let mut stmt = executor.prepare(&sql)?;
-        let mut db_post = stmt
-            .query_row([site.row_id, rowid], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
-            .map_err(SqliteDbError::from)?;
-
-        // Populate terms from term_relationships table
-        self.populate_terms(executor, site, &mut db_post)?;
-
-        Ok(db_post)
+        stmt.query_row([site.row_id, rowid], |row| {
+            DbAnyPostWithEditContext::from_row_with_terms(row, terms.clone())
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        })
+        .map_err(SqliteDbError::from)
     }
 
     /// Select all posts for a given site (returns wrappers with rowids).
@@ -53,21 +63,37 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
+        // First pass: extract row_ids
+        let sql = format!(
+            "SELECT rowid FROM {} WHERE db_site_id = ?",
+            Self::TABLE_NAME
+        );
         let mut stmt = executor.prepare(&sql)?;
-        let rows = stmt.query_map([site.row_id], |row| {
-            DbAnyPostWithEditContext::try_from_row(row)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })?;
-
-        let mut posts: Vec<DbAnyPostWithEditContext> = rows
+        let row_ids: Vec<RowId> = stmt
+            .query_map([site.row_id], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(SqliteDbError::from)?;
 
-        // Populate terms for all posts
-        for db_post in &mut posts {
-            self.populate_terms(executor, site, db_post)?;
+        if row_ids.is_empty() {
+            return Ok(Vec::new());
         }
+
+        // Batch load terms for all posts
+        let term_repo = TermRelationshipRepository;
+        let terms_map = term_repo.get_post_terms_batch(executor, site, &row_ids)?;
+
+        // Second pass: construct posts with terms
+        let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
+        let mut stmt = executor.prepare(&sql)?;
+        let posts = stmt
+            .query_map([site.row_id], |row| {
+                let row_id: RowId = row.get(0)?;
+                let terms = terms_map.get(&row_id).cloned().unwrap_or_default();
+                DbAnyPostWithEditContext::from_row_with_terms(row, terms)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
 
         Ok(posts)
     }
@@ -85,22 +111,30 @@ impl PostRepository {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
+        // First get the rowid
+        let sql = format!(
+            "SELECT rowid FROM {} WHERE db_site_id = ? AND id = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let rowid: RowId = stmt
+            .query_row(rusqlite::params![site.row_id, post_id.0], |row| row.get(0))
+            .map_err(SqliteDbError::from)?;
+
+        // Load terms
+        let terms = self.load_terms_for_post(executor, site, rowid)?;
+
+        // Query and construct post with terms
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND id = ?",
             Self::TABLE_NAME
         );
         let mut stmt = executor.prepare(&sql)?;
-        let mut db_post = stmt
-            .query_row(rusqlite::params![site.row_id, post_id.0], |row| {
-                DbAnyPostWithEditContext::try_from_row(row)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })
-            .map_err(SqliteDbError::from)?;
-
-        // Populate terms from term_relationships table
-        self.populate_terms(executor, site, &mut db_post)?;
-
-        Ok(db_post)
+        stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
+            DbAnyPostWithEditContext::from_row_with_terms(row, terms.clone())
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        })
+        .map_err(SqliteDbError::from)
     }
 
     /// Delete a post by its WordPress post ID for a given site.
@@ -310,30 +344,6 @@ impl PostRepository {
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row([site.row_id], |row| row.get(0))
             .map_err(SqliteDbError::from)
-    }
-
-    /// Populate categories and tags from term_relationships table.
-    ///
-    /// This is a helper method used by select methods to join term data.
-    fn populate_terms(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        db_post: &mut DbAnyPostWithEditContext,
-    ) -> Result<(), SqliteDbError> {
-        let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_all_terms_for_object(executor, site, db_post.row_id)?;
-
-        // Only overwrite categories/tags if there are entries in term_relationships.
-        // This preserves backward compatibility with posts that only have JSON storage.
-        if let Some(categories) = terms_map.get(&TaxonomyType::Category) {
-            db_post.post.categories = Some(categories.clone());
-        }
-        if let Some(tags) = terms_map.get(&TaxonomyType::PostTag) {
-            db_post.post.tags = Some(tags.clone());
-        }
-
-        Ok(())
     }
 }
 

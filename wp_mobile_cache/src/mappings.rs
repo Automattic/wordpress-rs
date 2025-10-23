@@ -1,4 +1,3 @@
-use crate::SqliteDbError;
 use rusqlite::Row;
 
 pub mod helpers;
@@ -28,10 +27,4 @@ impl RowExt for Row<'_> {
     {
         self.get(column.as_index())
     }
-}
-
-/// Trait for types that can be constructed from a SQLite row.
-/// Similar to `TryFrom<&Row>` but with our custom error type.
-pub trait TryFromDbRow: Sized {
-    fn try_from_row(row: &Row) -> Result<Self, SqliteDbError>;
 }

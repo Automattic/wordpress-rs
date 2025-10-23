@@ -1,12 +1,13 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
     mappings::{
-        ColumnIndex, RowExt, TryFromDbRow,
+        ColumnIndex, RowExt,
         helpers::{
             deserialize_json_value, get_id, get_optional_id, integer_to_bool, parse_datetime,
             parse_enum, parse_optional_enum,
         },
     },
+    repository::term_relationships::PostTerms,
 };
 use rusqlite::Row;
 use wp_api::posts::{
@@ -70,8 +71,16 @@ pub struct DbAnyPostWithEditContext {
     pub last_fetched_at: String,
 }
 
-impl TryFromDbRow for DbAnyPostWithEditContext {
-    fn try_from_row(row: &Row) -> Result<Self, SqliteDbError> {
+impl DbAnyPostWithEditContext {
+    /// Construct a post entity from a database row with its associated terms.
+    ///
+    /// This is the only way to construct a `DbAnyPostWithEditContext`, ensuring that
+    /// terms are always properly loaded from the term_relationships table.
+    ///
+    /// # Arguments
+    /// * `row` - Database row containing post data
+    /// * `terms` - Terms (categories and tags) loaded from term_relationships table
+    pub fn from_row_with_terms(row: &Row, terms: PostTerms) -> Result<Self, SqliteDbError> {
         use PostEditContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
@@ -127,8 +136,8 @@ impl TryFromDbRow for DbAnyPostWithEditContext {
             meta: deserialize_json_value(row.get_column(Meta)?)?,
             sticky: integer_to_bool(row.get_column(Sticky)?),
             template: row.get_column(Template)?,
-            categories: None,
-            tags: None,
+            categories: terms.categories,
+            tags: terms.tags,
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
         };

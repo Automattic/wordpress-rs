@@ -3,6 +3,16 @@ use std::collections::HashMap;
 use wp_api::taxonomies::TaxonomyType;
 use wp_api::terms::TermId;
 
+/// Terms associated with a post (categories and tags).
+///
+/// This struct is used to populate term fields when constructing database entities,
+/// ensuring that terms are always loaded from the term_relationships table.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PostTerms {
+    pub categories: Option<Vec<TermId>>,
+    pub tags: Option<Vec<TermId>>,
+}
+
 /// Repository for managing term relationships in the database.
 ///
 /// Provides methods for syncing, querying, and deleting term associations
@@ -198,6 +208,99 @@ impl TermRelationshipRepository {
             Self::TABLE_NAME
         );
         executor.execute(&sql, rusqlite::params![site.row_id, object_id])
+    }
+
+    /// Get post terms (categories and tags) for a single post object.
+    ///
+    /// This is the canonical way to retrieve terms for constructing post entities.
+    /// Returns `None` for both categories and tags if no terms exist for the object.
+    pub fn get_post_terms(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: RowId,
+    ) -> Result<PostTerms, SqliteDbError> {
+        let terms_map = self.get_all_terms_for_object(executor, site, object_id)?;
+        Ok(PostTerms {
+            categories: terms_map.get(&TaxonomyType::Category).cloned(),
+            tags: terms_map.get(&TaxonomyType::PostTag).cloned(),
+        })
+    }
+
+    /// Get post terms for multiple objects in a single batch query.
+    ///
+    /// This is more efficient than calling `get_post_terms` in a loop when loading
+    /// multiple posts. Returns a HashMap mapping object_id to its PostTerms.
+    /// Objects without any terms will have an empty PostTerms (both fields None).
+    pub fn get_post_terms_batch(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_ids: &[RowId],
+    ) -> Result<HashMap<RowId, PostTerms>, SqliteDbError> {
+        if object_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Build placeholders for IN clause
+        let placeholders: Vec<_> = (0..object_ids.len()).map(|_| "?").collect();
+        let sql = format!(
+            "SELECT object_id, taxonomy_type, term_id FROM {} WHERE db_site_id = ? AND object_id IN ({})",
+            Self::TABLE_NAME,
+            placeholders.join(", ")
+        );
+
+        // Build params: [site_id, object_id1, object_id2, ...]
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(site.row_id)];
+        for object_id in object_ids {
+            params.push(Box::new(*object_id));
+        }
+
+        let params_refs: Vec<_> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = executor.prepare(&sql)?;
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
+            let object_id: RowId = row.get(0)?;
+            let taxonomy_str: String = row.get(1)?;
+            let term_id: i64 = row.get(2)?;
+            Ok((object_id, taxonomy_str, term_id))
+        })?;
+
+        // Group terms by object_id and taxonomy_type
+        let mut object_terms: HashMap<RowId, HashMap<TaxonomyType, Vec<TermId>>> = HashMap::new();
+        for row_result in rows {
+            let (object_id, taxonomy_str, term_id) = row_result.map_err(SqliteDbError::from)?;
+            let taxonomy_type: TaxonomyType = serde_json::from_value(serde_json::Value::String(
+                taxonomy_str.clone(),
+            ))
+            .map_err(|e| {
+                SqliteDbError::SqliteError(format!(
+                    "Invalid taxonomy_type '{}': {}",
+                    taxonomy_str, e
+                ))
+            })?;
+
+            object_terms
+                .entry(object_id)
+                .or_default()
+                .entry(taxonomy_type)
+                .or_default()
+                .push(TermId(term_id));
+        }
+
+        // Convert to PostTerms, ensuring all requested object_ids have an entry
+        let mut result = HashMap::new();
+        for &object_id in object_ids {
+            let terms_map = object_terms.get(&object_id);
+            result.insert(
+                object_id,
+                PostTerms {
+                    categories: terms_map.and_then(|m| m.get(&TaxonomyType::Category).cloned()),
+                    tags: terms_map.and_then(|m| m.get(&TaxonomyType::PostTag).cloned()),
+                },
+            );
+        }
+
+        Ok(result)
     }
 }
 
