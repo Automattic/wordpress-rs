@@ -762,15 +762,17 @@ mod tests {
             .unwrap();
 
         // Manually add terms
+        let tx = test_ctx.conn.transaction().unwrap();
         term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 rowid,
                 &wp_api::taxonomies::TaxonomyType::Category,
                 &[wp_api::terms::TermId(1), wp_api::terms::TermId(2)],
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Verify terms exist
         let terms = term_repo

@@ -16,16 +16,20 @@ impl TermRelationshipRepository {
     ///
     /// This approach is observer-friendly: unchanged terms generate no DB events.
     /// Only actual changes (new terms added, old terms removed) generate INSERT/DELETE events.
+    ///
+    /// **IMPORTANT**: This method must be called within a transaction to ensure atomicity.
+    /// The transaction parameter enforces this requirement at compile-time.
     pub fn sync_terms_for_object(
         &self,
-        executor: &impl QueryExecutor,
+        transaction: &rusqlite::Transaction<'_>,
         site: &DbSite,
         object_id: RowId,
         taxonomy_type: &TaxonomyType,
         new_term_ids: &[TermId],
     ) -> Result<(), SqliteDbError> {
         // 1. Get existing term IDs
-        let existing_terms = self.get_terms_for_object(executor, site, object_id, taxonomy_type)?;
+        let existing_terms =
+            self.get_terms_for_object(transaction, site, object_id, taxonomy_type)?;
 
         // 2. Calculate diff (using Vec-based filtering since TermId may not impl Hash)
         let to_delete: Vec<_> = existing_terms
@@ -42,12 +46,12 @@ impl TermRelationshipRepository {
 
         // 3. Delete removed terms (only the ones being removed)
         if !to_delete.is_empty() {
-            self.delete_terms(executor, site, object_id, taxonomy_type, &to_delete)?;
+            self.delete_terms(transaction, site, object_id, taxonomy_type, &to_delete)?;
         }
 
         // 4. Insert new terms (only the ones being added)
         if !to_insert.is_empty() {
-            self.insert_terms(executor, site, object_id, taxonomy_type, &to_insert)?;
+            self.insert_terms(transaction, site, object_id, taxonomy_type, &to_insert)?;
         }
 
         // Unchanged terms: no DB operations = no observer events
@@ -204,22 +208,24 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    fn test_sync_terms_insert_new(test_ctx: TestContext) {
+    fn test_sync_terms_insert_new(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         let term_ids = vec![TermId(1), TermId(2), TermId(3)];
 
         // Sync terms (should insert all)
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::Category,
                 &term_ids,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Verify all were inserted
         let retrieved = test_ctx
@@ -239,34 +245,38 @@ mod tests {
     }
 
     #[rstest]
-    fn test_sync_terms_remove_old(test_ctx: TestContext) {
+    fn test_sync_terms_remove_old(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         // Insert initial terms
         let initial_terms = vec![TermId(1), TermId(2), TermId(3)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &initial_terms,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Sync with fewer terms (remove 2 and 3)
         let updated_terms = vec![TermId(1)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &updated_terms,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Verify only term 1 remains
         let retrieved = test_ctx
@@ -284,34 +294,38 @@ mod tests {
     }
 
     #[rstest]
-    fn test_sync_terms_add_new_keep_existing(test_ctx: TestContext) {
+    fn test_sync_terms_add_new_keep_existing(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         // Insert initial terms
         let initial_terms = vec![TermId(1), TermId(2)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::Category,
                 &initial_terms,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Sync with additional terms (keep 1, 2, add 3, 4)
         let updated_terms = vec![TermId(1), TermId(2), TermId(3), TermId(4)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::Category,
                 &updated_terms,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Verify all four are present
         let retrieved = test_ctx
@@ -332,33 +346,37 @@ mod tests {
     }
 
     #[rstest]
-    fn test_sync_terms_no_changes(test_ctx: TestContext) {
+    fn test_sync_terms_no_changes(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         // Insert initial terms
         let terms = vec![TermId(1), TermId(2), TermId(3)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &terms,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Sync with same terms (no changes)
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &terms,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Verify terms unchanged
         let retrieved = test_ctx
@@ -375,34 +393,38 @@ mod tests {
     }
 
     #[rstest]
-    fn test_get_all_terms_for_object(test_ctx: TestContext) {
+    fn test_get_all_terms_for_object(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         // Add categories
         let categories = vec![TermId(1), TermId(2)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::Category,
                 &categories,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Add tags
         let tags = vec![TermId(10), TermId(20), TermId(30)];
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &tags,
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Get all terms
         let all_terms = test_ctx
@@ -448,14 +470,15 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_all_terms_for_object(test_ctx: TestContext) {
+    fn test_delete_all_terms_for_object(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         // Add terms
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::Category,
@@ -465,13 +488,14 @@ mod tests {
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &[TermId(10)],
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Delete all terms
         let deleted = test_ctx
@@ -489,14 +513,15 @@ mod tests {
     }
 
     #[rstest]
-    fn test_different_taxonomy_types_are_isolated(test_ctx: TestContext) {
+    fn test_different_taxonomy_types_are_isolated(mut test_ctx: TestContext) {
         let test_object_id = RowId(42);
 
         // Add same term ID to different taxonomies
+        let tx = test_ctx.conn.transaction().unwrap();
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::Category,
@@ -506,13 +531,14 @@ mod tests {
         test_ctx
             .term_repo
             .sync_terms_for_object(
-                &test_ctx.conn,
+                &tx,
                 &test_ctx.site,
                 test_object_id,
                 &TaxonomyType::PostTag,
                 &[TermId(1)],
             )
             .unwrap();
+        tx.commit().unwrap();
 
         // Verify both exist independently
         let categories = test_ctx
