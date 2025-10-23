@@ -315,12 +315,10 @@ impl PostRepository {
         site: &DbSite,
         posts: &[AnyPostWithEditContext],
     ) -> Result<Vec<RowId>, SqliteDbError> {
-        let mut rowids = Vec::with_capacity(posts.len());
-        for post in posts {
-            let rowid = self.upsert(transaction_manager, site, post)?;
-            rowids.push(rowid);
-        }
-        Ok(rowids)
+        posts
+            .iter()
+            .map(|post| self.upsert(transaction_manager, site, post))
+            .collect()
     }
 
     /// Get the total count of posts for a given site.
@@ -493,12 +491,12 @@ mod tests {
         );
 
         // Verify can retrieve each
-        for rowid in rowids {
+        rowids.iter().for_each(|&rowid| {
             test_ctx
                 .post_repo
                 .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
                 .expect("Should exist");
-        }
+        });
     }
 
     #[rstest]

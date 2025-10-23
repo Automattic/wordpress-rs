@@ -93,9 +93,11 @@ impl TermRelationshipRepository {
             Box::new(object_id),
             Box::new(taxonomy_type.to_string()),
         ];
-        for term_id in term_ids {
-            params.push(Box::new(term_id.0));
-        }
+        params.extend(
+            term_ids
+                .iter()
+                .map(|term_id| Box::new(term_id.0) as Box<dyn rusqlite::ToSql>),
+        );
 
         let params_refs: Vec<_> = params.iter().map(|p| p.as_ref()).collect();
         executor.execute(&sql, params_refs.as_slice())?;
@@ -123,13 +125,13 @@ impl TermRelationshipRepository {
             Self::TABLE_NAME
         );
 
-        for term_id in term_ids {
+        term_ids.iter().try_for_each(|term_id| {
             executor.execute(
                 &insert_sql,
                 rusqlite::params![site.row_id, object_id, term_id.0, taxonomy_type.to_string()],
             )?;
-        }
-        Ok(())
+            Ok::<_, SqliteDbError>(())
+        })
     }
 
     /// Get all term IDs for an object's taxonomy.
@@ -175,32 +177,32 @@ impl TermRelationshipRepository {
             Self::TABLE_NAME
         );
         let mut stmt = executor.prepare(&sql)?;
-        let rows = stmt.query_map(rusqlite::params![site.row_id, object_id], |row| {
+        let mut rows = stmt.query_map(rusqlite::params![site.row_id, object_id], |row| {
             let taxonomy_str: String = row.get(0)?;
             let term_id: i64 = row.get(1)?;
             Ok((taxonomy_str, term_id))
         })?;
 
-        let mut result: HashMap<TaxonomyType, Vec<TermId>> = HashMap::new();
-        for row_result in rows {
-            let (taxonomy_str, term_id) = row_result.map_err(SqliteDbError::from)?;
-            let taxonomy_type: TaxonomyType = serde_json::from_value(serde_json::Value::String(
-                taxonomy_str.clone(),
-            ))
-            .map_err(|e| {
-                SqliteDbError::SqliteError(format!(
-                    "Invalid taxonomy_type '{}': {}",
-                    taxonomy_str, e
-                ))
-            })?;
+        rows.try_fold(
+            HashMap::new(),
+            |mut result: HashMap<TaxonomyType, Vec<TermId>>, row_result| {
+                let (taxonomy_str, term_id) = row_result.map_err(SqliteDbError::from)?;
+                let taxonomy_type: TaxonomyType =
+                    serde_json::from_value(serde_json::Value::String(taxonomy_str.clone()))
+                        .map_err(|e| {
+                            SqliteDbError::SqliteError(format!(
+                                "Invalid taxonomy_type '{}': {}",
+                                taxonomy_str, e
+                            ))
+                        })?;
 
-            result
-                .entry(taxonomy_type)
-                .or_default()
-                .push(TermId(term_id));
-        }
-
-        Ok(result)
+                result
+                    .entry(taxonomy_type)
+                    .or_default()
+                    .push(TermId(term_id));
+                Ok::<_, SqliteDbError>(result)
+            },
+        )
     }
 
     /// Delete all terms for an object (called when deleting the object itself).
