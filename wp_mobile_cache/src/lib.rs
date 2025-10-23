@@ -56,6 +56,27 @@ impl From<i64> for RowId {
     }
 }
 
+impl RowId {
+    /// Convert a slice of RowIds to a comma-separated string for use in SQL IN clauses.
+    ///
+    /// This helper is used when building dynamic SQL queries with arrays of IDs.
+    /// Since RowIds are internal database IDs (not user input), this is safe from SQL injection.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let row_ids = vec![RowId(1), RowId(2), RowId(3)];
+    /// let ids_str = RowId::to_sql_list(&row_ids); // "1, 2, 3"
+    /// let sql = format!("SELECT * FROM table WHERE id IN ({})", ids_str);
+    /// ```
+    pub fn to_sql_list(row_ids: &[RowId]) -> String {
+        row_ids
+            .iter()
+            .map(|id| id.0.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
 impl From<RowId> for i64 {
     fn from(row_id: RowId) -> Self {
         row_id.0 as i64

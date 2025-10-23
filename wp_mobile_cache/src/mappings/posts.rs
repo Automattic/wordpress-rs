@@ -7,12 +7,15 @@ use crate::{
             parse_enum, parse_optional_enum,
         },
     },
-    repository::term_relationships::PostTerms,
+    term_relationships::DbTermRelationship,
 };
 use rusqlite::Row;
-use wp_api::posts::{
-    AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext,
-    PostTitleWithEditContext, SparsePostExcerpt,
+use wp_api::{
+    posts::{
+        AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext,
+        PostTitleWithEditContext, SparsePostExcerpt,
+    },
+    taxonomies::TaxonomyType,
 };
 
 /// Column indexes for posts_edit_context table.
@@ -72,21 +75,40 @@ pub struct DbAnyPostWithEditContext {
 }
 
 impl DbAnyPostWithEditContext {
-    /// Construct a post entity from a database row with its associated terms.
+    /// Construct a post entity from a database row with its associated term relationships.
     ///
     /// This is the only way to construct a `DbAnyPostWithEditContext`, ensuring that
     /// terms are always properly loaded from the term_relationships table.
     ///
+    /// Domain-specific logic for extracting categories and tags from the generic
+    /// term relationships is handled here in the mapping layer.
+    ///
     /// # Arguments
     /// * `row` - Database row containing post data
-    /// * `terms` - Terms (categories and tags) loaded from term_relationships table
-    pub fn from_row_with_terms(row: &Row, terms: PostTerms) -> Result<Self, SqliteDbError> {
+    /// * `term_relationships` - Term relationships loaded from term_relationships table
+    pub fn from_row_with_terms(
+        row: &Row,
+        term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self, SqliteDbError> {
         use PostEditContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
         let site = DbSite {
             row_id: row.get_column(PostEditContextColumn::SiteId)?,
         };
+
+        // Extract categories and tags from term relationships
+        let (categories, tags) = term_relationships.into_iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut cats, mut tags), relationship| {
+                match relationship.taxonomy_type {
+                    TaxonomyType::Category => cats.push(relationship.term_id),
+                    TaxonomyType::PostTag => tags.push(relationship.term_id),
+                    _ => {} // Ignore other taxonomy types for posts
+                }
+                (cats, tags)
+            },
+        );
 
         let post = AnyPostWithEditContext {
             id: get_id(row, Id)?,
@@ -136,8 +158,12 @@ impl DbAnyPostWithEditContext {
             meta: deserialize_json_value(row.get_column(Meta)?)?,
             sticky: integer_to_bool(row.get_column(Sticky)?),
             template: row.get_column(Template)?,
-            categories: terms.categories,
-            tags: terms.tags,
+            categories: if categories.is_empty() {
+                None
+            } else {
+                Some(categories)
+            },
+            tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
         };
