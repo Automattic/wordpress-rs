@@ -146,17 +146,3 @@ fn test_delete_by_post_id_only_deletes_from_specified_site(
     // Site 2 should still have its post
     assert!(repo.select_by_post_id(&test_db, &site2, post_id).is_ok());
 }
-
-#[rstest]
-fn test_site_isolation_basic_verification(mut test_db: Connection, test_site: DbSite) {
-    let repo = PostRepository;
-    let site2 = create_test_site(&test_db, 2);
-
-    // Insert post in site1
-    let post = PostBuilder::new().with_id(PostId(777)).build();
-    repo.upsert(&mut test_db, &test_site, &post).unwrap();
-
-    // site2 should not see site1's post
-    let result = repo.select_by_post_id(&test_db, &site2, PostId(777));
-    assert!(result.is_err(), "Site 2 should not access Site 1's posts");
-}

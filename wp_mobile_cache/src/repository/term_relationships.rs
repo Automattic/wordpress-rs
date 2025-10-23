@@ -48,7 +48,7 @@ impl TermRelationshipRepository {
             self.insert_terms(executor, site, object_id, taxonomy_type, &to_insert)?;
         }
 
-        // Unchanged terms: no DB operations = no observer events ✅
+        // Unchanged terms: no DB operations = no observer events
         Ok(())
     }
 

@@ -47,17 +47,6 @@ pub fn test_site() -> DbSite {
     DbSite { row_id: RowId(1) }
 }
 
-/// Fixture: Second test site with row_id = 2 for multi-site testing.
-///
-/// Creates an additional site in the database to test site isolation.
-#[fixture]
-pub fn second_site(test_db: Connection) -> (Connection, DbSite) {
-    test_db
-        .execute("INSERT INTO sites (id) VALUES (2)", [])
-        .expect("Failed to insert second test site");
-    (test_db, DbSite { row_id: RowId(2) })
-}
-
 /// Fixture: PostRepository instance.
 ///
 /// Zero-cost abstraction since PostRepository is zero-sized.
