@@ -95,64 +95,6 @@ impl PostRepository {
         Ok(db_post)
     }
 
-    /// Select posts by author user ID for a given site (returns wrappers with rowids).
-    ///
-    /// Returns an empty vector if no posts by the given author exist for the site.
-    /// Automatically populates categories and tags from term_relationships table.
-    pub fn select_by_author(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        author_id: wp_api::users::UserId,
-    ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND author = ?";
-        let mut stmt = executor.prepare(sql)?;
-        let rows = stmt.query_map(rusqlite::params![site.row_id, author_id.0], |row| {
-            DbAnyPostWithEditContext::try_from_row(row)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })?;
-
-        let mut posts: Vec<DbAnyPostWithEditContext> = rows
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)?;
-
-        // Populate terms for all posts
-        for db_post in &mut posts {
-            self.populate_terms(executor, site, db_post)?;
-        }
-
-        Ok(posts)
-    }
-
-    /// Select posts by status for a given site (e.g., "publish", "draft").
-    ///
-    /// Returns an empty vector if no posts with the given status exist for the site.
-    /// Automatically populates categories and tags from term_relationships table.
-    pub fn select_by_status(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        status: &str,
-    ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
-        let sql = "SELECT * FROM posts_edit_context WHERE db_site_id = ? AND status = ?";
-        let mut stmt = executor.prepare(sql)?;
-        let rows = stmt.query_map(rusqlite::params![site.row_id, status], |row| {
-            DbAnyPostWithEditContext::try_from_row(row)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })?;
-
-        let mut posts: Vec<DbAnyPostWithEditContext> = rows
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)?;
-
-        // Populate terms for all posts
-        for db_post in &mut posts {
-            self.populate_terms(executor, site, db_post)?;
-        }
-
-        Ok(posts)
-    }
-
     /// Delete a post by its WordPress post ID for a given site.
     ///
     /// Returns the number of rows deleted (0 or 1).
@@ -382,7 +324,7 @@ mod tests {
         test_ctx,
     };
     use rstest::*;
-    use wp_api::{posts::PostStatus, users::UserId};
+    use wp_api::posts::PostStatus;
 
     #[rstest]
     fn test_repository_insert_and_select_by_rowid(mut test_ctx: TestContext) {
@@ -436,96 +378,6 @@ mod tests {
                 .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(999));
 
         assert!(result.is_err());
-    }
-
-    #[rstest]
-    fn test_repository_select_by_author(mut test_ctx: TestContext) {
-        // Insert posts with different authors
-        let mut post1 = create_minimal_post();
-        post1.id = PostId(1);
-        post1.author = Some(UserId(10));
-
-        let mut post2 = create_minimal_post();
-        post2.id = PostId(2);
-        post2.author = Some(UserId(10));
-
-        let mut post3 = create_minimal_post();
-        post3.id = PostId(3);
-        post3.author = Some(UserId(20));
-
-        test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post1)
-            .unwrap();
-        test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post2)
-            .unwrap();
-        test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post3)
-            .unwrap();
-
-        // Select by author
-        let author_10_posts = test_ctx
-            .post_repo
-            .select_by_author(&test_ctx.conn, &test_ctx.site, UserId(10))
-            .unwrap();
-        assert_eq!(author_10_posts.len(), 2);
-        assert!(
-            author_10_posts
-                .iter()
-                .all(|p| p.post.author == Some(UserId(10)))
-        );
-
-        let author_20_posts = test_ctx
-            .post_repo
-            .select_by_author(&test_ctx.conn, &test_ctx.site, UserId(20))
-            .unwrap();
-        assert_eq!(author_20_posts.len(), 1);
-        assert_eq!(author_20_posts[0].post.author, Some(UserId(20)));
-    }
-
-    #[rstest]
-    fn test_repository_select_by_status(mut test_ctx: TestContext) {
-        // Insert posts with different statuses
-        let mut post1 = create_minimal_post();
-        post1.id = PostId(1);
-        post1.status = PostStatus::Publish;
-
-        let mut post2 = create_minimal_post();
-        post2.id = PostId(2);
-        post2.status = PostStatus::Draft;
-
-        let mut post3 = create_minimal_post();
-        post3.id = PostId(3);
-        post3.status = PostStatus::Publish;
-
-        test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post1)
-            .unwrap();
-        test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post2)
-            .unwrap();
-        test_ctx
-            .post_repo
-            .upsert(&mut test_ctx.conn, &test_ctx.site, &post3)
-            .unwrap();
-
-        // Select by status
-        let published = test_ctx
-            .post_repo
-            .select_by_status(&test_ctx.conn, &test_ctx.site, "publish")
-            .unwrap();
-        assert_eq!(published.len(), 2);
-
-        let drafts = test_ctx
-            .post_repo
-            .select_by_status(&test_ctx.conn, &test_ctx.site, "draft")
-            .unwrap();
-        assert_eq!(drafts.len(), 1);
     }
 
     #[rstest]
