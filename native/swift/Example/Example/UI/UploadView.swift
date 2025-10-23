@@ -190,8 +190,7 @@ private class UploadViewModel: ObservableObject {
 
             NSLog("Uploading \(item)")
             _ = try await api.uploadMedia(
-                params: .init(),
-                fromLocalFileURL: file,
+                params: .init(filePath: file.path),
                 fulfilling: child
             )
 

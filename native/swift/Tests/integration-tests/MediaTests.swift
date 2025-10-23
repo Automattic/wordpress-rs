@@ -9,15 +9,25 @@ struct MediaTests {
     @Test
     func uploadImage() async throws {
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        let response = try await api.media.create(
-            params: .init(title: "Image", altText: "This is a test image"),
-            filePath: file.path,
-            fileContentType: "image/jpeg",
-            requestId: nil
-        )
+        let response = try await api.media.create(params: .init(title: "Image", altText: "This is a test image", filePath: file.path))
         #expect(response.data.mimeType == "image/jpeg")
         #expect(response.data.title.raw == "Image")
         #expect(response.data.altText == "This is a test image")
+
+        try await restoreTestServer()
+    }
+
+    @Test
+    func fileNotFoundError() async throws {
+        let file = "/path/to/a/non-existent-file.jpg"
+        await #expect(
+            throws: WpApiError.MediaFileNotFound(filePath: file),
+            performing: {
+                let _ = try await api.media.create(
+                    params: .init(filePath: file)
+                )
+            }
+        )
 
         try await restoreTestServer()
     }
@@ -30,8 +40,7 @@ struct MediaTests {
 
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
         let response = try await api.uploadMedia(
-            params: .init(),
-            fromLocalFileURL: file,
+            params: .init(filePath: file.path),
             fulfilling: progress
         )
         #expect(response.data.mimeType == "image/jpeg")
@@ -51,8 +60,7 @@ struct MediaTests {
             performing: {
                 let task = Task {
                     _ = try await api.uploadMedia(
-                        params: .init(),
-                        fromLocalFileURL: file,
+                        params: .init(filePath: file.path),
                         fulfilling: progress
                     )
                     Issue.record("The creating post function should throw")
@@ -80,8 +88,7 @@ struct MediaTests {
             performing: {
                 let task = Task {
                     _ = try await api.uploadMedia(
-                        params: .init(),
-                        fromLocalFileURL: file,
+                        params: .init(filePath: file.path),
                         fulfilling: progress
                     )
                     Issue.record("The creating post function should throw")

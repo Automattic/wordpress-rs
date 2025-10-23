@@ -48,9 +48,7 @@ final class HTTPStubs: SafeRequestExecutor {
         }
     }
 
-    func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest
-    ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
+    func upload(request: WpMultipartFormRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
         preconditionFailure("This method is not yet implemented")
     }
 
