@@ -82,6 +82,12 @@ impl PostBuilder {
         self
     }
 
+    /// Set a specific post ID (overrides auto-increment).
+    pub fn with_post_id(mut self, post_id: PostId) -> Self {
+        self.post.id = post_id;
+        self
+    }
+
     /// Set the post author.
     pub fn with_author(mut self, author: UserId) -> Self {
         self.post.author = Some(author);

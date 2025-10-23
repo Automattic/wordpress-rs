@@ -99,9 +99,11 @@ fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
 
 #[rstest]
 fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
+    let post_id_500 = PostId(500);
+
     // Create post with terms
     let post = PostBuilder::minimal()
-        .with_id(500)
+        .with_post_id(post_id_500)
         .with_categories(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)])
         .with_tags(vec![wp_api::terms::TermId(10)])
         .build();
@@ -115,9 +117,9 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     // Verify post exists
     let retrieved = test_ctx
         .post_repo
-        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(500))
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
         .unwrap();
-    assert_eq!(retrieved.post.id, PostId(500));
+    assert_eq!(retrieved.post.id, post_id_500);
     assert_eq!(retrieved.row_id, rowid);
 
     // Verify terms were synced correctly
@@ -129,7 +131,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
 
     // Update the post with different terms
     let updated_post = PostBuilder::minimal()
-        .with_id(500)
+        .with_post_id(post_id_500)
         .with_categories(vec![wp_api::terms::TermId(3)]) // Changed
         .with_tags(vec![]) // Cleared
         .build();
@@ -143,7 +145,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     // Verify terms were updated correctly
     let retrieved = test_ctx
         .post_repo
-        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(500))
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
         .unwrap();
     assert_eq!(
         retrieved.post.categories,
@@ -155,7 +157,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     // The term_relationships table should only have the new category term
     let all_terms = test_ctx
         .term_repo
-        .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, 500)
+        .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post_id_500.0)
         .unwrap();
 
     // Should only have one entry (Category with term 3)
