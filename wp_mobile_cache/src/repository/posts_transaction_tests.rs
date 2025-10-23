@@ -1,7 +1,7 @@
-//! Transaction rollback tests for PostRepository.
+//! Transaction handling tests for PostRepository.
 //!
-//! These tests verify that transaction failures properly rollback database state
-//! without leaving partial writes or corrupted data.
+//! These tests verify both successful transactions and failure cases,
+//! ensuring proper rollback on errors without leaving partial writes or corrupted data.
 
 use crate::{
     DbSite, RowId,

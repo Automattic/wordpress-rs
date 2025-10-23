@@ -746,8 +746,6 @@ mod tests {
 
     #[rstest]
     fn test_delete_by_post_id_deletes_terms(mut test_ctx: TestContext) {
-        let term_repo = crate::repository::term_relationships::TermRelationshipRepository;
-
         // Insert post without terms (to avoid transaction issues in this test)
         let post = PostBuilder::minimal().with_id(500).build();
         test_ctx
@@ -757,7 +755,8 @@ mod tests {
 
         // Manually add terms using WordPress post ID
         let tx = test_ctx.conn.transaction().unwrap();
-        term_repo
+        test_ctx
+            .term_repo
             .sync_terms_for_object(
                 &tx,
                 &test_ctx.site,
@@ -769,7 +768,8 @@ mod tests {
         tx.commit().unwrap();
 
         // Verify terms exist
-        let terms = term_repo
+        let terms = test_ctx
+            .term_repo
             .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post.id.0)
             .unwrap();
         assert!(!terms.is_empty());
@@ -781,7 +781,8 @@ mod tests {
             .unwrap();
 
         // Verify terms were also deleted
-        let terms_after = term_repo
+        let terms_after = test_ctx
+            .term_repo
             .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post.id.0)
             .unwrap();
         assert!(terms_after.is_empty());

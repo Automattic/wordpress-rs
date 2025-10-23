@@ -179,10 +179,7 @@ impl DbAnyPostWithEditContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        repository::posts::PostRepository,
-        test_fixtures::{TestContext, posts::PostBuilder, test_ctx},
-    };
+    use crate::test_fixtures::{TestContext, posts::PostBuilder, test_ctx};
     use rstest::*;
     use wp_api::posts::PostStatus;
 
@@ -209,16 +206,17 @@ mod tests {
 
     #[rstest]
     fn test_round_trip_with_minimal_fields(mut test_ctx: TestContext) {
-        let repo = PostRepository;
         let original_post = PostBuilder::minimal().build();
 
         // Insert into database using repository
-        let rowid = repo
+        let rowid = test_ctx
+            .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &original_post)
             .expect("Failed to insert post");
 
         // Read back from database using PostRepository's select_by_rowid
-        let retrieved = repo
+        let retrieved = test_ctx
+            .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
             .expect("Failed to read post");
 
@@ -231,16 +229,17 @@ mod tests {
 
     #[rstest]
     fn test_round_trip_with_all_fields(mut test_ctx: TestContext) {
-        let repo = PostRepository;
         let original_post = PostBuilder::full().build();
 
         // Insert into database using repository
-        let rowid = repo
+        let rowid = test_ctx
+            .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &original_post)
             .expect("Failed to insert post");
 
         // Read back from database using repository
-        let retrieved = repo
+        let retrieved = test_ctx
+            .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
             .expect("Failed to read post");
 
@@ -280,16 +279,17 @@ mod tests {
 
     #[rstest]
     fn test_round_trip_with_empty_json_arrays(mut test_ctx: TestContext) {
-        let repo = PostRepository;
         let post = PostBuilder::minimal()
             .with_categories(vec![])
             .with_tags(vec![])
             .build();
 
-        let rowid = repo
+        let rowid = test_ctx
+            .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
-        let retrieved = repo
+        let retrieved = test_ctx
+            .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
             .unwrap();
 
