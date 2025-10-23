@@ -1,21 +1,3 @@
-//! Test helpers and fixtures for wp_mobile_cache tests.
-//!
-//! This module provides rstest fixtures and utilities to reduce boilerplate
-//! in tests and make test intent clearer.
-//!
-//! # Usage
-//!
-//! ```rust
-//! use rstest::*;
-//! use wp_mobile_cache::test_helpers::*;
-//!
-//! #[rstest]
-//! fn test_something(test_db: Connection, test_site: DbSite, post_repo: PostRepository) {
-//!     let post = PostBuilder::new().with_author(UserId(10)).build();
-//!     post_repo.upsert(&mut test_db, &test_site, &post, &test_site).unwrap();
-//! }
-//! ```
-
 use crate::{
     DbSite, MigrationManager, RowId,
     repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
@@ -23,24 +5,7 @@ use crate::{
 use rstest::*;
 use rusqlite::Connection;
 
-/// Fixture: Creates an in-memory test database with all migrations applied.
-///
-/// Also inserts a test site with id = 1 to satisfy foreign key constraints.
-#[fixture]
-pub fn test_db() -> Connection {
-    let conn = Connection::open_in_memory().unwrap();
-    let mut migration_manager = MigrationManager::new(&conn).unwrap();
-
-    migration_manager
-        .perform_migrations()
-        .expect("All migrations should succeed");
-
-    // Insert default test site (id = 1)
-    conn.execute("INSERT INTO sites (id) VALUES (1)", [])
-        .expect("Failed to insert test site");
-
-    conn
-}
+pub mod posts;
 
 /// Test context bundling common test dependencies.
 ///
@@ -63,13 +28,28 @@ pub struct TestContext {
 }
 
 #[fixture]
-pub fn test_ctx(test_db: Connection) -> TestContext {
+pub fn test_ctx() -> TestContext {
     TestContext {
-        conn: test_db,
+        conn: test_db(),
         site: DbSite { row_id: RowId(1) },
         post_repo: PostRepository,
         term_repo: TermRelationshipRepository,
     }
+}
+
+fn test_db() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    let mut migration_manager = MigrationManager::new(&conn).unwrap();
+
+    migration_manager
+        .perform_migrations()
+        .expect("All migrations should succeed");
+
+    // Insert default test site (id = 1)
+    conn.execute("INSERT INTO sites (id) VALUES (1)", [])
+        .expect("Failed to insert test site");
+
+    conn
 }
 
 /// Helper to create an additional test site with a specific ID.

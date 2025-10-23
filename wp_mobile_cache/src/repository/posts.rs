@@ -376,13 +376,13 @@ impl PostRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        test_fixtures::posts::{create_full_post, create_minimal_post},
-        test_helpers::{TestContext, test_ctx},
+    use crate::test_fixtures::{
+        TestContext,
+        posts::{create_full_post, create_minimal_post},
+        test_ctx,
     };
     use rstest::*;
-    use wp_api::posts::PostStatus;
-    use wp_api::users::UserId;
+    use wp_api::{posts::PostStatus, users::UserId};
 
     #[rstest]
     fn test_repository_insert_and_select_by_rowid(mut test_ctx: TestContext) {

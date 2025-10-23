@@ -151,8 +151,11 @@ impl DbEntity for AnyPostWithEditContext {
 mod tests {
     use crate::{
         repository::posts::PostRepository,
-        test_fixtures::posts::{create_full_post, create_minimal_post},
-        test_helpers::{TestContext, test_ctx},
+        test_fixtures::{
+            TestContext,
+            posts::{create_full_post, create_minimal_post},
+            test_ctx,
+        },
     };
     use rstest::*;
     use wp_api::posts::{PostId, PostStatus};

@@ -5,8 +5,7 @@
 
 use crate::{
     DbSite, RowId,
-    test_fixtures::posts::PostBuilder,
-    test_helpers::{TestContext, test_ctx},
+    test_fixtures::{TestContext, posts::PostBuilder, test_ctx},
 };
 use rstest::*;
 use wp_api::posts::PostId;

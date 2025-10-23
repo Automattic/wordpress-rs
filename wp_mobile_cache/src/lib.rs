@@ -9,8 +9,6 @@ pub mod term_relationships;
 
 #[cfg(test)]
 pub mod test_fixtures;
-#[cfg(test)]
-pub mod test_helpers;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {

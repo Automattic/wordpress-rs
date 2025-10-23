@@ -2,10 +2,7 @@
 //!
 //! These tests verify that term relationships are correctly isolated between sites.
 
-use crate::{
-    test_fixtures::posts::PostBuilder,
-    test_helpers::{TestContext, create_test_site, test_ctx},
-};
+use crate::test_fixtures::{TestContext, create_test_site, posts::PostBuilder, test_ctx};
 use rstest::*;
 use wp_api::{taxonomies::TaxonomyType, terms::TermId};
 

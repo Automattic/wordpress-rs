@@ -185,7 +185,7 @@ impl TermRelationshipRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{TestContext, test_ctx};
+    use crate::test_fixtures::{TestContext, test_ctx};
     use rstest::*;
 
     #[rstest]
