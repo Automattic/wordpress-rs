@@ -42,30 +42,6 @@ pub fn test_db() -> Connection {
     conn
 }
 
-/// Fixture: Default test site with row_id = 1.
-///
-/// Note: Depends on `test_db` fixture which creates site with id = 1.
-#[fixture]
-pub fn test_site() -> DbSite {
-    DbSite { row_id: RowId(1) }
-}
-
-/// Fixture: PostRepository instance.
-///
-/// Zero-cost abstraction since PostRepository is zero-sized.
-#[fixture]
-pub fn post_repo() -> PostRepository {
-    PostRepository
-}
-
-/// Fixture: TermRelationshipRepository instance.
-///
-/// Zero-cost abstraction since TermRelationshipRepository is zero-sized.
-#[fixture]
-pub fn term_repo() -> TermRelationshipRepository {
-    TermRelationshipRepository
-}
-
 /// Test context bundling common test dependencies.
 ///
 /// Reduces boilerplate when you need connection, site, and repositories.
@@ -87,17 +63,12 @@ pub struct TestContext {
 }
 
 #[fixture]
-pub fn test_ctx(
-    test_db: Connection,
-    test_site: DbSite,
-    post_repo: PostRepository,
-    term_repo: TermRelationshipRepository,
-) -> TestContext {
+pub fn test_ctx(test_db: Connection) -> TestContext {
     TestContext {
         conn: test_db,
-        site: test_site,
-        post_repo,
-        term_repo,
+        site: DbSite { row_id: RowId(1) },
+        post_repo: PostRepository,
+        term_repo: TermRelationshipRepository,
     }
 }
 
