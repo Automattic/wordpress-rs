@@ -347,6 +347,76 @@ mod tests {
     use wp_api::posts::PostStatus;
 
     #[rstest]
+    #[case(PostBuilder::minimal().build())]
+    #[case(PostBuilder::full().build())]
+    fn test_round_trip(mut test_ctx: TestContext, #[case] original_post: AnyPostWithEditContext) {
+        // Insert into database using repository
+        let rowid = test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &original_post)
+            .expect("Failed to insert post");
+
+        // Read back from database using PostRepository's select_by_rowid
+        let retrieved = test_ctx
+            .post_repo
+            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+            .expect("Failed to read post");
+
+        // Verify round-trip
+        assert_eq!(retrieved.row_id, rowid);
+        assert_eq!(retrieved.site, test_ctx.site);
+        assert_recent_timestamp(&retrieved.last_fetched_at);
+        assert_eq!(retrieved.post, original_post);
+    }
+
+    #[rstest]
+    #[case(PostStatus::Publish)]
+    #[case(PostStatus::Draft)]
+    #[case(PostStatus::Pending)]
+    #[case(PostStatus::Private)]
+    #[case(PostStatus::Future)]
+    #[case(PostStatus::Custom("custom-status".to_string()))]
+    fn test_round_trip_with_different_enum_variants(
+        mut test_ctx: TestContext,
+        #[case] post_status: PostStatus,
+    ) {
+        let post = PostBuilder::minimal()
+            .with_status(post_status.clone())
+            .build();
+
+        let rowid = test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .unwrap();
+        let retrieved = test_ctx
+            .post_repo
+            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+            .unwrap();
+
+        assert_eq!(retrieved.post.status, post_status);
+    }
+
+    #[rstest]
+    fn test_round_trip_with_empty_json_arrays(mut test_ctx: TestContext) {
+        let post = PostBuilder::minimal()
+            .with_categories(vec![])
+            .with_tags(vec![])
+            .build();
+
+        let rowid = test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .unwrap();
+        let retrieved = test_ctx
+            .post_repo
+            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+            .unwrap();
+
+        assert_eq!(retrieved.post.categories, None);
+        assert_eq!(retrieved.post.tags, None);
+    }
+
+    #[rstest]
     fn test_repository_insert_and_select_by_rowid(mut test_ctx: TestContext) {
         let post = PostBuilder::minimal().build();
 
