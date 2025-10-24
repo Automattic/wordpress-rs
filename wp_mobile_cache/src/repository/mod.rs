@@ -37,6 +37,14 @@ pub trait TransactionManager: QueryExecutor {
     fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, SqliteDbError>;
 }
 
+/// Marker trait indicating operations are executing within a transaction context.
+///
+/// This trait is only implemented by Transaction types to enforce at compile-time
+/// that certain operations (like `sync_terms_for_object`) must run in a transaction.
+/// This provides stronger guarantees than accepting `&impl QueryExecutor`, which would
+/// allow both Connection and Transaction.
+pub trait InTransaction: QueryExecutor {}
+
 impl QueryExecutor for Connection {
     fn prepare(&self, sql: &str) -> Result<rusqlite::Statement<'_>, SqliteDbError> {
         self.prepare(sql).map_err(SqliteDbError::from)
@@ -70,6 +78,8 @@ impl<'conn> QueryExecutor for rusqlite::Transaction<'conn> {
         rusqlite::Connection::last_insert_rowid(self).into()
     }
 }
+
+impl<'conn> InTransaction for rusqlite::Transaction<'conn> {}
 
 #[cfg(test)]
 mod tests {

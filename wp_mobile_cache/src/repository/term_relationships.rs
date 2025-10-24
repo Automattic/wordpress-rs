@@ -1,5 +1,7 @@
 use crate::{
-    DbSite, SqliteDbError, repository::QueryExecutor, term_relationships::DbTermRelationship,
+    DbSite, SqliteDbError,
+    repository::{InTransaction, QueryExecutor},
+    term_relationships::DbTermRelationship,
 };
 use std::collections::HashMap;
 use wp_api::taxonomies::TaxonomyType;
@@ -20,13 +22,13 @@ impl TermRelationshipRepository {
     /// Only actual changes (new terms added, old terms removed) generate INSERT/DELETE events.
     ///
     /// **IMPORTANT**: This method must be called within a transaction to ensure atomicity.
-    /// The transaction parameter enforces this requirement at compile-time.
+    /// The `InTransaction` trait bound enforces this requirement at compile-time.
     ///
     /// # Arguments
     /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
     pub fn sync_terms_for_object(
         &self,
-        transaction: &rusqlite::Transaction<'_>,
+        transaction: &impl InTransaction,
         site: &DbSite,
         object_id: i64,
         taxonomy_type: &TaxonomyType,
