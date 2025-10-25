@@ -10,7 +10,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttp
 import okhttp3.Request
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.InvalidSslErrorReason
@@ -87,75 +86,12 @@ class WpRequestExecutor(
 
     override suspend fun upload(request: WpMultipartFormRequest): WpNetworkResponse =
         withContext(dispatcher) {
-            val requestBuilder = Request.Builder().url(request.url())
-            val multipartBodyBuilder = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-            request.fields().forEach { (k, v) ->
-                multipartBodyBuilder.addFormDataPart(k, v)
-            }
-            request.files().forEach { (name, fileInfo) ->
-                val file = fileResolver.getFile(fileInfo.filePath)
-                if (file == null || !file.canBeUploaded()) {
-                    throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
-                }
-                val mimeType = fileInfo.mimeType ?: "application/octet-stream"
-                val filename = fileInfo.fileName ?: file.name
-                // Don't wrap individual files - we'll wrap the entire multipart body instead
-                val requestBody = file.asRequestBody(mimeType.toMediaType())
-                multipartBodyBuilder.addFormDataPart(
-                    name = name,
-                    filename = filename,
-                    body = requestBody
-                )
-            }
-
-            // Build the multipart body
-            val multipartBody = multipartBodyBuilder.build()
-
-            // Wrap the entire multipart body for progress tracking
-            // This ensures progress is cumulative across all files, not per-file
-            val bodyWithProgress = if (uploadListener != null) {
-                ProgressRequestBody(
-                    delegate = multipartBody,
-                    progressListener = object : ProgressRequestBody.ProgressListener {
-                        override fun onProgress(bytesWritten: Long, contentLength: Long) {
-                            uploadListener.onProgressUpdate(bytesWritten, contentLength)
-                        }
-                    }
-                )
-            } else {
-                multipartBody
-            }
-
-            requestBuilder.method(
-                method = request.method().toString(),
-                body = bodyWithProgress
-            )
-            request.headerMap().toMap().forEach { (key, values) ->
-                values.forEach { value ->
-                    requestBuilder.addHeader(key, value)
-                }
-            }
-            // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
-            requestBuilder.header(
-                USER_AGENT_HEADER_NAME,
-                uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
-            )
-
-            val urlRequest = requestBuilder.build()
+            val multipartBody = buildMultipartBody(request)
+            val bodyWithProgress = wrapWithProgressTracking(multipartBody)
+            val urlRequest = buildUploadRequest(request, bodyWithProgress)
 
             try {
-                val call = httpClient.getClient().newCall(urlRequest)
-                uploadListener?.onUploadStarted(CancellableCall(call))
-                call.execute().use { response ->
-                    return@withContext WpNetworkResponse(
-                        body = response.body?.bytes() ?: ByteArray(0),
-                        statusCode = response.code.toUShort(),
-                        responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
-                        requestUrl = request.url(),
-                        requestHeaderMap = request.headerMap()
-                    )
-                }
+                executeUpload(urlRequest, request)
             } catch (e: SSLPeerUnverifiedException) {
                 throw requestExecutionFailedWith(
                     RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
@@ -167,6 +103,87 @@ class WpRequestExecutor(
             }
         }
 
+    private fun buildMultipartBody(request: WpMultipartFormRequest): MultipartBody {
+        val multipartBodyBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
+
+        request.fields().forEach { (k, v) ->
+            multipartBodyBuilder.addFormDataPart(k, v)
+        }
+
+        request.files().forEach { (name, fileInfo) ->
+            val file = fileResolver.getFile(fileInfo.filePath)
+            if (file == null || !file.canBeUploaded()) {
+                throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
+            }
+            val mimeType = fileInfo.mimeType ?: "application/octet-stream"
+            val filename = fileInfo.fileName ?: file.name
+            val requestBody = file.asRequestBody(mimeType.toMediaType())
+            multipartBodyBuilder.addFormDataPart(
+                name = name,
+                filename = filename,
+                body = requestBody
+            )
+        }
+
+        return multipartBodyBuilder.build()
+    }
+
+    private fun wrapWithProgressTracking(multipartBody: MultipartBody): okhttp3.RequestBody {
+        // Wrap the entire multipart body for progress tracking
+        // This ensures progress is cumulative across all files, not per-file
+        return if (uploadListener != null) {
+            ProgressRequestBody(
+                delegate = multipartBody,
+                progressListener = object : ProgressRequestBody.ProgressListener {
+                    override fun onProgress(bytesWritten: Long, contentLength: Long) {
+                        uploadListener.onProgressUpdate(bytesWritten, contentLength)
+                    }
+                }
+            )
+        } else {
+            multipartBody
+        }
+    }
+
+    private fun buildUploadRequest(
+        request: WpMultipartFormRequest,
+        body: okhttp3.RequestBody
+    ): Request {
+        val requestBuilder = Request.Builder().url(request.url())
+
+        requestBuilder.method(request.method().toString(), body)
+
+        request.headerMap().toMap().forEach { (key, values) ->
+            values.forEach { value ->
+                requestBuilder.addHeader(key, value)
+            }
+        }
+
+        // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
+        requestBuilder.header(
+            USER_AGENT_HEADER_NAME,
+            uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
+        )
+
+        return requestBuilder.build()
+    }
+
+    private fun executeUpload(
+        urlRequest: Request,
+        request: WpMultipartFormRequest
+    ): WpNetworkResponse {
+        val call = httpClient.getClient().newCall(urlRequest)
+        uploadListener?.onUploadStarted(CancellableCall(call))
+        return call.execute().use { response ->
+            WpNetworkResponse(
+                body = response.body?.bytes() ?: ByteArray(0),
+                statusCode = response.code.toUShort(),
+                responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
+                requestUrl = request.url(),
+                requestHeaderMap = request.headerMap()
+            )
+        }
+    }
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
@@ -233,7 +250,7 @@ private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHost
         reason = e.localizedMessage
     )
 
-@Suppress("UNUSED_PARAMETER")
+@Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     e: SSLPeerUnverifiedException, // To avoid `SwallowedException` from Detekt
     requestUrl: HttpUrl
@@ -262,7 +279,10 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
             newConnection.disconnect()
         }
     } catch (ex: Exception) {
-        // Fallback if certificate inspection fails
+        // Fallback if certificate inspection fails due to network issues, cast failures, etc.
+        // We intentionally catch Exception here as we want to return a valid error response
+        // even if certificate inspection fails. The original SSL error (e parameter) is
+        // preserved in the calling context. This is a best-effort attempt to get cert details.
         RequestExecutionErrorReason.InvalidSslError(
             reason = InvalidSslErrorReason.CertificateNotValidForName(
                 hostname = requestUrl.host,
