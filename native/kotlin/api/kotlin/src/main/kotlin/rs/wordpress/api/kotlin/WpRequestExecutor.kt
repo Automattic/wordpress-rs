@@ -135,6 +135,10 @@ class WpRequestExecutor(
                     requestBuilder.addHeader(key, value)
                 }
             }
+            requestBuilder.addHeader(
+                USER_AGENT_HEADER_NAME,
+                uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
+            )
 
             val urlRequest = requestBuilder.build()
 
