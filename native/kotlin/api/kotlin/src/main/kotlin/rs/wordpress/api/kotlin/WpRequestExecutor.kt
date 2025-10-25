@@ -98,17 +98,37 @@ class WpRequestExecutor(
                     throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
                 }
                 val mimeType = fileInfo.mimeType ?: "application/octet-stream"
-                val requestBody = getRequestBody(file, mimeType, uploadListener)
                 val filename = fileInfo.fileName ?: file.name
+                // Don't wrap individual files - we'll wrap the entire multipart body instead
+                val requestBody = file.asRequestBody(mimeType.toMediaType())
                 multipartBodyBuilder.addFormDataPart(
                     name = name,
                     filename = filename,
                     body = requestBody
                 )
             }
+
+            // Build the multipart body
+            val multipartBody = multipartBodyBuilder.build()
+
+            // Wrap the entire multipart body for progress tracking
+            // This ensures progress is cumulative across all files, not per-file
+            val bodyWithProgress = if (uploadListener != null) {
+                ProgressRequestBody(
+                    delegate = multipartBody,
+                    progressListener = object : ProgressRequestBody.ProgressListener {
+                        override fun onProgress(bytesWritten: Long, contentLength: Long) {
+                            uploadListener.onProgressUpdate(bytesWritten, contentLength)
+                        }
+                    }
+                )
+            } else {
+                multipartBody
+            }
+
             requestBuilder.method(
                 method = request.method().toString(),
-                body = multipartBodyBuilder.build()
+                body = bodyWithProgress
             )
             request.headerMap().toMap().forEach { (key, values) ->
                 values.forEach { value ->
@@ -129,25 +149,6 @@ class WpRequestExecutor(
             }
         }
 
-    private fun getRequestBody(
-        file: File,
-        mimeType: String,
-        uploadListener: UploadListener?
-    ): RequestBody {
-        val fileRequestBody = file.asRequestBody(mimeType.toMediaType())
-        return if (uploadListener != null) {
-            ProgressRequestBody(
-                delegate = fileRequestBody,
-                progressListener = object : ProgressRequestBody.ProgressListener {
-                    override fun onProgress(bytesWritten: Long, contentLength: Long) {
-                        uploadListener.onProgressUpdate(bytesWritten, contentLength)
-                    }
-                }
-            )
-        } else {
-            fileRequestBody
-        }
-    }
 
     override suspend fun sleep(millis: ULong) {
         delay(millis.toLong())
