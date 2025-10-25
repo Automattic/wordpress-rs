@@ -136,16 +136,28 @@ class WpRequestExecutor(
                 }
             }
 
-            val call = httpClient.getClient().newCall(requestBuilder.build())
-            uploadListener?.onUploadStarted(CancellableCall(call))
-            call.execute().use { response ->
-                return@withContext WpNetworkResponse(
-                    body = response.body?.bytes() ?: ByteArray(0),
-                    statusCode = response.code.toUShort(),
-                    responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
-                    requestUrl = request.url(),
-                    requestHeaderMap = request.headerMap()
+            val urlRequest = requestBuilder.build()
+
+            try {
+                val call = httpClient.getClient().newCall(urlRequest)
+                uploadListener?.onUploadStarted(CancellableCall(call))
+                call.execute().use { response ->
+                    return@withContext WpNetworkResponse(
+                        body = response.body?.bytes() ?: ByteArray(0),
+                        statusCode = response.code.toUShort(),
+                        responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
+                        requestUrl = request.url(),
+                        requestHeaderMap = request.headerMap()
+                    )
+                }
+            } catch (e: SSLPeerUnverifiedException) {
+                throw requestExecutionFailedWith(
+                    RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
                 )
+            } catch (e: UnknownHostException) {
+                throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
+            } catch (e: NoRouteToHostException) {
+                throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
             }
         }
 
