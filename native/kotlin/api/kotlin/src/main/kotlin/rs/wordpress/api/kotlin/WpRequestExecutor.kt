@@ -242,18 +242,32 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     //
     // We spin up a new connection that'll accept any certificate. The connection will then
     // contain all the details we need for the error.
-    val newConnection = requestUrl.toUrl().openConnection() as HttpsURLConnection
-    newConnection.setHostnameVerifier { _, _ -> return@setHostnameVerifier true }
-    newConnection.connect()
+    return try {
+        val newConnection = requestUrl.toUrl().openConnection() as HttpsURLConnection
+        newConnection.setHostnameVerifier { _, _ -> true }
+        newConnection.connect()
 
-    // Certificate is parsed by the Rust shared implementation.
-    val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
-    return RequestExecutionErrorReason.InvalidSslError(
-        reason = InvalidSslErrorReason.CertificateNotValidForName(
-            hostname = requestUrl.host,
-            presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+        try {
+            // Certificate is parsed by the Rust shared implementation.
+            val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
+            RequestExecutionErrorReason.InvalidSslError(
+                reason = InvalidSslErrorReason.CertificateNotValidForName(
+                    hostname = requestUrl.host,
+                    presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+                )
+            )
+        } finally {
+            newConnection.disconnect()
+        }
+    } catch (ex: Exception) {
+        // Fallback if certificate inspection fails
+        RequestExecutionErrorReason.InvalidSslError(
+            reason = InvalidSslErrorReason.CertificateNotValidForName(
+                hostname = requestUrl.host,
+                presentedHostnames = emptyList()
+            )
         )
-    )
+    }
 }
 
 private fun requestExecutionFailedWith(reason: RequestExecutionErrorReason) =
