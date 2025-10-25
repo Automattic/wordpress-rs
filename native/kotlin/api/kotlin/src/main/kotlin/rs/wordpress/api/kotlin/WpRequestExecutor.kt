@@ -50,57 +50,24 @@ class WpRequestExecutor(
                     wpNetworkRequestBody
                 }
             )
-            request.headerMap().toMap().forEach { (key, values) ->
-                values.forEach { value ->
-                    requestBuilder.addHeader(key, value)
-                }
-            }
-            // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
-            requestBuilder.header(
-                USER_AGENT_HEADER_NAME,
-                uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
-            )
 
+            addRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
-            try {
-                httpClient.getClient().newCall(urlRequest).execute().use { response ->
-                    return@withContext WpNetworkResponse(
-                        body = response.body?.bytes() ?: ByteArray(0),
-                        statusCode = response.code.toUShort(),
-                        responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
-                        requestUrl = request.url(),
-                        requestHeaderMap = request.headerMap()
-                    )
-                }
-            } catch (e: SSLPeerUnverifiedException) {
-                throw requestExecutionFailedWith(
-                    RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
-                )
-            } catch (e: UnknownHostException) {
-                throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
-            } catch (e: NoRouteToHostException) {
-                throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
-            }
+            executeRequestSafely(urlRequest, request.url(), request.headerMap())
         }
 
     override suspend fun upload(request: WpMultipartFormRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val multipartBody = buildMultipartBody(request)
             val bodyWithProgress = wrapWithProgressTracking(multipartBody)
-            val urlRequest = buildUploadRequest(request, bodyWithProgress)
+            val requestBuilder = Request.Builder().url(request.url())
+            requestBuilder.method(request.method().toString(), bodyWithProgress)
 
-            try {
-                executeUpload(urlRequest, request)
-            } catch (e: SSLPeerUnverifiedException) {
-                throw requestExecutionFailedWith(
-                    RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
-                )
-            } catch (e: UnknownHostException) {
-                throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
-            } catch (e: NoRouteToHostException) {
-                throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
-            }
+            addRequestHeaders(requestBuilder, request.headerMap())
+            val urlRequest = requestBuilder.build()
+
+            executeRequestSafely(urlRequest, request.url(), request.headerMap(), notifyUploadListener = true)
         }
 
     private fun buildMultipartBody(request: WpMultipartFormRequest): MultipartBody {
@@ -145,43 +112,51 @@ class WpRequestExecutor(
         }
     }
 
-    private fun buildUploadRequest(
-        request: WpMultipartFormRequest,
-        body: okhttp3.RequestBody
-    ): Request {
-        val requestBuilder = Request.Builder().url(request.url())
-
-        requestBuilder.method(request.method().toString(), body)
-
-        request.headerMap().toMap().forEach { (key, values) ->
+    private fun addRequestHeaders(requestBuilder: Request.Builder, headerMap: WpNetworkHeaderMap) {
+        headerMap.toMap().forEach { (key, values) ->
             values.forEach { value ->
                 requestBuilder.addHeader(key, value)
             }
         }
-
         // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
         requestBuilder.header(
             USER_AGENT_HEADER_NAME,
             uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
         )
-
-        return requestBuilder.build()
     }
 
-    private fun executeUpload(
+    @Suppress("ThrowsCount")
+    private fun executeRequestSafely(
         urlRequest: Request,
-        request: WpMultipartFormRequest
+        requestUrl: String,
+        requestHeaderMap: WpNetworkHeaderMap,
+        notifyUploadListener: Boolean = false
     ): WpNetworkResponse {
-        val call = httpClient.getClient().newCall(urlRequest)
-        uploadListener?.onUploadStarted(CancellableCall(call))
-        return call.execute().use { response ->
-            WpNetworkResponse(
-                body = response.body?.bytes() ?: ByteArray(0),
-                statusCode = response.code.toUShort(),
-                responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
-                requestUrl = request.url(),
-                requestHeaderMap = request.headerMap()
+        try {
+            val call = httpClient.getClient().newCall(urlRequest)
+
+            // Notify upload listener if this is an upload request
+            if (notifyUploadListener) {
+                uploadListener?.onUploadStarted(CancellableCall(call))
+            }
+
+            return call.execute().use { response ->
+                WpNetworkResponse(
+                    body = response.body?.bytes() ?: ByteArray(0),
+                    statusCode = response.code.toUShort(),
+                    responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
+                    requestUrl = requestUrl,
+                    requestHeaderMap = requestHeaderMap
+                )
+            }
+        } catch (e: SSLPeerUnverifiedException) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
             )
+        } catch (e: UnknownHostException) {
+            throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
+        } catch (e: NoRouteToHostException) {
+            throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
         }
     }
 
