@@ -56,7 +56,8 @@ class WpRequestExecutor(
                     requestBuilder.addHeader(key, value)
                 }
             }
-            requestBuilder.addHeader(
+            // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
+            requestBuilder.header(
                 USER_AGENT_HEADER_NAME,
                 uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
             )
@@ -135,7 +136,8 @@ class WpRequestExecutor(
                     requestBuilder.addHeader(key, value)
                 }
             }
-            requestBuilder.addHeader(
+            // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
+            requestBuilder.header(
                 USER_AGENT_HEADER_NAME,
                 uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
             )
