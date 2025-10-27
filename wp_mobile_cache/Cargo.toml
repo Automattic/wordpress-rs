@@ -8,6 +8,12 @@ default = ["rusqlite/bundled"]
 
 [dependencies]
 rusqlite = { version = "0.37.0", features = ["hooks"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
+
+[dev-dependencies]
+chrono = { workspace = true }
+rstest = "0.18"

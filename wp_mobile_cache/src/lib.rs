@@ -1,6 +1,14 @@
 use rusqlite::hooks::Action;
+use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::{Arc, Mutex};
+
+pub mod mappings;
+pub mod repository;
+pub mod term_relationships;
+
+#[cfg(test)]
+pub mod test_fixtures;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
@@ -19,6 +27,88 @@ impl From<rusqlite::Error> for SqliteDbError {
     fn from(err: rusqlite::Error) -> Self {
         SqliteDbError::SqliteError(err.to_string())
     }
+}
+
+/// Represents a database row ID (autoincrement field).
+/// SQLite rowids are guaranteed to be non-negative, so we use u64.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct RowId(pub u64);
+
+impl ToSql for RowId {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0 as i64))
+    }
+}
+
+impl FromSql for RowId {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
+        i64::column_result(value).map(|i| {
+            debug_assert!(i >= 0, "RowId should be non-negative, got: {}", i);
+            RowId(i as u64)
+        })
+    }
+}
+
+impl From<i64> for RowId {
+    fn from(value: i64) -> Self {
+        debug_assert!(value >= 0, "RowId should be non-negative, got: {}", value);
+        RowId(value as u64)
+    }
+}
+
+impl RowId {
+    /// Convert a slice of RowIds to a comma-separated string for use in SQL IN clauses.
+    ///
+    /// This helper is used when building dynamic SQL queries with arrays of IDs.
+    /// Since RowIds are internal database IDs (not user input), this is safe from SQL injection.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let row_ids = vec![RowId(1), RowId(2), RowId(3)];
+    /// let ids_str = RowId::to_sql_list(&row_ids); // "1, 2, 3"
+    /// let sql = format!("SELECT * FROM table WHERE id IN ({})", ids_str);
+    /// ```
+    pub fn to_sql_list(row_ids: &[RowId]) -> String {
+        row_ids
+            .iter()
+            .map(|id| id.0.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+impl From<RowId> for i64 {
+    fn from(row_id: RowId) -> Self {
+        row_id.0 as i64
+    }
+}
+
+/// Represents a cached WordPress site in the database.
+///
+/// # Design Rationale
+///
+/// This is intentionally a database-specific type (hence the `Db` prefix) rather than
+/// a domain type representing a WordPress site. This design choice prevents confusion:
+///
+/// - **Not a WordPress.com site ID**: The `row_id` has no relationship to WordPress.com site IDs
+/// - **Not a self-hosted site identifier**: Self-hosted sites don't have numeric IDs
+/// - **Internal cache identifier only**: This ID exists only for our local database's multi-site support
+///
+/// # Future Extension
+///
+/// When site type tables are added (e.g., `self_hosted_sites`, `wordpress_com_sites`), this
+/// struct will gain additional fields:
+///
+/// ```ignore
+/// pub struct DbSite {
+///     pub row_id: RowId,
+///     pub site_type: SiteType,      // SelfHosted | WordPressCom
+///     pub mapped_site_id: RowId,    // Foreign key to specific site type table
+/// }
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct DbSite {
+    pub row_id: RowId,
 }
 
 #[derive(uniffi::Object)]
@@ -62,9 +152,10 @@ impl WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 2] = [
-    include_str!("../migrations/0001-create-posts-table.sql"),
-    include_str!("../migrations/0002-create-users-table.sql"),
+static MIGRATION_QUERIES: [&str; 3] = [
+    include_str!("../migrations/0001-create-sites-table.sql"),
+    include_str!("../migrations/0002-create-posts-table.sql"),
+    include_str!("../migrations/0003-create-term-relationships.sql"),
 ];
 
 pub struct MigrationManager<'a> {

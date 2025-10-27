@@ -1,0 +1,641 @@
+use crate::{
+    DbSite, SqliteDbError,
+    repository::{InTransaction, QueryExecutor},
+    term_relationships::DbTermRelationship,
+};
+use std::collections::HashMap;
+use wp_api::taxonomies::TaxonomyType;
+use wp_api::terms::TermId;
+
+/// Repository for managing term relationships in the database.
+///
+/// Provides methods for syncing, querying, and deleting term associations
+/// between objects (posts, pages, etc.) and WordPress terms.
+pub struct TermRelationshipRepository;
+
+impl TermRelationshipRepository {
+    const TABLE_NAME: &'static str = "term_relationships";
+
+    /// Synchronize terms for an object (only insert new, delete removed, keep unchanged).
+    ///
+    /// This approach is observer-friendly: unchanged terms generate no DB events.
+    /// Only actual changes (new terms added, old terms removed) generate INSERT/DELETE events.
+    ///
+    /// **IMPORTANT**: This method must be called within a transaction to ensure atomicity.
+    /// The `InTransaction` trait bound enforces this requirement at compile-time.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
+    pub fn sync_terms_for_object(
+        &self,
+        transaction: &impl InTransaction,
+        site: &DbSite,
+        object_id: i64,
+        taxonomy_type: &TaxonomyType,
+        new_term_ids: &[TermId],
+    ) -> Result<(), SqliteDbError> {
+        // 1. Get existing term IDs
+        let existing_terms =
+            self.get_terms_for_object(transaction, site, object_id, taxonomy_type)?;
+
+        // 2. Calculate diff (using Vec-based filtering since TermId may not impl Hash)
+        let to_delete: Vec<_> = existing_terms
+            .iter()
+            .filter(|existing| !new_term_ids.contains(existing))
+            .copied()
+            .collect();
+
+        let to_insert: Vec<_> = new_term_ids
+            .iter()
+            .filter(|new_id| !existing_terms.contains(new_id))
+            .copied()
+            .collect();
+
+        // 3. Delete removed terms (only the ones being removed)
+        if !to_delete.is_empty() {
+            self.delete_terms(transaction, site, object_id, taxonomy_type, &to_delete)?;
+        }
+
+        // 4. Insert new terms (only the ones being added)
+        if !to_insert.is_empty() {
+            self.insert_terms(transaction, site, object_id, taxonomy_type, &to_insert)?;
+        }
+
+        // Unchanged terms: no DB operations = no observer events
+        Ok(())
+    }
+
+    /// Delete specific terms for an object.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
+    fn delete_terms(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: i64,
+        taxonomy_type: &TaxonomyType,
+        term_ids: &[TermId],
+    ) -> Result<(), SqliteDbError> {
+        if term_ids.is_empty() {
+            return Ok(());
+        }
+
+        // Build placeholders for IN clause
+        let placeholders: Vec<_> = (0..term_ids.len()).map(|_| "?").collect();
+        let sql = format!(
+            "DELETE FROM {} WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ? AND term_id IN ({})",
+            Self::TABLE_NAME,
+            placeholders.join(", ")
+        );
+
+        // Build params: [site_id, object_id, taxonomy_type, term_id1, term_id2, ...]
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![
+            Box::new(site.row_id),
+            Box::new(object_id),
+            Box::new(taxonomy_type.to_string()),
+        ];
+        params.extend(
+            term_ids
+                .iter()
+                .map(|term_id| Box::new(term_id.0) as Box<dyn rusqlite::ToSql>),
+        );
+
+        let params_refs: Vec<_> = params.iter().map(|p| p.as_ref()).collect();
+        executor.execute(&sql, params_refs.as_slice())?;
+        Ok(())
+    }
+
+    /// Insert new terms for an object.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
+    fn insert_terms(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: i64,
+        taxonomy_type: &TaxonomyType,
+        term_ids: &[TermId],
+    ) -> Result<(), SqliteDbError> {
+        if term_ids.is_empty() {
+            return Ok(());
+        }
+
+        let insert_sql = format!(
+            "INSERT INTO {} (db_site_id, object_id, term_id, taxonomy_type) VALUES (?, ?, ?, ?)",
+            Self::TABLE_NAME
+        );
+
+        term_ids.iter().try_for_each(|term_id| {
+            executor.execute(
+                &insert_sql,
+                rusqlite::params![site.row_id, object_id, term_id.0, taxonomy_type.to_string()],
+            )?;
+            Ok::<_, SqliteDbError>(())
+        })
+    }
+
+    /// Get all term IDs for an object's taxonomy.
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
+    pub fn get_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: i64,
+        taxonomy_type: &TaxonomyType,
+    ) -> Result<Vec<TermId>, SqliteDbError> {
+        let sql = format!(
+            "SELECT term_id FROM {} WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let rows = stmt.query_map(
+            rusqlite::params![site.row_id, object_id, taxonomy_type.to_string()],
+            |row| {
+                let id: i64 = row.get(0)?;
+                Ok(TermId(id))
+            },
+        )?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)
+    }
+
+    /// Get all term IDs grouped by taxonomy for an object (for post reads with joins).
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
+    pub fn get_all_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: i64,
+    ) -> Result<HashMap<TaxonomyType, Vec<TermId>>, SqliteDbError> {
+        let sql = format!(
+            "SELECT taxonomy_type, term_id FROM {} WHERE db_site_id = ? AND object_id = ?",
+            Self::TABLE_NAME
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let mut rows = stmt.query_map(rusqlite::params![site.row_id, object_id], |row| {
+            let taxonomy_str: String = row.get(0)?;
+            let term_id: i64 = row.get(1)?;
+            Ok((taxonomy_str, term_id))
+        })?;
+
+        rows.try_fold(
+            HashMap::new(),
+            |mut result: HashMap<TaxonomyType, Vec<TermId>>, row_result| {
+                let (taxonomy_str, term_id) = row_result.map_err(SqliteDbError::from)?;
+                let taxonomy_type: TaxonomyType =
+                    serde_json::from_value(serde_json::Value::String(taxonomy_str.clone()))
+                        .map_err(|e| {
+                            SqliteDbError::SqliteError(format!(
+                                "Invalid taxonomy_type '{}': {}",
+                                taxonomy_str, e
+                            ))
+                        })?;
+
+                result
+                    .entry(taxonomy_type)
+                    .or_default()
+                    .push(TermId(term_id));
+                Ok::<_, SqliteDbError>(result)
+            },
+        )
+    }
+
+    /// Delete all terms for an object (called when deleting the object itself).
+    ///
+    /// # Arguments
+    /// * `object_id` - WordPress object ID (e.g., post.id), NOT SQLite rowid
+    pub fn delete_all_terms_for_object(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_id: i64,
+    ) -> Result<usize, SqliteDbError> {
+        let sql = format!(
+            "DELETE FROM {} WHERE db_site_id = ? AND object_id = ?",
+            Self::TABLE_NAME
+        );
+        executor.execute(&sql, rusqlite::params![site.row_id, object_id])
+    }
+
+    /// Get all term relationships for multiple objects in a single batch query.
+    ///
+    /// This is a generic method that loads complete `DbTermRelationship` entities
+    /// for the specified objects. Domain-specific logic (e.g., separating categories
+    /// from tags) should be handled in the mapping layer.
+    ///
+    /// # Arguments
+    /// * `object_ids` - WordPress object IDs (e.g., post.id, page.id), NOT SQLite rowids
+    ///
+    /// Returns a HashMap mapping object_id (as i64) to its term relationships.
+    pub fn get_terms_for_objects(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        object_ids: &[i64],
+    ) -> Result<HashMap<i64, Vec<DbTermRelationship>>, SqliteDbError> {
+        if object_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let ids_str = object_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql = format!(
+            "SELECT * FROM {} WHERE db_site_id = ? AND object_id IN ({})",
+            Self::TABLE_NAME,
+            ids_str
+        );
+
+        let mut stmt = executor.prepare(&sql)?;
+        let mut rows = stmt.query_map([site.row_id], |row| {
+            DbTermRelationship::from_row(row)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        })?;
+
+        // Group term relationships by object_id
+        rows.try_fold(
+            HashMap::new(),
+            |mut acc: HashMap<i64, Vec<DbTermRelationship>>, row_result| {
+                let relationship = row_result.map_err(SqliteDbError::from)?;
+                acc.entry(relationship.object_id.0 as i64)
+                    .or_default()
+                    .push(relationship);
+                Ok::<_, SqliteDbError>(acc)
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::{TestContext, test_ctx};
+    use rstest::*;
+
+    #[rstest]
+    fn test_sync_terms_insert_new(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        let term_ids = vec![TermId(1), TermId(2), TermId(3)];
+
+        // Sync terms (should insert all)
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+                &term_ids,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Verify all were inserted
+        let retrieved = test_ctx
+            .term_repo
+            .get_terms_for_object(
+                &test_ctx.conn,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+            )
+            .unwrap();
+
+        assert_eq!(retrieved.len(), 3);
+        assert!(retrieved.contains(&TermId(1)));
+        assert!(retrieved.contains(&TermId(2)));
+        assert!(retrieved.contains(&TermId(3)));
+    }
+
+    #[rstest]
+    fn test_sync_terms_remove_old(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        // Insert initial terms
+        let initial_terms = vec![TermId(1), TermId(2), TermId(3)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &initial_terms,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Sync with fewer terms (remove 2 and 3)
+        let updated_terms = vec![TermId(1)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &updated_terms,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Verify only term 1 remains
+        let retrieved = test_ctx
+            .term_repo
+            .get_terms_for_object(
+                &test_ctx.conn,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+            )
+            .unwrap();
+
+        assert_eq!(retrieved.len(), 1);
+        assert_eq!(retrieved[0], TermId(1));
+    }
+
+    #[rstest]
+    fn test_sync_terms_add_new_keep_existing(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        // Insert initial terms
+        let initial_terms = vec![TermId(1), TermId(2)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+                &initial_terms,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Sync with additional terms (keep 1, 2, add 3, 4)
+        let updated_terms = vec![TermId(1), TermId(2), TermId(3), TermId(4)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+                &updated_terms,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Verify all four are present
+        let retrieved = test_ctx
+            .term_repo
+            .get_terms_for_object(
+                &test_ctx.conn,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+            )
+            .unwrap();
+
+        assert_eq!(retrieved.len(), 4);
+        assert!(retrieved.contains(&TermId(1)));
+        assert!(retrieved.contains(&TermId(2)));
+        assert!(retrieved.contains(&TermId(3)));
+        assert!(retrieved.contains(&TermId(4)));
+    }
+
+    #[rstest]
+    fn test_sync_terms_no_changes(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        // Insert initial terms
+        let terms = vec![TermId(1), TermId(2), TermId(3)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &terms,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Sync with same terms (no changes)
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &terms,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Verify terms unchanged
+        let retrieved = test_ctx
+            .term_repo
+            .get_terms_for_object(
+                &test_ctx.conn,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+            )
+            .unwrap();
+
+        assert_eq!(retrieved.len(), 3);
+    }
+
+    #[rstest]
+    fn test_get_all_terms_for_object(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        // Add categories
+        let categories = vec![TermId(1), TermId(2)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+                &categories,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Add tags
+        let tags = vec![TermId(10), TermId(20), TermId(30)];
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &tags,
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Get all terms
+        let all_terms = test_ctx
+            .term_repo
+            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, test_object_id)
+            .unwrap();
+
+        // Verify categories
+        assert_eq!(all_terms.get(&TaxonomyType::Category).unwrap().len(), 2);
+        assert!(
+            all_terms
+                .get(&TaxonomyType::Category)
+                .unwrap()
+                .contains(&TermId(1))
+        );
+        assert!(
+            all_terms
+                .get(&TaxonomyType::Category)
+                .unwrap()
+                .contains(&TermId(2))
+        );
+
+        // Verify tags
+        assert_eq!(all_terms.get(&TaxonomyType::PostTag).unwrap().len(), 3);
+        assert!(
+            all_terms
+                .get(&TaxonomyType::PostTag)
+                .unwrap()
+                .contains(&TermId(10))
+        );
+        assert!(
+            all_terms
+                .get(&TaxonomyType::PostTag)
+                .unwrap()
+                .contains(&TermId(20))
+        );
+        assert!(
+            all_terms
+                .get(&TaxonomyType::PostTag)
+                .unwrap()
+                .contains(&TermId(30))
+        );
+    }
+
+    #[rstest]
+    fn test_delete_all_terms_for_object(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        // Add terms
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+                &[TermId(1)],
+            )
+            .unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &[TermId(10)],
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Delete all terms
+        let deleted = test_ctx
+            .term_repo
+            .delete_all_terms_for_object(&test_ctx.conn, &test_ctx.site, test_object_id)
+            .unwrap();
+        assert_eq!(deleted, 2);
+
+        // Verify all deleted
+        let all_terms = test_ctx
+            .term_repo
+            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, test_object_id)
+            .unwrap();
+        assert!(all_terms.is_empty());
+    }
+
+    #[rstest]
+    fn test_different_taxonomy_types_are_isolated(mut test_ctx: TestContext) {
+        let test_object_id = 42;
+
+        // Add same term ID to different taxonomies
+        let tx = test_ctx.conn.transaction().unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+                &[TermId(1)],
+            )
+            .unwrap();
+        test_ctx
+            .term_repo
+            .sync_terms_for_object(
+                &tx,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+                &[TermId(1)],
+            )
+            .unwrap();
+        tx.commit().unwrap();
+
+        // Verify both exist independently
+        let categories = test_ctx
+            .term_repo
+            .get_terms_for_object(
+                &test_ctx.conn,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::Category,
+            )
+            .unwrap();
+        let tags = test_ctx
+            .term_repo
+            .get_terms_for_object(
+                &test_ctx.conn,
+                &test_ctx.site,
+                test_object_id,
+                &TaxonomyType::PostTag,
+            )
+            .unwrap();
+
+        assert_eq!(categories.len(), 1);
+        assert_eq!(tags.len(), 1);
+    }
+}
