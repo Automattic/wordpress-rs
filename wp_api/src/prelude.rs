@@ -2,8 +2,8 @@ pub use crate::{
     WpApiParamOrder, WpAppNotifier, WpContext,
     api_client::{IsWpApiClientDelegate, WpApiClient, WpApiClientDelegate, WpApiRequestBuilder},
     api_error::{
-        InvalidSslErrorReason, MaybeWpError, MediaUploadRequestExecutionError, ParsedRequestError,
-        RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
+        InvalidSslErrorReason, MaybeWpError, ParsedRequestError, RequestExecutionError,
+        RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
     },
     auth::{WpAuthentication, WpAuthenticationProvider},
     date::WpGmtDateTime,
@@ -14,7 +14,7 @@ pub use crate::{
     request::{
         NetworkRequestAccessor, RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest,
         WpNetworkResponse,
-        endpoint::{ApiUrlResolver, WpOrgSiteApiUrlResolver, media_endpoint::MediaUploadRequest},
+        endpoint::{ApiUrlResolver, WpOrgSiteApiUrlResolver},
     },
     uuid::{WpUuid, WpUuidParseError},
     wp_content_i64_id, wp_content_string_id,

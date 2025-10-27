@@ -14,13 +14,12 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import uniffi.wp_api.InvalidSslErrorReason
-import uniffi.wp_api.MediaUploadRequest
-import uniffi.wp_api.MediaUploadRequestExecutionException
 import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.RequestMethod
+import uniffi.wp_api.WpMultipartFormRequest
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
@@ -85,54 +84,57 @@ class WpRequestExecutor(
             }
         }
 
-    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse =
+    override suspend fun upload(request: WpMultipartFormRequest): WpNetworkResponse =
         withContext(dispatcher) {
-            val requestBuilder = Request.Builder().url(mediaUploadRequest.url())
+            val requestBuilder = Request.Builder().url(request.url())
             val multipartBodyBuilder = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-            mediaUploadRequest.mediaParams().forEach { (k, v) ->
+            request.fields().forEach { (k, v) ->
                 multipartBodyBuilder.addFormDataPart(k, v)
             }
-            val file = fileResolver.getFile(mediaUploadRequest.filePath())
-            if (file == null || !file.canBeUploaded()) {
-                throw MediaUploadRequestExecutionException.MediaFileNotFound(mediaUploadRequest.filePath())
+            request.files().forEach { (name, fileInfo) ->
+                val file = fileResolver.getFile(fileInfo.filePath)
+                if (file == null || !file.canBeUploaded()) {
+                    throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
+                }
+                val mimeType = fileInfo.mimeType ?: "application/octet-stream"
+                val requestBody = getRequestBody(file, mimeType, uploadListener)
+                val filename = fileInfo.fileName ?: file.name
+                multipartBodyBuilder.addFormDataPart(
+                    name = name,
+                    filename = filename,
+                    body = requestBody
+                )
             }
-            val progressRequestBody = getRequestBody(file, mediaUploadRequest, uploadListener)
-            multipartBodyBuilder.addFormDataPart(
-                name = "file",
-                filename = file.name,
-                body = progressRequestBody
-            )
             requestBuilder.method(
-                method = mediaUploadRequest.method().toString(),
+                method = request.method().toString(),
                 body = multipartBodyBuilder.build()
             )
-            mediaUploadRequest.headerMap().toMap().forEach { (key, values) ->
+            request.headerMap().toMap().forEach { (key, values) ->
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
             }
 
             val call = httpClient.getClient().newCall(requestBuilder.build())
-            // Notify about the call creation so it can be cancelled if needed
             uploadListener?.onUploadStarted(CancellableCall(call))
             call.execute().use { response ->
                 return@withContext WpNetworkResponse(
                     body = response.body?.bytes() ?: ByteArray(0),
                     statusCode = response.code.toUShort(),
                     responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
-                    requestUrl = mediaUploadRequest.url(),
-                    requestHeaderMap = mediaUploadRequest.headerMap()
+                    requestUrl = request.url(),
+                    requestHeaderMap = request.headerMap()
                 )
             }
         }
 
     private fun getRequestBody(
         file: File,
-        mediaUploadRequest: MediaUploadRequest,
+        mimeType: String,
         uploadListener: UploadListener?
     ): RequestBody {
-        val fileRequestBody = file.asRequestBody(mediaUploadRequest.fileContentType().toMediaType())
+        val fileRequestBody = file.asRequestBody(mimeType.toMediaType())
         return if (uploadListener != null) {
             ProgressRequestBody(
                 delegate = fileRequestBody,

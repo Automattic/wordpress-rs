@@ -6,6 +6,7 @@ use crate::{
         PostCommentStatus, PostId, PostPingStatus, PostStatus, WpApiParamPostsOrderBy,
         WpApiParamPostsSearchColumn,
     },
+    request::{MultipartFormFile, RequiresMultipartForm},
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -310,6 +311,23 @@ pub struct MediaCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_id: Option<PostId>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/381
+    #[serde(skip)]
+    pub file_path: String,
+}
+
+impl RequiresMultipartForm for MediaCreateParams {
+    fn multipart_form_files(&self) -> HashMap<String, MultipartFormFile> {
+        let mut files = HashMap::new();
+        files.insert(
+            "file".to_string(),
+            MultipartFormFile {
+                file_path: self.file_path.clone(),
+                mime_type: None,
+                file_name: None,
+            },
+        );
+        files
+    }
 }
 
 impl From<MediaCreateParams> for HashMap<String, String> {

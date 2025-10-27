@@ -9,10 +9,6 @@ import FoundationNetworking
 import Combine
 #endif
 
-#if canImport(UniformTypeIdentifiers)
-import UniformTypeIdentifiers
-#endif
-
 public actor WordPressAPI {
 
     enum Errors: Error {
@@ -176,45 +172,47 @@ public actor WordPressAPI {
 #if PROGRESS_REPORTING_ENABLED
     public func uploadMedia(
         params: MediaCreateParams,
-        fromLocalFileURL localFileURL: URL,
-        fulfilling progress: Progress,
-        mimeType: String? = nil,
+        fulfilling progress: Progress
     ) async throws -> MediaRequestCreateResponse {
-        precondition(localFileURL.isFileURL)
         precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
         precondition(progress.cancellationHandler == nil)
 
-        let requestId = WpUuid()
-
-        let fileContentType: String
-        if let mimeType {
-            fileContentType = mimeType
-        } else if let mimeType = UTType(filenameExtension: localFileURL.pathExtension)?.preferredMIMEType {
-            fileContentType = mimeType
-        } else {
-            fileContentType = "application/octet-stream"
-        }
-
-        let cancellable = requestExecutor
-            .progress(forRequestWithId: requestId.uuidString())
-            .sink {
-                progress.addChild($0, withPendingUnitCount: progress.totalUnitCount - progress.completedUnitCount)
-            }
-        defer {
-            cancellable.cancel()
-        }
+        let context = RequestContext()
 
         let uploadTask = Task {
-            try await media.create(
-                params: params,
-                filePath: localFileURL.path,
-                fileContentType: fileContentType,
-                requestId: requestId
-            )
+            try await media.createCancellation(params: params, context: context)
+        }
+
+        let progressObserver = Task {
+            // A request id will be put into the `RequestContext` during the execution of the `media.create` above.
+            // This loop waits for the request id becomes available
+            let requestId: String
+            while true {
+                try await Task.sleep(nanoseconds: 100_000)
+                try Task.checkCancellation()
+
+                guard let id = context.requestIds().first else {
+                    continue
+                }
+
+                requestId = id
+                break
+            }
+
+            // Get the progress of the `URLSessionTask` of the given request id.
+            guard let task = await requestExecutor
+                .progress(forRequestWithId: requestId)
+                .values
+                .first(where: { _ in true }) else { return }
+
+            try Task.checkCancellation()
+
+            progress.addChild(task, withPendingUnitCount: progress.totalUnitCount - progress.completedUnitCount)
         }
 
         progress.cancellationHandler = {
             uploadTask.cancel()
+            progressObserver.cancel()
         }
 
         return try await withTaskCancellationHandler {

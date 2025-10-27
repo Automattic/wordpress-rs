@@ -540,12 +540,18 @@ pub enum RequestExecutionError {
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
+    MediaFileNotFound {
+        file_path: String,
+    },
 }
 
 impl WpSupportsLocalization for RequestExecutionError {
     fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             RequestExecutionError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
+            RequestExecutionError::MediaFileNotFound { file_path } => {
+                WpMessages::media_file_not_found(file_path)
+            }
         }
     }
 }
@@ -695,31 +701,6 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
-pub enum MediaUploadRequestExecutionError {
-    RequestExecutionFailed {
-        status_code: Option<u16>,
-        redirects: Option<Vec<WpRedirect>>,
-        reason: RequestExecutionErrorReason,
-    },
-    MediaFileNotFound {
-        file_path: String,
-    },
-}
-
-impl WpSupportsLocalization for MediaUploadRequestExecutionError {
-    fn message_bundle(&self) -> MessageBundle<'_> {
-        match self {
-            MediaUploadRequestExecutionError::RequestExecutionFailed { reason, .. } => {
-                reason.message_bundle()
-            }
-            MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {
-                WpMessages::media_file_not_found(file_path)
-            }
-        }
-    }
-}
-
 impl From<RequestExecutionError> for WpApiError {
     fn from(value: RequestExecutionError) -> Self {
         match value {
@@ -732,23 +713,7 @@ impl From<RequestExecutionError> for WpApiError {
                 redirects,
                 reason,
             },
-        }
-    }
-}
-
-impl From<MediaUploadRequestExecutionError> for WpApiError {
-    fn from(value: MediaUploadRequestExecutionError) -> Self {
-        match value {
-            MediaUploadRequestExecutionError::RequestExecutionFailed {
-                status_code,
-                redirects,
-                reason,
-            } => Self::RequestExecutionFailed {
-                status_code,
-                redirects,
-                reason,
-            },
-            MediaUploadRequestExecutionError::MediaFileNotFound { file_path } => {
+            RequestExecutionError::MediaFileNotFound { file_path } => {
                 Self::MediaFileNotFound { file_path }
             }
         }

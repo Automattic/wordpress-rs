@@ -3,8 +3,7 @@ use wp_api::{
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     prelude::*,
-    request::RequestContext,
-    request::endpoint::media_endpoint::MediaUploadRequest,
+    request::{RequestContext, WpMultipartFormRequest},
     users::UserId,
 };
 use wp_api_integration_tests::prelude::*;
@@ -14,12 +13,10 @@ use wp_api_integration_tests::prelude::*;
 async fn create_media_err_cannot_create() {
     api_client_as_subscriber()
         .media()
-        .create(
-            MediaCreateParams::default(),
-            MEDIA_TEST_FILE_PATH.to_string(),
-            MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
-            None,
-        )
+        .create(&MediaCreateParams {
+            file_path: MEDIA_TEST_FILE_PATH.to_string(),
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::CannotCreate)
 }
@@ -29,12 +26,10 @@ async fn create_media_err_cannot_create() {
 async fn create_media_err_upload_no_data() {
     api_client_with_medir_err_networking(MediaErrNetworkingTestType::UploadNoData)
         .media()
-        .create(
-            MediaCreateParams::default(),
-            MEDIA_TEST_FILE_PATH.to_string(),
-            MEDIA_TEST_FILE_CONTENT_TYPE.to_string(),
-            None,
-        )
+        .create(&MediaCreateParams {
+            file_path: MEDIA_TEST_FILE_PATH.to_string(),
+            ..Default::default()
+        })
         .await
         .assert_wp_error(WpErrorCode::UploadNoData)
 }
@@ -210,50 +205,39 @@ impl RequestExecutor for MediaErrNetworking {
         })
     }
 
-    async fn upload_media(
+    async fn upload(
         &self,
-        media_upload_request: Arc<MediaUploadRequest>,
-    ) -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        let mut request = self
+        upload_request: Arc<WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let request = self
             .client
             .request(
-                ReqwestRequestExecutor::request_method(media_upload_request.method()),
-                media_upload_request.url().0.as_str(),
+                ReqwestRequestExecutor::request_method(upload_request.method()),
+                upload_request.url().0.as_str(),
             )
-            .headers(media_upload_request.header_map().to_header_map());
-        let mut file_header_map = HeaderMap::new();
-        file_header_map.insert(
-            http::header::CONTENT_TYPE,
-            HeaderValue::from_str(&media_upload_request.file_content_type()).unwrap(),
-        );
+            .headers(upload_request.header_map().to_header_map());
         let mut form = reqwest::multipart::Form::new();
+
         match self.test_type {
             MediaErrNetworkingTestType::UploadNoData => {
                 // don't add the file
             }
         }
-        for (k, v) in media_upload_request.media_params() {
+
+        for (k, v) in upload_request.fields() {
             form = form.text(k, v)
         }
-        request = request.multipart(form);
 
-        let mut response = request.send().await.map_err(|err| {
-            MediaUploadRequestExecutionError::RequestExecutionFailed {
-                status_code: err.status().map(|s| s.as_u16()),
-                redirects: None,
-                reason: RequestExecutionErrorReason::GenericError {
-                    error_message: err.to_string(),
-                },
-            }
-        })?;
+        let request = request.multipart(form);
+        let mut response = request.send().await?;
 
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16(),
             body: response.bytes().await.unwrap().to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
-            request_url: media_upload_request.url(),
-            request_header_map: media_upload_request.header_map(),
+            request_url: upload_request.url(),
+            request_header_map: upload_request.header_map(),
         })
     }
 

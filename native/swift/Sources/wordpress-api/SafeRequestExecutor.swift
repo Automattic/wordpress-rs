@@ -1,6 +1,10 @@
 import Foundation
 import WordPressAPIInternal
 
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
+
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -11,9 +15,7 @@ import Combine
 
 public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func execute(_ request: WpNetworkRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
-    func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest
-    ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError>
+    func upload(request: WpMultipartFormRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 
     #if PROGRESS_REPORTING_ENABLED
     /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task
@@ -28,8 +30,8 @@ extension SafeRequestExecutor {
         return try result.get()
     }
 
-    public func uploadMedia(mediaUploadRequest: MediaUploadRequest) async throws -> WpNetworkResponse {
-        let result = await uploadMedia(mediaUploadRequest: mediaUploadRequest)
+    public func upload(request: WpMultipartFormRequest) async throws -> WpNetworkResponse {
+        let result = await upload(request: request)
         return try result.get()
     }
 }
@@ -59,20 +61,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         await perform(request)
     }
 
-    public func uploadMedia(
-        mediaUploadRequest: MediaUploadRequest
-    ) async -> Result<WpNetworkResponse, MediaUploadRequestExecutionError> {
-        (await perform(mediaUploadRequest))
-            .mapError { error in
-                switch error {
-                case let .RequestExecutionFailed(statusCode, redirects, reason):
-                    MediaUploadRequestExecutionError.RequestExecutionFailed(
-                        statusCode: statusCode,
-                        redirects: redirects,
-                        reason: reason
-                    )
-                }
-            }
+    public func upload(request: WpMultipartFormRequest) async -> Result<WpNetworkResponse, RequestExecutionError> {
+        await perform(request)
     }
 
     public func cancel(context: RequestContext) {
@@ -93,6 +83,10 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
             return .success(try WpNetworkResponse(data: data, request: request, response: response))
         } catch {
+            if let error = error as? RequestExecutionError {
+                return .failure(error)
+            }
+
             if errorIsHttpsError(error) {
                 return handleHttpsError(error, for: request)
             }
@@ -380,7 +374,7 @@ extension WpNetworkRequest: NetworkRequestContent {
     }
 }
 
-extension MediaUploadRequest: NetworkRequestContent {
+extension WpMultipartFormRequest: NetworkRequestContent {
 
     func encodeBody(into request: inout URLRequest) throws {
         // Do nothing.
@@ -394,10 +388,33 @@ extension MediaUploadRequest: NetworkRequestContent {
         var request = try buildURLRequest(additionalHeaders: headers)
 
         var form = [MultipartFormField]()
-        for (name, value) in mediaParams() {
+        for (name, value) in fields() {
             form.append(.init(text: value, name: name))
         }
-        try form.append(.init(fileAtPath: filePath(), name: "file"))
+        for (name, file) in files() {
+            var mimeType = file.mimeType
+
+            #if canImport(UniformTypeIdentifiers)
+            if mimeType == nil {
+                mimeType = UTType(
+                    filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
+                )?.preferredMIMEType
+            }
+            #endif
+
+            do {
+                try form.append(
+                    .init(
+                        fileAtPath: file.filePath,
+                        name: name,
+                        filename: file.fileName,
+                        mimeType: mimeType
+                    )
+                )
+            } catch {
+                throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
+            }
+        }
 
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")

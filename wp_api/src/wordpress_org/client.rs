@@ -244,6 +244,11 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
                 redirects,
                 reason,
             },
+            RequestExecutionError::MediaFileNotFound { .. } => {
+                WordPressOrgApiClientError::RequestEncodingError {
+                    reason: "file not found".to_string(),
+                }
+            }
         }
     }
 }

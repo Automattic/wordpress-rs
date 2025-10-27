@@ -2,9 +2,9 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.delay
 import okio.FileNotFoundException
-import uniffi.wp_api.MediaUploadRequest
 import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.WpMultipartFormRequest
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
@@ -41,7 +41,7 @@ class MockRequestExecutor(private var stubs: List<Stub> = listOf()) : RequestExe
         throw NoStubFoundException("No stub found for ${request.url()}")
     }
 
-    override suspend fun uploadMedia(mediaUploadRequest: MediaUploadRequest): WpNetworkResponse {
+    override suspend fun upload(request: WpMultipartFormRequest): WpNetworkResponse {
         TODO("Not yet implemented")
     }
 

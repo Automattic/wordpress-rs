@@ -1,15 +1,7 @@
-use super::{AsNamespace, DerivedRequest, WpEndpointUrl, WpNamespace};
-use crate::{
-    api_error::WpApiError,
-    media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext},
-    request::{
-        CONTENT_TYPE_MULTIPART, NetworkRequestAccessor, ParsedResponse, RequestMethod,
-        WpNetworkHeaderMap, WpNetworkResponse,
-    },
-    uuid::WpUuid,
+use super::{AsNamespace, DerivedRequest, WpNamespace};
+use crate::media::{
+    MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
 };
-use http::HeaderValue;
-use std::{collections::HashMap, sync::Arc};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
@@ -22,6 +14,8 @@ enum MediaRequest {
     Delete,
     #[post(url = "/media/<media_id>", params = &MediaUpdateParams, output = MediaWithEditContext)]
     Update,
+    #[post(url = "/media", params = &MediaCreateParams, output = MediaWithEditContext, multipart = true)]
+    Create,
 }
 
 impl DerivedRequest for MediaRequest {
@@ -36,166 +30,6 @@ impl DerivedRequest for MediaRequest {
 
     fn namespace() -> impl AsNamespace {
         WpNamespace::WpV2
-    }
-}
-
-impl MediaRequestEndpoint {
-    pub fn create(&self) -> crate::request::endpoint::ApiEndpointUrl {
-        Arc::unwrap_or_clone(self.api_url_resolver.resolve(
-            MediaRequest::namespace().namespace_value().to_string(),
-            vec!["media".to_string()],
-        ))
-        .inner
-        .into()
-    }
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record)]
-#[serde(transparent)]
-pub struct MediaRequestCreateResponse {
-    pub data: crate::media::MediaWithEditContext,
-    #[serde(skip)]
-    pub header_map: std::sync::Arc<crate::request::WpNetworkHeaderMap>,
-}
-
-impl From<MediaRequestCreateResponse> for ParsedResponse<MediaWithEditContext, ()> {
-    fn from(value: MediaRequestCreateResponse) -> Self {
-        Self {
-            data: value.data,
-            header_map: value.header_map,
-            next_page_params: None,
-            prev_page_params: None,
-        }
-    }
-}
-impl From<ParsedResponse<MediaWithEditContext, ()>> for MediaRequestCreateResponse {
-    fn from(value: ParsedResponse<MediaWithEditContext, ()>) -> Self {
-        Self {
-            data: value.data,
-            header_map: value.header_map,
-        }
-    }
-}
-
-#[uniffi::export]
-fn parse_as_media_request_create_response(
-    response: WpNetworkResponse,
-) -> Result<MediaRequestCreateResponse, WpApiError> {
-    response.parse()
-}
-
-#[derive(uniffi::Object)]
-pub struct MediaUploadRequest {
-    pub(crate) uuid: String,
-    pub(crate) method: RequestMethod,
-    pub(crate) url: WpEndpointUrl,
-    pub(crate) header_map: Arc<WpNetworkHeaderMap>,
-    pub(crate) file_path: String,
-    pub(crate) file_content_type: String,
-    pub(crate) media_params: HashMap<String, String>,
-}
-
-#[uniffi::export]
-impl MediaUploadRequest {
-    pub fn file_path(&self) -> String {
-        self.file_path.clone()
-    }
-
-    pub fn file_content_type(&self) -> String {
-        self.file_content_type.clone()
-    }
-
-    pub fn media_params(&self) -> HashMap<String, String> {
-        self.media_params.clone()
-    }
-}
-
-impl std::fmt::Debug for MediaUploadRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut s = format!(
-            indoc::indoc! {"
-                MediaUploadRequest {{
-                    method: '{:?}',
-                    url: '{:?}',
-                    header_map: '{:?}',
-                    file_path: '{:?}'
-                    file_content_type: '{:?}'
-                    media_params: '{:?}'
-                }}
-                "},
-            self.method,
-            self.url,
-            self.header_map,
-            self.file_path,
-            self.file_content_type,
-            self.media_params
-        );
-        s.pop(); // Remove the new line at the end
-        write!(f, "{s}")
-    }
-}
-
-#[uniffi::export]
-impl NetworkRequestAccessor for MediaUploadRequest {
-    fn request_id(&self) -> String {
-        self.uuid.clone()
-    }
-
-    fn method(&self) -> RequestMethod {
-        self.method.clone()
-    }
-
-    fn url(&self) -> WpEndpointUrl {
-        self.url.clone()
-    }
-
-    fn header_map(&self) -> Arc<WpNetworkHeaderMap> {
-        self.header_map.clone()
-    }
-}
-
-impl MediaRequestBuilder {
-    pub fn create(
-        &self,
-        params: MediaCreateParams,
-        file_path: String,
-        file_content_type: String,
-        request_id: Option<Arc<WpUuid>>,
-    ) -> MediaUploadRequest {
-        let mut header_map = self.inner.header_map();
-        header_map.inner.insert(
-            http::header::CONTENT_TYPE,
-            HeaderValue::from_static(CONTENT_TYPE_MULTIPART),
-        );
-        MediaUploadRequest {
-            uuid: request_id.unwrap_or_default().uuid_string(),
-            method: RequestMethod::POST,
-            url: self.endpoint.create().into(),
-            header_map: header_map.into(),
-            file_path,
-            file_content_type,
-            media_params: params.into(),
-        }
-    }
-}
-
-#[uniffi::export]
-impl MediaRequestExecutor {
-    pub async fn create(
-        &self,
-        params: MediaCreateParams,
-        file_path: String,
-        file_content_type: String,
-        request_id: Option<Arc<WpUuid>>,
-    ) -> Result<MediaRequestCreateResponse, WpApiError> {
-        let request = self
-            .request_builder
-            .create(params, file_path, file_content_type, request_id);
-        self.delegate
-            .request_executor
-            .upload_media(Arc::new(request))
-            .await?
-            .parse()
     }
 }
 
