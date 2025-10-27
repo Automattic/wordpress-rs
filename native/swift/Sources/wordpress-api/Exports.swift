@@ -192,6 +192,9 @@ public typealias TermsRequestListWithEmbedContextResponse = WordPressAPIInternal
 
 // MARK: - Taxonomies
 public typealias TaxonomyListParams = WordPressAPIInternal.TaxonomyListParams
+public typealias TaxonomyTypeDetailsWithEditContext = WordPressAPIInternal.TaxonomyTypeDetailsWithEditContext
+public typealias TaxonomyTypeDetailsWithViewContext = WordPressAPIInternal.TaxonomyTypeDetailsWithEditContext
+public typealias TaxonomyTypeDetailsWithEmbedContext = WordPressAPIInternal.TaxonomyTypeDetailsWithEmbedContext
 
 // MARK: Navigation
 public typealias NavigationStatus = WordPressAPIInternal.NavigationStatus

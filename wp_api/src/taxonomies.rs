@@ -161,3 +161,12 @@ pub struct TaxonomyTypeVisibility {
     pub show_in_quick_edit: bool,
     pub show_ui: bool,
 }
+
+crate::uniffi_export_serialization!(
+    taxonomy_type_details_with_edit_context,
+    TaxonomyTypeDetailsWithEditContext
+);
+crate::uniffi_export_serialization!(
+    taxonomy_type_details_with_edit_context_list,
+    Vec<TaxonomyTypeDetailsWithEditContext>
+);

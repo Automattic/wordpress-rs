@@ -122,3 +122,13 @@ extension PostType: ExpressibleByStringLiteral {
         self.init(stringLiteral)
     }
 }
+
+extension Array where Element == TaxonomyTypeDetailsWithEditContext {
+    public func serialize() throws -> Data {
+        try serializeTaxonomyTypeDetailsWithEditContextList(value: self)
+    }
+
+    static public func deserialize(from data: Data) throws -> [TaxonomyTypeDetailsWithEditContext] {
+        try deserializeTaxonomyTypeDetailsWithEditContextList(value: data)
+    }
+}
