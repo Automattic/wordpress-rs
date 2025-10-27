@@ -212,25 +212,27 @@ mod localization_tests {
     impl WpSupportsLocalization for ParseApiRootUrlError {
         fn message_bundle(&self) -> crate::MessageBundle<'_> {
             match self {
-                ParseApiRootUrlError::Error { message } => WpMessages::site_error_message(message),
+                ParseApiRootUrlError::Error { message } => {
+                    WpMessages::response_parsing_error(message)
+                }
             }
         }
     }
 
     #[test]
     fn test_example_localizable_error() {
-        let expected_en_message = "Your site sent an error message: \u{2068}foo\u{2069}.";
-        let expected_tr_message = "Siteniz bir hata mesajı gönderdi: \u{2068}foo\u{2069}.";
+        let expected_en_message = "Response couldn't be parsed: \u{2068}foo\u{2069}.";
+        let expected_tr_message = "Yanıt işlenemedi: \u{2068}foo\u{2069}.";
         {
             let map = {
                 let mut map = HashMap::new();
-                map.insert("error_message".into(), "foo".into());
+                map.insert("reason".into(), "foo".into());
                 map
             };
             assert_eq!(
                 LOCALES.lookup_with_args(
                     WpLocale::from("en-US").as_language_id(),
-                    "site_error_message",
+                    "response_parsing_error",
                     &map
                 ),
                 expected_en_message
@@ -238,7 +240,7 @@ mod localization_tests {
             assert_eq!(
                 LOCALES.lookup_with_args(
                     WpLocale::from("tr-TR").as_language_id(),
-                    "site_error_message",
+                    "response_parsing_error",
                     &map
                 ),
                 expected_tr_message
@@ -249,9 +251,9 @@ mod localization_tests {
         };
 
         let message_bundle = error.message_bundle();
-        assert_eq!(message_bundle.key, "site_error_message");
+        assert_eq!(message_bundle.key, "response_parsing_error");
         let message_args = message_bundle.args.unwrap();
-        assert_eq!(message_args["error_message"], "foo".into());
+        assert_eq!(message_args["reason"], "foo".into());
         assert_eq!(error.to_string(), expected_en_message);
         assert_eq!(error.localize(Some("tr-TR".into())), expected_tr_message);
     }
