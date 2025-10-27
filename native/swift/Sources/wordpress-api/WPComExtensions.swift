@@ -19,3 +19,9 @@ public extension BotConversation {
         return false
     }
 }
+
+public extension SupportAttachment {
+    var dimensions: AttachmentDimensions? {
+        getAttachmentDimensions(attachment: self)
+    }
+}
