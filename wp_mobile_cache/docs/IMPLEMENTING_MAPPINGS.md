@@ -92,19 +92,19 @@ Compare the fields across contexts to understand what needs to be stored:
 
 See `CONTEXT_FIELD_ANALYSIS.md` for a complete example.
 
-### Step 4: Implement Database Mappings
+### Step 4: Create Database Type Definitions
 
-For each context, create mappings in `src/mappings/{entity}/`:
+For each context, create type definitions in `src/db_types/{entity}/`:
 
 ```
-src/mappings/posts/
-├── mod.rs      # Re-exports all context mappings
-├── edit.rs     # EditContext mapping
-├── view.rs     # ViewContext mapping
-└── embed.rs    # EmbedContext mapping
+src/db_types/posts/
+├── mod.rs      # Re-exports all context types
+├── edit.rs     # EditContext types (column enum + wrapper struct)
+├── view.rs     # ViewContext types (column enum + wrapper struct)
+└── embed.rs    # EmbedContext types (column enum + wrapper struct)
 ```
 
-Each mapping file needs three components:
+Each type definition file contains two components:
 
 #### 4.1 Column Index Enum
 
@@ -146,16 +146,29 @@ pub struct DbAnyPostWithEditContext {
 }
 ```
 
-#### 4.3 Mapping Implementation
+**Note**: The `src/db_types/{entity}/*.rs` files contain ONLY these type definitions (column enums and wrapper structs). They are kept intentionally minimal.
 
-Maps database rows to the entity type:
+### Step 5: Implement Row Mapping in Repository
+
+The actual database operations (mapping rows to types, upsert logic) are implemented in `src/repository/{entity}.rs`. This keeps all database interaction logic in one place.
+
+#### 5.1 Implement FromRowWithTerms Trait
+
+In the repository file (e.g., `src/repository/posts.rs`), implement the private `FromRowWithTerms` trait for each context:
 
 ```rust
-impl DbAnyPostWithEditContext {
-    /// Construct from a database row with associated term relationships.
-    ///
-    /// This is the only way to construct this type, ensuring terms are always loaded.
-    pub fn from_row_with_terms(
+// In src/repository/posts.rs
+
+// Private trait for generic read operations
+trait FromRowWithTerms: Sized {
+    fn from_row_with_terms(
+        row: &Row,
+        term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self, SqliteDbError>;
+}
+
+impl FromRowWithTerms for DbAnyPostWithEditContext {
+    fn from_row_with_terms(
         row: &Row,
         term_relationships: Vec<DbTermRelationship>,
     ) -> Result<Self, SqliteDbError> {
@@ -205,9 +218,9 @@ impl DbAnyPostWithEditContext {
 }
 ```
 
-#### 4.4 Helper Functions Available
+#### 5.2 Helper Functions Available
 
-The `mappings::helpers` module provides utilities for common conversions:
+The `mappings::helpers` module provides utilities for common conversions in your repository implementations:
 
 **ID Extraction:**
 - `get_id(row, column)` - Extract ID types (PostId, UserId, TermId, etc.)
@@ -226,9 +239,9 @@ The `mappings::helpers` module provides utilities for common conversions:
 **RowExt Trait:**
 - `row.get_column(ColumnEnum)` - Type-safe column access using enum
 
-See `src/mappings/posts/edit.rs` for a complete reference implementation.
+See `src/repository/posts.rs` (specifically the `FromRowWithTerms` implementations) for a complete reference.
 
-### Step 5: Create Database Migrations
+### Step 6: Create Database Migrations
 
 Create SQL migration files for each context's table:
 
@@ -303,22 +316,26 @@ pub struct PostTitleWithEditContext {
 `title_rendered` TEXT NOT NULL
 ```
 
-### Step 6: Update Module Exports
+### Step 7: Update Module Exports
 
-Add the new mappings to `src/mappings/mod.rs`:
+Add the new types to `src/db_types/mod.rs`:
 
 ```rust
 pub mod posts;
+```
 
-// Re-export commonly used types
-pub use posts::{
-    DbAnyPostWithEditContext,
-    DbAnyPostWithViewContext,
-    DbAnyPostWithEmbedContext,
+The db_types are re-exported in the repository module for the public API:
+
+```rust
+// In src/repository/posts.rs
+pub use crate::db_types::posts::{
+    DbAnyPostWithEditContext as DbPostEdit,
+    DbAnyPostWithEmbedContext as DbPostEmbed,
+    DbAnyPostWithViewContext as DbPostView,
 };
 ```
 
-### Step 7: Testing
+### Step 8: Testing
 
 Create unit tests in the repository file (e.g., `src/repository/posts.rs`):
 
@@ -368,14 +385,17 @@ When implementing mappings for a new entity (e.g., "implement mappings for Spars
 - [ ] Run `cargo expand -p wp_api comments > /tmp/generated_comments.rs`
 - [ ] Find context-specific types: `grep "pub struct.*Comment.*Context" /tmp/generated_comments.rs`
 - [ ] Analyze field differences between Edit/View/Embed contexts
-- [ ] Create `src/mappings/comments/mod.rs` and context files (`edit.rs`, `view.rs`, `embed.rs`)
-- [ ] For each context:
+- [ ] Create `src/db_types/comments/mod.rs` and context files (`edit.rs`, `view.rs`, `embed.rs`)
+- [ ] For each context in `src/db_types/comments/*.rs`:
   - [ ] Define column index enum
   - [ ] Define `DbCommentWith{Context}` wrapper struct
-  - [ ] Implement `from_row_with_terms` (or `from_row` if no term relationships)
+- [ ] In `src/repository/comments.rs`:
+  - [ ] Implement `FromRowWithTerms` trait for each context
+  - [ ] Implement repository CRUD methods (using generic `PostRepository<C>` pattern)
+  - [ ] Implement context-specific upsert methods (EditContext only)
 - [ ] Create migration files for each context table
-- [ ] Update `src/mappings/mod.rs` to export new types
-- [ ] Write unit tests for round-trip persistence
+- [ ] Update `src/db_types/mod.rs` to export new module
+- [ ] Write unit tests for round-trip persistence in repository file
 - [ ] Verify `cargo test` passes
 
 ## Common Patterns
@@ -425,22 +445,26 @@ wp_mobile_cache/
 ├── docs/
 │   └── IMPLEMENTING_MAPPINGS.md    # This file
 ├── src/
-│   ├── mappings/
-│   │   ├── mod.rs                  # Re-exports
-│   │   ├── helpers.rs              # Shared utilities
+│   ├── context.rs                  # Context trait definitions (EditContext, ViewContext, etc.)
+│   ├── db_types/
+│   │   ├── mod.rs                  # Re-exports entity modules
 │   │   ├── posts/
-│   │   │   ├── mod.rs
-│   │   │   ├── edit.rs
-│   │   │   ├── view.rs
-│   │   │   └── embed.rs
+│   │   │   ├── mod.rs              # Re-exports all context types
+│   │   │   ├── edit.rs             # Column enum + DbAnyPostWithEditContext
+│   │   │   ├── view.rs             # Column enum + DbAnyPostWithViewContext
+│   │   │   └── embed.rs            # Column enum + DbAnyPostWithEmbedContext
 │   │   └── comments/               # Same structure
 │   │       ├── mod.rs
 │   │       ├── edit.rs
 │   │       ├── view.rs
 │   │       └── embed.rs
+│   ├── mappings/
+│   │   ├── mod.rs
+│   │   └── helpers.rs              # Shared conversion utilities
 │   └── repository/
-│       ├── posts.rs
-│       └── comments.rs
+│       ├── mod.rs
+│       ├── posts.rs                # PostRepository<C> + FromRowWithTerms impls + upsert
+│       └── comments.rs             # CommentRepository<C> + FromRowWithTerms impls + upsert
 └── migrations/
     ├── 0001-create-sites-table.sql
     ├── 0002-create-posts-edit-context-table.sql
@@ -448,6 +472,12 @@ wp_mobile_cache/
     ├── 0004-create-posts-view-context-table.sql
     └── 0005-create-posts-embed-context-table.sql
 ```
+
+**Architecture Summary:**
+- **`context.rs`**: Trait definitions for context markers (EditContext, ViewContext, EmbedContext) with associated types
+- **`db_types/`**: Type-only definitions (column enums, wrapper structs) - no logic
+- **`mappings/helpers.rs`**: Reusable conversion utilities (parse_enum, integer_to_bool, etc.)
+- **`repository/`**: All database interaction logic including row-to-type mapping AND SQL operations
 
 ## Related Documentation
 
