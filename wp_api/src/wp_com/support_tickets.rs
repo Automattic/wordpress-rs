@@ -76,14 +76,24 @@ pub enum SupportMessageAuthor {
 }
 
 #[derive(
-    Debug, Hash, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum, strum_macros::Display,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::Display,
+    strum_macros::EnumString,
 )]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
 pub enum AttachmentMetadataKey {
+    #[serde(alias = "width")]
     Width,
+    #[serde(alias = "height")]
     Height,
-    Other(String),
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
@@ -163,6 +173,7 @@ impl std::fmt::Display for ConversationId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
     #[test]
     fn test_support_conversation_deserialization() {
@@ -227,5 +238,35 @@ mod tests {
             get_attachment_dimensions(&conversation.messages[0].attachments[1]).unwrap();
         assert_eq!(dimensions.width, 2000);
         assert_eq!(dimensions.height, 1600);
+    }
+
+    #[test]
+    fn test_attachment_metadata_key_custom_deserialization() {
+        let json = r#"{"Custom": "test"}"#;
+        let metadata: HashMap<AttachmentMetadataKey, AttachmentMetadataValue> =
+            serde_json::from_str(json).expect("Failed to deserialize attachment metadata");
+        assert_eq!(metadata.len(), 1);
+    }
+
+    #[rstest]
+    #[case(AttachmentMetadataKey::Width, "Width")]
+    #[case(AttachmentMetadataKey::Height, "Height")]
+    #[case(
+        AttachmentMetadataKey::Custom(String::from("testlowercase")),
+        "testlowercase"
+    )]
+    #[case(
+        AttachmentMetadataKey::Custom(String::from("testWithCamelCase")),
+        "testWithCamelCase"
+    )]
+    #[case(
+        AttachmentMetadataKey::Custom(String::from("test_with_snake_case")),
+        "test_with_snake_case"
+    )]
+    fn test_attachment_metadata_key_to_string(
+        #[case] key: AttachmentMetadataKey,
+        #[case] expected_str: &str,
+    ) {
+        assert_eq!(key.to_string(), expected_str);
     }
 }
