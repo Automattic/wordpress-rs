@@ -170,44 +170,37 @@ public actor WordPressAPI {
     }
 
 #if PROGRESS_REPORTING_ENABLED
-    public func uploadMedia(
-        params: MediaCreateParams,
-        fulfilling progress: Progress
-    ) async throws -> MediaRequestCreateResponse {
+    /// Track the progress of the given HTTP API calls in the `apiCall` closure.
+    ///
+    /// Note: pass the `RequestContext` parameter in `apiCall` to one and only one HTTP API call.
+    public func fulfill<R: Sendable>(
+        progress: Progress,
+        withApiCall apiCall: sending @escaping (RequestContext) async throws -> R
+    ) async throws -> R {
         precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
         precondition(progress.cancellationHandler == nil)
 
         let context = RequestContext()
 
         let uploadTask = Task {
-            try await media.createCancellation(params: params, context: context)
+            try await withTaskCancellationHandler {
+                try await apiCall(context)
+            } onCancel: {
+                requestExecutor.cancel(context: context)
+            }
         }
 
         let progressObserver = Task {
-            // A request id will be put into the `RequestContext` during the execution of the `media.create` above.
-            // This loop waits for the request id becomes available
-            let requestId: String
-            while true {
-                try await Task.sleep(nanoseconds: 100_000)
-                try Task.checkCancellation()
-
-                guard let id = context.requestIds().first else {
-                    continue
-                }
-
-                requestId = id
-                break
+            for await task in requestExecutor.progresses(for: context).values {
+                // For one single request call, the Rust layer should send HTTP requests sequentially.
+                // For example, the retry mechanism in the Rust layer only send the retry call when the initial
+                // call fails.
+                //
+                // Since we can't know how many HTTP requests will be sent, the best we can do is make the `progress`
+                // starts from zero to complete for each HTTP request.
+                progress.completedUnitCount = 0
+                progress.addChild(task, withPendingUnitCount: progress.totalUnitCount)
             }
-
-            // Get the progress of the `URLSessionTask` of the given request id.
-            guard let task = await requestExecutor
-                .progress(forRequestWithId: requestId)
-                .values
-                .first(where: { _ in true }) else { return }
-
-            try Task.checkCancellation()
-
-            progress.addChild(task, withPendingUnitCount: progress.totalUnitCount - progress.completedUnitCount)
         }
 
         progress.cancellationHandler = {
@@ -215,17 +208,21 @@ public actor WordPressAPI {
             progressObserver.cancel()
         }
 
+        defer { progressObserver.cancel() }
+
         return try await withTaskCancellationHandler {
             try await uploadTask.value
         } onCancel: {
-            // Please note: the async functions exported by uniffi-rs _do not_ support cancellation.
-            // That means cancelling an API call like `Task { try await api.users.retrieveMe() }.cancel()`
-            // does not cancel the underlying HTTP request sent by URLSession.
-            //
-            // The `progress.cancel()` in this particular function can cancel the HTTP request, because the
-            // `progress` instance is the parent progress of `URLSessionTask.progress`, and cancelling a parent
-            // progress automatically cancels their child progress, which is the `URLSessionTask` in this case.
             progress.cancel()
+        }
+    }
+
+    public func uploadMedia(
+        params: MediaCreateParams,
+        fulfilling progress: Progress
+    ) async throws -> MediaRequestCreateResponse {
+        try await fulfill(progress: progress) { [media] in
+            try await media.createCancellation(params: params, context: $0)
         }
     }
 #endif

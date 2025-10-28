@@ -53,7 +53,7 @@ final class HTTPStubs: SafeRequestExecutor {
     }
 
 #if PROGRESS_REPORTING_ENABLED
-    func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never> {
+    func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never> {
         Record(output: [], completion: .finished).eraseToAnyPublisher()
     }
 #endif
