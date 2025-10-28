@@ -443,7 +443,7 @@ sticky: integer_to_bool(row.get_column(Sticky)?),
 ```
 wp_mobile_cache/
 ├── docs/
-│   └── IMPLEMENTING_MAPPINGS.md    # This file
+│   └── ADDING_NEW_ENTITIES.md      # This file
 ├── src/
 │   ├── context.rs                  # Context trait definitions (EditContext, ViewContext, etc.)
 │   ├── db_types/

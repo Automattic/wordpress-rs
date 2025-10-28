@@ -40,7 +40,7 @@ Example: "Implement mappings for SparseComment in wp_api/src/comments.rs"
 5. Create migration files for each context table
 6. Use helper functions from `src/mappings/helpers.rs`
 
-**Detailed guide**: See `docs/IMPLEMENTING_MAPPINGS.md` for complete step-by-step instructions.
+**Detailed guide**: See `docs/ADDING_NEW_ENTITIES.md` for complete step-by-step instructions.
 
 ### Understanding Generated Types
 
@@ -60,7 +60,7 @@ All in `src/mappings/helpers.rs`:
 
 ## Important Files
 
-- `docs/IMPLEMENTING_MAPPINGS.md` - Complete guide for implementing new mappings
+- `docs/ADDING_NEW_ENTITIES.md` - Complete guide for adding database support for new entity types
 - `CONTEXT_FIELD_ANALYSIS.md` - Example field analysis for posts
 - `CONTEXT_SUPPORT_DESIGN.md` - Architecture design document
 - `src/mappings/posts/edit.rs` - Reference implementation for mappings
