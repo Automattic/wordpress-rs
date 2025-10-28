@@ -30,7 +30,6 @@ impl RequiresMultipartForm for CreateSupportTicketParams {
             .enumerate()
             .map(|(i, file_path)| {
                 (
-                    // TODO: The backend is not ready yet. This name may need to be changed.
                     format!("attachment_{i}"),
                     MultipartFormFile {
                         file_path: file_path.clone(),
@@ -172,8 +171,28 @@ pub struct SupportAgentIdentity {
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct AddMessageToSupportConversationParams {
     pub message: String,
+    #[serde(skip)]
     #[uniffi(default = [])]
     pub attachments: Vec<String>,
+}
+
+impl RequiresMultipartForm for AddMessageToSupportConversationParams {
+    fn multipart_form_files(&self) -> HashMap<String, MultipartFormFile> {
+        self.attachments
+            .iter()
+            .enumerate()
+            .map(|(i, file_path)| {
+                (
+                    format!("attachment_{i}"),
+                    MultipartFormFile {
+                        file_path: file_path.clone(),
+                        mime_type: None,
+                        file_name: None,
+                    },
+                )
+            })
+            .collect()
+    }
 }
 
 impl_as_query_value_for_new_type!(ConversationId);
