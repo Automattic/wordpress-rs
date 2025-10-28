@@ -1,25 +1,101 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
+    context::PostContext,
+    db_types::posts::{
+        DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
+        PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
+    },
     mappings::{
-        helpers::{bool_to_integer, serialize_value_to_json},
-        posts::DbAnyPostWithEditContext,
+        RowExt,
+        helpers::{
+            bool_to_integer, deserialize_json_value, get_id, get_optional_id, integer_to_bool,
+            parse_datetime, parse_enum, parse_optional_enum, serialize_value_to_json,
+        },
     },
     repository::{
         QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository,
     },
+    term_relationships::DbTermRelationship,
 };
+use rusqlite::Row;
+use std::marker::PhantomData;
 use wp_api::{
-    posts::{AnyPostWithEditContext, PostId},
+    posts::{
+        AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
+        PostContentWithEditContext, PostContentWithViewContext,
+        PostGuidWithEditContext, PostGuidWithViewContext,
+        PostId, PostTitleWithEditContext, PostTitleWithEmbedContext, PostTitleWithViewContext,
+        SparsePostExcerpt,
+    },
     taxonomies::TaxonomyType,
+    terms::TermId,
 };
+
+// Re-export for public API
+pub use crate::db_types::posts::{
+    DbAnyPostWithEditContext as DbPostEdit, DbAnyPostWithEmbedContext as DbPostEmbed,
+    DbAnyPostWithViewContext as DbPostView,
+};
+
+// Private trait for generic read operations
+trait FromRowWithTerms: Sized {
+    fn from_row_with_terms(
+        row: &Row,
+        term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self, SqliteDbError>;
+}
+
+/// Extract categories and tags from term relationships.
+fn extract_categories_and_tags(
+    term_relationships: Vec<DbTermRelationship>,
+) -> (Vec<TermId>, Vec<TermId>) {
+    term_relationships.into_iter().fold(
+        (Vec::new(), Vec::new()),
+        |(mut cats, mut tags), relationship| {
+            match relationship.taxonomy_type {
+                TaxonomyType::Category => cats.push(relationship.term_id),
+                TaxonomyType::PostTag => tags.push(relationship.term_id),
+                _ => {} // Ignore other taxonomy types for posts
+            }
+            (cats, tags)
+        },
+    )
+}
 
 /// Repository for managing posts in the database.
 ///
-/// Provides CRUD operations and post-specific query methods.
-pub struct PostRepository;
+/// Generic over PostContext trait to support edit, view, and embed contexts.
+/// Each context provides appropriate type associations.
+///
+/// # Type Parameters
+/// * `C` - The context type (EditContext, ViewContext, or EmbedContext)
+pub struct PostRepository<C: PostContext> {
+    _phantom: PhantomData<C>,
+}
 
-impl PostRepository {
-    const TABLE_NAME: &'static str = "posts_edit_context";
+impl<C: PostContext> Default for PostRepository<C> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// Allow private_bounds because FromRowWithTerms is intentionally an internal implementation detail.
+// The trait is sealed within this module and not part of the public API.
+#[allow(private_bounds)]
+impl<C: PostContext> PostRepository<C> {
+    const TABLE_NAME_PREFIX: &'static str = "posts";
+
+    /// Create a new repository instance.
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Get the full table name for this context.
+    fn table_name() -> String {
+        C::table_name(Self::TABLE_NAME_PREFIX)
+    }
 
     /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
     ///
@@ -30,11 +106,14 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         rowid: RowId,
-    ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
+    ) -> Result<C::DbPost, SqliteDbError>
+    where
+        C::DbPost: FromRowWithTerms,
+    {
         // First get the post.id (WordPress ID) from the rowid
         let sql = format!(
             "SELECT id FROM {} WHERE db_site_id = ? AND rowid = ?",
-            Self::TABLE_NAME
+            Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         let post_id: i64 = stmt
@@ -49,11 +128,11 @@ impl PostRepository {
         // Query and construct post with term relationships
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND rowid = ?",
-            Self::TABLE_NAME
+            Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row([site.row_id, rowid], |row| {
-            DbAnyPostWithEditContext::from_row_with_terms(row, term_relationships.clone())
+            C::DbPost::from_row_with_terms(row, term_relationships.clone())
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .map_err(SqliteDbError::from)
@@ -67,9 +146,12 @@ impl PostRepository {
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-    ) -> Result<Vec<DbAnyPostWithEditContext>, SqliteDbError> {
+    ) -> Result<Vec<C::DbPost>, SqliteDbError>
+    where
+        C::DbPost: FromRowWithTerms,
+    {
         // First pass: extract post IDs (WordPress IDs, not SQLite rowids)
-        let sql = format!("SELECT id FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
+        let sql = format!("SELECT id FROM {} WHERE db_site_id = ?", Self::table_name());
         let mut stmt = executor.prepare(&sql)?;
         let post_ids: Vec<i64> = stmt
             .query_map([site.row_id], |row| row.get(0))?
@@ -85,13 +167,13 @@ impl PostRepository {
         let terms_map = term_repo.get_terms_for_objects(executor, site, &post_ids)?;
 
         // Second pass: construct posts with term relationships
-        let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::TABLE_NAME);
+        let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::table_name());
         let mut stmt = executor.prepare(&sql)?;
         let posts = stmt
             .query_map([site.row_id], |row| {
                 let post_id: i64 = row.get("id")?;
                 let term_relationships = terms_map.get(&post_id).cloned().unwrap_or_default();
-                DbAnyPostWithEditContext::from_row_with_terms(row, term_relationships)
+                C::DbPost::from_row_with_terms(row, term_relationships)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -112,7 +194,10 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
-    ) -> Result<DbAnyPostWithEditContext, SqliteDbError> {
+    ) -> Result<C::DbPost, SqliteDbError>
+    where
+        C::DbPost: FromRowWithTerms,
+    {
         // Load term relationships using the WordPress post ID
         let term_repo = TermRelationshipRepository;
         let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
@@ -121,11 +206,11 @@ impl PostRepository {
         // Query and construct post with term relationships
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND id = ?",
-            Self::TABLE_NAME
+            Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
-            DbAnyPostWithEditContext::from_row_with_terms(row, term_relationships.clone())
+            C::DbPost::from_row_with_terms(row, term_relationships.clone())
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .map_err(SqliteDbError::from)
@@ -140,39 +225,254 @@ impl PostRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
-    ) -> Result<usize, SqliteDbError> {
+    ) -> Result<usize, SqliteDbError>
+    where
+        C::DbPost: FromRowWithTerms,
+    {
         // First, try to get the rowid (if post doesn't exist, return 0)
-        let db_post = match self.select_by_post_id(executor, site, post_id) {
+        let _db_post = match self.select_by_post_id(executor, site, post_id) {
             Ok(post) => post,
             Err(_) => return Ok(0), // Post doesn't exist
         };
 
         // Delete term relationships using WordPress post ID
         let term_repo = TermRelationshipRepository;
-        term_repo.delete_all_terms_for_object(executor, site, db_post.post.id.0)?;
+        term_repo.delete_all_terms_for_object(executor, site, post_id.0)?;
 
         // Delete the post
         let sql = format!(
             "DELETE FROM {} WHERE db_site_id = ? AND id = ?",
-            Self::TABLE_NAME
+            Self::table_name()
         );
         executor.execute(&sql, rusqlite::params![site.row_id, post_id.0])
     }
 
-    /// Upsert a post with its term relationships (atomic transaction).
-    ///
-    /// This uses SQLite's INSERT ... ON CONFLICT ... DO UPDATE syntax to either
-    /// insert a new post or update an existing one based on the (db_site_id, post_id) pair.
-    /// This ensures the database observer sees a single INSERT or UPDATE action.
-    ///
-    /// Term relationships are synced using a diff approach - only changes generate DB events.
+    /// Get the total count of posts for a given site.
+    pub fn count(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+    ) -> Result<i64, SqliteDbError> {
+        let sql = format!(
+            "SELECT COUNT(*) FROM {} WHERE db_site_id = ?",
+            Self::table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        stmt.query_row([site.row_id], |row| row.get(0))
+            .map_err(SqliteDbError::from)
+    }
+}
+
+// Context-specific implementations
+
+impl FromRowWithTerms for DbAnyPostWithEditContext {
+    fn from_row_with_terms(
+        row: &Row,
+        term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self, SqliteDbError> {
+        use PostEditContextColumn::*;
+
+        let row_id: RowId = row.get_column(Rowid)?;
+        let site = DbSite {
+            row_id: row.get_column(PostEditContextColumn::SiteId)?,
+        };
+
+        let (categories, tags) = extract_categories_and_tags(term_relationships);
+
+        let post = AnyPostWithEditContext {
+            id: get_id(row, Id)?,
+            date: row.get_column(Date)?,
+            date_gmt: parse_datetime(row, DateGmt)?,
+            guid: PostGuidWithEditContext {
+                raw: row.get_column(GuidRaw)?,
+                rendered: row.get_column(GuidRendered)?,
+            },
+            link: row.get_column(Link)?,
+            modified: row.get_column(Modified)?,
+            modified_gmt: parse_datetime(row, ModifiedGmt)?,
+            slug: row.get_column(Slug)?,
+            status: parse_enum(row, Status)?,
+            post_type: row.get_column(PostType)?,
+            password: row.get_column(Password)?,
+            permalink_template: row.get_column(PermalinkTemplate)?,
+            generated_slug: row.get_column(GeneratedSlug)?,
+            title: PostTitleWithEditContext {
+                raw: row.get_column(TitleRaw)?,
+                rendered: row.get_column(TitleRendered)?,
+            },
+            content: PostContentWithEditContext {
+                raw: row.get_column(ContentRaw)?,
+                rendered: row.get_column(ContentRendered)?,
+                protected: row.get_column(ContentProtected)?,
+                block_version: row.get_column(ContentBlockVersion)?,
+            },
+            author: get_optional_id(row, Author)?,
+            excerpt: {
+                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                if excerpt_rendered.is_some() {
+                    Some(SparsePostExcerpt {
+                        raw: row.get_column(ExcerptRaw)?,
+                        rendered: excerpt_rendered,
+                        protected: row.get_column(ExcerptProtected)?,
+                    })
+                } else {
+                    None
+                }
+            },
+            featured_media: get_optional_id(row, FeaturedMedia)?,
+            comment_status: parse_optional_enum(row, CommentStatus)?,
+            ping_status: parse_optional_enum(row, PingStatus)?,
+            format: parse_optional_enum(row, Format)?,
+            meta: deserialize_json_value(row.get_column(Meta)?)?,
+            sticky: integer_to_bool(row.get_column(Sticky)?),
+            template: row.get_column(Template)?,
+            categories: if categories.is_empty() {
+                None
+            } else {
+                Some(categories)
+            },
+            tags: if tags.is_empty() { None } else { Some(tags) },
+            parent: get_optional_id(row, Parent)?,
+            menu_order: row.get_column(MenuOrder)?,
+        };
+
+        Ok(Self {
+            row_id,
+            site,
+            post,
+            last_fetched_at: row.get_column(LastFetchedAt)?,
+        })
+    }
+}
+
+impl FromRowWithTerms for DbAnyPostWithViewContext {
+    fn from_row_with_terms(
+        row: &Row,
+        term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self, SqliteDbError> {
+        use PostViewContextColumn::*;
+
+        let row_id: RowId = row.get_column(Rowid)?;
+        let site = DbSite {
+            row_id: row.get_column(PostViewContextColumn::SiteId)?,
+        };
+
+        let (categories, tags) = extract_categories_and_tags(term_relationships);
+
+        let post = AnyPostWithViewContext {
+            id: get_id(row, Id)?,
+            date: row.get_column(Date)?,
+            date_gmt: parse_datetime(row, DateGmt)?,
+            guid: PostGuidWithViewContext {
+                rendered: row.get_column(GuidRendered)?,
+            },
+            link: row.get_column(Link)?,
+            modified: row.get_column(Modified)?,
+            modified_gmt: parse_datetime(row, ModifiedGmt)?,
+            slug: row.get_column(Slug)?,
+            status: parse_enum(row, Status)?,
+            post_type: row.get_column(PostType)?,
+            title: PostTitleWithViewContext {
+                rendered: row.get_column(TitleRendered)?,
+            },
+            content: PostContentWithViewContext {
+                rendered: row.get_column(ContentRendered)?,
+                protected: row.get_column(ContentProtected)?,
+            },
+            author: get_optional_id(row, Author)?,
+            excerpt: {
+                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                if excerpt_rendered.is_some() {
+                    Some(SparsePostExcerpt {
+                        raw: row.get_column(ExcerptRaw)?,
+                        rendered: excerpt_rendered,
+                        protected: row.get_column(ExcerptProtected)?,
+                    })
+                } else {
+                    None
+                }
+            },
+            featured_media: get_optional_id(row, FeaturedMedia)?,
+            comment_status: parse_optional_enum(row, CommentStatus)?,
+            ping_status: parse_optional_enum(row, PingStatus)?,
+            format: parse_optional_enum(row, Format)?,
+            meta: deserialize_json_value(row.get_column(Meta)?)?,
+            sticky: integer_to_bool(row.get_column(Sticky)?),
+            template: row.get_column(Template)?,
+            categories: if categories.is_empty() {
+                None
+            } else {
+                Some(categories)
+            },
+            tags: if tags.is_empty() { None } else { Some(tags) },
+            parent: get_optional_id(row, Parent)?,
+            menu_order: row.get_column(MenuOrder)?,
+        };
+
+        Ok(Self {
+            row_id,
+            site,
+            post,
+            last_fetched_at: row.get_column(LastFetchedAt)?,
+        })
+    }
+}
+
+impl FromRowWithTerms for DbAnyPostWithEmbedContext {
+    fn from_row_with_terms(
+        row: &Row,
+        _term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self, SqliteDbError> {
+        use PostEmbedContextColumn::*;
+
+        let row_id: RowId = row.get_column(Rowid)?;
+        let site = DbSite {
+            row_id: row.get_column(PostEmbedContextColumn::SiteId)?,
+        };
+
+        let post = AnyPostWithEmbedContext {
+            id: get_id(row, Id)?,
+            date: row.get_column(Date)?,
+            link: row.get_column(Link)?,
+            slug: row.get_column(Slug)?,
+            post_type: row.get_column(PostType)?,
+            title: PostTitleWithEmbedContext {
+                rendered: row.get_column(TitleRendered)?,
+            },
+            author: get_optional_id(row, Author)?,
+            excerpt: {
+                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                if excerpt_rendered.is_some() {
+                    Some(SparsePostExcerpt {
+                        raw: row.get_column(ExcerptRaw)?,
+                        rendered: excerpt_rendered,
+                        protected: row.get_column(ExcerptProtected)?,
+                    })
+                } else {
+                    None
+                }
+            },
+            featured_media: get_optional_id(row, FeaturedMedia)?,
+        };
+
+        Ok(Self {
+            row_id,
+            site,
+            post,
+            last_fetched_at: row.get_column(LastFetchedAt)?,
+        })
+    }
+}
+
+impl PostRepository<crate::context::EditContext> {
+    /// Upsert a post with edit context and its term relationships (atomic transaction).
     ///
     /// Returns the rowid of the inserted or updated row.
     pub fn upsert(
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
-        post: &AnyPostWithEditContext,
+        post: &wp_api::posts::AnyPostWithEditContext,
     ) -> Result<RowId, SqliteDbError> {
         let tx = transaction_manager.transaction()?;
 
@@ -228,7 +528,7 @@ impl PostRepository {
                 excerpt_protected = excluded.excerpt_protected,
                 last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             "#,
-            Self::TABLE_NAME
+            Self::table_name()
         );
 
         tx.execute(
@@ -271,9 +571,10 @@ impl PostRepository {
             },
         )?;
 
+        // Get the rowid of the upserted post
         let sql = format!(
             "SELECT rowid FROM {} WHERE db_site_id = ? AND id = ?",
-            Self::TABLE_NAME
+            Self::table_name()
         );
         let post_rowid: i64 = {
             let mut stmt = tx.prepare(&sql)?;
@@ -282,7 +583,7 @@ impl PostRepository {
         };
         let post_rowid = RowId(post_rowid as u64);
 
-        // Sync term relationships using WordPress post ID, not SQLite rowid
+        // Sync term relationships
         let term_repo = TermRelationshipRepository;
 
         if let Some(ref categories) = post.categories {
@@ -304,36 +605,16 @@ impl PostRepository {
     }
 
     /// Upsert multiple posts with their term relationships.
-    ///
-    /// Each post is upserted in its own transaction. If any upsert fails,
-    /// previously successful upserts remain in the database.
-    ///
-    /// Returns a vector of rowids for successfully upserted posts.
     pub fn upsert_batch(
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
-        posts: &[AnyPostWithEditContext],
+        posts: &[wp_api::posts::AnyPostWithEditContext],
     ) -> Result<Vec<RowId>, SqliteDbError> {
         posts
             .iter()
             .map(|post| self.upsert(transaction_manager, site, post))
             .collect()
-    }
-
-    /// Get the total count of posts for a given site.
-    pub fn count(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-    ) -> Result<i64, SqliteDbError> {
-        let sql = format!(
-            "SELECT COUNT(*) FROM {} WHERE db_site_id = ?",
-            Self::TABLE_NAME
-        );
-        let mut stmt = executor.prepare(&sql)?;
-        stmt.query_row([site.row_id], |row| row.get(0))
-            .map_err(SqliteDbError::from)
     }
 }
 
@@ -344,7 +625,7 @@ mod tests {
         TestContext, assert_recent_timestamp, posts::PostBuilder, test_ctx,
     };
     use rstest::*;
-    use wp_api::posts::PostStatus;
+    use wp_api::posts::{AnyPostWithEditContext, PostStatus};
 
     #[rstest]
     #[case(PostBuilder::minimal().build())]

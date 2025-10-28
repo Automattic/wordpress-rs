@@ -1,5 +1,6 @@
 use crate::{
     DbSite, MigrationManager, RowId,
+    context::EditContext,
     repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
 };
 use chrono::{DateTime, Utc};
@@ -24,7 +25,7 @@ pub mod posts;
 pub struct TestContext {
     pub conn: Connection,
     pub site: DbSite,
-    pub post_repo: PostRepository,
+    pub post_repo: PostRepository<EditContext>,
     pub term_repo: TermRelationshipRepository,
 }
 
@@ -33,7 +34,7 @@ pub fn test_ctx() -> TestContext {
     TestContext {
         conn: test_db(),
         site: DbSite { row_id: RowId(1) },
-        post_repo: PostRepository,
+        post_repo: PostRepository::new(),
         term_repo: TermRelationshipRepository,
     }
 }
