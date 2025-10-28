@@ -17,7 +17,7 @@ use crate::{
     },
     term_relationships::DbTermRelationship,
 };
-use rusqlite::Row;
+use rusqlite::{OptionalExtension, Row};
 use std::marker::PhantomData;
 use wp_api::{
     posts::{
@@ -99,14 +99,14 @@ impl<C: PostContext> PostRepository<C> {
 
     /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
     ///
-    /// Returns an error if no post with the given rowid exists for this site.
+    /// Returns `Ok(None)` if no post with the given rowid exists for this site.
     /// Automatically populates categories and tags from term_relationships table.
     pub fn select_by_rowid(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         rowid: RowId,
-    ) -> Result<C::DbPost, SqliteDbError>
+    ) -> Result<Option<C::DbPost>, SqliteDbError>
     where
         C::DbPost: FromRowWithTerms,
     {
@@ -116,9 +116,12 @@ impl<C: PostContext> PostRepository<C> {
             Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        let post_id: i64 = stmt
+        let Some(post_id) = stmt
             .query_row([site.row_id, rowid], |row| row.get(0))
-            .map_err(SqliteDbError::from)?;
+            .optional()
+            .map_err(SqliteDbError::from)? else {
+            return Ok(None);
+        };
 
         // Load term relationships using the WordPress post ID
         let term_repo = TermRelationshipRepository;
@@ -135,6 +138,7 @@ impl<C: PostContext> PostRepository<C> {
             C::DbPost::from_row_with_terms(row, term_relationships.clone())
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
+        .optional()
         .map_err(SqliteDbError::from)
     }
 
@@ -187,14 +191,14 @@ impl<C: PostContext> PostRepository<C> {
     /// This is different from `select_by_rowid` which uses the SQLite rowid.
     /// The post_id is the WordPress post ID from the REST API.
     ///
-    /// Returns an error if no post with the given WordPress post ID exists for this site.
+    /// Returns `Ok(None)` if no post with the given WordPress post ID exists for this site.
     /// Automatically populates categories and tags from term_relationships table.
     pub fn select_by_post_id(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
-    ) -> Result<C::DbPost, SqliteDbError>
+    ) -> Result<Option<C::DbPost>, SqliteDbError>
     where
         C::DbPost: FromRowWithTerms,
     {
@@ -213,6 +217,7 @@ impl<C: PostContext> PostRepository<C> {
             C::DbPost::from_row_with_terms(row, term_relationships.clone())
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
+        .optional()
         .map_err(SqliteDbError::from)
     }
 
@@ -230,9 +235,9 @@ impl<C: PostContext> PostRepository<C> {
         C::DbPost: FromRowWithTerms,
     {
         // First, try to get the rowid (if post doesn't exist, return 0)
-        let _db_post = match self.select_by_post_id(executor, site, post_id) {
-            Ok(post) => post,
-            Err(_) => return Ok(0), // Post doesn't exist
+        let _db_post = match self.select_by_post_id(executor, site, post_id)? {
+            Some(post) => post,
+            None => return Ok(0), // Post doesn't exist
         };
 
         // Delete term relationships using WordPress post ID
@@ -641,7 +646,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to read post");
+            .expect("Failed to read post")
+            .expect("Post should exist");
 
         // Verify round-trip
         assert_eq!(retrieved.row_id, rowid);
@@ -672,7 +678,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist");
 
         assert_eq!(retrieved.post.status, post_status);
     }
@@ -691,7 +698,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist");
 
         assert_eq!(retrieved.post.categories, None);
         assert_eq!(retrieved.post.tags, None);
@@ -711,7 +719,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to select");
+            .expect("Failed to select")
+            .expect("Post should exist");
 
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site, test_ctx.site);
@@ -732,7 +741,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(42))
-            .expect("Failed to select by post_id");
+            .expect("Failed to select by post_id")
+            .expect("Post should exist");
 
         assert_eq!(retrieved.post.id, PostId(42));
         assert_eq!(retrieved.site, test_ctx.site);
@@ -747,7 +757,7 @@ mod tests {
                 .post_repo
                 .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(999));
 
-        assert!(result.is_err());
+        assert!(result.unwrap().is_none(), "Should return None when post doesn't exist");
     }
 
     #[rstest]
@@ -848,6 +858,7 @@ mod tests {
             test_ctx
                 .post_repo
                 .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+                .expect("Should not error")
                 .expect("Should exist");
         });
     }
@@ -864,6 +875,7 @@ mod tests {
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(42))
+            .expect("Should not error")
             .expect("Post should exist");
 
         // Delete
@@ -877,8 +889,9 @@ mod tests {
         let result =
             test_ctx
                 .post_repo
-                .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(42));
-        assert!(result.is_err());
+                .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(42))
+                .unwrap();
+        assert!(result.is_none(), "Post should not exist after deletion");
 
         // Delete non-existent should return 0
         let deleted = test_ctx
@@ -900,7 +913,9 @@ mod tests {
             test_ctx
                 .post_repo
                 .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
-                .is_err()
+                .unwrap()
+                .is_none(),
+            "Post should not exist before insert"
         );
 
         // Upsert should insert
@@ -913,7 +928,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist after insert");
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site, test_ctx.site);
         assert_eq!(retrieved.post.status, PostStatus::Draft);
@@ -952,7 +968,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist after update");
         assert_eq!(retrieved.post.status, PostStatus::Publish);
         assert_eq!(retrieved.post.slug, "updated-slug");
 
@@ -984,7 +1001,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist");
         assert_eq!(retrieved.post.id, PostId(300));
 
         // Verify categories were inserted
@@ -1060,7 +1078,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(400))
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist");
 
         // Categories: should have 1, 3 (not 2)
         assert_eq!(retrieved.post.categories.as_ref().unwrap().len(), 2);
@@ -1158,7 +1177,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist");
         assert_eq!(
             retrieved.post.categories,
             Some(vec![wp_api::terms::TermId(5)])
@@ -1179,7 +1199,8 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap();
+            .unwrap()
+            .expect("Post should exist");
 
         // Validate timestamp is recent and valid
         assert_recent_timestamp(&retrieved.last_fetched_at);
@@ -1201,6 +1222,7 @@ mod tests {
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .unwrap()
+            .expect("Post should exist")
             .last_fetched_at
             .clone();
 
@@ -1220,6 +1242,7 @@ mod tests {
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .unwrap()
+            .expect("Post should exist")
             .last_fetched_at;
 
         // last_fetched_at should be updated (different)

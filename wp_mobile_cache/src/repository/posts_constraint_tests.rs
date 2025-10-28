@@ -50,7 +50,8 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
     let retrieved = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id)
-        .unwrap();
+        .unwrap()
+        .expect("Post should exist");
     assert_eq!(retrieved.post.title.rendered, "Updated Title");
 }
 
@@ -78,27 +79,29 @@ fn test_invalid_site_id_fails_foreign_key_constraint(mut test_ctx: TestContext) 
 }
 
 #[rstest]
-fn test_select_by_post_id_returns_error_for_non_existent_post(test_ctx: TestContext) {
+fn test_select_by_post_id_returns_none_for_non_existent_post(test_ctx: TestContext) {
     let result =
         test_ctx
             .post_repo
-            .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(99999));
+            .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(99999))
+            .unwrap();
 
     assert!(
-        result.is_err(),
-        "Should return error when post doesn't exist"
+        result.is_none(),
+        "Should return None when post doesn't exist"
     );
 }
 
 #[rstest]
-fn test_select_by_rowid_returns_error_for_non_existent_rowid(test_ctx: TestContext) {
+fn test_select_by_rowid_returns_none_for_non_existent_rowid(test_ctx: TestContext) {
     let result = test_ctx
         .post_repo
-        .select_by_rowid(&test_ctx.conn, &test_ctx.site, RowId(99999));
+        .select_by_rowid(&test_ctx.conn, &test_ctx.site, RowId(99999))
+        .unwrap();
 
     assert!(
-        result.is_err(),
-        "Should return error when rowid doesn't exist"
+        result.is_none(),
+        "Should return None when rowid doesn't exist"
     );
 }
 
