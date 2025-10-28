@@ -16,4 +16,4 @@ wp_api = { path = "../wp_api" }
 
 [dev-dependencies]
 chrono = { workspace = true }
-rstest = "0.18"
+rstest = "0.24"
