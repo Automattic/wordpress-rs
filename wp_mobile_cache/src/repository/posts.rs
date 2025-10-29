@@ -1,6 +1,6 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
-    context::PostContext,
+    context::{EditContext, EmbedContext, PostContext, ViewContext},
     db_types::posts::{
         DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
         PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
@@ -22,10 +22,9 @@ use std::marker::PhantomData;
 use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
-        PostContentWithEditContext, PostContentWithViewContext,
-        PostGuidWithEditContext, PostGuidWithViewContext,
-        PostId, PostTitleWithEditContext, PostTitleWithEmbedContext, PostTitleWithViewContext,
-        SparsePostExcerpt,
+        PostContentWithEditContext, PostContentWithViewContext, PostGuidWithEditContext,
+        PostGuidWithViewContext, PostId, PostTitleWithEditContext, PostTitleWithEmbedContext,
+        PostTitleWithViewContext, SparsePostExcerpt,
     },
     taxonomies::TaxonomyType,
     terms::TermId,
@@ -105,7 +104,8 @@ impl<C: PostContext> PostRepository<C> {
         let Some(post_id) = stmt
             .query_row([site.row_id, rowid], |row| row.get(0))
             .optional()
-            .map_err(SqliteDbError::from)? else {
+            .map_err(SqliteDbError::from)?
+        else {
             return Ok(None);
         };
 
@@ -247,14 +247,11 @@ impl<C: PostContext> PostRepository<C> {
 
 // Context-specific implementations
 
-impl PostContext for crate::context::EditContext {
+impl PostContext for EditContext {
     type Post = AnyPostWithEditContext;
     type DbPost = DbAnyPostWithEditContext;
 
-    fn from_row_with_terms<F>(
-        row: &Row,
-        fetch_terms: F,
-    ) -> Result<Self::DbPost, SqliteDbError>
+    fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
     {
@@ -335,14 +332,11 @@ impl PostContext for crate::context::EditContext {
     }
 }
 
-impl PostContext for crate::context::ViewContext {
+impl PostContext for ViewContext {
     type Post = AnyPostWithViewContext;
     type DbPost = DbAnyPostWithViewContext;
 
-    fn from_row_with_terms<F>(
-        row: &Row,
-        fetch_terms: F,
-    ) -> Result<Self::DbPost, SqliteDbError>
+    fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
     {
@@ -416,14 +410,11 @@ impl PostContext for crate::context::ViewContext {
     }
 }
 
-impl PostContext for crate::context::EmbedContext {
+impl PostContext for EmbedContext {
     type Post = AnyPostWithEmbedContext;
     type DbPost = DbAnyPostWithEmbedContext;
 
-    fn from_row_with_terms<F>(
-        row: &Row,
-        _fetch_terms: F,
-    ) -> Result<Self::DbPost, SqliteDbError>
+    fn from_row_with_terms<F>(row: &Row, _fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
     {
@@ -471,7 +462,7 @@ impl PostContext for crate::context::EmbedContext {
     }
 }
 
-impl PostRepository<crate::context::EditContext> {
+impl PostRepository<EditContext> {
     /// Upsert a post with edit context and its term relationships (atomic transaction).
     ///
     /// Returns the rowid of the inserted or updated row.
@@ -479,7 +470,7 @@ impl PostRepository<crate::context::EditContext> {
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
-        post: &wp_api::posts::AnyPostWithEditContext,
+        post: &AnyPostWithEditContext,
     ) -> Result<RowId, SqliteDbError> {
         let tx = transaction_manager.transaction()?;
 
@@ -534,60 +525,53 @@ impl PostRepository<crate::context::EditContext> {
                 excerpt_rendered = excluded.excerpt_rendered,
                 excerpt_protected = excluded.excerpt_protected,
                 last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            RETURNING rowid
             "#,
             Self::table_name()
         );
 
-        tx.execute(
-            &upsert_sql,
-            rusqlite::named_params! {
-                ":db_site_id": site.row_id,
-                ":id": post.id.0,
-                ":date": post.date,
-                ":date_gmt": post.date_gmt.to_string(),
-                ":link": post.link,
-                ":modified": post.modified,
-                ":modified_gmt": post.modified_gmt.to_string(),
-                ":slug": post.slug,
-                ":status": post.status.to_string(),
-                ":post_type": post.post_type,
-                ":password": post.password,
-                ":template": post.template,
-                ":permalink_template": post.permalink_template,
-                ":generated_slug": post.generated_slug,
-                ":author": post.author.map(|u| u.0),
-                ":featured_media": post.featured_media.map(|m| m.0),
-                ":sticky": bool_to_integer(post.sticky),
-                ":parent": post.parent.map(|p| p.0),
-                ":menu_order": post.menu_order,
-                ":comment_status": post.comment_status.as_ref().map(|s| s.to_string()),
-                ":ping_status": post.ping_status.as_ref().map(|s| s.to_string()),
-                ":format": post.format.as_ref().map(|f| f.to_string()),
-                ":meta": serialize_value_to_json(&post.meta)?,
-                ":guid_raw": post.guid.raw,
-                ":guid_rendered": post.guid.rendered,
-                ":title_raw": post.title.raw,
-                ":title_rendered": post.title.rendered,
-                ":content_raw": post.content.raw,
-                ":content_rendered": post.content.rendered,
-                ":content_protected": post.content.protected,
-                ":content_block_version": post.content.block_version,
-                ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
-                ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
-                ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
-            },
-        )?;
-
-        // Get the rowid of the upserted post
-        let sql = format!(
-            "SELECT rowid FROM {} WHERE db_site_id = ? AND id = ?",
-            Self::table_name()
-        );
-        let post_rowid: i64 = {
-            let mut stmt = tx.prepare(&sql)?;
-            stmt.query_row(rusqlite::params![site.row_id, post.id.0], |row| row.get(0))
-                .map_err(SqliteDbError::from)?
-        };
+        let post_rowid: i64 = tx
+            .query_row(
+                &upsert_sql,
+                rusqlite::named_params! {
+                    ":db_site_id": site.row_id,
+                    ":id": post.id.0,
+                    ":date": post.date,
+                    ":date_gmt": post.date_gmt.to_string(),
+                    ":link": post.link,
+                    ":modified": post.modified,
+                    ":modified_gmt": post.modified_gmt.to_string(),
+                    ":slug": post.slug,
+                    ":status": post.status.to_string(),
+                    ":post_type": post.post_type,
+                    ":password": post.password,
+                    ":template": post.template,
+                    ":permalink_template": post.permalink_template,
+                    ":generated_slug": post.generated_slug,
+                    ":author": post.author.map(|u| u.0),
+                    ":featured_media": post.featured_media.map(|m| m.0),
+                    ":sticky": bool_to_integer(post.sticky),
+                    ":parent": post.parent.map(|p| p.0),
+                    ":menu_order": post.menu_order,
+                    ":comment_status": post.comment_status.as_ref().map(|s| s.to_string()),
+                    ":ping_status": post.ping_status.as_ref().map(|s| s.to_string()),
+                    ":format": post.format.as_ref().map(|f| f.to_string()),
+                    ":meta": serialize_value_to_json(&post.meta)?,
+                    ":guid_raw": post.guid.raw,
+                    ":guid_rendered": post.guid.rendered,
+                    ":title_raw": post.title.raw,
+                    ":title_rendered": post.title.rendered,
+                    ":content_raw": post.content.raw,
+                    ":content_rendered": post.content.rendered,
+                    ":content_protected": post.content.protected,
+                    ":content_block_version": post.content.block_version,
+                    ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
+                    ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
+                    ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
+                },
+                |row| row.get(0),
+            )
+            .map_err(SqliteDbError::from)?;
         let post_rowid = RowId(post_rowid as u64);
 
         // Sync term relationships
@@ -616,7 +600,226 @@ impl PostRepository<crate::context::EditContext> {
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
-        posts: &[wp_api::posts::AnyPostWithEditContext],
+        posts: &[AnyPostWithEditContext],
+    ) -> Result<Vec<RowId>, SqliteDbError> {
+        posts
+            .iter()
+            .map(|post| self.upsert(transaction_manager, site, post))
+            .collect()
+    }
+}
+
+impl PostRepository<ViewContext> {
+    /// Upsert a post with view context and its term relationships (atomic transaction).
+    ///
+    /// Returns the rowid of the inserted or updated row.
+    pub fn upsert(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        post: &AnyPostWithViewContext,
+    ) -> Result<RowId, SqliteDbError> {
+        let tx = transaction_manager.transaction()?;
+
+        let upsert_sql = format!(
+            r#"
+            INSERT INTO {} (
+                db_site_id, id, date, date_gmt, link, modified, modified_gmt, slug, status, post_type,
+                template, author, featured_media, sticky, parent, menu_order,
+                comment_status, ping_status, format, meta,
+                guid_rendered, title_rendered,
+                content_rendered, content_protected,
+                excerpt_raw, excerpt_rendered, excerpt_protected
+            ) VALUES (
+                :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
+                :template, :author, :featured_media, :sticky, :parent, :menu_order,
+                :comment_status, :ping_status, :format, :meta,
+                :guid_rendered, :title_rendered,
+                :content_rendered, :content_protected,
+                :excerpt_raw, :excerpt_rendered, :excerpt_protected
+            )
+            ON CONFLICT(db_site_id, id) DO UPDATE SET
+                date = excluded.date,
+                date_gmt = excluded.date_gmt,
+                link = excluded.link,
+                modified = excluded.modified,
+                modified_gmt = excluded.modified_gmt,
+                slug = excluded.slug,
+                status = excluded.status,
+                post_type = excluded.post_type,
+                template = excluded.template,
+                author = excluded.author,
+                featured_media = excluded.featured_media,
+                sticky = excluded.sticky,
+                parent = excluded.parent,
+                menu_order = excluded.menu_order,
+                comment_status = excluded.comment_status,
+                ping_status = excluded.ping_status,
+                format = excluded.format,
+                meta = excluded.meta,
+                guid_rendered = excluded.guid_rendered,
+                title_rendered = excluded.title_rendered,
+                content_rendered = excluded.content_rendered,
+                content_protected = excluded.content_protected,
+                excerpt_raw = excluded.excerpt_raw,
+                excerpt_rendered = excluded.excerpt_rendered,
+                excerpt_protected = excluded.excerpt_protected,
+                last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            RETURNING rowid
+            "#,
+            Self::table_name()
+        );
+
+        let post_rowid: i64 = tx
+            .query_row(
+                &upsert_sql,
+                rusqlite::named_params! {
+                    ":db_site_id": site.row_id,
+                    ":id": post.id.0,
+                    ":date": post.date,
+                    ":date_gmt": post.date_gmt.to_string(),
+                    ":link": post.link,
+                    ":modified": post.modified,
+                    ":modified_gmt": post.modified_gmt.to_string(),
+                    ":slug": post.slug,
+                    ":status": post.status.to_string(),
+                    ":post_type": post.post_type,
+                    ":template": post.template,
+                    ":author": post.author.map(|u| u.0),
+                    ":featured_media": post.featured_media.map(|m| m.0),
+                    ":sticky": bool_to_integer(post.sticky),
+                    ":parent": post.parent.map(|p| p.0),
+                    ":menu_order": post.menu_order,
+                    ":comment_status": post.comment_status.as_ref().map(|s| s.to_string()),
+                    ":ping_status": post.ping_status.as_ref().map(|s| s.to_string()),
+                    ":format": post.format.as_ref().map(|f| f.to_string()),
+                    ":meta": serialize_value_to_json(&post.meta)?,
+                    ":guid_rendered": post.guid.rendered,
+                    ":title_rendered": post.title.rendered,
+                    ":content_rendered": post.content.rendered,
+                    ":content_protected": post.content.protected,
+                    ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
+                    ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
+                    ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
+                },
+                |row| row.get(0),
+            )
+            .map_err(SqliteDbError::from)?;
+        let post_rowid = RowId(post_rowid as u64);
+
+        // Sync term relationships (ViewContext has categories and tags)
+        let term_repo = TermRelationshipRepository;
+
+        if let Some(ref categories) = post.categories {
+            term_repo.sync_terms_for_object(
+                &tx,
+                site,
+                post.id.0,
+                &TaxonomyType::Category,
+                categories,
+            )?;
+        }
+
+        if let Some(ref tags) = post.tags {
+            term_repo.sync_terms_for_object(&tx, site, post.id.0, &TaxonomyType::PostTag, tags)?;
+        }
+
+        tx.commit().map_err(SqliteDbError::from)?;
+        Ok(post_rowid)
+    }
+
+    /// Upsert multiple posts with their term relationships.
+    pub fn upsert_batch(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        posts: &[AnyPostWithViewContext],
+    ) -> Result<Vec<RowId>, SqliteDbError> {
+        posts
+            .iter()
+            .map(|post| self.upsert(transaction_manager, site, post))
+            .collect()
+    }
+}
+
+impl PostRepository<EmbedContext> {
+    /// Upsert a post with embed context (atomic transaction).
+    ///
+    /// Note: EmbedContext does not include categories or tags, so no term relationships are synced.
+    ///
+    /// Returns the rowid of the inserted or updated row.
+    pub fn upsert(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        post: &AnyPostWithEmbedContext,
+    ) -> Result<RowId, SqliteDbError> {
+        let tx = transaction_manager.transaction()?;
+
+        let upsert_sql = format!(
+            r#"
+            INSERT INTO {} (
+                db_site_id, id, date, link, slug, post_type,
+                title_rendered, author,
+                excerpt_raw, excerpt_rendered, excerpt_protected,
+                featured_media
+            ) VALUES (
+                :db_site_id, :id, :date, :link, :slug, :post_type,
+                :title_rendered, :author,
+                :excerpt_raw, :excerpt_rendered, :excerpt_protected,
+                :featured_media
+            )
+            ON CONFLICT(db_site_id, id) DO UPDATE SET
+                date = excluded.date,
+                link = excluded.link,
+                slug = excluded.slug,
+                post_type = excluded.post_type,
+                title_rendered = excluded.title_rendered,
+                author = excluded.author,
+                excerpt_raw = excluded.excerpt_raw,
+                excerpt_rendered = excluded.excerpt_rendered,
+                excerpt_protected = excluded.excerpt_protected,
+                featured_media = excluded.featured_media,
+                last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            RETURNING rowid
+            "#,
+            Self::table_name()
+        );
+
+        let post_rowid: i64 = tx
+            .query_row(
+                &upsert_sql,
+                rusqlite::named_params! {
+                    ":db_site_id": site.row_id,
+                    ":id": post.id.0,
+                    ":date": post.date,
+                    ":link": post.link,
+                    ":slug": post.slug,
+                    ":post_type": post.post_type,
+                    ":title_rendered": post.title.rendered,
+                    ":author": post.author.map(|u| u.0),
+                    ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
+                    ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
+                    ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
+                    ":featured_media": post.featured_media.map(|m| m.0),
+                },
+                |row| row.get(0),
+            )
+            .map_err(SqliteDbError::from)?;
+        let post_rowid = RowId(post_rowid as u64);
+
+        // No term relationships for EmbedContext (no categories or tags)
+
+        tx.commit().map_err(SqliteDbError::from)?;
+        Ok(post_rowid)
+    }
+
+    /// Upsert multiple posts.
+    pub fn upsert_batch(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &DbSite,
+        posts: &[AnyPostWithEmbedContext],
     ) -> Result<Vec<RowId>, SqliteDbError> {
         posts
             .iter()
@@ -628,13 +831,13 @@ impl PostRepository<crate::context::EditContext> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db_types::posts::{
+        PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
+    };
+    use crate::mappings::ColumnIndex;
     use crate::test_fixtures::{
         TestContext, assert_recent_timestamp, get_table_column_names, posts::PostBuilder, test_ctx,
     };
-    use crate::db_types::posts::{
-        PostEditContextColumn, PostViewContextColumn, PostEmbedContextColumn,
-    };
-    use crate::mappings::ColumnIndex;
     use rstest::*;
     use wp_api::posts::{AnyPostWithEditContext, PostStatus};
 
@@ -678,7 +881,10 @@ mod tests {
         assert_eq!(columns[ContentRaw.as_index()], "content_raw");
         assert_eq!(columns[ContentRendered.as_index()], "content_rendered");
         assert_eq!(columns[ContentProtected.as_index()], "content_protected");
-        assert_eq!(columns[ContentBlockVersion.as_index()], "content_block_version");
+        assert_eq!(
+            columns[ContentBlockVersion.as_index()],
+            "content_block_version"
+        );
         assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
         assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
@@ -880,7 +1086,10 @@ mod tests {
                 .post_repo
                 .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(999));
 
-        assert!(result.unwrap().is_none(), "Should return None when post doesn't exist");
+        assert!(
+            result.unwrap().is_none(),
+            "Should return None when post doesn't exist"
+        );
     }
 
     #[rstest]
@@ -1009,11 +1218,10 @@ mod tests {
         assert_eq!(deleted, 1);
 
         // Verify no longer exists
-        let result =
-            test_ctx
-                .post_repo
-                .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(42))
-                .unwrap();
+        let result = test_ctx
+            .post_repo
+            .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(42))
+            .unwrap();
         assert!(result.is_none(), "Post should not exist after deletion");
 
         // Delete non-existent should return 0

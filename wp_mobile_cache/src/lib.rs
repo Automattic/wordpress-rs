@@ -324,4 +324,28 @@ mod tests {
             MIGRATION_QUERIES.len()
         );
     }
+
+    #[test]
+    fn test_bundled_sqlite_version_supports_returning() {
+        let conn = Connection::open_in_memory().unwrap();
+        let version: String = conn
+            .query_row("SELECT sqlite_version()", [], |row| row.get(0))
+            .unwrap();
+
+        println!("Bundled SQLite version: {}", version);
+
+        // Parse version to check if >= 3.35.0 (when RETURNING was added)
+        let parts: Vec<&str> = version.split('.').collect();
+        let major: i32 = parts[0].parse().unwrap();
+        let minor: i32 = parts[1].parse().unwrap();
+
+        assert!(major >= 3, "SQLite major version should be at least 3");
+        if major == 3 {
+            assert!(
+                minor >= 35,
+                "SQLite version {} is too old for RETURNING clause (need 3.35.0+)",
+                version
+            );
+        }
+    }
 }
