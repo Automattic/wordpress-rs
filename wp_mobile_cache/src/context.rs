@@ -46,10 +46,7 @@ pub trait PostContext: IsContext {
     /// This method is implemented in the repository module where database logic belongs.
     /// The `fetch_terms` closure is only called if the context actually needs term relationships.
     /// This allows contexts like Embed (which don't use terms) to avoid unnecessary database queries.
-    fn from_row_with_terms<F>(
-        row: &Row,
-        fetch_terms: F,
-    ) -> Result<Self::DbPost, SqliteDbError>
+    fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>;
 }

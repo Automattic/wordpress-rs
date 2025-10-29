@@ -80,11 +80,10 @@ fn test_invalid_site_id_fails_foreign_key_constraint(mut test_ctx: TestContext) 
 
 #[rstest]
 fn test_select_by_post_id_returns_none_for_non_existent_post(test_ctx: TestContext) {
-    let result =
-        test_ctx
-            .post_repo
-            .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(99999))
-            .unwrap();
+    let result = test_ctx
+        .post_repo
+        .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(99999))
+        .unwrap();
 
     assert!(
         result.is_none(),

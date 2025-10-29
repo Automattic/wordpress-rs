@@ -30,12 +30,6 @@ use wp_api::{
     terms::TermId,
 };
 
-// Re-export for public API
-pub use crate::db_types::posts::{
-    DbAnyPostWithEditContext as DbPostEdit, DbAnyPostWithEmbedContext as DbPostEmbed,
-    DbAnyPostWithViewContext as DbPostView,
-};
-
 /// Extract categories and tags from term relationships.
 fn extract_categories_and_tags(
     term_relationships: Vec<DbTermRelationship>,
