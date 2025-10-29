@@ -86,8 +86,6 @@ response_parsing_error = A resposta não pôde ser analisada: { $reason }.
 
 url_parsing_error = URL inválida.
 
-site_error_message = Seu site enviou uma mensagem de erro: { $error_message }.
-
 wp_api_error_generic_error = Algo deu errado.
 
 probably_not_wordpress_site = O site não parece ser um site WordPress.
