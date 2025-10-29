@@ -70,8 +70,6 @@ response_parsing_error = Yanıt işlenemedi: { $reason }.
 
 url_parsing_error = Geçersiz URL.
 
-site_error_message = Siteniz bir hata mesajı gönderdi: { $error_message }.
-
 wp_api_error_generic_error = Bir şeyler yanlış gitti.
 
 probably_not_wordpress_site = Site bir WordPress sitesi gibi görünmüyor.
