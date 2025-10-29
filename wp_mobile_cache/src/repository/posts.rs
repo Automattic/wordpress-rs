@@ -109,20 +109,19 @@ impl<C: PostContext> PostRepository<C> {
             return Ok(None);
         };
 
-        // Load term relationships using the WordPress post ID
-        let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id])?;
-        let term_relationships = terms_map.get(&post_id).cloned().unwrap_or_default();
-
-        // Query and construct post with term relationships
+        // Query and construct post with lazy term relationship loading
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND rowid = ?",
             Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row([site.row_id, rowid], |row| {
-            C::from_row_with_terms(row, term_relationships.clone())
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            C::from_row_with_terms(row, || {
+                let term_repo = TermRelationshipRepository;
+                let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id])?;
+                Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
+            })
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .optional()
         .map_err(SqliteDbError::from)
@@ -150,18 +149,20 @@ impl<C: PostContext> PostRepository<C> {
         }
 
         // Batch load term relationships for all posts using WordPress post IDs
+        // This is done upfront for efficiency, but each context decides whether to use them
         let term_repo = TermRelationshipRepository;
         let terms_map = term_repo.get_terms_for_objects(executor, site, &post_ids)?;
 
-        // Second pass: construct posts with term relationships
+        // Second pass: construct posts with lazy term relationship access
         let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::table_name());
         let mut stmt = executor.prepare(&sql)?;
         let posts = stmt
             .query_map([site.row_id], |row| {
                 let post_id: i64 = row.get("id")?;
-                let term_relationships = terms_map.get(&post_id).cloned().unwrap_or_default();
-                C::from_row_with_terms(row, term_relationships)
-                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+                C::from_row_with_terms(row, || {
+                    Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
+                })
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
             })?
             .collect::<Result<Vec<_>, _>>()
             .map_err(SqliteDbError::from)?;
@@ -182,20 +183,19 @@ impl<C: PostContext> PostRepository<C> {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<Option<C::DbPost>, SqliteDbError> {
-        // Load term relationships using the WordPress post ID
-        let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
-        let term_relationships = terms_map.get(&post_id.0).cloned().unwrap_or_default();
-
-        // Query and construct post with term relationships
+        // Query and construct post with lazy term relationship loading
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND id = ?",
             Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
-            C::from_row_with_terms(row, term_relationships.clone())
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            C::from_row_with_terms(row, || {
+                let term_repo = TermRelationshipRepository;
+                let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
+                Ok(terms_map.get(&post_id.0).cloned().unwrap_or_default())
+            })
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .optional()
         .map_err(SqliteDbError::from)
@@ -251,10 +251,13 @@ impl PostContext for crate::context::EditContext {
     type Post = AnyPostWithEditContext;
     type DbPost = DbAnyPostWithEditContext;
 
-    fn from_row_with_terms(
+    fn from_row_with_terms<F>(
         row: &Row,
-        term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self::DbPost, SqliteDbError> {
+        fetch_terms: F,
+    ) -> Result<Self::DbPost, SqliteDbError>
+    where
+        F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
+    {
         use PostEditContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
@@ -262,6 +265,8 @@ impl PostContext for crate::context::EditContext {
             row_id: row.get_column(PostEditContextColumn::SiteId)?,
         };
 
+        // EditContext uses term relationships (categories and tags)
+        let term_relationships = fetch_terms()?;
         let (categories, tags) = extract_categories_and_tags(term_relationships);
 
         let post = AnyPostWithEditContext {
@@ -334,10 +339,13 @@ impl PostContext for crate::context::ViewContext {
     type Post = AnyPostWithViewContext;
     type DbPost = DbAnyPostWithViewContext;
 
-    fn from_row_with_terms(
+    fn from_row_with_terms<F>(
         row: &Row,
-        term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self::DbPost, SqliteDbError> {
+        fetch_terms: F,
+    ) -> Result<Self::DbPost, SqliteDbError>
+    where
+        F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
+    {
         use PostViewContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
@@ -345,6 +353,8 @@ impl PostContext for crate::context::ViewContext {
             row_id: row.get_column(PostViewContextColumn::SiteId)?,
         };
 
+        // ViewContext uses term relationships (categories and tags)
+        let term_relationships = fetch_terms()?;
         let (categories, tags) = extract_categories_and_tags(term_relationships);
 
         let post = AnyPostWithViewContext {
@@ -410,16 +420,22 @@ impl PostContext for crate::context::EmbedContext {
     type Post = AnyPostWithEmbedContext;
     type DbPost = DbAnyPostWithEmbedContext;
 
-    fn from_row_with_terms(
+    fn from_row_with_terms<F>(
         row: &Row,
-        _term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self::DbPost, SqliteDbError> {
+        _fetch_terms: F,
+    ) -> Result<Self::DbPost, SqliteDbError>
+    where
+        F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
+    {
         use PostEmbedContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
         let site = DbSite {
             row_id: row.get_column(PostEmbedContextColumn::SiteId)?,
         };
+
+        // EmbedContext does not use term relationships (no categories/tags in embed context)
+        // The fetch_terms closure is never called, avoiding unnecessary database queries
 
         let post = AnyPostWithEmbedContext {
             id: get_id(row, Id)?,

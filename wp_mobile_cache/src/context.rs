@@ -41,13 +41,17 @@ pub trait PostContext: IsContext {
     /// The context-specific database wrapper type (e.g., DbAnyPostWithEditContext)
     type DbPost;
 
-    /// Construct DbPost from a database row with associated term relationships.
+    /// Construct DbPost from a database row with lazy term relationship loading.
     ///
     /// This method is implemented in the repository module where database logic belongs.
-    fn from_row_with_terms(
+    /// The `fetch_terms` closure is only called if the context actually needs term relationships.
+    /// This allows contexts like Embed (which don't use terms) to avoid unnecessary database queries.
+    fn from_row_with_terms<F>(
         row: &Row,
-        term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self::DbPost, SqliteDbError>;
+        fetch_terms: F,
+    ) -> Result<Self::DbPost, SqliteDbError>
+    where
+        F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>;
 }
 
 // Future entity-specific traits would go here:
