@@ -629,10 +629,131 @@ impl PostRepository<crate::context::EditContext> {
 mod tests {
     use super::*;
     use crate::test_fixtures::{
-        TestContext, assert_recent_timestamp, posts::PostBuilder, test_ctx,
+        TestContext, assert_recent_timestamp, get_table_column_names, posts::PostBuilder, test_ctx,
     };
+    use crate::db_types::posts::{
+        PostEditContextColumn, PostViewContextColumn, PostEmbedContextColumn,
+    };
+    use crate::mappings::ColumnIndex;
     use rstest::*;
     use wp_api::posts::{AnyPostWithEditContext, PostStatus};
+
+    /// Verify that PostEditContextColumn enum values match the actual database schema.
+    /// This test protects against column reordering in migrations breaking the positional index mapping.
+    #[rstest]
+    fn test_post_edit_context_column_enum_matches_schema(test_ctx: TestContext) {
+        use PostEditContextColumn::*;
+
+        let columns = get_table_column_names(&test_ctx.conn, "posts_edit_context");
+
+        // Verify each enum value maps to the correct column name
+        assert_eq!(columns[Rowid.as_index()], "rowid");
+        assert_eq!(columns[SiteId.as_index()], "db_site_id");
+        assert_eq!(columns[Id.as_index()], "id");
+        assert_eq!(columns[Date.as_index()], "date");
+        assert_eq!(columns[DateGmt.as_index()], "date_gmt");
+        assert_eq!(columns[Link.as_index()], "link");
+        assert_eq!(columns[Modified.as_index()], "modified");
+        assert_eq!(columns[ModifiedGmt.as_index()], "modified_gmt");
+        assert_eq!(columns[Slug.as_index()], "slug");
+        assert_eq!(columns[Status.as_index()], "status");
+        assert_eq!(columns[PostType.as_index()], "post_type");
+        assert_eq!(columns[Password.as_index()], "password");
+        assert_eq!(columns[Template.as_index()], "template");
+        assert_eq!(columns[PermalinkTemplate.as_index()], "permalink_template");
+        assert_eq!(columns[GeneratedSlug.as_index()], "generated_slug");
+        assert_eq!(columns[Author.as_index()], "author");
+        assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
+        assert_eq!(columns[Sticky.as_index()], "sticky");
+        assert_eq!(columns[Parent.as_index()], "parent");
+        assert_eq!(columns[MenuOrder.as_index()], "menu_order");
+        assert_eq!(columns[CommentStatus.as_index()], "comment_status");
+        assert_eq!(columns[PingStatus.as_index()], "ping_status");
+        assert_eq!(columns[Format.as_index()], "format");
+        assert_eq!(columns[Meta.as_index()], "meta");
+        assert_eq!(columns[GuidRaw.as_index()], "guid_raw");
+        assert_eq!(columns[GuidRendered.as_index()], "guid_rendered");
+        assert_eq!(columns[TitleRaw.as_index()], "title_raw");
+        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
+        assert_eq!(columns[ContentRaw.as_index()], "content_raw");
+        assert_eq!(columns[ContentRendered.as_index()], "content_rendered");
+        assert_eq!(columns[ContentProtected.as_index()], "content_protected");
+        assert_eq!(columns[ContentBlockVersion.as_index()], "content_block_version");
+        assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
+        assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
+        assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
+        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+
+        // Verify total column count matches
+        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+    }
+
+    /// Verify that PostViewContextColumn enum values match the actual database schema.
+    /// This test protects against column reordering in migrations breaking the positional index mapping.
+    #[rstest]
+    fn test_post_view_context_column_enum_matches_schema(test_ctx: TestContext) {
+        use PostViewContextColumn::*;
+
+        let columns = get_table_column_names(&test_ctx.conn, "posts_view_context");
+
+        assert_eq!(columns[Rowid.as_index()], "rowid");
+        assert_eq!(columns[SiteId.as_index()], "db_site_id");
+        assert_eq!(columns[Id.as_index()], "id");
+        assert_eq!(columns[Date.as_index()], "date");
+        assert_eq!(columns[DateGmt.as_index()], "date_gmt");
+        assert_eq!(columns[Link.as_index()], "link");
+        assert_eq!(columns[Modified.as_index()], "modified");
+        assert_eq!(columns[ModifiedGmt.as_index()], "modified_gmt");
+        assert_eq!(columns[Slug.as_index()], "slug");
+        assert_eq!(columns[Status.as_index()], "status");
+        assert_eq!(columns[PostType.as_index()], "post_type");
+        assert_eq!(columns[Template.as_index()], "template");
+        assert_eq!(columns[Author.as_index()], "author");
+        assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
+        assert_eq!(columns[Sticky.as_index()], "sticky");
+        assert_eq!(columns[Parent.as_index()], "parent");
+        assert_eq!(columns[MenuOrder.as_index()], "menu_order");
+        assert_eq!(columns[CommentStatus.as_index()], "comment_status");
+        assert_eq!(columns[PingStatus.as_index()], "ping_status");
+        assert_eq!(columns[Format.as_index()], "format");
+        assert_eq!(columns[Meta.as_index()], "meta");
+        assert_eq!(columns[GuidRendered.as_index()], "guid_rendered");
+        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
+        assert_eq!(columns[ContentRendered.as_index()], "content_rendered");
+        assert_eq!(columns[ContentProtected.as_index()], "content_protected");
+        assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
+        assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
+        assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
+        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+
+        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+    }
+
+    /// Verify that PostEmbedContextColumn enum values match the actual database schema.
+    /// This test protects against column reordering in migrations breaking the positional index mapping.
+    #[rstest]
+    fn test_post_embed_context_column_enum_matches_schema(test_ctx: TestContext) {
+        use PostEmbedContextColumn::*;
+
+        let columns = get_table_column_names(&test_ctx.conn, "posts_embed_context");
+
+        assert_eq!(columns[Rowid.as_index()], "rowid");
+        assert_eq!(columns[SiteId.as_index()], "db_site_id");
+        assert_eq!(columns[Id.as_index()], "id");
+        assert_eq!(columns[Date.as_index()], "date");
+        assert_eq!(columns[Link.as_index()], "link");
+        assert_eq!(columns[Slug.as_index()], "slug");
+        assert_eq!(columns[PostType.as_index()], "post_type");
+        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
+        assert_eq!(columns[Author.as_index()], "author");
+        assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
+        assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
+        assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
+        assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
+        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+
+        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+    }
 
     #[rstest]
     #[case(PostBuilder::minimal().build())]
