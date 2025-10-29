@@ -1,3 +1,6 @@
+use crate::{SqliteDbError, term_relationships::DbTermRelationship};
+use rusqlite::Row;
+
 /// Base trait for WordPress REST API context types.
 ///
 /// This trait is entity-agnostic and only handles table naming and context identification.
@@ -30,13 +33,21 @@ pub trait IsContext: 'static + Copy {
 
 /// Entity-specific context trait for Posts.
 ///
-/// Associates a context with post-specific types.
+/// Associates a context with post-specific types and provides database row mapping.
 pub trait PostContext: IsContext {
     /// The context-specific post entity type (e.g., AnyPostWithEditContext)
     type Post;
 
     /// The context-specific database wrapper type (e.g., DbAnyPostWithEditContext)
     type DbPost;
+
+    /// Construct DbPost from a database row with associated term relationships.
+    ///
+    /// This method is implemented in the repository module where database logic belongs.
+    fn from_row_with_terms(
+        row: &Row,
+        term_relationships: Vec<DbTermRelationship>,
+    ) -> Result<Self::DbPost, SqliteDbError>;
 }
 
 // Future entity-specific traits would go here:
@@ -84,22 +95,6 @@ impl IsContext for EmbedContext {
     fn wp_context() -> wp_api::WpContext {
         wp_api::WpContext::Embed
     }
-}
-
-// Implement PostContext for each marker type
-impl PostContext for EditContext {
-    type Post = wp_api::posts::AnyPostWithEditContext;
-    type DbPost = crate::db_types::posts::DbAnyPostWithEditContext;
-}
-
-impl PostContext for ViewContext {
-    type Post = wp_api::posts::AnyPostWithViewContext;
-    type DbPost = crate::db_types::posts::DbAnyPostWithViewContext;
-}
-
-impl PostContext for EmbedContext {
-    type Post = wp_api::posts::AnyPostWithEmbedContext;
-    type DbPost = crate::db_types::posts::DbAnyPostWithEmbedContext;
 }
 
 #[cfg(test)]

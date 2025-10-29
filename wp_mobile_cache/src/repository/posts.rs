@@ -37,14 +37,6 @@ pub use crate::db_types::posts::{
     DbAnyPostWithViewContext as DbPostView,
 };
 
-// Private trait for generic read operations
-trait FromRowWithTerms: Sized {
-    fn from_row_with_terms(
-        row: &Row,
-        term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self, SqliteDbError>;
-}
-
 /// Extract categories and tags from term relationships.
 fn extract_categories_and_tags(
     term_relationships: Vec<DbTermRelationship>,
@@ -79,9 +71,6 @@ impl<C: PostContext> Default for PostRepository<C> {
     }
 }
 
-// Allow private_bounds because FromRowWithTerms is intentionally an internal implementation detail.
-// The trait is sealed within this module and not part of the public API.
-#[allow(private_bounds)]
 impl<C: PostContext> PostRepository<C> {
     const TABLE_NAME_PREFIX: &'static str = "posts";
 
@@ -106,10 +95,7 @@ impl<C: PostContext> PostRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
         rowid: RowId,
-    ) -> Result<Option<C::DbPost>, SqliteDbError>
-    where
-        C::DbPost: FromRowWithTerms,
-    {
+    ) -> Result<Option<C::DbPost>, SqliteDbError> {
         // First get the post.id (WordPress ID) from the rowid
         let sql = format!(
             "SELECT id FROM {} WHERE db_site_id = ? AND rowid = ?",
@@ -135,7 +121,7 @@ impl<C: PostContext> PostRepository<C> {
         );
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row([site.row_id, rowid], |row| {
-            C::DbPost::from_row_with_terms(row, term_relationships.clone())
+            C::from_row_with_terms(row, term_relationships.clone())
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .optional()
@@ -150,10 +136,7 @@ impl<C: PostContext> PostRepository<C> {
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-    ) -> Result<Vec<C::DbPost>, SqliteDbError>
-    where
-        C::DbPost: FromRowWithTerms,
-    {
+    ) -> Result<Vec<C::DbPost>, SqliteDbError> {
         // First pass: extract post IDs (WordPress IDs, not SQLite rowids)
         let sql = format!("SELECT id FROM {} WHERE db_site_id = ?", Self::table_name());
         let mut stmt = executor.prepare(&sql)?;
@@ -177,7 +160,7 @@ impl<C: PostContext> PostRepository<C> {
             .query_map([site.row_id], |row| {
                 let post_id: i64 = row.get("id")?;
                 let term_relationships = terms_map.get(&post_id).cloned().unwrap_or_default();
-                C::DbPost::from_row_with_terms(row, term_relationships)
+                C::from_row_with_terms(row, term_relationships)
                     .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -198,10 +181,7 @@ impl<C: PostContext> PostRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
-    ) -> Result<Option<C::DbPost>, SqliteDbError>
-    where
-        C::DbPost: FromRowWithTerms,
-    {
+    ) -> Result<Option<C::DbPost>, SqliteDbError> {
         // Load term relationships using the WordPress post ID
         let term_repo = TermRelationshipRepository;
         let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
@@ -214,7 +194,7 @@ impl<C: PostContext> PostRepository<C> {
         );
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
-            C::DbPost::from_row_with_terms(row, term_relationships.clone())
+            C::from_row_with_terms(row, term_relationships.clone())
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })
         .optional()
@@ -230,10 +210,7 @@ impl<C: PostContext> PostRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
-    ) -> Result<usize, SqliteDbError>
-    where
-        C::DbPost: FromRowWithTerms,
-    {
+    ) -> Result<usize, SqliteDbError> {
         // First, try to get the rowid (if post doesn't exist, return 0)
         let _db_post = match self.select_by_post_id(executor, site, post_id)? {
             Some(post) => post,
@@ -270,11 +247,14 @@ impl<C: PostContext> PostRepository<C> {
 
 // Context-specific implementations
 
-impl FromRowWithTerms for DbAnyPostWithEditContext {
+impl PostContext for crate::context::EditContext {
+    type Post = AnyPostWithEditContext;
+    type DbPost = DbAnyPostWithEditContext;
+
     fn from_row_with_terms(
         row: &Row,
         term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self, SqliteDbError> {
+    ) -> Result<Self::DbPost, SqliteDbError> {
         use PostEditContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
@@ -341,7 +321,7 @@ impl FromRowWithTerms for DbAnyPostWithEditContext {
             menu_order: row.get_column(MenuOrder)?,
         };
 
-        Ok(Self {
+        Ok(DbAnyPostWithEditContext {
             row_id,
             site,
             post,
@@ -350,11 +330,14 @@ impl FromRowWithTerms for DbAnyPostWithEditContext {
     }
 }
 
-impl FromRowWithTerms for DbAnyPostWithViewContext {
+impl PostContext for crate::context::ViewContext {
+    type Post = AnyPostWithViewContext;
+    type DbPost = DbAnyPostWithViewContext;
+
     fn from_row_with_terms(
         row: &Row,
         term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self, SqliteDbError> {
+    ) -> Result<Self::DbPost, SqliteDbError> {
         use PostViewContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
@@ -414,7 +397,7 @@ impl FromRowWithTerms for DbAnyPostWithViewContext {
             menu_order: row.get_column(MenuOrder)?,
         };
 
-        Ok(Self {
+        Ok(DbAnyPostWithViewContext {
             row_id,
             site,
             post,
@@ -423,11 +406,14 @@ impl FromRowWithTerms for DbAnyPostWithViewContext {
     }
 }
 
-impl FromRowWithTerms for DbAnyPostWithEmbedContext {
+impl PostContext for crate::context::EmbedContext {
+    type Post = AnyPostWithEmbedContext;
+    type DbPost = DbAnyPostWithEmbedContext;
+
     fn from_row_with_terms(
         row: &Row,
         _term_relationships: Vec<DbTermRelationship>,
-    ) -> Result<Self, SqliteDbError> {
+    ) -> Result<Self::DbPost, SqliteDbError> {
         use PostEmbedContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
@@ -460,7 +446,7 @@ impl FromRowWithTerms for DbAnyPostWithEmbedContext {
             featured_media: get_optional_id(row, FeaturedMedia)?,
         };
 
-        Ok(Self {
+        Ok(DbAnyPostWithEmbedContext {
             row_id,
             site,
             post,
