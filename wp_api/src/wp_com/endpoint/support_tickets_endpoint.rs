@@ -12,13 +12,13 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum SupportTicketsRequest {
-    #[post(url = "/mobile-support/conversations", params = &CreateSupportTicketParams, output = SupportConversation)]
+    #[post(url = "/mobile-support/conversations", params = &CreateSupportTicketParams, output = SupportConversation, multipart = true)]
     CreateSupportTicket,
     #[get(url = "/mobile-support/conversations", output = Vec<SupportConversationSummary>)]
     GetSupportConversationList,
     #[get(url = "/mobile-support/conversations/<conversation_id>", output = SupportConversation)]
     GetSupportConversation,
-    #[post(url = "/mobile-support/conversations/<conversation_id>", params = &AddMessageToSupportConversationParams, output = SupportConversation)]
+    #[post(url = "/mobile-support/conversations/<conversation_id>", params = &AddMessageToSupportConversationParams, output = SupportConversation, multipart = true)]
     AddMessageToSupportConversation,
 }
 
