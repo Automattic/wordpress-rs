@@ -109,9 +109,11 @@ pub fn assert_recent_timestamp(timestamp: &str) {
 /// # Example
 ///
 /// ```rust
+/// use PostEditContextColumn::*;
+///
 /// let columns = get_table_column_names(&conn, "posts_edit_context");
-/// assert_eq!(columns[0], "rowid");
-/// assert_eq!(columns[1], "db_site_id");
+/// assert_eq!(columns[Rowid.as_index()], "rowid");
+/// assert_eq!(columns[SiteId.as_index()], "db_site_id");
 /// ```
 pub fn get_table_column_names(conn: &Connection, table_name: &str) -> Vec<String> {
     let query = format!("PRAGMA table_info({})", table_name);
