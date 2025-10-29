@@ -1,6 +1,6 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
-    context::{EditContext, EmbedContext, PostContext, ViewContext},
+    context::{EditContext, EmbedContext, IsContext, ViewContext},
     db_types::posts::{
         DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
         PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
@@ -29,6 +29,25 @@ use wp_api::{
     taxonomies::TaxonomyType,
     terms::TermId,
 };
+
+/// Entity-specific context trait for Posts.
+///
+/// Associates a context with post-specific types and provides database row mapping.
+pub trait PostContext: IsContext {
+    /// The context-specific post entity type (e.g., AnyPostWithEditContext)
+    type Post;
+
+    /// The context-specific database wrapper type (e.g., DbAnyPostWithEditContext)
+    type DbPost;
+
+    /// Construct DbPost from a database row with lazy term relationship loading.
+    ///
+    /// The `fetch_terms` closure is only called if the context actually needs term relationships.
+    /// This allows contexts like Embed (which don't use terms) to avoid unnecessary database queries.
+    fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
+    where
+        F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>;
+}
 
 /// Extract categories and tags from term relationships.
 fn extract_categories_and_tags(

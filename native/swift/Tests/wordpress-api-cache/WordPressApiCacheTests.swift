@@ -13,7 +13,7 @@ actor Test {
 
     @Test func testMigrationsWork() async throws {
         let migrationsPerformed = try await self.cache.performMigrations()
-        #expect(migrationsPerformed == 3)
+        #expect(migrationsPerformed == 5)
     }
 
     #if !os(Linux)

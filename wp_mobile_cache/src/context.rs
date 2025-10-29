@@ -1,10 +1,7 @@
-use crate::{SqliteDbError, term_relationships::DbTermRelationship};
-use rusqlite::Row;
-
 /// Base trait for WordPress REST API context types.
 ///
 /// This trait is entity-agnostic and only handles table naming and context identification.
-/// Entity-specific traits (PostContext, CommentContext, etc.) extend this.
+/// Entity-specific traits (e.g., PostContext) are defined in their respective repository modules.
 pub trait IsContext: 'static + Copy {
     /// The context suffix used in table names.
     ///
@@ -30,30 +27,6 @@ pub trait IsContext: 'static + Copy {
         format!("{}_{}_context", prefix, Self::context_suffix())
     }
 }
-
-/// Entity-specific context trait for Posts.
-///
-/// Associates a context with post-specific types and provides database row mapping.
-pub trait PostContext: IsContext {
-    /// The context-specific post entity type (e.g., AnyPostWithEditContext)
-    type Post;
-
-    /// The context-specific database wrapper type (e.g., DbAnyPostWithEditContext)
-    type DbPost;
-
-    /// Construct DbPost from a database row with lazy term relationship loading.
-    ///
-    /// This method is implemented in the repository module where database logic belongs.
-    /// The `fetch_terms` closure is only called if the context actually needs term relationships.
-    /// This allows contexts like Embed (which don't use terms) to avoid unnecessary database queries.
-    fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
-    where
-        F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>;
-}
-
-// Future entity-specific traits would go here:
-// pub trait CommentContext: IsContext { ... }
-// pub trait UserContext: IsContext { ... }
 
 /// Marker type for Edit context
 #[derive(Debug, Clone, Copy)]
