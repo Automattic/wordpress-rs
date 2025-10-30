@@ -388,37 +388,33 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         var request = try buildURLRequest(additionalHeaders: headers)
 
         var form = [MultipartFormField]()
-        for (name, value) in fields() {
-            switch value {
-            case .string(let string):
-                form.append(MultipartFormField(text: string, name: name))
-            case .array(let array):
-                form.append(contentsOf: array.map { MultipartFormField(text: $0, name: "\(name)[]") })
-            }
-        }
+        for field in self.form() {
+            switch field {
+            case .text(let name, let value):
+                form.append(MultipartFormField(text: value, name: name))
+            case .file(let name, let file):
+                var mimeType = file.mimeType
 
-        for (name, file) in files() {
-            var mimeType = file.mimeType
+                #if canImport(UniformTypeIdentifiers)
+                if mimeType == nil {
+                    mimeType = UTType(
+                        filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
+                    )?.preferredMIMEType
+                }
+                #endif
 
-            #if canImport(UniformTypeIdentifiers)
-            if mimeType == nil {
-                mimeType = UTType(
-                    filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
-                )?.preferredMIMEType
-            }
-            #endif
-
-            do {
-                try form.append(
-                    .init(
-                        fileAtPath: file.filePath,
-                        name: name,
-                        filename: file.fileName,
-                        mimeType: mimeType
+                do {
+                    try form.append(
+                        .init(
+                            fileAtPath: file.filePath,
+                            name: name,
+                            filename: file.fileName,
+                            mimeType: mimeType
+                        )
                     )
-                )
-            } catch {
-                throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
+                } catch {
+                    throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
+                }
             }
         }
 

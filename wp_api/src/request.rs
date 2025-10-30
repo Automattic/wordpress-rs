@@ -118,22 +118,16 @@ impl InnerRequestBuilder {
     where
         T: ?Sized + Serialize + RequiresMultipartForm,
     {
-        let mut fields: HashMap<String, WpMultipartFormFieldValue> = HashMap::new();
+        let mut form = Vec::new();
+
         if let Ok(serde_json::Value::Object(object)) = serde_json::to_value(params) {
             for (key, value) in object {
-                if let serde_json::Value::String(s) = value {
-                    fields.insert(key, WpMultipartFormFieldValue::String(s));
-                } else if let serde_json::Value::Array(vec) = value {
-                    fields.insert(
-                        key,
-                        WpMultipartFormFieldValue::Array(
-                            vec.into_iter().map(|v| v.to_string()).collect(),
-                        ),
-                    );
-                } else {
-                    fields.insert(key, WpMultipartFormFieldValue::String(value.to_string()));
-                }
+                form.extend(WpMultipartFormField::from_json(key, value));
             }
+        }
+
+        for (name, file) in params.multipart_form_files() {
+            form.push(WpMultipartFormField::File { name, file });
         }
 
         let mut header_map = self.header_map_for_post_request();
@@ -147,8 +141,7 @@ impl InnerRequestBuilder {
             method: RequestMethod::POST,
             url: url.into(),
             header_map: header_map.into(),
-            fields,
-            files: params.multipart_form_files(),
+            form,
         }
     }
 
@@ -340,6 +333,44 @@ impl NetworkRequestAccessor for WpNetworkRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum WpMultipartFormField {
+    Text {
+        name: String,
+        value: String,
+    },
+    File {
+        name: String,
+        file: MultipartFormFile,
+    },
+}
+
+impl WpMultipartFormField {
+    pub fn from_json(key: String, value: serde_json::Value) -> Vec<Self> {
+        match value {
+            serde_json::Value::String(s) => vec![Self::Text {
+                name: key,
+                value: s,
+            }],
+            serde_json::Value::Array(arr) => arr
+                .into_iter()
+                .enumerate()
+                .flat_map(|(idx, v)| Self::from_json(format!("{key}[{idx}]"), v))
+                .collect(),
+            serde_json::Value::Object(obj) => obj
+                .into_iter()
+                .flat_map(|(nested_key, nested_value)| {
+                    Self::from_json(format!("{key}[{nested_key}]"), nested_value)
+                })
+                .collect(),
+            _ => vec![Self::Text {
+                name: key,
+                value: value.to_string(),
+            }],
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 pub enum WpMultipartFormFieldValue {
     String(String),
@@ -363,18 +394,13 @@ pub struct WpMultipartFormRequest {
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
-    pub(crate) fields: HashMap<String, WpMultipartFormFieldValue>,
-    pub(crate) files: HashMap<String, MultipartFormFile>,
+    pub(crate) form: Vec<WpMultipartFormField>,
 }
 
 #[uniffi::export]
 impl WpMultipartFormRequest {
-    pub fn fields(&self) -> HashMap<String, WpMultipartFormFieldValue> {
-        self.fields.clone()
-    }
-
-    pub fn files(&self) -> HashMap<String, MultipartFormFile> {
-        self.files.clone()
+    pub fn form(&self) -> Vec<WpMultipartFormField> {
+        self.form.clone()
     }
 }
 
@@ -386,11 +412,10 @@ impl std::fmt::Debug for WpMultipartFormRequest {
                     method: '{:?}',
                     url: '{:?}',
                     header_map: '{:?}',
-                    fields: '{:?}',
-                    files: '{:?}'
+                    form: '{:?}'
                 }}
                 "},
-            self.method, self.url, self.header_map, self.fields, self.files
+            self.method, self.url, self.header_map, self.form
         );
         s.pop(); // Remove the new line at the end
         write!(f, "{s}")
@@ -1044,6 +1069,86 @@ mod tests {
         pub fn insert(&mut self, header_name: HeaderName, header_value: String) {
             let value = header_value.parse().expect("Header Value must be ascii");
             self.inner.insert(header_name, value);
+        }
+    }
+
+    #[rstest]
+    #[case(serde_json::Value::String("test".to_string()), "test")]
+    #[case(serde_json::json!(42), "42")]
+    #[case(serde_json::json!(true), "true")]
+    #[case(serde_json::Value::Null, "null")]
+    fn test_multipart_form_field_from_json_primitives(
+        #[case] value: serde_json::Value,
+        #[case] expected: &str,
+    ) {
+        let result = WpMultipartFormField::from_json("key".to_string(), value);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0],
+            WpMultipartFormField::Text {
+                name: "key".to_string(),
+                value: expected.to_string()
+            }
+        );
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"key": ["a", "b", "c"]}"#,
+        vec![
+            ("key[0]", "a"),
+            ("key[1]", "b"),
+            ("key[2]", "c"),
+        ]
+    )]
+    #[case(
+        r#"{"key": [["a", "b"], ["c", "d"]]}"#,
+        vec![
+            ("key[0][0]", "a"),
+            ("key[0][1]", "b"),
+            ("key[1][0]", "c"),
+            ("key[1][1]", "d"),
+        ]
+    )]
+    #[case(
+        r#"{"key": {"foo": "bar", "baz": "qux"}}"#,
+        vec![
+            ("key[baz]", "qux"),
+            ("key[foo]", "bar"),
+        ]
+    )]
+    #[case(
+        r#"{"key": {"outer": {"inner": "value"}}}"#,
+        vec![("key[outer][inner]", "value")]
+    )]
+    #[case(
+        r#"{"key": {"tags": ["tag1", "tag2"], "metadata": {"author": "john"}}}"#,
+        vec![
+            ("key[metadata][author]", "john"),
+            ("key[tags][0]", "tag1"),
+            ("key[tags][1]", "tag2"),
+        ]
+    )]
+    fn test_multipart_form_field_from_json_complex(
+        #[case] json: serde_json::Value,
+        #[case] expected: Vec<(&str, &str)>,
+    ) {
+        let serde_json::Value::Object(obj) = json else {
+            panic!("Expected JSON object");
+        };
+        assert_eq!(obj.len(), 1, "Expected exactly one key-value pair");
+        let (key, value) = obj.into_iter().next().unwrap();
+        let result = WpMultipartFormField::from_json(key, value);
+        assert_eq!(result.len(), expected.len());
+
+        for (i, (expected_name, expected_value)) in expected.iter().enumerate() {
+            assert_eq!(
+                result[i],
+                WpMultipartFormField::Text {
+                    name: expected_name.to_string(),
+                    value: expected_value.to_string()
+                }
+            );
         }
     }
 
