@@ -2,7 +2,7 @@ use crate::{
     DbSite, DbSiteType, RowId, SqliteDbError,
     db_types::{
         row_ext::RowExt,
-        self_hosted_site::{DbSelfHostedSite, SelfHostedSiteColumn},
+        self_hosted_site::{DbSelfHostedSite, SelfHostedSite, SelfHostedSiteColumn},
     },
     repository::QueryExecutor,
 };
@@ -21,8 +21,7 @@ impl SiteRepository {
     pub fn upsert_self_hosted_site(
         &self,
         executor: &impl QueryExecutor,
-        url: &str,
-        api_root: &str,
+        site: &SelfHostedSite,
     ) -> Result<(DbSite, DbSelfHostedSite), SqliteDbError> {
         // Upsert into self_hosted_sites and get the rowid
         let sql = format!(
@@ -34,7 +33,7 @@ impl SiteRepository {
 
         let mut stmt = executor.prepare(&sql)?;
         let self_hosted_site_id: RowId = stmt
-            .query_row((url, api_root), |row| row.get(0))
+            .query_row((&site.url, &site.api_root), |row| row.get(0))
             .map_err(SqliteDbError::from)?;
 
         // Insert into sites table
@@ -59,8 +58,8 @@ impl SiteRepository {
 
         let db_self_hosted_site = DbSelfHostedSite {
             row_id: self_hosted_site_id,
-            url: url.to_string(),
-            api_root: api_root.to_string(),
+            url: site.url.clone(),
+            api_root: site.api_root.clone(),
         };
 
         Ok((db_site, db_self_hosted_site))
