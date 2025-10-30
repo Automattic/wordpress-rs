@@ -1,9 +1,9 @@
 use crate::{
     api_error::{InvalidSslErrorReason, RequestExecutionError, RequestExecutionErrorReason},
-    request::RequestContext,
     request::{
-        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpMultipartFormRequest,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse, user_agent,
+        NetworkRequestAccessor, RequestContext, RequestExecutor, RequestMethod,
+        WpMultipartFormFieldValue, WpMultipartFormRequest, WpNetworkHeaderMap, WpNetworkRequest,
+        WpNetworkResponse, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -133,7 +133,15 @@ impl RequestExecutor for ReqwestRequestExecutor {
         }
 
         for (k, v) in upload_request.fields() {
-            form = form.text(k, v)
+            match v {
+                WpMultipartFormFieldValue::String(s) => form = form.text(k, s),
+                WpMultipartFormFieldValue::Array(vec) => {
+                    let key = format!("{k}[]", k = &k.to_string());
+                    for item in vec {
+                        form = form.text(key.clone(), item.to_string());
+                    }
+                }
+            }
         }
 
         let request = request.multipart(form);
