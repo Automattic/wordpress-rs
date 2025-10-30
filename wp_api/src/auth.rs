@@ -6,7 +6,10 @@ use std::sync::{Arc, RwLock};
 pub enum WpAuthentication {
     AuthorizationHeader { token: String },
     Bearer { token: String },
-    // Cookies+nonce authentication. The "cookies" part is implicitly handled by the HTTP client.
+    // Cookies+nonce authentication.
+    // The "cookies" part is implicitly handled by the HTTP client.
+    // Since nonce is refreshed often, when using this authentication method,
+    // the caller should not keep using the same nonce for a long time.
     Nonce { nonce: String },
     None,
 }
