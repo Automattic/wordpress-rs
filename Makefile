@@ -70,10 +70,10 @@ release-on-ci:
 	@echo "Swift package will be released by https://buildkite.com/automattic/wordpress-rs/builds/$$(jq -r '.number' .build/buildkite_release_job_response.json)"
 	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
 
-apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
-apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+apple-platform-targets-macos := aarch64-apple-darwin
+apple-platform-targets-ios := aarch64-apple-ios aarch64-apple-ios-sim
 apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
-apple-platform-targets-watchos := arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
+apple-platform-targets-watchos := arm64_32-apple-watchos aarch64-apple-watchos-sim
 apple-platform-targets := \
 	$(apple-platform-targets-macos) \
 	$(apple-platform-targets-ios) \
