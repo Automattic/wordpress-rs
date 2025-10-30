@@ -33,7 +33,11 @@ pub struct TestContext {
 pub fn test_ctx() -> TestContext {
     TestContext {
         conn: test_db(),
-        site: DbSite { row_id: RowId(1) },
+        site: DbSite {
+            row_id: RowId(1),
+            site_type: crate::DbSiteType::SelfHosted,
+            mapped_site_id: RowId(1),
+        },
         post_repo: PostRepository::new(),
         term_repo: TermRelationshipRepository,
     }
@@ -62,6 +66,8 @@ pub fn create_test_site(conn: &Connection, id: i64) -> DbSite {
         .expect("Failed to create test site");
     DbSite {
         row_id: RowId(id as u64),
+        site_type: crate::DbSiteType::SelfHosted,
+        mapped_site_id: RowId(id as u64),
     }
 }
 

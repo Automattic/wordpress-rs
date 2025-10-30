@@ -75,7 +75,12 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
 
 #[rstest]
 fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
-    let invalid_site = DbSite { row_id: RowId(999) };
+    // Site doesn't exist in database - intentionally invalid for testing error handling
+    let invalid_site = DbSite {
+        row_id: RowId(999),
+        site_type: crate::DbSiteType::SelfHosted,
+        mapped_site_id: RowId(999),
+    };
 
     let post1 = PostBuilder::minimal().build();
     let post2 = PostBuilder::minimal().build();

@@ -33,6 +33,9 @@ impl DbTermRelationship {
             row_id: row.get_column(Col::Rowid)?,
             site: DbSite {
                 row_id: row.get_column(Col::DbSiteId)?,
+                // TODO: These should be fetched from sites table via JOIN or separate query
+                site_type: crate::DbSiteType::SelfHosted,
+                mapped_site_id: crate::RowId(0),
             },
             object_id: row.get_column(Col::ObjectId)?,
             term_id: TermId(row.get_column(Col::TermId)?),

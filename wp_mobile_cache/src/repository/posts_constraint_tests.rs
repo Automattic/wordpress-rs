@@ -57,7 +57,12 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
 
 #[rstest]
 fn test_invalid_site_id_fails_foreign_key_constraint(mut test_ctx: TestContext) {
-    let non_existent_site = DbSite { row_id: RowId(999) }; // Site doesn't exist
+    // Site doesn't exist in database - intentionally invalid for testing error handling
+    let non_existent_site = DbSite {
+        row_id: RowId(999),
+        site_type: crate::DbSiteType::SelfHosted,
+        mapped_site_id: RowId(999),
+    };
 
     let post = PostBuilder::minimal().build();
     let result = test_ctx

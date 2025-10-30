@@ -85,6 +85,32 @@ impl From<RowId> for i64 {
     }
 }
 
+/// Type of WordPress site stored in the database.
+///
+/// Uses integer representation in the database for performance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[repr(i64)]
+pub enum DbSiteType {
+    SelfHosted = 0,
+    WordPressCom = 1,
+}
+
+impl ToSql for DbSiteType {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(*self as i64))
+    }
+}
+
+impl FromSql for DbSiteType {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
+        match i64::column_result(value)? {
+            0 => Ok(DbSiteType::SelfHosted),
+            1 => Ok(DbSiteType::WordPressCom),
+            other => Err(rusqlite::types::FromSqlError::OutOfRange(other)),
+        }
+    }
+}
+
 /// Represents a cached WordPress site in the database.
 ///
 /// # Design Rationale
@@ -96,21 +122,19 @@ impl From<RowId> for i64 {
 /// - **Not a self-hosted site identifier**: Self-hosted sites don't have numeric IDs
 /// - **Internal cache identifier only**: This ID exists only for our local database's multi-site support
 ///
-/// # Future Extension
+/// # Site Type Mapping
 ///
-/// When site type tables are added (e.g., `self_hosted_sites`, `wordpress_com_sites`), this
-/// struct will gain additional fields:
+/// The `site_type` field indicates which type-specific table contains additional data:
+/// - `DbSiteType::SelfHosted` → `mapped_site_id` references `self_hosted_sites` table
+/// - `DbSiteType::WordPressCom` → `mapped_site_id` references `wordpress_com_sites` table (future)
 ///
-/// ```ignore
-/// pub struct DbSite {
-///     pub row_id: RowId,
-///     pub site_type: SiteType,      // SelfHosted | WordPressCom
-///     pub mapped_site_id: RowId,    // Foreign key to specific site type table
-/// }
-/// ```
+/// Note: `mapped_site_id` is a reference column, not a foreign key constraint, since it can
+/// point to different tables based on `site_type`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DbSite {
     pub row_id: RowId,
+    pub site_type: DbSiteType,
+    pub mapped_site_id: RowId,
 }
 
 /// Get the SQLite version string from the database.

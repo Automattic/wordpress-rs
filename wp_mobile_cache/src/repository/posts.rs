@@ -273,6 +273,9 @@ impl PostContext for EditContext {
         let row_id: RowId = row.get_column(Rowid)?;
         let site = DbSite {
             row_id: row.get_column(PostEditContextColumn::SiteId)?,
+            // TODO: These should be fetched from sites table via JOIN or separate query
+            site_type: crate::DbSiteType::SelfHosted,
+            mapped_site_id: RowId(0),
         };
 
         // EditContext uses term relationships (categories and tags)
@@ -358,6 +361,9 @@ impl PostContext for ViewContext {
         let row_id: RowId = row.get_column(Rowid)?;
         let site = DbSite {
             row_id: row.get_column(PostViewContextColumn::SiteId)?,
+            // TODO: These should be fetched from sites table via JOIN or separate query
+            site_type: crate::DbSiteType::SelfHosted,
+            mapped_site_id: RowId(0),
         };
 
         // ViewContext uses term relationships (categories and tags)
@@ -436,6 +442,9 @@ impl PostContext for EmbedContext {
         let row_id: RowId = row.get_column(Rowid)?;
         let site = DbSite {
             row_id: row.get_column(PostEmbedContextColumn::SiteId)?,
+            // TODO: These should be fetched from sites table via JOIN or separate query
+            site_type: crate::DbSiteType::SelfHosted,
+            mapped_site_id: RowId(0),
         };
 
         // EmbedContext does not use term relationships (no categories/tags in embed context)
