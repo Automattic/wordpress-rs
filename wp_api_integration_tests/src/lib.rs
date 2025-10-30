@@ -251,13 +251,3 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
 pub fn unwrapped_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
     s.parse::<WpGmtDateTime>().expect("Expected a valid date")
 }
-
-#[derive(Debug)]
-pub struct EmptyAppNotifier;
-
-#[async_trait]
-impl WpAppNotifier for EmptyAppNotifier {
-    async fn requested_with_invalid_authentication(&self, _request_url: String) {
-        // no-op
-    }
-}

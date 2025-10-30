@@ -14,6 +14,7 @@ use wp_serde_helper::{
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
 
 pub mod login_client;
+pub mod nonce;
 pub mod url_discovery;
 
 #[derive(Debug, uniffi::Record)]

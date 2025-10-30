@@ -1,4 +1,4 @@
-use http::HeaderValue;
+use http::{HeaderMap, HeaderValue};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
@@ -6,6 +6,8 @@ use std::sync::{Arc, RwLock};
 pub enum WpAuthentication {
     AuthorizationHeader { token: String },
     Bearer { token: String },
+    // Cookies+nonce authentication. The "cookies" part is implicitly handled by the HTTP client.
+    Nonce { nonce: String },
     None,
 }
 
@@ -25,15 +27,21 @@ impl WpAuthentication {
         }
     }
 
-    pub fn header_value(&self) -> Option<HeaderValue> {
+    pub fn insert_header(&self, headers: &mut http::HeaderMap) {
         match self {
-            Self::None => None,
+            Self::None => {}
             Self::AuthorizationHeader { token } => {
-                Some(HeaderValue::from_str(&format!("Basic {token}"))
-                .expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token"))
+                let value = HeaderValue::from_str(&format!("Basic {token}"))
+                .expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
+                headers.insert(http::header::AUTHORIZATION, value);
             }
             Self::Bearer { token } => {
-                Some(HeaderValue::from_str(&format!("Bearer {token}")).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token"))
+                let value = HeaderValue::from_str(&format!("Bearer {token}")).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token");
+                headers.insert(http::header::AUTHORIZATION, value);
+            }
+            Self::Nonce { nonce } => {
+                let value = HeaderValue::from_str(nonce).expect("It shouldn't be possible to build WpAuthentication::Nonce with an invalid nonce");
+                headers.insert("X-WP-Nonce", value);
             }
         }
     }
@@ -62,11 +70,11 @@ impl ModifiableAuthenticationProvider {
 }
 
 impl ModifiableAuthenticationProvider {
-    pub fn header_value(&self) -> Option<HeaderValue> {
+    pub fn insert_header(&self, headers: &mut http::HeaderMap) {
         self.auth
             .read()
             .expect("If the lock is poisoned, there isn't much we can do")
-            .header_value()
+            .insert_header(headers)
     }
 }
 
@@ -136,13 +144,15 @@ impl WpAuthenticationProvider {
 }
 
 impl WpAuthenticationProvider {
-    pub fn auth_header_value(&self) -> Option<HeaderValue> {
+    pub fn insert_header(&self, headers: &mut HeaderMap) {
         match self {
-            WpAuthenticationProvider::StaticAuthenticationProvider { auth } => auth.header_value(),
-            WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => {
-                inner.auth().header_value()
+            WpAuthenticationProvider::StaticAuthenticationProvider { auth } => {
+                auth.insert_header(headers)
             }
-            WpAuthenticationProvider::Modifiable { inner } => inner.header_value(),
+            WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => {
+                inner.auth().insert_header(headers)
+            }
+            WpAuthenticationProvider::Modifiable { inner } => inner.insert_header(headers),
         }
     }
 

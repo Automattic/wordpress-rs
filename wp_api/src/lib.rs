@@ -217,6 +217,16 @@ pub trait WpAppNotifier: Send + Sync + std::fmt::Debug {
     async fn requested_with_invalid_authentication(&self, request_url: String);
 }
 
+#[derive(Debug)]
+pub struct EmptyAppNotifier;
+
+#[async_trait::async_trait]
+impl WpAppNotifier for EmptyAppNotifier {
+    async fn requested_with_invalid_authentication(&self, _request_url: String) {
+        // no-op
+    }
+}
+
 #[macro_export]
 macro_rules! generate {
     ($type_name:ident) => {
