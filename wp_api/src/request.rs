@@ -118,13 +118,20 @@ impl InnerRequestBuilder {
     where
         T: ?Sized + Serialize + RequiresMultipartForm,
     {
-        let mut fields = HashMap::new();
+        let mut fields: HashMap<String, WpMultipartFormFieldValue> = HashMap::new();
         if let Ok(serde_json::Value::Object(object)) = serde_json::to_value(params) {
             for (key, value) in object {
                 if let serde_json::Value::String(s) = value {
-                    fields.insert(key, s);
+                    fields.insert(key, WpMultipartFormFieldValue::String(s));
+                } else if let serde_json::Value::Array(vec) = value {
+                    fields.insert(
+                        key,
+                        WpMultipartFormFieldValue::Array(
+                            vec.into_iter().map(|v| v.to_string()).collect(),
+                        ),
+                    );
                 } else {
-                    fields.insert(key, value.to_string());
+                    fields.insert(key, WpMultipartFormFieldValue::String(value.to_string()));
                 }
             }
         }
@@ -333,6 +340,12 @@ impl NetworkRequestAccessor for WpNetworkRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum WpMultipartFormFieldValue {
+    String(String),
+    Array(Vec<String>),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct MultipartFormFile {
     pub file_path: String,
@@ -350,13 +363,13 @@ pub struct WpMultipartFormRequest {
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
-    pub(crate) fields: HashMap<String, String>,
+    pub(crate) fields: HashMap<String, WpMultipartFormFieldValue>,
     pub(crate) files: HashMap<String, MultipartFormFile>,
 }
 
 #[uniffi::export]
 impl WpMultipartFormRequest {
-    pub fn fields(&self) -> HashMap<String, String> {
+    pub fn fields(&self) -> HashMap<String, WpMultipartFormFieldValue> {
         self.fields.clone()
     }
 
