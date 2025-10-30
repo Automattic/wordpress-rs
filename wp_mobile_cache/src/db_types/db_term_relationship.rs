@@ -1,6 +1,6 @@
 use crate::{
     DbSite, SqliteDbError,
-    mappings::{ColumnIndex, RowExt},
+    db_types::row_ext::{ColumnIndex, RowExt},
     term_relationships::DbTermRelationship,
 };
 use rusqlite::Row;

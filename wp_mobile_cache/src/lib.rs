@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 pub mod context;
 pub mod db_types;
-pub mod mappings;
 pub mod repository;
 pub mod term_relationships;
 

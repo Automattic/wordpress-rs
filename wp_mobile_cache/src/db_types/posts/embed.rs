@@ -1,4 +1,4 @@
-use crate::{DbSite, RowId, mappings::ColumnIndex};
+use crate::{DbSite, RowId, db_types::row_ext::ColumnIndex};
 use wp_api::posts::AnyPostWithEmbedContext;
 
 /// Column indexes for posts_embed_context table.

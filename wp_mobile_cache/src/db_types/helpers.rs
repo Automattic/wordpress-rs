@@ -1,6 +1,6 @@
 use crate::{
     SqliteDbError,
-    mappings::{ColumnIndex, RowExt},
+    db_types::row_ext::{ColumnIndex, RowExt},
 };
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};

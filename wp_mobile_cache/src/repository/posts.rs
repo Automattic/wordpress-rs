@@ -1,16 +1,16 @@
 use crate::{
     DbSite, RowId, SqliteDbError,
     context::{EditContext, EmbedContext, IsContext, ViewContext},
-    db_types::posts::{
-        DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
-        PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
-    },
-    mappings::{
-        RowExt,
+    db_types::{
         helpers::{
             bool_to_integer, deserialize_json_value, get_id, get_optional_id, integer_to_bool,
             parse_datetime, parse_enum, parse_optional_enum, serialize_value_to_json,
         },
+        posts::{
+            DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
+            PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
+        },
+        row_ext::RowExt,
     },
     repository::{
         QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository,
@@ -856,7 +856,7 @@ mod tests {
     use crate::db_types::posts::{
         PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
     };
-    use crate::mappings::ColumnIndex;
+    use crate::db_types::row_ext::ColumnIndex;
     use crate::test_fixtures::{
         TestContext, assert_recent_timestamp, get_table_column_names, posts::PostBuilder, test_ctx,
     };
