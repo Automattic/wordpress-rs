@@ -1,5 +1,5 @@
 use crate::{
-    DbSite, SqliteDbError,
+    SqliteDbError,
     db_types::row_ext::{ColumnIndex, RowExt},
     term_relationships::DbTermRelationship,
 };
@@ -31,12 +31,7 @@ impl DbTermRelationship {
 
         Ok(Self {
             row_id: row.get_column(Col::Rowid)?,
-            site: DbSite {
-                row_id: row.get_column(Col::DbSiteId)?,
-                // TODO: These should be fetched from sites table via JOIN or separate query
-                site_type: crate::DbSiteType::SelfHosted,
-                mapped_site_id: crate::RowId(0),
-            },
+            db_site_id: row.get_column(Col::DbSiteId)?,
             object_id: row.get_column(Col::ObjectId)?,
             term_id: TermId(row.get_column(Col::TermId)?),
             taxonomy_type: row.get_column::<String, _>(Col::TaxonomyType)?.into(),

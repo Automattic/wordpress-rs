@@ -1,4 +1,4 @@
-use crate::{DbSite, RowId, db_types::row_ext::ColumnIndex};
+use crate::{RowId, db_types::row_ext::ColumnIndex};
 use wp_api::posts::AnyPostWithEditContext;
 
 /// Column indexes for posts_edit_context table.
@@ -7,7 +7,7 @@ use wp_api::posts::AnyPostWithEditContext;
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostEditContextColumn {
     Rowid = 0,
-    SiteId = 1,
+    DbSiteId = 1,
     Id = 2,
     Date = 3,
     DateGmt = 4,
@@ -52,7 +52,7 @@ impl ColumnIndex for PostEditContextColumn {
 
 pub struct DbAnyPostWithEditContext {
     pub row_id: RowId,
-    pub site: DbSite,
+    pub db_site_id: RowId,
     pub post: AnyPostWithEditContext,
     pub last_fetched_at: String,
 }

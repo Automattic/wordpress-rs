@@ -271,12 +271,7 @@ impl PostContext for EditContext {
         use PostEditContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
-        let site = DbSite {
-            row_id: row.get_column(PostEditContextColumn::SiteId)?,
-            // TODO: These should be fetched from sites table via JOIN or separate query
-            site_type: crate::DbSiteType::SelfHosted,
-            mapped_site_id: RowId(0),
-        };
+        let db_site_id: RowId = row.get_column(PostEditContextColumn::DbSiteId)?;
 
         // EditContext uses term relationships (categories and tags)
         let term_relationships = fetch_terms()?;
@@ -341,7 +336,7 @@ impl PostContext for EditContext {
 
         Ok(DbAnyPostWithEditContext {
             row_id,
-            site,
+            db_site_id,
             post,
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
@@ -359,12 +354,7 @@ impl PostContext for ViewContext {
         use PostViewContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
-        let site = DbSite {
-            row_id: row.get_column(PostViewContextColumn::SiteId)?,
-            // TODO: These should be fetched from sites table via JOIN or separate query
-            site_type: crate::DbSiteType::SelfHosted,
-            mapped_site_id: RowId(0),
-        };
+        let db_site_id: RowId = row.get_column(PostViewContextColumn::DbSiteId)?;
 
         // ViewContext uses term relationships (categories and tags)
         let term_relationships = fetch_terms()?;
@@ -422,7 +412,7 @@ impl PostContext for ViewContext {
 
         Ok(DbAnyPostWithViewContext {
             row_id,
-            site,
+            db_site_id,
             post,
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
@@ -440,12 +430,7 @@ impl PostContext for EmbedContext {
         use PostEmbedContextColumn::*;
 
         let row_id: RowId = row.get_column(Rowid)?;
-        let site = DbSite {
-            row_id: row.get_column(PostEmbedContextColumn::SiteId)?,
-            // TODO: These should be fetched from sites table via JOIN or separate query
-            site_type: crate::DbSiteType::SelfHosted,
-            mapped_site_id: RowId(0),
-        };
+        let db_site_id: RowId = row.get_column(PostEmbedContextColumn::DbSiteId)?;
 
         // EmbedContext does not use term relationships (no categories/tags in embed context)
         // The fetch_terms closure is never called, avoiding unnecessary database queries
@@ -477,7 +462,7 @@ impl PostContext for EmbedContext {
 
         Ok(DbAnyPostWithEmbedContext {
             row_id,
-            site,
+            db_site_id,
             post,
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
@@ -873,7 +858,7 @@ mod tests {
 
         // Verify each enum value maps to the correct column name
         assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[SiteId.as_index()], "db_site_id");
+        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
         assert_eq!(columns[Id.as_index()], "id");
         assert_eq!(columns[Date.as_index()], "date");
         assert_eq!(columns[DateGmt.as_index()], "date_gmt");
@@ -925,7 +910,7 @@ mod tests {
         let columns = get_table_column_names(&test_ctx.conn, "posts_view_context");
 
         assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[SiteId.as_index()], "db_site_id");
+        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
         assert_eq!(columns[Id.as_index()], "id");
         assert_eq!(columns[Date.as_index()], "date");
         assert_eq!(columns[DateGmt.as_index()], "date_gmt");
@@ -966,7 +951,7 @@ mod tests {
         let columns = get_table_column_names(&test_ctx.conn, "posts_embed_context");
 
         assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[SiteId.as_index()], "db_site_id");
+        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
         assert_eq!(columns[Id.as_index()], "id");
         assert_eq!(columns[Date.as_index()], "date");
         assert_eq!(columns[Link.as_index()], "link");
@@ -1002,7 +987,7 @@ mod tests {
 
         // Verify round-trip
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site, test_ctx.site);
+        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
         assert_recent_timestamp(&retrieved.last_fetched_at);
         assert_eq!(retrieved.post, original_post);
     }
@@ -1074,7 +1059,7 @@ mod tests {
             .expect("Post should exist");
 
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site, test_ctx.site);
+        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
         assert_eq!(retrieved.post, post);
     }
 
@@ -1096,7 +1081,7 @@ mod tests {
             .expect("Post should exist");
 
         assert_eq!(retrieved.post.id, PostId(42));
-        assert_eq!(retrieved.site, test_ctx.site);
+        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
         assert_eq!(retrieved.post, post);
     }
 
@@ -1284,7 +1269,7 @@ mod tests {
             .expect("Failed to select post by post_id")
             .expect("Post should exist after insert");
         assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.site, test_ctx.site);
+        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
         assert_eq!(retrieved.post.status, PostStatus::Draft);
     }
 
