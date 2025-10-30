@@ -389,8 +389,14 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 
         var form = [MultipartFormField]()
         for (name, value) in fields() {
-            form.append(.init(text: value, name: name))
+            switch value {
+            case .string(let string):
+                form.append(MultipartFormField(text: string, name: name))
+            case .array(let array):
+                form.append(contentsOf: array.map { MultipartFormField(text: $0, name: "\(name)[]") })
+            }
         }
+
         for (name, file) in files() {
             var mimeType = file.mimeType
 
