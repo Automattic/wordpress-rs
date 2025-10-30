@@ -52,8 +52,19 @@ fn test_db() -> Connection {
         .expect("All migrations should succeed");
 
     // Insert default test site (id = 1)
-    conn.execute("INSERT INTO sites (id) VALUES (1)", [])
-        .expect("Failed to insert test site");
+    // First insert into self_hosted_sites
+    conn.execute(
+        "INSERT INTO self_hosted_sites (id, url, api_root) VALUES (1, 'https://example.com', 'https://example.com/wp-json')",
+        []
+    )
+    .expect("Failed to insert self-hosted site");
+
+    // Then insert into sites referencing the self_hosted_sites entry
+    conn.execute(
+        "INSERT INTO sites (id, site_type, mapped_site_id) VALUES (1, 0, 1)",
+        [],
+    )
+    .expect("Failed to insert test site");
 
     conn
 }
@@ -62,8 +73,24 @@ fn test_db() -> Connection {
 ///
 /// Useful when you need more than 2 sites or specific site IDs.
 pub fn create_test_site(conn: &Connection, id: i64) -> DbSite {
-    conn.execute("INSERT INTO sites (id) VALUES (?)", [id])
-        .expect("Failed to create test site");
+    // First insert into self_hosted_sites
+    conn.execute(
+        "INSERT INTO self_hosted_sites (id, url, api_root) VALUES (?, ?, ?)",
+        (
+            id,
+            format!("https://example-{}.com", id),
+            format!("https://example-{}.com/wp-json", id),
+        ),
+    )
+    .expect("Failed to insert self-hosted site");
+
+    // Then insert into sites
+    conn.execute(
+        "INSERT INTO sites (id, site_type, mapped_site_id) VALUES (?, 0, ?)",
+        (id, id),
+    )
+    .expect("Failed to create test site");
+
     DbSite {
         row_id: RowId(id as u64),
         site_type: crate::DbSiteType::SelfHosted,
