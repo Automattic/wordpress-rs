@@ -16,6 +16,7 @@ pub struct TestCredentials {
     pub admin_username: &'static str,
     pub admin_password: &'static str,
     pub admin_password_uuid: &'static str,
+    pub admin_account_password: &'static str,
     pub subscriber_username: &'static str,
     pub subscriber_password: &'static str,
     pub subscriber_password_uuid: &'static str,

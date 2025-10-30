@@ -9,6 +9,7 @@ public final class WordPressLoginClient: @unchecked Sendable {
 
     private let requestExecutor: SafeRequestExecutor
     private let client: UniffiWpLoginClient
+    private let middleware: MiddlewarePipeline
 
     public convenience init(
         urlSession: URLSession,
@@ -22,6 +23,7 @@ public final class WordPressLoginClient: @unchecked Sendable {
         middleware: MiddlewarePipeline = .default
     ) {
         self.requestExecutor = requestExecutor
+        self.middleware = middleware
         self.client = UniffiWpLoginClient(requestExecutor: requestExecutor, middlewarePipeline: middleware)
     }
 
@@ -59,6 +61,18 @@ public final class WordPressLoginClient: @unchecked Sendable {
     ///
     public func credentials(from callbackUrl: URL) throws -> WpApiApplicationPasswordDetails {
         try extractLoginDetailsFromUrl(url: callbackUrl.absoluteString)
+    }
+
+    public func authenticateTemporarily(username: String, password: String, details: AutoDiscoveryAttemptSuccess) async throws -> WordPressAPI {
+        let nonceRetrieval = WpRestNonceRetrieval(details: details, requestExecutor: requestExecutor)
+        let nonce = try await nonceRetrieval.getNonce(username: username, password: password)
+        return WordPressAPI(
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: details.apiRootUrl),
+            authenticationProvider: .staticWithAuth(auth: .nonce(nonce: nonce)),
+            executor: requestExecutor,
+            middlewarePipeline: middleware,
+            appNotifier: nil
+        )
     }
 }
 

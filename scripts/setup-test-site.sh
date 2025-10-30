@@ -41,13 +41,14 @@ echo "--- :wordpress: Setting up WordPress"
 wp core version --extra
 wp --info
 
+ADMIN_ACCOUNT_PASSWORD="strongpassword"
 ## Install WordPress
 wp core install \
 	--url=localhost \
 	--title=my-test-site \
 	--admin_user=test@example.com \
 	--admin_email=test@example.com \
-	--admin_password=strongpassword \
+	--admin_password="$ADMIN_ACCOUNT_PASSWORD" \
 	--skip-email
 
 ## Ensure URLs work as expected
@@ -279,6 +280,7 @@ create_test_credentials () {
     admin_username="$ADMIN_USERNAME" \
     admin_password="$ADMIN_PASSWORD" \
     admin_password_uuid="$ADMIN_PASSWORD_UUID" \
+    admin_account_password="$ADMIN_ACCOUNT_PASSWORD" \
     subscriber_username="$SUBSCRIBER_USERNAME" \
     subscriber_password="$SUBSCRIBER_PASSWORD" \
     subscriber_password_uuid="$SUBSCRIBER_PASSWORD_UUID" \
