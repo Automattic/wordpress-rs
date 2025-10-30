@@ -18,6 +18,7 @@ import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.RequestMethod
+import uniffi.wp_api.WpMultipartFormFieldValue
 import uniffi.wp_api.WpMultipartFormRequest
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -74,7 +75,15 @@ class WpRequestExecutor(
         val multipartBodyBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
 
         request.fields().forEach { (k, v) ->
-            multipartBodyBuilder.addFormDataPart(k, v)
+            when (v) {
+                is WpMultipartFormFieldValue.String ->
+                    multipartBodyBuilder.addFormDataPart(k, value = v.v1)
+
+                is WpMultipartFormFieldValue.Array ->
+                    for (value in v.v1) {
+                        multipartBodyBuilder.addFormDataPart("$k[]", value = value)
+                    }
+            }
         }
 
         request.files().forEach { (name, fileInfo) ->
