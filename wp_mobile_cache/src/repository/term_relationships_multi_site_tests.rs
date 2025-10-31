@@ -2,13 +2,22 @@
 //!
 //! These tests verify that term relationships are correctly isolated between sites.
 
-use crate::test_fixtures::{TestContext, create_test_site, posts::PostBuilder, test_ctx};
+use crate::{
+    db_types::self_hosted_site::SelfHostedSite,
+    test_fixtures::{TestContext, create_test_site, posts::PostBuilder, test_ctx},
+};
 use rstest::*;
 use wp_api::{taxonomies::TaxonomyType, terms::TermId};
 
 #[rstest]
 fn test_term_relationships_isolated_by_site(mut test_ctx: TestContext) {
-    let site2 = create_test_site(&test_ctx.conn, 2);
+    let site2 = create_test_site(
+        &test_ctx.conn,
+        &SelfHostedSite {
+            url: "https://example-2.com".to_string(),
+            api_root: "https://example-2.com/wp-json".to_string(),
+        },
+    );
 
     // Insert post in site 1 with categories
     let post1 = PostBuilder::minimal()

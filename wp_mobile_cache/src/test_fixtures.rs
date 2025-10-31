@@ -1,9 +1,14 @@
 use crate::{
-    DbSite, MigrationManager, RowId,
+    DbSite, MigrationManager,
     context::EditContext,
-    repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
+    db_types::self_hosted_site::SelfHostedSite,
+    repository::{
+        posts::PostRepository, sites::SiteRepository,
+        term_relationships::TermRelationshipRepository,
+    },
 };
 use chrono::{DateTime, Utc};
+use integration_test_credentials::TestCredentials;
 use rstest::*;
 use rusqlite::Connection;
 
@@ -31,19 +36,16 @@ pub struct TestContext {
 
 #[fixture]
 pub fn test_ctx() -> TestContext {
+    let (conn, site) = test_db();
     TestContext {
-        conn: test_db(),
-        site: DbSite {
-            row_id: RowId(1),
-            site_type: crate::DbSiteType::SelfHosted,
-            mapped_site_id: RowId(1),
-        },
+        conn,
+        site,
         post_repo: PostRepository::new(),
         term_repo: TermRelationshipRepository,
     }
 }
 
-fn test_db() -> Connection {
+fn test_db() -> (Connection, DbSite) {
     let conn = Connection::open_in_memory().unwrap();
     let mut migration_manager = MigrationManager::new(&conn).unwrap();
 
@@ -51,51 +53,28 @@ fn test_db() -> Connection {
         .perform_migrations()
         .expect("All migrations should succeed");
 
-    // Insert default test site (id = 1)
-    // First insert into self_hosted_sites
-    conn.execute(
-        "INSERT INTO self_hosted_sites (id, url, api_root) VALUES (1, 'https://example.com', 'https://example.com/wp-json')",
-        []
-    )
-    .expect("Failed to insert self-hosted site");
+    // Insert default test site using real test credentials
+    let test_creds = TestCredentials::instance();
+    let self_hosted_site = SelfHostedSite {
+        url: test_creds.site_url.to_string(),
+        api_root: format!("{}/wp-json", test_creds.site_url),
+    };
 
-    // Then insert into sites referencing the self_hosted_sites entry
-    conn.execute(
-        "INSERT INTO sites (id, site_type, mapped_site_id) VALUES (1, 0, 1)",
-        [],
-    )
-    .expect("Failed to insert test site");
+    let db_site = create_test_site(&conn, &self_hosted_site);
 
-    conn
+    (conn, db_site)
 }
 
-/// Helper to create an additional test site with a specific ID.
+/// Helper to create a test site.
 ///
-/// Useful when you need more than 2 sites or specific site IDs.
-pub fn create_test_site(conn: &Connection, id: i64) -> DbSite {
-    // First insert into self_hosted_sites
-    conn.execute(
-        "INSERT INTO self_hosted_sites (id, url, api_root) VALUES (?, ?, ?)",
-        (
-            id,
-            format!("https://example-{}.com", id),
-            format!("https://example-{}.com/wp-json", id),
-        ),
-    )
-    .expect("Failed to insert self-hosted site");
+/// Uses `SiteRepository` to insert the site into the database.
+pub fn create_test_site(conn: &Connection, site: &SelfHostedSite) -> DbSite {
+    let site_repo = SiteRepository;
+    let (db_site, _) = site_repo
+        .upsert_self_hosted_site(conn, site)
+        .expect("Failed to upsert test site");
 
-    // Then insert into sites
-    conn.execute(
-        "INSERT INTO sites (id, site_type, mapped_site_id) VALUES (?, 0, ?)",
-        (id, id),
-    )
-    .expect("Failed to create test site");
-
-    DbSite {
-        row_id: RowId(id as u64),
-        site_type: crate::DbSiteType::SelfHosted,
-        mapped_site_id: RowId(id as u64),
-    }
+    db_site
 }
 
 /// Validates that a timestamp is a recent, valid ISO 8601 UTC timestamp.
