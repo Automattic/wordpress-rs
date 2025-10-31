@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use integration_test_credentials::TestCredentials;
 use rstest::*;
 use rusqlite::Connection;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub mod posts;
 
@@ -75,6 +76,29 @@ pub fn create_test_site(conn: &Connection, site: &SelfHostedSite) -> DbSite {
         .expect("Failed to upsert test site");
 
     db_site
+}
+
+static RANDOM_TEST_SITE_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Helper to create a test site with auto-generated URL.
+///
+/// Uses an internal counter to generate unique URLs for each call.
+/// Useful for tests that need multiple sites but don't care about specific URLs.
+///
+/// # Example
+///
+/// ```rust
+/// let site1 = create_random_test_site(&conn);
+/// let site2 = create_random_test_site(&conn);
+/// // site1 and site2 will have different URLs
+/// ```
+pub fn create_random_test_site(conn: &Connection) -> DbSite {
+    let counter = RANDOM_TEST_SITE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let site = SelfHostedSite {
+        url: format!("https://test-site-{}.local", counter),
+        api_root: format!("https://test-site-{}.local/wp-json", counter),
+    };
+    create_test_site(conn, &site)
 }
 
 /// Validates that a timestamp is a recent, valid ISO 8601 UTC timestamp.
