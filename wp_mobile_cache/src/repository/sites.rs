@@ -363,9 +363,7 @@ mod tests {
             .expect("Failed to select site")
             .expect("Site should exist");
 
-        assert_eq!(retrieved.row_id, original_db_self_hosted_site.row_id);
-        assert_eq!(retrieved.url, original_db_self_hosted_site.url);
-        assert_eq!(retrieved.api_root, original_db_self_hosted_site.api_root);
+        assert_eq!(retrieved, original_db_self_hosted_site);
     }
 
     #[rstest]
@@ -424,27 +422,9 @@ mod tests {
             .expect("Failed to select site")
             .expect("Site should exist");
 
-        // Verify DbSite matches
-        assert_eq!(retrieved_db_site.row_id, original_db_site.row_id);
-        assert_eq!(retrieved_db_site.site_type, original_db_site.site_type);
-        assert_eq!(
-            retrieved_db_site.mapped_site_id,
-            original_db_site.mapped_site_id
-        );
-
-        // Verify DbSelfHostedSite matches
-        assert_eq!(
-            retrieved_db_self_hosted_site.row_id,
-            original_db_self_hosted_site.row_id
-        );
-        assert_eq!(
-            retrieved_db_self_hosted_site.url,
-            original_db_self_hosted_site.url
-        );
-        assert_eq!(
-            retrieved_db_self_hosted_site.api_root,
-            original_db_self_hosted_site.api_root
-        );
+        // Verify both structs match
+        assert_eq!(retrieved_db_site, original_db_site);
+        assert_eq!(retrieved_db_self_hosted_site, original_db_self_hosted_site);
     }
 
     #[rstest]
