@@ -1,6 +1,6 @@
 CREATE TABLE `self_hosted_sites` (
   -- Internal DB field (auto-incrementing)
-  `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
   -- Site URL (unique constraint for upsert logic)
   `url` TEXT NOT NULL UNIQUE,
