@@ -113,6 +113,71 @@ pub struct DbSite {
     pub row_id: RowId,
 }
 
+/// Get the SQLite version string from the database.
+///
+/// This function queries the database for its SQLite version using `SELECT sqlite_version()`.
+/// Clients can use this to check compatibility or log version information.
+///
+/// # Example
+/// ```ignore
+/// use wp_mobile_cache::get_sqlite_version;
+///
+/// let version = get_sqlite_version(&connection)?;
+/// println!("SQLite version: {}", version);
+/// ```
+pub fn get_sqlite_version(
+    executor: &impl repository::QueryExecutor,
+) -> Result<String, SqliteDbError> {
+    let mut stmt = executor.prepare("SELECT sqlite_version()")?;
+    stmt.query_row([], |row| row.get(0))
+        .map_err(SqliteDbError::from)
+}
+
+/// Check if a SQLite version supports the RETURNING clause.
+///
+/// The RETURNING clause was added in SQLite 3.35.0. This function parses the version
+/// string and returns true if the version is >= 3.35.0.
+///
+/// # Arguments
+/// * `version` - SQLite version string in the format "X.Y.Z" (e.g., "3.45.0")
+///
+/// # Returns
+/// * `true` if the version supports RETURNING (>= 3.35.0)
+/// * `false` if the version is too old or if the version string cannot be parsed
+///
+/// # Example
+/// ```ignore
+/// use wp_mobile_cache::{get_sqlite_version, does_sqlite_support_returning};
+///
+/// let version = get_sqlite_version(&connection)?;
+/// if does_sqlite_support_returning(&version) {
+///     // Safe to use RETURNING clause
+/// }
+/// ```
+pub fn does_sqlite_support_returning(version: &str) -> bool {
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() < 2 {
+        return false;
+    }
+
+    let Ok(major) = parts[0].parse::<i32>() else {
+        return false;
+    };
+    let Ok(minor) = parts[1].parse::<i32>() else {
+        return false;
+    };
+
+    // RETURNING was added in SQLite 3.35.0
+    if major > 3 {
+        return true;
+    }
+    if major == 3 && minor >= 35 {
+        return true;
+    }
+
+    false
+}
+
 #[derive(uniffi::Object)]
 pub struct WpApiCache {
     inner: DBManager,
@@ -328,24 +393,30 @@ mod tests {
     #[test]
     fn test_bundled_sqlite_version_supports_returning() {
         let conn = Connection::open_in_memory().unwrap();
-        let version: String = conn
-            .query_row("SELECT sqlite_version()", [], |row| row.get(0))
-            .unwrap();
+        let version = get_sqlite_version(&conn).expect("Failed to get SQLite version");
 
         println!("Bundled SQLite version: {}", version);
 
-        // Parse version to check if >= 3.35.0 (when RETURNING was added)
-        let parts: Vec<&str> = version.split('.').collect();
-        let major: i32 = parts[0].parse().unwrap();
-        let minor: i32 = parts[1].parse().unwrap();
+        assert!(
+            does_sqlite_support_returning(&version),
+            "SQLite version {} is too old for RETURNING clause (need 3.35.0+)",
+            version
+        );
+    }
 
-        assert!(major >= 3, "SQLite major version should be at least 3");
-        if major == 3 {
-            assert!(
-                minor >= 35,
-                "SQLite version {} is too old for RETURNING clause (need 3.35.0+)",
-                version
-            );
-        }
+    #[test]
+    fn test_does_sqlite_support_returning() {
+        // Supported versions
+        assert!(does_sqlite_support_returning("3.35.0"));
+        assert!(does_sqlite_support_returning("3.45.0"));
+        assert!(does_sqlite_support_returning("4.0.0"));
+
+        // Unsupported versions
+        assert!(!does_sqlite_support_returning("3.34.0"));
+        assert!(!does_sqlite_support_returning("2.8.17"));
+
+        // Invalid version strings
+        assert!(!does_sqlite_support_returning("invalid"));
+        assert!(!does_sqlite_support_returning(""));
     }
 }
