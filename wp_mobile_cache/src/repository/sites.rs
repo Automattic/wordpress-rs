@@ -13,7 +13,7 @@ pub struct SiteRepository;
 
 impl SiteRepository {
     const SELF_HOSTED_SITES_TABLE: &'static str = "self_hosted_sites";
-    const SITES_TABLE: &'static str = "sites";
+    const DB_SITES_TABLE: &'static str = "db_sites";
 
     /// Upsert a self-hosted site and return both the DbSite and DbSelfHostedSite.
     ///
@@ -44,7 +44,7 @@ impl SiteRepository {
              ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
                 site_type = excluded.site_type
              RETURNING rowid",
-            Self::SITES_TABLE
+            Self::DB_SITES_TABLE
         );
 
         let mut stmt = executor.prepare(&sql)?;
@@ -132,7 +132,7 @@ impl SiteRepository {
         let sql = format!(
             "SELECT rowid, site_type, mapped_site_id FROM {}
              WHERE site_type = ? AND mapped_site_id = ?",
-            Self::SITES_TABLE
+            Self::DB_SITES_TABLE
         );
         let mut stmt = executor.prepare(&sql)?;
 
@@ -153,8 +153,11 @@ impl SiteRepository {
     /// Count all sites in the database.
     ///
     /// This is primarily useful for testing to verify database state.
-    pub fn count_all_sites(&self, executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
-        let sql = format!("SELECT COUNT(*) FROM {}", Self::SITES_TABLE);
+    pub fn count_all_db_sites(
+        &self,
+        executor: &impl QueryExecutor,
+    ) -> Result<usize, SqliteDbError> {
+        let sql = format!("SELECT COUNT(*) FROM {}", Self::DB_SITES_TABLE);
         let mut stmt = executor.prepare(&sql)?;
         let count: i64 = stmt.query_row([], |row| row.get(0))?;
         Ok(count as usize)
@@ -200,7 +203,7 @@ impl SiteRepository {
         };
 
         // Delete from sites table
-        let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::SITES_TABLE);
+        let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::DB_SITES_TABLE);
         let sites_deleted = executor.execute(&sql, [site.row_id])?;
 
         Ok(sites_deleted > 0)
@@ -335,7 +338,7 @@ mod tests {
         assert_eq!(db_site2.row_id, db_site3.row_id);
 
         // Verify only one entry exists in sites table (ensures bug fix works)
-        let count = repo.count_all_sites(&test_conn).unwrap();
+        let count = repo.count_all_db_sites(&test_conn).unwrap();
         assert_eq!(
             count, 1,
             "Multiple upserts should not create duplicate sites table entries"
@@ -502,7 +505,7 @@ mod tests {
             .expect("Failed to upsert site");
 
         // Verify site exists in both tables
-        let count_sites = repo.count_all_sites(&test_conn).unwrap();
+        let count_sites = repo.count_all_db_sites(&test_conn).unwrap();
         let count_self_hosted = repo.count_all_self_hosted_sites(&test_conn).unwrap();
         assert_eq!(count_sites, 1);
         assert_eq!(count_self_hosted, 1);
@@ -512,7 +515,7 @@ mod tests {
         assert!(deleted, "Should return true when site is deleted");
 
         // Verify site is removed from both tables
-        let count_sites_after = repo.count_all_sites(&test_conn).unwrap();
+        let count_sites_after = repo.count_all_db_sites(&test_conn).unwrap();
         let count_self_hosted_after = repo.count_all_self_hosted_sites(&test_conn).unwrap();
         assert_eq!(
             count_sites_after, 0,

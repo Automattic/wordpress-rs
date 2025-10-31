@@ -2,8 +2,8 @@ CREATE TABLE `posts_edit_context` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
-  -- Site identifier (foreign key to sites table)
-  `db_site_id` INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  -- Site identifier (foreign key to db_sites table)
+  `db_site_id` INTEGER NOT NULL REFERENCES db_sites(id) ON DELETE CASCADE,
 
   -- Top-level non-nullable fields
   `id` INTEGER NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE `posts_edit_context` (
   -- Client-side cache metadata: when this post was last fetched from the WordPress API
   `last_fetched_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 
-  FOREIGN KEY (db_site_id) REFERENCES sites(id) ON DELETE CASCADE
+  FOREIGN KEY (db_site_id) REFERENCES db_sites(id) ON DELETE CASCADE
 ) STRICT;
 
 CREATE UNIQUE INDEX idx_posts_edit_context_unique_db_site_id_and_id ON posts_edit_context(db_site_id, id);

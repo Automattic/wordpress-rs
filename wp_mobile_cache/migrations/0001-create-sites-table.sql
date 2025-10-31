@@ -1,4 +1,4 @@
-CREATE TABLE `sites` (
+CREATE TABLE `db_sites` (
   -- Internal DB field (auto-incrementing)
   `id` INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -11,4 +11,4 @@ CREATE TABLE `sites` (
 ) STRICT;
 
 -- Unique constraint to prevent duplicate site mappings
-CREATE UNIQUE INDEX idx_sites_unique_site_type_and_mapped_site_id ON sites(site_type, mapped_site_id);
+CREATE UNIQUE INDEX idx_db_sites_unique_site_type_and_mapped_site_id ON db_sites(site_type, mapped_site_id);
