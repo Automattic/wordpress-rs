@@ -18,9 +18,7 @@ public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func upload(request: WpMultipartFormRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 
     #if PROGRESS_REPORTING_ENABLED
-    /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task
-    /// for the given `requestId`.
-    func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never>
+    func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never>
     #endif
 }
 
@@ -124,10 +122,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
 #if PROGRESS_REPORTING_ENABLED
-    public func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never> {
+    public func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never> {
         NotificationCenter.default.publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
             .compactMap { $0.object as? URLSessionTask }
-            .first { $0.originalRequest?.requestId == requestId }
+            .filter {
+                guard let requestId = $0.originalRequest?.requestId else { return false }
+
+                return context.requestIds().contains(requestId)
+            }
             .map { $0.progress }
             .eraseToAnyPublisher()
     }
