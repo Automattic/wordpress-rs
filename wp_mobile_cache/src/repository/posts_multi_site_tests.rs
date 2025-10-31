@@ -55,12 +55,12 @@ fn test_same_post_id_can_exist_in_different_sites(mut test_ctx: TestContext) {
     let retrieved1 = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id)
-        .unwrap()
+        .expect("Failed to select post by post_id")
         .expect("Post should exist in site 1");
     let retrieved2 = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &site2, post_id)
-        .unwrap()
+        .expect("Failed to select post by post_id")
         .expect("Post should exist in site 2");
 
     assert_eq!(retrieved1.post.title.rendered, "Site 1 Post");
@@ -190,7 +190,7 @@ fn test_delete_by_post_id_only_deletes_from_specified_site(mut test_ctx: TestCon
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id)
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .is_none(),
         "Post should not exist in site 1 after deletion"
     );
@@ -200,7 +200,7 @@ fn test_delete_by_post_id_only_deletes_from_specified_site(mut test_ctx: TestCon
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &site2, post_id)
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .is_some(),
         "Post should still exist in site 2"
     );

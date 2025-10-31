@@ -1016,11 +1016,11 @@ mod tests {
         let rowid = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-            .unwrap();
+            .expect("Failed to upsert post");
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap()
+            .expect("Failed to select post by rowid")
             .expect("Post should exist");
 
         assert_eq!(retrieved.post.status, post_status);
@@ -1036,11 +1036,11 @@ mod tests {
         let rowid = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
-            .unwrap();
+            .expect("Failed to upsert post");
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap()
+            .expect("Failed to select post by rowid")
             .expect("Post should exist");
 
         assert_eq!(retrieved.post.categories, None);
@@ -1272,7 +1272,7 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .expect("Post should exist after insert");
         assert_eq!(retrieved.row_id, rowid);
         assert_eq!(retrieved.site, test_ctx.site);
@@ -1312,7 +1312,7 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .expect("Post should exist after update");
         assert_eq!(retrieved.post.status, PostStatus::Publish);
         assert_eq!(retrieved.post.slug, "updated-slug");
@@ -1345,7 +1345,7 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap()
+            .expect("Failed to select post by rowid")
             .expect("Post should exist");
         assert_eq!(retrieved.post.id, PostId(300));
 
@@ -1422,7 +1422,7 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(400))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .expect("Post should exist");
 
         // Categories: should have 1, 3 (not 2)
@@ -1521,7 +1521,7 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap()
+            .expect("Failed to select post by rowid")
             .expect("Post should exist");
         assert_eq!(
             retrieved.post.categories,
@@ -1543,7 +1543,7 @@ mod tests {
         let retrieved = test_ctx
             .post_repo
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .unwrap()
+            .expect("Failed to select post by rowid")
             .expect("Post should exist");
 
         // Validate timestamp is recent and valid
@@ -1565,7 +1565,7 @@ mod tests {
         let first_fetch = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .expect("Post should exist")
             .last_fetched_at
             .clone();
@@ -1585,7 +1585,7 @@ mod tests {
         let second_fetch = test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .expect("Post should exist")
             .last_fetched_at;
 

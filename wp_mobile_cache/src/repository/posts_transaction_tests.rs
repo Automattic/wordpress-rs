@@ -51,7 +51,7 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .is_some()
     );
 
@@ -59,7 +59,7 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
     let post200 = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
-        .unwrap()
+        .expect("Failed to select post by post_id")
         .expect("Post should exist");
     assert_eq!(post200.post.title.rendered, "Updated");
 
@@ -68,7 +68,7 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(300))
-            .unwrap()
+            .expect("Failed to select post by post_id")
             .is_some()
     );
 }
@@ -121,7 +121,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     let retrieved = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
-        .unwrap()
+        .expect("Failed to select post by post_id")
         .expect("Post should exist");
     assert_eq!(retrieved.post.id, post_id_500);
     assert_eq!(retrieved.row_id, rowid);
@@ -150,7 +150,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     let retrieved = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
-        .unwrap()
+        .expect("Failed to select post by post_id")
         .expect("Post should exist");
     assert_eq!(
         retrieved.post.categories,

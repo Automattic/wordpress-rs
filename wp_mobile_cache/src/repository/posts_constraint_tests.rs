@@ -50,7 +50,7 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
     let retrieved = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id)
-        .unwrap()
+        .expect("Failed to select post by post_id")
         .expect("Post should exist");
     assert_eq!(retrieved.post.title.rendered, "Updated Title");
 }
