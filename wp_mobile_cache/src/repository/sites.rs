@@ -159,6 +159,68 @@ impl SiteRepository {
         let count: i64 = stmt.query_row([], |row| row.get(0))?;
         Ok(count as usize)
     }
+
+    /// Count all self-hosted sites in the database.
+    ///
+    /// This is primarily useful for testing to verify database state.
+    pub fn count_all_self_hosted_sites(
+        &self,
+        executor: &impl QueryExecutor,
+    ) -> Result<usize, SqliteDbError> {
+        let sql = format!("SELECT COUNT(*) FROM {}", Self::SELF_HOSTED_SITES_TABLE);
+        let mut stmt = executor.prepare(&sql)?;
+        let count: i64 = stmt.query_row([], |row| row.get(0))?;
+        Ok(count as usize)
+    }
+
+    /// Delete a site and its type-specific data.
+    ///
+    /// Deletes both the site entry and its corresponding type-specific entry
+    /// (e.g., from self_hosted_sites or wordpress_com_sites). This ensures proper
+    /// cleanup since foreign key constraints cannot be used with polymorphic references.
+    ///
+    /// Returns `true` if a site was deleted, `false` if the site didn't exist.
+    pub fn delete_site(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+    ) -> Result<bool, SqliteDbError> {
+        // Delete from type-specific table based on site_type
+        let _type_table_deleted = match site.site_type {
+            DbSiteType::SelfHosted => {
+                let sql = format!(
+                    "DELETE FROM {} WHERE rowid = ?",
+                    Self::SELF_HOSTED_SITES_TABLE
+                );
+                executor.execute(&sql, [site.mapped_site_id])?
+            }
+            DbSiteType::WordPressCom => {
+                panic!("WordPress.com site deletion is not yet implemented")
+            }
+        };
+
+        // Delete from sites table
+        let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::SITES_TABLE);
+        let sites_deleted = executor.execute(&sql, [site.row_id])?;
+
+        Ok(sites_deleted > 0)
+    }
+
+    /// Delete a self-hosted site by URL (convenience wrapper).
+    ///
+    /// Returns `true` if a site was deleted, `false` if no site with that URL exists.
+    pub fn delete_self_hosted_site_by_url(
+        &self,
+        executor: &impl QueryExecutor,
+        url: &str,
+    ) -> Result<bool, SqliteDbError> {
+        let site_data = self.select_self_hosted_site_by_url(executor, url)?;
+
+        match site_data {
+            Some((db_site, _)) => self.delete_site(executor, &db_site),
+            None => Ok(false),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -424,5 +486,132 @@ mod tests {
 
         assert!(retrieved1.is_some());
         assert!(retrieved2.is_some());
+    }
+
+    #[rstest]
+    fn test_delete_site_removes_both_tables(test_conn: Connection) {
+        let repo = SiteRepository;
+        let site = SelfHostedSite {
+            url: "https://example.com".to_string(),
+            api_root: "https://example.com/wp-json".to_string(),
+        };
+
+        // Create site
+        let (db_site, _) = repo
+            .upsert_self_hosted_site(&test_conn, &site)
+            .expect("Failed to upsert site");
+
+        // Verify site exists in both tables
+        let count_sites = repo.count_all_sites(&test_conn).unwrap();
+        let count_self_hosted = repo.count_all_self_hosted_sites(&test_conn).unwrap();
+        assert_eq!(count_sites, 1);
+        assert_eq!(count_self_hosted, 1);
+
+        // Delete site
+        let deleted = repo.delete_site(&test_conn, &db_site).unwrap();
+        assert!(deleted, "Should return true when site is deleted");
+
+        // Verify site is removed from both tables
+        let count_sites_after = repo.count_all_sites(&test_conn).unwrap();
+        let count_self_hosted_after = repo.count_all_self_hosted_sites(&test_conn).unwrap();
+        assert_eq!(
+            count_sites_after, 0,
+            "Site should be deleted from sites table"
+        );
+        assert_eq!(
+            count_self_hosted_after, 0,
+            "Site should be deleted from self_hosted_sites table"
+        );
+    }
+
+    #[rstest]
+    fn test_delete_site_returns_false_for_non_existent_site(test_conn: Connection) {
+        let repo = SiteRepository;
+
+        let non_existent_site = DbSite {
+            row_id: RowId(999),
+            site_type: DbSiteType::SelfHosted,
+            mapped_site_id: RowId(888),
+        };
+
+        let deleted = repo.delete_site(&test_conn, &non_existent_site).unwrap();
+        assert!(!deleted, "Should return false when site doesn't exist");
+    }
+
+    #[rstest]
+    fn test_delete_site_only_deletes_specified_site(test_conn: Connection) {
+        let repo = SiteRepository;
+
+        // Create two sites
+        let site1 = SelfHostedSite {
+            url: "https://example1.com".to_string(),
+            api_root: "https://example1.com/wp-json".to_string(),
+        };
+        let site2 = SelfHostedSite {
+            url: "https://example2.com".to_string(),
+            api_root: "https://example2.com/wp-json".to_string(),
+        };
+
+        let (db_site1, _) = repo.upsert_self_hosted_site(&test_conn, &site1).unwrap();
+        let (db_site2, _) = repo.upsert_self_hosted_site(&test_conn, &site2).unwrap();
+
+        // Delete site1
+        let deleted = repo.delete_site(&test_conn, &db_site1).unwrap();
+        assert!(deleted);
+
+        // Verify site1 is gone
+        let retrieved1 = repo
+            .select_self_hosted_site_by_url(&test_conn, &site1.url)
+            .unwrap();
+        assert_eq!(retrieved1, None, "Site1 should be deleted");
+
+        // Verify site2 still exists
+        let retrieved2 = repo
+            .select_self_hosted_site_by_url(&test_conn, &site2.url)
+            .unwrap();
+        assert!(retrieved2.is_some(), "Site2 should still exist");
+        assert_eq!(retrieved2.unwrap().0.row_id, db_site2.row_id);
+    }
+
+    #[rstest]
+    fn test_delete_self_hosted_site_by_url_deletes_site(test_conn: Connection) {
+        let repo = SiteRepository;
+        let url = "https://example.com";
+        let site = SelfHostedSite {
+            url: url.to_string(),
+            api_root: "https://example.com/wp-json".to_string(),
+        };
+
+        // Create site
+        repo.upsert_self_hosted_site(&test_conn, &site)
+            .expect("Failed to upsert site");
+
+        // Verify site exists
+        let before_delete = repo
+            .select_self_hosted_site_by_url(&test_conn, url)
+            .unwrap();
+        assert!(before_delete.is_some());
+
+        // Delete by URL
+        let deleted = repo
+            .delete_self_hosted_site_by_url(&test_conn, url)
+            .unwrap();
+        assert!(deleted, "Should return true when site is deleted");
+
+        // Verify site is gone
+        let after_delete = repo
+            .select_self_hosted_site_by_url(&test_conn, url)
+            .unwrap();
+        assert_eq!(after_delete, None, "Site should be deleted");
+    }
+
+    #[rstest]
+    fn test_delete_self_hosted_site_by_url_returns_false_for_non_existent(test_conn: Connection) {
+        let repo = SiteRepository;
+
+        let deleted = repo
+            .delete_self_hosted_site_by_url(&test_conn, "https://non-existent.com")
+            .unwrap();
+        assert!(!deleted, "Should return false when site doesn't exist");
     }
 }
