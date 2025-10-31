@@ -18,7 +18,7 @@ import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.RequestMethod
-import uniffi.wp_api.WpMultipartFormFieldValue
+import uniffi.wp_api.WpMultipartFormField
 import uniffi.wp_api.WpMultipartFormRequest
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -74,31 +74,27 @@ class WpRequestExecutor(
     private fun buildMultipartBody(request: WpMultipartFormRequest): MultipartBody {
         val multipartBodyBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
 
-        request.fields().forEach { (k, v) ->
-            when (v) {
-                is WpMultipartFormFieldValue.String ->
-                    multipartBodyBuilder.addFormDataPart(k, value = v.v1)
-
-                is WpMultipartFormFieldValue.Array ->
-                    for (value in v.v1) {
-                        multipartBodyBuilder.addFormDataPart("$k[]", value = value)
+        request.form().forEach { field ->
+            when (field) {
+                is WpMultipartFormField.Text -> {
+                    multipartBodyBuilder.addFormDataPart(field.name, value = field.value)
+                }
+                is WpMultipartFormField.File -> {
+                    val fileInfo = field.file
+                    val file = fileResolver.getFile(fileInfo.filePath)
+                    if (file == null || !file.canBeUploaded()) {
+                        throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
                     }
+                    val mimeType = fileInfo.mimeType ?: "application/octet-stream"
+                    val filename = fileInfo.fileName ?: file.name
+                    val requestBody = file.asRequestBody(mimeType.toMediaType())
+                    multipartBodyBuilder.addFormDataPart(
+                        name = field.name,
+                        filename = filename,
+                        body = requestBody
+                    )
+                }
             }
-        }
-
-        request.files().forEach { (name, fileInfo) ->
-            val file = fileResolver.getFile(fileInfo.filePath)
-            if (file == null || !file.canBeUploaded()) {
-                throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
-            }
-            val mimeType = fileInfo.mimeType ?: "application/octet-stream"
-            val filename = fileInfo.fileName ?: file.name
-            val requestBody = file.asRequestBody(mimeType.toMediaType())
-            multipartBodyBuilder.addFormDataPart(
-                name = name,
-                filename = filename,
-                body = requestBody
-            )
         }
 
         return multipartBodyBuilder.build()
