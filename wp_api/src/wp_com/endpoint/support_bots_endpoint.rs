@@ -1,5 +1,6 @@
 use crate::wp_com::support_bots::BotId;
 use crate::wp_com::support_bots::ChatId;
+use crate::wp_com::support_bots::ListBotConversationsParams;
 use crate::wp_com::support_bots::MessageId;
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
@@ -18,7 +19,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum SupportBotsRequest {
     #[post(url = "/odie/chat/<bot_id>", params = &CreateBotConversationParams, output = BotConversation)]
     CreateBotConversation,
-    #[get(url = "/odie/conversations/<bot_id>", output = Vec<BotConversationSummary>)]
+    #[get(url = "/odie/conversations/<bot_id>", params = &ListBotConversationsParams, output = Vec<BotConversationSummary>)]
     GetBotConverationList,
     #[get(url = "/odie/chat/<bot_id>/<chat_id>", params = &GetBotConversationParams, output = BotConversation)]
     GetBotConversation,

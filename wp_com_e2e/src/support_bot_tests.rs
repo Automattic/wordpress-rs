@@ -4,7 +4,7 @@ use wp_api::wp_com::{
     client::WpComApiClient,
     support_bots::{
         AddMessageToBotConversationParams, BotConversation, BotId, ChatId,
-        CreateBotConversationParams, GetBotConversationParams,
+        CreateBotConversationParams, GetBotConversationParams, ListBotConversationsParams,
     },
 };
 
@@ -14,7 +14,7 @@ pub async fn support_bots_test(client: &WpComApiClient, allow_writes: bool) -> a
 
     let conversations = client
         .support_bots()
-        .get_bot_converation_list(&bot_id)
+        .get_bot_converation_list(&bot_id, &ListBotConversationsParams::default())
         .await?
         .data;
 
