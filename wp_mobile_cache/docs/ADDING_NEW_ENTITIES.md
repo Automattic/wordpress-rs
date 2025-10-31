@@ -70,6 +70,8 @@ When adding a new entity type (e.g., implementing cache support for comments):
 
 **RETURNING optimization**: Use SQLite's `RETURNING rowid` clause in upsert statements to eliminate separate SELECT queries. Our bundled SQLite version (3.50.2) fully supports this.
 
+**Platform requirements**: The minimum supported iOS version for this library is iOS 15, which bundles SQLite 3.36.0. This ensures RETURNING clause support (added in SQLite 3.35.0) across all target platforms. See [SQLite versions bundled with OS](https://github.com/yapstudios/YapDatabase/wiki/SQLite-version-(bundled-with-OS)) for reference.
+
 ## Reference Implementation
 
 See `src/repository/posts.rs` for a complete working example including:
