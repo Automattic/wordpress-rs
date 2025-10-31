@@ -3,7 +3,7 @@ use wp_api::{
     media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
     posts::WpApiParamPostsOrderBy,
     prelude::*,
-    request::{RequestContext, WpMultipartFormRequest},
+    request::{RequestContext, WpMultipartFormField, WpMultipartFormRequest},
     users::UserId,
 };
 use wp_api_integration_tests::prelude::*;
@@ -224,8 +224,13 @@ impl RequestExecutor for MediaErrNetworking {
             }
         }
 
-        for (k, v) in upload_request.fields() {
-            form = form.text(k, v)
+        for field in upload_request.form() {
+            match field {
+                WpMultipartFormField::Text { name, value } => {
+                    form = form.text(name, value);
+                }
+                WpMultipartFormField::File { .. } => {}
+            }
         }
 
         let request = request.multipart(form);
