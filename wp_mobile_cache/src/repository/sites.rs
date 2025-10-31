@@ -36,9 +36,12 @@ impl SiteRepository {
             .query_row((&site.url, &site.api_root), |row| row.get(0))
             .map_err(SqliteDbError::from)?;
 
-        // Insert into sites table
+        // Upsert into sites table
+        // If site_type + mapped_site_id already exists, reuse that entry
         let sql = format!(
             "INSERT INTO {} (site_type, mapped_site_id) VALUES (?, ?)
+             ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
+                site_type = excluded.site_type
              RETURNING rowid",
             Self::SITES_TABLE
         );
