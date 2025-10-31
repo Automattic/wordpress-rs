@@ -34,13 +34,3 @@ pub struct DbSelfHostedSite {
     pub url: String,
     pub api_root: String,
 }
-
-impl DbSelfHostedSite {
-    /// Convert to the domain model (without row_id).
-    pub fn to_self_hosted_site(&self) -> SelfHostedSite {
-        SelfHostedSite {
-            url: self.url.clone(),
-            api_root: self.api_root.clone(),
-        }
-    }
-}
