@@ -271,6 +271,7 @@ public typealias SubscriberImportJobsListParams = WordPressAPIInternal.Subscribe
 public typealias AddSubscribersParams = WordPressAPIInternal.AddSubscribersParams
 
 // MARK: Support Bots
+public typealias ListBotConversationParams = WordPressAPIInternal.ListBotConversationsParams
 public typealias CreateBotConversationParams = WordPressAPIInternal.CreateBotConversationParams
 public typealias AddMessageToBotConversationParams = WordPressAPIInternal.AddMessageToBotConversationParams
 public typealias GetBotConversationParams = WordPressAPIInternal.GetBotConversationParams
