@@ -1,7 +1,7 @@
 use crate::{
-    DbSite, MigrationManager,
+    MigrationManager,
     context::EditContext,
-    db_types::self_hosted_site::SelfHostedSite,
+    db_types::{db_site::DbSite, self_hosted_site::SelfHostedSite},
     repository::{
         posts::PostRepository, sites::SiteRepository,
         term_relationships::TermRelationshipRepository,

@@ -4,7 +4,8 @@
 //! and that error cases are handled appropriately.
 
 use crate::{
-    DbSite, RowId,
+    RowId,
+    db_types::db_site::{DbSite, DbSiteType},
     test_fixtures::{TestContext, posts::PostBuilder, test_ctx},
 };
 use rstest::*;
@@ -60,7 +61,7 @@ fn test_invalid_site_id_fails_foreign_key_constraint(mut test_ctx: TestContext) 
     // Site doesn't exist in database - intentionally invalid for testing error handling
     let non_existent_site = DbSite {
         row_id: RowId(999),
-        site_type: crate::DbSiteType::SelfHosted,
+        site_type: DbSiteType::SelfHosted,
         mapped_site_id: RowId(999),
     };
 

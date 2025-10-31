@@ -84,9 +84,6 @@ impl From<RowId> for i64 {
     }
 }
 
-// Re-export site types from db_types module
-pub use db_types::db_site::{DbSite, DbSiteType};
-
 /// Get the SQLite version string from the database.
 ///
 /// This function queries the database for its SQLite version using `SELECT sqlite_version()`.

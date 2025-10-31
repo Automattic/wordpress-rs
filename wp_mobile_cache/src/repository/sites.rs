@@ -1,6 +1,7 @@
 use crate::{
-    DbSite, DbSiteType, RowId, SqliteDbError,
+    RowId, SqliteDbError,
     db_types::{
+        db_site::{DbSite, DbSiteType},
         row_ext::RowExt,
         self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
     },

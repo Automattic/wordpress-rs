@@ -4,7 +4,8 @@
 //! ensuring proper rollback on errors without leaving partial writes or corrupted data.
 
 use crate::{
-    DbSite, RowId,
+    RowId,
+    db_types::db_site::{DbSite, DbSiteType},
     test_fixtures::{TestContext, posts::PostBuilder, test_ctx},
 };
 use rstest::*;
@@ -78,7 +79,7 @@ fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
     // Site doesn't exist in database - intentionally invalid for testing error handling
     let invalid_site = DbSite {
         row_id: RowId(999),
-        site_type: crate::DbSiteType::SelfHosted,
+        site_type: DbSiteType::SelfHosted,
         mapped_site_id: RowId(999),
     };
 

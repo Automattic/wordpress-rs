@@ -1,5 +1,6 @@
 use crate::{
-    DbSite, SqliteDbError,
+    SqliteDbError,
+    db_types::db_site::DbSite,
     repository::{InTransaction, QueryExecutor},
     term_relationships::DbTermRelationship,
 };
