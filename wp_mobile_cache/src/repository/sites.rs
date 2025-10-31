@@ -2,7 +2,7 @@ use crate::{
     DbSite, DbSiteType, RowId, SqliteDbError,
     db_types::{
         row_ext::RowExt,
-        self_hosted_site::{DbSelfHostedSite, SelfHostedSite, SelfHostedSiteColumn},
+        self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
     },
     repository::QueryExecutor,
 };
@@ -88,9 +88,9 @@ impl SiteRepository {
 
         stmt.query_row([site.mapped_site_id], |row| {
             Ok(DbSelfHostedSite {
-                row_id: row.get_column(SelfHostedSiteColumn::Rowid)?,
-                url: row.get_column(SelfHostedSiteColumn::Url)?,
-                api_root: row.get_column(SelfHostedSiteColumn::ApiRoot)?,
+                row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
+                url: row.get_column(DbSelfHostedSiteColumn::Url)?,
+                api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
             })
         })
         .optional()
@@ -115,9 +115,9 @@ impl SiteRepository {
         let self_hosted_site: Option<DbSelfHostedSite> = stmt
             .query_row([url], |row| {
                 Ok(DbSelfHostedSite {
-                    row_id: row.get_column(SelfHostedSiteColumn::Rowid)?,
-                    url: row.get_column(SelfHostedSiteColumn::Url)?,
-                    api_root: row.get_column(SelfHostedSiteColumn::ApiRoot)?,
+                    row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
+                    url: row.get_column(DbSelfHostedSiteColumn::Url)?,
+                    api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
                 })
             })
             .optional()
@@ -178,11 +178,11 @@ mod tests {
         conn
     }
 
-    /// Verify that SelfHostedSiteColumn enum values match the actual database schema.
+    /// Verify that DbSelfHostedSiteColumn enum values match the actual database schema.
     /// This test protects against column reordering in migrations breaking the positional index mapping.
     #[rstest]
     fn test_self_hosted_site_column_enum_matches_schema(test_conn: Connection) {
-        use SelfHostedSiteColumn::*;
+        use DbSelfHostedSiteColumn::*;
 
         let columns = get_table_column_names(&test_conn, "self_hosted_sites");
 

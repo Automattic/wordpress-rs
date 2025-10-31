@@ -4,13 +4,13 @@ use crate::{RowId, db_types::row_ext::ColumnIndex};
 /// These must match the order of columns in the CREATE TABLE statement.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum SelfHostedSiteColumn {
+pub(crate) enum DbSelfHostedSiteColumn {
     Rowid = 0,
     Url = 1,
     ApiRoot = 2,
 }
 
-impl ColumnIndex for SelfHostedSiteColumn {
+impl ColumnIndex for DbSelfHostedSiteColumn {
     fn as_index(&self) -> usize {
         *self as usize
     }
