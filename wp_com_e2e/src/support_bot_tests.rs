@@ -14,7 +14,7 @@ pub async fn support_bots_test(client: &WpComApiClient, allow_writes: bool) -> a
 
     let conversations = client
         .support_bots()
-        .get_bot_converation_list(&bot_id, &ListBotConversationsParams::default())
+        .get_bot_conversation_list(&bot_id, &ListBotConversationsParams::default())
         .await?
         .data;
 
