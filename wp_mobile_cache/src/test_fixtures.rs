@@ -23,7 +23,7 @@ pub mod posts;
 ///
 /// ```rust
 /// #[rstest]
-/// fn test_something(test_ctx: TestContext) {
+/// fn test_something(mut test_ctx: TestContext) {
 ///     let post = PostBuilder::new().build();
 ///     test_ctx.post_repo.upsert(&mut test_ctx.conn, &test_ctx.site, &post).unwrap();
 /// }
@@ -47,7 +47,7 @@ pub fn test_ctx() -> TestContext {
 }
 
 fn test_db() -> (Connection, DbSite) {
-    let conn = Connection::open_in_memory().unwrap();
+    let mut conn = Connection::open_in_memory().unwrap();
     let mut migration_manager = MigrationManager::new(&conn).unwrap();
 
     migration_manager
@@ -61,7 +61,7 @@ fn test_db() -> (Connection, DbSite) {
         api_root: format!("{}/wp-json", test_creds.site_url),
     };
 
-    let db_site = create_test_site(&conn, &self_hosted_site);
+    let db_site = create_test_site(&mut conn, &self_hosted_site);
 
     (conn, db_site)
 }
@@ -69,7 +69,7 @@ fn test_db() -> (Connection, DbSite) {
 /// Helper to create a test site.
 ///
 /// Uses `SiteRepository` to insert the site into the database.
-pub fn create_test_site(conn: &Connection, site: &SelfHostedSite) -> DbSite {
+pub fn create_test_site(conn: &mut Connection, site: &SelfHostedSite) -> DbSite {
     let site_repo = SiteRepository;
     let (db_site, _) = site_repo
         .upsert_self_hosted_site(conn, site)
@@ -88,11 +88,11 @@ static RANDOM_TEST_SITE_COUNTER: AtomicU32 = AtomicU32::new(1);
 /// # Example
 ///
 /// ```rust
-/// let site1 = create_random_test_site(&conn);
-/// let site2 = create_random_test_site(&conn);
+/// let site1 = create_random_test_site(&mut conn);
+/// let site2 = create_random_test_site(&mut conn);
 /// // site1 and site2 will have different URLs
 /// ```
-pub fn create_random_test_site(conn: &Connection) -> DbSite {
+pub fn create_random_test_site(conn: &mut Connection) -> DbSite {
     let counter = RANDOM_TEST_SITE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let site = SelfHostedSite {
         url: format!("https://test-site-{}.local", counter),

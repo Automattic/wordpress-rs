@@ -8,7 +8,7 @@ use wp_api::{taxonomies::TaxonomyType, terms::TermId};
 
 #[rstest]
 fn test_term_relationships_isolated_by_site(mut test_ctx: TestContext) {
-    let site2 = create_random_test_site(&test_ctx.conn);
+    let site2 = create_random_test_site(&mut test_ctx.conn);
 
     // Insert post in site 1 with categories
     let post1 = PostBuilder::minimal()

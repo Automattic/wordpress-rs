@@ -5,7 +5,7 @@ use crate::{
         row_ext::RowExt,
         self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
     },
-    repository::QueryExecutor,
+    repository::{QueryExecutor, TransactionManager},
 };
 use rusqlite::OptionalExtension;
 
@@ -15,44 +15,49 @@ impl SiteRepository {
     const SELF_HOSTED_SITES_TABLE: &'static str = "self_hosted_sites";
     const DB_SITES_TABLE: &'static str = "db_sites";
 
-    /// Upsert a self-hosted site and return both the DbSite and DbSelfHostedSite.
+    /// Upsert a self-hosted site and return both the DbSite and DbSelfHostedSite (atomic transaction).
     ///
     /// If a site with the given URL already exists, updates it. Otherwise creates a new one.
     /// Uses SQLite's RETURNING clause to get the inserted/updated rowid.
     pub fn upsert_self_hosted_site(
         &self,
-        executor: &impl QueryExecutor,
+        transaction_manager: &mut impl TransactionManager,
         site: &SelfHostedSite,
     ) -> Result<(DbSite, DbSelfHostedSite), SqliteDbError> {
-        // Upsert into self_hosted_sites and get the rowid
-        let sql = format!(
-            "INSERT INTO {} (url, api_root) VALUES (?, ?)
-             ON CONFLICT(url) DO UPDATE SET api_root = excluded.api_root
-             RETURNING rowid",
-            Self::SELF_HOSTED_SITES_TABLE
-        );
+        let tx = transaction_manager.transaction()?;
 
-        let mut stmt = executor.prepare(&sql)?;
-        let self_hosted_site_id: RowId = stmt
-            .query_row((&site.url, &site.api_root), |row| row.get(0))
-            .map_err(SqliteDbError::from)?;
+        // Upsert into self_hosted_sites and get the rowid
+        let self_hosted_site_id: RowId = {
+            let sql = format!(
+                "INSERT INTO {} (url, api_root) VALUES (?, ?)
+                 ON CONFLICT(url) DO UPDATE SET api_root = excluded.api_root
+                 RETURNING rowid",
+                Self::SELF_HOSTED_SITES_TABLE
+            );
+
+            let mut stmt = tx.prepare(&sql)?;
+            stmt.query_row((&site.url, &site.api_root), |row| row.get(0))
+                .map_err(SqliteDbError::from)?
+        };
 
         // Upsert into sites table
         // If site_type + mapped_site_id already exists, reuse that entry
-        let sql = format!(
-            "INSERT INTO {} (site_type, mapped_site_id) VALUES (?, ?)
-             ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
-                site_type = excluded.site_type
-             RETURNING rowid",
-            Self::DB_SITES_TABLE
-        );
+        // Note: DO UPDATE SET is required for RETURNING to work on conflict (DO NOTHING returns no rows)
+        let site_id: RowId = {
+            let sql = format!(
+                "INSERT INTO {} (site_type, mapped_site_id) VALUES (?, ?)
+                 ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
+                    site_type = excluded.site_type
+                 RETURNING rowid",
+                Self::DB_SITES_TABLE
+            );
 
-        let mut stmt = executor.prepare(&sql)?;
-        let site_id: RowId = stmt
-            .query_row((DbSiteType::SelfHosted, self_hosted_site_id), |row| {
+            let mut stmt = tx.prepare(&sql)?;
+            stmt.query_row((DbSiteType::SelfHosted, self_hosted_site_id), |row| {
                 row.get(0)
             })
-            .map_err(SqliteDbError::from)?;
+            .map_err(SqliteDbError::from)?
+        };
 
         let db_site = DbSite {
             row_id: site_id,
@@ -66,6 +71,7 @@ impl SiteRepository {
             api_root: site.api_root.clone(),
         };
 
+        tx.commit().map_err(SqliteDbError::from)?;
         Ok((db_site, db_self_hosted_site))
     }
 
@@ -176,7 +182,7 @@ impl SiteRepository {
         Ok(count as usize)
     }
 
-    /// Delete a site and its type-specific data.
+    /// Delete a site and its type-specific data (atomic transaction).
     ///
     /// Deletes both the site entry and its corresponding type-specific entry
     /// (e.g., from self_hosted_sites or wordpress_com_sites). This ensures proper
@@ -185,17 +191,19 @@ impl SiteRepository {
     /// Returns `true` if a site was deleted, `false` if the site didn't exist.
     pub fn delete_site(
         &self,
-        executor: &impl QueryExecutor,
+        transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
     ) -> Result<bool, SqliteDbError> {
+        let tx = transaction_manager.transaction()?;
+
         // Delete from type-specific table based on site_type
-        let _type_table_deleted = match site.site_type {
+        match site.site_type {
             DbSiteType::SelfHosted => {
                 let sql = format!(
                     "DELETE FROM {} WHERE rowid = ?",
                     Self::SELF_HOSTED_SITES_TABLE
                 );
-                executor.execute(&sql, [site.mapped_site_id])?
+                tx.execute(&sql, [site.mapped_site_id])?;
             }
             DbSiteType::WordPressCom => {
                 panic!("WordPress.com site deletion is not yet implemented")
@@ -203,9 +211,12 @@ impl SiteRepository {
         };
 
         // Delete from sites table
-        let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::DB_SITES_TABLE);
-        let sites_deleted = executor.execute(&sql, [site.row_id])?;
+        let sites_deleted = {
+            let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::DB_SITES_TABLE);
+            tx.execute(&sql, [site.row_id])?
+        };
 
+        tx.commit().map_err(SqliteDbError::from)?;
         Ok(sites_deleted > 0)
     }
 
@@ -214,13 +225,13 @@ impl SiteRepository {
     /// Returns `true` if a site was deleted, `false` if no site with that URL exists.
     pub fn delete_self_hosted_site_by_url(
         &self,
-        executor: &impl QueryExecutor,
+        transaction_manager: &mut impl TransactionManager,
         url: &str,
     ) -> Result<bool, SqliteDbError> {
-        let site_data = self.select_self_hosted_site_by_url(executor, url)?;
+        let site_data = self.select_self_hosted_site_by_url(transaction_manager, url)?;
 
         match site_data {
-            Some((db_site, _)) => self.delete_site(executor, &db_site),
+            Some((db_site, _)) => self.delete_site(transaction_manager, &db_site),
             None => Ok(false),
         }
     }
@@ -263,7 +274,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_upsert_inserts_new_site(test_conn: Connection) {
+    fn test_upsert_inserts_new_site(mut test_conn: Connection) {
         let repo = SiteRepository;
         let site = SelfHostedSite {
             url: "https://example.com".to_string(),
@@ -271,7 +282,7 @@ mod tests {
         };
 
         let (db_site, db_self_hosted_site) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
         // Verify self_hosted_sites entry
@@ -284,7 +295,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_upsert_updates_existing_site_url(test_conn: Connection) {
+    fn test_upsert_updates_existing_site_url(mut test_conn: Connection) {
         let repo = SiteRepository;
         let url = "https://example.com";
 
@@ -294,7 +305,7 @@ mod tests {
             api_root: "https://example.com/wp-json".to_string(),
         };
         let (db_site1, db_self_hosted_site1) = repo
-            .upsert_self_hosted_site(&test_conn, &site1)
+            .upsert_self_hosted_site(&mut test_conn, &site1)
             .expect("Failed to upsert site");
 
         // Second upsert with same URL but different api_root
@@ -303,7 +314,7 @@ mod tests {
             api_root: "https://example.com/wordpress/wp-json".to_string(),
         };
         let (db_site2, db_self_hosted_site2) = repo
-            .upsert_self_hosted_site(&test_conn, &site2)
+            .upsert_self_hosted_site(&mut test_conn, &site2)
             .expect("Failed to upsert site");
 
         // Verify it updated the same row (same rowid) - this proves update, not insert
@@ -315,7 +326,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_upsert_does_not_create_duplicate_sites_entries(test_conn: Connection) {
+    fn test_upsert_does_not_create_duplicate_sites_entries(mut test_conn: Connection) {
         let repo = SiteRepository;
 
         // Insert same site multiple times
@@ -325,13 +336,13 @@ mod tests {
         };
 
         let (db_site1, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("First upsert failed");
         let (db_site2, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Second upsert failed");
         let (db_site3, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Third upsert failed");
 
         // All should return the same DbSite
@@ -349,7 +360,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_select_self_hosted_site_by_db_site(test_conn: Connection) {
+    fn test_select_self_hosted_site_by_db_site(mut test_conn: Connection) {
         let repo = SiteRepository;
         let site = SelfHostedSite {
             url: "https://example.com".to_string(),
@@ -357,7 +368,7 @@ mod tests {
         };
 
         let (db_site, original_db_self_hosted_site) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
         // Select using DbSite reference
@@ -408,7 +419,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_select_self_hosted_site_by_url(test_conn: Connection) {
+    fn test_select_self_hosted_site_by_url(mut test_conn: Connection) {
         let repo = SiteRepository;
         let site = SelfHostedSite {
             url: "https://example.com".to_string(),
@@ -416,7 +427,7 @@ mod tests {
         };
 
         let (original_db_site, original_db_self_hosted_site) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
         // Select by URL
@@ -444,7 +455,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_multiple_different_sites_can_coexist(test_conn: Connection) {
+    fn test_multiple_different_sites_can_coexist(mut test_conn: Connection) {
         let repo = SiteRepository;
 
         let site1 = SelfHostedSite {
@@ -457,10 +468,10 @@ mod tests {
         };
 
         let (db_site1, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site1)
+            .upsert_self_hosted_site(&mut test_conn, &site1)
             .expect("Failed to upsert site1");
         let (db_site2, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site2)
+            .upsert_self_hosted_site(&mut test_conn, &site2)
             .expect("Failed to upsert site2");
 
         // Verify different sites get different IDs
@@ -479,7 +490,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_site_removes_both_tables(test_conn: Connection) {
+    fn test_delete_site_removes_both_tables(mut test_conn: Connection) {
         let repo = SiteRepository;
         let site = SelfHostedSite {
             url: "https://example.com".to_string(),
@@ -488,7 +499,7 @@ mod tests {
 
         // Create site
         let (db_site, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site)
+            .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
         // Verify site exists in both tables
@@ -503,7 +514,7 @@ mod tests {
 
         // Delete site
         let deleted = repo
-            .delete_site(&test_conn, &db_site)
+            .delete_site(&mut test_conn, &db_site)
             .expect("Failed to delete site");
         assert!(deleted, "Should return true when site is deleted");
 
@@ -525,7 +536,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_site_returns_false_for_non_existent_site(test_conn: Connection) {
+    fn test_delete_site_returns_false_for_non_existent_site(mut test_conn: Connection) {
         let repo = SiteRepository;
 
         let non_existent_site = DbSite {
@@ -535,13 +546,13 @@ mod tests {
         };
 
         let deleted = repo
-            .delete_site(&test_conn, &non_existent_site)
+            .delete_site(&mut test_conn, &non_existent_site)
             .expect("Failed to delete site");
         assert!(!deleted, "Should return false when site doesn't exist");
     }
 
     #[rstest]
-    fn test_delete_site_only_deletes_specified_site(test_conn: Connection) {
+    fn test_delete_site_only_deletes_specified_site(mut test_conn: Connection) {
         let repo = SiteRepository;
 
         // Create two sites
@@ -555,15 +566,15 @@ mod tests {
         };
 
         let (db_site1, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site1)
+            .upsert_self_hosted_site(&mut test_conn, &site1)
             .expect("Failed to upsert site1");
         let (db_site2, _) = repo
-            .upsert_self_hosted_site(&test_conn, &site2)
+            .upsert_self_hosted_site(&mut test_conn, &site2)
             .expect("Failed to upsert site2");
 
         // Delete site1
         let deleted = repo
-            .delete_site(&test_conn, &db_site1)
+            .delete_site(&mut test_conn, &db_site1)
             .expect("Failed to delete site1");
         assert!(deleted);
 
@@ -585,7 +596,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_self_hosted_site_by_url_deletes_site(test_conn: Connection) {
+    fn test_delete_self_hosted_site_by_url_deletes_site(mut test_conn: Connection) {
         let repo = SiteRepository;
         let url = "https://example.com";
         let site = SelfHostedSite {
@@ -594,7 +605,7 @@ mod tests {
         };
 
         // Create site
-        repo.upsert_self_hosted_site(&test_conn, &site)
+        repo.upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
         // Verify site exists
@@ -605,7 +616,7 @@ mod tests {
 
         // Delete by URL
         let deleted = repo
-            .delete_self_hosted_site_by_url(&test_conn, url)
+            .delete_self_hosted_site_by_url(&mut test_conn, url)
             .expect("Failed to delete site by URL");
         assert!(deleted, "Should return true when site is deleted");
 
@@ -617,11 +628,13 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_self_hosted_site_by_url_returns_false_for_non_existent(test_conn: Connection) {
+    fn test_delete_self_hosted_site_by_url_returns_false_for_non_existent(
+        mut test_conn: Connection,
+    ) {
         let repo = SiteRepository;
 
         let deleted = repo
-            .delete_self_hosted_site_by_url(&test_conn, "https://non-existent.com")
+            .delete_self_hosted_site_by_url(&mut test_conn, "https://non-existent.com")
             .expect("Failed to delete site by URL");
         assert!(!deleted, "Should return false when site doesn't exist");
     }
