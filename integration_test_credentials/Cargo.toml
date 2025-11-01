@@ -1,0 +1,7 @@
+[package]
+name = "integration_test_credentials"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+serde_json = { workspace = true }

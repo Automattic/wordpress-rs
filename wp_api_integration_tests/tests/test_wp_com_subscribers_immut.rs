@@ -5,7 +5,7 @@ use wp_api::wp_com::{
         ListSubscribersSortField, SubscribersListParams, SubscriptionId,
     },
 };
-use wp_api_integration_tests::{WpComTestCredentials, prelude::*, wp_com_client};
+use wp_api_integration_tests::{prelude::*, wp_com_client};
 
 #[tokio::test]
 #[apply(list_cases)]
