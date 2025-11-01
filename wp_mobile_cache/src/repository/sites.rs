@@ -236,8 +236,9 @@ mod tests {
 
     #[fixture]
     fn test_conn() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        let mut migration_manager = MigrationManager::new(&conn).unwrap();
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
+        let mut migration_manager =
+            MigrationManager::new(&conn).expect("Failed to create MigrationManager");
         migration_manager
             .perform_migrations()
             .expect("All migrations should succeed");
@@ -338,7 +339,9 @@ mod tests {
         assert_eq!(db_site2.row_id, db_site3.row_id);
 
         // Verify only one entry exists in sites table (ensures bug fix works)
-        let count = repo.count_all_db_sites(&test_conn).unwrap();
+        let count = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites");
         assert_eq!(
             count, 1,
             "Multiple upserts should not create duplicate sites table entries"
@@ -453,8 +456,12 @@ mod tests {
             api_root: "https://example2.com/wp-json".to_string(),
         };
 
-        let (db_site1, _) = repo.upsert_self_hosted_site(&test_conn, &site1).unwrap();
-        let (db_site2, _) = repo.upsert_self_hosted_site(&test_conn, &site2).unwrap();
+        let (db_site1, _) = repo
+            .upsert_self_hosted_site(&test_conn, &site1)
+            .expect("Failed to upsert site1");
+        let (db_site2, _) = repo
+            .upsert_self_hosted_site(&test_conn, &site2)
+            .expect("Failed to upsert site2");
 
         // Verify different sites get different IDs
         assert_ne!(db_site1.row_id, db_site2.row_id);
@@ -462,10 +469,10 @@ mod tests {
         // Verify both can be retrieved by URL
         let retrieved1 = repo
             .select_self_hosted_site_by_url(&test_conn, &site1.url)
-            .unwrap();
+            .expect("Failed to select site by URL");
         let retrieved2 = repo
             .select_self_hosted_site_by_url(&test_conn, &site2.url)
-            .unwrap();
+            .expect("Failed to select site by URL");
 
         assert!(retrieved1.is_some());
         assert!(retrieved2.is_some());
@@ -485,18 +492,28 @@ mod tests {
             .expect("Failed to upsert site");
 
         // Verify site exists in both tables
-        let count_sites = repo.count_all_db_sites(&test_conn).unwrap();
-        let count_self_hosted = repo.count_all_self_hosted_sites(&test_conn).unwrap();
+        let count_sites = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites");
+        let count_self_hosted = repo
+            .count_all_self_hosted_sites(&test_conn)
+            .expect("Failed to count self_hosted_sites");
         assert_eq!(count_sites, 1);
         assert_eq!(count_self_hosted, 1);
 
         // Delete site
-        let deleted = repo.delete_site(&test_conn, &db_site).unwrap();
+        let deleted = repo
+            .delete_site(&test_conn, &db_site)
+            .expect("Failed to delete site");
         assert!(deleted, "Should return true when site is deleted");
 
         // Verify site is removed from both tables
-        let count_sites_after = repo.count_all_db_sites(&test_conn).unwrap();
-        let count_self_hosted_after = repo.count_all_self_hosted_sites(&test_conn).unwrap();
+        let count_sites_after = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites after delete");
+        let count_self_hosted_after = repo
+            .count_all_self_hosted_sites(&test_conn)
+            .expect("Failed to count self_hosted_sites after delete");
         assert_eq!(
             count_sites_after, 0,
             "Site should be deleted from sites table"
@@ -517,7 +534,9 @@ mod tests {
             mapped_site_id: RowId(888),
         };
 
-        let deleted = repo.delete_site(&test_conn, &non_existent_site).unwrap();
+        let deleted = repo
+            .delete_site(&test_conn, &non_existent_site)
+            .expect("Failed to delete site");
         assert!(!deleted, "Should return false when site doesn't exist");
     }
 
@@ -535,25 +554,34 @@ mod tests {
             api_root: "https://example2.com/wp-json".to_string(),
         };
 
-        let (db_site1, _) = repo.upsert_self_hosted_site(&test_conn, &site1).unwrap();
-        let (db_site2, _) = repo.upsert_self_hosted_site(&test_conn, &site2).unwrap();
+        let (db_site1, _) = repo
+            .upsert_self_hosted_site(&test_conn, &site1)
+            .expect("Failed to upsert site1");
+        let (db_site2, _) = repo
+            .upsert_self_hosted_site(&test_conn, &site2)
+            .expect("Failed to upsert site2");
 
         // Delete site1
-        let deleted = repo.delete_site(&test_conn, &db_site1).unwrap();
+        let deleted = repo
+            .delete_site(&test_conn, &db_site1)
+            .expect("Failed to delete site1");
         assert!(deleted);
 
         // Verify site1 is gone
         let retrieved1 = repo
             .select_self_hosted_site_by_url(&test_conn, &site1.url)
-            .unwrap();
+            .expect("Failed to select site by URL");
         assert_eq!(retrieved1, None, "Site1 should be deleted");
 
         // Verify site2 still exists
         let retrieved2 = repo
             .select_self_hosted_site_by_url(&test_conn, &site2.url)
-            .unwrap();
+            .expect("Failed to select site by URL");
         assert!(retrieved2.is_some(), "Site2 should still exist");
-        assert_eq!(retrieved2.unwrap().0.row_id, db_site2.row_id);
+        assert_eq!(
+            retrieved2.expect("Site2 should exist").0.row_id,
+            db_site2.row_id
+        );
     }
 
     #[rstest]
@@ -572,19 +600,19 @@ mod tests {
         // Verify site exists
         let before_delete = repo
             .select_self_hosted_site_by_url(&test_conn, url)
-            .unwrap();
+            .expect("Failed to select site by URL");
         assert!(before_delete.is_some());
 
         // Delete by URL
         let deleted = repo
             .delete_self_hosted_site_by_url(&test_conn, url)
-            .unwrap();
+            .expect("Failed to delete site by URL");
         assert!(deleted, "Should return true when site is deleted");
 
         // Verify site is gone
         let after_delete = repo
             .select_self_hosted_site_by_url(&test_conn, url)
-            .unwrap();
+            .expect("Failed to select site by URL");
         assert_eq!(after_delete, None, "Site should be deleted");
     }
 
@@ -594,7 +622,7 @@ mod tests {
 
         let deleted = repo
             .delete_self_hosted_site_by_url(&test_conn, "https://non-existent.com")
-            .unwrap();
+            .expect("Failed to delete site by URL");
         assert!(!deleted, "Should return false when site doesn't exist");
     }
 }
