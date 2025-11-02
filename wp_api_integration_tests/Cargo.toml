@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 http = { workspace = true }
+integration_test_credentials = { path = "../integration_test_credentials" }
 reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate" ] }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }

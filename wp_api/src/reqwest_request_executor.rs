@@ -1,9 +1,9 @@
 use crate::{
     api_error::{InvalidSslErrorReason, RequestExecutionError, RequestExecutionErrorReason},
-    request::RequestContext,
     request::{
-        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpMultipartFormRequest,
-        WpNetworkHeaderMap, WpNetworkRequest, WpNetworkResponse, user_agent,
+        NetworkRequestAccessor, RequestContext, RequestExecutor, RequestMethod,
+        WpMultipartFormField, WpMultipartFormRequest, WpNetworkHeaderMap, WpNetworkRequest,
+        WpNetworkResponse, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -116,24 +116,27 @@ impl RequestExecutor for ReqwestRequestExecutor {
             .headers(upload_request.header_map().to_header_map());
         let mut form = reqwest::multipart::Form::new();
 
-        for (name, file) in upload_request.files() {
-            let file_path = file.file_path;
-            let mut file_header_map = HeaderMap::new();
-            if let Some(mime_type) = &file.mime_type {
-                file_header_map.insert(
-                    http::header::CONTENT_TYPE,
-                    HeaderValue::from_str(mime_type).unwrap(),
-                );
+        for field in upload_request.form() {
+            match field {
+                WpMultipartFormField::Text { name, value } => {
+                    form = form.text(name, value);
+                }
+                WpMultipartFormField::File { name, file } => {
+                    let file_path = file.file_path;
+                    let mut file_header_map = HeaderMap::new();
+                    if let Some(mime_type) = &file.mime_type {
+                        file_header_map.insert(
+                            http::header::CONTENT_TYPE,
+                            HeaderValue::from_str(mime_type).unwrap(),
+                        );
+                    }
+                    let part = Part::file(file_path)
+                        .await
+                        .unwrap()
+                        .headers(file_header_map);
+                    form = form.part(name, part);
+                }
             }
-            let part = Part::file(file_path)
-                .await
-                .unwrap()
-                .headers(file_header_map);
-            form = form.part(name, part);
-        }
-
-        for (k, v) in upload_request.fields() {
-            form = form.text(k, v)
         }
 
         let request = request.multipart(form);

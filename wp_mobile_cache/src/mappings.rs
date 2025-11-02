@@ -1,7 +1,6 @@
 use rusqlite::Row;
 
 pub mod helpers;
-pub mod posts;
 pub mod term_relationships;
 
 /// Trait for types that can be used as column indexes.

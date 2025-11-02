@@ -1,15 +1,52 @@
+use crate::url_query::FromUrlQueryPairs;
+use crate::url_query::UrlQueryPairsMap;
 use crate::{
     date::WpGmtDateTime,
-    impl_as_query_value_for_new_type,
+    impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
 };
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
+use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::deserialize_empty_vec_or_none;
 
 use super::WpComSiteId;
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ListBotConversationsSummaryMethod {
+    FirstMessage,
+    #[default]
+    LastMessage,
+}
+
+impl_as_query_value_from_to_string!(ListBotConversationsSummaryMethod);
+
+#[derive(
+    Debug, Default, PartialEq, Eq, Serialize, Deserialize, uniffi::Record, WpDeriveParamsField,
+)]
+#[supports_pagination(false)]
+pub struct ListBotConversationsParams {
+    #[uniffi(default = None)]
+    pub summary_method: Option<ListBotConversationsSummaryMethod>,
+}
 
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct CreateBotConversationParams {
@@ -107,7 +144,9 @@ pub struct UserPaidSupportPlan {
 pub struct BotConversationSummary {
     pub chat_id: u64,
     pub created_at: WpGmtDateTime,
-    pub last_message: BotMessageSummary,
+    #[serde(alias = "first_message")]
+    #[serde(alias = "last_message")]
+    pub summary_message: BotMessageSummary,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -231,17 +270,20 @@ mod tests {
         #[case] json_file_path: &str,
         #[case] expected_chat_id: u64,
     ) {
-        let json = test_json(json_file_path).expect("Failed to read JSON file");
+        let json: Vec<u8> = test_json(json_file_path).expect("Failed to read JSON file");
         let conversation: BotConversation = serde_json::from_slice(json.as_slice())
             .expect("Failed to deserialize bot conversation");
         assert_eq!(conversation.chat_id, expected_chat_id);
     }
 
-    #[test]
-    fn test_bot_conversation_summary_deserialization() {
-        let json = include_str!("../../tests/wpcom/support_bots/converation-list.json");
-        let conversations: Vec<BotConversationSummary> =
-            serde_json::from_str(json).expect("Failed to deserialize bot conversation summary");
+    #[rstest]
+    #[case("conversation-list-01.json")]
+    #[case("conversation-list-02.json")]
+    fn test_bot_conversation_summary_deserialization(#[case] json_file_path: &str) {
+        let json = test_json(json_file_path).expect("Failed to read JSON file");
+        let conversations: Vec<BotConversationSummary> = serde_json::from_slice(json.as_slice())
+            .expect("Failed to deserialize bot conversation summary");
+
         assert_eq!(conversations.len(), 1);
         assert_eq!(conversations[0].chat_id, 1965758);
     }

@@ -51,14 +51,16 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
-            .is_ok()
+            .expect("Failed to select post by post_id")
+            .is_some()
     );
 
     // Verify post 200 was updated
     let post200 = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
-        .unwrap();
+        .expect("Failed to select post by post_id")
+        .expect("Post should exist");
     assert_eq!(post200.post.title.rendered, "Updated");
 
     // Verify post 300 was inserted
@@ -66,7 +68,8 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         test_ctx
             .post_repo
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(300))
-            .is_ok()
+            .expect("Failed to select post by post_id")
+            .is_some()
     );
 }
 
@@ -118,7 +121,8 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     let retrieved = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
-        .unwrap();
+        .expect("Failed to select post by post_id")
+        .expect("Post should exist");
     assert_eq!(retrieved.post.id, post_id_500);
     assert_eq!(retrieved.row_id, rowid);
 
@@ -146,7 +150,8 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
     let retrieved = test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
-        .unwrap();
+        .expect("Failed to select post by post_id")
+        .expect("Post should exist");
     assert_eq!(
         retrieved.post.categories,
         Some(vec![wp_api::terms::TermId(3)])
@@ -201,13 +206,16 @@ fn test_insert_batch_succeeds_with_valid_posts(mut test_ctx: TestContext) {
     test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
+        .expect("Should not error")
         .expect("Post 100 should exist");
     test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
+        .expect("Should not error")
         .expect("Post 200 should exist");
     test_ctx
         .post_repo
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(300))
+        .expect("Should not error")
         .expect("Post 300 should exist");
 }

@@ -18,9 +18,7 @@ public protocol SafeRequestExecutor: RequestExecutor, Sendable {
     func upload(request: WpMultipartFormRequest) async -> Result<WpNetworkResponse, RequestExecutionError>
 
     #if PROGRESS_REPORTING_ENABLED
-    /// Returns a publisher that emits zero or one `Progress` instance representing the overall progress of the task
-    /// for the given `requestId`.
-    func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never>
+    func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never>
     #endif
 }
 
@@ -124,10 +122,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
 #if PROGRESS_REPORTING_ENABLED
-    public func progress(forRequestWithId requestId: String) -> AnyPublisher<Progress, Never> {
+    public func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never> {
         NotificationCenter.default.publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
             .compactMap { $0.object as? URLSessionTask }
-            .first { $0.originalRequest?.requestId == requestId }
+            .filter {
+                guard let requestId = $0.originalRequest?.requestId else { return false }
+
+                return context.requestIds().contains(requestId)
+            }
             .map { $0.progress }
             .eraseToAnyPublisher()
     }
@@ -388,31 +390,33 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         var request = try buildURLRequest(additionalHeaders: headers)
 
         var form = [MultipartFormField]()
-        for (name, value) in fields() {
-            form.append(.init(text: value, name: name))
-        }
-        for (name, file) in files() {
-            var mimeType = file.mimeType
+        for field in self.form() {
+            switch field {
+            case .text(let name, let value):
+                form.append(MultipartFormField(text: value, name: name))
+            case .file(let name, let file):
+                var mimeType = file.mimeType
 
-            #if canImport(UniformTypeIdentifiers)
-            if mimeType == nil {
-                mimeType = UTType(
-                    filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
-                )?.preferredMIMEType
-            }
-            #endif
+                #if canImport(UniformTypeIdentifiers)
+                if mimeType == nil {
+                    mimeType = UTType(
+                        filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
+                    )?.preferredMIMEType
+                }
+                #endif
 
-            do {
-                try form.append(
-                    .init(
-                        fileAtPath: file.filePath,
-                        name: name,
-                        filename: file.fileName,
-                        mimeType: mimeType
+                do {
+                    try form.append(
+                        .init(
+                            fileAtPath: file.filePath,
+                            name: name,
+                            filename: file.fileName,
+                            mimeType: mimeType
+                        )
                     )
-                )
-            } catch {
-                throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
+                } catch {
+                    throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
+                }
             }
         }
 

@@ -1,5 +1,6 @@
 use crate::{
     DbSite, MigrationManager, RowId,
+    context::EditContext,
     repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
 };
 use chrono::{DateTime, Utc};
@@ -24,7 +25,7 @@ pub mod posts;
 pub struct TestContext {
     pub conn: Connection,
     pub site: DbSite,
-    pub post_repo: PostRepository,
+    pub post_repo: PostRepository<EditContext>,
     pub term_repo: TermRelationshipRepository,
 }
 
@@ -33,7 +34,7 @@ pub fn test_ctx() -> TestContext {
     TestContext {
         conn: test_db(),
         site: DbSite { row_id: RowId(1) },
-        post_repo: PostRepository,
+        post_repo: PostRepository::new(),
         term_repo: TermRelationshipRepository,
     }
 }
@@ -98,4 +99,28 @@ pub fn assert_recent_timestamp(timestamp: &str) {
         timestamp_utc,
         diff.num_seconds()
     );
+}
+
+/// Extract column names from a table using SQLite's PRAGMA table_info.
+///
+/// Returns a vector of column names in the order they appear in the table schema.
+/// This is useful for verifying that column enums match the actual database schema.
+///
+/// # Example
+///
+/// ```rust
+/// use PostEditContextColumn::*;
+///
+/// let columns = get_table_column_names(&conn, "posts_edit_context");
+/// assert_eq!(columns[Rowid.as_index()], "rowid");
+/// assert_eq!(columns[SiteId.as_index()], "db_site_id");
+/// ```
+pub fn get_table_column_names(conn: &Connection, table_name: &str) -> Vec<String> {
+    let query = format!("PRAGMA table_info({})", table_name);
+    conn.prepare(&query)
+        .expect("Failed to prepare PRAGMA query")
+        .query_map([], |row| row.get::<_, String>(1)) // column name is at index 1
+        .expect("Failed to execute PRAGMA query")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("Failed to collect column names")
 }
