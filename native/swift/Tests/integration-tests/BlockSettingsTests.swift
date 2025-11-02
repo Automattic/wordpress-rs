@@ -2,7 +2,7 @@ import Foundation
 import WordPressAPI
 import Testing
 
-@Suite
+@Suite(.serialized)
 struct BlockSettingsTests {
     let api = WordPressAPI.admin()
 

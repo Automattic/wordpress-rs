@@ -160,10 +160,10 @@ test-swift:
 	$(MAKE) test-swift-$(uname)
 
 test-swift-linux:
-	docker compose run --rm swift make test-swift-linux-in-docker
+	docker exec -w /app -i wordpress make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
-	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_mobile
+	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_mobile --no-parallel
 
 test-swift-darwin: xcframework
 	swift test

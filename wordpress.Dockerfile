@@ -56,3 +56,9 @@ RUN mkdir gradle-cache-tmp \
         && ./gradlew \
         && cd .. \
         && rm -rf ./gradle-cache-tmp
+
+# Setup Swift
+ENV PATH="/root/.local/share/swiftly/bin:$PATH"
+COPY scripts/docker/install-swift.sh /tmp/install-swift.sh
+RUN chmod +x /tmp/install-swift.sh && /tmp/install-swift.sh && rm /tmp/install-swift.sh
+RUN swift --version

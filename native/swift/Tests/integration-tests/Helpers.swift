@@ -6,13 +6,7 @@ import FoundationNetworking
 #endif
 
 func restoreTestServer() async throws {
-    #if os(Linux)
-    // Integration tests are run in a Docker container, where the test site
-    // hostname is 'wordpress'.
-    let url = URL(string: "http://wordpress:4000/restore?db=true&plugins=true")!
-    #else
     let url = URL(string: "http://localhost:4000/restore?db=true&plugins=true")!
-    #endif
     _ = try await URLSession(configuration: .ephemeral).data(from: url)
 }
 
