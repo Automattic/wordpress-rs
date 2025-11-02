@@ -3,7 +3,7 @@ import WordPressAPI
 import WordPressAPIInternal
 import Testing
 
-@Suite
+@Suite(.serialized)
 struct NonceAuthenticationTests {
 
     @Test

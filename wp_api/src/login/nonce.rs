@@ -39,9 +39,12 @@ impl WpRestNonceRetrieval {
         username: String,
         password: String,
     ) -> Result<String, NonceRetrievalError> {
+        // First, try to get the nonce directly. This HTTP request returns
+        // a valid nonce if the underlying `request_executor` has valid cookies.
         let mut nonce = self.nonce_from_request(self.nonce_request()).await;
 
-        if let Err(NonceRetrievalError::UnexpectedResponse { .. }) = nonce {
+        // If that fails, try to log in with the provided username and password
+        if nonce.is_err() {
             nonce = self
                 .nonce_from_request(self.nonce_request_via_login(&username, &password))
                 .await;
