@@ -2,7 +2,7 @@ import Foundation
 @testable import WordPressAPI
 import Testing
 
-@Suite
+@Suite(.serialized)
 struct MediaTests {
     let api = WordPressAPI.admin()
 

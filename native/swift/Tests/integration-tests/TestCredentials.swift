@@ -48,12 +48,6 @@ struct TestCredentials: Decodable {
             )!
             .absoluteURL
         // swiftlint:disable:next force_try
-        var result = try! JSONDecoder().decode(Self.self, from: Data(contentsOf: json))
-        #if os(Linux)
-        // Integration tests are run in a Docker container, where the test site
-        // hostname is 'wordpress'.
-        result.siteUrl = "http://wordpress"
-        #endif
-        return result
+        return try! JSONDecoder().decode(Self.self, from: Data(contentsOf: json))
     }
 }
