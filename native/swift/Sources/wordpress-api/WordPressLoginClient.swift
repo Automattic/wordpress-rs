@@ -15,6 +15,10 @@ public final class WordPressLoginClient: @unchecked Sendable {
         urlSession: URLSession,
         middleware: MiddlewarePipeline = .default
     ) {
+        precondition(urlSession.configuration.httpCookieStorage != nil)
+        precondition(urlSession.configuration.httpShouldSetCookies == true)
+        precondition(urlSession.configuration.httpCookieAcceptPolicy != .never)
+
         self.init(requestExecutor: WpRequestExecutor(urlSession: urlSession), middleware: middleware)
     }
 
