@@ -37,7 +37,7 @@ struct NonceAuthenticationTests {
 
         // When sign in with another account, an error should be returned.
         await #expect(throws: NonceRetrievalError.AlreadyLoggedIn(username: credentials.adminUsername)) {
-            let _ = try await client.authenticateTemporarily(
+            _ = try await client.authenticateTemporarily(
                 username: credentials.authorUsername,
                 password: credentials.authorPassword,
                 details: details

@@ -67,7 +67,11 @@ public final class WordPressLoginClient: @unchecked Sendable {
         try extractLoginDetailsFromUrl(url: callbackUrl.absoluteString)
     }
 
-    public func authenticateTemporarily(username: String, password: String, details: AutoDiscoveryAttemptSuccess) async throws -> WordPressAPI {
+    public func authenticateTemporarily(
+        username: String,
+        password: String,
+        details: AutoDiscoveryAttemptSuccess
+    ) async throws -> WordPressAPI {
         let nonceRetrieval = WpRestNonceRetrieval(details: details, requestExecutor: requestExecutor)
         let nonce = try await nonceRetrieval.getNonce(username: username, password: password)
         return WordPressAPI(
