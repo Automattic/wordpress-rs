@@ -2,7 +2,7 @@ CREATE TABLE `term_relationships` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
-  -- Site identifier (foreign key to sites table)
+  -- Site identifier (foreign key to db_sites table)
   `db_site_id` INTEGER NOT NULL,
 
   -- Object identifier (rowid of post/page/nav_menu_item/etc)
@@ -15,7 +15,7 @@ CREATE TABLE `term_relationships` (
   -- Taxonomy type ('category', 'post_tag', or custom taxonomy)
   `taxonomy_type` TEXT NOT NULL,
 
-  FOREIGN KEY (db_site_id) REFERENCES sites(id) ON DELETE CASCADE
+  FOREIGN KEY (db_site_id) REFERENCES db_sites(id) ON DELETE CASCADE
 ) STRICT;
 
 -- Prevent duplicate associations (same object can't have same term twice in same taxonomy)

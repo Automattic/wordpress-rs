@@ -2,6 +2,7 @@ use crate::{RowId, SqliteDbError};
 use rusqlite::Connection;
 
 pub mod posts;
+pub mod sites;
 pub mod term_relationships;
 
 #[cfg(test)]

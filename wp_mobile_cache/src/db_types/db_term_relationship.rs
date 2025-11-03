@@ -1,6 +1,6 @@
 use crate::{
-    DbSite, SqliteDbError,
-    mappings::{ColumnIndex, RowExt},
+    SqliteDbError,
+    db_types::row_ext::{ColumnIndex, RowExt},
     term_relationships::DbTermRelationship,
 };
 use rusqlite::Row;
@@ -31,9 +31,7 @@ impl DbTermRelationship {
 
         Ok(Self {
             row_id: row.get_column(Col::Rowid)?,
-            site: DbSite {
-                row_id: row.get_column(Col::DbSiteId)?,
-            },
+            db_site_id: row.get_column(Col::DbSiteId)?,
             object_id: row.get_column(Col::ObjectId)?,
             term_id: TermId(row.get_column(Col::TermId)?),
             taxonomy_type: row.get_column::<String, _>(Col::TaxonomyType)?.into(),

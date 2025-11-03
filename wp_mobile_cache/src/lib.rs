@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 pub mod context;
 pub mod db_types;
-pub mod mappings;
 pub mod repository;
 pub mod term_relationships;
 
@@ -83,34 +82,6 @@ impl From<RowId> for i64 {
     fn from(row_id: RowId) -> Self {
         row_id.0 as i64
     }
-}
-
-/// Represents a cached WordPress site in the database.
-///
-/// # Design Rationale
-///
-/// This is intentionally a database-specific type (hence the `Db` prefix) rather than
-/// a domain type representing a WordPress site. This design choice prevents confusion:
-///
-/// - **Not a WordPress.com site ID**: The `row_id` has no relationship to WordPress.com site IDs
-/// - **Not a self-hosted site identifier**: Self-hosted sites don't have numeric IDs
-/// - **Internal cache identifier only**: This ID exists only for our local database's multi-site support
-///
-/// # Future Extension
-///
-/// When site type tables are added (e.g., `self_hosted_sites`, `wordpress_com_sites`), this
-/// struct will gain additional fields:
-///
-/// ```ignore
-/// pub struct DbSite {
-///     pub row_id: RowId,
-///     pub site_type: SiteType,      // SelfHosted | WordPressCom
-///     pub mapped_site_id: RowId,    // Foreign key to specific site type table
-/// }
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct DbSite {
-    pub row_id: RowId,
 }
 
 /// Get the SQLite version string from the database.
@@ -219,12 +190,13 @@ impl WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 5] = [
+static MIGRATION_QUERIES: [&str; 6] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
     include_str!("../migrations/0004-create-posts-view-context-table.sql"),
     include_str!("../migrations/0005-create-posts-embed-context-table.sql"),
+    include_str!("../migrations/0006-create-self-hosted-sites-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

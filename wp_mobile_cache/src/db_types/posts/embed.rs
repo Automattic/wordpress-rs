@@ -1,4 +1,4 @@
-use crate::{DbSite, RowId, mappings::ColumnIndex};
+use crate::{RowId, db_types::row_ext::ColumnIndex};
 use wp_api::posts::AnyPostWithEmbedContext;
 
 /// Column indexes for posts_embed_context table.
@@ -7,7 +7,7 @@ use wp_api::posts::AnyPostWithEmbedContext;
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostEmbedContextColumn {
     Rowid = 0,
-    SiteId = 1,
+    DbSiteId = 1,
     Id = 2,
     Date = 3,
     Link = 4,
@@ -30,7 +30,7 @@ impl ColumnIndex for PostEmbedContextColumn {
 
 pub struct DbAnyPostWithEmbedContext {
     pub row_id: RowId,
-    pub site: DbSite,
+    pub db_site_id: RowId,
     pub post: AnyPostWithEmbedContext,
     pub last_fetched_at: String,
 }

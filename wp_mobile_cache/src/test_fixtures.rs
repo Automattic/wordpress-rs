@@ -1,11 +1,17 @@
 use crate::{
-    DbSite, MigrationManager, RowId,
+    MigrationManager,
     context::EditContext,
-    repository::{posts::PostRepository, term_relationships::TermRelationshipRepository},
+    db_types::{db_site::DbSite, self_hosted_site::SelfHostedSite},
+    repository::{
+        posts::PostRepository, sites::SiteRepository,
+        term_relationships::TermRelationshipRepository,
+    },
 };
 use chrono::{DateTime, Utc};
+use integration_test_credentials::TestCredentials;
 use rstest::*;
 use rusqlite::Connection;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub mod posts;
 
@@ -17,7 +23,7 @@ pub mod posts;
 ///
 /// ```rust
 /// #[rstest]
-/// fn test_something(test_ctx: TestContext) {
+/// fn test_something(mut test_ctx: TestContext) {
 ///     let post = PostBuilder::new().build();
 ///     test_ctx.post_repo.upsert(&mut test_ctx.conn, &test_ctx.site, &post).unwrap();
 /// }
@@ -31,38 +37,68 @@ pub struct TestContext {
 
 #[fixture]
 pub fn test_ctx() -> TestContext {
+    let (conn, site) = test_db();
     TestContext {
-        conn: test_db(),
-        site: DbSite { row_id: RowId(1) },
+        conn,
+        site,
         post_repo: PostRepository::new(),
         term_repo: TermRelationshipRepository,
     }
 }
 
-fn test_db() -> Connection {
-    let conn = Connection::open_in_memory().unwrap();
+fn test_db() -> (Connection, DbSite) {
+    let mut conn = Connection::open_in_memory().unwrap();
     let mut migration_manager = MigrationManager::new(&conn).unwrap();
 
     migration_manager
         .perform_migrations()
         .expect("All migrations should succeed");
 
-    // Insert default test site (id = 1)
-    conn.execute("INSERT INTO sites (id) VALUES (1)", [])
-        .expect("Failed to insert test site");
+    // Insert default test site using real test credentials
+    let test_creds = TestCredentials::instance();
+    let self_hosted_site = SelfHostedSite {
+        url: test_creds.site_url.to_string(),
+        api_root: format!("{}/wp-json", test_creds.site_url),
+    };
 
-    conn
+    let db_site = create_test_site(&mut conn, &self_hosted_site);
+
+    (conn, db_site)
 }
 
-/// Helper to create an additional test site with a specific ID.
+/// Helper to create a test site.
 ///
-/// Useful when you need more than 2 sites or specific site IDs.
-pub fn create_test_site(conn: &Connection, id: i64) -> DbSite {
-    conn.execute("INSERT INTO sites (id) VALUES (?)", [id])
-        .expect("Failed to create test site");
-    DbSite {
-        row_id: RowId(id as u64),
-    }
+/// Uses `SiteRepository` to insert the site into the database.
+pub fn create_test_site(conn: &mut Connection, site: &SelfHostedSite) -> DbSite {
+    let site_repo = SiteRepository;
+    let (db_site, _) = site_repo
+        .upsert_self_hosted_site(conn, site)
+        .expect("Failed to upsert test site");
+
+    db_site
+}
+
+static RANDOM_TEST_SITE_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Helper to create a test site with auto-generated URL.
+///
+/// Uses an internal counter to generate unique URLs for each call.
+/// Useful for tests that need multiple sites but don't care about specific URLs.
+///
+/// # Example
+///
+/// ```rust
+/// let site1 = create_random_test_site(&mut conn);
+/// let site2 = create_random_test_site(&mut conn);
+/// // site1 and site2 will have different URLs
+/// ```
+pub fn create_random_test_site(conn: &mut Connection) -> DbSite {
+    let counter = RANDOM_TEST_SITE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let site = SelfHostedSite {
+        url: format!("https://test-site-{}.local", counter),
+        api_root: format!("https://test-site-{}.local/wp-json", counter),
+    };
+    create_test_site(conn, &site)
 }
 
 /// Validates that a timestamp is a recent, valid ISO 8601 UTC timestamp.

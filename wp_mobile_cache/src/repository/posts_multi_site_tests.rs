@@ -1,12 +1,12 @@
 //! Multi-site isolation tests for PostRepository.
 
-use crate::test_fixtures::{TestContext, create_test_site, posts::PostBuilder, test_ctx};
+use crate::test_fixtures::{TestContext, create_random_test_site, posts::PostBuilder, test_ctx};
 use rstest::*;
 use wp_api::posts::PostId;
 
 #[rstest]
 fn test_posts_in_site_1_invisible_to_site_2(mut test_ctx: TestContext) {
-    let site2 = create_test_site(&test_ctx.conn, 2);
+    let site2 = create_random_test_site(&mut test_ctx.conn);
 
     // Insert post in site 1
     let post = PostBuilder::minimal().with_id(100).build();
@@ -28,7 +28,7 @@ fn test_posts_in_site_1_invisible_to_site_2(mut test_ctx: TestContext) {
 
 #[rstest]
 fn test_same_post_id_can_exist_in_different_sites(mut test_ctx: TestContext) {
-    let site2 = create_test_site(&test_ctx.conn, 2);
+    let site2 = create_random_test_site(&mut test_ctx.conn);
 
     // Create post with same ID in both sites
     let post_id = PostId(42);
@@ -69,7 +69,7 @@ fn test_same_post_id_can_exist_in_different_sites(mut test_ctx: TestContext) {
 
 #[rstest]
 fn test_select_all_only_returns_posts_for_requested_site(mut test_ctx: TestContext) {
-    let site2 = create_test_site(&test_ctx.conn, 2);
+    let site2 = create_random_test_site(&mut test_ctx.conn);
 
     // Insert posts in site 1
     test_ctx
@@ -119,7 +119,7 @@ fn test_select_all_only_returns_posts_for_requested_site(mut test_ctx: TestConte
 
 #[rstest]
 fn test_count_only_counts_posts_for_requested_site(mut test_ctx: TestContext) {
-    let site2 = create_test_site(&test_ctx.conn, 2);
+    let site2 = create_random_test_site(&mut test_ctx.conn);
 
     // Insert posts in both sites
     test_ctx
@@ -156,7 +156,7 @@ fn test_count_only_counts_posts_for_requested_site(mut test_ctx: TestContext) {
 
 #[rstest]
 fn test_delete_by_post_id_only_deletes_from_specified_site(mut test_ctx: TestContext) {
-    let site2 = create_test_site(&test_ctx.conn, 2);
+    let site2 = create_random_test_site(&mut test_ctx.conn);
 
     let post_id = PostId(999);
 

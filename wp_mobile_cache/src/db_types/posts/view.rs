@@ -1,4 +1,4 @@
-use crate::{DbSite, RowId, mappings::ColumnIndex};
+use crate::{RowId, db_types::row_ext::ColumnIndex};
 use wp_api::posts::AnyPostWithViewContext;
 
 /// Column indexes for posts_view_context table.
@@ -7,7 +7,7 @@ use wp_api::posts::AnyPostWithViewContext;
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostViewContextColumn {
     Rowid = 0,
-    SiteId = 1,
+    DbSiteId = 1,
     Id = 2,
     Date = 3,
     DateGmt = 4,
@@ -45,7 +45,7 @@ impl ColumnIndex for PostViewContextColumn {
 
 pub struct DbAnyPostWithViewContext {
     pub row_id: RowId,
-    pub site: DbSite,
+    pub db_site_id: RowId,
     pub post: AnyPostWithViewContext,
     pub last_fetched_at: String,
 }
