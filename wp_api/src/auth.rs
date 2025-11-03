@@ -2,6 +2,11 @@ use http::{HeaderMap, HeaderValue};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
+use crate::{
+    login::{nonce::WpRestNonceRetrieval, url_discovery::AutoDiscoveryAttemptSuccess},
+    request::RequestExecutor,
+};
+
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum WpAuthentication {
     AuthorizationHeader { token: String },
@@ -78,6 +83,60 @@ impl ModifiableAuthenticationProvider {
             .read()
             .expect("If the lock is poisoned, there isn't much we can do")
             .insert_header(headers)
+    }
+}
+
+#[derive(Debug, uniffi::Object)]
+pub struct CookiesNonceAuthenticationProvider {
+    username: String,
+    password: String,
+    nonce_retrieval: Arc<WpRestNonceRetrieval>,
+    auth: RwLock<WpAuthentication>,
+}
+
+#[uniffi::export]
+impl CookiesNonceAuthenticationProvider {
+    #[uniffi::constructor]
+    pub fn new(
+        username: String,
+        password: String,
+        details: AutoDiscoveryAttemptSuccess,
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Self {
+        Self {
+            username,
+            password,
+            nonce_retrieval: Arc::new(WpRestNonceRetrieval::new(details, request_executor)),
+            auth: RwLock::new(WpAuthentication::None),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl WpDynamicAuthenticationProvider for CookiesNonceAuthenticationProvider {
+    fn auth(&self) -> WpAuthentication {
+        self.auth
+            .read()
+            .expect("If the lock is poisoned, there isn't much we can do")
+            .clone()
+    }
+
+    async fn refresh(&self) -> bool {
+        match self
+            .nonce_retrieval
+            .get_nonce(self.username.clone(), self.password.clone())
+            .await
+        {
+            Ok(nonce) => {
+                *self
+                    .auth
+                    .write()
+                    .expect("If the lock is poisoned, there isn't much we can do") =
+                    WpAuthentication::Nonce { nonce };
+                true
+            }
+            Err(_) => false,
+        }
     }
 }
 

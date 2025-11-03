@@ -8,7 +8,7 @@ pub use crate::{
     TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE, TERM_ID_INVALID, THEME_TWENTY_TWENTY_FIVE,
     THEME_TWENTY_TWENTY_FOUR, THEME_TWENTY_TWENTY_THREE, USER_ID_INVALID,
     WP_ORG_PLUGIN_SLUG_CLASSIC_WIDGETS, api_client, api_client_as_author, api_client_as_subscriber,
-    api_client_with_auth_provider,
+    api_client_with_account_credentials, api_client_with_auth_provider,
     backend::{Backend, RestoreServer},
     mock::{MockExecutor, response_helpers},
     test_site_api_url_resolver, test_site_url, unwrapped_wp_gmt_date_time,

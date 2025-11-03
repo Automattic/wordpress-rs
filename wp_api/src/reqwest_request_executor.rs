@@ -46,6 +46,17 @@ impl ReqwestRequestExecutor {
             Duration::from_secs(DEFAULT_TIMEOUT),
         )
     }
+
+    pub fn new_with_cookie_store() -> Self {
+        Self {
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(DEFAULT_TIMEOUT))
+                .use_rustls_tls()
+                .cookie_store(true)
+                .build()
+                .expect("We should be able to build the reqwest client with this configuration"),
+        }
+    }
 }
 
 impl ReqwestRequestExecutor {

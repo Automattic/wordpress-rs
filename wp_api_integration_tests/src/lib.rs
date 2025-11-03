@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use wp_api::{
+    auth::CookiesNonceAuthenticationProvider,
+    login::login_client::WpLoginClient,
     nav_menus::NavMenuId,
     wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver},
 };
@@ -98,6 +100,41 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
         WpApiClientDelegate {
             auth_provider,
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
+    )
+}
+
+pub async fn api_client_with_account_credentials(
+    username: String,
+    password: String,
+) -> WpApiClient {
+    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_cookie_store());
+
+    let login_client = WpLoginClient::new(
+        request_executor.clone(),
+        Arc::new(WpApiMiddlewarePipeline::default()),
+    );
+    let discovery_result = login_client
+        .api_discovery(TestCredentials::instance().site_url.to_string())
+        .await;
+    let details = discovery_result
+        .combined_result()
+        .expect("API discovery should succeed");
+
+    let nonce_auth_provider = Arc::new(CookiesNonceAuthenticationProvider::new(
+        username,
+        password,
+        details.clone(),
+        request_executor.clone(),
+    ));
+
+    WpApiClient::new(
+        test_site_api_url_resolver(),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::dynamic(nonce_auth_provider)),
+            request_executor,
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
         },

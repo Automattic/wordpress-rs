@@ -21,6 +21,15 @@ pub struct WpRestNonceRetrieval {
     request_executor: Arc<dyn RequestExecutor>,
 }
 
+impl std::fmt::Debug for WpRestNonceRetrieval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WpRestNonceRetrieval")
+            .field("details", &self.details)
+            .field("request_executor", &"<dyn RequestExecutor>")
+            .finish()
+    }
+}
+
 #[uniffi::export]
 impl WpRestNonceRetrieval {
     #[uniffi::constructor]

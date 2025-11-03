@@ -151,3 +151,39 @@ async fn test_modifiable_auth_provider() {
     // FIRST_USER_ID is the current user's id
     assert_eq!(FIRST_USER_ID, user.id);
 }
+
+#[tokio::test]
+#[parallel]
+async fn test_cookies_nonce() {
+    let client = api_client_with_account_credentials(
+        TestCredentials::instance().admin_username.to_string(),
+        TestCredentials::instance()
+            .admin_account_password
+            .to_string(),
+    )
+    .await;
+
+    let user = client
+        .users()
+        .retrieve_me_with_edit_context()
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(user.username, TestCredentials::instance().admin_username);
+}
+
+#[tokio::test]
+#[parallel]
+async fn test_cookies_nonce_with_app_password() {
+    let client = api_client_with_account_credentials(
+        TestCredentials::instance().admin_username.to_string(),
+        TestCredentials::instance().admin_password.to_string(),
+    )
+    .await;
+
+    client
+        .users()
+        .retrieve_me_with_edit_context()
+        .await
+        .assert_wp_error(WpErrorCode::Unauthorized);
+}
