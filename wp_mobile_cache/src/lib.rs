@@ -190,6 +190,16 @@ impl WpApiCache {
     }
 }
 
+impl WpApiCache {
+    /// Get access to the database connection
+    ///
+    /// Returns a MutexGuard that implements both QueryExecutor and TransactionManager.
+    /// The connection is automatically unlocked when the guard is dropped.
+    pub fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.inner.connection.lock().unwrap()
+    }
+}
+
 static MIGRATION_QUERIES: [&str; 6] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),

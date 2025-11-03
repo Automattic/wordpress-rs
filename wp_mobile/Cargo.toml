@@ -12,6 +12,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_mobile"
 
 [dependencies]
+thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
 wp_mobile_cache = { path = "../wp_mobile_cache" }

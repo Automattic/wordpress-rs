@@ -5306,6 +5306,7 @@ dependencies = [
 name = "wp_mobile"
 version = "0.1.0"
 dependencies = [
+ "thiserror 2.0.17",
  "uniffi",
  "wp_api",
  "wp_mobile_cache",
