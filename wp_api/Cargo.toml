@@ -28,13 +28,14 @@ url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls-tls", "hickory-dns" ], optional = true }
+reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls-tls", "hickory-dns", "cookies" ], optional = true }
 roxmltree = { workspace = true }
 rustls = { workspace = true, optional = true }
 scraper = { workspace = true }
 serde = { workspace = true, features = [ "derive", "rc" ] }
 serde_json = { workspace = true, features = [ "raw_value" ] }
 serde_repr = { workspace = true }
+serde_urlencoded = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }

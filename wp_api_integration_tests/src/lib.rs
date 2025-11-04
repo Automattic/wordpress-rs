@@ -1,13 +1,14 @@
 use crate::prelude::*;
 use wp_api::{
+    auth::CookiesNonceAuthenticationProvider,
+    login::login_client::WpLoginClient,
     nav_menus::NavMenuId,
     wp_com::{WpComBaseUrl, client::WpComApiClient, endpoint::WpComDotOrgApiUrlResolver},
 };
 
+pub mod backend;
 pub mod mock;
 pub mod prelude;
-
-pub mod backend;
 
 // The first user is also the current user
 pub const FIRST_USER_ID: UserId = UserId(1);
@@ -105,6 +106,41 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
     )
 }
 
+pub async fn api_client_with_account_credentials(
+    username: String,
+    password: String,
+) -> WpApiClient {
+    let request_executor = Arc::new(ReqwestRequestExecutor::new_with_cookie_store());
+
+    let login_client = WpLoginClient::new(
+        request_executor.clone(),
+        Arc::new(WpApiMiddlewarePipeline::default()),
+    );
+    let discovery_result = login_client
+        .api_discovery(TestCredentials::instance().site_url.to_string())
+        .await;
+    let details = discovery_result
+        .combined_result()
+        .expect("API discovery should succeed");
+
+    let nonce_auth_provider = Arc::new(CookiesNonceAuthenticationProvider::new(
+        username,
+        password,
+        details.clone(),
+        request_executor.clone(),
+    ));
+
+    WpApiClient::new(
+        test_site_api_url_resolver(),
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::dynamic(nonce_auth_provider)),
+            request_executor,
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        },
+    )
+}
+
 pub fn wp_com_client() -> WpComApiClient {
     WpComApiClient::new(WpApiClientDelegate {
         auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
@@ -189,14 +225,4 @@ impl<T: std::fmt::Debug, E: std::error::Error> AssertResponse for Result<T, E> {
 
 pub fn unwrapped_wp_gmt_date_time(s: &str) -> WpGmtDateTime {
     s.parse::<WpGmtDateTime>().expect("Expected a valid date")
-}
-
-#[derive(Debug)]
-pub struct EmptyAppNotifier;
-
-#[async_trait]
-impl WpAppNotifier for EmptyAppNotifier {
-    async fn requested_with_invalid_authentication(&self, _request_url: String) {
-        // no-op
-    }
 }

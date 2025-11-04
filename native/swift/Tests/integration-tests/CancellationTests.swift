@@ -6,6 +6,7 @@ import Testing
 
 #if os(macOS)
 
+@Suite(.serialized)
 struct CancellationTests {
     let api = WordPressAPI.admin()
 

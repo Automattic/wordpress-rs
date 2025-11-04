@@ -151,9 +151,7 @@ impl InnerRequestBuilder {
             http::header::ACCEPT,
             HeaderValue::from_static(CONTENT_TYPE_JSON),
         );
-        if let Some(hv) = self.auth_provider.auth_header_value() {
-            header_map.insert(http::header::AUTHORIZATION, hv);
-        }
+        self.auth_provider.insert_header(&mut header_map);
         header_map.into()
     }
 

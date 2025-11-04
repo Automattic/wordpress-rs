@@ -100,8 +100,6 @@ steps:
         plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
-      - label: ":swift: :linux: Build and Test"
-        command: ".buildkite/commands/run-swift-tests-linux.sh"
       - label: ":swift: Lint"
         command: |
           .buildkite/download-xcframework.sh
@@ -253,6 +251,12 @@ steps:
               format: "junit"
         artifact_paths:
           - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
+
+      - label: ":wordpress: :swift: WordPress {{matrix}}"
+        command: ".buildkite/commands/run-swift-tests-linux.sh"
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
 
   - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION

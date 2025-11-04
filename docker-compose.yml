@@ -4,7 +4,7 @@ services:
             context: .
             dockerfile: wordpress.Dockerfile
             args:
-                WORDPRESS_VERSION: ${WORDPRESS_VERSION:-latest}
+                WORDPRESS_VERSION: ${WORDPRESS_VERSION:-6.8.1}
         container_name: 'wordpress'
         ports:
             - '80:80'
@@ -29,17 +29,6 @@ services:
             interval: 4s
             timeout: 1s
             retries: 30
-
-    swift:
-        build:
-            context: .
-            dockerfile: swift.Dockerfile
-        volumes:
-            - ./:/app
-        working_dir: /app
-        environment:
-            - TEST_ALL_PLUGINS
-            - CARGO_HOME=/app/.cargo
 
     database:
         image: 'public.ecr.aws/docker/library/mariadb:11.2'
