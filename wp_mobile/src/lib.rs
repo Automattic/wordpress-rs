@@ -3,7 +3,11 @@ pub use wp_api;
 pub use wp_mobile_cache;
 
 mod entity;
+mod entity_error;
 mod service;
+
+// Re-export error types
+pub use entity_error::EntityError;
 
 wp_mobile_entity!(
     EntityAnyPostWithEditContext,
