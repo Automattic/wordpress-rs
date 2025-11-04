@@ -5,10 +5,7 @@ use wp_api::{
     posts::{AnyPostWithEditContext, PostId},
 };
 use wp_mobile_cache::{
-    WpApiCache,
-    db_types::db_site::DbSite,
-    repository::posts::PostRepository,
-    context::EditContext,
+    WpApiCache, context::EditContext, db_types::db_site::DbSite, repository::posts::PostRepository,
 };
 
 /// Service layer for post operations
@@ -51,7 +48,10 @@ impl PostService {
     ///
     /// This bypasses the entity layer for direct access to cached post data.
     /// Can be made public in the future if needed.
-    fn read_post_from_db(&self, id: PostId) -> Result<Option<AnyPostWithEditContext>, EntityError> {
+    pub(crate) fn read_post_from_db(
+        &self,
+        id: PostId,
+    ) -> Result<Option<AnyPostWithEditContext>, EntityError> {
         Self::read_post_from_db_internal(&self.cache, &self.db_site, id)
     }
 }
@@ -73,9 +73,105 @@ impl PostService {
 
         Entity::<AnyPostWithEditContext>::new(
             id.0,
-            Box::new(move || {
-                Self::read_post_from_db_internal(&cache, &db_site, PostId(id_val))
-            })
-        ).into()
+            Box::new(move || Self::read_post_from_db_internal(&cache, &db_site, PostId(id_val))),
+        )
+        .into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_fixtures::mock_api_client;
+    use rstest::*;
+    use rusqlite::Connection;
+    use wp_mobile_cache::{
+        MigrationManager, WpApiCache,
+        db_types::self_hosted_site::SelfHostedSite,
+        repository::{posts::PostRepository, sites::SiteRepository},
+        test_fixtures::posts::PostBuilder,
+    };
+
+    #[rstest]
+    fn test_read_post_from_db_returns_cached_post(post_service_ctx: PostServiceTestContext) {
+        // Setup: Insert test post into cache
+        let test_post_id = PostId(42);
+        let test_post = PostBuilder::minimal()
+            .with_id(42)
+            .with_title("Test Post")
+            .with_slug("test-post")
+            .build();
+
+        let post_repo = PostRepository::<EditContext>::new();
+        let mut conn = post_service_ctx.cache.connection();
+        post_repo
+            .upsert(&mut *conn, &post_service_ctx.db_site, &test_post)
+            .expect("Post insert should succeed");
+        drop(conn); // Release the connection lock
+
+        // Test: Read post from database
+        let result = post_service_ctx
+            .post_service
+            .read_post_from_db(test_post_id)
+            .expect("Database read should succeed");
+
+        // Assert: Post was found and matches what we inserted
+        assert!(result.is_some(), "Post should be found in cache");
+        let retrieved_post = result.unwrap();
+        assert_eq!(retrieved_post.id, test_post_id);
+        assert_eq!(retrieved_post.title.rendered, "Test Post");
+        assert_eq!(retrieved_post.slug, "test-post");
+    }
+
+    /// Test context bundling PostService with database and site setup
+    pub struct PostServiceTestContext {
+        pub post_service: PostService,
+        pub db_site: Arc<DbSite>,
+        pub cache: Arc<WpApiCache>,
+    }
+
+    /// rstest fixture providing a PostService with in-memory database
+    ///
+    /// Sets up an in-memory SQLite database with migrations, creates a test site,
+    /// and returns a PostService instance ready for testing.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// #[rstest]
+    /// fn test_something(post_service_ctx: PostServiceTestContext) {
+    ///     let result = post_service_ctx.post_service.read_post_from_db(PostId(1));
+    ///     // ...
+    /// }
+    /// ```
+    #[fixture]
+    fn post_service_ctx(mock_api_client: Arc<WpApiClient>) -> PostServiceTestContext {
+        // Setup: Create in-memory database with migrations
+        let mut conn = Connection::open_in_memory().unwrap();
+        let mut migration_manager = MigrationManager::new(&conn).unwrap();
+        migration_manager
+            .perform_migrations()
+            .expect("Migrations should succeed");
+
+        // Setup: Create test site
+        let site_repo = SiteRepository;
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let (db_site, _) = site_repo
+            .upsert_self_hosted_site(&mut conn, &self_hosted_site)
+            .expect("Site creation should succeed");
+
+        // Setup: Create PostService with cache
+        let cache = Arc::new(WpApiCache::from(conn));
+        let db_site_arc = Arc::new(db_site);
+        let post_service = PostService::new(mock_api_client, db_site_arc.clone(), cache.clone());
+
+        PostServiceTestContext {
+            post_service,
+            db_site: db_site_arc,
+            cache,
+        }
     }
 }

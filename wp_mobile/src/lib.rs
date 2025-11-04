@@ -6,6 +6,9 @@ mod entity;
 mod entity_error;
 mod service;
 
+#[cfg(test)]
+mod test_fixtures;
+
 // Re-export error types
 pub use entity_error::EntityError;
 

@@ -8,7 +8,7 @@ pub mod db_types;
 pub mod repository;
 pub mod term_relationships;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 pub mod test_fixtures;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -197,6 +197,16 @@ impl WpApiCache {
     /// The connection is automatically unlocked when the guard is dropped.
     pub fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.inner.connection.lock().unwrap()
+    }
+}
+
+impl From<Connection> for WpApiCache {
+    fn from(connection: Connection) -> Self {
+        Self {
+            inner: DBManager {
+                connection: Mutex::new(connection),
+            },
+        }
     }
 }
 
