@@ -95,32 +95,76 @@ mod tests {
     #[rstest]
     fn test_read_post_from_db_returns_cached_post(post_service_ctx: PostServiceTestContext) {
         // Setup: Insert test post into cache
-        let test_post_id = PostId(42);
-        let test_post = PostBuilder::minimal()
-            .with_id(42)
-            .with_title("Test Post")
-            .with_slug("test-post")
-            .build();
-
-        let post_repo = PostRepository::<EditContext>::new();
-        let mut conn = post_service_ctx.cache.connection();
-        post_repo
-            .upsert(&mut *conn, &post_service_ctx.db_site, &test_post)
-            .expect("Post insert should succeed");
-        drop(conn); // Release the connection lock
+        let test_post = insert_test_post(&post_service_ctx);
 
         // Test: Read post from database
         let result = post_service_ctx
             .post_service
-            .read_post_from_db(test_post_id)
+            .read_post_from_db(test_post.id)
             .expect("Database read should succeed");
 
         // Assert: Post was found and matches what we inserted
-        assert!(result.is_some(), "Post should be found in cache");
-        let retrieved_post = result.unwrap();
-        assert_eq!(retrieved_post.id, test_post_id);
-        assert_eq!(retrieved_post.title.rendered, "Test Post");
-        assert_eq!(retrieved_post.slug, "test-post");
+        let retrieved_post = result.expect("Post should be found in cache");
+        test_post.assert_matches(&retrieved_post);
+    }
+
+    #[rstest]
+    fn test_get_entity_load_data_returns_cached_post(post_service_ctx: PostServiceTestContext) {
+        // Setup: Insert test post into cache
+        let test_post = insert_test_post(&post_service_ctx);
+
+        // Test: Get entity and load data
+        let entity = post_service_ctx.post_service.get_entity(test_post.id);
+        let result = entity.load_data().expect("Database read should succeed");
+
+        // Assert: Post was found and matches what we inserted
+        let retrieved_post = result.expect("Post should be found in cache");
+        test_post.assert_matches(&retrieved_post);
+    }
+
+    /// Test helper that encapsulates a test post with its assertion logic
+    struct TestPost {
+        id: PostId,
+        title: String,
+        slug: String,
+    }
+
+    impl TestPost {
+        /// Assert that a retrieved post matches the expected values
+        fn assert_matches(&self, post: &AnyPostWithEditContext) {
+            assert_eq!(post.id, self.id);
+            assert_eq!(post.title.rendered, self.title);
+            assert_eq!(post.slug, self.slug);
+        }
+    }
+
+    /// Helper function to insert a test post into the cache
+    ///
+    /// Creates a test post with predefined values and inserts it into the database.
+    /// Returns a TestPost that can be used to assert the retrieved data matches what was inserted.
+    /// This common setup is used by multiple tests to showcase similarities between
+    /// direct database reads and entity-based reads.
+    fn insert_test_post(ctx: &PostServiceTestContext) -> TestPost {
+        let test_post = TestPost {
+            id: PostId(42),
+            title: "Test Post".to_string(),
+            slug: "test-post".to_string(),
+        };
+
+        let post = PostBuilder::minimal()
+            .with_id(test_post.id.0)
+            .with_title(&test_post.title)
+            .with_slug(&test_post.slug)
+            .build();
+
+        let post_repo = PostRepository::<EditContext>::new();
+        let mut conn = ctx.cache.connection();
+        post_repo
+            .upsert(&mut *conn, &ctx.db_site, &post)
+            .expect("Post insert should succeed");
+        drop(conn); // Release the connection lock
+
+        test_post
     }
 
     /// Test context bundling PostService with database and site setup
@@ -147,8 +191,10 @@ mod tests {
     #[fixture]
     fn post_service_ctx(mock_api_client: Arc<WpApiClient>) -> PostServiceTestContext {
         // Setup: Create in-memory database with migrations
-        let mut conn = Connection::open_in_memory().unwrap();
-        let mut migration_manager = MigrationManager::new(&conn).unwrap();
+        let mut conn = Connection::open_in_memory()
+            .expect("Failed to create in-memory database");
+        let mut migration_manager = MigrationManager::new(&conn)
+            .expect("Failed to create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations should succeed");
