@@ -1,4 +1,4 @@
-ARG WORDPRESS_VERSION="latest"
+ARG WORDPRESS_VERSION="6.8.1"
 
 FROM public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION}
 
