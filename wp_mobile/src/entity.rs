@@ -31,13 +31,16 @@ impl<T> Entity<T> {
         self.id
     }
 
-    /// Get current data (reads from cache/DB)
+    /// Load current data from cache/DB
+    ///
+    /// This is an expensive operation that reads from the database each time.
+    /// Subsequent calls may return different results if the underlying data has changed.
     ///
     /// Returns:
     /// - Ok(Some(T)) if entity exists in cache
     /// - Ok(None) if entity not found in cache
     /// - Err(EntityError) if database error occurred
-    pub fn data(&self) -> Result<Option<T>, EntityError> {
+    pub fn load_data(&self) -> Result<Option<T>, EntityError> {
         (self.read_data)()
     }
 
@@ -71,14 +74,17 @@ macro_rules! wp_mobile_entity {
                 self.0.id()
             }
 
-            /// Get current data (reads from cache/DB)
+            /// Load current data from cache/DB
+            ///
+            /// This is an expensive operation that reads from the database each time.
+            /// Subsequent calls may return different results if the underlying data has changed.
             ///
             /// Returns:
             /// - Ok(Some(T)) if entity exists in cache
             /// - Ok(None) if entity not found in cache
             /// - Err(EntityError) if database error occurred
-            pub fn data(&self) -> Result<Option<$t_type>, $crate::entity_error::EntityError> {
-                self.0.data()
+            pub fn load_data(&self) -> Result<Option<$t_type>, $crate::entity_error::EntityError> {
+                self.0.load_data()
             }
         }
     };
