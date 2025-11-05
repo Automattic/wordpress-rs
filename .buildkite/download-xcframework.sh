@@ -15,3 +15,4 @@ pushd target
 buildkite-agent artifact download libwordpressFFI.xcframework.zip . --step "xcframework"
 unzip libwordpressFFI.xcframework.zip -d .
 rm libwordpressFFI.xcframework.zip
+popd
