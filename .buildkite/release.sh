@@ -22,7 +22,7 @@ echo "--- :rubygems: Setting up Gems"
 install_gems
 
 echo "--- :closed_lock_with_key: Setting up Code Signing"
-bundle exec fastlane set_up_signing
+bundle exec fastlane set_up_signing_release
 
 echo "--- :rust: Building XCFramework"
 make xcframework-package

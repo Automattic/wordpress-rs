@@ -71,7 +71,7 @@ steps:
 
           echo "--- :swift: Building xcframework"
           install_gems
-          bundle exec fastlane set_up_signing
+          bundle exec fastlane set_up_signing_release
 
           make xcframework-package
           make xcframework-package-checksum
