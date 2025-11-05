@@ -45,6 +45,7 @@ impl_as_query_value_from_to_string!(ListBotConversationsSummaryMethod);
 #[supports_pagination(false)]
 pub struct ListBotConversationsParams {
     #[uniffi(default = None)]
+    #[serde(rename = "truncation_method")]
     pub summary_method: Option<ListBotConversationsSummaryMethod>,
 }
 
@@ -254,6 +255,22 @@ mod tests {
     use std::io::Read;
 
     use super::*;
+    #[test]
+    fn test_list_bot_conversations_params_serialization() {
+        let fm_params = ListBotConversationsParams {
+            summary_method: Some(ListBotConversationsSummaryMethod::FirstMessage),
+        };
+        let serialized = serde_json::to_string(&fm_params)
+            .expect("Failed to serialize list bot conversations params");
+        assert_eq!(serialized, r#"{"truncation_method":"first_message"}"#);
+
+        let lm_params = ListBotConversationsParams {
+            summary_method: Some(ListBotConversationsSummaryMethod::LastMessage),
+        };
+        let serialized = serde_json::to_string(&lm_params)
+            .expect("Failed to serialize list bot conversations params");
+        assert_eq!(serialized, r#"{"truncation_method":"last_message"}"#);
+    }
 
     #[test]
     fn test_bot_create_conversation_response_deserialization() {
