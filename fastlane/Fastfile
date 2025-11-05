@@ -26,7 +26,6 @@ GLOTPRESS_PROJECT_BASE_URL = 'https://translate.wordpress.com/projects/mobile/wo
 
 # Code Signing
 APPLE_TEAM_ID = 'PZYM8XX95Q'
-APPLE_BUNDLE_IDENTIFIER = 'com.automattic.hostmgr'
 
 ASC_API_KEY_ENV_VARS = %w[
   APP_STORE_CONNECT_API_KEY_KEY_ID
@@ -411,24 +410,20 @@ lane :generate_fluent_file_from_po do |file_path:|
   fluent_file_path
 end
 
-desc 'Download the development signing certificates to this machine'
+desc 'Downloads all code signing certificates'
 lane :set_up_signing do |readonly: true|
-  require_env_vars!(*ASC_API_KEY_ENV_VARS, *CODE_SIGNING_STORAGE_ENV_VARS)
+  set_up_signing_development(readonly: readonly)
+  set_up_signing_release(readonly: readonly)
+end
 
-  sync_code_signing(
-    platform: 'macos',
-    app_identifier: APPLE_BUNDLE_IDENTIFIER,
-    team_id: APPLE_TEAM_ID,
-    api_key: app_store_connect_api_key,
-    type: 'development',
-    certificate_id: 'Apple Development: Created via API (886NX39KP6)',
+desc 'Download the development signing certificates to this machine'
+lane :set_up_signing_development do |readonly: true|
+  set_up_certificate_in_keychain(type: 'development', readonly: readonly)
+end
 
-    storage_mode: 's3',
-    s3_region: 'us-east-2',
-    s3_bucket: 'a8c-fastlane-match',
-
-    readonly: readonly
-  )
+desc 'Download the release (distribution) signing certificates to this machine'
+lane :set_up_signing_release do |readonly: true|
+  set_up_certificate_in_keychain(type: 'appstore', readonly: readonly)
 end
 
 # Utils
@@ -511,4 +506,31 @@ def get_required_env!(key)
   return ENV.fetch(key) if ENV.key?(key)
 
   UI.user_error!("Environment variable `#{key}` is not set.")
+end
+
+def set_up_certificate_in_keychain(type:, readonly:)
+  require_env_vars!(*ASC_API_KEY_ENV_VARS, *CODE_SIGNING_STORAGE_ENV_VARS)
+
+  # This will fetch the certificate and provisioning profile for the given type from remote storage.
+  # It will then set them up in the local keychain, where 'codesign' looks for identities.
+  #
+  # Notice we do not need the provisioning profile because we sign with 'codesign' elsewhere.
+  # However, there is no other way to set up the certificate in the keychain.
+  # Fastlane offers a tool called cert, but it only downloads certificates.
+  sync_code_signing(
+    team_id: APPLE_TEAM_ID,
+    api_key: app_store_connect_api_key,
+    type: type,
+    storage_mode: 's3',
+    s3_region: 'us-east-2',
+    s3_bucket: 'a8c-fastlane-match',
+    readonly: readonly,
+    # We need to provide an app identifier, but remember we only care about the certificate that gets downloaded.
+    # The identifier is used to find a provisioning profile, but we don't care about it.
+    #
+    # Similar rationale for the platform argument,
+    # with the addition that it's required to identify the existing provisioning profile for the given app id.
+    app_identifier: 'com.automattic.hostmgr',
+    platform: 'macos'
+  )
 end

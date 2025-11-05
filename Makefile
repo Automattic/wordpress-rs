@@ -16,6 +16,8 @@ swift_package_platform_ios = $(call swift_package_platform_version,ios)
 swift_package_platform_watchos = $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 
+certificate_name_release = Apple Distribution: Automattic, Inc. (PZYM8XX95Q)
+
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
 rust_nightly_toolchain := nightly-2025-07-29
 
@@ -138,7 +140,7 @@ xcframework-package-checksum:
 	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
 
 xcframework-sign:
-	codesign --timestamp -v --sign "Apple Development: Created via API (886NX39KP6)" target/libwordpressFFI.xcframework
+	codesign --timestamp -v --sign "${certificate_name_release}" target/libwordpressFFI.xcframework
 
 docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
