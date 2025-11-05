@@ -246,7 +246,7 @@ lane :download_translations do |commit_changes: false|
     updated_fluent_files = []
 
     if downloaded_files.empty?
-      UI.message("No .po files were downloaded from GlotPress")
+      UI.message('No .po files were downloaded from GlotPress')
       next
     end
 
