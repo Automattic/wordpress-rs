@@ -69,10 +69,12 @@ steps:
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
 
-          echo "--- :swift: Building xcframework"
+          echo "--- :ruby: Installing Ruby tools"
           install_gems
+          echo "--- :xcode: Setting up code signing"
           bundle exec fastlane set_up_signing_release
 
+          echo "--- :swift: Building XCFramework"
           make xcframework-package
           make xcframework-package-checksum
           make xcframework-sign
