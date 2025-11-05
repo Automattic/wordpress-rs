@@ -95,6 +95,11 @@ SUPPORTED_LOCALES = [
   { glotpress: 'zh-tw', project: 'zh-TW'  }
 ].freeze
 
+before_all do
+  # Fixes issues with keychain in CI
+  setup_ci
+end
+
 lane :release do |options|
   version = options[:version] || UI.user_error!('version is required')
   lane_context[LANE_VALUE_VERSION] = version
