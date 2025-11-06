@@ -31,12 +31,12 @@ macro_rules! wp_mobile_entity {
             // FullEntity wrapper - pairs data with EntityId for UniFFI
             #[derive(uniffi::Record)]
             pub struct [<Full $id_type>] {
-                pub entity_id: std::sync::Arc<wp_mobile_cache::EntityId>,
+                pub entity_id: std::sync::Arc<wp_mobile_cache::entity::EntityId>,
                 pub data: $t_type,
             }
 
-            impl From<wp_mobile_cache::FullEntity<$t_type>> for [<Full $id_type>] {
-                fn from(value: wp_mobile_cache::FullEntity<$t_type>) -> Self {
+            impl From<wp_mobile_cache::entity::FullEntity<$t_type>> for [<Full $id_type>] {
+                fn from(value: wp_mobile_cache::entity::FullEntity<$t_type>) -> Self {
                     Self {
                         entity_id: value.entity_id,
                         data: value.data,
@@ -46,10 +46,10 @@ macro_rules! wp_mobile_entity {
 
             // Entity wrapper - handle to reload data
             #[derive(uniffi::Object)]
-            pub struct $id_type(pub wp_mobile_cache::Entity<$t_type>);
+            pub struct $id_type(pub wp_mobile_cache::entity::Entity<$t_type>);
 
-            impl From<wp_mobile_cache::Entity<$t_type>> for $id_type {
-                fn from(value: wp_mobile_cache::Entity<$t_type>) -> Self {
+            impl From<wp_mobile_cache::entity::Entity<$t_type>> for $id_type {
+                fn from(value: wp_mobile_cache::entity::Entity<$t_type>) -> Self {
                     Self(value)
                 }
             }

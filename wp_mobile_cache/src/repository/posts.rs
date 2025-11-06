@@ -1,5 +1,5 @@
 use crate::{
-    FullEntity, RowId, SqliteDbError,
+    RowId, SqliteDbError,
     context::{EditContext, EmbedContext, IsContext, ViewContext},
     db_types::{
         db_site::DbSite,
@@ -13,14 +13,14 @@ use crate::{
         },
         row_ext::RowExt,
     },
+    entity::{EntityId, FullEntity},
     repository::{
         QueryExecutor, TransactionManager, term_relationships::TermRelationshipRepository,
     },
     term_relationships::DbTermRelationship,
 };
 use rusqlite::{OptionalExtension, Row};
-use std::marker::PhantomData;
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
@@ -150,7 +150,7 @@ impl<C: PostContext> PostRepository<C> {
 
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
-            let entity_id = Arc::new(crate::EntityId::new(site.clone(), C::TABLE_NAME, rowid));
+            let entity_id = Arc::new(EntityId::new(site.clone(), C::TABLE_NAME, rowid));
             FullEntity::new(entity_id, db_post)
         }))
     }
@@ -199,7 +199,7 @@ impl<C: PostContext> PostRepository<C> {
             .into_iter()
             .map(|db_post| {
                 let rowid = C::get_rowid(&db_post);
-                let entity_id = Arc::new(crate::EntityId::new(site.clone(), C::TABLE_NAME, rowid));
+                let entity_id = Arc::new(EntityId::new(site.clone(), C::TABLE_NAME, rowid));
                 FullEntity::new(entity_id, db_post)
             })
             .collect())
@@ -244,8 +244,7 @@ impl<C: PostContext> PostRepository<C> {
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
 
-            let entity_id =
-                std::sync::Arc::new(crate::EntityId::new(site.clone(), C::TABLE_NAME, rowid));
+            let entity_id = Arc::new(EntityId::new(site.clone(), C::TABLE_NAME, rowid));
 
             FullEntity::new(entity_id, db_post)
         }))

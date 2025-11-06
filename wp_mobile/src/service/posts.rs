@@ -5,7 +5,11 @@ use wp_api::{
     posts::{AnyPostWithEditContext, PostId},
 };
 use wp_mobile_cache::{
-    WpApiCache, context::EditContext, db_types::db_site::DbSite, repository::posts::PostRepository,
+    WpApiCache,
+    context::EditContext,
+    db_types::db_site::DbSite,
+    entity::{Entity, FullEntity},
+    repository::posts::PostRepository,
 };
 
 /// Service layer for post operations
@@ -36,20 +40,14 @@ impl PostService {
         cache: &WpApiCache,
         db_site: &DbSite,
         id: PostId,
-    ) -> Result<
-        Option<wp_mobile_cache::FullEntity<AnyPostWithEditContext>>,
-        wp_mobile_cache::SqliteDbError,
-    > {
+    ) -> Result<Option<FullEntity<AnyPostWithEditContext>>, wp_mobile_cache::SqliteDbError> {
         let repo = PostRepository::<EditContext>::new();
         let connection = cache.connection();
 
         repo.select_by_post_id(&*connection, db_site, id)
             .map(|opt| {
                 opt.map(|db_post_full_entity| {
-                    wp_mobile_cache::FullEntity::new(
-                        db_post_full_entity.entity_id,
-                        db_post_full_entity.data.post,
-                    )
+                    FullEntity::new(db_post_full_entity.entity_id, db_post_full_entity.data.post)
                 })
             })
             .map_err(|e| e.into())
@@ -179,7 +177,7 @@ impl PostService {
             .map(|p| p.data.row_id.0 as i64)
             .unwrap_or(0);
 
-        wp_mobile_cache::Entity::<AnyPostWithEditContext>::new(
+        Entity::<AnyPostWithEditContext>::new(
             id.0,
             Box::new(move || Self::read_post_from_db_internal(&cache, &db_site, PostId(id_val))),
             Box::new(move |hook: &wp_mobile_cache::UpdateHook| {

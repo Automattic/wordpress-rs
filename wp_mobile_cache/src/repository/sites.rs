@@ -5,6 +5,7 @@ use crate::{
         row_ext::RowExt,
         self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
     },
+    entity::{EntityId, FullEntity},
     repository::{QueryExecutor, TransactionManager},
 };
 use rusqlite::OptionalExtension;
@@ -86,7 +87,7 @@ impl SiteRepository {
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-    ) -> Result<Option<crate::FullEntity<DbSelfHostedSite>>, SqliteDbError> {
+    ) -> Result<Option<FullEntity<DbSelfHostedSite>>, SqliteDbError> {
         if site.site_type != DbSiteType::SelfHosted {
             return Ok(None);
         }
@@ -109,12 +110,12 @@ impl SiteRepository {
             .map_err(SqliteDbError::from)?;
 
         Ok(db_self_hosted_site.map(|db_self_hosted_site| {
-            let entity_id = Arc::new(crate::EntityId::new(
+            let entity_id = Arc::new(EntityId::new(
                 site.clone(),
                 Self::SELF_HOSTED_SITES_TABLE,
                 db_self_hosted_site.row_id,
             ));
-            crate::FullEntity::new(entity_id, db_self_hosted_site)
+            FullEntity::new(entity_id, db_self_hosted_site)
         }))
     }
 
@@ -126,7 +127,7 @@ impl SiteRepository {
         &self,
         executor: &impl QueryExecutor,
         url: &str,
-    ) -> Result<Option<crate::FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
+    ) -> Result<Option<FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
         // First get the self_hosted_site
         let sql = format!(
             "SELECT * FROM {} WHERE url = ?",
@@ -169,12 +170,12 @@ impl SiteRepository {
             .map_err(SqliteDbError::from)?;
 
         Ok(db_site.map(|db_site| {
-            let entity_id = Arc::new(crate::EntityId::new(
+            let entity_id = Arc::new(EntityId::new(
                 db_site.clone(),
                 Self::SELF_HOSTED_SITES_TABLE,
                 self_hosted_site.row_id,
             ));
-            crate::FullEntity::new(entity_id, (db_site, self_hosted_site))
+            FullEntity::new(entity_id, (db_site, self_hosted_site))
         }))
     }
 
