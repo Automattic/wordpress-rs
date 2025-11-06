@@ -18,66 +18,74 @@ pub use entity_error::EntityError;
 /// 2. FullEntity wrapper (e.g., FullEntityAnyPostWithEditContext) - data + EntityId
 ///
 /// The FullEntity wrapper exposes both the EntityId and the data to UniFFI clients.
+///
+/// # Usage
+/// ```ignore
+/// wp_mobile_entity!(EntityAnyPostWithEditContext, wp_api::posts::AnyPostWithEditContext);
+/// ```
+/// This generates both `EntityAnyPostWithEditContext` and `FullEntityAnyPostWithEditContext`.
 #[macro_export]
 macro_rules! wp_mobile_entity {
-    ($id_type:ident, $full_entity_type:ident, $t_type:ty) => {
-        // FullEntity wrapper - pairs data with EntityId for UniFFI
-        #[derive(uniffi::Record)]
-        pub struct $full_entity_type {
-            pub entity_id: std::sync::Arc<wp_mobile_cache::EntityId>,
-            pub data: $t_type,
-        }
+    ($id_type:ident, $t_type:ty) => {
+        paste::paste! {
+            // FullEntity wrapper - pairs data with EntityId for UniFFI
+            #[derive(uniffi::Record)]
+            pub struct [<Full $id_type>] {
+                pub entity_id: std::sync::Arc<wp_mobile_cache::EntityId>,
+                pub data: $t_type,
+            }
 
-        impl From<wp_mobile_cache::FullEntity<$t_type>> for $full_entity_type {
-            fn from(value: wp_mobile_cache::FullEntity<$t_type>) -> Self {
-                Self {
-                    entity_id: value.entity_id,
-                    data: value.data,
+            impl From<wp_mobile_cache::FullEntity<$t_type>> for [<Full $id_type>] {
+                fn from(value: wp_mobile_cache::FullEntity<$t_type>) -> Self {
+                    Self {
+                        entity_id: value.entity_id,
+                        data: value.data,
+                    }
                 }
             }
-        }
 
-        // Entity wrapper - handle to reload data
-        #[derive(uniffi::Object)]
-        pub struct $id_type(pub wp_mobile_cache::Entity<$t_type>);
+            // Entity wrapper - handle to reload data
+            #[derive(uniffi::Object)]
+            pub struct $id_type(pub wp_mobile_cache::Entity<$t_type>);
 
-        impl From<wp_mobile_cache::Entity<$t_type>> for $id_type {
-            fn from(value: wp_mobile_cache::Entity<$t_type>) -> Self {
-                Self(value)
-            }
-        }
-
-        #[uniffi::export]
-        impl $id_type {
-            /// Get the entity's ID
-            pub fn id(&self) -> i64 {
-                self.0.id()
+            impl From<wp_mobile_cache::Entity<$t_type>> for $id_type {
+                fn from(value: wp_mobile_cache::Entity<$t_type>) -> Self {
+                    Self(value)
+                }
             }
 
-            /// Load current data from cache/DB
-            ///
-            /// This is an expensive operation that reads from the database each time.
-            /// Subsequent calls may return different results if the underlying data has changed.
-            ///
-            /// Returns:
-            /// - Ok(Some(FullEntity)) if entity exists in cache (includes EntityId and data)
-            /// - Ok(None) if entity not found in cache
-            /// - Err(EntityError) if database error occurred
-            pub fn load_data(
-                &self,
-            ) -> Result<Option<$full_entity_type>, $crate::entity_error::EntityError> {
-                self.0
-                    .load_data()
-                    .map(|opt| opt.map(|full_entity| full_entity.into()))
-                    .map_err(|e| e.into())
-            }
+            #[uniffi::export]
+            impl $id_type {
+                /// Get the entity's ID
+                pub fn id(&self) -> i64 {
+                    self.0.id()
+                }
 
-            /// Check if a database update is relevant to this entity
-            ///
-            /// This method allows platform-specific observable wrappers to determine
-            /// whether they should notify observers about a database change.
-            pub fn is_relevant_update(&self, hook: &wp_mobile_cache::UpdateHook) -> bool {
-                self.0.is_relevant_update(hook)
+                /// Load current data from cache/DB
+                ///
+                /// This is an expensive operation that reads from the database each time.
+                /// Subsequent calls may return different results if the underlying data has changed.
+                ///
+                /// Returns:
+                /// - Ok(Some(FullEntity)) if entity exists in cache (includes EntityId and data)
+                /// - Ok(None) if entity not found in cache
+                /// - Err(EntityError) if database error occurred
+                pub fn load_data(
+                    &self,
+                ) -> Result<Option<[<Full $id_type>]>, $crate::entity_error::EntityError> {
+                    self.0
+                        .load_data()
+                        .map(|opt| opt.map(|full_entity| full_entity.into()))
+                        .map_err(|e| e.into())
+                }
+
+                /// Check if a database update is relevant to this entity
+                ///
+                /// This method allows platform-specific observable wrappers to determine
+                /// whether they should notify observers about a database change.
+                pub fn is_relevant_update(&self, hook: &wp_mobile_cache::UpdateHook) -> bool {
+                    self.0.is_relevant_update(hook)
+                }
             }
         }
     };
@@ -85,7 +93,6 @@ macro_rules! wp_mobile_entity {
 
 wp_mobile_entity!(
     EntityAnyPostWithEditContext,
-    FullEntityAnyPostWithEditContext,
     wp_api::posts::AnyPostWithEditContext
 );
 

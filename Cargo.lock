@@ -5307,6 +5307,7 @@ name = "wp_mobile"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "paste",
  "rstest",
  "rusqlite",
  "thiserror 2.0.17",
