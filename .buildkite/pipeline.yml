@@ -80,8 +80,8 @@ steps:
           make xcframework-sign
 
         artifact_paths:
-          - libwordpressFFI.xcframework.zip
-          - libwordpressFFI.xcframework.zip.checksum.txt
+          - target/libwordpressFFI.xcframework.zip
+          - target/libwordpressFFI.xcframework.zip.checksum.txt
           - native/swift/Sources/wordpress-api-wrapper/*.swift
         plugins: [$CI_TOOLKIT]
         agents:
