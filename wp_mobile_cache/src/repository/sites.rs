@@ -8,6 +8,7 @@ use crate::{
     repository::{QueryExecutor, TransactionManager},
 };
 use rusqlite::OptionalExtension;
+use std::sync::Arc;
 
 pub struct SiteRepository;
 
@@ -77,12 +78,15 @@ impl SiteRepository {
 
     /// Select a self-hosted site by its DbSite reference.
     ///
+    /// Returns the site data paired with its EntityId, which encapsulates the
+    /// database identity (db_site_id, table_name, rowid).
+    ///
     /// Returns None if the site doesn't exist or isn't a self-hosted site.
     pub fn select_self_hosted_site(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-    ) -> Result<Option<DbSelfHostedSite>, SqliteDbError> {
+    ) -> Result<Option<crate::FullEntity<DbSelfHostedSite>>, SqliteDbError> {
         if site.site_type != DbSiteType::SelfHosted {
             return Ok(None);
         }
@@ -93,25 +97,36 @@ impl SiteRepository {
         );
         let mut stmt = executor.prepare(&sql)?;
 
-        stmt.query_row([site.mapped_site_id], |row| {
-            Ok(DbSelfHostedSite {
-                row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
-                url: row.get_column(DbSelfHostedSiteColumn::Url)?,
-                api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
+        let db_self_hosted_site = stmt
+            .query_row([site.mapped_site_id], |row| {
+                Ok(DbSelfHostedSite {
+                    row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
+                    url: row.get_column(DbSelfHostedSiteColumn::Url)?,
+                    api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
+                })
             })
-        })
-        .optional()
-        .map_err(SqliteDbError::from)
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(db_self_hosted_site.map(|db_self_hosted_site| {
+            let entity_id = Arc::new(crate::EntityId::new(
+                site.row_id.0 as i64,
+                Self::SELF_HOSTED_SITES_TABLE.to_string(),
+                db_self_hosted_site.row_id.0 as i64,
+            ));
+            crate::FullEntity::new(entity_id, db_self_hosted_site)
+        }))
     }
 
     /// Select a self-hosted site by URL.
     ///
-    /// Returns both the DbSite and DbSelfHostedSite if found.
+    /// Returns the site data (DbSite and DbSelfHostedSite) paired with its EntityId,
+    /// which encapsulates the database identity (db_site_id, table_name, rowid).
     pub fn select_self_hosted_site_by_url(
         &self,
         executor: &impl QueryExecutor,
         url: &str,
-    ) -> Result<Option<(DbSite, DbSelfHostedSite)>, SqliteDbError> {
+    ) -> Result<Option<crate::FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
         // First get the self_hosted_site
         let sql = format!(
             "SELECT * FROM {} WHERE url = ?",
@@ -153,7 +168,14 @@ impl SiteRepository {
             .optional()
             .map_err(SqliteDbError::from)?;
 
-        Ok(db_site.map(|site| (site, self_hosted_site)))
+        Ok(db_site.map(|db_site| {
+            let entity_id = Arc::new(crate::EntityId::new(
+                db_site.row_id.0 as i64,
+                Self::SELF_HOSTED_SITES_TABLE.to_string(),
+                self_hosted_site.row_id.0 as i64,
+            ));
+            crate::FullEntity::new(entity_id, (db_site, self_hosted_site))
+        }))
     }
 
     /// Count all sites in the database.
@@ -231,7 +253,7 @@ impl SiteRepository {
         let site_data = self.select_self_hosted_site_by_url(transaction_manager, url)?;
 
         match site_data {
-            Some((db_site, _)) => self.delete_site(transaction_manager, &db_site),
+            Some(full_entity) => self.delete_site(transaction_manager, &full_entity.data.0),
             None => Ok(false),
         }
     }
@@ -377,7 +399,7 @@ mod tests {
             .expect("Failed to select site")
             .expect("Site should exist");
 
-        assert_eq!(retrieved, original_db_self_hosted_site);
+        assert_eq!(retrieved.data, original_db_self_hosted_site);
     }
 
     #[rstest]
@@ -431,14 +453,14 @@ mod tests {
             .expect("Failed to upsert site");
 
         // Select by URL
-        let (retrieved_db_site, retrieved_db_self_hosted_site) = repo
+        let retrieved = repo
             .select_self_hosted_site_by_url(&test_conn, &site.url)
             .expect("Failed to select site")
             .expect("Site should exist");
 
         // Verify both structs match
-        assert_eq!(retrieved_db_site, original_db_site);
-        assert_eq!(retrieved_db_self_hosted_site, original_db_self_hosted_site);
+        assert_eq!(retrieved.data.0, original_db_site);
+        assert_eq!(retrieved.data.1, original_db_self_hosted_site);
     }
 
     #[rstest]
@@ -590,7 +612,7 @@ mod tests {
             .expect("Failed to select site by URL");
         assert!(retrieved2.is_some(), "Site2 should still exist");
         assert_eq!(
-            retrieved2.expect("Site2 should exist").0.row_id,
+            retrieved2.expect("Site2 should exist").data.0.row_id,
             db_site2.row_id
         );
     }
