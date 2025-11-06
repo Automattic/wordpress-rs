@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 
 pub mod context;
 pub mod db_types;
+pub mod entity_id;
 pub mod repository;
 pub mod term_relationships;
 
@@ -295,6 +296,35 @@ pub trait DatabaseDelegate: Send + Sync {
 pub struct User {
     id: i64,
     name: String,
+}
+
+// Re-export EntityId from entity_id module
+pub use entity_id::EntityId;
+
+/// Wrapper that pairs cached data with its database identity
+///
+/// When fetching data from the cache, we return both the data and
+/// an EntityId that can be used to:
+/// - Create observable entities without additional database queries
+/// - Identify this specific entity in update notifications
+/// - Compare entities for identity equality
+///
+/// This type is generic over the data type T, which is typically
+/// a WordPress API type like AnyPostWithEditContext.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FullEntity<T> {
+    /// The database identity of this entity
+    pub entity_id: Arc<EntityId>,
+
+    /// The cached data
+    pub data: T,
+}
+
+impl<T> FullEntity<T> {
+    /// Create a new FullEntity pairing data with its identity
+    pub fn new(entity_id: Arc<EntityId>, data: T) -> Self {
+        Self { entity_id, data }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]

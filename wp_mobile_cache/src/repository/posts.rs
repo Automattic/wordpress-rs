@@ -48,6 +48,15 @@ pub trait PostContext: IsContext {
     fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>;
+
+    /// Extract the rowid from DbPost (for EntityId creation)
+    fn get_rowid(db_post: &Self::DbPost) -> RowId;
+
+    /// Extract the db_site_id from DbPost (for EntityId creation)
+    fn get_db_site_id(db_post: &Self::DbPost) -> RowId;
+
+    /// Extract the post data from DbPost (for FullEntity creation)
+    fn get_post(db_post: Self::DbPost) -> Self::Post;
 }
 
 /// Extract categories and tags from term relationships.
@@ -215,6 +224,40 @@ impl<C: PostContext> PostRepository<C> {
         .map_err(SqliteDbError::from)
     }
 
+    /// Select a post by its WordPress post ID for a given site (returns FullEntity with EntityId).
+    ///
+    /// This is a prototype method that returns the post data along with its EntityId,
+    /// which encapsulates the database identity (site_id, table_name, rowid).
+    ///
+    /// Returns `Ok(None)` if no post with the given ID exists for this site.
+    /// Automatically populates categories and tags from term_relationships table.
+    pub fn select_by_post_id_with_entity_id(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        post_id: PostId,
+    ) -> Result<Option<crate::FullEntity<C::Post>>, SqliteDbError> {
+        // Get the DbPost which includes rowid, db_site_id, and post data
+        let db_post = self.select_by_post_id(executor, site, post_id)?;
+
+        Ok(db_post.map(|db_post| {
+            // Extract metadata using trait methods
+            let rowid = C::get_rowid(&db_post);
+            let db_site_id = C::get_db_site_id(&db_post);
+
+            // Create EntityId from database metadata
+            let entity_id = std::sync::Arc::new(crate::EntityId::new(
+                db_site_id.0 as i64,
+                Self::table_name(),
+                rowid.0 as i64,
+            ));
+
+            // Extract post data and wrap with entity_id
+            let post = C::get_post(db_post);
+            crate::FullEntity::new(entity_id, post)
+        }))
+    }
+
     /// Delete a post by its WordPress post ID for a given site.
     ///
     /// Returns the number of rows deleted (0 or 1).
@@ -342,6 +385,18 @@ impl PostContext for EditContext {
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
     }
+
+    fn get_rowid(db_post: &Self::DbPost) -> RowId {
+        db_post.row_id
+    }
+
+    fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
+        db_post.db_site_id
+    }
+
+    fn get_post(db_post: Self::DbPost) -> Self::Post {
+        db_post.post
+    }
 }
 
 impl PostContext for ViewContext {
@@ -418,6 +473,18 @@ impl PostContext for ViewContext {
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
     }
+
+    fn get_rowid(db_post: &Self::DbPost) -> RowId {
+        db_post.row_id
+    }
+
+    fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
+        db_post.db_site_id
+    }
+
+    fn get_post(db_post: Self::DbPost) -> Self::Post {
+        db_post.post
+    }
 }
 
 impl PostContext for EmbedContext {
@@ -467,6 +534,18 @@ impl PostContext for EmbedContext {
             post,
             last_fetched_at: row.get_column(LastFetchedAt)?,
         })
+    }
+
+    fn get_rowid(db_post: &Self::DbPost) -> RowId {
+        db_post.row_id
+    }
+
+    fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
+        db_post.db_site_id
+    }
+
+    fn get_post(db_post: Self::DbPost) -> Self::Post {
+        db_post.post
     }
 }
 
