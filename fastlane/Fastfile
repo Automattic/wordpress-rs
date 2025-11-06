@@ -24,6 +24,20 @@ PROJECT_NAME = 'wordpress-rs'
 # GlotPress configuration
 GLOTPRESS_PROJECT_BASE_URL = 'https://translate.wordpress.com/projects/mobile/wordpress-rs'
 
+# Code Signing
+APPLE_TEAM_ID = 'PZYM8XX95Q'
+
+ASC_API_KEY_ENV_VARS = %w[
+  APP_STORE_CONNECT_API_KEY_KEY_ID
+  APP_STORE_CONNECT_API_KEY_ISSUER_ID
+  APP_STORE_CONNECT_API_KEY_KEY
+].freeze
+
+CODE_SIGNING_STORAGE_ENV_VARS = %w[
+  MATCH_S3_ACCESS_KEY
+  MATCH_S3_SECRET_ACCESS_KEY
+].freeze
+
 # Supported locales mapping between GlotPress and project locale codes
 # This list combines locales supported in the iOS and Android apps
 SUPPORTED_LOCALES = [
@@ -81,6 +95,11 @@ SUPPORTED_LOCALES = [
   { glotpress: 'zh-tw', project: 'zh-TW'  }
 ].freeze
 
+before_all do
+  # Fixes issues with keychain in CI
+  setup_ci
+end
+
 lane :release do |options|
   version = options[:version] || UI.user_error!('version is required')
   lane_context[LANE_VALUE_VERSION] = version
@@ -90,7 +109,7 @@ lane :release do |options|
 
   validate
   update_swift_package
-  publish_github_release
+  publish_release_to_github
   publish_to_s3
 end
 
@@ -124,7 +143,7 @@ lane :update_swift_package do
   File.open(file_path, 'w') { |file| file.puts lines }
 end
 
-lane :publish_github_release do
+lane :publish_release_to_github do
   version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
   github_token = lane_context[LANE_VALUE_GITHUB_TOKEN] || UI.user_error!('Missing github token lane context')
 
@@ -232,7 +251,7 @@ lane :download_translations do |commit_changes: false|
     updated_fluent_files = []
 
     if downloaded_files.empty?
-      UI.message("No .po files were downloaded from GlotPress")
+      UI.message('No .po files were downloaded from GlotPress')
       next
     end
 
@@ -396,6 +415,22 @@ lane :generate_fluent_file_from_po do |file_path:|
   fluent_file_path
 end
 
+desc 'Downloads all code signing certificates'
+lane :set_up_signing do |readonly: true|
+  set_up_signing_development(readonly: readonly)
+  set_up_signing_release(readonly: readonly)
+end
+
+desc 'Download the development signing certificates to this machine'
+lane :set_up_signing_development do |readonly: true|
+  set_up_certificate_in_keychain(type: 'development', readonly: readonly)
+end
+
+desc 'Download the release (distribution) signing certificates to this machine'
+lane :set_up_signing_release do |readonly: true|
+  set_up_certificate_in_keychain(type: 'appstore', readonly: readonly)
+end
+
 # Utils
 
 def xcframework_checksum
@@ -462,4 +497,45 @@ def only_date_headers_changed?(file_path)
   end
 
   changed_lines.all? { |l| l.include?('"POT-Creation-Date:') || l.include?('"PO-Revision-Date:') }
+end
+
+# Use this to ensure all env vars a lane requires are set.
+#
+# The best place to call this is at the start of a lane, to fail early.
+def require_env_vars!(*keys)
+  keys.each { |key| get_required_env!(key) }
+end
+
+# Use this instead of getting values from `ENV` directly. It will throw an error if the requested value is missing.
+def get_required_env!(key)
+  return ENV.fetch(key) if ENV.key?(key)
+
+  UI.user_error!("Environment variable `#{key}` is not set.")
+end
+
+def set_up_certificate_in_keychain(type:, readonly:)
+  require_env_vars!(*ASC_API_KEY_ENV_VARS, *CODE_SIGNING_STORAGE_ENV_VARS)
+
+  # This will fetch the certificate and provisioning profile for the given type from remote storage.
+  # It will then set them up in the local keychain, where 'codesign' looks for identities.
+  #
+  # Notice we do not need the provisioning profile because we sign with 'codesign' elsewhere.
+  # However, there is no other way to set up the certificate in the keychain.
+  # Fastlane offers a tool called cert, but it only downloads certificates.
+  sync_code_signing(
+    team_id: APPLE_TEAM_ID,
+    api_key: app_store_connect_api_key,
+    type: type,
+    storage_mode: 's3',
+    s3_region: 'us-east-2',
+    s3_bucket: 'a8c-fastlane-match',
+    readonly: readonly,
+    # We need to provide an app identifier, but remember we only care about the certificate that gets downloaded.
+    # The identifier is used to find a provisioning profile, but we don't care about it.
+    #
+    # Similar rationale for the platform argument,
+    # with the addition that it's required to identify the existing provisioning profile for the given app id.
+    app_identifier: 'com.automattic.hostmgr',
+    platform: 'macos'
+  )
 end
