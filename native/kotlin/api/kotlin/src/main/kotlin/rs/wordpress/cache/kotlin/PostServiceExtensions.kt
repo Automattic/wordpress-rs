@@ -1,5 +1,6 @@
 package rs.wordpress.cache.kotlin
 
+import uniffi.wp_mobile.FullEntityAnyPostWithEditContext
 import uniffi.wp_mobile.PostService
 
 /**
@@ -21,9 +22,14 @@ import uniffi.wp_mobile.PostService
  * }
  * ```
  */
-fun PostService.getObservableEntityWithEditContext(id: Long): ObservableEntity {
+fun PostService.getObservableEntityWithEditContext(id: Long): ObservableEntity<FullEntityAnyPostWithEditContext> {
     val entity = this.getEntityWithEditContext(id)
-    val observableEntity = ObservableEntity(entity)
+    val observableEntity = ObservableEntity(
+        loadDataFn = { entity.loadData() },
+        loadDataAsyncFn = { entity.loadDataAsync() },
+        idFn = { entity.id() },
+        isRelevantUpdateFn = { hook -> entity.isRelevantUpdate(hook) }
+    )
     DatabaseChangeNotifier.register(observableEntity)
     return observableEntity
 }

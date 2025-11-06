@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArraySet
  * the Entity's is_relevant_update closure handles all the matching logic in Rust.
  */
 object DatabaseChangeNotifier : DatabaseDelegate {
-    private val observableEntities = CopyOnWriteArraySet<ObservableEntity>()
+    private val observableEntities = CopyOnWriteArraySet<ObservableEntity<*>>()
 
     /**
      * Register an ObservableEntity to receive database change notifications.
@@ -23,14 +23,14 @@ object DatabaseChangeNotifier : DatabaseDelegate {
      * The entity will be notified of all database updates and can decide internally
      * whether the update is relevant to it.
      */
-    fun register(entity: ObservableEntity) {
+    fun register(entity: ObservableEntity<*>) {
         observableEntities.add(entity)
     }
 
     /**
      * Unregister an ObservableEntity from receiving database change notifications.
      */
-    fun unregister(entity: ObservableEntity) {
+    fun unregister(entity: ObservableEntity<*>) {
         observableEntities.remove(entity)
     }
 

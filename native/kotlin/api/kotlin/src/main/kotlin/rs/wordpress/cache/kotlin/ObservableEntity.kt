@@ -1,6 +1,5 @@
 package rs.wordpress.cache.kotlin
 
-import uniffi.wp_mobile.EntityAnyPostWithEditContext
 import uniffi.wp_mobile_cache.UpdateHook
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -10,9 +9,16 @@ import java.util.concurrent.CopyOnWriteArrayList
  * This class bridges Rust entity updates to Kotlin observer pattern without exposing
  * database implementation details (table names, rowids, etc).
  *
+ * Generic over the data type D (e.g., FullEntityAnyPostWithEditContext).
+ *
  * Usage:
  * ```
- * val observableEntity = ObservableEntity(entity)
+ * val observableEntity = ObservableEntity(
+ *     loadDataFn = { entity.loadData() },
+ *     loadDataAsyncFn = { entity.loadDataAsync() },
+ *     idFn = { entity.id() },
+ *     isRelevantUpdateFn = { hook -> entity.isRelevantUpdate(hook) }
+ * )
  * observableEntity.addObserver {
  *     // React to changes
  *     val newData = observableEntity.loadData()
@@ -20,8 +26,11 @@ import java.util.concurrent.CopyOnWriteArrayList
  * DatabaseChangeNotifier.register(observableEntity)
  * ```
  */
-class ObservableEntity(
-    private val entity: EntityAnyPostWithEditContext
+class ObservableEntity<D>(
+    private val loadDataFn: () -> D?,
+    private val loadDataAsyncFn: suspend () -> D?,
+    private val idFn: () -> Long,
+    private val isRelevantUpdateFn: (UpdateHook) -> Boolean
 ) {
     private val observers = CopyOnWriteArrayList<() -> Unit>()
 
@@ -48,7 +57,7 @@ class ObservableEntity(
      *
      * This is an expensive operation that reads from the database each time.
      */
-    fun loadData() = entity.loadData()
+    fun loadData(): D? = loadDataFn()
 
     /**
      * Load current data from cache/DB (async version).
@@ -56,12 +65,12 @@ class ObservableEntity(
      * This is an expensive operation that reads from the database each time.
      * Use this version to avoid blocking the caller.
      */
-    suspend fun loadDataAsync() = entity.loadDataAsync()
+    suspend fun loadDataAsync(): D? = loadDataAsyncFn()
 
     /**
      * Get the entity's ID.
      */
-    fun id() = entity.id()
+    fun id(): Long = idFn()
 
     /**
      * Internal method called by DatabaseChangeNotifier when a database update occurs.
@@ -69,7 +78,7 @@ class ObservableEntity(
      * Checks if the update is relevant to this entity, and if so, notifies all observers.
      */
     internal fun notifyIfRelevant(hook: UpdateHook) {
-        if (entity.isRelevantUpdate(hook)) {
+        if (isRelevantUpdateFn(hook)) {
             observers.forEach { it() }
         }
     }
