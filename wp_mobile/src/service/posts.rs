@@ -231,8 +231,8 @@ mod tests {
         let result = entity.load_data().expect("Database read should succeed");
 
         // Assert: Post was found and matches what we inserted
-        let retrieved_post = result.expect("Post should be found in cache");
-        test_post.assert_matches(&retrieved_post);
+        let full_entity = result.expect("Post should be found in cache");
+        test_post.assert_matches(&full_entity.data);
     }
 
     #[rstest]

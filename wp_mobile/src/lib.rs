@@ -13,11 +13,31 @@ pub use entity_error::EntityError;
 
 /// Macro to create UniFFI-compatible entity wrappers
 ///
-/// This macro wraps wp_mobile_cache::Entity<T> with error conversion for UniFFI compatibility.
-/// The wrapped type exposes id(), load_data(), and is_relevant_update() methods.
+/// This macro generates two types:
+/// 1. Entity wrapper (e.g., EntityAnyPostWithEditContext) - handle to reload data
+/// 2. FullEntity wrapper (e.g., FullEntityAnyPostWithEditContext) - data + EntityId
+///
+/// The FullEntity wrapper exposes both the EntityId and the data to UniFFI clients.
 #[macro_export]
 macro_rules! wp_mobile_entity {
-    ($id_type:ident, $t_type:ty) => {
+    ($id_type:ident, $full_entity_type:ident, $t_type:ty) => {
+        // FullEntity wrapper - pairs data with EntityId for UniFFI
+        #[derive(uniffi::Record)]
+        pub struct $full_entity_type {
+            pub entity_id: std::sync::Arc<wp_mobile_cache::EntityId>,
+            pub data: $t_type,
+        }
+
+        impl From<wp_mobile_cache::FullEntity<$t_type>> for $full_entity_type {
+            fn from(value: wp_mobile_cache::FullEntity<$t_type>) -> Self {
+                Self {
+                    entity_id: value.entity_id,
+                    data: value.data,
+                }
+            }
+        }
+
+        // Entity wrapper - handle to reload data
         #[derive(uniffi::Object)]
         pub struct $id_type(pub wp_mobile_cache::Entity<$t_type>);
 
@@ -40,13 +60,15 @@ macro_rules! wp_mobile_entity {
             /// Subsequent calls may return different results if the underlying data has changed.
             ///
             /// Returns:
-            /// - Ok(Some(T)) if entity exists in cache
+            /// - Ok(Some(FullEntity)) if entity exists in cache (includes EntityId and data)
             /// - Ok(None) if entity not found in cache
             /// - Err(EntityError) if database error occurred
-            pub fn load_data(&self) -> Result<Option<$t_type>, $crate::entity_error::EntityError> {
+            pub fn load_data(
+                &self,
+            ) -> Result<Option<$full_entity_type>, $crate::entity_error::EntityError> {
                 self.0
                     .load_data()
-                    .map(|opt| opt.map(|full_entity| full_entity.data))
+                    .map(|opt| opt.map(|full_entity| full_entity.into()))
                     .map_err(|e| e.into())
             }
 
@@ -63,6 +85,7 @@ macro_rules! wp_mobile_entity {
 
 wp_mobile_entity!(
     EntityAnyPostWithEditContext,
+    FullEntityAnyPostWithEditContext,
     wp_api::posts::AnyPostWithEditContext
 );
 
