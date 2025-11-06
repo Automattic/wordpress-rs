@@ -133,11 +133,11 @@ xcframework: xcframework-all
 endif
 
 xcframework-package: xcframework-all
-	rm -rf libwordpressFFI.xcframework.zip
-	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ libwordpressFFI.xcframework.zip
+	rm -rf target/libwordpressFFI.xcframework.zip
+	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ target/libwordpressFFI.xcframework.zip
 
 xcframework-package-checksum:
-	swift package compute-checksum libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
+	swift package compute-checksum target/libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
 
 xcframework-sign:
 	codesign --timestamp -v --sign "${certificate_name_release}" target/libwordpressFFI.xcframework
