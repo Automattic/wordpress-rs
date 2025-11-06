@@ -63,8 +63,8 @@ fn test_same_post_id_can_exist_in_different_sites(mut test_ctx: TestContext) {
         .expect("Failed to select post by post_id")
         .expect("Post should exist in site 2");
 
-    assert_eq!(retrieved1.post.title.rendered, "Site 1 Post");
-    assert_eq!(retrieved2.post.title.rendered, "Site 2 Post");
+    assert_eq!(retrieved1.data.post.title.rendered, "Site 1 Post");
+    assert_eq!(retrieved2.data.post.title.rendered, "Site 2 Post");
 }
 
 #[rstest]

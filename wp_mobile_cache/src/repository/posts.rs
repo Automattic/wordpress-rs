@@ -1,5 +1,5 @@
 use crate::{
-    RowId, SqliteDbError,
+    FullEntity, RowId, SqliteDbError,
     context::{EditContext, EmbedContext, IsContext, ViewContext},
     db_types::{
         db_site::DbSite,
@@ -20,6 +20,7 @@ use crate::{
 };
 use rusqlite::{OptionalExtension, Row};
 use std::marker::PhantomData;
+use std::sync::Arc;
 use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
@@ -54,9 +55,6 @@ pub trait PostContext: IsContext {
 
     /// Extract the db_site_id from DbPost (for EntityId creation)
     fn get_db_site_id(db_post: &Self::DbPost) -> RowId;
-
-    /// Extract the post data from DbPost (for FullEntity creation)
-    fn get_post(db_post: Self::DbPost) -> Self::Post;
 }
 
 /// Extract categories and tags from term relationships.
@@ -117,7 +115,7 @@ impl<C: PostContext> PostRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
         rowid: RowId,
-    ) -> Result<Option<C::DbPost>, SqliteDbError> {
+    ) -> Result<Option<FullEntity<C::DbPost>>, SqliteDbError> {
         // First get the post.id (WordPress ID) from the rowid
         let sql = format!(
             "SELECT id FROM {} WHERE db_site_id = ? AND rowid = ?",
@@ -138,16 +136,28 @@ impl<C: PostContext> PostRepository<C> {
             Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        stmt.query_row([site.row_id, rowid], |row| {
-            C::from_row_with_terms(row, || {
-                let term_repo = TermRelationshipRepository;
-                let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id])?;
-                Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
+        let db_post = stmt
+            .query_row([site.row_id, rowid], |row| {
+                C::from_row_with_terms(row, || {
+                    let term_repo = TermRelationshipRepository;
+                    let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id])?;
+                    Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
+                })
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
             })
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })
-        .optional()
-        .map_err(SqliteDbError::from)
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(db_post.map(|db_post| {
+            let rowid = C::get_rowid(&db_post);
+            let db_site_id = C::get_db_site_id(&db_post);
+            let entity_id = Arc::new(crate::EntityId::new(
+                db_site_id.0 as i64,
+                Self::table_name(),
+                rowid.0 as i64,
+            ));
+            FullEntity::new(entity_id, db_post)
+        }))
     }
 
     /// Select all posts for a given site (returns wrappers with rowids).
@@ -158,7 +168,7 @@ impl<C: PostContext> PostRepository<C> {
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-    ) -> Result<Vec<C::DbPost>, SqliteDbError> {
+    ) -> Result<Vec<FullEntity<C::DbPost>>, SqliteDbError> {
         // First pass: extract post IDs (WordPress IDs, not SQLite rowids)
         let sql = format!("SELECT id FROM {} WHERE db_site_id = ?", Self::table_name());
         let mut stmt = executor.prepare(&sql)?;
@@ -190,10 +200,25 @@ impl<C: PostContext> PostRepository<C> {
             .collect::<Result<Vec<_>, _>>()
             .map_err(SqliteDbError::from)?;
 
-        Ok(posts)
+        Ok(posts
+            .into_iter()
+            .map(|db_post| {
+                let rowid = C::get_rowid(&db_post);
+                let db_site_id = C::get_db_site_id(&db_post);
+                let entity_id = Arc::new(crate::EntityId::new(
+                    db_site_id.0 as i64,
+                    Self::table_name(),
+                    rowid.0 as i64,
+                ));
+                FullEntity::new(entity_id, db_post)
+            })
+            .collect())
     }
 
-    /// Select a post by its WordPress post ID for a given site (returns wrapper with rowid).
+    /// Select a post by its WordPress post ID for a given site.
+    ///
+    /// Returns the post data paired with its EntityId, which encapsulates the
+    /// database identity (site_id, table_name, rowid).
     ///
     /// This is different from `select_by_rowid` which uses the SQLite rowid.
     /// The post_id is the WordPress post ID from the REST API.
@@ -205,56 +230,38 @@ impl<C: PostContext> PostRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_id: PostId,
-    ) -> Result<Option<C::DbPost>, SqliteDbError> {
+    ) -> Result<Option<FullEntity<C::DbPost>>, SqliteDbError> {
         // Query and construct post with lazy term relationship loading
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND id = ?",
             Self::table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        stmt.query_row(rusqlite::params![site.row_id, post_id.0], |row| {
-            C::from_row_with_terms(row, || {
-                let term_repo = TermRelationshipRepository;
-                let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
-                Ok(terms_map.get(&post_id.0).cloned().unwrap_or_default())
+        let db_post = stmt
+            .query_row(rusqlite::params![site.row_id, post_id.0], |row| {
+                C::from_row_with_terms(row, || {
+                    let term_repo = TermRelationshipRepository;
+                    let terms_map =
+                        term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
+                    Ok(terms_map.get(&post_id.0).cloned().unwrap_or_default())
+                })
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
             })
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-        })
-        .optional()
-        .map_err(SqliteDbError::from)
-    }
+            .optional()
+            .map_err(SqliteDbError::from)?;
 
-    /// Select a post by its WordPress post ID for a given site (returns FullEntity with EntityId).
-    ///
-    /// This is a prototype method that returns the post data along with its EntityId,
-    /// which encapsulates the database identity (site_id, table_name, rowid).
-    ///
-    /// Returns `Ok(None)` if no post with the given ID exists for this site.
-    /// Automatically populates categories and tags from term_relationships table.
-    pub fn select_by_post_id_with_entity_id(
-        &self,
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        post_id: PostId,
-    ) -> Result<Option<crate::FullEntity<C::Post>>, SqliteDbError> {
-        // Get the DbPost which includes rowid, db_site_id, and post data
-        let db_post = self.select_by_post_id(executor, site, post_id)?;
-
+        // Wrap in FullEntity with EntityId
         Ok(db_post.map(|db_post| {
-            // Extract metadata using trait methods
             let rowid = C::get_rowid(&db_post);
             let db_site_id = C::get_db_site_id(&db_post);
 
-            // Create EntityId from database metadata
             let entity_id = std::sync::Arc::new(crate::EntityId::new(
                 db_site_id.0 as i64,
                 Self::table_name(),
                 rowid.0 as i64,
             ));
 
-            // Extract post data and wrap with entity_id
-            let post = C::get_post(db_post);
-            crate::FullEntity::new(entity_id, post)
+            FullEntity::new(entity_id, db_post)
         }))
     }
 
@@ -393,10 +400,6 @@ impl PostContext for EditContext {
     fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
         db_post.db_site_id
     }
-
-    fn get_post(db_post: Self::DbPost) -> Self::Post {
-        db_post.post
-    }
 }
 
 impl PostContext for ViewContext {
@@ -481,10 +484,6 @@ impl PostContext for ViewContext {
     fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
         db_post.db_site_id
     }
-
-    fn get_post(db_post: Self::DbPost) -> Self::Post {
-        db_post.post
-    }
 }
 
 impl PostContext for EmbedContext {
@@ -542,10 +541,6 @@ impl PostContext for EmbedContext {
 
     fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
         db_post.db_site_id
-    }
-
-    fn get_post(db_post: Self::DbPost) -> Self::Post {
-        db_post.post
     }
 }
 
@@ -1066,10 +1061,10 @@ mod tests {
             .expect("Post should exist");
 
         // Verify round-trip
-        assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
-        assert_recent_timestamp(&retrieved.last_fetched_at);
-        assert_eq!(retrieved.post, original_post);
+        assert_eq!(retrieved.data.row_id, rowid);
+        assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
+        assert_recent_timestamp(&retrieved.data.last_fetched_at);
+        assert_eq!(retrieved.data.post, original_post);
     }
 
     #[rstest]
@@ -1097,7 +1092,7 @@ mod tests {
             .expect("Failed to select post by rowid")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.post.status, post_status);
+        assert_eq!(retrieved.data.post.status, post_status);
     }
 
     #[rstest]
@@ -1117,8 +1112,8 @@ mod tests {
             .expect("Failed to select post by rowid")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.post.categories, None);
-        assert_eq!(retrieved.post.tags, None);
+        assert_eq!(retrieved.data.post.categories, None);
+        assert_eq!(retrieved.data.post.tags, None);
     }
 
     #[rstest]
@@ -1138,9 +1133,9 @@ mod tests {
             .expect("Failed to select")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
-        assert_eq!(retrieved.post, post);
+        assert_eq!(retrieved.data.row_id, rowid);
+        assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
+        assert_eq!(retrieved.data.post, post);
     }
 
     #[rstest]
@@ -1160,9 +1155,9 @@ mod tests {
             .expect("Failed to select by post_id")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.post.id, PostId(42));
-        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
-        assert_eq!(retrieved.post, post);
+        assert_eq!(retrieved.data.post.id, PostId(42));
+        assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
+        assert_eq!(retrieved.data.post, post);
     }
 
     #[rstest]
@@ -1348,9 +1343,9 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
             .expect("Failed to select post by post_id")
             .expect("Post should exist after insert");
-        assert_eq!(retrieved.row_id, rowid);
-        assert_eq!(retrieved.db_site_id, test_ctx.site.row_id);
-        assert_eq!(retrieved.post.status, PostStatus::Draft);
+        assert_eq!(retrieved.data.row_id, rowid);
+        assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
+        assert_eq!(retrieved.data.post.status, PostStatus::Draft);
     }
 
     #[rstest]
@@ -1388,8 +1383,8 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .expect("Failed to select post by post_id")
             .expect("Post should exist after update");
-        assert_eq!(retrieved.post.status, PostStatus::Publish);
-        assert_eq!(retrieved.post.slug, "updated-slug");
+        assert_eq!(retrieved.data.post.status, PostStatus::Publish);
+        assert_eq!(retrieved.data.post.slug, "updated-slug");
 
         // Verify only one post exists with this ID
         assert_eq!(
@@ -1421,12 +1416,13 @@ mod tests {
             .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
             .expect("Failed to select post by rowid")
             .expect("Post should exist");
-        assert_eq!(retrieved.post.id, PostId(300));
+        assert_eq!(retrieved.data.post.id, PostId(300));
 
         // Verify categories were inserted
-        assert_eq!(retrieved.post.categories.as_ref().unwrap().len(), 2);
+        assert_eq!(retrieved.data.post.categories.as_ref().unwrap().len(), 2);
         assert!(
             retrieved
+                .data
                 .post
                 .categories
                 .as_ref()
@@ -1435,6 +1431,7 @@ mod tests {
         );
         assert!(
             retrieved
+                .data
                 .post
                 .categories
                 .as_ref()
@@ -1443,9 +1440,10 @@ mod tests {
         );
 
         // Verify tags were inserted
-        assert_eq!(retrieved.post.tags.as_ref().unwrap().len(), 2);
+        assert_eq!(retrieved.data.post.tags.as_ref().unwrap().len(), 2);
         assert!(
             retrieved
+                .data
                 .post
                 .tags
                 .as_ref()
@@ -1454,6 +1452,7 @@ mod tests {
         );
         assert!(
             retrieved
+                .data
                 .post
                 .tags
                 .as_ref()
@@ -1500,9 +1499,10 @@ mod tests {
             .expect("Post should exist");
 
         // Categories: should have 1, 3 (not 2)
-        assert_eq!(retrieved.post.categories.as_ref().unwrap().len(), 2);
+        assert_eq!(retrieved.data.post.categories.as_ref().unwrap().len(), 2);
         assert!(
             retrieved
+                .data
                 .post
                 .categories
                 .as_ref()
@@ -1511,6 +1511,7 @@ mod tests {
         );
         assert!(
             retrieved
+                .data
                 .post
                 .categories
                 .as_ref()
@@ -1519,6 +1520,7 @@ mod tests {
         );
         assert!(
             !retrieved
+                .data
                 .post
                 .categories
                 .as_ref()
@@ -1527,9 +1529,9 @@ mod tests {
         );
 
         // Tags: should only have 10 (not 20, 30)
-        assert_eq!(retrieved.post.tags.as_ref().unwrap().len(), 1);
+        assert_eq!(retrieved.data.post.tags.as_ref().unwrap().len(), 1);
         assert_eq!(
-            retrieved.post.tags.as_ref().unwrap()[0],
+            retrieved.data.post.tags.as_ref().unwrap()[0],
             wp_api::terms::TermId(10)
         );
     }
@@ -1598,7 +1600,7 @@ mod tests {
             .expect("Failed to select post by rowid")
             .expect("Post should exist");
         assert_eq!(
-            retrieved.post.categories,
+            retrieved.data.post.categories,
             Some(vec![wp_api::terms::TermId(5)])
         );
     }
@@ -1621,7 +1623,7 @@ mod tests {
             .expect("Post should exist");
 
         // Validate timestamp is recent and valid
-        assert_recent_timestamp(&retrieved.last_fetched_at);
+        assert_recent_timestamp(&retrieved.data.last_fetched_at);
     }
 
     #[rstest]
@@ -1641,6 +1643,7 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .expect("Failed to select post by post_id")
             .expect("Post should exist")
+            .data
             .last_fetched_at
             .clone();
 
@@ -1661,6 +1664,7 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .expect("Failed to select post by post_id")
             .expect("Post should exist")
+            .data
             .last_fetched_at;
 
         // last_fetched_at should be updated (different)

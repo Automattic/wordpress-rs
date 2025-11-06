@@ -309,8 +309,7 @@ pub use entity_id::EntityId;
 /// - Identify this specific entity in update notifications
 /// - Compare entities for identity equality
 ///
-/// This type is generic over the data type T, which is typically
-/// a WordPress API type like AnyPostWithEditContext.
+/// This type is generic over the data type T
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FullEntity<T> {
     /// The database identity of this entity
