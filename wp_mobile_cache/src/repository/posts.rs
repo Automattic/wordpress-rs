@@ -52,9 +52,6 @@ pub trait PostContext: IsContext {
 
     /// Extract the rowid from DbPost (for EntityId creation)
     fn get_rowid(db_post: &Self::DbPost) -> RowId;
-
-    /// Extract the db_site_id from DbPost (for EntityId creation)
-    fn get_db_site_id(db_post: &Self::DbPost) -> RowId;
 }
 
 /// Extract categories and tags from term relationships.
@@ -150,11 +147,10 @@ impl<C: PostContext> PostRepository<C> {
 
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
-            let db_site_id = C::get_db_site_id(&db_post);
             let entity_id = Arc::new(crate::EntityId::new(
-                db_site_id.0 as i64,
+                site.clone(),
                 Self::table_name(),
-                rowid.0 as i64,
+                rowid,
             ));
             FullEntity::new(entity_id, db_post)
         }))
@@ -204,11 +200,10 @@ impl<C: PostContext> PostRepository<C> {
             .into_iter()
             .map(|db_post| {
                 let rowid = C::get_rowid(&db_post);
-                let db_site_id = C::get_db_site_id(&db_post);
                 let entity_id = Arc::new(crate::EntityId::new(
-                    db_site_id.0 as i64,
+                    site.clone(),
                     Self::table_name(),
-                    rowid.0 as i64,
+                    rowid,
                 ));
                 FullEntity::new(entity_id, db_post)
             })
@@ -253,12 +248,11 @@ impl<C: PostContext> PostRepository<C> {
         // Wrap in FullEntity with EntityId
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
-            let db_site_id = C::get_db_site_id(&db_post);
 
             let entity_id = std::sync::Arc::new(crate::EntityId::new(
-                db_site_id.0 as i64,
+                site.clone(),
                 Self::table_name(),
-                rowid.0 as i64,
+                rowid,
             ));
 
             FullEntity::new(entity_id, db_post)
@@ -396,10 +390,6 @@ impl PostContext for EditContext {
     fn get_rowid(db_post: &Self::DbPost) -> RowId {
         db_post.row_id
     }
-
-    fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
-        db_post.db_site_id
-    }
 }
 
 impl PostContext for ViewContext {
@@ -480,10 +470,6 @@ impl PostContext for ViewContext {
     fn get_rowid(db_post: &Self::DbPost) -> RowId {
         db_post.row_id
     }
-
-    fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
-        db_post.db_site_id
-    }
 }
 
 impl PostContext for EmbedContext {
@@ -537,10 +523,6 @@ impl PostContext for EmbedContext {
 
     fn get_rowid(db_post: &Self::DbPost) -> RowId {
         db_post.row_id
-    }
-
-    fn get_db_site_id(db_post: &Self::DbPost) -> RowId {
-        db_post.db_site_id
     }
 }
 
