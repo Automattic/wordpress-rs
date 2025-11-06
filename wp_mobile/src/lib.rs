@@ -44,7 +44,10 @@ macro_rules! wp_mobile_entity {
             /// - Ok(None) if entity not found in cache
             /// - Err(EntityError) if database error occurred
             pub fn load_data(&self) -> Result<Option<$t_type>, $crate::entity_error::EntityError> {
-                self.0.load_data().map_err(|e| e.into())
+                self.0
+                    .load_data()
+                    .map(|opt| opt.map(|full_entity| full_entity.data))
+                    .map_err(|e| e.into())
             }
 
             /// Check if a database update is relevant to this entity

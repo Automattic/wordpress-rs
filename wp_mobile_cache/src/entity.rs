@@ -1,4 +1,4 @@
-use crate::{SqliteDbError, UpdateHook};
+use crate::{FullEntity, SqliteDbError, UpdateHook};
 
 /// Lightweight handle to a single entity with state and metadata.
 ///
@@ -6,7 +6,7 @@ use crate::{SqliteDbError, UpdateHook};
 /// Multiple Entity instances with the same ID are considered equal and will read the same data.
 pub struct Entity<T> {
     id: i64,
-    read_data: Box<dyn Fn() -> Result<Option<T>, SqliteDbError> + Send + Sync>,
+    read_data: Box<dyn Fn() -> Result<Option<FullEntity<T>>, SqliteDbError> + Send + Sync>,
     is_relevant_update: Box<dyn Fn(&UpdateHook) -> bool + Send + Sync>,
     // TODO: Add trait reference for state_reader
     // state_reader: Arc<dyn StateReader>,
@@ -22,7 +22,7 @@ impl<T> Entity<T> {
     /// whether a database update is relevant to this entity.
     pub fn new(
         id: i64,
-        read_data: Box<dyn Fn() -> Result<Option<T>, SqliteDbError> + Send + Sync>,
+        read_data: Box<dyn Fn() -> Result<Option<FullEntity<T>>, SqliteDbError> + Send + Sync>,
         is_relevant_update: Box<dyn Fn(&UpdateHook) -> bool + Send + Sync>,
     ) -> Self {
         Self {
@@ -43,10 +43,10 @@ impl<T> Entity<T> {
     /// Subsequent calls may return different results if the underlying data has changed.
     ///
     /// Returns:
-    /// - Ok(Some(T)) if entity exists in cache
+    /// - Ok(Some(FullEntity<T>)) if entity exists in cache (includes EntityId and data)
     /// - Ok(None) if entity not found in cache
     /// - Err(SqliteDbError) if database error occurred
-    pub fn load_data(&self) -> Result<Option<T>, SqliteDbError> {
+    pub fn load_data(&self) -> Result<Option<FullEntity<T>>, SqliteDbError> {
         (self.read_data)()
     }
 

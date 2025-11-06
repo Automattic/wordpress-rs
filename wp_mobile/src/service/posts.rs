@@ -31,16 +31,27 @@ impl PostService {
     /// Internal helper to read post data from the database
     ///
     /// This is used by both the direct read method and the entity closure.
+    /// Returns FullEntity to provide both EntityId and post data.
     fn read_post_from_db_internal(
         cache: &WpApiCache,
         db_site: &DbSite,
         id: PostId,
-    ) -> Result<Option<AnyPostWithEditContext>, wp_mobile_cache::SqliteDbError> {
+    ) -> Result<
+        Option<wp_mobile_cache::FullEntity<AnyPostWithEditContext>>,
+        wp_mobile_cache::SqliteDbError,
+    > {
         let repo = PostRepository::<EditContext>::new();
         let connection = cache.connection();
 
         repo.select_by_post_id(&*connection, db_site, id)
-            .map(|opt| opt.map(|db_post| db_post.data.post))
+            .map(|opt| {
+                opt.map(|db_post_full_entity| {
+                    wp_mobile_cache::FullEntity::new(
+                        db_post_full_entity.entity_id,
+                        db_post_full_entity.data.post,
+                    )
+                })
+            })
             .map_err(|e| e.into())
     }
 
@@ -52,7 +63,9 @@ impl PostService {
         &self,
         id: PostId,
     ) -> Result<Option<AnyPostWithEditContext>, EntityError> {
-        Self::read_post_from_db_internal(&self.cache, &self.db_site, id).map_err(|e| e.into())
+        Self::read_post_from_db_internal(&self.cache, &self.db_site, id)
+            .map(|opt| opt.map(|full_entity| full_entity.data))
+            .map_err(|e| e.into())
     }
 }
 
