@@ -216,6 +216,70 @@ mod tests {
         test_post.assert_matches(&retrieved_post);
     }
 
+    #[rstest]
+    fn test_entity_is_relevant_update_matches_correct_updates(
+        post_service_ctx: PostServiceTestContext,
+    ) {
+        // Setup: Insert test post
+        let test_post = insert_test_post(&post_service_ctx);
+
+        // Get entity
+        let entity = post_service_ctx.post_service.get_entity(test_post.id);
+
+        // Get the table name and rowid for the post
+        let table_name = PostRepository::<EditContext>::table_name();
+        let repo = PostRepository::<EditContext>::new();
+        let connection = post_service_ctx.cache.connection();
+        let db_post = repo
+            .select_by_post_id(&*connection, &post_service_ctx.db_site, test_post.id)
+            .expect("Should read post")
+            .expect("Post should exist");
+        let rowid = db_post.row_id.0 as i64;
+        drop(connection);
+
+        // Test: Create UpdateHook that matches this entity
+        let matching_hook = wp_mobile_cache::UpdateHook {
+            action: wp_mobile_cache::HookAction::Update,
+            db_name: "main".to_string(),
+            table_name: table_name.clone(),
+            row_id: rowid,
+        };
+
+        // Assert: Entity should recognize this update as relevant
+        assert!(
+            entity.0.is_relevant_update(&matching_hook),
+            "Entity should match updates with same table and rowid"
+        );
+
+        // Test: Create UpdateHook with different table
+        let wrong_table_hook = wp_mobile_cache::UpdateHook {
+            action: wp_mobile_cache::HookAction::Update,
+            db_name: "main".to_string(),
+            table_name: "wrong_table".to_string(),
+            row_id: rowid,
+        };
+
+        // Assert: Entity should not match updates from different table
+        assert!(
+            !entity.0.is_relevant_update(&wrong_table_hook),
+            "Entity should not match updates from different table"
+        );
+
+        // Test: Create UpdateHook with different rowid
+        let wrong_rowid_hook = wp_mobile_cache::UpdateHook {
+            action: wp_mobile_cache::HookAction::Update,
+            db_name: "main".to_string(),
+            table_name,
+            row_id: rowid + 1,
+        };
+
+        // Assert: Entity should not match updates for different row
+        assert!(
+            !entity.0.is_relevant_update(&wrong_rowid_hook),
+            "Entity should not match updates for different rowid"
+        );
+    }
+
     /// Test helper that encapsulates a test post with its assertion logic
     struct TestPost {
         id: PostId,
@@ -285,10 +349,9 @@ mod tests {
     #[fixture]
     fn post_service_ctx(mock_api_client: Arc<WpApiClient>) -> PostServiceTestContext {
         // Setup: Create in-memory database with migrations
-        let mut conn = Connection::open_in_memory()
-            .expect("Failed to create in-memory database");
-        let mut migration_manager = MigrationManager::new(&conn)
-            .expect("Failed to create migration manager");
+        let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
+        let mut migration_manager =
+            MigrationManager::new(&conn).expect("Failed to create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations should succeed");

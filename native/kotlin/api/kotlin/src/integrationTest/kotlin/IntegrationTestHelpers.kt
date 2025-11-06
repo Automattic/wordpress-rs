@@ -2,9 +2,15 @@ package rs.wordpress.api.kotlin
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserId
+import uniffi.wp_api.WpApiClientDelegate
+import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpOrgSiteApiUrlResolver
+import uniffi.wp_mobile.WpSelfHostedService
+import rs.wordpress.cache.kotlin.WordPressApiCache
 
 const val FIRST_USER_ID: UserId = 1
 const val SECOND_USER_ID: UserId = 2
@@ -22,6 +28,28 @@ fun defaultApiClient(): WpApiClient {
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
     return WpApiClient(testCredentials.apiRootUrl, authProvider)
+}
+
+fun createSelfHostedService(): WpSelfHostedService {
+    val wordPressApiCache = WordPressApiCache()
+    wordPressApiCache.performMigrations()
+
+    val testCredentials = TestCredentials.INSTANCE
+    val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
+        username = testCredentials.adminUsername,
+        password = testCredentials.adminPassword
+    )
+
+    return WpSelfHostedService(
+        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(testCredentials.apiRootUrl.toString())),
+        delegate = WpApiClientDelegate(
+            authProvider,
+            requestExecutor = WpRequestExecutor(),
+            middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
+            appNotifier = EmptyAppNotifier()
+        ),
+        cache = wordPressApiCache.cache
+    )
 }
 
 fun <T> WpRequestResult<T>.assertSuccess() {
