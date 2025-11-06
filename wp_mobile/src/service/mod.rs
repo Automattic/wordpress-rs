@@ -11,8 +11,8 @@ pub mod posts;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum WpServiceError {
-    #[error("Database error: {message}")]
-    DatabaseError { message: String },
+    #[error("Database error: {err_message}")]
+    DatabaseError { err_message: String },
 
     #[error("Site not found in cache")]
     SiteNotFound,
@@ -21,7 +21,7 @@ pub enum WpServiceError {
 impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
     fn from(err: wp_mobile_cache::SqliteDbError) -> Self {
         WpServiceError::DatabaseError {
-            message: err.to_string(),
+            err_message: err.to_string(),
         }
     }
 }
