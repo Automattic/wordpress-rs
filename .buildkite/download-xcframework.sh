@@ -3,6 +3,7 @@
 set -euo pipefail
 
 echo "--- :arrow_down: Downloading XCFramework"
+mkdir -p target
 pushd target
 buildkite-agent artifact download libwordpressFFI.xcframework.zip . --step "xcframework"
 unzip libwordpressFFI.xcframework.zip -d .
