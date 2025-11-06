@@ -33,7 +33,7 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 /// like PostService, CommentService, etc.
 #[derive(uniffi::Object)]
 pub struct WpSelfHostedService {
-    posts: PostService,
+    posts: Arc<PostService>,
 }
 
 impl WpSelfHostedService {
@@ -49,12 +49,14 @@ impl WpSelfHostedService {
         let site_url = site_url_parsed.as_str();
 
         // First, try to find existing site
-        let connection = cache.connection();
-        if let Some((db_site, _)) = site_repository
-            .select_self_hosted_site_by_url(&*connection, site_url)?
         {
-            return Ok(db_site);
-        }
+            let connection = cache.connection();
+            if let Some((db_site, _)) =
+                site_repository.select_self_hosted_site_by_url(&*connection, site_url)?
+            {
+                return Ok(db_site);
+            }
+        } // Drop the connection guard here
 
         // Site doesn't exist, create it
         let mut connection = cache.connection();
@@ -67,8 +69,8 @@ impl WpSelfHostedService {
             api_root: api_root_parsed.as_str().to_string(),
         };
 
-        let (db_site, _) = site_repository
-            .upsert_self_hosted_site(&mut *connection, &self_hosted_site)?;
+        let (db_site, _) =
+            site_repository.upsert_self_hosted_site(&mut *connection, &self_hosted_site)?;
 
         Ok(db_site)
     }
@@ -89,7 +91,11 @@ impl WpSelfHostedService {
         let db_site = Arc::new(Self::get_or_create_db_site(&api_url_resolver, &cache)?);
 
         Ok(Self {
-            posts: PostService::new(api_client, db_site, cache),
+            posts: Arc::new(PostService::new(api_client, db_site, cache)),
         })
+    }
+
+    pub fn posts(&self) -> Arc<PostService> {
+        self.posts.clone()
     }
 }
