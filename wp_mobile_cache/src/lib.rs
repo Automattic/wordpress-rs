@@ -299,10 +299,10 @@ pub struct User {
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct UpdateHook {
-    action: HookAction,
-    db_name: String,
-    table_name: String,
-    row_id: i64,
+    pub action: HookAction,
+    pub db_name: String,
+    pub table_name: String,
+    pub row_id: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]

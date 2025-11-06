@@ -95,7 +95,7 @@ impl<C: PostContext> PostRepository<C> {
     }
 
     /// Get the full table name for this context.
-    fn table_name() -> String {
+    pub fn table_name() -> String {
         C::table_name(Self::TABLE_NAME_PREFIX)
     }
 

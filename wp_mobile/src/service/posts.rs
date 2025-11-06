@@ -64,16 +64,30 @@ impl PostService {
 impl PostService {
     /// Get an entity handle for a specific post
     ///
-    /// Returns an entity that can be used to read post data and observe changes.
-    /// The entity is lightweight - it doesn't fetch data until you call data() on it.
+    /// Returns an entity that can be used to read post data.
+    /// The entity is lightweight - it doesn't fetch data until you call load_data() on it.
     pub fn get_entity(&self, id: PostId) -> EntityAnyPostWithEditContext {
         let cache = self.cache.clone();
         let db_site = self.db_site.clone();
         let id_val = id.0;
 
+        // Get table name and rowid for relevance checking
+        let table_name = PostRepository::<EditContext>::table_name();
+        let repo = PostRepository::<EditContext>::new();
+        let connection = self.cache.connection();
+        let db_post = repo
+            .select_by_post_id(&*connection, &self.db_site, id)
+            .expect("Failed to read post from database");
+        drop(connection);
+
+        let rowid = db_post.as_ref().map(|p| p.row_id.0 as i64).unwrap_or(0);
+
         Entity::<AnyPostWithEditContext>::new(
             id.0,
             Box::new(move || Self::read_post_from_db_internal(&cache, &db_site, PostId(id_val))),
+            Box::new(move |hook: &wp_mobile_cache::UpdateHook| {
+                hook.table_name == table_name && hook.row_id == rowid
+            }),
         )
         .into()
     }
