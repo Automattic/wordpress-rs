@@ -51,6 +51,14 @@ class ObservableEntity(
     fun loadData() = entity.loadData()
 
     /**
+     * Load current data from cache/DB (async version).
+     *
+     * This is an expensive operation that reads from the database each time.
+     * Use this version to avoid blocking the caller.
+     */
+    suspend fun loadDataAsync() = entity.loadDataAsync()
+
+    /**
      * Get the entity's ID.
      */
     fun id() = entity.id()

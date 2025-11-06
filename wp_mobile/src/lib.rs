@@ -79,6 +79,24 @@ macro_rules! wp_mobile_entity {
                         .map_err(|e| e.into())
                 }
 
+                /// Load current data from cache/DB (async version)
+                ///
+                /// This is an expensive operation that reads from the database each time.
+                /// Subsequent calls may return different results if the underlying data has changed.
+                ///
+                /// Returns:
+                /// - Ok(Some(FullEntity)) if entity exists in cache (includes EntityId and data)
+                /// - Ok(None) if entity not found in cache
+                /// - Err(EntityError) if database error occurred
+                pub async fn load_data_async(
+                    &self,
+                ) -> Result<Option<[<Full $id_type>]>, $crate::entity_error::EntityError> {
+                    self.0
+                        .load_data()
+                        .map(|opt| opt.map(|full_entity| full_entity.into()))
+                        .map_err(|e| e.into())
+                }
+
                 /// Check if a database update is relevant to this entity
                 ///
                 /// This method allows platform-specific observable wrappers to determine
