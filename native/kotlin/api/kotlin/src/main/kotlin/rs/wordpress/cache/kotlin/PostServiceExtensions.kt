@@ -3,10 +3,10 @@ package rs.wordpress.cache.kotlin
 import uniffi.wp_mobile.PostService
 
 /**
- * Get an observable entity handle for a specific post.
+ * Get an observable entity handle for a specific post with edit context.
  *
  * Returns an ObservableEntity that can be used to:
- * - Read post data via loadData()
+ * - Read post data with full edit context via loadData()
  * - Observe changes via addObserver()
  *
  * The returned entity is automatically registered with DatabaseChangeNotifier
@@ -14,15 +14,15 @@ import uniffi.wp_mobile.PostService
  *
  * Usage:
  * ```
- * val observablePost = postService.getObservableEntity(postId)
+ * val observablePost = postService.getObservableEntityWithEditContext(postId)
  * observablePost.addObserver {
  *     val updatedData = observablePost.loadData()
  *     // React to changes
  * }
  * ```
  */
-fun PostService.getObservableEntity(id: Long): ObservableEntity {
-    val entity = this.getEntity(id)
+fun PostService.getObservableEntityWithEditContext(id: Long): ObservableEntity {
+    val entity = this.getEntityWithEditContext(id)
     val observableEntity = ObservableEntity(entity)
     DatabaseChangeNotifier.register(observableEntity)
     return observableEntity

@@ -142,11 +142,11 @@ impl PostService {
             .expect("Failed to update mock post");
     }
 
-    /// Get an entity handle for a specific post
+    /// Get an entity handle for a specific post with edit context
     ///
-    /// Returns an entity that can be used to read post data.
+    /// Returns an entity that can be used to read post data with full edit context.
     /// The entity is lightweight - it doesn't fetch data until you call load_data() on it.
-    pub fn get_entity(&self, id: PostId) -> EntityAnyPostWithEditContext {
+    pub fn get_entity_with_edit_context(&self, id: PostId) -> EntityAnyPostWithEditContext {
         let cache = self.cache.clone();
         let db_site = self.db_site.clone();
         let id_val = id.0;
@@ -208,7 +208,9 @@ mod tests {
         let test_post = insert_test_post(&post_service_ctx);
 
         // Test: Get entity and load data
-        let entity = post_service_ctx.post_service.get_entity(test_post.id);
+        let entity = post_service_ctx
+            .post_service
+            .get_entity_with_edit_context(test_post.id);
         let result = entity.load_data().expect("Database read should succeed");
 
         // Assert: Post was found and matches what we inserted
@@ -224,7 +226,9 @@ mod tests {
         let test_post = insert_test_post(&post_service_ctx);
 
         // Get entity
-        let entity = post_service_ctx.post_service.get_entity(test_post.id);
+        let entity = post_service_ctx
+            .post_service
+            .get_entity_with_edit_context(test_post.id);
 
         // Get the table name and rowid for the post
         let table_name = PostRepository::<EditContext>::table_name();
