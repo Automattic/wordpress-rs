@@ -1,4 +1,4 @@
-use crate::{EntityAnyPostWithEditContext, entity::Entity, entity_error::EntityError};
+use crate::{EntityAnyPostWithEditContext, entity_error::EntityError};
 use std::sync::Arc;
 use wp_api::{
     api_client::WpApiClient,
@@ -35,12 +35,12 @@ impl PostService {
         cache: &WpApiCache,
         db_site: &DbSite,
         id: PostId,
-    ) -> Result<Option<AnyPostWithEditContext>, EntityError> {
+    ) -> Result<Option<AnyPostWithEditContext>, wp_mobile_cache::SqliteDbError> {
         let repo = PostRepository::<EditContext>::new();
         let connection = cache.connection();
 
         repo.select_by_post_id(&*connection, db_site, id)
-            .map(|opt| opt.map(|db_post| db_post.post))
+            .map(|opt| opt.map(|db_post| db_post.data.post))
             .map_err(|e| e.into())
     }
 
@@ -52,7 +52,7 @@ impl PostService {
         &self,
         id: PostId,
     ) -> Result<Option<AnyPostWithEditContext>, EntityError> {
-        Self::read_post_from_db_internal(&self.cache, &self.db_site, id)
+        Self::read_post_from_db_internal(&self.cache, &self.db_site, id).map_err(|e| e.into())
     }
 }
 
@@ -136,6 +136,7 @@ impl PostService {
             .select_by_post_id(&*conn, &self.db_site, id)
             .expect("Failed to read post")
             .expect("Post not found")
+            .data
             .post;
         post.title.rendered = new_title;
         repo.upsert(&mut *conn, &self.db_site, &post)
@@ -160,9 +161,12 @@ impl PostService {
             .expect("Failed to read post from database");
         drop(connection);
 
-        let rowid = db_post.as_ref().map(|p| p.row_id.0 as i64).unwrap_or(0);
+        let rowid = db_post
+            .as_ref()
+            .map(|p| p.data.row_id.0 as i64)
+            .unwrap_or(0);
 
-        Entity::<AnyPostWithEditContext>::new(
+        wp_mobile_cache::Entity::<AnyPostWithEditContext>::new(
             id.0,
             Box::new(move || Self::read_post_from_db_internal(&cache, &db_site, PostId(id_val))),
             Box::new(move |hook: &wp_mobile_cache::UpdateHook| {
@@ -238,7 +242,7 @@ mod tests {
             .select_by_post_id(&*connection, &post_service_ctx.db_site, test_post.id)
             .expect("Should read post")
             .expect("Post should exist");
-        let rowid = db_post.row_id.0 as i64;
+        let rowid = db_post.data.row_id.0 as i64;
         drop(connection);
 
         // Test: Create UpdateHook that matches this entity

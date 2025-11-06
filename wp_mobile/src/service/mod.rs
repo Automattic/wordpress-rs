@@ -51,10 +51,10 @@ impl WpSelfHostedService {
         // First, try to find existing site
         {
             let connection = cache.connection();
-            if let Some((db_site, _)) =
+            if let Some(full_entity) =
                 site_repository.select_self_hosted_site_by_url(&*connection, site_url)?
             {
-                return Ok(db_site);
+                return Ok(full_entity.data.0);
             }
         } // Drop the connection guard here
 

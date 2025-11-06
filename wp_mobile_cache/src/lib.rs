@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 
 pub mod context;
 pub mod db_types;
+pub mod entity;
 pub mod entity_id;
 pub mod repository;
 pub mod term_relationships;
@@ -298,7 +299,8 @@ pub struct User {
     name: String,
 }
 
-// Re-export EntityId from entity_id module
+// Re-export Entity and EntityId
+pub use entity::Entity;
 pub use entity_id::EntityId;
 
 /// Wrapper that pairs cached data with its database identity
