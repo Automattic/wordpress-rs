@@ -111,7 +111,7 @@ impl SiteRepository {
         Ok(db_self_hosted_site.map(|db_self_hosted_site| {
             let entity_id = Arc::new(crate::EntityId::new(
                 site.clone(),
-                Self::SELF_HOSTED_SITES_TABLE.to_string(),
+                Self::SELF_HOSTED_SITES_TABLE,
                 db_self_hosted_site.row_id,
             ));
             crate::FullEntity::new(entity_id, db_self_hosted_site)
@@ -171,7 +171,7 @@ impl SiteRepository {
         Ok(db_site.map(|db_site| {
             let entity_id = Arc::new(crate::EntityId::new(
                 db_site.clone(),
-                Self::SELF_HOSTED_SITES_TABLE.to_string(),
+                Self::SELF_HOSTED_SITES_TABLE,
                 self_hosted_site.row_id,
             ));
             crate::FullEntity::new(entity_id, (db_site, self_hosted_site))

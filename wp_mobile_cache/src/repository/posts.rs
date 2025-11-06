@@ -42,6 +42,9 @@ pub trait PostContext: IsContext {
     /// The context-specific database wrapper type (e.g., DbAnyPostWithEditContext)
     type DbPost;
 
+    /// The table name for this context (e.g., "posts_edit_context")
+    const TABLE_NAME: &'static str;
+
     /// Construct DbPost from a database row with lazy term relationship loading.
     ///
     /// The `fetch_terms` closure is only called if the context actually needs term relationships.
@@ -147,11 +150,7 @@ impl<C: PostContext> PostRepository<C> {
 
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
-            let entity_id = Arc::new(crate::EntityId::new(
-                site.clone(),
-                Self::table_name(),
-                rowid,
-            ));
+            let entity_id = Arc::new(crate::EntityId::new(site.clone(), C::TABLE_NAME, rowid));
             FullEntity::new(entity_id, db_post)
         }))
     }
@@ -200,11 +199,7 @@ impl<C: PostContext> PostRepository<C> {
             .into_iter()
             .map(|db_post| {
                 let rowid = C::get_rowid(&db_post);
-                let entity_id = Arc::new(crate::EntityId::new(
-                    site.clone(),
-                    Self::table_name(),
-                    rowid,
-                ));
+                let entity_id = Arc::new(crate::EntityId::new(site.clone(), C::TABLE_NAME, rowid));
                 FullEntity::new(entity_id, db_post)
             })
             .collect())
@@ -249,11 +244,8 @@ impl<C: PostContext> PostRepository<C> {
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
 
-            let entity_id = std::sync::Arc::new(crate::EntityId::new(
-                site.clone(),
-                Self::table_name(),
-                rowid,
-            ));
+            let entity_id =
+                std::sync::Arc::new(crate::EntityId::new(site.clone(), C::TABLE_NAME, rowid));
 
             FullEntity::new(entity_id, db_post)
         }))
@@ -308,6 +300,7 @@ impl<C: PostContext> PostRepository<C> {
 impl PostContext for EditContext {
     type Post = AnyPostWithEditContext;
     type DbPost = DbAnyPostWithEditContext;
+    const TABLE_NAME: &'static str = "posts_edit_context";
 
     fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
@@ -395,6 +388,7 @@ impl PostContext for EditContext {
 impl PostContext for ViewContext {
     type Post = AnyPostWithViewContext;
     type DbPost = DbAnyPostWithViewContext;
+    const TABLE_NAME: &'static str = "posts_view_context";
 
     fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
@@ -475,6 +469,7 @@ impl PostContext for ViewContext {
 impl PostContext for EmbedContext {
     type Post = AnyPostWithEmbedContext;
     type DbPost = DbAnyPostWithEmbedContext;
+    const TABLE_NAME: &'static str = "posts_embed_context";
 
     fn from_row_with_terms<F>(row: &Row, _fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where

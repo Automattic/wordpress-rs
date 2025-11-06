@@ -21,7 +21,9 @@ pub struct EntityId {
     db_site: DbSite,
 
     /// The table name where this entity is stored (e.g., "posts_edit_context")
-    table_name: String,
+    ///
+    /// Uses a static string reference to avoid heap allocation and keep EntityId small.
+    table_name: &'static str,
 
     /// The database rowid (SQLite autoincrement primary key)
     rowid: RowId,
@@ -42,7 +44,7 @@ impl EntityId {
 
 impl EntityId {
     /// Create a new EntityId (internal only - not exposed via UniFFI)
-    pub(crate) fn new(db_site: DbSite, table_name: String, rowid: RowId) -> Self {
+    pub(crate) fn new(db_site: DbSite, table_name: &'static str, rowid: RowId) -> Self {
         Self {
             db_site,
             table_name,
@@ -56,8 +58,8 @@ impl EntityId {
     }
 
     /// Get the table name (internal only)
-    pub(crate) fn table_name(&self) -> &str {
-        &self.table_name
+    pub(crate) fn table_name(&self) -> &'static str {
+        self.table_name
     }
 
     /// Get the DbSite (internal only)
@@ -86,8 +88,8 @@ mod tests {
     #[test]
     fn test_is_same_entity_matching() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site.clone(), "posts_edit_context".to_string(), RowId(42));
-        let id2 = EntityId::new(site, "posts_edit_context".to_string(), RowId(42));
+        let id1 = EntityId::new(site.clone(), "posts_edit_context", RowId(42));
+        let id2 = EntityId::new(site, "posts_edit_context", RowId(42));
 
         assert!(id1.is_same_entity(&id2));
     }
@@ -95,8 +97,8 @@ mod tests {
     #[test]
     fn test_is_same_entity_different_rowid() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site.clone(), "posts_edit_context".to_string(), RowId(42));
-        let id2 = EntityId::new(site, "posts_edit_context".to_string(), RowId(43));
+        let id1 = EntityId::new(site.clone(), "posts_edit_context", RowId(42));
+        let id2 = EntityId::new(site, "posts_edit_context", RowId(43));
 
         assert!(!id1.is_same_entity(&id2));
     }
@@ -104,8 +106,8 @@ mod tests {
     #[test]
     fn test_is_same_entity_different_table() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site.clone(), "posts_edit_context".to_string(), RowId(42));
-        let id2 = EntityId::new(site, "posts_view_context".to_string(), RowId(42));
+        let id1 = EntityId::new(site.clone(), "posts_edit_context", RowId(42));
+        let id2 = EntityId::new(site, "posts_view_context", RowId(42));
 
         assert!(!id1.is_same_entity(&id2));
     }
@@ -114,8 +116,8 @@ mod tests {
     fn test_is_same_entity_different_site() {
         let site1 = make_db_site(1);
         let site2 = make_db_site(2);
-        let id1 = EntityId::new(site1, "posts_edit_context".to_string(), RowId(42));
-        let id2 = EntityId::new(site2, "posts_edit_context".to_string(), RowId(42));
+        let id1 = EntityId::new(site1, "posts_edit_context", RowId(42));
+        let id2 = EntityId::new(site2, "posts_edit_context", RowId(42));
 
         assert!(!id1.is_same_entity(&id2));
     }
