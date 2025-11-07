@@ -1,4 +1,4 @@
-use crate::{EntityAnyPostWithEditContext, entity_error::EntityError};
+use crate::EntityAnyPostWithEditContext;
 use std::sync::Arc;
 use wp_api::{
     api_client::WpApiClient,
@@ -8,7 +8,7 @@ use wp_mobile_cache::{
     WpApiCache,
     context::EditContext,
     db_types::db_site::DbSite,
-    entity::{Entity, FullEntity},
+    entity::{Entity, EntityId, FullEntity},
     repository::posts::PostRepository,
 };
 
@@ -30,40 +30,6 @@ impl PostService {
             db_site,
             cache,
         }
-    }
-
-    /// Internal helper to read post data from the database
-    ///
-    /// This is used by both the direct read method and the entity closure.
-    /// Returns FullEntity to provide both EntityId and post data.
-    fn read_post_from_db_internal(
-        cache: &WpApiCache,
-        db_site: &DbSite,
-        id: PostId,
-    ) -> Result<Option<FullEntity<AnyPostWithEditContext>>, wp_mobile_cache::SqliteDbError> {
-        let repo = PostRepository::<EditContext>::new();
-        let connection = cache.connection();
-
-        repo.select_by_post_id(&*connection, db_site, id)
-            .map(|opt| {
-                opt.map(|db_post_full_entity| {
-                    FullEntity::new(db_post_full_entity.entity_id, db_post_full_entity.data.post)
-                })
-            })
-            .map_err(|e| e.into())
-    }
-
-    /// Read post data directly from the database
-    ///
-    /// This bypasses the entity layer for direct access to cached post data.
-    /// Can be made public in the future if needed.
-    pub(crate) fn read_post_from_db(
-        &self,
-        id: PostId,
-    ) -> Result<Option<AnyPostWithEditContext>, EntityError> {
-        Self::read_post_from_db_internal(&self.cache, &self.db_site, id)
-            .map(|opt| opt.map(|full_entity| full_entity.data))
-            .map_err(|e| e.into())
     }
 }
 
@@ -121,20 +87,19 @@ impl PostService {
             menu_order: None,
         }
     }
+
     /// TEMPORARY: Insert a mock post for testing purposes
     ///
     /// This is a temporary method to test the observer pattern without needing
     /// the full API client stack. Should be removed once proper data insertion is available.
-    pub fn insert_mock_post_for_testing(&self, id: PostId, title: String) -> PostId {
+    pub fn insert_mock_post_for_testing(&self, id: PostId, title: String) -> EntityId {
         let mut post = self.create_temp_post(id);
         post.title.rendered = title;
 
         let repo = PostRepository::<EditContext>::new();
         let mut conn = self.cache.connection();
         repo.upsert(&mut *conn, &self.db_site, &post)
-            .expect("Failed to insert mock post");
-
-        id
+            .expect("Failed to insert mock post")
     }
 
     /// TEMPORARY: Update a mock post for testing purposes
@@ -154,34 +119,35 @@ impl PostService {
             .expect("Failed to update mock post");
     }
 
-    /// Get an entity handle for a specific post with edit context
+    /// Get an entity handle using an EntityId
     ///
     /// Returns an entity that can be used to read post data with full edit context.
     /// The entity is lightweight - it doesn't fetch data until you call load_data() on it.
-    pub fn get_entity_with_edit_context(&self, id: PostId) -> EntityAnyPostWithEditContext {
+    ///
+    /// The EntityId should come from repository results (e.g., select_by_post_id).
+    pub fn get_entity_with_edit_context(
+        &self,
+        entity_id: Arc<EntityId>,
+    ) -> EntityAnyPostWithEditContext {
         let cache = self.cache.clone();
-        let db_site = self.db_site.clone();
-        let id_val = id.0;
-
-        // Get table name and rowid for relevance checking
-        let table_name = PostRepository::<EditContext>::table_name();
-        let repo = PostRepository::<EditContext>::new();
-        let connection = self.cache.connection();
-        let db_post = repo
-            .select_by_post_id(&*connection, &self.db_site, id)
-            .expect("Failed to read post from database");
-        drop(connection);
-
-        let rowid = db_post
-            .as_ref()
-            .map(|p| p.data.row_id.0 as i64)
-            .unwrap_or(0);
+        let entity_id = *entity_id;
 
         Entity::<AnyPostWithEditContext>::new(
-            id.0,
-            Box::new(move || Self::read_post_from_db_internal(&cache, &db_site, PostId(id_val))),
-            Box::new(move |hook: &wp_mobile_cache::UpdateHook| {
-                hook.table_name == table_name && hook.row_id == rowid
+            entity_id,
+            Box::new(move || {
+                let repo = PostRepository::<EditContext>::new();
+                let connection = cache.connection();
+
+                repo.select_by_entity_id(&*connection, &entity_id)
+                    .map(|opt| {
+                        opt.map(|db_post_full_entity| {
+                            FullEntity::new(
+                                db_post_full_entity.entity_id,
+                                db_post_full_entity.data.post,
+                            )
+                        })
+                    })
+                    .map_err(|e| e.into())
             }),
         )
         .into()
@@ -195,37 +161,30 @@ mod tests {
     use rstest::*;
     use rusqlite::Connection;
     use wp_mobile_cache::{
-        MigrationManager, WpApiCache,
+        HookAction, MigrationManager, UpdateHook, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
         repository::{posts::PostRepository, sites::SiteRepository},
         test_fixtures::posts::PostBuilder,
     };
 
     #[rstest]
-    fn test_read_post_from_db_returns_cached_post(post_service_ctx: PostServiceTestContext) {
-        // Setup: Insert test post into cache
-        let test_post = insert_test_post(&post_service_ctx);
-
-        // Test: Read post from database
-        let result = post_service_ctx
-            .post_service
-            .read_post_from_db(test_post.id)
-            .expect("Database read should succeed");
-
-        // Assert: Post was found and matches what we inserted
-        let retrieved_post = result.expect("Post should be found in cache");
-        test_post.assert_matches(&retrieved_post);
-    }
-
-    #[rstest]
     fn test_get_entity_load_data_returns_cached_post(post_service_ctx: PostServiceTestContext) {
         // Setup: Insert test post into cache
         let test_post = insert_test_post(&post_service_ctx);
 
-        // Test: Get entity and load data
+        // Test: Get EntityId from repository, then create entity
+        let repo = PostRepository::<EditContext>::new();
+        let connection = post_service_ctx.cache.connection();
+        let full_entity_from_repo = repo
+            .select_by_post_id(&*connection, &post_service_ctx.db_site, test_post.id)
+            .expect("Database read should succeed")
+            .expect("Post should exist");
+        let entity_id = full_entity_from_repo.entity_id;
+        drop(connection);
+
         let entity = post_service_ctx
             .post_service
-            .get_entity_with_edit_context(test_post.id);
+            .get_entity_with_edit_context(entity_id);
         let result = entity.load_data().expect("Database read should succeed");
 
         // Assert: Post was found and matches what we inserted
@@ -240,27 +199,29 @@ mod tests {
         // Setup: Insert test post
         let test_post = insert_test_post(&post_service_ctx);
 
-        // Get entity
-        let entity = post_service_ctx
-            .post_service
-            .get_entity_with_edit_context(test_post.id);
-
-        // Get the table name and rowid for the post
-        let table_name = PostRepository::<EditContext>::table_name();
+        // Get EntityId from repository
         let repo = PostRepository::<EditContext>::new();
         let connection = post_service_ctx.cache.connection();
-        let db_post = repo
+        let full_entity_from_repo = repo
             .select_by_post_id(&*connection, &post_service_ctx.db_site, test_post.id)
             .expect("Should read post")
             .expect("Post should exist");
-        let rowid = db_post.data.row_id.0 as i64;
+        let entity_id = full_entity_from_repo.entity_id.clone();
         drop(connection);
 
+        let entity = post_service_ctx
+            .post_service
+            .get_entity_with_edit_context(entity_id.clone());
+
+        // Get the table name and rowid from the entity_id
+        let table_name = entity_id.table_name;
+        let rowid = entity_id.rowid.0 as i64;
+
         // Test: Create UpdateHook that matches this entity
-        let matching_hook = wp_mobile_cache::UpdateHook {
-            action: wp_mobile_cache::HookAction::Update,
+        let matching_hook = UpdateHook {
+            action: HookAction::Update,
             db_name: "main".to_string(),
-            table_name: table_name.clone(),
+            table_name: table_name.to_string(),
             row_id: rowid,
         };
 
@@ -271,8 +232,8 @@ mod tests {
         );
 
         // Test: Create UpdateHook with different table
-        let wrong_table_hook = wp_mobile_cache::UpdateHook {
-            action: wp_mobile_cache::HookAction::Update,
+        let wrong_table_hook = UpdateHook {
+            action: HookAction::Update,
             db_name: "main".to_string(),
             table_name: "wrong_table".to_string(),
             row_id: rowid,
@@ -285,10 +246,10 @@ mod tests {
         );
 
         // Test: Create UpdateHook with different rowid
-        let wrong_rowid_hook = wp_mobile_cache::UpdateHook {
-            action: wp_mobile_cache::HookAction::Update,
+        let wrong_rowid_hook = UpdateHook {
+            action: HookAction::Update,
             db_name: "main".to_string(),
-            table_name,
+            table_name: table_name.to_string(),
             row_id: rowid + 1,
         };
 
@@ -381,9 +342,10 @@ mod tests {
             url: "https://test.local".to_string(),
             api_root: "https://test.local/wp-json".to_string(),
         };
-        let (db_site, _) = site_repo
+        let db_site = site_repo
             .upsert_self_hosted_site(&mut conn, &self_hosted_site)
-            .expect("Site creation should succeed");
+            .expect("Site creation should succeed")
+            .db_site;
 
         // Setup: Create PostService with cache
         let cache = Arc::new(WpApiCache::from(conn));

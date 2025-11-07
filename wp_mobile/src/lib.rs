@@ -57,8 +57,8 @@ macro_rules! wp_mobile_entity {
             #[uniffi::export]
             impl $id_type {
                 /// Get the entity's ID
-                pub fn id(&self) -> i64 {
-                    self.0.id()
+                pub fn id(&self) -> std::sync::Arc<wp_mobile_cache::entity::EntityId> {
+                    std::sync::Arc::new(*self.0.id())
                 }
 
                 /// Load current data from cache/DB

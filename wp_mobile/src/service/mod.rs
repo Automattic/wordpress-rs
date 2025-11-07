@@ -69,10 +69,10 @@ impl WpSelfHostedService {
             api_root: api_root_parsed.as_str().to_string(),
         };
 
-        let (db_site, _) =
+        let entity_id =
             site_repository.upsert_self_hosted_site(&mut *connection, &self_hosted_site)?;
 
-        Ok(db_site)
+        Ok(entity_id.db_site)
     }
 }
 
