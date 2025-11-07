@@ -15,10 +15,7 @@ pub mod test_fixtures;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),
-    TableNameMismatch {
-        expected: String,
-        actual: String,
-    },
+    TableNameMismatch { expected: String, actual: String },
 }
 
 impl std::fmt::Display for SqliteDbError {

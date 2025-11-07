@@ -23,10 +23,11 @@ class ObservableEntityTest {
     fun `observable entity notifies observers when database updates`() = runTest {
         val service = createSelfHostedService()
         val postService = service.posts()
+        val mockPostService = service.mockPosts()
 
         // Setup: Insert a test post
         val postId = 42L
-        val entityId = postService.insertMockPostForTesting(postId, "Original Title")
+        val entityId = mockPostService.insertMockPost(postId, "Original Title")
 
         // Create observable entity and add observer
         val observableEntity = postService.getObservableEntityWithEditContext(entityId)
@@ -40,7 +41,7 @@ class ObservableEntityTest {
         assertEquals(0, callCount.get())
 
         // Update the post - should trigger observer
-        postService.updateMockPostForTesting(postId, "Updated Title")
+        mockPostService.updateMockPost(postId, "Updated Title")
 
         // Verify observer was called exactly once
         assertEquals(1, callCount.get())
@@ -54,9 +55,10 @@ class ObservableEntityTest {
     fun `observable entity supports multiple observers`() = runTest {
         val service = createSelfHostedService()
         val postService = service.posts()
+        val mockPostService = service.mockPosts()
 
         val postId = 100L
-        val entityId = postService.insertMockPostForTesting(postId, "Multi Observer Test")
+        val entityId = mockPostService.insertMockPost(postId, "Multi Observer Test")
 
         val observableEntity = postService.getObservableEntityWithEditContext(entityId)
 
@@ -67,7 +69,7 @@ class ObservableEntityTest {
         observableEntity.addObserver { observer2Calls.incrementAndGet() }
 
         // Update should trigger both observers
-        postService.updateMockPostForTesting(postId, "Updated")
+        mockPostService.updateMockPost(postId, "Updated")
 
         assertEquals(1, observer1Calls.get())
         assertEquals(1, observer2Calls.get())
@@ -77,12 +79,13 @@ class ObservableEntityTest {
     fun `observable entity only fires for relevant updates`() = runTest {
         val service = createSelfHostedService()
         val postService = service.posts()
+        val mockPostService = service.mockPosts()
 
         // Create two different posts
         val post1Id = 200L
         val post2Id = 201L
-        val entity1Id = postService.insertMockPostForTesting(post1Id, "Post 1")
-        postService.insertMockPostForTesting(post2Id, "Post 2")
+        val entity1Id = mockPostService.insertMockPost(post1Id, "Post 1")
+        mockPostService.insertMockPost(post2Id, "Post 2")
 
         // Create observable entity for post1
         val observablePost1 = postService.getObservableEntityWithEditContext(entity1Id)
@@ -90,11 +93,11 @@ class ObservableEntityTest {
         observablePost1.addObserver { post1Calls.incrementAndGet() }
 
         // Update post2 - should NOT trigger post1's observer
-        postService.updateMockPostForTesting(post2Id, "Post 2 Updated")
+        mockPostService.updateMockPost(post2Id, "Post 2 Updated")
         assertEquals(0, post1Calls.get(), "Observer should not fire for unrelated post")
 
         // Update post1 - SHOULD trigger observer
-        postService.updateMockPostForTesting(post1Id, "Post 1 Updated")
+        mockPostService.updateMockPost(post1Id, "Post 1 Updated")
         assertEquals(1, post1Calls.get(), "Observer should fire for relevant post")
     }
 
@@ -102,9 +105,10 @@ class ObservableEntityTest {
     fun `observers can be removed`() = runTest {
         val service = createSelfHostedService()
         val postService = service.posts()
+        val mockPostService = service.mockPosts()
 
         val postId = 300L
-        val entityId = postService.insertMockPostForTesting(postId, "Remove Test")
+        val entityId = mockPostService.insertMockPost(postId, "Remove Test")
 
         val observableEntity = postService.getObservableEntityWithEditContext(entityId)
         val callCount = AtomicInteger(0)
@@ -113,14 +117,14 @@ class ObservableEntityTest {
         observableEntity.addObserver(observer)
 
         // First update - should fire
-        postService.updateMockPostForTesting(postId, "Update 1")
+        mockPostService.updateMockPost(postId, "Update 1")
         assertEquals(1, callCount.get())
 
         // Remove observer
         observableEntity.removeObserver(observer)
 
         // Second update - should NOT fire
-        postService.updateMockPostForTesting(postId, "Update 2")
+        mockPostService.updateMockPost(postId, "Update 2")
         assertEquals(1, callCount.get(), "Observer should not fire after removal")
     }
 }
