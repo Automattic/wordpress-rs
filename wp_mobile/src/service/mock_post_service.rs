@@ -5,7 +5,10 @@
 //! data insertion is available through the API client.
 
 use crate::service::posts::PostService;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 use wp_api::posts::{
     AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext, PostId,
     PostStatus, PostTitleWithEditContext,
@@ -133,5 +136,101 @@ impl MockPostService {
         }
 
         entity_ids
+    }
+
+    /// Start randomly updating posts in a background thread
+    ///
+    /// Spawns a thread that continuously picks random posts from the provided
+    /// entity IDs and updates them with random titles. The thread sleeps for
+    /// the specified delay (in seconds) between each update.
+    ///
+    /// Returns a handle that can be used to stop the background updates and
+    /// query the current update count.
+    ///
+    /// # Arguments
+    /// * `entity_ids` - The entity IDs to randomly update
+    /// * `delay_seconds` - Delay between updates in seconds (can be fractional)
+    pub fn start_random_updates(
+        &self,
+        entity_ids: Vec<Arc<EntityId>>,
+        delay_seconds: f64,
+    ) -> Arc<StressTestHandle> {
+        let stop_flag = Arc::new(Mutex::new(false));
+        let stop_flag_clone = stop_flag.clone();
+        let update_counter = Arc::new(AtomicU64::new(0));
+        let update_counter_clone = update_counter.clone();
+        let cache = self.post_service.cache().clone();
+        let db_site = *self.post_service.db_site();
+
+        thread::spawn(move || {
+            let repo = PostRepository::<EditContext>::new();
+
+            loop {
+                // Check if we should stop
+                {
+                    let should_stop = *stop_flag_clone.lock().unwrap();
+                    if should_stop {
+                        break;
+                    }
+                }
+
+                // Pick a random entity ID (using round-robin for simplicity)
+                if !entity_ids.is_empty() {
+                    let current_count = update_counter_clone.load(Ordering::Relaxed);
+                    let random_index = (current_count as usize) % entity_ids.len();
+                    let entity_id = &entity_ids[random_index];
+
+                    // Update the post
+                    let conn = cache.connection();
+                    if let Ok(Some(full_entity)) =
+                        repo.select_by_entity_id(&*conn, entity_id)
+                    {
+                        let mut post = full_entity.data.post;
+                        post.title.rendered = format!("Updated Post {} (update #{})", post.id.0, current_count);
+
+                        let mut conn = cache.connection();
+                        let _ = repo.upsert(&mut *conn, &db_site, &post);
+                    }
+
+                    update_counter_clone.fetch_add(1, Ordering::Relaxed);
+                }
+
+                // Sleep for the specified delay
+                thread::sleep(Duration::from_secs_f64(delay_seconds));
+            }
+        });
+
+        Arc::new(StressTestHandle {
+            stop_flag,
+            update_counter,
+        })
+    }
+}
+
+/// Handle for controlling background stress testing
+///
+/// Allows stopping the background thread that performs random updates
+/// and querying the current update count.
+#[derive(uniffi::Object)]
+pub struct StressTestHandle {
+    stop_flag: Arc<Mutex<bool>>,
+    update_counter: Arc<AtomicU64>,
+}
+
+#[uniffi::export]
+impl StressTestHandle {
+    /// Stop the background updates
+    ///
+    /// Signals the background thread to stop. The thread will complete its
+    /// current update and then exit.
+    pub fn stop(&self) {
+        *self.stop_flag.lock().unwrap() = true;
+    }
+
+    /// Get the current number of updates performed
+    ///
+    /// Returns the total count of post updates since starting.
+    pub fn update_count(&self) -> u64 {
+        self.update_counter.load(Ordering::Relaxed)
     }
 }

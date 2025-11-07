@@ -149,4 +149,50 @@ class ObservableEntityTest {
         val finalCount = postService.countEditContext()
         assertEquals(postCount.toLong(), finalCount)
     }
+
+    @Test
+    fun `stress test with random updates triggers observers`() = runTest {
+        val service = createSelfHostedService()
+        val postService = service.posts()
+        val mockPostService = service.mockPosts()
+
+        // Generate a small set of posts for stress testing
+        val postCount = 5u
+        val entityIds = mockPostService.generateAndInsertPosts(postCount)
+
+        // Create observables for all posts and count notifications
+        val observedCount = AtomicInteger(0)
+        val observables = entityIds.map { entityId ->
+            postService.getObservableEntityWithEditContext(entityId).apply {
+                addObserver { observedCount.incrementAndGet() }
+            }
+        }
+
+        // Start random updates with 50ms delay
+        val handle = mockPostService.startRandomUpdates(entityIds, 0.05)
+
+        // Let it run for ~500ms (should get roughly 10 updates)
+        Thread.sleep(500)
+
+        // Stop the updates
+        handle.stop()
+
+        // Get the final counts
+        val updateCount = handle.updateCount()
+        val totalObserved = observedCount.get()
+
+        // Verify we got a reasonable number of updates
+        // Update count should be > 0 and roughly around 10 (500ms / 50ms)
+        assert(updateCount > 0u) { "Should have performed some updates" }
+        assert(updateCount >= 8u) { "Should have performed at least 8 updates in 500ms with 50ms delay" }
+
+        // Observed count should be close to update count
+        // It might be slightly less due to timing, but should be reasonably close
+        assert(totalObserved > 0) { "Should have observed some updates" }
+        assert(totalObserved.toULong() >= updateCount - 2u) {
+            "Observed count ($totalObserved) should be close to update count ($updateCount)"
+        }
+
+        println("Stress test completed: $updateCount updates, $totalObserved observed events")
+    }
 }
