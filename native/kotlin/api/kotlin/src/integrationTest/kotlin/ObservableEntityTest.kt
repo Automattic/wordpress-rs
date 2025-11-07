@@ -127,4 +127,26 @@ class ObservableEntityTest {
         mockPostService.updateMockPost(postId, "Update 2")
         assertEquals(1, callCount.get(), "Observer should not fire after removal")
     }
+
+    @Test
+    fun `bulk insert posts and verify count`() = runTest {
+        val service = createSelfHostedService()
+        val postService = service.posts()
+        val mockPostService = service.mockPosts()
+
+        // Verify initial count is 0
+        val initialCount = postService.countEditContext()
+        assertEquals(0, initialCount)
+
+        // Generate and insert 50 posts
+        val postCount = 50u
+        val entityIds = mockPostService.generateAndInsertPosts(postCount)
+
+        // Verify the correct number of entity IDs were returned
+        assertEquals(postCount.toInt(), entityIds.size)
+
+        // Verify the count matches the number of posts inserted
+        val finalCount = postService.countEditContext()
+        assertEquals(postCount.toLong(), finalCount)
+    }
 }

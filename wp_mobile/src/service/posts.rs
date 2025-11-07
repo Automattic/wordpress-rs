@@ -79,6 +79,15 @@ impl PostService {
         )
         .into()
     }
+
+    /// Get the total count of posts for this site
+    ///
+    /// Returns the number of posts stored in the cache for this site.
+    pub fn count_edit_context(&self) -> Result<i64, wp_mobile_cache::SqliteDbError> {
+        let repo = PostRepository::<EditContext>::new();
+        let connection = self.cache.connection();
+        repo.count(&*connection, &self.db_site)
+    }
 }
 
 #[cfg(test)]

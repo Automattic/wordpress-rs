@@ -107,4 +107,31 @@ impl MockPostService {
         repo.upsert(&mut *conn, self.post_service.db_site(), &post)
             .expect("Failed to update mock post");
     }
+
+    /// Generate and insert multiple mock posts for stress testing
+    ///
+    /// Creates and inserts the specified number of mock posts with sequential IDs.
+    /// Starting from ID 10000 to avoid conflicts with real posts.
+    ///
+    /// Returns a vector of EntityIds for the inserted posts.
+    pub fn generate_and_insert_posts(&self, count: u32) -> Vec<Arc<EntityId>> {
+        let repo = PostRepository::<EditContext>::new();
+        let mut conn = self.post_service.cache().connection();
+        let mut entity_ids = Vec::with_capacity(count as usize);
+
+        for i in 0..count {
+            let post_id = PostId(10000 + i as i64);
+            let mut post = self.create_temp_post(post_id);
+            post.title.rendered = format!("Stress Test Post {}", i + 1);
+            post.slug = format!("stress-test-post-{}", i + 1);
+            post.link = format!("https://example.com/stress-test-post-{}", i + 1);
+
+            let entity_id = repo
+                .upsert(&mut *conn, self.post_service.db_site(), &post)
+                .expect("Failed to insert mock post");
+            entity_ids.push(Arc::new(entity_id));
+        }
+
+        entity_ids
+    }
 }
