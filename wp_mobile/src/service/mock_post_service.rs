@@ -89,8 +89,9 @@ impl MockPostService {
         post.title.rendered = title;
 
         let repo = PostRepository::<EditContext>::new();
-        let mut conn = self.post_service.cache().connection();
-        repo.upsert(&mut *conn, self.post_service.db_site(), &post)
+        self.post_service
+            .cache()
+            .execute(|conn| repo.upsert(conn, self.post_service.db_site(), &post))
             .expect("Failed to insert mock post")
     }
 
@@ -99,15 +100,18 @@ impl MockPostService {
     /// Updates an existing post's title. Used for testing the observer pattern.
     pub fn update_mock_post(&self, id: PostId, new_title: String) {
         let repo = PostRepository::<EditContext>::new();
-        let mut conn = self.post_service.cache().connection();
-        let mut post = repo
-            .select_by_post_id(&*conn, self.post_service.db_site(), id)
-            .expect("Failed to read post")
-            .expect("Post not found")
-            .data
-            .post;
-        post.title.rendered = new_title;
-        repo.upsert(&mut *conn, self.post_service.db_site(), &post)
+        self.post_service
+            .cache()
+            .execute(|conn| {
+                let mut post = repo
+                    .select_by_post_id(conn, self.post_service.db_site(), id)?
+                    .ok_or_else(|| wp_mobile_cache::SqliteDbError::SqliteError("Post not found".to_string()))?
+                    .data
+                    .post;
+                post.title.rendered = new_title;
+                repo.upsert(conn, self.post_service.db_site(), &post)?;
+                Ok::<_, wp_mobile_cache::SqliteDbError>(())
+            })
             .expect("Failed to update mock post");
     }
 
@@ -118,9 +122,8 @@ impl MockPostService {
     ///
     /// Returns a vector of EntityIds for the inserted posts.
     pub fn generate_and_insert_posts(&self, count: u32) -> Vec<Arc<EntityId>> {
-        let repo = PostRepository::<EditContext>::new();
-        let mut conn = self.post_service.cache().connection();
         let mut entity_ids = Vec::with_capacity(count as usize);
+        let repo = PostRepository::<EditContext>::new();
 
         for i in 0..count {
             let post_id = PostId(10000 + i as i64);
@@ -129,8 +132,10 @@ impl MockPostService {
             post.slug = format!("stress-test-post-{}", i + 1);
             post.link = format!("https://example.com/stress-test-post-{}", i + 1);
 
-            let entity_id = repo
-                .upsert(&mut *conn, self.post_service.db_site(), &post)
+            let entity_id = self
+                .post_service
+                .cache()
+                .execute(|conn| repo.upsert(conn, self.post_service.db_site(), &post))
                 .expect("Failed to insert mock post");
             entity_ids.push(Arc::new(entity_id));
         }
@@ -180,17 +185,21 @@ impl MockPostService {
                     let random_index = (current_count as usize) % entity_ids.len();
                     let entity_id = &entity_ids[random_index];
 
-                    // Update the post
-                    let conn = cache.connection();
-                    if let Ok(Some(full_entity)) =
-                        repo.select_by_entity_id(&*conn, entity_id)
-                    {
-                        let mut post = full_entity.data.post;
-                        post.title.rendered = format!("Updated Post {} (update #{})", post.id.0, current_count);
-
-                        let mut conn = cache.connection();
-                        let _ = repo.upsert(&mut *conn, &db_site, &post);
-                    }
+                    // Update the post - using the execute() pattern
+                    // This prevents the self-deadlock by ensuring the connection is only
+                    // held during the closure execution
+                    let _result = cache.execute(|conn| {
+                        // Read and update in a single atomic operation
+                        if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
+                            let mut post = full_entity.data.post;
+                            post.title.rendered = format!(
+                                "Updated Post {} (update #{})",
+                                post.id.0, current_count
+                            );
+                            repo.upsert(conn, &db_site, &post)?;
+                        }
+                        Ok::<_, wp_mobile_cache::SqliteDbError>(())
+                    });
 
                     update_counter_clone.fetch_add(1, Ordering::Relaxed);
                 }

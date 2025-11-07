@@ -1,7 +1,7 @@
 use rusqlite::hooks::Action;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 pub mod context;
 pub mod db_types;
@@ -173,43 +173,90 @@ impl WpApiCache {
     }
 
     pub fn perform_migrations(&self) -> Result<u64, SqliteDbError> {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        Ok(MigrationManager::new(connection)?.perform_migrations()?)
+        self.execute(|connection| {
+            let mut mgr = MigrationManager::new(connection)?;
+            mgr.perform_migrations().map_err(SqliteDbError::from)
+        })
     }
 
-    pub fn start_listening_for_updates(&self, delegate: Arc<dyn DatabaseDelegate>) {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        connection.update_hook(Some(
-            move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
-                let hook_data = UpdateHook {
-                    action: action.into(),
-                    db_name: db_name.to_string(),
-                    table_name: table_name.to_string(),
-                    row_id,
-                };
+    pub fn start_listening_for_updates(&self, delegate: std::sync::Arc<dyn DatabaseDelegate>) {
+        self.execute(|connection| {
+            connection.update_hook(Some(
+                move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
+                    let hook_data = UpdateHook {
+                        action: action.into(),
+                        db_name: db_name.to_string(),
+                        table_name: table_name.to_string(),
+                        row_id,
+                    };
 
-                delegate.did_update(hook_data);
-            },
-        ));
+                    delegate.did_update(hook_data);
+                },
+            ));
+        });
     }
 
     pub fn stop_listening_for_updates(&self) {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        connection.update_hook(None::<fn(Action, &str, &str, i64)>);
+        self.execute(|connection| {
+            connection.update_hook(None::<fn(Action, &str, &str, i64)>);
+        });
     }
 }
 
 impl WpApiCache {
-    /// Get access to the database connection
+    /// Execute a database operation with scoped access to the connection.
     ///
-    /// Returns a MutexGuard that implements both QueryExecutor and TransactionManager.
-    /// The connection is automatically unlocked when the guard is dropped.
-    pub fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.inner.connection.lock().unwrap()
+    /// This is the **only** way to access the database. The provided closure
+    /// receives a mutable reference to the connection that is only valid within
+    /// the closure scope.
+    ///
+    /// This design prevents deadlocks by ensuring that:
+    /// 1. The connection cannot be held across multiple `execute()` calls
+    /// 2. The closure scope naturally encourages grouping related operations
+    /// 3. The lock is automatically released when the closure returns
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Read operation
+    /// let post = cache.execute(|conn| {
+    ///     repo.select_by_id(conn, post_id)
+    /// })?;
+    ///
+    /// // Write operation
+    /// cache.execute(|conn| {
+    ///     repo.upsert(conn, &site, &post)
+    /// })?;
+    /// ```
+    ///
+    /// # Preventing Deadlocks
+    ///
+    /// **Safe** - Lock is released between calls:
+    /// ```ignore
+    /// let data = cache.execute(|conn| read(conn))?;
+    /// cache.execute(|conn| write(conn, data))?;  // ✅ OK
+    /// ```
+    ///
+    /// **Unsafe** - Nested calls (requires explicit Arc clone, unlikely to write accidentally):
+    /// ```ignore
+    /// let cache2 = cache.clone();
+    /// cache.execute(|conn| {
+    ///     cache2.execute(|conn2| { ... })  // ⚠️ Deadlock!
+    /// })?;
+    /// ```
+    pub fn execute<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut Connection) -> R,
+    {
+        let mut conn = self.inner.connection.lock().unwrap();
+        f(&mut conn)
     }
 }
 
 impl From<Connection> for WpApiCache {
+    /// Create a WpApiCache from an existing connection.
+    ///
+    /// This is typically used in tests to create a cache from an already-migrated
+    /// in-memory database connection.
     fn from(connection: Connection) -> Self {
         Self {
             inner: DBManager {
@@ -333,18 +380,19 @@ impl From<Action> for HookAction {
 }
 
 struct DBManager {
+    /// Mutex-protected SQLite connection
+    /// Access only through WpApiCache::execute() to prevent deadlocks
     connection: Mutex<Connection>,
 }
 
 impl DBManager {
     pub fn new(path: &Option<String>) -> Result<Self, SqliteDbError> {
-        let connection: Connection;
-
-        if let Some(path) = path.clone() {
-            connection = Connection::open(path)?;
+        // Create the database connection
+        let connection = if let Some(path) = path {
+            Connection::open(path)?
         } else {
-            connection = Connection::open_in_memory()?;
-        }
+            Connection::open_in_memory()?
+        };
 
         Ok(Self {
             connection: Mutex::new(connection),

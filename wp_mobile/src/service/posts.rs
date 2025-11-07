@@ -63,9 +63,9 @@ impl PostService {
             entity_id,
             Box::new(move || {
                 let repo = PostRepository::<EditContext>::new();
-                let connection = cache.connection();
 
-                repo.select_by_entity_id(&*connection, &entity_id)
+                cache
+                    .execute(|connection| repo.select_by_entity_id(connection, &entity_id))
                     .map(|opt| {
                         opt.map(|db_post_full_entity| {
                             FullEntity::new(
@@ -85,8 +85,8 @@ impl PostService {
     /// Returns the number of posts stored in the cache for this site.
     pub fn count_edit_context(&self) -> Result<i64, wp_mobile_cache::SqliteDbError> {
         let repo = PostRepository::<EditContext>::new();
-        let connection = self.cache.connection();
-        repo.count(&*connection, &self.db_site)
+        self.cache
+            .execute(|connection| repo.count(connection, &self.db_site))
     }
 }
 
@@ -109,14 +109,15 @@ mod tests {
         let test_post = insert_test_post(&post_service_ctx);
 
         // Test: Get EntityId from repository, then create entity
-        let repo = PostRepository::<EditContext>::new();
-        let connection = post_service_ctx.cache.connection();
-        let full_entity_from_repo = repo
-            .select_by_post_id(&*connection, &post_service_ctx.db_site, test_post.id)
+        let entity_id = post_service_ctx
+            .cache
+            .execute(|conn| {
+                let repo = PostRepository::<EditContext>::new();
+                repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
+                    .map(|opt| opt.map(|full_entity| full_entity.entity_id))
+            })
             .expect("Database read should succeed")
             .expect("Post should exist");
-        let entity_id = full_entity_from_repo.entity_id;
-        drop(connection);
 
         let entity = post_service_ctx
             .post_service
@@ -136,14 +137,15 @@ mod tests {
         let test_post = insert_test_post(&post_service_ctx);
 
         // Get EntityId from repository
-        let repo = PostRepository::<EditContext>::new();
-        let connection = post_service_ctx.cache.connection();
-        let full_entity_from_repo = repo
-            .select_by_post_id(&*connection, &post_service_ctx.db_site, test_post.id)
-            .expect("Should read post")
+        let entity_id = post_service_ctx
+            .cache
+            .execute(|conn| {
+                let repo = PostRepository::<EditContext>::new();
+                repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
+                    .map(|opt| opt.map(|full_entity| full_entity.entity_id))
+            })
+            .expect("Database read should succeed")
             .expect("Post should exist");
-        let entity_id = full_entity_from_repo.entity_id.clone();
-        drop(connection);
 
         let entity = post_service_ctx
             .post_service
@@ -231,12 +233,12 @@ mod tests {
             .with_slug(&test_post.slug)
             .build();
 
-        let post_repo = PostRepository::<EditContext>::new();
-        let mut conn = ctx.cache.connection();
-        post_repo
-            .upsert(&mut *conn, &ctx.db_site, &post)
+        ctx.cache
+            .execute(|conn| {
+                let post_repo = PostRepository::<EditContext>::new();
+                post_repo.upsert(conn, &ctx.db_site, &post)
+            })
             .expect("Post insert should succeed");
-        drop(conn); // Release the connection lock
 
         test_post
     }

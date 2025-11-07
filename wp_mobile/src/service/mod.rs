@@ -46,35 +46,30 @@ impl WpSelfHostedService {
     ) -> Result<DbSite, WpServiceError> {
         let site_repository = SiteRepository;
 
-        // Get site URL from resolver
+        // Get site URL and API root from resolver
         let site_url_parsed = api_url_resolver.resolve("".to_string(), vec![]);
         let site_url = site_url_parsed.as_str();
+        let api_root_parsed = api_url_resolver.resolve("".to_string(), vec![]);
+        let api_root = api_root_parsed.as_str();
 
-        // First, try to find existing site
-        {
-            let connection = cache.connection();
+        // Use execute() to find or create the site in a single operation
+        cache.execute(|conn| {
+            // First, try to find existing site
             if let Some(full_entity) =
-                site_repository.select_self_hosted_site_by_url(&*connection, site_url)?
+                site_repository.select_self_hosted_site_by_url(conn, site_url)?
             {
                 return Ok(full_entity.data.0);
             }
-        } // Drop the connection guard here
 
-        // Site doesn't exist, create it
-        let mut connection = cache.connection();
+            // Site doesn't exist, create it
+            let self_hosted_site = SelfHostedSite {
+                url: site_url.to_string(),
+                api_root: api_root.to_string(),
+            };
 
-        // Get API root from resolver
-        let api_root_parsed = api_url_resolver.resolve("".to_string(), vec![]);
-
-        let self_hosted_site = SelfHostedSite {
-            url: site_url.to_string(),
-            api_root: api_root_parsed.as_str().to_string(),
-        };
-
-        let entity_id =
-            site_repository.upsert_self_hosted_site(&mut *connection, &self_hosted_site)?;
-
-        Ok(entity_id.db_site)
+            let entity_id = site_repository.upsert_self_hosted_site(conn, &self_hosted_site)?;
+            Ok(entity_id.db_site)
+        })
     }
 }
 
