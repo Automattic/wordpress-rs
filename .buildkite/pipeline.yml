@@ -17,7 +17,7 @@ common_params:
     # - '6.4'
     # - '6.5'
     # - '6.6'
-    - '6.8.1'
+    - "6.8.1"
 
 steps:
   #
@@ -171,7 +171,7 @@ steps:
           cd ./native/kotlin
           ./gradlew detektMain detektTest
         agents:
-          queue: android
+          queue: android-staging
       - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
         key: "publish-wp-api-kotlin"
         plugins: [$CI_TOOLKIT]
@@ -187,7 +187,7 @@ steps:
           echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
           .buildkite/publish-wp-api-kotlin.sh
         agents:
-          queue: android
+          queue: android-staging
       - label: ":kotlin: Publish `rs.wordpress.api:android`"
         key: "publish-wp-api-android"
         plugins: [$CI_TOOLKIT]
@@ -206,7 +206,7 @@ steps:
           echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
           .buildkite/publish-wp-api-android.sh
         agents:
-          queue: android
+          queue: android-staging
 
       - label: ":android: Build Example App"
         plugins: [$CI_TOOLKIT]
@@ -223,7 +223,7 @@ steps:
           echo "--- :android: Building Sample App"
           ./native/kotlin/gradlew -p native/kotlin :example:composeApp:assembleDebug
         agents:
-          queue: android
+          queue: android-staging
 
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
@@ -255,7 +255,7 @@ steps:
         matrix: *wordpress_version_matrix
         plugins:
           - $CI_TOOLKIT
-          - $TEST_COLLECTOR :
+          - $TEST_COLLECTOR:
               files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
               format: "junit"
         artifact_paths:
