@@ -1,35 +1,54 @@
 package rs.wordpress.cache.kotlin
 
+import uniffi.wp_mobile_cache.EntityId
 import uniffi.wp_mobile_cache.UpdateHook
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Observable wrapper for Entity that notifies observers when the underlying data changes.
+ * Create an observable entity that notifies observers when data changes.
  *
- * This class bridges Rust entity updates to Kotlin observer pattern without exposing
- * database implementation details (table names, rowids, etc).
+ * This helper automatically registers the entity with [DatabaseChangeNotifier].
+ * Use service extension functions (e.g., `getObservableEntityWithEditContext`)
+ * instead of calling this directly.
  *
- * Generic over the data type D (e.g., FullEntityAnyPostWithEditContext).
- *
- * Usage:
+ * Example:
  * ```
- * val observableEntity = ObservableEntity(
- *     loadDataFn = { entity.loadData() },
- *     loadDataAsyncFn = { entity.loadDataAsync() },
- *     idFn = { entity.id() },
- *     isRelevantUpdateFn = { hook -> entity.isRelevantUpdate(hook) }
- * )
- * observableEntity.addObserver {
+ * val observablePost = postService.getObservableEntityWithEditContext(postId)
+ * observablePost.addObserver {
+ *     val updatedData = observablePost.loadDataAsync()
  *     // React to changes
- *     val newData = observableEntity.loadData()
  * }
- * DatabaseChangeNotifier.register(observableEntity)
  * ```
+ */
+fun <D> createObservableEntity(
+    loadData: () -> D?,
+    loadDataAsync: suspend () -> D?,
+    id: () -> EntityId,
+    isRelevantUpdate: (UpdateHook) -> Boolean
+): ObservableEntity<D> = ObservableEntity(
+    loadDataFn = loadData,
+    loadDataAsyncFn = loadDataAsync,
+    idFn = id,
+    isRelevantUpdateFn = isRelevantUpdate
+).also {
+    DatabaseChangeNotifier.register(it)
+}
+
+/**
+ * Observable wrapper around entity data that notifies observers when changes occur.
+ *
+ * Bridges Rust entity updates to Kotlin observer pattern without exposing database
+ * implementation details.
+ *
+ * Generic over data type `D` (e.g., `FullEntityAnyPostWithEditContext`).
+ *
+ * Create instances using [createObservableEntity] or service extension functions
+ * rather than the constructor directly.
  */
 class ObservableEntity<D>(
     private val loadDataFn: () -> D?,
     private val loadDataAsyncFn: suspend () -> D?,
-    private val idFn: () -> Long,
+    private val idFn: () -> EntityId,
     private val isRelevantUpdateFn: (UpdateHook) -> Boolean
 ) {
     private val observers = CopyOnWriteArrayList<() -> Unit>()
@@ -70,7 +89,7 @@ class ObservableEntity<D>(
     /**
      * Get the entity's ID.
      */
-    fun id(): Long = idFn()
+    fun id(): EntityId = idFn()
 
     /**
      * Internal method called by DatabaseChangeNotifier when a database update occurs.

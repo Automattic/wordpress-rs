@@ -26,10 +26,10 @@ class ObservableEntityTest {
 
         // Setup: Insert a test post
         val postId = 42L
-        postService.insertMockPostForTesting(postId, "Original Title")
+        val entityId = postService.insertMockPostForTesting(postId, "Original Title")
 
         // Create observable entity and add observer
-        val observableEntity = postService.getObservableEntityWithEditContext(postId)
+        val observableEntity = postService.getObservableEntityWithEditContext(entityId)
         val callCount = AtomicInteger(0)
 
         observableEntity.addObserver {
@@ -56,9 +56,9 @@ class ObservableEntityTest {
         val postService = service.posts()
 
         val postId = 100L
-        postService.insertMockPostForTesting(postId, "Multi Observer Test")
+        val entityId = postService.insertMockPostForTesting(postId, "Multi Observer Test")
 
-        val observableEntity = postService.getObservableEntityWithEditContext(postId)
+        val observableEntity = postService.getObservableEntityWithEditContext(entityId)
 
         val observer1Calls = AtomicInteger(0)
         val observer2Calls = AtomicInteger(0)
@@ -81,11 +81,11 @@ class ObservableEntityTest {
         // Create two different posts
         val post1Id = 200L
         val post2Id = 201L
-        postService.insertMockPostForTesting(post1Id, "Post 1")
+        val entity1Id = postService.insertMockPostForTesting(post1Id, "Post 1")
         postService.insertMockPostForTesting(post2Id, "Post 2")
 
         // Create observable entity for post1
-        val observablePost1 = postService.getObservableEntityWithEditContext(post1Id)
+        val observablePost1 = postService.getObservableEntityWithEditContext(entity1Id)
         val post1Calls = AtomicInteger(0)
         observablePost1.addObserver { post1Calls.incrementAndGet() }
 
@@ -104,9 +104,9 @@ class ObservableEntityTest {
         val postService = service.posts()
 
         val postId = 300L
-        postService.insertMockPostForTesting(postId, "Remove Test")
+        val entityId = postService.insertMockPostForTesting(postId, "Remove Test")
 
-        val observableEntity = postService.getObservableEntityWithEditContext(postId)
+        val observableEntity = postService.getObservableEntityWithEditContext(entityId)
         val callCount = AtomicInteger(0)
 
         val observer = { callCount.incrementAndGet(); Unit }
