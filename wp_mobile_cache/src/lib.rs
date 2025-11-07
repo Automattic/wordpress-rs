@@ -15,12 +15,23 @@ pub mod test_fixtures;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),
+    TableNameMismatch {
+        expected: String,
+        actual: String,
+    },
 }
 
 impl std::fmt::Display for SqliteDbError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SqliteDbError::SqliteError(message) => write!(f, "SqliteDbError: message={}", message),
+            SqliteDbError::TableNameMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "Table name mismatch: expected '{}', but got '{}'",
+                    expected, actual
+                )
+            }
         }
     }
 }

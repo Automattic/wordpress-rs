@@ -71,11 +71,11 @@ fn test_db() -> (Connection, DbSite) {
 /// Uses `SiteRepository` to insert the site into the database.
 pub fn create_test_site(conn: &mut Connection, site: &SelfHostedSite) -> DbSite {
     let site_repo = SiteRepository;
-    let (db_site, _) = site_repo
+    let entity_id = site_repo
         .upsert_self_hosted_site(conn, site)
         .expect("Failed to upsert test site");
 
-    db_site
+    entity_id.db_site
 }
 
 static RANDOM_TEST_SITE_COUNTER: AtomicU32 = AtomicU32::new(1);

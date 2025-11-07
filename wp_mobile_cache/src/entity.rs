@@ -16,31 +16,18 @@ use std::sync::Arc;
 ///
 /// EntityId is immutable once created and remains valid even if the
 /// underlying database row is deleted (though queries may return None).
-#[derive(uniffi::Object, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Object)]
 pub struct EntityId {
     /// The site this entity belongs to
-    db_site: DbSite,
+    pub db_site: DbSite,
 
     /// The table name where this entity is stored (e.g., "posts_edit_context")
     ///
     /// Uses a static string reference to avoid heap allocation and keep EntityId small.
-    table_name: &'static str,
+    pub table_name: &'static str,
 
     /// The database rowid (SQLite autoincrement primary key)
-    rowid: RowId,
-}
-
-#[uniffi::export]
-impl EntityId {
-    /// Check if two EntityIds refer to the same database entity
-    ///
-    /// Two EntityIds are considered the same if they have matching
-    /// db_site, table_name, and rowid.
-    pub fn is_same_entity(&self, other: &EntityId) -> bool {
-        self.db_site == other.db_site
-            && self.table_name == other.table_name
-            && self.rowid == other.rowid
-    }
+    pub rowid: RowId,
 }
 
 impl EntityId {
@@ -53,19 +40,18 @@ impl EntityId {
         }
     }
 
-    /// Get the rowid (internal only)
-    pub(crate) fn rowid(&self) -> RowId {
-        self.rowid
-    }
+    /// Validate that this EntityId's table name matches the expected table.
+    ///
+    /// Returns an error if the table names don't match.
+    pub fn validate_table_name(&self, expected: &'static str) -> Result<(), SqliteDbError> {
+        if self.table_name != expected {
+            return Err(SqliteDbError::TableNameMismatch {
+                expected: expected.to_string(),
+                actual: self.table_name.to_string(),
+            });
+        }
 
-    /// Get the table name (internal only)
-    pub(crate) fn table_name(&self) -> &'static str {
-        self.table_name
-    }
-
-    /// Get the DbSite (internal only)
-    pub(crate) fn db_site(&self) -> &DbSite {
-        &self.db_site
+        Ok(())
     }
 }
 
@@ -99,9 +85,8 @@ impl<T> FullEntity<T> {
 /// Entity is just an ID wrapper that reads data from global stores (cache DB and state store).
 /// Multiple Entity instances with the same ID are considered equal and will read the same data.
 pub struct Entity<T> {
-    id: i64,
+    entity_id: EntityId,
     read_data: Box<dyn Fn() -> Result<Option<FullEntity<T>>, SqliteDbError> + Send + Sync>,
-    is_relevant_update: Box<dyn Fn(&UpdateHook) -> bool + Send + Sync>,
     // TODO: Add trait reference for state_reader
     // state_reader: Arc<dyn StateReader>,
 }
@@ -115,20 +100,18 @@ impl<T> Entity<T> {
     /// The is_relevant_update closure is provided by the service layer and determines
     /// whether a database update is relevant to this entity.
     pub fn new(
-        id: i64,
+        entity_id: EntityId,
         read_data: Box<dyn Fn() -> Result<Option<FullEntity<T>>, SqliteDbError> + Send + Sync>,
-        is_relevant_update: Box<dyn Fn(&UpdateHook) -> bool + Send + Sync>,
     ) -> Self {
         Self {
-            id,
+            entity_id,
             read_data,
-            is_relevant_update,
         }
     }
 
     /// Get the entity's ID
-    pub fn id(&self) -> i64 {
-        self.id
+    pub fn id(&self) -> &EntityId {
+        &self.entity_id
     }
 
     /// Load current data from cache/DB
@@ -149,7 +132,7 @@ impl<T> Entity<T> {
     /// This method allows platform-specific observable wrappers to determine
     /// whether they should notify observers about a database change.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
-        (self.is_relevant_update)(hook)
+        self.entity_id.table_name == hook.table_name && self.entity_id.rowid == hook.row_id.into()
     }
 
     // TODO: Add methods that will be implemented later:
@@ -182,37 +165,37 @@ mod tests {
     #[test]
     fn test_is_same_entity_matching() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site.clone(), "posts_edit_context", RowId(42));
+        let id1 = EntityId::new(site, "posts_edit_context", RowId(42));
         let id2 = EntityId::new(site, "posts_edit_context", RowId(42));
 
-        assert!(id1.is_same_entity(&id2));
+        assert_eq!(id1, id2);
     }
 
     #[test]
-    fn test_is_same_entity_different_rowid() {
+    fn test_not_same_entity_different_rowid() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site.clone(), "posts_edit_context", RowId(42));
+        let id1 = EntityId::new(site, "posts_edit_context", RowId(42));
         let id2 = EntityId::new(site, "posts_edit_context", RowId(43));
 
-        assert!(!id1.is_same_entity(&id2));
+        assert_ne!(id1, id2);
     }
 
     #[test]
-    fn test_is_same_entity_different_table() {
+    fn test_not_same_entity_different_table() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site.clone(), "posts_edit_context", RowId(42));
+        let id1 = EntityId::new(site, "posts_edit_context", RowId(42));
         let id2 = EntityId::new(site, "posts_view_context", RowId(42));
 
-        assert!(!id1.is_same_entity(&id2));
+        assert_ne!(id1, id2);
     }
 
     #[test]
-    fn test_is_same_entity_different_site() {
+    fn test_not_is_same_entity_different_site() {
         let site1 = make_db_site(1);
         let site2 = make_db_site(2);
         let id1 = EntityId::new(site1, "posts_edit_context", RowId(42));
         let id2 = EntityId::new(site2, "posts_edit_context", RowId(42));
 
-        assert!(!id1.is_same_entity(&id2));
+        assert_ne!(id1, id2);
     }
 }

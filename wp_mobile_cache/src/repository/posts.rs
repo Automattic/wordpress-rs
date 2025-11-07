@@ -106,16 +106,19 @@ impl<C: PostContext> PostRepository<C> {
         C::table_name(Self::TABLE_NAME_PREFIX)
     }
 
-    /// Select a post by its SQLite rowid for a given site (returns wrapper with rowid).
+    /// Select a post by its EntityId (returns wrapper with rowid).
     ///
-    /// Returns `Ok(None)` if no post with the given rowid exists for this site.
+    /// Returns an error if the EntityId's table name doesn't match this repository's context.
+    /// Returns `Ok(None)` if no post with the given EntityId exists.
     /// Automatically populates categories and tags from term_relationships table.
-    pub fn select_by_rowid(
+    pub fn select_by_entity_id(
         &self,
         executor: &impl QueryExecutor,
-        site: &DbSite,
-        rowid: RowId,
+        entity_id: &EntityId,
     ) -> Result<Option<FullEntity<C::DbPost>>, SqliteDbError> {
+        // Validate that the entity_id is for the correct table
+        entity_id.validate_table_name(C::TABLE_NAME)?;
+
         // First get the post.id (WordPress ID) from the rowid
         let sql = format!(
             "SELECT id FROM {} WHERE db_site_id = ? AND rowid = ?",
@@ -123,7 +126,9 @@ impl<C: PostContext> PostRepository<C> {
         );
         let mut stmt = executor.prepare(&sql)?;
         let Some(post_id) = stmt
-            .query_row([site.row_id, rowid], |row| row.get(0))
+            .query_row([entity_id.db_site.row_id, entity_id.rowid], |row| {
+                row.get(0)
+            })
             .optional()
             .map_err(SqliteDbError::from)?
         else {
@@ -137,10 +142,14 @@ impl<C: PostContext> PostRepository<C> {
         );
         let mut stmt = executor.prepare(&sql)?;
         let db_post = stmt
-            .query_row([site.row_id, rowid], |row| {
+            .query_row([entity_id.db_site.row_id, entity_id.rowid], |row| {
                 C::from_row_with_terms(row, || {
                     let term_repo = TermRelationshipRepository;
-                    let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id])?;
+                    let terms_map = term_repo.get_terms_for_objects(
+                        executor,
+                        &entity_id.db_site,
+                        &[post_id],
+                    )?;
                     Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
                 })
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
@@ -149,8 +158,7 @@ impl<C: PostContext> PostRepository<C> {
             .map_err(SqliteDbError::from)?;
 
         Ok(db_post.map(|db_post| {
-            let rowid = C::get_rowid(&db_post);
-            let entity_id = Arc::new(EntityId::new(site.clone(), C::TABLE_NAME, rowid));
+            let entity_id = Arc::new(*entity_id);
             FullEntity::new(entity_id, db_post)
         }))
     }
@@ -199,7 +207,7 @@ impl<C: PostContext> PostRepository<C> {
             .into_iter()
             .map(|db_post| {
                 let rowid = C::get_rowid(&db_post);
-                let entity_id = Arc::new(EntityId::new(site.clone(), C::TABLE_NAME, rowid));
+                let entity_id = Arc::new(EntityId::new(*site, C::TABLE_NAME, rowid));
                 FullEntity::new(entity_id, db_post)
             })
             .collect())
@@ -244,7 +252,7 @@ impl<C: PostContext> PostRepository<C> {
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
 
-            let entity_id = Arc::new(EntityId::new(site.clone(), C::TABLE_NAME, rowid));
+            let entity_id = Arc::new(EntityId::new(*site, C::TABLE_NAME, rowid));
 
             FullEntity::new(entity_id, db_post)
         }))
@@ -523,13 +531,13 @@ impl PostContext for EmbedContext {
 impl PostRepository<EditContext> {
     /// Upsert a post with edit context and its term relationships (atomic transaction).
     ///
-    /// Returns the rowid of the inserted or updated row.
+    /// Returns the EntityId of the inserted or updated row.
     pub fn upsert(
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         post: &AnyPostWithEditContext,
-    ) -> Result<RowId, SqliteDbError> {
+    ) -> Result<EntityId, SqliteDbError> {
         let tx = transaction_manager.transaction()?;
 
         let upsert_sql = format!(
@@ -650,7 +658,7 @@ impl PostRepository<EditContext> {
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok(post_rowid)
+        Ok(EntityId::new(*site, EditContext::TABLE_NAME, post_rowid))
     }
 
     /// Upsert multiple posts with their term relationships.
@@ -659,7 +667,7 @@ impl PostRepository<EditContext> {
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         posts: &[AnyPostWithEditContext],
-    ) -> Result<Vec<RowId>, SqliteDbError> {
+    ) -> Result<Vec<EntityId>, SqliteDbError> {
         posts
             .iter()
             .map(|post| self.upsert(transaction_manager, site, post))
@@ -670,13 +678,13 @@ impl PostRepository<EditContext> {
 impl PostRepository<ViewContext> {
     /// Upsert a post with view context and its term relationships (atomic transaction).
     ///
-    /// Returns the rowid of the inserted or updated row.
+    /// Returns the EntityId of the inserted or updated row.
     pub fn upsert(
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         post: &AnyPostWithViewContext,
-    ) -> Result<RowId, SqliteDbError> {
+    ) -> Result<EntityId, SqliteDbError> {
         let tx = transaction_manager.transaction()?;
 
         let upsert_sql = format!(
@@ -783,7 +791,7 @@ impl PostRepository<ViewContext> {
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok(post_rowid)
+        Ok(EntityId::new(*site, ViewContext::TABLE_NAME, post_rowid))
     }
 
     /// Upsert multiple posts with their term relationships.
@@ -792,7 +800,7 @@ impl PostRepository<ViewContext> {
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         posts: &[AnyPostWithViewContext],
-    ) -> Result<Vec<RowId>, SqliteDbError> {
+    ) -> Result<Vec<EntityId>, SqliteDbError> {
         posts
             .iter()
             .map(|post| self.upsert(transaction_manager, site, post))
@@ -805,13 +813,13 @@ impl PostRepository<EmbedContext> {
     ///
     /// Note: EmbedContext does not include categories or tags, so no term relationships are synced.
     ///
-    /// Returns the rowid of the inserted or updated row.
+    /// Returns the EntityId of the inserted or updated row.
     pub fn upsert(
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         post: &AnyPostWithEmbedContext,
-    ) -> Result<RowId, SqliteDbError> {
+    ) -> Result<EntityId, SqliteDbError> {
         let tx = transaction_manager.transaction()?;
 
         let upsert_sql = format!(
@@ -869,7 +877,7 @@ impl PostRepository<EmbedContext> {
         // No term relationships for EmbedContext (no categories or tags)
 
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok(post_rowid)
+        Ok(EntityId::new(*site, EmbedContext::TABLE_NAME, post_rowid))
     }
 
     /// Upsert multiple posts.
@@ -878,7 +886,7 @@ impl PostRepository<EmbedContext> {
         transaction_manager: &mut impl TransactionManager,
         site: &DbSite,
         posts: &[AnyPostWithEmbedContext],
-    ) -> Result<Vec<RowId>, SqliteDbError> {
+    ) -> Result<Vec<EntityId>, SqliteDbError> {
         posts
             .iter()
             .map(|post| self.upsert(transaction_manager, site, post))
@@ -1024,20 +1032,20 @@ mod tests {
     #[case(PostBuilder::full().build())]
     fn test_round_trip(mut test_ctx: TestContext, #[case] original_post: AnyPostWithEditContext) {
         // Insert into database using repository
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &original_post)
             .expect("Failed to insert post");
 
-        // Read back from database using PostRepository's select_by_rowid
+        // Read back from database using PostRepository's select_by_entity_id
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
             .expect("Failed to read post")
             .expect("Post should exist");
 
         // Verify round-trip
-        assert_eq!(retrieved.data.row_id, rowid);
+        assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
         assert_recent_timestamp(&retrieved.data.last_fetched_at);
         assert_eq!(retrieved.data.post, original_post);
@@ -1058,14 +1066,14 @@ mod tests {
             .with_status(post_status.clone())
             .build();
 
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .expect("Failed to upsert post");
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to select post by rowid")
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .expect("Failed to select post by entity_id")
             .expect("Post should exist");
 
         assert_eq!(retrieved.data.post.status, post_status);
@@ -1078,14 +1086,14 @@ mod tests {
             .with_tags(vec![])
             .build();
 
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .expect("Failed to upsert post");
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to select post by rowid")
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .expect("Failed to select post by entity_id")
             .expect("Post should exist");
 
         assert_eq!(retrieved.data.post.categories, None);
@@ -1093,23 +1101,23 @@ mod tests {
     }
 
     #[rstest]
-    fn test_repository_insert_and_select_by_rowid(mut test_ctx: TestContext) {
+    fn test_repository_insert_and_select_by_entity_id(mut test_ctx: TestContext) {
         let post = PostBuilder::minimal().build();
 
         // Insert using repository
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .expect("Failed to insert");
 
-        // Select by rowid
+        // Select by entity_id
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
             .expect("Failed to select")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.data.row_id, rowid);
+        assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
         assert_eq!(retrieved.data.post, post);
     }
@@ -1228,11 +1236,11 @@ mod tests {
         let posts = vec![post1, post2, post3];
 
         // Insert batch
-        let rowids = test_ctx
+        let entity_ids = test_ctx
             .post_repo
             .upsert_batch(&mut test_ctx.conn, &test_ctx.site, &posts)
             .unwrap();
-        assert_eq!(rowids.len(), 3);
+        assert_eq!(entity_ids.len(), 3);
 
         // Verify all were inserted
         assert_eq!(
@@ -1244,10 +1252,10 @@ mod tests {
         );
 
         // Verify can retrieve each
-        rowids.iter().for_each(|&rowid| {
+        entity_ids.iter().for_each(|entity_id| {
             test_ctx
                 .post_repo
-                .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
+                .select_by_entity_id(&test_ctx.conn, entity_id)
                 .expect("Should not error")
                 .expect("Should exist");
         });
@@ -1308,7 +1316,7 @@ mod tests {
         );
 
         // Upsert should insert
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
@@ -1319,7 +1327,7 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(100))
             .expect("Failed to select post by post_id")
             .expect("Post should exist after insert");
-        assert_eq!(retrieved.data.row_id, rowid);
+        assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
         assert_eq!(retrieved.data.post.status, PostStatus::Draft);
     }
@@ -1333,7 +1341,7 @@ mod tests {
             .with_slug("original-slug")
             .build();
 
-        let original_rowid = test_ctx
+        let original_entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
@@ -1345,13 +1353,13 @@ mod tests {
             .with_slug("updated-slug")
             .build();
 
-        let new_rowid = test_ctx
+        let new_entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &updated_post)
             .unwrap();
 
-        // Rowid should be the same (it's an update, not delete+insert)
-        assert_eq!(original_rowid, new_rowid);
+        // EntityId should be the same (it's an update, not delete+insert)
+        assert_eq!(original_entity_id, new_entity_id);
 
         // Verify the update
         let retrieved = test_ctx
@@ -1381,7 +1389,7 @@ mod tests {
             .build();
 
         // Upsert with terms
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
@@ -1389,8 +1397,8 @@ mod tests {
         // Verify post was inserted
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to select post by rowid")
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .expect("Failed to select post by entity_id")
             .expect("Post should exist");
         assert_eq!(retrieved.data.post.id, PostId(300));
 
@@ -1557,23 +1565,23 @@ mod tests {
     }
 
     #[rstest]
-    fn test_select_by_rowid_populates_terms(mut test_ctx: TestContext) {
+    fn test_select_by_entity_id_populates_terms(mut test_ctx: TestContext) {
         // Insert post with terms
         let post = PostBuilder::minimal()
             .with_id(600)
             .with_categories(vec![wp_api::terms::TermId(5)])
             .build();
 
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
 
-        // Select by rowid should populate terms
+        // Select by entity_id should populate terms
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to select post by rowid")
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .expect("Failed to select post by entity_id")
             .expect("Post should exist");
         assert_eq!(
             retrieved.data.post.categories,
@@ -1586,7 +1594,7 @@ mod tests {
         let post = PostBuilder::minimal().build();
 
         // Insert post
-        let rowid = test_ctx
+        let entity_id = test_ctx
             .post_repo
             .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
             .unwrap();
@@ -1594,8 +1602,8 @@ mod tests {
         // Retrieve and validate last_fetched_at
         let retrieved = test_ctx
             .post_repo
-            .select_by_rowid(&test_ctx.conn, &test_ctx.site, rowid)
-            .expect("Failed to select post by rowid")
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .expect("Failed to select post by entity_id")
             .expect("Post should exist");
 
         // Validate timestamp is recent and valid
