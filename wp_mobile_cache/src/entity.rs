@@ -1,5 +1,31 @@
 use crate::{RowId, SqliteDbError, UpdateHook, db_types::db_site::DbSite};
 use std::sync::Arc;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+/// Hashable key derived from an EntityId
+///
+/// This type can be used as a key in HashMap/HashSet on platforms like Kotlin
+/// where EntityId (as a uniffi::Object) cannot be used directly as a HashMap key.
+///
+/// EntityKey is derived from EntityId and uniquely identifies an entity through
+/// three opaque parts that together form a composite key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Record)]
+pub struct EntityKey {
+    /// First part of the composite key
+    pub part1: i64,
+    /// Second part of the composite key
+    pub part2: u32,
+    /// Third part of the composite key
+    pub part3: u64,
+}
+
+/// Helper function to create a stable hash of a table name
+fn hash_table_name(table_name: &str) -> u32 {
+    let mut hasher = DefaultHasher::new();
+    table_name.hash(&mut hasher);
+    hasher.finish() as u32
+}
 
 /// Unique identifier for an entity stored in the cache database
 ///
@@ -52,6 +78,21 @@ impl EntityId {
         }
 
         Ok(())
+    }
+}
+
+#[uniffi::export]
+impl EntityId {
+    /// Convert this EntityId to an EntityKey that can be used as a HashMap key
+    ///
+    /// Returns an EntityKey that uniquely identifies this entity and can be used
+    /// on platforms where EntityId cannot be used directly as a HashMap key.
+    pub fn to_key(&self) -> EntityKey {
+        EntityKey {
+            part1: self.db_site.row_id.0 as i64,
+            part2: hash_table_name(self.table_name),
+            part3: self.rowid.0,
+        }
     }
 }
 
