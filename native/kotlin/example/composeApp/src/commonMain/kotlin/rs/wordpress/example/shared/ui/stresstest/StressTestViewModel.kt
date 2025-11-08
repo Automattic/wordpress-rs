@@ -8,13 +8,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import rs.wordpress.cache.kotlin.ObservableEntity
+import rs.wordpress.cache.kotlin.ObservableCollection
 import rs.wordpress.cache.kotlin.WordPressApiCache
-import rs.wordpress.cache.kotlin.getObservableEntityWithEditContext
+import rs.wordpress.cache.kotlin.getObservableAllPostsWithEditContext
 import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.StressTestHandle
 import uniffi.wp_mobile.WpSelfHostedService
-import uniffi.wp_mobile_cache.EntityKey
 
 class StressTestViewModel(
     private val mockPostService: MockPostService,
@@ -33,8 +32,7 @@ class StressTestViewModel(
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
     private var stressTestHandle: StressTestHandle? = null
-    private val observableEntities = mutableListOf<ObservableEntity<*>>()
-    private val updateCounts = mutableMapOf<EntityKey, Int>()
+    private var observableCollection: ObservableCollection<*>? = null
 
     init {
         startStressTest()
@@ -42,86 +40,57 @@ class StressTestViewModel(
 
     private fun startStressTest() {
         println("Starting stress test...")
+
         // Generate 1000 posts
         val entityIds = mockPostService.generateAndInsertPosts(1000u)
         println("Generated ${entityIds.size} posts")
 
         val postService = selfHostedService.posts()
 
-        // Create observable entities for all posts
-        val postDataList = mutableListOf<PostDisplayData>()
+        // Create a single observable collection for all posts
+        val collection = postService.getObservableAllPostsWithEditContext()
 
-        entityIds.forEach { entityId ->
-            val observableEntity = postService.getObservableEntityWithEditContext(entityId)
+        // Helper function to reload and update posts
+        fun reloadPosts() {
+            try {
+                val allPosts = collection.loadData()
+                println("Loaded ${allPosts.size} posts from collection")
 
-            // Load initial data
-            val fullEntity = observableEntity.loadData()
-            if (fullEntity != null) {
-                val entityKey = fullEntity.entityId.toKey()
-                val postData = PostDisplayData(
-                    entityId = fullEntity.entityId,
-                    title = fullEntity.data.title.rendered,
-                    contentPreview = fullEntity.data.content.rendered.take(100),
-                    status = fullEntity.data.status.toString(),
-                    author = fullEntity.data.author?.toString(),
-                    date = fullEntity.data.date,
-                    modified = fullEntity.data.modified,
-                    updateCount = 0
-                )
-                postDataList.add(postData)
-                updateCounts[entityKey] = 0
-            }
-
-            // Add observer to update UI when post changes
-            observableEntity.addObserver {
-                viewModelScope.launch(Dispatchers.IO) {
-                    try {
-                        println("Observer called!")
-                        val updatedEntity = observableEntity.loadData()
-                        if (updatedEntity != null) {
-                            println("Updated entity loaded: ${updatedEntity.data.title.rendered}")
-                            val entityKey = updatedEntity.entityId.toKey()
-                            val currentCount = updateCounts[entityKey] ?: 0
-                            updateCounts[entityKey] = currentCount + 1
-
-                            val updatedPostData = PostDisplayData(
-                                entityId = updatedEntity.entityId,
-                                title = updatedEntity.data.title.rendered,
-                                contentPreview = updatedEntity.data.content.rendered.take(100),
-                                status = updatedEntity.data.status.toString(),
-                                author = updatedEntity.data.author?.toString(),
-                                date = updatedEntity.data.date,
-                                modified = updatedEntity.data.modified,
-                                updateCount = updateCounts[entityKey] ?: 0
-                            )
-
-                            // Update the posts list
-                            // Note: StateFlow is thread-safe, Compose will recompose on the main thread
-                            val currentPosts = _posts.value.toMutableList()
-                            val index = currentPosts.indexOfFirst {
-                                it.entityId.toKey() == updatedEntity.entityId.toKey()
-                            }
-                            if (index != -1) {
-                                currentPosts[index] = updatedPostData
-                                _posts.value = currentPosts
-                            }
-
-                            // Update total count
-                            _totalUpdates.value = updateCounts.values.sum().toLong()
-                        } else {
-                            println("WARNING: loadData() returned null for entity")
-                        }
-                    } catch (e: Exception) {
-                        println("ERROR in observer: ${e.message}")
-                        e.printStackTrace()
-                    }
+                val postDataList = allPosts.map { fullEntity ->
+                    PostDisplayData(
+                        entityId = fullEntity.entityId,
+                        title = fullEntity.data.title.rendered,
+                        contentPreview = fullEntity.data.content.rendered.take(100),
+                        status = fullEntity.data.status.toString(),
+                        author = fullEntity.data.author?.toString(),
+                        date = fullEntity.data.date,
+                        modified = fullEntity.data.modified,
+                        updateCount = 0  // Not tracking per-post updates anymore
+                    )
                 }
-            }
 
-            observableEntities.add(observableEntity)
+                _posts.value = postDataList
+            } catch (e: Exception) {
+                println("ERROR loading posts: ${e.message}")
+                e.printStackTrace()
+            }
         }
 
-        _posts.value = postDataList
+        // Load initial data
+        reloadPosts()
+
+        // Add observer to reload all posts when any change occurs
+        collection.addObserver {
+            viewModelScope.launch(Dispatchers.IO) {
+                println("Collection observer called!")
+                reloadPosts()
+
+                // Increment total updates counter (number of times observer fired)
+                _totalUpdates.value += 1
+            }
+        }
+
+        observableCollection = collection
         _isRunning.value = true
 
         println("Starting comprehensive stress test for ${entityIds.size} posts...")
@@ -135,19 +104,16 @@ class StressTestViewModel(
             minBatchSize = 1u,
             maxBatchSize = 20u
         )
-        println("Comprehensive stress test started!")
+        println("Comprehensive stress test started with ObservableCollection!")
     }
 
     fun onCleared() {
         // Stop background updates
         stressTestHandle?.stop()
 
-        // Remove all observers
-        observableEntities.forEach { entity ->
-            // ObservableEntity doesn't expose removeAllObservers, so we'll just clear the list
-            // The observers will be cleaned up when the entities are garbage collected
-        }
-        observableEntities.clear()
+        // Clear the observable collection
+        // The collection and its observers will be cleaned up when garbage collected
+        observableCollection = null
 
         // Cancel coroutine scope
         viewModelScope.cancel()

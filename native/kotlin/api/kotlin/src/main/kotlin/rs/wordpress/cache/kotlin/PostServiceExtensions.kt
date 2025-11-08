@@ -13,3 +13,12 @@ fun PostService.getObservableEntityWithEditContext(entityId: EntityId): Observab
         isRelevantUpdate = entity::isRelevantUpdate
     )
 }
+
+fun PostService.getObservableAllPostsWithEditContext(): ObservableCollection<FullEntityAnyPostWithEditContext> {
+    val collection = this.getAllPostsWithEditContext()
+    return createObservableCollection(
+        loadData = collection::loadData,
+        loadDataAsync = collection::loadDataAsync,
+        isRelevantUpdate = collection::isRelevantUpdate
+    )
+}

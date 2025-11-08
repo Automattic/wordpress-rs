@@ -43,11 +43,15 @@ val cacheModule = module {
 val mockServiceModule = module {
     single {
         val cache = get<WordPressApiCache>()
-        val siteUrl = localTestSiteUrl().siteUrl
+        val selfHostedService = get<WpSelfHostedService>()
+
+        // Use the exact same site_url and api_root as WpSelfHostedService
+        val siteInfo = selfHostedService.sites().getCurrentSiteInfo()
 
         MockPostService(
             cache.cache,
-            siteUrl
+            siteInfo.siteUrl,
+            siteInfo.apiRoot
         )
     }
 }
