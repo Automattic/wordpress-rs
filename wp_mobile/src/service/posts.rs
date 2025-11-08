@@ -1,4 +1,4 @@
-use crate::EntityAnyPostWithEditContext;
+use crate::{AllPostsWithEditContextCollection, EntityAnyPostWithEditContext};
 use std::sync::Arc;
 use wp_api::{api_client::WpApiClient, posts::AnyPostWithEditContext};
 use wp_mobile_cache::{
@@ -87,6 +87,18 @@ impl PostService {
         let repo = PostRepository::<EditContext>::new();
         self.cache
             .execute(|connection| repo.count(connection, &self.db_site))
+    }
+
+    /// Get a collection of all posts with edit context for this site.
+    ///
+    /// Returns a collection that can be used to observe all posts for this site.
+    /// The collection uses table-level filtering - any insert, update, or delete
+    /// to the posts table will trigger observers.
+    ///
+    /// Unlike individual entities, the collection re-queries all posts when any
+    /// change occurs.
+    pub fn get_all_posts_with_edit_context(&self) -> AllPostsWithEditContextCollection {
+        AllPostsWithEditContextCollection::new(*self.db_site, self.cache.clone())
     }
 }
 

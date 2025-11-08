@@ -2,13 +2,14 @@
 pub use wp_api;
 pub use wp_mobile_cache;
 
+mod all_posts_with_edit_context_collection;
 mod entity_error;
 mod service;
 
 #[cfg(test)]
 mod test_fixtures;
 
-// Re-export error types
+// Re-export types
 pub use entity_error::EntityError;
 
 /// Macro to create UniFFI-compatible entity wrappers

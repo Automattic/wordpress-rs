@@ -1,4 +1,4 @@
-use crate::service::posts::PostService;
+use crate::service::{posts::PostService, sites::SiteService};
 use std::sync::Arc;
 use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
 use wp_mobile_cache::{
@@ -9,6 +9,7 @@ use wp_mobile_cache::{
 
 pub mod mock_post_service;
 pub mod posts;
+pub mod sites;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum WpServiceError {
@@ -35,6 +36,8 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 #[derive(uniffi::Object)]
 pub struct WpSelfHostedService {
     posts: Arc<PostService>,
+    sites: Arc<SiteService>,
+    db_site: DbSite,
 }
 
 impl WpSelfHostedService {
@@ -74,6 +77,11 @@ impl WpSelfHostedService {
 
 #[uniffi::export]
 impl WpSelfHostedService {
+    /// Get the site service for this WordPress site
+    pub fn sites(&self) -> Arc<SiteService> {
+        self.sites.clone()
+    }
+
     /// Create a new service for a self-hosted WordPress site
     ///
     /// This will look up the site in the cache or create it if it doesn't exist.
@@ -84,11 +92,17 @@ impl WpSelfHostedService {
         cache: Arc<WpApiCache>,
     ) -> Result<Self, WpServiceError> {
         let api_client = Arc::new(WpApiClient::new(api_url_resolver.clone(), delegate));
-        let db_site = Arc::new(Self::get_or_create_db_site(&api_url_resolver, &cache)?);
+        let db_site_value = Self::get_or_create_db_site(&api_url_resolver, &cache)?;
+        let db_site = Arc::new(db_site_value);
 
-        let posts = Arc::new(PostService::new(api_client, db_site, cache));
+        let posts = Arc::new(PostService::new(api_client, db_site.clone(), cache.clone()));
+        let sites = Arc::new(SiteService::new(cache, db_site_value));
 
-        Ok(Self { posts })
+        Ok(Self {
+            posts,
+            sites,
+            db_site: db_site_value,
+        })
     }
 
     pub fn posts(&self) -> Arc<PostService> {

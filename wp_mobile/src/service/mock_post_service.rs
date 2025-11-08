@@ -37,9 +37,9 @@ impl MockPostService {
     fn get_or_create_test_db_site(
         cache: &WpApiCache,
         site_url: &str,
+        api_root: &str,
     ) -> Result<DbSite, wp_mobile_cache::SqliteDbError> {
         let site_repository = SiteRepository;
-        let api_root = format!("{}/wp-json/wp/v2", site_url);
 
         cache.execute(|conn| {
             // Try to find existing test site
@@ -52,7 +52,7 @@ impl MockPostService {
             // Site doesn't exist, create it
             let self_hosted_site = SelfHostedSite {
                 url: site_url.to_string(),
-                api_root,
+                api_root: api_root.to_string(),
             };
 
             let entity_id = site_repository.upsert_self_hosted_site(conn, &self_hosted_site)?;
@@ -68,9 +68,10 @@ impl MockPostService {
     /// # Arguments
     /// * `cache` - The cache instance to use for database operations
     /// * `site_url` - The site URL to use (e.g., "https://test.example.com")
+    /// * `api_root` - The API root URL to use (e.g., "https://test.example.com/wp-json")
     #[uniffi::constructor]
-    pub fn new(cache: Arc<WpApiCache>, site_url: String) -> Self {
-        let db_site = Self::get_or_create_test_db_site(&cache, &site_url)
+    pub fn new(cache: Arc<WpApiCache>, site_url: String, api_root: String) -> Self {
+        let db_site = Self::get_or_create_test_db_site(&cache, &site_url, &api_root)
             .expect("Failed to create test DB site for mock service");
         Self { cache, db_site }
     }

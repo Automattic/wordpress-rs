@@ -14,7 +14,7 @@ use std::sync::Arc;
 pub struct SiteRepository;
 
 impl SiteRepository {
-    const SELF_HOSTED_SITES_TABLE: &'static str = "self_hosted_sites";
+    pub const SELF_HOSTED_SITES_TABLE: &'static str = "self_hosted_sites";
     const DB_SITES_TABLE: &'static str = "db_sites";
 
     /// Upsert a self-hosted site and return its EntityId (atomic transaction).
