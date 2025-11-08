@@ -13,6 +13,7 @@ name = "wp_mobile"
 
 [dependencies]
 paste = { workspace = true }
+rand = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }

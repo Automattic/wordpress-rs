@@ -4,6 +4,7 @@
 //! without requiring the full API client stack. It should be removed once proper
 //! data insertion is available through the API client.
 
+use rand::Rng;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -242,6 +243,99 @@ impl MockPostService {
 
                 // Sleep for the specified delay
                 thread::sleep(Duration::from_secs_f64(delay_seconds));
+            }
+        });
+
+        Arc::new(StressTestHandle {
+            stop_flag,
+            update_counter,
+        })
+    }
+
+    /// Start a comprehensive stress test with variable batch sizes and timing
+    ///
+    /// This provides a more realistic stress test than `start_random_updates()`:
+    /// - Updates multiple posts per batch (1-50 posts)
+    /// - Variable timing (bursts and quiet periods)
+    /// - Uses actual random selection instead of round-robin
+    ///
+    /// # Arguments
+    /// * `entity_ids` - The entity IDs to randomly update
+    /// * `min_delay_ms` - Minimum delay between batches in milliseconds
+    /// * `max_delay_ms` - Maximum delay between batches in milliseconds
+    /// * `min_batch_size` - Minimum number of posts to update per batch
+    /// * `max_batch_size` - Maximum number of posts to update per batch
+    pub fn start_comprehensive_stress_test(
+        &self,
+        entity_ids: Vec<Arc<EntityId>>,
+        min_delay_ms: u64,
+        max_delay_ms: u64,
+        min_batch_size: u32,
+        max_batch_size: u32,
+    ) -> Arc<StressTestHandle> {
+        let stop_flag = Arc::new(Mutex::new(false));
+        let stop_flag_clone = stop_flag.clone();
+        let update_counter = Arc::new(AtomicU64::new(0));
+        let update_counter_clone = update_counter.clone();
+        let cache = self.cache.clone();
+        let db_site = self.db_site;
+
+        thread::spawn(move || {
+            let repo = PostRepository::<EditContext>::new();
+            let mut rng = rand::thread_rng();
+
+            loop {
+                // Check if we should stop
+                {
+                    let should_stop = *stop_flag_clone.lock().unwrap();
+                    if should_stop {
+                        break;
+                    }
+                }
+
+                if entity_ids.is_empty() {
+                    break;
+                }
+
+                // Determine batch size for this iteration
+                let batch_size = rng.gen_range(min_batch_size..=max_batch_size);
+                let batch_size = batch_size.min(entity_ids.len() as u32);
+
+                // Select random posts for this batch
+                let mut batch_indices = Vec::new();
+                for _ in 0..batch_size {
+                    let idx = rng.gen_range(0..entity_ids.len());
+                    batch_indices.push(idx);
+                }
+
+                // Update all posts in the batch
+                let current_count = update_counter_clone.load(Ordering::Relaxed);
+
+                for idx in batch_indices {
+                    let entity_id = &entity_ids[idx];
+
+                    let _result = cache.execute(|conn| {
+                        if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
+                            let mut post = full_entity.data.post;
+                            post.title.rendered = format!(
+                                "Updated Post {} (batch update #{})",
+                                post.id.0, current_count
+                            );
+                            post.content.rendered = format!(
+                                "<p>Content updated at batch #{}</p>",
+                                current_count
+                            );
+                            repo.upsert(conn, &db_site, &post)?;
+                        }
+                        Ok::<_, wp_mobile_cache::SqliteDbError>(())
+                    });
+
+                    update_counter_clone.fetch_add(1, Ordering::Relaxed);
+                }
+
+                // Variable delay between batches
+                let delay_ms = rng.gen_range(min_delay_ms..=max_delay_ms);
+                thread::sleep(Duration::from_millis(delay_ms));
             }
         });
 

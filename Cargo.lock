@@ -5308,6 +5308,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "paste",
+ "rand 0.8.5",
  "rstest",
  "rusqlite",
  "thiserror 2.0.17",

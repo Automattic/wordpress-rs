@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import rs.wordpress.cache.kotlin.ObservableEntity
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.cache.kotlin.getObservableEntityWithEditContext
@@ -22,7 +21,7 @@ class StressTestViewModel(
     private val selfHostedService: WpSelfHostedService,
     private val cache: WordPressApiCache
 ) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val _posts = MutableStateFlow<List<PostDisplayData>>(emptyList())
     val posts: StateFlow<List<PostDisplayData>> = _posts.asStateFlow()
@@ -96,21 +95,19 @@ class StressTestViewModel(
                                 updateCount = updateCounts[entityKey] ?: 0
                             )
 
-                            // Switch to Main thread only for StateFlow updates
-                            withContext(Dispatchers.Main) {
-                                // Update the posts list
-                                val currentPosts = _posts.value.toMutableList()
-                                val index = currentPosts.indexOfFirst {
-                                    it.entityId.toKey() == updatedEntity.entityId.toKey()
-                                }
-                                if (index != -1) {
-                                    currentPosts[index] = updatedPostData
-                                    _posts.value = currentPosts
-                                }
-
-                                // Update total count
-                                _totalUpdates.value = updateCounts.values.sum().toLong()
+                            // Update the posts list
+                            // Note: StateFlow is thread-safe, Compose will recompose on the main thread
+                            val currentPosts = _posts.value.toMutableList()
+                            val index = currentPosts.indexOfFirst {
+                                it.entityId.toKey() == updatedEntity.entityId.toKey()
                             }
+                            if (index != -1) {
+                                currentPosts[index] = updatedPostData
+                                _posts.value = currentPosts
+                            }
+
+                            // Update total count
+                            _totalUpdates.value = updateCounts.values.sum().toLong()
                         } else {
                             println("WARNING: loadData() returned null for entity")
                         }
@@ -127,10 +124,18 @@ class StressTestViewModel(
         _posts.value = postDataList
         _isRunning.value = true
 
-        println("Starting random updates for ${entityIds.size} posts...")
-        // Start random updates with 50ms delay
-        stressTestHandle = mockPostService.startRandomUpdates(entityIds, 0.05)
-        println("Random updates started!")
+        println("Starting comprehensive stress test for ${entityIds.size} posts...")
+        // Start comprehensive stress test with:
+        // - 10-100ms delay between batches (variable timing)
+        // - 1-20 posts per batch (variable batch size)
+        stressTestHandle = mockPostService.startComprehensiveStressTest(
+            entityIds,
+            minDelayMs = 10u,
+            maxDelayMs = 100u,
+            minBatchSize = 1u,
+            maxBatchSize = 20u
+        )
+        println("Comprehensive stress test started!")
     }
 
     fun onCleared() {
