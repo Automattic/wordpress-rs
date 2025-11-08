@@ -2,7 +2,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
 import org.junit.jupiter.api.parallel.ExecutionMode
-import rs.wordpress.api.kotlin.createSelfHostedService
+import rs.wordpress.api.kotlin.createTestServiceContext
 import rs.wordpress.cache.kotlin.getObservableEntityWithEditContext
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
@@ -21,9 +21,9 @@ class ObservableEntityTest {
 
     @Test
     fun `observable entity notifies observers when database updates`() = runTest {
-        val service = createSelfHostedService()
-        val postService = service.posts()
-        val mockPostService = service.mockPosts()
+        val context = createTestServiceContext()
+        val postService = context.service.posts()
+        val mockPostService = context.mockPostService
 
         // Setup: Insert a test post
         val postId = 42L
@@ -53,9 +53,9 @@ class ObservableEntityTest {
 
     @Test
     fun `observable entity supports multiple observers`() = runTest {
-        val service = createSelfHostedService()
-        val postService = service.posts()
-        val mockPostService = service.mockPosts()
+        val context = createTestServiceContext()
+        val postService = context.service.posts()
+        val mockPostService = context.mockPostService
 
         val postId = 100L
         val entityId = mockPostService.insertMockPost(postId, "Multi Observer Test")
@@ -77,9 +77,9 @@ class ObservableEntityTest {
 
     @Test
     fun `observable entity only fires for relevant updates`() = runTest {
-        val service = createSelfHostedService()
-        val postService = service.posts()
-        val mockPostService = service.mockPosts()
+        val context = createTestServiceContext()
+        val postService = context.service.posts()
+        val mockPostService = context.mockPostService
 
         // Create two different posts
         val post1Id = 200L
@@ -103,9 +103,9 @@ class ObservableEntityTest {
 
     @Test
     fun `observers can be removed`() = runTest {
-        val service = createSelfHostedService()
-        val postService = service.posts()
-        val mockPostService = service.mockPosts()
+        val context = createTestServiceContext()
+        val postService = context.service.posts()
+        val mockPostService = context.mockPostService
 
         val postId = 300L
         val entityId = mockPostService.insertMockPost(postId, "Remove Test")
@@ -130,9 +130,9 @@ class ObservableEntityTest {
 
     @Test
     fun `bulk insert posts and verify count`() = runTest {
-        val service = createSelfHostedService()
-        val postService = service.posts()
-        val mockPostService = service.mockPosts()
+        val context = createTestServiceContext()
+        val postService = context.service.posts()
+        val mockPostService = context.mockPostService
 
         // Verify initial count is 0
         val initialCount = postService.countEditContext()
@@ -152,9 +152,9 @@ class ObservableEntityTest {
 
     @Test
     fun `stress test with random updates triggers observers`() = runTest {
-        val service = createSelfHostedService()
-        val postService = service.posts()
-        val mockPostService = service.mockPosts()
+        val context = createTestServiceContext()
+        val postService = context.service.posts()
+        val mockPostService = context.mockPostService
 
         // Generate a small set of posts for stress testing
         val postCount = 5u

@@ -4,7 +4,6 @@
 //! without requiring the full API client stack. It should be removed once proper
 //! data insertion is available through the API client.
 
-use crate::service::posts::PostService;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -13,28 +12,68 @@ use wp_api::posts::{
     AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext, PostId,
     PostStatus, PostTitleWithEditContext,
 };
-use wp_mobile_cache::{context::EditContext, entity::EntityId, repository::posts::PostRepository};
+use wp_mobile_cache::{
+    WpApiCache, context::EditContext, db_types::db_site::DbSite,
+    db_types::self_hosted_site::SelfHostedSite, entity::EntityId,
+    repository::posts::PostRepository, repository::sites::SiteRepository,
+};
 
 /// Mock post service for testing purposes
 ///
-/// This service wraps PostService and provides utilities to insert and update
-/// mock posts for testing the observer pattern and other functionality without
+/// This service provides utilities to insert and update mock posts directly
+/// in the cache for testing the observer pattern and other functionality without
 /// needing real API calls.
 ///
 /// **TEMPORARY**: This should be removed once proper data insertion is available.
 #[derive(uniffi::Object)]
 pub struct MockPostService {
-    post_service: Arc<PostService>,
+    cache: Arc<WpApiCache>,
+    db_site: DbSite,
 }
 
 impl MockPostService {
-    pub fn new(post_service: Arc<PostService>) -> Self {
-        Self { post_service }
+    /// Get or create a test DbSite for the mock service
+    fn get_or_create_test_db_site(
+        cache: &WpApiCache,
+        site_url: &str,
+    ) -> Result<DbSite, wp_mobile_cache::SqliteDbError> {
+        let site_repository = SiteRepository;
+        let api_root = format!("{}/wp-json/wp/v2", site_url);
+
+        cache.execute(|conn| {
+            // Try to find existing test site
+            if let Some(full_entity) =
+                site_repository.select_self_hosted_site_by_url(conn, site_url)?
+            {
+                return Ok(full_entity.data.0);
+            }
+
+            // Site doesn't exist, create it
+            let self_hosted_site = SelfHostedSite {
+                url: site_url.to_string(),
+                api_root,
+            };
+
+            let entity_id = site_repository.upsert_self_hosted_site(conn, &self_hosted_site)?;
+            Ok(entity_id.db_site)
+        })
     }
 }
 
 #[uniffi::export]
 impl MockPostService {
+    /// Create a new MockPostService for testing
+    ///
+    /// # Arguments
+    /// * `cache` - The cache instance to use for database operations
+    /// * `site_url` - The site URL to use (e.g., "https://test.example.com")
+    #[uniffi::constructor]
+    pub fn new(cache: Arc<WpApiCache>, site_url: String) -> Self {
+        let db_site = Self::get_or_create_test_db_site(&cache, &site_url)
+            .expect("Failed to create test DB site for mock service");
+        Self { cache, db_site }
+    }
+
     /// Create a temporary post with default values
     fn create_temp_post(&self, id: PostId) -> AnyPostWithEditContext {
         AnyPostWithEditContext {
@@ -89,9 +128,8 @@ impl MockPostService {
         post.title.rendered = title;
 
         let repo = PostRepository::<EditContext>::new();
-        self.post_service
-            .cache()
-            .execute(|conn| repo.upsert(conn, self.post_service.db_site(), &post))
+        self.cache
+            .execute(|conn| repo.upsert(conn, &self.db_site, &post))
             .expect("Failed to insert mock post")
     }
 
@@ -100,16 +138,15 @@ impl MockPostService {
     /// Updates an existing post's title. Used for testing the observer pattern.
     pub fn update_mock_post(&self, id: PostId, new_title: String) {
         let repo = PostRepository::<EditContext>::new();
-        self.post_service
-            .cache()
+        self.cache
             .execute(|conn| {
                 let mut post = repo
-                    .select_by_post_id(conn, self.post_service.db_site(), id)?
+                    .select_by_post_id(conn, &self.db_site, id)?
                     .ok_or_else(|| wp_mobile_cache::SqliteDbError::SqliteError("Post not found".to_string()))?
                     .data
                     .post;
                 post.title.rendered = new_title;
-                repo.upsert(conn, self.post_service.db_site(), &post)?;
+                repo.upsert(conn, &self.db_site, &post)?;
                 Ok::<_, wp_mobile_cache::SqliteDbError>(())
             })
             .expect("Failed to update mock post");
@@ -133,9 +170,8 @@ impl MockPostService {
             post.link = format!("https://example.com/stress-test-post-{}", i + 1);
 
             let entity_id = self
-                .post_service
-                .cache()
-                .execute(|conn| repo.upsert(conn, self.post_service.db_site(), &post))
+                .cache
+                .execute(|conn| repo.upsert(conn, &self.db_site, &post))
                 .expect("Failed to insert mock post");
             entity_ids.push(Arc::new(entity_id));
         }
@@ -164,8 +200,8 @@ impl MockPostService {
         let stop_flag_clone = stop_flag.clone();
         let update_counter = Arc::new(AtomicU64::new(0));
         let update_counter_clone = update_counter.clone();
-        let cache = self.post_service.cache().clone();
-        let db_site = *self.post_service.db_site();
+        let cache = self.cache.clone();
+        let db_site = self.db_site;
 
         thread::spawn(move || {
             let repo = PostRepository::<EditContext>::new();

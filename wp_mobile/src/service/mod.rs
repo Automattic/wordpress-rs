@@ -35,7 +35,6 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 #[derive(uniffi::Object)]
 pub struct WpSelfHostedService {
     posts: Arc<PostService>,
-    mock_posts: Arc<mock_post_service::MockPostService>,
 }
 
 impl WpSelfHostedService {
@@ -88,19 +87,11 @@ impl WpSelfHostedService {
         let db_site = Arc::new(Self::get_or_create_db_site(&api_url_resolver, &cache)?);
 
         let posts = Arc::new(PostService::new(api_client, db_site, cache));
-        let mock_posts = Arc::new(mock_post_service::MockPostService::new(posts.clone()));
 
-        Ok(Self { posts, mock_posts })
+        Ok(Self { posts })
     }
 
     pub fn posts(&self) -> Arc<PostService> {
         self.posts.clone()
-    }
-
-    /// Get the mock post service for testing
-    ///
-    /// **TEMPORARY**: This should be removed once proper data insertion is available.
-    pub fn mock_posts(&self) -> Arc<mock_post_service::MockPostService> {
-        self.mock_posts.clone()
     }
 }

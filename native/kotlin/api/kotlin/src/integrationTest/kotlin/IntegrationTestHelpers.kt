@@ -9,6 +9,7 @@ import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.WpOrgSiteApiUrlResolver
+import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.WpSelfHostedService
 import rs.wordpress.cache.kotlin.WordPressApiCache
 
@@ -30,17 +31,26 @@ fun defaultApiClient(): WpApiClient {
     return WpApiClient(testCredentials.apiRootUrl, authProvider)
 }
 
-fun createSelfHostedService(): WpSelfHostedService {
+data class TestServiceContext(
+    val service: WpSelfHostedService,
+    val mockPostService: MockPostService
+)
+
+fun createTestServiceContext(): TestServiceContext {
+    // Create and migrate cache
     val wordPressApiCache = WordPressApiCache()
     wordPressApiCache.performMigrations()
 
     val testCredentials = TestCredentials.INSTANCE
+
+    // Create auth provider
     val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
         username = testCredentials.adminUsername,
         password = testCredentials.adminPassword
     )
 
-    return WpSelfHostedService(
+    // Create self-hosted service
+    val service = WpSelfHostedService(
         apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(testCredentials.apiRootUrl.toString())),
         delegate = WpApiClientDelegate(
             authProvider,
@@ -50,6 +60,14 @@ fun createSelfHostedService(): WpSelfHostedService {
         ),
         cache = wordPressApiCache.cache
     )
+
+    // Create mock post service with shared cache
+    val mockPostService = MockPostService(
+        wordPressApiCache.cache,
+        testCredentials.apiRootUrl.toString()
+    )
+
+    return TestServiceContext(service, mockPostService)
 }
 
 fun <T> WpRequestResult<T>.assertSuccess() {
