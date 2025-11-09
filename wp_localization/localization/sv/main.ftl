@@ -1,3 +1,5 @@
+already_logged_in = Du är redan inloggad som { $username }.
+
 site_error_message = { $error_message }
 
 http_cancellation_error = Begäran avbröts.
