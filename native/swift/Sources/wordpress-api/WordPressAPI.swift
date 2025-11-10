@@ -68,6 +68,55 @@ public actor WordPressAPI {
         )
     }
 
+    public init(
+        urlSession: URLSession,
+        siteUrl: String,
+        apiRootUrl: ParsedUrl,
+        username: String,
+        password: String,
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
+    ) {
+        let executor = WpRequestExecutor(urlSession: urlSession)
+        let provider = CookiesNonceAuthenticationProvider.withSiteUrl(
+            url: siteUrl,
+            username: username,
+            password: password,
+            requestExecutor: executor
+        )
+        self.init(
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
+            authenticationProvider: .dynamic(dynamicAuthenticationProvider: provider),
+            executor: executor,
+            middlewarePipeline: middlewarePipeline,
+            appNotifier: appNotifier
+        )
+    }
+
+    public init(
+        urlSession: URLSession,
+        details: AutoDiscoveryAttemptSuccess,
+        username: String,
+        password: String,
+        middlewarePipeline: MiddlewarePipeline = .default,
+        appNotifier: WpAppNotifier? = nil
+    ) {
+        let executor = WpRequestExecutor(urlSession: urlSession)
+        let provider = CookiesNonceAuthenticationProvider(
+            username: username,
+            password: password,
+            details: details,
+            requestExecutor: executor
+        )
+        self.init(
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: details.apiRootUrl),
+            authenticationProvider: .dynamic(dynamicAuthenticationProvider: provider),
+            executor: executor,
+            middlewarePipeline: middlewarePipeline,
+            appNotifier: appNotifier
+        )
+    }
+
     init(
         apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,

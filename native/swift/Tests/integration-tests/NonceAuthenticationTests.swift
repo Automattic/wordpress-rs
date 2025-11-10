@@ -45,4 +45,35 @@ struct NonceAuthenticationTests {
         }
     }
 
+    @Test
+    func cookiesNonceAuth() async throws {
+        let credentials = TestCredentials.instance()
+        let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
+        let details = try await client.details(ofSite: credentials.siteUrl)
+        let api = WordPressAPI(
+            urlSession: .init(configuration: .ephemeral),
+            details: details,
+            username: credentials.adminUsername,
+            password: credentials.adminAccountPassword
+        )
+
+        let loggedIn = try await api.users.retrieveMeWithEditContext().data.username
+        #expect(loggedIn == credentials.adminUsername)
+    }
+
+    @Test
+    func cookiesNonceAuthWithoutURLDiscovery() async throws {
+        let credentials = TestCredentials.instance()
+        let api = WordPressAPI(
+            urlSession: .init(configuration: .ephemeral),
+            siteUrl: credentials.siteUrl,
+            apiRootUrl: credentials.apiRootURL,
+            username: credentials.adminUsername,
+            password: credentials.adminAccountPassword
+        )
+
+        let loggedIn = try await api.users.retrieveMeWithEditContext().data.username
+        #expect(loggedIn == credentials.adminUsername)
+    }
+
 }
