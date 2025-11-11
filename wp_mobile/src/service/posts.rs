@@ -1,4 +1,4 @@
-use crate::{AllPostsWithEditContextCollection, EntityAnyPostWithEditContext};
+use crate::{AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext};
 use std::sync::Arc;
 use wp_api::{api_client::WpApiClient, posts::AnyPostWithEditContext};
 use wp_mobile_cache::{
@@ -92,13 +92,38 @@ impl PostService {
     /// Get a collection of all posts with edit context for this site.
     ///
     /// Returns a collection that can be used to observe all posts for this site.
-    /// The collection uses table-level filtering - any insert, update, or delete
-    /// to the posts table will trigger observers.
+    /// The collection monitors both the posts table and term relationships table -
+    /// any insert, update, or delete to either table will trigger observers.
     ///
     /// Unlike individual entities, the collection re-queries all posts when any
-    /// change occurs.
-    pub fn get_all_posts_with_edit_context(&self) -> AllPostsWithEditContextCollection {
-        AllPostsWithEditContextCollection::new(*self.db_site, self.cache.clone())
+    /// relevant change occurs.
+    pub fn get_all_posts_with_edit_context(&self) -> AllAnyPostWithEditContextCollection {
+        let cache = self.cache.clone();
+        let db_site = *self.db_site;
+
+        wp_mobile_cache::naive_collection::NaiveCollection::new(
+            vec![
+                wp_mobile_cache::DbTable::PostsEditContext,
+                wp_mobile_cache::DbTable::TermRelationships,
+            ],
+            Box::new(move || {
+                let repo = PostRepository::<EditContext>::new();
+                cache.execute(|connection| {
+                    repo.select_all(connection, &db_site).map(|posts| {
+                        posts
+                            .into_iter()
+                            .map(|db_post_full_entity| {
+                                wp_mobile_cache::entity::FullEntity::new(
+                                    db_post_full_entity.entity_id,
+                                    db_post_full_entity.data.post,
+                                )
+                            })
+                            .collect()
+                    })
+                })
+            }),
+        )
+        .into()
     }
 }
 
@@ -108,6 +133,7 @@ mod tests {
     use crate::test_fixtures::mock_api_client;
     use rstest::*;
     use rusqlite::Connection;
+    use wp_api::posts::PostId;
     use wp_mobile_cache::{
         HookAction, MigrationManager, UpdateHook, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
