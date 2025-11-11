@@ -9,6 +9,5 @@ data class PostDisplayData(
     val status: String,
     val author: String?,
     val date: String,
-    val modified: String,
-    val updateCount: Int = 0
+    val modified: String
 )

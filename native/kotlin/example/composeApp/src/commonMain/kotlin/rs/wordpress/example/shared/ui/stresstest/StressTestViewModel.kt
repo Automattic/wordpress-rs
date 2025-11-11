@@ -48,20 +48,34 @@ class StressTestViewModel(
     private var observableCollection: ObservableCollection<*>? = null
 
     // Performance tracking
+    private val enableMetrics = true  // Set to false to disable metrics tracking overhead
+    private val metricsLock = Any()
     private val recentLoadTimes = mutableListOf<Long>()
     private val recentTotalLatencies = mutableListOf<Long>()
     private val maxSamples = 100
     private var minLoadTime = Long.MAX_VALUE
     private var maxLoadTime = 0L
 
+    private data class MetricsSnapshot(
+        val size: Int,
+        val avgLoad: Int,
+        val avgLatency: Int,
+        val last10: List<Long>,
+        val minLoad: Long,
+        val maxLoad: Long
+    )
+
     init {
-        startStressTest()
+        // Run stress test initialization in background to avoid blocking main thread
+        viewModelScope.launch(Dispatchers.IO) {
+            startStressTest()
+        }
     }
 
-    private fun startStressTest() {
+    private suspend fun startStressTest() {
         println("Starting stress test...")
 
-        // Generate 1000 posts
+        // Generate 1000 posts (runs on background thread)
         val entityIds = mockPostService.generateAndInsertPosts(1000u)
         println("Generated ${entityIds.size} posts")
 
@@ -86,8 +100,7 @@ class StressTestViewModel(
                         status = fullEntity.data.status.toString(),
                         author = fullEntity.data.author?.toString(),
                         date = fullEntity.data.date,
-                        modified = fullEntity.data.modified,
-                        updateCount = 0  // Not tracking per-post updates anymore
+                        modified = fullEntity.data.modified
                     )
                 }
 
@@ -142,44 +155,49 @@ class StressTestViewModel(
     }
 
     private fun updatePerformanceMetrics(loadDuration: Long, totalLatency: Long) {
-        // Track load times
-        recentLoadTimes.add(loadDuration)
-        if (recentLoadTimes.size > maxSamples) {
-            recentLoadTimes.removeAt(0)
+        if (!enableMetrics) return
+
+        // Minimize work inside synchronized block - only mutate collections
+        val snapshot = synchronized(metricsLock) {
+            recentLoadTimes.add(loadDuration)
+            if (recentLoadTimes.size > maxSamples) {
+                recentLoadTimes.removeAt(0)
+            }
+
+            recentTotalLatencies.add(totalLatency)
+            if (recentTotalLatencies.size > maxSamples) {
+                recentTotalLatencies.removeAt(0)
+            }
+
+            if (loadDuration < minLoadTime) minLoadTime = loadDuration
+            if (loadDuration > maxLoadTime) maxLoadTime = loadDuration
+
+            // Calculate averages and copy data inside lock, but minimize work
+            MetricsSnapshot(
+                size = recentLoadTimes.size,
+                avgLoad = recentLoadTimes.average().roundToInt(),
+                avgLatency = recentTotalLatencies.average().roundToInt(),
+                last10 = recentLoadTimes.takeLast(10),
+                minLoad = minLoadTime,
+                maxLoad = maxLoadTime
+            )
         }
 
-        // Track total latencies
-        recentTotalLatencies.add(totalLatency)
-        if (recentTotalLatencies.size > maxSamples) {
-            recentTotalLatencies.removeAt(0)
-        }
-
-        // Update min/max
-        if (loadDuration < minLoadTime) minLoadTime = loadDuration
-        if (loadDuration > maxLoadTime) maxLoadTime = loadDuration
-
-        // Calculate averages
-        val avgLoadTime = recentLoadTimes.average().roundToInt()
-        val avgTotalLatency = recentTotalLatencies.average().roundToInt()
-
-        // Get last 10 load times for display
-        val last10 = recentLoadTimes.takeLast(10)
-
-        // Update StateFlow
+        // Everything else outside the lock to avoid contention
         _performanceMetrics.value = PerformanceMetrics(
-            avgLoadTimeMs = avgLoadTime,
-            minLoadTimeMs = minLoadTime,
-            maxLoadTimeMs = maxLoadTime,
-            avgTotalLatencyMs = avgTotalLatency,
-            last10LoadTimes = last10,
-            sampleCount = recentLoadTimes.size
+            avgLoadTimeMs = snapshot.avgLoad,
+            minLoadTimeMs = snapshot.minLoad,
+            maxLoadTimeMs = snapshot.maxLoad,
+            avgTotalLatencyMs = snapshot.avgLatency,
+            last10LoadTimes = snapshot.last10,
+            sampleCount = snapshot.size
         )
 
-        // Log every 10 updates
-        if (recentLoadTimes.size % 10 == 0) {
-            println("⏱️ Performance (${recentLoadTimes.size} samples): " +
-                    "avg=${avgLoadTime}ms, min=${minLoadTime}ms, max=${maxLoadTime}ms, " +
-                    "latency=${avgTotalLatency}ms")
+        // Log every 10 updates (outside lock)
+        if (snapshot.size % 10 == 0) {
+            println("⏱️ Performance (${snapshot.size} samples): " +
+                    "avg=${snapshot.avgLoad}ms, min=${snapshot.minLoad}ms, max=${snapshot.maxLoad}ms, " +
+                    "latency=${snapshot.avgLatency}ms")
         }
     }
 

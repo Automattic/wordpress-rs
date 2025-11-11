@@ -1,12 +1,9 @@
 package rs.wordpress.example.shared.ui.stresstest
 
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -34,6 +30,7 @@ fun StressTestScreen(viewModel: StressTestViewModel = koinInject()) {
     val posts by viewModel.posts.collectAsState()
     val totalUpdates by viewModel.totalUpdates.collectAsState()
     val isRunning by viewModel.isRunning.collectAsState()
+    val performanceMetrics by viewModel.performanceMetrics.collectAsState()
     val listState = rememberLazyListState()
 
     MaterialTheme {
@@ -56,25 +53,30 @@ fun StressTestScreen(viewModel: StressTestViewModel = koinInject()) {
                     Text(text = "Total Posts: ${posts.size}")
                     Text(text = "Total Updates: $totalUpdates")
                     Text(text = "Status: ${if (isRunning) "Running" else "Stopped"}")
+
+                    performanceMetrics?.let { metrics ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Performance",
+                            style = MaterialTheme.typography.subtitle2,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(text = "Avg Load: ${metrics.avgLoadTimeMs}ms (${metrics.sampleCount} samples)")
+                        Text(text = "Range: ${metrics.minLoadTimeMs}ms - ${metrics.maxLoadTimeMs}ms")
+                        Text(text = "Total Latency: ${metrics.avgTotalLatencyMs}ms")
+                    }
                 }
             }
 
-            // Posts list with scrollbar
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(posts) { post ->
-                        PostCard(post)
-                    }
+            // Posts list
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(posts) { post ->
+                    PostCard(post)
                 }
-
-                VerticalScrollbar(
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                    adapter = rememberScrollbarAdapter(scrollState = listState)
-                )
             }
         }
     }
@@ -115,22 +117,6 @@ fun PostCard(post: PostDisplayData) {
                 Text(
                     text = "Modified: ${post.modified}",
                     style = MaterialTheme.typography.caption
-                )
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.padding(start = 8.dp)
-            ) {
-                Text(
-                    text = "Updates",
-                    style = MaterialTheme.typography.caption,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${post.updateCount}",
-                    style = MaterialTheme.typography.h6,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colors.primary
                 )
             }
         }

@@ -18,6 +18,7 @@ import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpOrgSiteApiUrlResolver
 import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.WpSelfHostedService
+import java.io.File
 
 val authModule = module {
     single {
@@ -34,7 +35,12 @@ val authModule = module {
 
 val cacheModule = module {
     single {
-        WordPressApiCache().apply {
+        // Create temporary file for disk-based database testing
+        val tempFile = File.createTempFile("wordpress_cache_", ".db")
+        tempFile.deleteOnExit()
+        println("📁 Using disk-based DB: ${tempFile.absolutePath}")
+
+        WordPressApiCache(tempFile.toPath()).apply {
             performMigrations()
         }
     }
