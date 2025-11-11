@@ -60,13 +60,14 @@ mkdir -p wp-content/uploads/fonts
 echo "--- :card_file_box: Importing Data"
 
 ## Download the sample data (https://codex.wordpress.org/Theme_Unit_Test)
-curl https://raw.githubusercontent.com/WPTT/theme-unit-test/master/themeunittestdata.wordpress.xml -C - -o /tmp/testdata.xml
+curl -s https://raw.githubusercontent.com/WPTT/theme-unit-test/master/themeunittestdata.wordpress.xml -C - -o /tmp/testdata.xml
 
 ## Then install the importer plugin
 wp plugin install wordpress-importer --activate
 
 ## Then install the test data (https://developer.wordpress.org/cli/commands/import/)
-wp import /tmp/testdata.xml --authors=create
+echo "Importing test data..."
+wp import --quiet /tmp/testdata.xml --authors=create
 
 ## Then clean up the importer plugin
 wp plugin deactivate wordpress-importer
