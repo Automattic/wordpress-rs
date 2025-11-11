@@ -18,6 +18,8 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum ApplicationPasswordsRequest {
     #[post(url = "/users/<user_id>/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
     Create,
+    #[post(url = "/users/me/application-passwords", params = &ApplicationPasswordCreateParams, output = ApplicationPasswordWithEditContext)]
+    CreateForCurrentUser,
     #[delete(url = "/users/<user_id>/application-passwords/<application_password_uuid>", output = ApplicationPasswordDeleteResponse)]
     Delete,
     #[delete(url = "/users/<user_id>/application-passwords", output = ApplicationPasswordDeleteAllResponse)]
