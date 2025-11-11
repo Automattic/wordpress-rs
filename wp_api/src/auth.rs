@@ -2,6 +2,8 @@ use http::{HeaderMap, HeaderValue};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
+use crate::login::url_discovery::AutoDiscoveryAttemptFailure;
+use crate::prelude::WpLoginClient;
 use crate::{
     login::{nonce::WpRestNonceRetrieval, url_discovery::AutoDiscoveryAttemptSuccess},
     request::RequestExecutor,
@@ -86,17 +88,19 @@ impl ModifiableAuthenticationProvider {
     }
 }
 
-#[derive(Debug, uniffi::Object)]
+#[derive(uniffi::Object)]
 pub struct CookiesNonceAuthenticationProvider {
+    site_url: String,
     username: String,
     password: String,
-    nonce_retrieval: Arc<WpRestNonceRetrieval>,
+    request_executor: Arc<dyn RequestExecutor>,
+    nonce_retrieval: RwLock<Option<Arc<WpRestNonceRetrieval>>>,
     auth: RwLock<WpAuthentication>,
 }
 
 #[uniffi::export]
 impl CookiesNonceAuthenticationProvider {
-    #[uniffi::constructor]
+    #[uniffi::constructor(name = "new")]
     pub fn new(
         username: String,
         password: String,
@@ -104,14 +108,77 @@ impl CookiesNonceAuthenticationProvider {
         request_executor: Arc<dyn RequestExecutor>,
     ) -> Self {
         Self {
+            site_url: details.api_details.site_url_string(),
             username,
             password,
-            nonce_retrieval: Arc::new(WpRestNonceRetrieval::new(details, request_executor)),
+            request_executor: request_executor.clone(),
+            nonce_retrieval: RwLock::new(Some(Arc::new(WpRestNonceRetrieval::new(
+                details,
+                request_executor.clone(),
+            )))),
+            auth: RwLock::new(WpAuthentication::None),
+        }
+    }
+
+    #[uniffi::constructor(name = "with_site_url")]
+    pub fn with_site_url(
+        url: String,
+        username: String,
+        password: String,
+        request_executor: Arc<dyn RequestExecutor>,
+    ) -> Self {
+        Self {
+            site_url: url,
+            username,
+            password,
+            request_executor,
+            nonce_retrieval: RwLock::new(None),
             auth: RwLock::new(WpAuthentication::None),
         }
     }
 }
 
+impl CookiesNonceAuthenticationProvider {
+    fn get_nonce_retrieval(&self) -> Option<Arc<WpRestNonceRetrieval>> {
+        self.nonce_retrieval
+            .read()
+            .expect("If the lock is poisoned, there isn't much we can do")
+            .as_ref()
+            .cloned()
+    }
+
+    async fn create_nonce_retrieval_if_needed(
+        &self,
+    ) -> Result<Arc<WpRestNonceRetrieval>, AutoDiscoveryAttemptFailure> {
+        if let Some(nonce_retrieval) = self.get_nonce_retrieval() {
+            return Ok(nonce_retrieval);
+        }
+
+        let client =
+            WpLoginClient::new_with_default_middleware_pipeline(self.request_executor.clone());
+        let result = client.api_discovery(self.site_url.clone()).await;
+        let details = match result.combined_result() {
+            Ok(details) => details.clone(),
+            Err(err) => {
+                return Err(err.clone());
+            }
+        };
+
+        let nonce_retrieval = Arc::new(WpRestNonceRetrieval::new(
+            details,
+            self.request_executor.clone(),
+        ));
+
+        *self
+            .nonce_retrieval
+            .write()
+            .expect("If the lock is poisoned, there isn't much we can do") =
+            Some(nonce_retrieval.clone());
+        Ok(nonce_retrieval)
+    }
+}
+
+#[uniffi::export]
 #[async_trait::async_trait]
 impl WpDynamicAuthenticationProvider for CookiesNonceAuthenticationProvider {
     fn auth(&self) -> WpAuthentication {
@@ -122,8 +189,12 @@ impl WpDynamicAuthenticationProvider for CookiesNonceAuthenticationProvider {
     }
 
     async fn refresh(&self) -> bool {
-        match self
-            .nonce_retrieval
+        let nonce_retrieval = match self.create_nonce_retrieval_if_needed().await {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+
+        match nonce_retrieval
             .get_nonce(self.username.clone(), self.password.clone())
             .await
         {
@@ -137,6 +208,15 @@ impl WpDynamicAuthenticationProvider for CookiesNonceAuthenticationProvider {
             }
             Err(_) => false,
         }
+    }
+}
+
+impl Debug for CookiesNonceAuthenticationProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CookiesNonceAuthenticationProvider")
+            .field("site_url", &self.site_url)
+            .field("username", &self.username)
+            .finish()
     }
 }
 
