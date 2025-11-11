@@ -44,6 +44,49 @@ async fn create_application_password() {
 
 #[tokio::test]
 #[serial]
+async fn create_application_password_for_current_user() {
+    let client = api_client();
+    let user_id = client
+        .users()
+        .retrieve_me_with_edit_context()
+        .await
+        .assert_response()
+        .data
+        .id;
+    let password_name = "IntegrationTest";
+    // Assert that the application password name doesn't exist
+    assert!(
+        !application_password_meta_for_user(&user_id)
+            .await
+            .unwrap()
+            .meta_value
+            .contains(password_name)
+    );
+
+    // Create an application password using the API
+    let params = ApplicationPasswordCreateParams {
+        app_id: None,
+        name: password_name.to_string(),
+    };
+    let created_application_password = client
+        .application_passwords()
+        .create_for_current_user(&params)
+        .await
+        .assert_response()
+        .data;
+
+    // Assert that the application password is created
+    let user_meta_after_update = application_password_meta_for_user(&user_id).await;
+    assert!(user_meta_after_update.is_some());
+    let meta_value = user_meta_after_update.unwrap().meta_value;
+    assert!(meta_value.contains(password_name));
+    assert!(meta_value.contains(&created_application_password.uuid.uuid));
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
 async fn update_application_password() {
     let password_name = "IntegrationTest";
     // Assert that the application password name doesn't exist
