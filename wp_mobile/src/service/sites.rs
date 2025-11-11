@@ -1,8 +1,6 @@
 use std::sync::Arc;
 use wp_mobile_cache::{
-    SqliteDbError, WpApiCache,
-    db_types::db_site::DbSite,
-    entity::EntityId,
+    DbTable, SqliteDbError, WpApiCache, db_types::db_site::DbSite, entity::EntityId,
     repository::sites::SiteRepository,
 };
 
@@ -33,7 +31,7 @@ impl SiteService {
         let site_repository = SiteRepository;
         let entity_id = EntityId {
             db_site: self.db_site,
-            table_name: SiteRepository::SELF_HOSTED_SITES_TABLE,
+            table: DbTable::SelfHostedSites,
             rowid: self.db_site.mapped_site_id,
         };
 

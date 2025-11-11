@@ -163,15 +163,15 @@ mod tests {
             .post_service
             .get_entity_with_edit_context(entity_id.clone());
 
-        // Get the table name and rowid from the entity_id
-        let table_name = entity_id.table_name;
+        // Get the table and rowid from the entity_id
+        let table = entity_id.table;
         let rowid = entity_id.rowid.0 as i64;
 
         // Test: Create UpdateHook that matches this entity
         let matching_hook = UpdateHook {
             action: HookAction::Update,
             db_name: "main".to_string(),
-            table_name: table_name.to_string(),
+            table,
             row_id: rowid,
         };
 
@@ -185,7 +185,7 @@ mod tests {
         let wrong_table_hook = UpdateHook {
             action: HookAction::Update,
             db_name: "main".to_string(),
-            table_name: "wrong_table".to_string(),
+            table: wp_mobile_cache::DbTable::PostsViewContext, // Different table
             row_id: rowid,
         };
 
@@ -199,7 +199,7 @@ mod tests {
         let wrong_rowid_hook = UpdateHook {
             action: HookAction::Update,
             db_name: "main".to_string(),
-            table_name: table_name.to_string(),
+            table,
             row_id: rowid + 1,
         };
 

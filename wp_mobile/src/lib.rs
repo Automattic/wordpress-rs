@@ -10,6 +10,7 @@ mod service;
 mod test_fixtures;
 
 // Re-export types
+pub use all_posts_with_edit_context_collection::AllPostsWithEditContextCollection;
 pub use entity_error::EntityError;
 
 /// Macro to create UniFFI-compatible entity wrappers

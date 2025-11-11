@@ -1,11 +1,9 @@
 use crate::FullEntityAnyPostWithEditContext;
 use std::sync::Arc;
 use wp_mobile_cache::{
-    SqliteDbError, UpdateHook, WpApiCache, context::EditContext, db_types::db_site::DbSite,
-    entity::FullEntity, repository::posts::PostRepository,
+    DbTable, SqliteDbError, UpdateHook, WpApiCache, context::EditContext,
+    db_types::db_site::DbSite, entity::FullEntity, repository::posts::PostRepository,
 };
-
-const TABLE_NAME: &str = "posts_edit_context";
 
 /// Collection of all posts with edit context for a site.
 ///
@@ -83,6 +81,6 @@ impl AllPostsWithEditContextCollection {
     /// This is intentionally simple and stateless - we don't track individual
     /// row IDs, we just know "something changed in this table".
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
-        hook.table_name == TABLE_NAME
+        hook.table == DbTable::PostsEditContext
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    RowId, SqliteDbError,
+    DbTable, RowId, SqliteDbError,
     context::{EditContext, EmbedContext, IsContext, ViewContext},
     db_types::{
         db_site::DbSite,
@@ -42,8 +42,8 @@ pub trait PostContext: IsContext {
     /// The context-specific database wrapper type (e.g., DbAnyPostWithEditContext)
     type DbPost;
 
-    /// The table name for this context (e.g., "posts_edit_context")
-    const TABLE_NAME: &'static str;
+    /// Get the database table for this context
+    fn table() -> DbTable;
 
     /// Construct DbPost from a database row with lazy term relationship loading.
     ///
@@ -92,8 +92,6 @@ impl<C: PostContext> Default for PostRepository<C> {
 }
 
 impl<C: PostContext> PostRepository<C> {
-    const TABLE_NAME_PREFIX: &'static str = "posts";
-
     /// Create a new repository instance.
     pub fn new() -> Self {
         Self {
@@ -102,8 +100,8 @@ impl<C: PostContext> PostRepository<C> {
     }
 
     /// Get the full table name for this context.
-    pub fn table_name() -> String {
-        C::table_name(Self::TABLE_NAME_PREFIX)
+    pub fn table_name() -> &'static str {
+        C::table().table_name()
     }
 
     /// Select a post by its EntityId (returns wrapper with rowid).
@@ -117,7 +115,7 @@ impl<C: PostContext> PostRepository<C> {
         entity_id: &EntityId,
     ) -> Result<Option<FullEntity<C::DbPost>>, SqliteDbError> {
         // Validate that the entity_id is for the correct table
-        entity_id.validate_table_name(C::TABLE_NAME)?;
+        entity_id.validate_table(C::table())?;
 
         // First get the post.id (WordPress ID) from the rowid
         let sql = format!(
@@ -207,7 +205,7 @@ impl<C: PostContext> PostRepository<C> {
             .into_iter()
             .map(|db_post| {
                 let rowid = C::get_rowid(&db_post);
-                let entity_id = Arc::new(EntityId::new(*site, C::TABLE_NAME, rowid));
+                let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
                 FullEntity::new(entity_id, db_post)
             })
             .collect())
@@ -252,7 +250,7 @@ impl<C: PostContext> PostRepository<C> {
         Ok(db_post.map(|db_post| {
             let rowid = C::get_rowid(&db_post);
 
-            let entity_id = Arc::new(EntityId::new(*site, C::TABLE_NAME, rowid));
+            let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
 
             FullEntity::new(entity_id, db_post)
         }))
@@ -307,7 +305,10 @@ impl<C: PostContext> PostRepository<C> {
 impl PostContext for EditContext {
     type Post = AnyPostWithEditContext;
     type DbPost = DbAnyPostWithEditContext;
-    const TABLE_NAME: &'static str = "posts_edit_context";
+
+    fn table() -> DbTable {
+        DbTable::PostsEditContext
+    }
 
     fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
@@ -395,7 +396,10 @@ impl PostContext for EditContext {
 impl PostContext for ViewContext {
     type Post = AnyPostWithViewContext;
     type DbPost = DbAnyPostWithViewContext;
-    const TABLE_NAME: &'static str = "posts_view_context";
+
+    fn table() -> DbTable {
+        DbTable::PostsViewContext
+    }
 
     fn from_row_with_terms<F>(row: &Row, fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
@@ -476,7 +480,10 @@ impl PostContext for ViewContext {
 impl PostContext for EmbedContext {
     type Post = AnyPostWithEmbedContext;
     type DbPost = DbAnyPostWithEmbedContext;
-    const TABLE_NAME: &'static str = "posts_embed_context";
+
+    fn table() -> DbTable {
+        DbTable::PostsEmbedContext
+    }
 
     fn from_row_with_terms<F>(row: &Row, _fetch_terms: F) -> Result<Self::DbPost, SqliteDbError>
     where
@@ -658,7 +665,7 @@ impl PostRepository<EditContext> {
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok(EntityId::new(*site, EditContext::TABLE_NAME, post_rowid))
+        Ok(EntityId::new(*site, EditContext::table(), post_rowid))
     }
 
     /// Upsert multiple posts with their term relationships.
@@ -791,7 +798,7 @@ impl PostRepository<ViewContext> {
         }
 
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok(EntityId::new(*site, ViewContext::TABLE_NAME, post_rowid))
+        Ok(EntityId::new(*site, ViewContext::table(), post_rowid))
     }
 
     /// Upsert multiple posts with their term relationships.
@@ -877,7 +884,7 @@ impl PostRepository<EmbedContext> {
         // No term relationships for EmbedContext (no categories or tags)
 
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok(EntityId::new(*site, EmbedContext::TABLE_NAME, post_rowid))
+        Ok(EntityId::new(*site, EmbedContext::table(), post_rowid))
     }
 
     /// Upsert multiple posts.

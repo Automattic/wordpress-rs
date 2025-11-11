@@ -103,8 +103,7 @@ fn test_select_by_post_id_returns_none_for_non_existent_post(test_ctx: TestConte
 #[rstest]
 fn test_select_by_entity_id_returns_none_for_non_existent_rowid(test_ctx: TestContext) {
     // Create an EntityId with a non-existent rowid
-    let non_existent_entity_id =
-        EntityId::new(test_ctx.site, EditContext::TABLE_NAME, RowId(99999));
+    let non_existent_entity_id = EntityId::new(test_ctx.site, EditContext::table(), RowId(99999));
 
     let result = test_ctx
         .post_repo

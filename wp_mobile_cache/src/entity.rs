@@ -1,7 +1,5 @@
-use crate::{RowId, SqliteDbError, UpdateHook, db_types::db_site::DbSite};
+use crate::{DbTable, RowId, SqliteDbError, UpdateHook, db_types::db_site::DbSite};
 use std::sync::Arc;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 
 /// Hashable key derived from an EntityId
 ///
@@ -20,18 +18,11 @@ pub struct EntityKey {
     pub part3: u64,
 }
 
-/// Helper function to create a stable hash of a table name
-fn hash_table_name(table_name: &str) -> u32 {
-    let mut hasher = DefaultHasher::new();
-    table_name.hash(&mut hasher);
-    hasher.finish() as u32
-}
-
 /// Unique identifier for an entity stored in the cache database
 ///
 /// Encapsulates the complete identity of a cached entity:
 /// - Which site (DbSite with site_type and mapped_site_id)
-/// - Which table (table_name)
+/// - Which table (DbTable enum variant)
 /// - Which row (rowid)
 ///
 /// This type serves as an opaque handle that can be used to:
@@ -47,10 +38,8 @@ pub struct EntityId {
     /// The site this entity belongs to
     pub db_site: DbSite,
 
-    /// The table name where this entity is stored (e.g., "posts_edit_context")
-    ///
-    /// Uses a static string reference to avoid heap allocation and keep EntityId small.
-    pub table_name: &'static str,
+    /// The table where this entity is stored
+    pub table: DbTable,
 
     /// The database rowid (SQLite autoincrement primary key)
     pub rowid: RowId,
@@ -58,22 +47,22 @@ pub struct EntityId {
 
 impl EntityId {
     /// Create a new EntityId (internal only - not exposed via UniFFI)
-    pub(crate) fn new(db_site: DbSite, table_name: &'static str, rowid: RowId) -> Self {
+    pub(crate) fn new(db_site: DbSite, table: DbTable, rowid: RowId) -> Self {
         Self {
             db_site,
-            table_name,
+            table,
             rowid,
         }
     }
 
-    /// Validate that this EntityId's table name matches the expected table.
+    /// Validate that this EntityId's table matches the expected table.
     ///
-    /// Returns an error if the table names don't match.
-    pub fn validate_table_name(&self, expected: &'static str) -> Result<(), SqliteDbError> {
-        if self.table_name != expected {
+    /// Returns an error if the tables don't match.
+    pub fn validate_table(&self, expected: DbTable) -> Result<(), SqliteDbError> {
+        if self.table != expected {
             return Err(SqliteDbError::TableNameMismatch {
-                expected: expected.to_string(),
-                actual: self.table_name.to_string(),
+                expected,
+                actual: self.table,
             });
         }
 
@@ -90,7 +79,7 @@ impl EntityId {
     pub fn to_key(&self) -> EntityKey {
         EntityKey {
             part1: self.db_site.row_id.0 as i64,
-            part2: hash_table_name(self.table_name),
+            part2: self.table as u32,
             part3: self.rowid.0,
         }
     }
@@ -173,7 +162,7 @@ impl<T> Entity<T> {
     /// This method allows platform-specific observable wrappers to determine
     /// whether they should notify observers about a database change.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
-        self.entity_id.table_name == hook.table_name && self.entity_id.rowid == hook.row_id.into()
+        self.entity_id.table == hook.table && self.entity_id.rowid == hook.row_id.into()
     }
 
     // TODO: Add methods that will be implemented later:
@@ -206,8 +195,8 @@ mod tests {
     #[test]
     fn test_is_same_entity_matching() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site, "posts_edit_context", RowId(42));
-        let id2 = EntityId::new(site, "posts_edit_context", RowId(42));
+        let id1 = EntityId::new(site, DbTable::PostsEditContext, RowId(42));
+        let id2 = EntityId::new(site, DbTable::PostsEditContext, RowId(42));
 
         assert_eq!(id1, id2);
     }
@@ -215,8 +204,8 @@ mod tests {
     #[test]
     fn test_not_same_entity_different_rowid() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site, "posts_edit_context", RowId(42));
-        let id2 = EntityId::new(site, "posts_edit_context", RowId(43));
+        let id1 = EntityId::new(site, DbTable::PostsEditContext, RowId(42));
+        let id2 = EntityId::new(site, DbTable::PostsEditContext, RowId(43));
 
         assert_ne!(id1, id2);
     }
@@ -224,8 +213,8 @@ mod tests {
     #[test]
     fn test_not_same_entity_different_table() {
         let site = make_db_site(1);
-        let id1 = EntityId::new(site, "posts_edit_context", RowId(42));
-        let id2 = EntityId::new(site, "posts_view_context", RowId(42));
+        let id1 = EntityId::new(site, DbTable::PostsEditContext, RowId(42));
+        let id2 = EntityId::new(site, DbTable::PostsViewContext, RowId(42));
 
         assert_ne!(id1, id2);
     }
@@ -234,8 +223,8 @@ mod tests {
     fn test_not_is_same_entity_different_site() {
         let site1 = make_db_site(1);
         let site2 = make_db_site(2);
-        let id1 = EntityId::new(site1, "posts_edit_context", RowId(42));
-        let id2 = EntityId::new(site2, "posts_edit_context", RowId(42));
+        let id1 = EntityId::new(site1, DbTable::PostsEditContext, RowId(42));
+        let id2 = EntityId::new(site2, DbTable::PostsEditContext, RowId(42));
 
         assert_ne!(id1, id2);
     }

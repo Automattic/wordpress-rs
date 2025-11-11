@@ -1,5 +1,5 @@
 use crate::{
-    RowId, SqliteDbError,
+    DbTable, RowId, SqliteDbError,
     db_types::{
         db_site::{DbSite, DbSiteType},
         row_ext::RowExt,
@@ -14,9 +14,6 @@ use std::sync::Arc;
 pub struct SiteRepository;
 
 impl SiteRepository {
-    pub const SELF_HOSTED_SITES_TABLE: &'static str = "self_hosted_sites";
-    const DB_SITES_TABLE: &'static str = "db_sites";
-
     /// Upsert a self-hosted site and return its EntityId (atomic transaction).
     ///
     /// If a site with the given URL already exists, updates it. Otherwise creates a new one.
@@ -34,7 +31,7 @@ impl SiteRepository {
                 "INSERT INTO {} (url, api_root) VALUES (?, ?)
                  ON CONFLICT(url) DO UPDATE SET api_root = excluded.api_root
                  RETURNING rowid",
-                Self::SELF_HOSTED_SITES_TABLE
+                DbTable::SelfHostedSites.table_name()
             );
 
             let mut stmt = tx.prepare(&sql)?;
@@ -51,7 +48,7 @@ impl SiteRepository {
                  ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
                     site_type = excluded.site_type
                  RETURNING rowid",
-                Self::DB_SITES_TABLE
+                DbTable::DbSites.table_name()
             );
 
             let mut stmt = tx.prepare(&sql)?;
@@ -70,7 +67,7 @@ impl SiteRepository {
         tx.commit().map_err(SqliteDbError::from)?;
         Ok(EntityId::new(
             db_site,
-            Self::SELF_HOSTED_SITES_TABLE,
+            DbTable::SelfHostedSites,
             self_hosted_site_id,
         ))
     }
@@ -88,7 +85,7 @@ impl SiteRepository {
         entity_id: &EntityId,
     ) -> Result<Option<FullEntity<DbSelfHostedSite>>, SqliteDbError> {
         // Validate that the entity_id is for the correct table
-        entity_id.validate_table_name(Self::SELF_HOSTED_SITES_TABLE)?;
+        entity_id.validate_table(DbTable::SelfHostedSites)?;
 
         if entity_id.db_site.site_type != DbSiteType::SelfHosted {
             return Ok(None);
@@ -96,7 +93,7 @@ impl SiteRepository {
 
         let sql = format!(
             "SELECT * FROM {} WHERE rowid = ?",
-            Self::SELF_HOSTED_SITES_TABLE
+            DbTable::SelfHostedSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
 
@@ -129,7 +126,7 @@ impl SiteRepository {
         // First get the self_hosted_site
         let sql = format!(
             "SELECT * FROM {} WHERE url = ?",
-            Self::SELF_HOSTED_SITES_TABLE
+            DbTable::SelfHostedSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
 
@@ -152,7 +149,7 @@ impl SiteRepository {
         let sql = format!(
             "SELECT rowid, site_type, mapped_site_id FROM {}
              WHERE site_type = ? AND mapped_site_id = ?",
-            Self::DB_SITES_TABLE
+            DbTable::DbSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
 
@@ -170,7 +167,7 @@ impl SiteRepository {
         Ok(db_site.map(|db_site| {
             let entity_id = Arc::new(EntityId::new(
                 db_site,
-                Self::SELF_HOSTED_SITES_TABLE,
+                DbTable::SelfHostedSites,
                 self_hosted_site.row_id,
             ));
             FullEntity::new(entity_id, (db_site, self_hosted_site))
@@ -184,7 +181,7 @@ impl SiteRepository {
         &self,
         executor: &impl QueryExecutor,
     ) -> Result<usize, SqliteDbError> {
-        let sql = format!("SELECT COUNT(*) FROM {}", Self::DB_SITES_TABLE);
+        let sql = format!("SELECT COUNT(*) FROM {}", DbTable::DbSites.table_name());
         let mut stmt = executor.prepare(&sql)?;
         let count: i64 = stmt.query_row([], |row| row.get(0))?;
         Ok(count as usize)
@@ -197,7 +194,10 @@ impl SiteRepository {
         &self,
         executor: &impl QueryExecutor,
     ) -> Result<usize, SqliteDbError> {
-        let sql = format!("SELECT COUNT(*) FROM {}", Self::SELF_HOSTED_SITES_TABLE);
+        let sql = format!(
+            "SELECT COUNT(*) FROM {}",
+            DbTable::SelfHostedSites.table_name()
+        );
         let mut stmt = executor.prepare(&sql)?;
         let count: i64 = stmt.query_row([], |row| row.get(0))?;
         Ok(count as usize)
@@ -222,7 +222,7 @@ impl SiteRepository {
             DbSiteType::SelfHosted => {
                 let sql = format!(
                     "DELETE FROM {} WHERE rowid = ?",
-                    Self::SELF_HOSTED_SITES_TABLE
+                    DbTable::SelfHostedSites.table_name()
                 );
                 tx.execute(&sql, [site.mapped_site_id])?;
             }
@@ -233,7 +233,10 @@ impl SiteRepository {
 
         // Delete from sites table
         let sites_deleted = {
-            let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::DB_SITES_TABLE);
+            let sql = format!(
+                "DELETE FROM {} WHERE rowid = ?",
+                DbTable::DbSites.table_name()
+            );
             tx.execute(&sql, [site.row_id])?
         };
 
@@ -308,8 +311,8 @@ mod tests {
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
-        // Verify the EntityId has correct table name and site type
-        assert_eq!(entity_id.table_name, "self_hosted_sites");
+        // Verify the EntityId has correct table and site type
+        assert_eq!(entity_id.table, DbTable::SelfHostedSites);
         assert_eq!(entity_id.db_site.site_type, DbSiteType::SelfHosted);
         assert_eq!(entity_id.db_site.mapped_site_id, entity_id.rowid);
     }
@@ -409,11 +412,7 @@ mod tests {
         };
 
         // Create an EntityId for this non-self-hosted site
-        let entity_id = EntityId::new(
-            non_self_hosted_site,
-            SiteRepository::SELF_HOSTED_SITES_TABLE,
-            RowId(999),
-        );
+        let entity_id = EntityId::new(non_self_hosted_site, DbTable::SelfHostedSites, RowId(999));
 
         let result = repo
             .select_self_hosted_site(&test_conn, &entity_id)
@@ -436,11 +435,7 @@ mod tests {
         };
 
         // Create an EntityId for this non-existent site
-        let entity_id = EntityId::new(
-            non_existent_site,
-            SiteRepository::SELF_HOSTED_SITES_TABLE,
-            RowId(999),
-        );
+        let entity_id = EntityId::new(non_existent_site, DbTable::SelfHostedSites, RowId(999));
 
         let result = repo
             .select_self_hosted_site(&test_conn, &entity_id)

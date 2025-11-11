@@ -144,7 +144,9 @@ impl MockPostService {
             .execute(|conn| {
                 let mut post = repo
                     .select_by_post_id(conn, &self.db_site, id)?
-                    .ok_or_else(|| wp_mobile_cache::SqliteDbError::SqliteError("Post not found".to_string()))?
+                    .ok_or_else(|| {
+                        wp_mobile_cache::SqliteDbError::SqliteError("Post not found".to_string())
+                    })?
                     .data
                     .post;
                 post.title.rendered = new_title;
@@ -230,10 +232,8 @@ impl MockPostService {
                         // Read and update in a single atomic operation
                         if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
                             let mut post = full_entity.data.post;
-                            post.title.rendered = format!(
-                                "Updated Post {} (update #{})",
-                                post.id.0, current_count
-                            );
+                            post.title.rendered =
+                                format!("Updated Post {} (update #{})", post.id.0, current_count);
                             repo.upsert(conn, &db_site, &post)?;
                         }
                         Ok::<_, wp_mobile_cache::SqliteDbError>(())
@@ -322,10 +322,8 @@ impl MockPostService {
                                 "Updated Post {} (batch update #{})",
                                 post.id.0, current_count
                             );
-                            post.content.rendered = format!(
-                                "<p>Content updated at batch #{}</p>",
-                                current_count
-                            );
+                            post.content.rendered =
+                                format!("<p>Content updated at batch #{}</p>", current_count);
                             repo.upsert(conn, &db_site, &post)?;
                         }
                         Ok::<_, wp_mobile_cache::SqliteDbError>(())

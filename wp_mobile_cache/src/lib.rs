@@ -15,7 +15,7 @@ pub mod test_fixtures;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),
-    TableNameMismatch { expected: String, actual: String },
+    TableNameMismatch { expected: DbTable, actual: DbTable },
 }
 
 impl std::fmt::Display for SqliteDbError {
@@ -25,8 +25,9 @@ impl std::fmt::Display for SqliteDbError {
             SqliteDbError::TableNameMismatch { expected, actual } => {
                 write!(
                     f,
-                    "Table name mismatch: expected '{}', but got '{}'",
-                    expected, actual
+                    "Table mismatch: expected '{}', but got '{}'",
+                    expected.table_name(),
+                    actual.table_name()
                 )
             }
         }
@@ -36,6 +37,77 @@ impl std::fmt::Display for SqliteDbError {
 impl From<rusqlite::Error> for SqliteDbError {
     fn from(err: rusqlite::Error) -> Self {
         SqliteDbError::SqliteError(err.to_string())
+    }
+}
+
+/// Database table identifier.
+///
+/// Represents all tables tracked in the cache database. This enum provides
+/// a single source of truth for table names, ensuring consistency across
+/// the codebase and preventing typos.
+///
+/// Note: uniffi::Enum makes this type available to platform bindings but
+/// without exposing any methods (which is intentional - we don't want
+/// Kotlin/Swift to access table names directly).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum DbTable {
+    /// Posts with edit context (full data for editing)
+    PostsEditContext,
+    /// Posts with view context (public viewing data)
+    PostsViewContext,
+    /// Posts with embed context (minimal data for embeds)
+    PostsEmbedContext,
+    /// Self-hosted WordPress sites
+    SelfHostedSites,
+    /// Database sites mapping table
+    DbSites,
+    /// Term relationships (post-category, post-tag associations)
+    TermRelationships,
+}
+
+impl DbTable {
+    /// Get the database table name as a string.
+    ///
+    /// This is the only place where table names are defined as strings,
+    /// ensuring single source of truth for all SQL queries.
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            DbTable::PostsEditContext => "posts_edit_context",
+            DbTable::PostsViewContext => "posts_view_context",
+            DbTable::PostsEmbedContext => "posts_embed_context",
+            DbTable::SelfHostedSites => "self_hosted_sites",
+            DbTable::DbSites => "db_sites",
+            DbTable::TermRelationships => "term_relationships",
+        }
+    }
+}
+
+impl std::fmt::Display for DbTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.table_name())
+    }
+}
+
+/// Error type for DbTable conversion failures
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DbTableError {
+    #[error("Unknown table: {0}")]
+    UnknownTable(String),
+}
+
+impl TryFrom<&str> for DbTable {
+    type Error = DbTableError;
+
+    fn try_from(table_name: &str) -> Result<Self, Self::Error> {
+        match table_name {
+            "posts_edit_context" => Ok(DbTable::PostsEditContext),
+            "posts_view_context" => Ok(DbTable::PostsViewContext),
+            "posts_embed_context" => Ok(DbTable::PostsEmbedContext),
+            "self_hosted_sites" => Ok(DbTable::SelfHostedSites),
+            "db_sites" => Ok(DbTable::DbSites),
+            "term_relationships" => Ok(DbTable::TermRelationships),
+            _ => Err(DbTableError::UnknownTable(table_name.to_string())),
+        }
     }
 }
 
@@ -183,14 +255,24 @@ impl WpApiCache {
         self.execute(|connection| {
             connection.update_hook(Some(
                 move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
-                    let hook_data = UpdateHook {
-                        action: action.into(),
-                        db_name: db_name.to_string(),
-                        table_name: table_name.to_string(),
-                        row_id,
-                    };
-
-                    delegate.did_update(hook_data);
+                    match DbTable::try_from(table_name) {
+                        Ok(table) => {
+                            let hook_data = UpdateHook {
+                                action: action.into(),
+                                db_name: db_name.to_string(),
+                                table,
+                                row_id,
+                            };
+                            delegate.did_update(hook_data);
+                        }
+                        Err(_) => {
+                            // Ignore SQLite system tables (sqlite_sequence, sqlite_master, etc.)
+                            // These are expected and we don't need to track them
+                            if !table_name.starts_with("sqlite_") {
+                                eprintln!("Warning: Unknown table in update hook: {}", table_name);
+                            }
+                        }
+                    }
                 },
             ));
         });
@@ -357,7 +439,7 @@ pub struct User {
 pub struct UpdateHook {
     pub action: HookAction,
     pub db_name: String,
-    pub table_name: String,
+    pub table: DbTable,
     pub row_id: i64,
 }
 
