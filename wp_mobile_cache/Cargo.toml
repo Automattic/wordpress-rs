@@ -17,4 +17,4 @@ wp_api = { path = "../wp_api" }
 [dev-dependencies]
 chrono = { workspace = true }
 integration_test_credentials = { path = "../integration_test_credentials" }
-rstest = "0.24"
+rstest = "0.26"
