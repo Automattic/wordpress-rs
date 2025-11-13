@@ -1,5 +1,6 @@
 package rs.wordpress.cache.kotlin
 
+import uniffi.wp_mobile.AnyPostFilter
 import uniffi.wp_mobile.FullEntityAnyPostWithEditContext
 import uniffi.wp_mobile.PostService
 import uniffi.wp_mobile_cache.EntityId
@@ -16,6 +17,15 @@ fun PostService.getObservableEntityWithEditContext(entityId: EntityId): Observab
 
 fun PostService.getObservableAllPostsWithEditContext(): ObservableCollection<FullEntityAnyPostWithEditContext> {
     val collection = this.getAllPostsWithEditContext()
+    return createObservableCollection(
+        loadData = collection::loadData,
+        loadDataAsync = collection::loadDataAsync,
+        isRelevantUpdate = collection::isRelevantUpdate
+    )
+}
+
+fun PostService.getObservablePostCollectionWithEditContext(filter: AnyPostFilter): ObservableCollection<FullEntityAnyPostWithEditContext> {
+    val collection = this.createPostCollectionWithEditContext(filter)
     return createObservableCollection(
         loadData = collection::loadData,
         loadDataAsync = collection::loadDataAsync,
