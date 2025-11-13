@@ -1,6 +1,5 @@
 use crate::{AnyPostFilter, FetchError, FetchResult, NaiveCollection, service::posts::PostService};
 use std::sync::Arc;
-use wp_api::posts::AnyPostWithEditContext;
 use wp_mobile_cache::entity::FullEntity;
 
 /// Collection of posts with context-specific data
@@ -89,6 +88,3 @@ impl<T> PostCollection<T> {
         self.naive_collection.is_relevant_update(hook)
     }
 }
-
-// Type alias for EditContext collection
-pub type PostCollectionWithEditContext = PostCollection<AnyPostWithEditContext>;

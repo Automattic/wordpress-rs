@@ -1,6 +1,7 @@
 use crate::{
     AllAnyPostWithEditContextCollection, AnyPostFilter, EntityAnyPostWithEditContext, FetchError,
-    FetchResult, NaiveCollection, PostCollection, PostCollectionWithEditContext,
+    FetchResult, NaiveCollection, PostCollectionWithEditContext,
+    collection::post_collection::PostCollection,
 };
 use std::sync::Arc;
 use wp_api::{
@@ -98,7 +99,7 @@ impl PostService {
             }),
         );
 
-        PostCollection::new(filter.clone(), naive_collection, self.clone())
+        PostCollection::new(filter.clone(), naive_collection, self.clone()).into()
     }
 
     /// Fetch posts from network and save to cache
