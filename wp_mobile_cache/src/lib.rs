@@ -6,7 +6,6 @@ use std::sync::Mutex;
 pub mod context;
 pub mod db_types;
 pub mod entity;
-pub mod naive_collection;
 pub mod repository;
 pub mod term_relationships;
 

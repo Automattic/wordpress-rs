@@ -1,4 +1,4 @@
-use crate::{DbTable, SqliteDbError, UpdateHook};
+use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 
 /// Lightweight handle to a collection of entities that reloads all data from the database.
 ///
@@ -93,7 +93,7 @@ impl<T> NaiveCollection<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::HookAction;
+    use wp_mobile_cache::HookAction;
 
     #[test]
     fn test_load_data_calls_closure() {

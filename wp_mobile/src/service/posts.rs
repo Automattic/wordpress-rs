@@ -1,4 +1,4 @@
-use crate::{AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext};
+use crate::{AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext, NaiveCollection};
 use std::sync::Arc;
 use wp_api::{api_client::WpApiClient, posts::AnyPostWithEditContext};
 use wp_mobile_cache::{
@@ -101,7 +101,7 @@ impl PostService {
         let cache = self.cache.clone();
         let db_site = *self.db_site;
 
-        wp_mobile_cache::naive_collection::NaiveCollection::new(
+        NaiveCollection::new(
             vec![
                 wp_mobile_cache::DbTable::PostsEditContext,
                 wp_mobile_cache::DbTable::TermRelationships,

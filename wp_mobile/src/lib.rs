@@ -4,6 +4,7 @@ pub use wp_mobile_cache;
 
 mod collection_error;
 mod entity_error;
+mod naive_collection;
 mod service;
 
 #[cfg(test)]
@@ -12,6 +13,7 @@ mod test_fixtures;
 // Re-export types
 pub use collection_error::CollectionError;
 pub use entity_error::EntityError;
+pub use naive_collection::NaiveCollection;
 
 /// Macro to create UniFFI-compatible entity wrappers
 ///
@@ -152,19 +154,19 @@ macro_rules! wp_mobile_naive_collection {
         paste::paste! {
             #[derive(uniffi::Object)]
             pub struct [<All $entity_name Collection>](
-                pub wp_mobile_cache::naive_collection::NaiveCollection<
+                pub $crate::NaiveCollection<
                     wp_mobile_cache::entity::FullEntity<$data_type>,
                 >,
             );
 
             impl From<
-                    wp_mobile_cache::naive_collection::NaiveCollection<
+                    $crate::NaiveCollection<
                         wp_mobile_cache::entity::FullEntity<$data_type>,
                     >,
                 > for [<All $entity_name Collection>]
             {
                 fn from(
-                    value: wp_mobile_cache::naive_collection::NaiveCollection<
+                    value: $crate::NaiveCollection<
                         wp_mobile_cache::entity::FullEntity<$data_type>,
                     >,
                 ) -> Self {
