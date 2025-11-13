@@ -170,45 +170,7 @@ impl<C: PostContext> PostRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<Vec<FullEntity<C::DbPost>>, SqliteDbError> {
-        // First pass: extract post IDs (WordPress IDs, not SQLite rowids)
-        let sql = format!("SELECT id FROM {} WHERE db_site_id = ?", Self::table_name());
-        let mut stmt = executor.prepare(&sql)?;
-        let post_ids: Vec<i64> = stmt
-            .query_map([site.row_id], |row| row.get(0))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)?;
-
-        if post_ids.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        // Batch load term relationships for all posts using WordPress post IDs
-        // This is done upfront for efficiency, but each context decides whether to use them
-        let term_repo = TermRelationshipRepository;
-        let terms_map = term_repo.get_terms_for_objects(executor, site, &post_ids)?;
-
-        // Second pass: construct posts with lazy term relationship access
-        let sql = format!("SELECT * FROM {} WHERE db_site_id = ?", Self::table_name());
-        let mut stmt = executor.prepare(&sql)?;
-        let posts = stmt
-            .query_map([site.row_id], |row| {
-                let post_id: i64 = row.get("id")?;
-                C::from_row_with_terms(row, || {
-                    Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
-                })
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
-            })?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(SqliteDbError::from)?;
-
-        Ok(posts
-            .into_iter()
-            .map(|db_post| {
-                let rowid = C::get_rowid(&db_post);
-                let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
-                FullEntity::new(entity_id, db_post)
-            })
-            .collect())
+        self.select_by_filter(executor, site, None)
     }
 
     /// Select posts filtered by criteria.
@@ -1328,10 +1290,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(drafts.len(), 1);
-        assert_eq!(
-            drafts[0].data.post.status,
-            wp_api::posts::PostStatus::Draft
-        );
+        assert_eq!(drafts[0].data.post.status, wp_api::posts::PostStatus::Draft);
 
         // No filter - returns all
         let all = test_ctx
