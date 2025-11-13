@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.ObservableCollection
 import rs.wordpress.cache.kotlin.WordPressApiCache
-import rs.wordpress.cache.kotlin.getObservableAllPostsWithEditContext
+import rs.wordpress.cache.kotlin.getObservablePostCollectionWithEditContext
+import uniffi.wp_mobile.AnyPostFilter
 import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.StressTestHandle
 import uniffi.wp_mobile.WpSelfHostedService
@@ -82,7 +83,7 @@ class StressTestViewModel(
         val postService = selfHostedService.posts()
 
         // Create a single observable collection for all posts
-        val collection = postService.getObservableAllPostsWithEditContext()
+        val collection = postService.getObservablePostCollectionWithEditContext(AnyPostFilter())
 
         // Helper function to reload and update posts
         fun reloadPostsAndMeasure(): Long {
