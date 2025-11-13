@@ -211,6 +211,95 @@ impl<C: PostContext> PostRepository<C> {
             .collect())
     }
 
+    /// Select posts filtered by criteria.
+    ///
+    /// Similar to `select_all` but applies filtering based on provided parameters.
+    /// Currently supports filtering by status. More filters can be added as needed.
+    ///
+    /// # Arguments
+    /// * `executor` - Database connection or transaction
+    /// * `site` - The site to query posts from
+    /// * `status` - Optional post status filter (e.g., "publish", "draft")
+    ///
+    /// # Returns
+    /// Vector of posts matching the filter criteria, empty if no matches found.
+    pub fn select_by_filter(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        status: Option<&wp_api::posts::PostStatus>,
+    ) -> Result<Vec<FullEntity<C::DbPost>>, SqliteDbError> {
+        // Build WHERE clause
+        let mut where_clauses = vec!["db_site_id = ?"];
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(site.row_id)];
+
+        if let Some(status_value) = status {
+            where_clauses.push("status = ?");
+            params.push(Box::new(status_value.to_string()));
+        }
+
+        let where_clause = where_clauses.join(" AND ");
+
+        // First pass: extract post IDs (WordPress IDs, not SQLite rowids)
+        let sql = format!(
+            "SELECT id FROM {} WHERE {}",
+            Self::table_name(),
+            where_clause
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let post_ids: Vec<i64> = stmt
+            .query_map(
+                rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
+                |row| row.get(0),
+            )?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
+
+        if post_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Batch load term relationships for all posts using WordPress post IDs
+        let term_repo = TermRelationshipRepository;
+        let terms_map = term_repo.get_terms_for_objects(executor, site, &post_ids)?;
+
+        // Rebuild params for second query (need fresh boxes since params were consumed)
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(site.row_id)];
+        if let Some(status_value) = status {
+            params.push(Box::new(status_value.to_string()));
+        }
+
+        // Second pass: construct posts with lazy term relationship access
+        let sql = format!(
+            "SELECT * FROM {} WHERE {}",
+            Self::table_name(),
+            where_clause
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let posts = stmt
+            .query_map(
+                rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
+                |row| {
+                    let post_id: i64 = row.get("id")?;
+                    C::from_row_with_terms(row, || {
+                        Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
+                    })
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(posts
+            .into_iter()
+            .map(|db_post| {
+                let rowid = C::get_rowid(&db_post);
+                let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
+                FullEntity::new(entity_id, db_post)
+            })
+            .collect())
+    }
+
     /// Select a post by its WordPress post ID for a given site.
     ///
     /// Returns the post data paired with its EntityId, which encapsulates the
@@ -1191,6 +1280,63 @@ mod tests {
         let all = test_ctx
             .post_repo
             .select_all(&test_ctx.conn, &test_ctx.site)
+            .unwrap();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[rstest]
+    fn test_repository_select_by_filter(mut test_ctx: TestContext) {
+        // Insert posts with different statuses
+        let published_post = PostBuilder::minimal()
+            .with_status(wp_api::posts::PostStatus::Publish)
+            .build();
+        let draft_post = PostBuilder::minimal()
+            .with_status(wp_api::posts::PostStatus::Draft)
+            .build();
+
+        test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &published_post)
+            .unwrap();
+        test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &draft_post)
+            .unwrap();
+
+        // Filter by publish status
+        let published = test_ctx
+            .post_repo
+            .select_by_filter(
+                &test_ctx.conn,
+                &test_ctx.site,
+                Some(&wp_api::posts::PostStatus::Publish),
+            )
+            .unwrap();
+        assert_eq!(published.len(), 1);
+        assert_eq!(
+            published[0].data.post.status,
+            wp_api::posts::PostStatus::Publish
+        );
+
+        // Filter by draft status
+        let drafts = test_ctx
+            .post_repo
+            .select_by_filter(
+                &test_ctx.conn,
+                &test_ctx.site,
+                Some(&wp_api::posts::PostStatus::Draft),
+            )
+            .unwrap();
+        assert_eq!(drafts.len(), 1);
+        assert_eq!(
+            drafts[0].data.post.status,
+            wp_api::posts::PostStatus::Draft
+        );
+
+        // No filter - returns all
+        let all = test_ctx
+            .post_repo
+            .select_by_filter(&test_ctx.conn, &test_ctx.site, None)
             .unwrap();
         assert_eq!(all.len(), 2);
     }
