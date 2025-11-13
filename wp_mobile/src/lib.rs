@@ -2,6 +2,7 @@
 pub use wp_api;
 pub use wp_mobile_cache;
 
+mod collection;
 mod collection_error;
 mod entity_error;
 mod naive_collection;
@@ -11,6 +12,7 @@ mod service;
 mod test_fixtures;
 
 // Re-export types
+pub use collection::{FetchError, FetchResult};
 pub use collection_error::CollectionError;
 pub use entity_error::EntityError;
 pub use naive_collection::NaiveCollection;
