@@ -1,6 +1,6 @@
 use crate::{
     AllAnyPostWithEditContextCollection, AnyPostFilter, EntityAnyPostWithEditContext, FetchError,
-    FetchResult, NaiveCollection,
+    FetchResult, NaiveCollection, PostCollection, PostCollectionWithEditContext,
 };
 use std::sync::Arc;
 use wp_api::{
@@ -8,7 +8,7 @@ use wp_api::{
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
-    WpApiCache,
+    DbTable, WpApiCache,
     context::EditContext,
     db_types::db_site::DbSite,
     entity::{Entity, EntityId, FullEntity},
@@ -43,6 +43,62 @@ impl PostService {
     /// Get the db_site (internal use only)
     pub(crate) fn db_site(&self) -> &DbSite {
         &self.db_site
+    }
+
+    /// Create a filtered post collection with edit context
+    ///
+    /// Returns a collection that:
+    /// - Filters posts based on the provided filter criteria
+    /// - Supports network fetching via fetch_page()
+    /// - Monitors database changes and provides load_data() for cache access
+    ///
+    /// # Arguments
+    /// * `filter` - Filter criteria for posts (status, etc.)
+    ///
+    /// # Example
+    /// ```ignore
+    /// let filter = AnyPostFilter {
+    ///     status: Some(PostStatus::Draft),
+    /// };
+    /// let collection = post_service.create_post_collection_with_edit_context(&filter);
+    ///
+    /// // Fetch from network
+    /// let result = collection.fetch_page(1, 10).await?;
+    ///
+    /// // Load from cache
+    /// let posts = collection.load_data()?;
+    /// ```
+    pub fn create_post_collection_with_edit_context(
+        self: &Arc<Self>,
+        filter: &AnyPostFilter,
+    ) -> PostCollectionWithEditContext {
+        let cache = self.cache.clone();
+        let db_site = *self.db_site;
+        let filter_clone = filter.clone();
+
+        // Create NaiveCollection with filtering
+        let naive_collection = NaiveCollection::new(
+            vec![DbTable::PostsEditContext, DbTable::TermRelationships],
+            Box::new(move || {
+                let repo = PostRepository::<EditContext>::new();
+                cache.execute(|connection| {
+                    repo.select_by_filter(connection, &db_site, filter_clone.status.as_ref())
+                        .map(|posts| {
+                            posts
+                                .into_iter()
+                                .map(|db_post_full_entity| {
+                                    FullEntity::new(
+                                        db_post_full_entity.entity_id,
+                                        db_post_full_entity.data.post,
+                                    )
+                                })
+                                .collect()
+                        })
+                })
+            }),
+        );
+
+        PostCollection::new(filter.clone(), naive_collection, self.clone())
     }
 
     /// Fetch posts from network and save to cache
@@ -187,7 +243,7 @@ impl PostService {
                         posts
                             .into_iter()
                             .map(|db_post_full_entity| {
-                                wp_mobile_cache::entity::FullEntity::new(
+                                FullEntity::new(
                                     db_post_full_entity.entity_id,
                                     db_post_full_entity.data.post,
                                 )

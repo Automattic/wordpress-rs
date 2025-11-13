@@ -13,7 +13,7 @@ mod service;
 mod test_fixtures;
 
 // Re-export types
-pub use collection::{FetchError, FetchResult};
+pub use collection::{FetchError, FetchResult, PostCollection, PostCollectionWithEditContext};
 pub use collection_error::CollectionError;
 pub use entity_error::EntityError;
 pub use filters::AnyPostFilter;
