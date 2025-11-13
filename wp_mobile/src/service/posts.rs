@@ -1,6 +1,12 @@
-use crate::{AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext, NaiveCollection};
+use crate::{
+    AllAnyPostWithEditContextCollection, AnyPostFilter, EntityAnyPostWithEditContext, FetchError,
+    FetchResult, NaiveCollection,
+};
 use std::sync::Arc;
-use wp_api::{api_client::WpApiClient, posts::AnyPostWithEditContext};
+use wp_api::{
+    api_client::WpApiClient, posts::AnyPostWithEditContext,
+    request::endpoint::posts_endpoint::PostEndpointType,
+};
 use wp_mobile_cache::{
     WpApiCache,
     context::EditContext,
@@ -37,6 +43,74 @@ impl PostService {
     /// Get the db_site (internal use only)
     pub(crate) fn db_site(&self) -> &DbSite {
         &self.db_site
+    }
+
+    /// Fetch posts from network and save to cache
+    ///
+    /// This is the core networking primitive. It:
+    /// 1. Converts filter to API parameters
+    /// 2. Makes network request via WpApiClient
+    /// 3. Upserts posts to database via repository
+    /// 4. Returns entity IDs and pagination info
+    ///
+    /// # Arguments
+    /// * `filter` - Post filter criteria
+    /// * `page` - Page number to fetch (1-indexed)
+    /// * `per_page` - Number of posts per page
+    ///
+    /// # Returns
+    /// - `Ok(FetchResult)` with entity IDs of fetched posts
+    /// - `Err(FetchError)` if network or database error occurs
+    ///
+    /// # Database Updates
+    /// Successful fetch triggers database update hooks, which notify
+    /// any observers watching the relevant tables.
+    ///
+    /// # Note
+    /// This is an async function because network operations are async.
+    /// Platform-specific wrappers (Kotlin/Swift) will need to handle
+    /// the async bridge.
+    pub async fn fetch_posts_page(
+        &self,
+        filter: &AnyPostFilter,
+        page: u32,
+        per_page: u32,
+    ) -> Result<FetchResult, FetchError> {
+        // Convert filter to API params
+        let mut params = filter.to_list_params();
+        params.page = Some(page);
+        params.per_page = Some(per_page);
+
+        // Make network request
+        let response = self
+            .api_client
+            .posts()
+            .list_with_edit_context(&PostEndpointType::Posts, &params)
+            .await?;
+
+        // Upsert to database and collect entity IDs
+        let entity_ids = self.cache.execute(|conn| {
+            let repo = PostRepository::<EditContext>::new();
+
+            response
+                .data
+                .iter()
+                .map(|post| {
+                    repo.upsert(conn, &self.db_site, post)
+                        .map(Arc::new)
+                        .map_err(|e| FetchError::Database {
+                            err_message: e.to_string(),
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })?;
+
+        Ok(FetchResult {
+            entity_ids,
+            total_items: response.header_map.wp_total().map(|n| n as u64),
+            total_pages: response.header_map.wp_total_pages(),
+            current_page: page,
+        })
     }
 }
 
