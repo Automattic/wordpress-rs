@@ -2,7 +2,6 @@ package rs.wordpress.example.shared.ui.stresstest
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
+import rs.wordpress.example.shared.ui.components.PostCard
 
 @Composable
 @Preview
@@ -77,47 +77,6 @@ fun StressTestScreen(viewModel: StressTestViewModel = koinInject()) {
                 items(posts) { post ->
                     PostCard(post)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun PostCard(post: PostDisplayData) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 2.dp
-    ) {
-        Row(modifier = Modifier.padding(12.dp)) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = post.title,
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = post.contentPreview,
-                    style = MaterialTheme.typography.body2,
-                    maxLines = 2
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row {
-                    Text(
-                        text = "Status: ${post.status}",
-                        style = MaterialTheme.typography.caption
-                    )
-                    if (post.author != null) {
-                        Text(
-                            text = " • Author: ${post.author}",
-                            style = MaterialTheme.typography.caption
-                        )
-                    }
-                }
-                Text(
-                    text = "Modified: ${post.modified}",
-                    style = MaterialTheme.typography.caption
-                )
             }
         }
     }

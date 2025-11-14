@@ -518,6 +518,31 @@ pub enum PostStatus {
 
 impl_as_query_value_from_to_string!(PostStatus);
 
+/// Parse a string into a PostStatus.
+///
+/// This is a helper function for platform code that can't access the `FromStr` trait
+/// directly due to UniFFI limitations.
+///
+/// # Examples
+/// ```
+/// use wp_api::parse_post_status;
+/// use wp_api::PostStatus;
+///
+/// let status = parse_post_status("draft");
+/// assert_eq!(status, Some(PostStatus::Draft));
+///
+/// let status = parse_post_status("publish");
+/// assert_eq!(status, Some(PostStatus::Publish));
+///
+/// let status = parse_post_status("custom_status");
+/// assert_eq!(status, Some(PostStatus::Custom("custom_status".to_string())));
+/// ```
+#[uniffi::export]
+pub fn parse_post_status(s: &str) -> Option<PostStatus> {
+    use std::str::FromStr;
+    PostStatus::from_str(s).ok()
+}
+
 #[derive(
     Debug,
     Clone,

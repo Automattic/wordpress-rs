@@ -8,6 +8,7 @@ import rs.wordpress.example.TestCredentials
 import rs.wordpress.example.shared.localTestSiteUrl
 import rs.wordpress.example.shared.repository.AuthenticationRepository
 import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
+import rs.wordpress.example.shared.ui.postcollection.PostCollectionViewModel
 import rs.wordpress.example.shared.ui.stresstest.StressTestViewModel
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
@@ -65,14 +66,21 @@ val mockServiceModule = module {
 val selfHostedServiceModule = module {
     single {
         val cache = get<WordPressApiCache>()
-        val siteUrl = localTestSiteUrl().siteUrl
+        val authRepo = get<AuthenticationRepository>()
 
-        // Use no auth for stress test - we're only using MockPostService to insert data
-        val authProvider = WpAuthenticationProvider.none()
+        // Get the authenticated site from the repository
+        val authenticatedSite = authRepo.authenticatedSiteList().firstOrNull()
+        val wpAuth = authenticatedSite?.let { authRepo.authenticationForSite(it) }
+
+        val authProvider = if (wpAuth != null) {
+            WpAuthenticationProvider.staticWithAuth(wpAuth)
+        } else {
+            WpAuthenticationProvider.none()
+        }
 
         WpSelfHostedService(
             apiUrlResolver = WpOrgSiteApiUrlResolver(
-                apiRootUrl = ParsedUrl.parse(siteUrl)
+                apiRootUrl = ParsedUrl.parse("${localTestSiteUrl().siteUrl}/wp-json")
             ),
             delegate = WpApiClientDelegate(
                 authProvider,
@@ -91,6 +99,7 @@ val viewModelModule = module {
     single { UserListViewModel(get()) }
     single { WelcomeViewModel(get()) }
     single { StressTestViewModel(get(), get(), get()) }
+    single { PostCollectionViewModel(get()) }
 }
 
 fun commonModules() = listOf(

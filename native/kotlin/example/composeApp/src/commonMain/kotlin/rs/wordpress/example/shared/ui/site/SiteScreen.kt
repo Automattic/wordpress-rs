@@ -16,7 +16,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun SiteScreen(
     onUsersClicked: () -> Unit,
     onPluginsClicked: () -> Unit,
-    onStressTestClicked: () -> Unit
+    onStressTestClicked: () -> Unit,
+    onPostCollectionClicked: () -> Unit
 ) {
     MaterialTheme {
         Column(
@@ -44,6 +45,11 @@ fun SiteScreen(
                     Column {
                         Button(onClick = onStressTestClicked) {
                             Text("Stress Test")
+                        }
+                    }
+                    Column {
+                        Button(onClick = onPostCollectionClicked) {
+                            Text("Post Collection")
                         }
                     }
                 }
