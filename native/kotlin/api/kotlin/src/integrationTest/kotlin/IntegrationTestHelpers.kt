@@ -49,9 +49,15 @@ fun createTestServiceContext(): TestServiceContext {
         password = testCredentials.adminPassword
     )
 
+    val apiRootUrl = testCredentials.apiRootUrl.toString()
+    // Extract site URL by removing /wp-json suffix
+    val siteUrl = apiRootUrl.removeSuffix("/wp-json")
+
     // Create self-hosted service
     val service = WpSelfHostedService(
-        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(testCredentials.apiRootUrl.toString())),
+        siteUrl = siteUrl,
+        apiRoot = apiRootUrl,
+        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(apiRootUrl)),
         delegate = WpApiClientDelegate(
             authProvider,
             requestExecutor = WpRequestExecutor(),
@@ -64,7 +70,8 @@ fun createTestServiceContext(): TestServiceContext {
     // Create mock post service with shared cache
     val mockPostService = MockPostService(
         wordPressApiCache.cache,
-        testCredentials.apiRootUrl.toString()
+        siteUrl,
+        apiRootUrl
     )
 
     return TestServiceContext(service, mockPostService)

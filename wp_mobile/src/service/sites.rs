@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use wp_mobile_cache::{
-    DbTable, SqliteDbError, WpApiCache, db_types::db_site::DbSite, entity::EntityId,
+    DbTable, SqliteDbError, WpApiCache, db_types::db_site::DbSite,
+    db_types::self_hosted_site::SelfHostedSite, entity::EntityId,
     repository::sites::SiteRepository,
 };
 
@@ -21,6 +22,44 @@ pub struct SiteService {
 impl SiteService {
     pub fn new(cache: Arc<WpApiCache>, db_site: DbSite) -> Self {
         Self { cache, db_site }
+    }
+
+    /// Get or create a DbSite for a self-hosted WordPress site
+    ///
+    /// Looks up an existing site by URL, or creates it if not found.
+    /// This is an internal helper called by WpSelfHostedService::new().
+    ///
+    /// # Arguments
+    /// * `cache` - The cache instance to use for database operations
+    /// * `site_url` - The base site URL (e.g., "https://example.com")
+    /// * `api_root` - The API root URL (e.g., "https://example.com/wp-json")
+    ///
+    /// # Returns
+    /// The DbSite for the site, either existing or newly created
+    pub(crate) fn get_or_create_self_hosted_site(
+        cache: Arc<WpApiCache>,
+        site_url: String,
+        api_root: String,
+    ) -> Result<DbSite, SqliteDbError> {
+        let site_repository = SiteRepository;
+
+        cache.execute(|conn| {
+            // Try to find existing site by URL
+            if let Some(full_entity) =
+                site_repository.select_self_hosted_site_by_url(conn, &site_url)?
+            {
+                return Ok(full_entity.data.0);
+            }
+
+            // Site doesn't exist, create it
+            let self_hosted_site = SelfHostedSite {
+                url: site_url,
+                api_root,
+            };
+
+            let entity_id = site_repository.upsert_self_hosted_site(conn, &self_hosted_site)?;
+            Ok(entity_id.db_site)
+        })
     }
 }
 

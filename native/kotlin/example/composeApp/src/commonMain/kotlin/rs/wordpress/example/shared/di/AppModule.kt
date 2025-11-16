@@ -78,9 +78,14 @@ val selfHostedServiceModule = module {
             WpAuthenticationProvider.none()
         }
 
+        val siteUrl = localTestSiteUrl().siteUrl
+        val apiRoot = "$siteUrl/wp-json"
+
         WpSelfHostedService(
+            siteUrl = siteUrl,
+            apiRoot = apiRoot,
             apiUrlResolver = WpOrgSiteApiUrlResolver(
-                apiRootUrl = ParsedUrl.parse("${localTestSiteUrl().siteUrl}/wp-json")
+                apiRootUrl = ParsedUrl.parse(apiRoot)
             ),
             delegate = WpApiClientDelegate(
                 authProvider,

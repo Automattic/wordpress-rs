@@ -1,11 +1,7 @@
 use crate::service::{posts::PostService, sites::SiteService};
 use std::sync::Arc;
 use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
-use wp_mobile_cache::{
-    WpApiCache,
-    db_types::{db_site::DbSite, self_hosted_site::SelfHostedSite},
-    repository::sites::SiteRepository,
-};
+use wp_mobile_cache::WpApiCache;
 
 pub mod mock_post_service;
 pub mod posts;
@@ -37,75 +33,51 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 pub struct WpSelfHostedService {
     posts: Arc<PostService>,
     sites: Arc<SiteService>,
-    db_site: DbSite,
-}
-
-impl WpSelfHostedService {
-    /// Look up or create the DbSite for this service
-    fn get_or_create_db_site(
-        api_url_resolver: &Arc<dyn ApiUrlResolver>,
-        cache: &WpApiCache,
-    ) -> Result<DbSite, WpServiceError> {
-        let site_repository = SiteRepository;
-
-        // Get site URL and API root from resolver
-        let site_url_parsed = api_url_resolver.resolve("".to_string(), vec![]);
-        let site_url = site_url_parsed.as_str();
-        let api_root_parsed = api_url_resolver.resolve("".to_string(), vec![]);
-        let api_root = api_root_parsed.as_str();
-
-        // Use execute() to find or create the site in a single operation
-        cache.execute(|conn| {
-            // First, try to find existing site
-            if let Some(full_entity) =
-                site_repository.select_self_hosted_site_by_url(conn, site_url)?
-            {
-                return Ok(full_entity.data.0);
-            }
-
-            // Site doesn't exist, create it
-            let self_hosted_site = SelfHostedSite {
-                url: site_url.to_string(),
-                api_root: api_root.to_string(),
-            };
-
-            let entity_id = site_repository.upsert_self_hosted_site(conn, &self_hosted_site)?;
-            Ok(entity_id.db_site)
-        })
-    }
 }
 
 #[uniffi::export]
 impl WpSelfHostedService {
-    /// Get the site service for this WordPress site
-    pub fn sites(&self) -> Arc<SiteService> {
-        self.sites.clone()
-    }
-
     /// Create a new service for a self-hosted WordPress site
     ///
     /// This will look up the site in the cache or create it if it doesn't exist.
+    ///
+    /// # Arguments
+    /// * `site_url` - The base site URL (e.g., "https://example.com")
+    /// * `api_root` - The API root URL (e.g., "https://example.com/wp-json")
+    /// * `api_url_resolver` - URL resolver for building API endpoint URLs
+    /// * `delegate` - API client delegate with auth provider, request executor, etc.
+    /// * `cache` - The cache instance for database operations
     #[uniffi::constructor]
     pub fn new(
+        site_url: String,
+        api_root: String,
         api_url_resolver: Arc<dyn ApiUrlResolver>,
         delegate: WpApiClientDelegate,
         cache: Arc<WpApiCache>,
     ) -> Result<Self, WpServiceError> {
-        let api_client = Arc::new(WpApiClient::new(api_url_resolver.clone(), delegate));
-        let db_site_value = Self::get_or_create_db_site(&api_url_resolver, &cache)?;
-        let db_site = Arc::new(db_site_value);
+        let api_client = Arc::new(WpApiClient::new(api_url_resolver, delegate));
 
-        let posts = Arc::new(PostService::new(api_client, db_site.clone(), cache.clone()));
-        let sites = Arc::new(SiteService::new(cache, db_site_value));
+        // Get or create the DbSite
+        let db_site =
+            SiteService::get_or_create_self_hosted_site(cache.clone(), site_url, api_root)?;
 
-        Ok(Self {
-            posts,
-            sites,
-            db_site: db_site_value,
-        })
+        let posts = Arc::new(PostService::new(
+            api_client,
+            Arc::new(db_site),
+            cache.clone(),
+        ));
+        let sites = Arc::new(SiteService::new(cache, db_site));
+
+        Ok(Self { posts, sites })
     }
 
+    /// Get the post service for this WordPress site
     pub fn posts(&self) -> Arc<PostService> {
         self.posts.clone()
+    }
+
+    /// Get the site service for this WordPress site
+    pub fn sites(&self) -> Arc<SiteService> {
+        self.sites.clone()
     }
 }
