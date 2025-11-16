@@ -24,7 +24,7 @@ wp_mobile_post_collection!(
     wp_api::posts::AnyPostWithEditContext
 );
 
-wp_mobile_naive_collection!(
+wp_mobile_stateless_collection!(
     AnyPostWithEditContext,
     wp_api::posts::AnyPostWithEditContext
 );

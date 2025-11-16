@@ -1,13 +1,13 @@
 mod collection_error;
 mod fetch_error;
 mod fetch_result;
-mod naive_collection;
 pub(crate) mod post_collection;
+mod stateless_collection;
 
 pub use collection_error::CollectionError;
 pub use fetch_error::FetchError;
 pub use fetch_result::FetchResult;
-pub use naive_collection::NaiveCollection;
+pub use stateless_collection::StatelessCollection;
 
 /// Macro to create UniFFI-compatible post collection wrappers
 ///
@@ -72,7 +72,7 @@ macro_rules! wp_mobile_post_collection {
                 ///
                 /// This queries the database and returns all posts that match
                 /// the collection's filter criteria. It's an expensive operation
-                /// that re-queries on every call (naive behavior).
+                /// that re-queries on every call (stateless behavior).
                 ///
                 /// Returns:
                 /// - `Ok(Vec<FullEntity>>)` with all matching posts from cache
@@ -94,7 +94,7 @@ macro_rules! wp_mobile_post_collection {
                 ///
                 /// This queries the database and returns all posts that match
                 /// the collection's filter criteria. It's an expensive operation
-                /// that re-queries on every call (naive behavior).
+                /// that re-queries on every call (stateless behavior).
                 ///
                 /// Returns:
                 /// - `Ok(Vec<FullEntity>>)` with all matching posts from cache
@@ -125,9 +125,9 @@ macro_rules! wp_mobile_post_collection {
     };
 }
 
-/// Macro to create UniFFI-compatible naive collection wrappers
+/// Macro to create UniFFI-compatible stateless collection wrappers
 ///
-/// This macro generates a wrapper type for `NaiveCollection<T>` that can be used
+/// This macro generates a wrapper type for `StatelessCollection<T>` that can be used
 /// across language boundaries via UniFFI. The generated type includes methods for
 /// loading data and checking update relevance.
 ///
@@ -141,7 +141,7 @@ macro_rules! wp_mobile_post_collection {
 ///
 /// # Usage
 /// ```ignore
-/// wp_mobile_naive_collection!(
+/// wp_mobile_stateless_collection!(
 ///     AnyPostWithEditContext,
 ///     wp_api::posts::AnyPostWithEditContext
 /// );
@@ -151,24 +151,24 @@ macro_rules! wp_mobile_post_collection {
 /// - `AllAnyPostWithEditContextCollection` - the collection wrapper type
 /// - Uses `FullEntityAnyPostWithEditContext` - for the return type
 #[macro_export]
-macro_rules! wp_mobile_naive_collection {
+macro_rules! wp_mobile_stateless_collection {
     ($entity_name:ident, $data_type:ty) => {
         paste::paste! {
             #[derive(uniffi::Object)]
             pub struct [<All $entity_name Collection>](
-                pub $crate::collection::NaiveCollection<
+                pub $crate::collection::StatelessCollection<
                     wp_mobile_cache::entity::FullEntity<$data_type>,
                 >,
             );
 
             impl From<
-                    $crate::collection::NaiveCollection<
+                    $crate::collection::StatelessCollection<
                         wp_mobile_cache::entity::FullEntity<$data_type>,
                     >,
                 > for [<All $entity_name Collection>]
             {
                 fn from(
-                    value: $crate::collection::NaiveCollection<
+                    value: $crate::collection::StatelessCollection<
                         wp_mobile_cache::entity::FullEntity<$data_type>,
                     >,
                 ) -> Self {

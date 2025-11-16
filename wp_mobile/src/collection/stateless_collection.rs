@@ -2,11 +2,11 @@ use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 
 /// Lightweight handle to a collection of entities that reloads all data from the database.
 ///
-/// `NaiveCollection` is a simple collection type that re-queries all items from the database
+/// `StatelessCollection` is a simple collection type that re-queries all items from the database
 /// whenever load_data() is called. It tracks which tables are relevant for change notifications,
 /// and will indicate that updates are relevant when any of the tracked tables change.
 ///
-/// This is called "naive" because it doesn't track individual items in memory or apply
+/// This is called "stateless" because it doesn't track individual items in memory or apply
 /// incremental updates. For better performance with large collections, use `ManagedCollection`
 /// (to be implemented later).
 ///
@@ -15,7 +15,7 @@ use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 ///
 /// # Example Usage
 /// ```rust,ignore
-/// let collection = NaiveCollection::new(
+/// let collection = StatelessCollection::new(
 ///     vec![DbTable::PostsEditContext, DbTable::TermRelationships],
 ///     Box::new(move || {
 ///         // Load all posts from database
@@ -29,7 +29,7 @@ use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 ///     // ... notify observers with new data
 /// }
 /// ```
-pub struct NaiveCollection<T> {
+pub struct StatelessCollection<T> {
     /// Tables to monitor for changes
     relevant_tables: Vec<DbTable>,
 
@@ -37,8 +37,8 @@ pub struct NaiveCollection<T> {
     load_data: Box<dyn Fn() -> Result<Vec<T>, SqliteDbError> + Send + Sync>,
 }
 
-impl<T> NaiveCollection<T> {
-    /// Create a new naive collection handle
+impl<T> StatelessCollection<T> {
+    /// Create a new stateless collection handle
     ///
     /// # Parameters
     /// - `relevant_tables`: List of tables to monitor for changes. When any of these tables
@@ -100,7 +100,7 @@ mod tests {
         let test_data = vec![1, 2, 3];
         let test_data_clone = test_data.clone();
 
-        let collection = NaiveCollection::new(
+        let collection = StatelessCollection::new(
             vec![DbTable::PostsEditContext],
             Box::new(move || Ok(test_data_clone.clone())),
         );
@@ -111,8 +111,10 @@ mod tests {
 
     #[test]
     fn test_is_relevant_update_single_table() {
-        let collection =
-            NaiveCollection::<i32>::new(vec![DbTable::PostsEditContext], Box::new(|| Ok(vec![])));
+        let collection = StatelessCollection::<i32>::new(
+            vec![DbTable::PostsEditContext],
+            Box::new(|| Ok(vec![])),
+        );
 
         let matching_hook = UpdateHook {
             action: HookAction::Update,
@@ -141,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_is_relevant_update_multiple_tables() {
-        let collection = NaiveCollection::<i32>::new(
+        let collection = StatelessCollection::<i32>::new(
             vec![DbTable::PostsEditContext, DbTable::TermRelationships],
             Box::new(|| Ok(vec![])),
         );

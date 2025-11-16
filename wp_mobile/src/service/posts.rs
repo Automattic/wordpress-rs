@@ -1,7 +1,7 @@
 use crate::{
     AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext,
     PostCollectionWithEditContext,
-    collection::{FetchError, FetchResult, NaiveCollection, post_collection::PostCollection},
+    collection::{FetchError, FetchResult, StatelessCollection, post_collection::PostCollection},
     filters::AnyPostFilter,
 };
 use std::sync::Arc;
@@ -181,8 +181,8 @@ impl PostService {
         let db_site = *self.db_site;
         let filter_clone = filter.clone();
 
-        // Create NaiveCollection with filtering
-        let naive_collection = NaiveCollection::new(
+        // Create StatelessCollection with filtering
+        let stateless_collection = StatelessCollection::new(
             vec![DbTable::PostsEditContext, DbTable::TermRelationships],
             Box::new(move || {
                 let repo = PostRepository::<EditContext>::new();
@@ -203,7 +203,7 @@ impl PostService {
             }),
         );
 
-        PostCollection::new(filter, naive_collection, self.clone()).into()
+        PostCollection::new(filter, stateless_collection, self.clone()).into()
     }
 
     /// Get a collection of all posts with edit context for this site.
@@ -218,7 +218,7 @@ impl PostService {
         let cache = self.cache.clone();
         let db_site = *self.db_site;
 
-        NaiveCollection::new(
+        StatelessCollection::new(
             vec![
                 wp_mobile_cache::DbTable::PostsEditContext,
                 wp_mobile_cache::DbTable::TermRelationships,
@@ -247,7 +247,7 @@ impl PostService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::mock_api_client;
+    use crate::testing::mock_api_client;
     use rstest::*;
     use rusqlite::Connection;
     use wp_api::posts::PostId;

@@ -1,5 +1,5 @@
 use crate::{
-    collection::{FetchError, FetchResult, NaiveCollection, collection_error::CollectionError},
+    collection::{FetchError, FetchResult, StatelessCollection, collection_error::CollectionError},
     filters::AnyPostFilter,
     service::posts::PostService,
 };
@@ -8,7 +8,7 @@ use wp_mobile_cache::entity::FullEntity;
 
 /// Collection of posts with context-specific data
 ///
-/// Wraps NaiveCollection and adds:
+/// Wraps StatelessCollection and adds:
 /// - Type-specific filter configuration
 /// - Network fetching via service layer
 ///
@@ -17,8 +17,8 @@ pub struct PostCollection<T> {
     /// The filter defining which posts belong to this collection
     filter: AnyPostFilter,
 
-    /// Underlying naive collection for cache access
-    naive_collection: NaiveCollection<FullEntity<T>>,
+    /// Underlying stateless collection for cache access
+    stateless_collection: StatelessCollection<FullEntity<T>>,
 
     /// Reference to the service for network operations
     post_service: Arc<PostService>,
@@ -28,12 +28,12 @@ impl<T> PostCollection<T> {
     /// Create a new post collection
     pub fn new(
         filter: AnyPostFilter,
-        naive_collection: NaiveCollection<FullEntity<T>>,
+        stateless_collection: StatelessCollection<FullEntity<T>>,
         service: Arc<PostService>,
     ) -> Self {
         Self {
             filter,
-            naive_collection,
+            stateless_collection,
             post_service: service,
         }
     }
@@ -70,13 +70,13 @@ impl<T> PostCollection<T> {
     ///
     /// This queries the database and returns all posts that match
     /// the collection's filter criteria. It's an expensive operation
-    /// that re-queries on every call (naive behavior).
+    /// that re-queries on every call (stateless behavior).
     ///
     /// # Returns
     /// - `Ok(Vec<FullEntity>>)` with all matching posts from cache
     /// - `Err(CollectionError)` if database error occurs
     pub fn load_data(&self) -> Result<Vec<FullEntity<T>>, CollectionError> {
-        self.naive_collection
+        self.stateless_collection
             .load_data()
             .map_err(|e| CollectionError::DatabaseError {
                 err_message: e.to_string(),
@@ -89,6 +89,6 @@ impl<T> PostCollection<T> {
     /// Used by platform-specific observable wrappers to determine
     /// whether to notify observers.
     pub fn is_relevant_update(&self, hook: &wp_mobile_cache::UpdateHook) -> bool {
-        self.naive_collection.is_relevant_update(hook)
+        self.stateless_collection.is_relevant_update(hook)
     }
 }
