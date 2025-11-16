@@ -133,7 +133,12 @@ impl<C: PostContext> PostRepository<C> {
             return Ok(None);
         };
 
-        // Query and construct post with lazy term relationship loading
+        // Pre-load term relationships for this post
+        let term_repo = TermRelationshipRepository;
+        let terms_map =
+            term_repo.get_terms_for_objects(executor, &entity_id.db_site, &[post_id])?;
+
+        // Query and construct post with pre-loaded term relationships
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND rowid = ?",
             Self::table_name()
@@ -142,12 +147,6 @@ impl<C: PostContext> PostRepository<C> {
         let db_post = stmt
             .query_row([entity_id.db_site.row_id, entity_id.rowid], |row| {
                 C::from_row_with_terms(row, || {
-                    let term_repo = TermRelationshipRepository;
-                    let terms_map = term_repo.get_terms_for_objects(
-                        executor,
-                        &entity_id.db_site,
-                        &[post_id],
-                    )?;
                     Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
                 })
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
@@ -278,7 +277,11 @@ impl<C: PostContext> PostRepository<C> {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<Option<FullEntity<C::DbPost>>, SqliteDbError> {
-        // Query and construct post with lazy term relationship loading
+        // Pre-load term relationships for this post
+        let term_repo = TermRelationshipRepository;
+        let terms_map = term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
+
+        // Query and construct post with pre-loaded term relationships
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND id = ?",
             Self::table_name()
@@ -287,9 +290,6 @@ impl<C: PostContext> PostRepository<C> {
         let db_post = stmt
             .query_row(rusqlite::params![site.row_id, post_id.0], |row| {
                 C::from_row_with_terms(row, || {
-                    let term_repo = TermRelationshipRepository;
-                    let terms_map =
-                        term_repo.get_terms_for_objects(executor, site, &[post_id.0])?;
                     Ok(terms_map.get(&post_id.0).cloned().unwrap_or_default())
                 })
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
