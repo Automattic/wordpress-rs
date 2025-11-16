@@ -29,9 +29,4 @@ wp_mobile_naive_collection!(
     wp_api::posts::AnyPostWithEditContext
 );
 
-#[uniffi::export]
-fn wp_mobile_crate_works(input: String) -> String {
-    format!("foo is {}", input)
-}
-
 uniffi::setup_scaffolding!();
