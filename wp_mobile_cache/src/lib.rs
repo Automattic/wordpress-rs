@@ -50,6 +50,7 @@ impl From<rusqlite::Error> for SqliteDbError {
 /// without exposing any methods (which is intentional - we don't want
 /// Kotlin/Swift to access table names directly).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+#[non_exhaustive]
 pub enum DbTable {
     /// Posts with edit context (full data for editing)
     PostsEditContext,
