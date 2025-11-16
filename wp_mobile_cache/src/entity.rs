@@ -87,9 +87,12 @@ impl<T> FullEntity<T> {
 /// Multiple Entity instances with the same ID are considered equal and will read the same data.
 pub struct Entity<T> {
     entity_id: EntityId,
+    /// Closure for reading entity data from the cache/database.
+    ///
+    /// This field cannot be cloned because closures that capture their environment
+    /// (like database connections) are not Clone. This is why Entity<T> doesn't
+    /// implement Clone or PartialEq - see note at line 138-140.
     read_data: Box<dyn Fn() -> Result<Option<FullEntity<T>>, SqliteDbError> + Send + Sync>,
-    // TODO: Add trait reference for state_reader
-    // state_reader: Arc<dyn StateReader>,
 }
 
 impl<T> Entity<T> {
@@ -135,11 +138,6 @@ impl<T> Entity<T> {
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
         self.entity_id.table == hook.table && self.entity_id.rowid == hook.row_id.into()
     }
-
-    // TODO: Add methods that will be implemented later:
-    // pub fn state(&self) -> EntityState
-    // pub fn last_fetched_at(&self) -> Option<String>
-    // pub async fn refresh(&self) -> Result<(), SqliteDbError>
 }
 
 // Note: PartialEq, Eq, and Clone are not implemented because the read_data closure

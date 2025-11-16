@@ -54,7 +54,7 @@ pub trait PostContext: IsContext {
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>;
 
     /// Extract the rowid from DbPost (for EntityId creation)
-    fn get_rowid(db_post: &Self::DbPost) -> RowId;
+    fn rowid(db_post: &Self::DbPost) -> RowId;
 }
 
 /// Extract categories and tags from term relationships.
@@ -254,7 +254,7 @@ impl<C: PostContext> PostRepository<C> {
         Ok(posts
             .into_iter()
             .map(|db_post| {
-                let rowid = C::get_rowid(&db_post);
+                let rowid = C::rowid(&db_post);
                 let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
                 FullEntity::new(entity_id, db_post)
             })
@@ -299,7 +299,7 @@ impl<C: PostContext> PostRepository<C> {
 
         // Wrap in FullEntity with EntityId
         Ok(db_post.map(|db_post| {
-            let rowid = C::get_rowid(&db_post);
+            let rowid = C::rowid(&db_post);
 
             let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
 
@@ -439,7 +439,7 @@ impl PostContext for EditContext {
         })
     }
 
-    fn get_rowid(db_post: &Self::DbPost) -> RowId {
+    fn rowid(db_post: &Self::DbPost) -> RowId {
         db_post.row_id
     }
 }
@@ -523,7 +523,7 @@ impl PostContext for ViewContext {
         })
     }
 
-    fn get_rowid(db_post: &Self::DbPost) -> RowId {
+    fn rowid(db_post: &Self::DbPost) -> RowId {
         db_post.row_id
     }
 }
@@ -581,7 +581,7 @@ impl PostContext for EmbedContext {
         })
     }
 
-    fn get_rowid(db_post: &Self::DbPost) -> RowId {
+    fn rowid(db_post: &Self::DbPost) -> RowId {
         db_post.row_id
     }
 }
