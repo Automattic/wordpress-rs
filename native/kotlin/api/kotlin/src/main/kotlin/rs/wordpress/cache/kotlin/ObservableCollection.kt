@@ -10,12 +10,24 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Use service extension functions (e.g., `getObservableAllPostsWithEditContext`)
  * instead of calling this directly.
  *
- * Example:
+ * **Lifecycle Management**: Collections implement [AutoCloseable] and should be closed when
+ * no longer needed to prevent memory accumulation. In ViewModels, call `.close()` in
+ * `onCleared()`. For short-lived usage, use `.use { }` blocks. For app-lifecycle-scoped
+ * observables, explicit cleanup may not be necessary.
+ *
+ * Example (ViewModel):
  * ```
- * val observablePosts = postService.getObservableAllPostsWithEditContext()
- * observablePosts.addObserver {
- *     val allPosts = observablePosts.loadData()
- *     // React to changes
+ * class MyViewModel : ViewModel() {
+ *     private val observablePosts = postService.getObservableAllPostsWithEditContext()
+ *
+ *     init {
+ *         observablePosts.addObserver { /* update UI */ }
+ *     }
+ *
+ *     override fun onCleared() {
+ *         super.onCleared()
+ *         observablePosts.close()
+ *     }
  * }
  * ```
  */
@@ -42,11 +54,14 @@ fun <D> createObservableCollection(
  *
  * Create instances using [createObservableCollection] or service extension functions
  * rather than the constructor directly.
+ *
+ * Implements [AutoCloseable] to support cleanup. Call [close] when done (typically in
+ * ViewModel.onCleared()) to unregister from [DatabaseChangeNotifier].
  */
 class ObservableCollection<D>(
     private val loadDataFn: suspend () -> List<D>,
     private val isRelevantUpdateFn: (UpdateHook) -> Boolean
-) {
+) : AutoCloseable {
     private val observers = CopyOnWriteArrayList<() -> Unit>()
 
     /**
@@ -87,5 +102,15 @@ class ObservableCollection<D>(
         if (isRelevantUpdateFn(hook)) {
             observers.forEach { it() }
         }
+    }
+
+    /**
+     * Unregister this collection from receiving database change notifications.
+     *
+     * Call this when the collection is no longer needed, or use `.use { }` for automatic cleanup.
+     * After calling close(), the collection will no longer notify observers of database changes.
+     */
+    override fun close() {
+        DatabaseChangeNotifier.unregister(this)
     }
 }

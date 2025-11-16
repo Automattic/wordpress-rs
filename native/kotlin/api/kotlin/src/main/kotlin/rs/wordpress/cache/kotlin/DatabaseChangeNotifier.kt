@@ -13,6 +13,11 @@ import java.util.concurrent.CopyOnWriteArraySet
  *
  * This design keeps database implementation details (table names, rowids) hidden from application code -
  * the observable's is_relevant_update closure handles all the matching logic in Rust.
+ *
+ * **Lifecycle Management**: Observables are registered when created and should be closed
+ * when no longer needed. [ObservableEntity] and [ObservableCollection] implement [AutoCloseable]
+ * and will automatically unregister when closed. Use `.use { }` blocks for automatic cleanup,
+ * or call `.close()` manually.
  */
 object DatabaseChangeNotifier : DatabaseDelegate {
     private val observableEntities = CopyOnWriteArraySet<ObservableEntity<*>>()

@@ -90,6 +90,9 @@ class PostCollectionViewModel(
             isFetching = false
         )
 
+        // Close old observable before creating new one
+        observableCollection?.close()
+
         // Create new observable collection with the new filter
         createObservableCollection(newFilter)
 
@@ -194,6 +197,11 @@ class PostCollectionViewModel(
      * Clean up resources when ViewModel is destroyed
      */
     fun onCleared() {
+        // Close the observable collection to unregister from DatabaseChangeNotifier
+        observableCollection?.close()
+        observableCollection = null
+
+        // Cancel coroutine scope
         viewModelScope.cancel()
     }
 }

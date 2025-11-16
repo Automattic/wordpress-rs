@@ -11,12 +11,24 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Use service extension functions (e.g., `getObservableEntityWithEditContext`)
  * instead of calling this directly.
  *
- * Example:
+ * **Lifecycle Management**: Entities implement [AutoCloseable] and should be closed when
+ * no longer needed to prevent memory accumulation. In ViewModels, call `.close()` in
+ * `onCleared()`. For short-lived usage, use `.use { }` blocks. For app-lifecycle-scoped
+ * observables, explicit cleanup may not be necessary.
+ *
+ * Example (ViewModel):
  * ```
- * val observablePost = postService.getObservableEntityWithEditContext(postId)
- * observablePost.addObserver {
- *     val updatedData = observablePost.loadData()
- *     // React to changes
+ * class MyViewModel : ViewModel() {
+ *     private val observablePost = postService.getObservableEntityWithEditContext(postId)
+ *
+ *     init {
+ *         observablePost.addObserver { /* update UI */ }
+ *     }
+ *
+ *     override fun onCleared() {
+ *         super.onCleared()
+ *         observablePost.close()
+ *     }
  * }
  * ```
  */
@@ -42,12 +54,15 @@ fun <D> createObservableEntity(
  *
  * Create instances using [createObservableEntity] or service extension functions
  * rather than the constructor directly.
+ *
+ * Implements [AutoCloseable] to support cleanup. Call [close] when done (typically in
+ * ViewModel.onCleared()) to unregister from [DatabaseChangeNotifier].
  */
 class ObservableEntity<D>(
     private val loadDataFn: suspend () -> D?,
     private val idFn: () -> EntityId,
     private val isRelevantUpdateFn: (UpdateHook) -> Boolean
-) {
+) : AutoCloseable {
     private val observers = CopyOnWriteArrayList<() -> Unit>()
 
     /**
@@ -92,5 +107,15 @@ class ObservableEntity<D>(
         if (isRelevantUpdateFn(hook)) {
             observers.forEach { it() }
         }
+    }
+
+    /**
+     * Unregister this entity from receiving database change notifications.
+     *
+     * Call this when the entity is no longer needed, or use `.use { }` for automatic cleanup.
+     * After calling close(), the entity will no longer notify observers of database changes.
+     */
+    override fun close() {
+        DatabaseChangeNotifier.unregister(this)
     }
 }

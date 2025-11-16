@@ -86,7 +86,7 @@ class StressTestViewModel(
         val collection = postService.getObservablePostCollectionWithEditContext(AnyPostFilter())
 
         // Helper function to reload and update posts
-        fun reloadPostsAndMeasure(): Long {
+        suspend fun reloadPostsAndMeasure(): Long {
             return try {
                 val loadStartTime = System.currentTimeMillis()
                 val allPosts = collection.loadData()
@@ -206,8 +206,8 @@ class StressTestViewModel(
         // Stop background updates
         stressTestHandle?.stop()
 
-        // Clear the observable collection
-        // The collection and its observers will be cleaned up when garbage collected
+        // Close the observable collection to unregister from DatabaseChangeNotifier
+        observableCollection?.close()
         observableCollection = null
 
         // Cancel coroutine scope
