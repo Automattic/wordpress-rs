@@ -26,7 +26,7 @@ pub enum PostBuilderInitialState {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// // Minimal post with custom fields
 /// let post1 = PostBuilder::minimal()
 ///     .with_author(UserId(10))

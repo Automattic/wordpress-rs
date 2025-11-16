@@ -21,7 +21,7 @@ pub mod posts;
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// #[rstest]
 /// fn test_something(mut test_ctx: TestContext) {
 ///     let post = PostBuilder::new().build();
@@ -87,7 +87,7 @@ static RANDOM_TEST_SITE_COUNTER: AtomicU32 = AtomicU32::new(1);
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// let site1 = create_random_test_site(&mut conn);
 /// let site2 = create_random_test_site(&mut conn);
 /// // site1 and site2 will have different URLs
@@ -144,7 +144,7 @@ pub fn assert_recent_timestamp(timestamp: &str) {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// use PostEditContextColumn::*;
 ///
 /// let columns = get_table_column_names(&conn, "posts_edit_context");
