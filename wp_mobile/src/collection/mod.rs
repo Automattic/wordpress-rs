@@ -77,7 +77,12 @@ macro_rules! wp_mobile_post_collection {
                 /// Returns:
                 /// - `Ok(Vec<FullEntity>>)` with all matching posts from cache
                 /// - `Err(CollectionError)` if database error occurs
-                pub fn load_data(
+                ///
+                /// # Note
+                /// This async function is exported to client platforms (Kotlin/Swift) where it
+                /// will be executed on a background thread. The underlying Rust implementation
+                /// is synchronous as rusqlite doesn't support async operations.
+                pub async fn load_data(
                     &self,
                 ) -> Result<Vec<[<FullEntity $entity_name>]>, $crate::collection::CollectionError> {
                     self.0
@@ -88,23 +93,6 @@ macro_rules! wp_mobile_post_collection {
                                 .map(|full_entity| full_entity.into())
                                 .collect()
                         })
-                }
-
-                /// Load all cached items matching this collection's filter (async version)
-                ///
-                /// This queries the database and returns all posts that match
-                /// the collection's filter criteria. It's an expensive operation
-                /// that re-queries on every call (stateless behavior).
-                ///
-                /// Returns:
-                /// - `Ok(Vec<FullEntity>>)` with all matching posts from cache
-                /// - `Err(CollectionError)` if database error occurs
-                pub async fn load_data_async(
-                    &self,
-                ) -> Result<Vec<[<FullEntity $entity_name>]>, $crate::collection::CollectionError> {
-                    // For now, just call the sync version
-                    // In the future, this could be optimized to run on a background thread
-                    self.load_data()
                 }
 
                 /// Check if a database update is relevant to this collection
@@ -187,7 +175,12 @@ macro_rules! wp_mobile_stateless_collection {
                 /// Returns:
                 /// - Ok(Vec<FullEntity>) - All items in the collection (may be empty)
                 /// - Err(CollectionError) if a database error occurred
-                pub fn load_data(
+                ///
+                /// # Note
+                /// This async function is exported to client platforms (Kotlin/Swift) where it
+                /// will be executed on a background thread. The underlying Rust implementation
+                /// is synchronous as rusqlite doesn't support async operations.
+                pub async fn load_data(
                     &self,
                 ) -> Result<Vec<[<FullEntity $entity_name>]>, $crate::collection::CollectionError> {
                     self.0
@@ -199,23 +192,6 @@ macro_rules! wp_mobile_stateless_collection {
                                 .collect()
                         })
                         .map_err(|e| e.into())
-                }
-
-                /// Load all items in the collection from the database (async version)
-                ///
-                /// This is an expensive operation that reads from the database each time.
-                /// It returns all items currently stored in the database that match the
-                /// collection's criteria (site, context, etc.).
-                ///
-                /// Returns:
-                /// - Ok(Vec<FullEntity>) - All items in the collection (may be empty)
-                /// - Err(CollectionError) if a database error occurred
-                pub async fn load_data_async(
-                    &self,
-                ) -> Result<Vec<[<FullEntity $entity_name>]>, $crate::collection::CollectionError> {
-                    // For now, just call the sync version
-                    // In the future, this could be optimized to run on a background thread
-                    self.load_data()
                 }
 
                 /// Check if a database update is relevant to this collection

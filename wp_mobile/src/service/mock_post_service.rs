@@ -24,8 +24,6 @@ use wp_mobile_cache::{
 /// This service provides utilities to insert and update mock posts directly
 /// in the cache for testing the observer pattern and other functionality without
 /// needing real API calls.
-///
-/// **TEMPORARY**: This should be removed once proper data insertion is available.
 #[derive(uniffi::Object)]
 pub struct MockPostService {
     cache: Arc<WpApiCache>,

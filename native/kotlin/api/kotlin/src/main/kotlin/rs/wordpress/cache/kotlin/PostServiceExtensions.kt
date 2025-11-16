@@ -9,7 +9,6 @@ fun PostService.getObservableEntityWithEditContext(entityId: EntityId): Observab
     val entity = this.getEntityWithEditContext(entityId)
     return createObservableEntity(
         loadData = entity::loadData,
-        loadDataAsync = entity::loadDataAsync,
         id = entity::id,
         isRelevantUpdate = entity::isRelevantUpdate
     )
@@ -19,7 +18,6 @@ fun PostService.getObservableAllPostsWithEditContext(): ObservableCollection<Ful
     val collection = this.getAllPostsWithEditContext()
     return createObservableCollection(
         loadData = collection::loadData,
-        loadDataAsync = collection::loadDataAsync,
         isRelevantUpdate = collection::isRelevantUpdate
     )
 }
@@ -28,7 +26,6 @@ fun PostService.getObservablePostCollectionWithEditContext(filter: AnyPostFilter
     val collection = this.createPostCollectionWithEditContext(filter)
     return createObservableCollection(
         loadData = collection::loadData,
-        loadDataAsync = collection::loadDataAsync,
         isRelevantUpdate = collection::isRelevantUpdate
     )
 }

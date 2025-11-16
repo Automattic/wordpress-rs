@@ -46,8 +46,8 @@ class ObservableEntityTest {
         // Verify observer was called exactly once
         assertEquals(1, callCount.get())
 
-        // Verify data was actually updated (using async version)
-        val fullEntity = observableEntity.loadDataAsync()!!
+        // Verify data was actually updated
+        val fullEntity = observableEntity.loadData()!!
         assertEquals("Updated Title", fullEntity.data.title.rendered)
     }
 

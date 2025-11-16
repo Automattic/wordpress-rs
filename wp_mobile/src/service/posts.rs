@@ -105,10 +105,6 @@ impl PostService {
     }
 }
 
-// TODO: We probably want to implement an impl block that returns Entity<T> types and have a
-// attribute macro to generate the uniffi exported counterpart, as it'd be easier to work with the
-// generic type in Rust than the concrete wrapper type such as EntityAnyPostWithEditContext
-
 #[uniffi::export]
 impl PostService {
     /// Get an entity handle using an EntityId
@@ -277,7 +273,8 @@ mod tests {
         let entity = post_service_ctx
             .post_service
             .get_entity_with_edit_context(entity_id);
-        let result = entity.load_data().expect("Database read should succeed");
+        // Use the internal Entity's sync load_data for testing
+        let result = entity.0.load_data().expect("Database read should succeed");
 
         // Assert: Post was found and matches what we inserted
         let full_entity = result.expect("Post should be found in cache");

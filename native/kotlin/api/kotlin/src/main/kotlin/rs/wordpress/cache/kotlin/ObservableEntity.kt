@@ -15,19 +15,17 @@ import java.util.concurrent.CopyOnWriteArrayList
  * ```
  * val observablePost = postService.getObservableEntityWithEditContext(postId)
  * observablePost.addObserver {
- *     val updatedData = observablePost.loadDataAsync()
+ *     val updatedData = observablePost.loadData()
  *     // React to changes
  * }
  * ```
  */
 fun <D> createObservableEntity(
-    loadData: () -> D?,
-    loadDataAsync: suspend () -> D?,
+    loadData: suspend () -> D?,
     id: () -> EntityId,
     isRelevantUpdate: (UpdateHook) -> Boolean
 ): ObservableEntity<D> = ObservableEntity(
     loadDataFn = loadData,
-    loadDataAsyncFn = loadDataAsync,
     idFn = id,
     isRelevantUpdateFn = isRelevantUpdate
 ).also {
@@ -46,8 +44,7 @@ fun <D> createObservableEntity(
  * rather than the constructor directly.
  */
 class ObservableEntity<D>(
-    private val loadDataFn: () -> D?,
-    private val loadDataAsyncFn: suspend () -> D?,
+    private val loadDataFn: suspend () -> D?,
     private val idFn: () -> EntityId,
     private val isRelevantUpdateFn: (UpdateHook) -> Boolean
 ) {
@@ -74,17 +71,12 @@ class ObservableEntity<D>(
     /**
      * Load current data from cache/DB.
      *
-     * This is an expensive operation that reads from the database each time.
-     */
-    fun loadData(): D? = loadDataFn()
-
-    /**
-     * Load current data from cache/DB (async version).
+     * **Important**: This is an expensive operation that reads from the database each time.
+     * Subsequent calls may return different results if the underlying data has changed.
      *
-     * This is an expensive operation that reads from the database each time.
-     * Use this version to avoid blocking the caller.
+     * This is a suspend function and should be called from a coroutine or background thread.
      */
-    suspend fun loadDataAsync(): D? = loadDataAsyncFn()
+    suspend fun loadData(): D? = loadDataFn()
 
     /**
      * Get the entity's ID.

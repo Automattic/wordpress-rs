@@ -14,18 +14,16 @@ import java.util.concurrent.CopyOnWriteArrayList
  * ```
  * val observablePosts = postService.getObservableAllPostsWithEditContext()
  * observablePosts.addObserver {
- *     val allPosts = observablePosts.loadDataAsync()
+ *     val allPosts = observablePosts.loadData()
  *     // React to changes
  * }
  * ```
  */
 fun <D> createObservableCollection(
-    loadData: () -> List<D>,
-    loadDataAsync: suspend () -> List<D>,
+    loadData: suspend () -> List<D>,
     isRelevantUpdate: (UpdateHook) -> Boolean
 ): ObservableCollection<D> = ObservableCollection(
     loadDataFn = loadData,
-    loadDataAsyncFn = loadDataAsync,
     isRelevantUpdateFn = isRelevantUpdate
 ).also {
     DatabaseChangeNotifier.register(it)
@@ -46,8 +44,7 @@ fun <D> createObservableCollection(
  * rather than the constructor directly.
  */
 class ObservableCollection<D>(
-    private val loadDataFn: () -> List<D>,
-    private val loadDataAsyncFn: suspend () -> List<D>,
+    private val loadDataFn: suspend () -> List<D>,
     private val isRelevantUpdateFn: (UpdateHook) -> Boolean
 ) {
     private val observers = CopyOnWriteArrayList<() -> Unit>()
@@ -73,19 +70,13 @@ class ObservableCollection<D>(
     /**
      * Load current data from cache/DB.
      *
-     * This is an expensive operation that reads from the database each time.
-     * Returns all items in the collection.
-     */
-    fun loadData(): List<D> = loadDataFn()
-
-    /**
-     * Load current data from cache/DB (async version).
+     * **Important**: This is an expensive operation that reads from the database each time.
+     * The entire collection is re-queried on every call (stateless behavior).
      *
-     * This is an expensive operation that reads from the database each time.
-     * Use this version to avoid blocking the caller.
      * Returns all items in the collection.
+     * This is a suspend function and should be called from a coroutine or background thread.
      */
-    suspend fun loadDataAsync(): List<D> = loadDataAsyncFn()
+    suspend fun loadData(): List<D> = loadDataFn()
 
     /**
      * Internal method called by DatabaseChangeNotifier when a database update occurs.
