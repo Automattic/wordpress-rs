@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use wp_mobile_cache::entity::EntityId;
 
 /// Result of a network fetch operation
@@ -8,7 +7,7 @@ use wp_mobile_cache::entity::EntityId;
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct FetchResult {
     /// Entity IDs of successfully fetched and cached items
-    pub entity_ids: Vec<Arc<EntityId>>,
+    pub entity_ids: Vec<EntityId>,
 
     /// Total number of items matching the query (from API)
     pub total_items: Option<u64>,

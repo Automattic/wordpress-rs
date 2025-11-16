@@ -162,7 +162,7 @@ impl MockPostService {
     /// Starting from ID 10000 to avoid conflicts with real posts.
     ///
     /// Returns a vector of EntityIds for the inserted posts.
-    pub fn generate_and_insert_posts(&self, count: u32) -> Vec<Arc<EntityId>> {
+    pub fn generate_and_insert_posts(&self, count: u32) -> Vec<EntityId> {
         let mut entity_ids = Vec::with_capacity(count as usize);
         let repo = PostRepository::<EditContext>::new();
 
@@ -177,7 +177,7 @@ impl MockPostService {
                 .cache
                 .execute(|conn| repo.upsert(conn, &self.db_site, &post))
                 .expect("Failed to insert mock post");
-            entity_ids.push(Arc::new(entity_id));
+            entity_ids.push(entity_id);
         }
 
         entity_ids
@@ -197,7 +197,7 @@ impl MockPostService {
     /// * `delay_seconds` - Delay between updates in seconds (can be fractional)
     pub fn start_random_updates(
         &self,
-        entity_ids: Vec<Arc<EntityId>>,
+        entity_ids: Vec<EntityId>,
         delay_seconds: f64,
     ) -> Arc<StressTestHandle> {
         let stop_flag = Arc::new(Mutex::new(false));
@@ -268,7 +268,7 @@ impl MockPostService {
     /// * `max_batch_size` - Maximum number of posts to update per batch
     pub fn start_comprehensive_stress_test(
         &self,
-        entity_ids: Vec<Arc<EntityId>>,
+        entity_ids: Vec<EntityId>,
         min_delay_ms: u64,
         max_delay_ms: u64,
         min_batch_size: u32,

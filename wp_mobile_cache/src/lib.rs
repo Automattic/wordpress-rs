@@ -111,6 +111,8 @@ impl TryFrom<&str> for DbTable {
     }
 }
 
+uniffi::custom_newtype!(RowId, u64);
+
 /// Represents a database row ID (autoincrement field).
 /// SQLite rowids are guaranteed to be non-negative, so we use u64.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

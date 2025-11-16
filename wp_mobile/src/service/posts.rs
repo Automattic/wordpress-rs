@@ -98,7 +98,6 @@ impl PostService {
                 .iter()
                 .map(|post| {
                     repo.upsert(conn, &self.db_site, post)
-                        .map(Arc::new)
                         .map_err(|e| FetchError::Database {
                             err_message: e.to_string(),
                         })
@@ -129,10 +128,9 @@ impl PostService {
     /// The EntityId should come from repository results (e.g., select_by_post_id).
     pub fn get_entity_with_edit_context(
         &self,
-        entity_id: Arc<EntityId>,
+        entity_id: EntityId,
     ) -> EntityAnyPostWithEditContext {
         let cache = self.cache.clone();
-        let entity_id = *entity_id;
 
         Entity::<AnyPostWithEditContext>::new(
             entity_id,
@@ -281,7 +279,7 @@ mod tests {
             .execute(|conn| {
                 let repo = PostRepository::<EditContext>::new();
                 repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
-                    .map(|opt| opt.map(|full_entity| full_entity.entity_id))
+                    .map(|opt| opt.map(|full_entity| *full_entity.entity_id))
             })
             .expect("Database read should succeed")
             .expect("Post should exist");
@@ -309,14 +307,14 @@ mod tests {
             .execute(|conn| {
                 let repo = PostRepository::<EditContext>::new();
                 repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
-                    .map(|opt| opt.map(|full_entity| full_entity.entity_id))
+                    .map(|opt| opt.map(|full_entity| *full_entity.entity_id))
             })
             .expect("Database read should succeed")
             .expect("Post should exist");
 
         let entity = post_service_ctx
             .post_service
-            .get_entity_with_edit_context(entity_id.clone());
+            .get_entity_with_edit_context(entity_id);
 
         // Get the table and rowid from the entity_id
         let table = entity_id.table;

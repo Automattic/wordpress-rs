@@ -4,7 +4,9 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 /// Type of WordPress site stored in the database.
 ///
 /// Uses integer representation in the database for performance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, uniffi::Enum,
+)]
 #[repr(i64)]
 pub enum DbSiteType {
     SelfHosted = 0,
@@ -46,7 +48,9 @@ impl FromSql for DbSiteType {
 ///
 /// Note: `mapped_site_id` is a reference column, not a foreign key constraint, since it can
 /// point to different tables based on `site_type`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, uniffi::Record,
+)]
 pub struct DbSite {
     pub row_id: RowId,
     pub site_type: DbSiteType,
