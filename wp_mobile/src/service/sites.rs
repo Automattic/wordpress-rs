@@ -4,6 +4,7 @@ use wp_mobile_cache::{
     db_types::self_hosted_site::SelfHostedSite, entity::EntityId,
     repository::sites::SiteRepository,
 };
+use crate::service::WpServiceError;
 
 /// Information about a site's URLs
 #[derive(Debug, Clone, uniffi::Record)]
@@ -66,7 +67,21 @@ impl SiteService {
 #[uniffi::export]
 impl SiteService {
     /// Get site information (URLs) for the current site
-    pub fn get_current_site_info(&self) -> Result<SiteInfo, SqliteDbError> {
+    ///
+    /// Returns the site URL and API root for the site associated with this service.
+    /// This is useful when you need to display or use the site's URLs in the UI or
+    /// for other services that need to work with the same site.
+    ///
+    /// # Returns
+    /// - `Ok(SiteInfo)` with the site's URLs
+    /// - `Err(WpServiceError::DatabaseError)` if a database error occurs
+    /// - `Err(WpServiceError::SiteNotFound)` if the site doesn't exist in the database
+    ///
+    /// # Note
+    /// Since the `SiteService` is constructed with a valid `DbSite`, the site should
+    /// normally exist in the database. A `SiteNotFound` error indicates a data
+    /// inconsistency (e.g., site was deleted but entities still reference it).
+    pub fn get_current_site_info(&self) -> Result<SiteInfo, WpServiceError> {
         let site_repository = SiteRepository;
         let entity_id = EntityId {
             db_site: self.db_site,
@@ -74,19 +89,15 @@ impl SiteService {
             rowid: self.db_site.mapped_site_id,
         };
 
-        self.cache.execute(|conn| {
-            site_repository
-                .select_self_hosted_site(conn, &entity_id)
-                .map(|opt| {
-                    opt.map(|full_entity| SiteInfo {
-                        site_url: full_entity.data.url,
-                        api_root: full_entity.data.api_root,
-                    })
-                    .unwrap_or_else(|| SiteInfo {
-                        site_url: String::new(),
-                        api_root: String::new(),
-                    })
-                })
-        })
+        let full_entity = self
+            .cache
+            .execute(|conn| site_repository.select_self_hosted_site(conn, &entity_id))?;
+
+        full_entity
+            .ok_or(WpServiceError::SiteNotFound)
+            .map(|entity| SiteInfo {
+                site_url: entity.data.url,
+                api_root: entity.data.api_root,
+            })
     }
 }
