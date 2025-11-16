@@ -1,7 +1,8 @@
 use crate::{
-    AllAnyPostWithEditContextCollection, AnyPostFilter, EntityAnyPostWithEditContext, FetchError,
-    FetchResult, NaiveCollection, PostCollectionWithEditContext,
-    collection::post_collection::PostCollection,
+    AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext,
+    PostCollectionWithEditContext,
+    collection::{FetchError, FetchResult, NaiveCollection, post_collection::PostCollection},
+    filters::AnyPostFilter,
 };
 use std::sync::Arc;
 use wp_api::{
@@ -34,16 +35,6 @@ impl PostService {
             db_site,
             cache,
         }
-    }
-
-    /// Get the cache (internal use only)
-    pub(crate) fn cache(&self) -> &Arc<WpApiCache> {
-        &self.cache
-    }
-
-    /// Get the db_site (internal use only)
-    pub(crate) fn db_site(&self) -> &DbSite {
-        &self.db_site
     }
 
     /// Fetch posts from network and save to cache
@@ -147,7 +138,6 @@ impl PostService {
                             )
                         })
                     })
-                    .map_err(|e| e.into())
             }),
         )
         .into()

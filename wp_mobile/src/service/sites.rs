@@ -1,10 +1,10 @@
+use crate::service::WpServiceError;
 use std::sync::Arc;
 use wp_mobile_cache::{
     DbTable, SqliteDbError, WpApiCache, db_types::db_site::DbSite,
     db_types::self_hosted_site::SelfHostedSite, entity::EntityId,
     repository::sites::SiteRepository,
 };
-use crate::service::WpServiceError;
 
 /// Information about a site's URLs
 #[derive(Debug, Clone, uniffi::Record)]

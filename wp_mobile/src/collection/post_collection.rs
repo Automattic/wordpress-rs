@@ -1,4 +1,8 @@
-use crate::{AnyPostFilter, FetchError, FetchResult, NaiveCollection, service::posts::PostService};
+use crate::{
+    collection::{FetchError, FetchResult, NaiveCollection, collection_error::CollectionError},
+    filters::AnyPostFilter,
+    service::posts::PostService,
+};
 use std::sync::Arc;
 use wp_mobile_cache::entity::FullEntity;
 
@@ -71,10 +75,10 @@ impl<T> PostCollection<T> {
     /// # Returns
     /// - `Ok(Vec<FullEntity>>)` with all matching posts from cache
     /// - `Err(CollectionError)` if database error occurs
-    pub fn load_data(&self) -> Result<Vec<FullEntity<T>>, crate::CollectionError> {
+    pub fn load_data(&self) -> Result<Vec<FullEntity<T>>, CollectionError> {
         self.naive_collection
             .load_data()
-            .map_err(|e| crate::CollectionError::DatabaseError {
+            .map_err(|e| CollectionError::DatabaseError {
                 err_message: e.to_string(),
             })
     }
