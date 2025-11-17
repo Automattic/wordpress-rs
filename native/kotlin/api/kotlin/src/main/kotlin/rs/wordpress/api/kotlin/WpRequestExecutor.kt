@@ -25,6 +25,7 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseCertificate
 import java.io.File
+import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
@@ -130,7 +131,9 @@ class WpRequestExecutor(
         )
     }
 
-    @Suppress("ThrowsCount")
+    // We intentionally catch all exceptions to prevent UniFFI callback crashes.
+    // All exceptions are converted to proper Rust error types rather than being swallowed.
+    @Suppress("ThrowsCount", "TooGenericExceptionCaught", "SwallowedException")
     private fun executeRequestSafely(
         urlRequest: Request,
         requestUrl: String,
@@ -162,6 +165,18 @@ class WpRequestExecutor(
             throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
         } catch (e: NoRouteToHostException) {
             throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
+        } catch (e: ConnectException) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.HttpError(
+                    reason = "Connection failed: ${e.localizedMessage}"
+                )
+            )
+        } catch (e: Exception) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.GenericError(
+                    errorMessage = e.localizedMessage ?: e.toString()
+                )
+            )
         }
     }
 
