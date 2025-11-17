@@ -25,6 +25,7 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseCertificate
 import java.io.File
+import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
@@ -162,6 +163,18 @@ class WpRequestExecutor(
             throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
         } catch (e: NoRouteToHostException) {
             throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
+        } catch (e: ConnectException) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.HttpError(
+                    reason = "Connection failed: ${e.localizedMessage}"
+                )
+            )
+        } catch (e: Exception) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.GenericError(
+                    errorMessage = e.localizedMessage ?: e.toString()
+                )
+            )
         }
     }
 

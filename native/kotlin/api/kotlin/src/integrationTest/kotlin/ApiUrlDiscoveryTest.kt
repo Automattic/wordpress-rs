@@ -27,6 +27,15 @@ import kotlin.test.assertContains
 class ApiUrlDiscoveryTest {
     private val loginClient: WpLoginClient = WpLoginClient()
 
+    @Test
+    fun testLocalSite() = runTest {
+        assertEquals(
+            "http://localhost/wp-admin/authorize-application.php",
+            loginClient.apiDiscovery("http://localhost")
+                .assertSuccess().applicationPasswordsAuthenticationUrl.url()
+        )
+    }
+
     @Test // Spec Example 1
     fun testValidSiteWorksCorrectly() = runTest {
         assertEquals(
