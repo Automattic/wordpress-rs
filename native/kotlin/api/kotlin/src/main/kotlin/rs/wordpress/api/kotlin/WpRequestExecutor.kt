@@ -131,7 +131,9 @@ class WpRequestExecutor(
         )
     }
 
-    @Suppress("ThrowsCount")
+    // We intentionally catch all exceptions to prevent UniFFI callback crashes.
+    // All exceptions are converted to proper Rust error types rather than being swallowed.
+    @Suppress("ThrowsCount", "TooGenericExceptionCaught", "SwallowedException")
     private fun executeRequestSafely(
         urlRequest: Request,
         requestUrl: String,
