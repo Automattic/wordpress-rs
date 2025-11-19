@@ -87,6 +87,13 @@ var package = Package(
                 .target(name: "WordPressAPIInternal")
             ],
             path: "native/swift/Tests/wordpress-api-cache"
+        ),
+        .testTarget(
+            name: "WordPressApiCompatibilityTests",
+            dependencies: [
+                .target(name: "WordPressAPI"),
+            ],
+            path: "native/swift/Tests/api-compatibility"
         )
     ].addingIntegrationTests()
 )
