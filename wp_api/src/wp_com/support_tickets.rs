@@ -19,6 +19,8 @@ pub struct CreateSupportTicketParams {
     #[uniffi(default = [])]
     pub tags: Vec<String>,
     #[uniffi(default = [])]
+    pub encrypted_log_ids: Vec<String>,
+    #[uniffi(default = [])]
     #[serde(skip)]
     pub attachments: Vec<String>,
 }

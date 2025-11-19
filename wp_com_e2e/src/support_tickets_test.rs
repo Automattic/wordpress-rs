@@ -1,3 +1,4 @@
+use uuid::Uuid;
 use wp_api::wp_com::{
     client::WpComApiClient,
     support_tickets::{
@@ -54,6 +55,7 @@ async fn create_conversation(client: &WpComApiClient) -> anyhow::Result<SupportC
             wpcom_site_id: None,
             tags: vec!["jetpack_mobile".to_string(), "test".to_string()],
             attachments: vec![],
+            encrypted_log_ids: vec![Uuid::new_v4().to_string()],
         })
         .await?
         .data;
