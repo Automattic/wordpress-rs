@@ -438,11 +438,11 @@ def xcframework_checksum
 end
 
 def xcframework_checksum_file_path
-  File.join(PROJECT_ROOT, 'libwordpressFFI.xcframework.zip.checksum.txt')
+  File.join(PROJECT_ROOT, 'target', 'libwordpressFFI.xcframework.zip.checksum.txt')
 end
 
 def xcframework_file_path
-  File.join(PROJECT_ROOT, 'libwordpressFFI.xcframework.zip')
+  File.join(PROJECT_ROOT, 'target', 'libwordpressFFI.xcframework.zip')
 end
 
 def xcframework_bindings_file_path

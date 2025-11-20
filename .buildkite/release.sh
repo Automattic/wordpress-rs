@@ -25,9 +25,8 @@ echo "--- :closed_lock_with_key: Setting up Code Signing"
 bundle exec fastlane set_up_signing_release
 
 echo "--- :rust: Building XCFramework"
-make xcframework-package
+make xcframework-package-sign
 make xcframework-package-checksum
-make xcframework-sign
 
 release_version="$1"
 echo "--- :rocket: Publish release $release_version"

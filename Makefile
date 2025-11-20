@@ -136,11 +136,15 @@ xcframework-package: xcframework-all
 	rm -rf target/libwordpressFFI.xcframework.zip
 	ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ target/libwordpressFFI.xcframework.zip
 
+xcframework-package-sign: xcframework-all xcframework-sign xcframework-package
+
 xcframework-package-checksum:
-	swift package compute-checksum target/libwordpressFFI.xcframework.zip | tee libwordpressFFI.xcframework.zip.checksum.txt
+	swift package compute-checksum target/libwordpressFFI.xcframework.zip | tee target/libwordpressFFI.xcframework.zip.checksum.txt
 
 xcframework-sign:
 	codesign --timestamp -v --sign "${certificate_name_release}" target/libwordpressFFI.xcframework
+	codesign -dvv target/libwordpressFFI.xcframework
+
 
 docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
