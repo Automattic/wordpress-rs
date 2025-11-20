@@ -66,5 +66,5 @@ RUN curl -s -o swiftly.tar.gz "https://download.swift.org/swiftly/linux/swiftly-
 RUN apt-get update \
   && apt-get -y -qq install libicu-dev libcurl4-openssl-dev libedit-dev libsqlite3-dev \
     libncurses-dev libpython3-dev libxml2-dev uuid-dev git libstdc++-12-dev
-RUN swiftly install --progress-file /dev/null --use 6.1
+RUN swiftly install --progress-file /dev/null --use 6.2
 RUN swift --version
