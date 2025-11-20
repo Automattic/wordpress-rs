@@ -84,7 +84,8 @@ var package = Package(
             name: "WordPressApiCacheTests",
             dependencies: [
                 .target(name: "WordPressApiCache"),
-                .target(name: "WordPressAPIInternal")
+                .target(name: "WordPressAPIInternal"),
+                .target(name: "WordPressAPI")
             ],
             path: "native/swift/Tests/wordpress-api-cache"
         ),
