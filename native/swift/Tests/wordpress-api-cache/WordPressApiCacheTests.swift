@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 import WordPressAPI
-import WordPressAPIInternal
 import WordPressApiCache
+import WordPressAPIInternal
 
 actor Test {
 
@@ -26,20 +26,19 @@ actor Test {
         _ = try cache.performMigrations()
         cache.startListeningForUpdates(delegate: DatabaseChangeNotifier.shared)
 
-//        let mockService = MockPostService(
-//            cache: cache,
-//            siteUrl: "https://vanilla.wpmt.co",
-//            apiRoot: "https://vanilla.wpmt.co/wp-json"
-//        )
-//
-//        let ids = mockService.generateAndInsertPosts(count: 10_000)
+        let mockService = MockPostService(
+            cache: cache,
+            siteUrl: "https://vanilla.wpmt.co",
+            apiRoot: "https://vanilla.wpmt.co/wp-json"
+        )
 
         let delegate = WpApiClientDelegate(
-            authProvider: .staticWithAuth(auth: WpAuthentication(username: "admin", password: "SpBJ ChT0 pcZT okaf 8l27 iE9d")),
+            authProvider: .none(),
             requestExecutor: executor,
-            middlewarePipeline: WpApiMiddlewarePipeline(middlewares: []),
+            middlewarePipeline: MiddlewarePipeline(middlewares: []),
             appNotifier: MockAppNotifier()
         )
+
         let service = try WpSelfHostedService(
             siteUrl: "https://content-heavy.wpmt.co",
             apiRoot: "https://content-heavy.wpmt.co/wp-json",
@@ -48,30 +47,41 @@ actor Test {
             cache: cache
         )
 
-        let publishedPosts = service.posts().createPostCollectionWithEditContext(filter: AnyPostFilter(status: .publish))
+        let publishedPosts = service.posts().getAllPostsWithEditContext()
 
-        DatabaseChangeNotifier.shared.startObserving(publishedPosts) { hook in
-            debugPrint("Published Posts changed: \(hook.table) \(hook.rowId) \(hook.action)")
-        }
+//        DatabaseChangeNotifier.shared.startObserving(publishedPosts) { hook in
+//            debugPrint("Published Posts changed: \(hook.table) \(hook.rowId) \(hook.action)")
+//        }
+
+        let ids = mockService.generateAndInsertPosts(count: 10_000)
 
         try await withThrowingTaskGroup { group in
 
-            for i in 1...224 {
+            for i in 0...10 {
                 group.addTask {
-                    while(!Task.isCancelled) {
-                        let result = try await publishedPosts.fetchPage(page: UInt32(i), perPage: 1)
-                        debugPrint("fetched page \(i)")
-                    }
+                    _ = mockService.startComprehensiveStressTest(entityIds: ids, minDelayMs: 1, maxDelayMs: 1000, minBatchSize: 100, maxBatchSize: 1000)
                 }
             }
 
             group.addTask {
-                while(!Task.isCancelled) {
-                    try await Task.sleep(for: .seconds(1))
-                    let count = try await publishedPosts.loadData().count
-                    debugPrint(count)
+                if #available(macOS 15.0, *) {
+                    for try await values in DatabaseChangeNotifier.shared.startObserving(publishedPosts).map({ hook in
+                        try await publishedPosts.loadData()
+                    }){
+                        print("Received update hook: \(values.count)")
+                    }
+                } else {
+                    // Fallback on earlier versions
                 }
             }
+
+//            group.addTask {
+//                while(!Task.isCancelled) {
+//                    try await Task.sleep(for: .seconds(1))
+//                    let count = try await publishedPosts.loadData().count
+//                    debugPrint(count)
+//                }
+//            }
 
             group.addTask {
                 try await Task.sleep(for: .seconds(10))

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import WordPressAPIInternal
 import Synchronization
 
@@ -100,8 +101,8 @@ public final class DatabaseChangeNotifier: DatabaseDelegate, Sendable {
     ///
     /// - Note: You must call `stopObserving(_:)` when you're done observing to prevent memory leaks.
     public func startObserving(
-        _ collection: ObservableCollection,
-        callback: @escaping @Sendable (UpdateHook) -> Void
+        _ collection: any ObservableCollection,
+        callback: @escaping @Sendable (UpdateHook) async throws -> Void
     ) {
         let token = NotificationCenter.default.addObserver(
             forName: notificationName(for: collection),
@@ -109,12 +110,20 @@ public final class DatabaseChangeNotifier: DatabaseDelegate, Sendable {
             queue: nil
         ) { notification in
             guard let updateHook = notification.userInfo?["updateHook"] as? UpdateHook else { return }
-            callback(updateHook)
+
+            Task {
+                try await callback(updateHook)
+            }
         }
 
         tokenStore.add(token, for: collection.handle) {
             NotificationCenter.default.removeObserver($0)
         }
+    }
+
+    @available(macOS 15.0, *)
+    public func startObserving(_ collection: any ObservableCollection) -> UpdateHookSequence {
+        UpdateHookSequence(name: notificationName(for: collection))
     }
 
     /// Stops observing changes to a specific database entity.
@@ -135,7 +144,7 @@ public final class DatabaseChangeNotifier: DatabaseDelegate, Sendable {
     /// If no observer is registered for this collection, this method does nothing.
     ///
     /// - Parameter collection: The collection to stop observing.
-    public func stopObserving(_ collection: ObservableCollection) {
+    public func stopObserving(_ collection: any ObservableCollection) {
         if let token = tokenStore.get(for: collection.handle) {
             NotificationCenter.default.removeObserver(token)
         }
@@ -147,7 +156,7 @@ public final class DatabaseChangeNotifier: DatabaseDelegate, Sendable {
         return Notification.Name("org.wordpress.swift.ObservableEntity.\(table).\(rowid)")
     }
 
-    private func notificationName(for collection: ObservableCollection) -> Notification.Name {
+    private func notificationName(for collection: any ObservableCollection) -> Notification.Name {
         Notification.Name("org.wordpress.swift.ObservableCollection.\(collection.tableName)")
     }
 
@@ -254,5 +263,32 @@ class TokenStore: @unchecked Sendable {
             self.collectionTokens.removeValue(forKey: key)
             return value
         }
+    }
+}
+
+public struct UpdateHookSequence: AsyncSequence, Sendable {
+
+    let name: Notification.Name
+
+    public struct AsyncIterator : AsyncIteratorProtocol {
+        var publisher: AsyncCompactMapSequence<AsyncPublisher<NotificationCenter.Publisher>, UpdateHook>.Iterator
+
+        init(name: Notification.Name) {
+            let publisher = NotificationCenter.default.publisher(for: name)
+                .values
+                .compactMap { $0.userInfo?["updateHook"] as? UpdateHook }
+                .makeAsyncIterator()
+
+            self.publisher = publisher
+
+        }
+
+        public mutating func next() async -> UpdateHook? {
+            await self.publisher.next()
+        }
+    }
+
+    public func makeAsyncIterator() -> AsyncIterator {
+        AsyncIterator(name: name)
     }
 }

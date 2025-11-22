@@ -39,7 +39,8 @@ var package = Package(
         .target(
             name: "WordPressAPI",
             dependencies: [
-                .target(name: "WordPressAPIInternal")
+                .target(name: "WordPressAPIInternal"),
+                .target(name: "WordPressApiCache")
             ],
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [
@@ -72,6 +73,7 @@ var package = Package(
             name: "WordPressAPITests",
             dependencies: [
                 .target(name: "WordPressAPI"),
+                .target(name: "WordPressApiCache"),
                 .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api",

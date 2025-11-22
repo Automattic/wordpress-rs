@@ -1,4 +1,5 @@
 import SwiftUI
+import WordPressApiCache
 import WordPressAPI
 import Combine
 
@@ -46,6 +47,14 @@ struct RootListViewItem: View {
                     Text(name)
                 }
             }
+        case .collection(let name, let cachedResults, let fetchedResults, _):
+            VStack(alignment: .leading) {
+                NavigationLink {
+                    ListView(viewModel: CollectionListViewModel(cachedResults: cachedResults, fetchedResults: fetchedResults) )
+                } label: {
+                    Text(name)
+                }
+            }
         }
     }
 }
@@ -74,11 +83,13 @@ enum RootListData: Identifiable, Sendable {
 
     case callback(String, TaskListViewModel.FetchDataTask, Category)
     case sequence(String, SequenceListViewModel.SequenceProvider, Category)
+    case collection(String, CollectionListViewModel.CachedResultProvider, CollectionListViewModel.FetchedResultsProvider, Category)
 
     var id: String {
         switch self {
         case .callback(let id, _, _): id
         case .sequence(let id, _, _): id
+        case .collection(let id, _, _, _): id
         }
     }
 
@@ -86,6 +97,7 @@ enum RootListData: Identifiable, Sendable {
         switch self {
         case .callback(_, _, let category): category
         case .sequence(_, _, let category): category
+        case .collection(_, _, _, let category): category
         }
     }
 
@@ -95,6 +107,20 @@ enum RootListData: Identifiable, Sendable {
 
     init(name: String, sequence: @escaping SequenceListViewModel.SequenceProvider, category: Category) {
         self = .sequence(name, sequence, category)
+    }
+
+    init(
+        name: String,
+        cachedDataProvider: @escaping CollectionListViewModel.CachedResultProvider,
+        fetchedDataProvider: @escaping CollectionListViewModel.FetchedResultsProvider,
+        category: Category
+    ) {
+        self = .collection(
+            name,
+            cachedDataProvider,
+            fetchedDataProvider,
+            category
+        )
     }
 }
 
