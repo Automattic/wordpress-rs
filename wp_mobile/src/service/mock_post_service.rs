@@ -19,6 +19,142 @@ use wp_mobile_cache::{
     repository::posts::PostRepository, repository::sites::SiteRepository,
 };
 
+/// Operation type for stress testing
+enum StressTestOperation {
+    Update,
+    Delete,
+    Insert,
+}
+
+/// Configuration for comprehensive stress testing
+#[derive(uniffi::Record)]
+pub struct StressTestConfig {
+    /// Minimum delay between batches in milliseconds
+    pub min_delay_ms: u64,
+    /// Maximum delay between batches in milliseconds
+    pub max_delay_ms: u64,
+    /// Minimum number of posts to operate on per batch
+    pub min_batch_size: u32,
+    /// Maximum number of posts to operate on per batch
+    pub max_batch_size: u32,
+    /// Relative weight for update operations (e.g., 50 = 50% if all weights sum to 100)
+    pub update_weight: u32,
+    /// Relative weight for delete operations
+    pub delete_weight: u32,
+    /// Relative weight for insert operations
+    pub insert_weight: u32,
+}
+
+/// Perform batch update operation for stress testing
+fn stress_test_batch_update(
+    cache: &Arc<WpApiCache>,
+    db_site: &DbSite,
+    repo: &PostRepository<EditContext>,
+    entity_ids: &[EntityId],
+    batch_indices: &[usize],
+    current_count: u64,
+) {
+    batch_indices.iter().for_each(|&idx| {
+        let entity_id = &entity_ids[idx];
+        let _result = cache.execute(|conn| {
+            if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
+                let mut post = full_entity.data.post;
+                post.title.rendered = format!("Updated Post {} (batch #{})", post.id.0, current_count);
+                post.content.rendered = format!("<p>Content updated at batch #{}</p>", current_count);
+                repo.upsert(conn, db_site, &post)?;
+            }
+            Ok::<_, wp_mobile_cache::SqliteDbError>(())
+        });
+    });
+}
+
+/// Perform batch delete operation for stress testing
+fn stress_test_batch_delete(
+    cache: &Arc<WpApiCache>,
+    repo: &PostRepository<EditContext>,
+    entity_ids: &[EntityId],
+    batch_indices: &[usize],
+) {
+    batch_indices.iter().for_each(|&idx| {
+        let entity_id = &entity_ids[idx];
+        let _result = cache.execute(|conn| repo.delete_by_entity_id(conn, entity_id));
+    });
+}
+
+/// Perform batch insert operation for stress testing
+fn stress_test_batch_insert(
+    cache: &Arc<WpApiCache>,
+    db_site: &DbSite,
+    repo: &PostRepository<EditContext>,
+    batch_size: u32,
+    next_insert_id: &mut i64,
+    current_count: u64,
+) {
+    (0..batch_size).for_each(|_| {
+        let post_id = PostId(*next_insert_id);
+        *next_insert_id += 1;
+
+        let title = format!("Stress Insert {} (batch #{})", post_id.0, current_count);
+        let slug = format!("stress-insert-{}", post_id.0);
+        let link = format!("https://example.com/{}", slug);
+        let content = format!("<p>Inserted at batch #{}</p>", current_count);
+        let post = create_test_post(post_id, &title, &slug, &link, &content);
+
+        let _result = cache.execute(|conn| repo.upsert(conn, db_site, &post));
+    });
+}
+
+/// Create a temporary post with default values for testing
+fn create_test_post(
+    id: PostId,
+    title: &str,
+    slug: &str,
+    link: &str,
+    content: &str,
+) -> AnyPostWithEditContext {
+    AnyPostWithEditContext {
+        id,
+        date: "2025-01-01T00:00:00".to_string(),
+        date_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
+        guid: PostGuidWithEditContext {
+            raw: None,
+            rendered: format!("https://example.com/?p={}", id.0),
+        },
+        link: link.to_string(),
+        modified: "2025-01-01T00:00:00".to_string(),
+        modified_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
+        slug: slug.to_string(),
+        status: PostStatus::Publish,
+        post_type: "post".to_string(),
+        password: "".to_string(),
+        permalink_template: None,
+        generated_slug: None,
+        title: PostTitleWithEditContext {
+            raw: None,
+            rendered: title.to_string(),
+        },
+        content: PostContentWithEditContext {
+            raw: None,
+            rendered: content.to_string(),
+            protected: None,
+            block_version: None,
+        },
+        author: None,
+        excerpt: None,
+        featured_media: None,
+        comment_status: None,
+        ping_status: None,
+        format: None,
+        meta: None,
+        sticky: None,
+        template: "".to_string(),
+        categories: None,
+        tags: None,
+        parent: None,
+        menu_order: None,
+    }
+}
+
 /// Mock post service for testing purposes
 ///
 /// This service provides utilities to insert and update mock posts directly
@@ -74,58 +210,14 @@ impl MockPostService {
         Self { cache, db_site }
     }
 
-    /// Create a temporary post with default values
-    fn create_temp_post(&self, id: PostId) -> AnyPostWithEditContext {
-        AnyPostWithEditContext {
-            id,
-            date: "2025-01-01T00:00:00".to_string(),
-            date_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
-            guid: PostGuidWithEditContext {
-                raw: None,
-                rendered: format!("https://example.com/?p={}", id.0),
-            },
-            link: format!("https://example.com/test-post-{}", id.0),
-            modified: "2025-01-01T00:00:00".to_string(),
-            modified_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
-            slug: format!("test-post-{}", id.0),
-            status: PostStatus::Publish,
-            post_type: "post".to_string(),
-            password: "".to_string(),
-            permalink_template: None,
-            generated_slug: None,
-            title: PostTitleWithEditContext {
-                raw: None,
-                rendered: "Test Post".to_string(),
-            },
-            content: PostContentWithEditContext {
-                raw: None,
-                rendered: "<p>Test content</p>".to_string(),
-                protected: None,
-                block_version: None,
-            },
-            author: None,
-            excerpt: None,
-            featured_media: None,
-            comment_status: None,
-            ping_status: None,
-            format: None,
-            meta: None,
-            sticky: None,
-            template: "".to_string(),
-            categories: None,
-            tags: None,
-            parent: None,
-            menu_order: None,
-        }
-    }
-
     /// Insert a mock post for testing purposes
     ///
     /// Returns the EntityId of the inserted post, which can be used to create
     /// observable entities or fetch the post later.
     pub fn insert_mock_post(&self, id: PostId, title: String) -> EntityId {
-        let mut post = self.create_temp_post(id);
-        post.title.rendered = title;
+        let slug = format!("test-post-{}", id.0);
+        let link = format!("https://example.com/{}", slug);
+        let post = create_test_post(id, &title, &slug, &link, "<p>Test content</p>");
 
         let repo = PostRepository::<EditContext>::new();
         self.cache
@@ -166,10 +258,10 @@ impl MockPostService {
 
         for i in 0..count {
             let post_id = PostId(10000 + i as i64);
-            let mut post = self.create_temp_post(post_id);
-            post.title.rendered = format!("Stress Test Post {}", i + 1);
-            post.slug = format!("stress-test-post-{}", i + 1);
-            post.link = format!("https://example.com/stress-test-post-{}", i + 1);
+            let title = format!("Stress Test Post {}", i + 1);
+            let slug = format!("stress-test-post-{}", i + 1);
+            let link = format!("https://example.com/{}", slug);
+            let post = create_test_post(post_id, &title, &slug, &link, "<p>Test content</p>");
 
             let entity_id = self
                 .cache
@@ -254,23 +346,17 @@ impl MockPostService {
     /// Start a comprehensive stress test with variable batch sizes and timing
     ///
     /// This provides a more realistic stress test than `start_random_updates()`:
-    /// - Updates multiple posts per batch (1-50 posts)
-    /// - Variable timing (bursts and quiet periods)
+    /// - Randomly updates, deletes, and inserts posts based on operation weights
+    /// - Variable batch sizes and timing (bursts and quiet periods)
     /// - Uses actual random selection instead of round-robin
     ///
     /// # Arguments
-    /// * `entity_ids` - The entity IDs to randomly update
-    /// * `min_delay_ms` - Minimum delay between batches in milliseconds
-    /// * `max_delay_ms` - Maximum delay between batches in milliseconds
-    /// * `min_batch_size` - Minimum number of posts to update per batch
-    /// * `max_batch_size` - Maximum number of posts to update per batch
+    /// * `entity_ids` - The entity IDs to randomly update/delete
+    /// * `config` - Configuration for the stress test behavior
     pub fn start_comprehensive_stress_test(
         &self,
         entity_ids: Vec<EntityId>,
-        min_delay_ms: u64,
-        max_delay_ms: u64,
-        min_batch_size: u32,
-        max_batch_size: u32,
+        config: StressTestConfig,
     ) -> Arc<StressTestHandle> {
         let stop_flag = Arc::new(Mutex::new(false));
         let stop_flag_clone = stop_flag.clone();
@@ -278,16 +364,17 @@ impl MockPostService {
         let update_counter_clone = update_counter.clone();
         let cache = self.cache.clone();
         let db_site = self.db_site;
-        let status_values = [
-            PostStatus::Draft,
-            PostStatus::Pending,
-            PostStatus::Publish,
-            PostStatus::Future,
-        ];
 
         thread::spawn(move || {
             let repo = PostRepository::<EditContext>::new();
             let mut rng = rand::thread_rng();
+            let mut next_insert_id: i64 = 20000; // Start IDs for inserted posts
+
+            // Calculate total weight for operation selection
+            let total_weight = config.update_weight + config.delete_weight + config.insert_weight;
+            if total_weight == 0 {
+                return; // No operations to perform
+            }
 
             loop {
                 // Check if we should stop
@@ -303,47 +390,57 @@ impl MockPostService {
                 }
 
                 // Determine batch size for this iteration
-                let batch_size = rng.gen_range(min_batch_size..=max_batch_size);
+                let batch_size = rng.gen_range(config.min_batch_size..=config.max_batch_size);
                 let batch_size = batch_size.min(entity_ids.len() as u32);
 
-                // Select random posts for this batch
-                let mut batch_indices = Vec::new();
-                for _ in 0..batch_size {
-                    let idx = rng.gen_range(0..entity_ids.len());
-                    batch_indices.push(idx);
-                }
+                // Choose operation based on weights
+                let roll = rng.gen_range(0..total_weight);
+                let operation = if roll < config.update_weight {
+                    StressTestOperation::Update
+                } else if roll < config.update_weight + config.delete_weight {
+                    StressTestOperation::Delete
+                } else {
+                    StressTestOperation::Insert
+                };
 
-                // Update all posts in the batch
                 let current_count = update_counter_clone.load(Ordering::Relaxed);
 
-                for idx in batch_indices {
-                    let entity_id = &entity_ids[idx];
+                // Select random posts for this batch
+                let batch_indices: Vec<usize> = (0..batch_size)
+                    .map(|_| rng.gen_range(0..entity_ids.len()))
+                    .collect();
 
-                    let _result = cache.execute(|conn| {
-                        if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
-                            let mut post = full_entity.data.post;
-                            post.title.rendered = format!(
-                                "Updated Post {} (batch update #{})",
-                                post.id.0, current_count
-                            );
-                            post.content.rendered =
-                                format!("<p>Content updated at batch #{}</p>", current_count);
-
-                            // Randomize the post status
-                            let mut rng = rand::thread_rng();
-                            let status_index = rng.gen_range(0..status_values.len());
-                            post.status = status_values[status_index].clone();
-
-                            repo.upsert(conn, &db_site, &post)?;
-                        }
-                        Ok::<_, wp_mobile_cache::SqliteDbError>(())
-                    });
-
-                    update_counter_clone.fetch_add(1, Ordering::Relaxed);
+                match operation {
+                    StressTestOperation::Update => {
+                        stress_test_batch_update(
+                            &cache,
+                            &db_site,
+                            &repo,
+                            &entity_ids,
+                            &batch_indices,
+                            current_count,
+                        );
+                        update_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
+                    }
+                    StressTestOperation::Delete => {
+                        stress_test_batch_delete(&cache, &repo, &entity_ids, &batch_indices);
+                        update_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
+                    }
+                    StressTestOperation::Insert => {
+                        stress_test_batch_insert(
+                            &cache,
+                            &db_site,
+                            &repo,
+                            batch_size,
+                            &mut next_insert_id,
+                            current_count,
+                        );
+                        update_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
+                    }
                 }
 
                 // Variable delay between batches
-                let delay_ms = rng.gen_range(min_delay_ms..=max_delay_ms);
+                let delay_ms = rng.gen_range(config.min_delay_ms..=config.max_delay_ms);
                 thread::sleep(Duration::from_millis(delay_ms));
             }
         });
