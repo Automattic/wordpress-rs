@@ -10,7 +10,7 @@ pub struct FetchResult {
     pub entity_ids: Vec<EntityId>,
 
     /// Total number of items matching the query (from API)
-    pub total_items: Option<u64>,
+    pub total_items: Option<i64>,
 
     /// Total number of pages available (from API)
     pub total_pages: Option<u32>,

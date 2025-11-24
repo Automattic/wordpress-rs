@@ -112,16 +112,15 @@ impl TryFrom<&str> for DbTable {
     }
 }
 
-uniffi::custom_newtype!(RowId, u64);
+uniffi::custom_newtype!(RowId, i64);
 
 /// Represents a database row ID (autoincrement field).
-/// SQLite rowids are guaranteed to be non-negative, so we use u64.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct RowId(pub u64);
+pub struct RowId(pub i64);
 
 impl ToSql for RowId {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.0 as i64))
+        Ok(ToSqlOutput::from(self.0))
     }
 }
 
@@ -129,7 +128,7 @@ impl FromSql for RowId {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
         i64::column_result(value).map(|i| {
             debug_assert!(i >= 0, "RowId should be non-negative, got: {}", i);
-            RowId(i as u64)
+            RowId(i)
         })
     }
 }
@@ -137,7 +136,7 @@ impl FromSql for RowId {
 impl From<i64> for RowId {
     fn from(value: i64) -> Self {
         debug_assert!(value >= 0, "RowId should be non-negative, got: {}", value);
-        RowId(value as u64)
+        RowId(value)
     }
 }
 
@@ -164,7 +163,7 @@ impl RowId {
 
 impl From<RowId> for i64 {
     fn from(row_id: RowId) -> Self {
-        row_id.0 as i64
+        row_id.0
     }
 }
 
@@ -247,7 +246,7 @@ impl WpApiCache {
         })
     }
 
-    pub fn perform_migrations(&self) -> Result<u64, SqliteDbError> {
+    pub fn perform_migrations(&self) -> Result<i64, SqliteDbError> {
         self.execute(|connection| {
             let mut mgr = MigrationManager::new(connection)?;
             mgr.perform_migrations().map_err(SqliteDbError::from)
@@ -379,7 +378,7 @@ impl<'a> MigrationManager<'a> {
         Ok(result > 0)
     }
 
-    pub fn perform_migrations(&mut self) -> SqliteResult<u64> {
+    pub fn perform_migrations(&mut self) -> SqliteResult<i64> {
         if !self.has_migrations_table()? {
             self.create_migrations_table()?;
         }
@@ -394,10 +393,10 @@ impl<'a> MigrationManager<'a> {
             }
 
             // `.enumerate` will start the indexes from 0, so we need to add `next_migration_id`
-            self.insert_migration((next_migration_id + index + 1) as u64)?;
+            self.insert_migration((next_migration_id + index + 1) as i64)?;
         }
 
-        Ok(MIGRATION_QUERIES[next_migration_id..].len() as u64)
+        Ok(MIGRATION_QUERIES[next_migration_id..].len() as i64)
     }
 
     pub fn create_migrations_table(&self) -> SqliteResult<()> {
@@ -408,7 +407,7 @@ impl<'a> MigrationManager<'a> {
         Ok(())
     }
 
-    pub fn insert_migration(&mut self, migration_id: u64) -> SqliteResult<()> {
+    pub fn insert_migration(&mut self, migration_id: i64) -> SqliteResult<()> {
         let mut insert_migration_query = self
             .connection
             .prepare("INSERT INTO _migrations (migration_id) VALUES (?)")?;
@@ -508,14 +507,14 @@ mod tests {
         let mut stmt = connection
             .prepare("SELECT migration_id FROM _migrations ORDER BY migration_id")
             .unwrap();
-        let migration_ids: Vec<u64> = stmt
-            .query_map([], |row| row.get::<_, u64>(0))
+        let migration_ids: Vec<i64> = stmt
+            .query_map([], |row| row.get::<_, i64>(0))
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
         // Verify migration IDs are sequential and complete
-        let expected_ids: Vec<u64> = (1..=MIGRATION_QUERIES.len() as u64).collect();
+        let expected_ids: Vec<i64> = (1..=MIGRATION_QUERIES.len() as i64).collect();
         assert_eq!(
             migration_ids,
             expected_ids,

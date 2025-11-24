@@ -98,7 +98,7 @@ impl PostService {
 
         Ok(FetchResult {
             entity_ids,
-            total_items: response.header_map.wp_total().map(|n| n as u64),
+            total_items: response.header_map.wp_total().map(|n| n as i64),
             total_pages: response.header_map.wp_total_pages(),
             current_page: page,
         })
@@ -305,7 +305,7 @@ mod tests {
 
         // Get the table and rowid from the entity_id
         let table = entity_id.table;
-        let rowid = entity_id.rowid.0 as i64;
+        let rowid = entity_id.rowid.0;
 
         // Test: Create UpdateHook that matches this entity
         let matching_hook = UpdateHook {

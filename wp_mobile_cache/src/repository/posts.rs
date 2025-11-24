@@ -696,7 +696,7 @@ impl PostRepository<EditContext> {
                 |row| row.get(0),
             )
             .map_err(SqliteDbError::from)?;
-        let post_rowid = RowId(post_rowid as u64);
+        let post_rowid = RowId(post_rowid);
 
         // Sync term relationships
         let term_repo = TermRelationshipRepository;
@@ -829,7 +829,7 @@ impl PostRepository<ViewContext> {
                 |row| row.get(0),
             )
             .map_err(SqliteDbError::from)?;
-        let post_rowid = RowId(post_rowid as u64);
+        let post_rowid = RowId(post_rowid);
 
         // Sync term relationships (ViewContext has categories and tags)
         let term_repo = TermRelationshipRepository;
@@ -930,7 +930,7 @@ impl PostRepository<EmbedContext> {
                 |row| row.get(0),
             )
             .map_err(SqliteDbError::from)?;
-        let post_rowid = RowId(post_rowid as u64);
+        let post_rowid = RowId(post_rowid);
 
         // No term relationships for EmbedContext (no categories or tags)
 
