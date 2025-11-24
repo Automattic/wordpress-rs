@@ -340,6 +340,8 @@ impl MockPostService {
         Arc::new(StressTestHandle {
             stop_flag,
             update_counter,
+            insert_counter: Arc::new(AtomicU64::new(0)),
+            delete_counter: Arc::new(AtomicU64::new(0)),
         })
     }
 
@@ -362,6 +364,10 @@ impl MockPostService {
         let stop_flag_clone = stop_flag.clone();
         let update_counter = Arc::new(AtomicU64::new(0));
         let update_counter_clone = update_counter.clone();
+        let insert_counter = Arc::new(AtomicU64::new(0));
+        let insert_counter_clone = insert_counter.clone();
+        let delete_counter = Arc::new(AtomicU64::new(0));
+        let delete_counter_clone = delete_counter.clone();
         let cache = self.cache.clone();
         let db_site = self.db_site;
 
@@ -424,7 +430,7 @@ impl MockPostService {
                     }
                     StressTestOperation::Delete => {
                         stress_test_batch_delete(&cache, &repo, &entity_ids, &batch_indices);
-                        update_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
+                        delete_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
                     }
                     StressTestOperation::Insert => {
                         stress_test_batch_insert(
@@ -435,7 +441,7 @@ impl MockPostService {
                             &mut next_insert_id,
                             current_count,
                         );
-                        update_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
+                        insert_counter_clone.fetch_add(batch_size as u64, Ordering::Relaxed);
                     }
                 }
 
@@ -448,6 +454,8 @@ impl MockPostService {
         Arc::new(StressTestHandle {
             stop_flag,
             update_counter,
+            insert_counter,
+            delete_counter,
         })
     }
 }
@@ -455,11 +463,13 @@ impl MockPostService {
 /// Handle for controlling background stress testing
 ///
 /// Allows stopping the background thread that performs random updates
-/// and querying the current update count.
+/// and querying the current update, insert, and delete counts.
 #[derive(uniffi::Object)]
 pub struct StressTestHandle {
     stop_flag: Arc<Mutex<bool>>,
     update_counter: Arc<AtomicU64>,
+    insert_counter: Arc<AtomicU64>,
+    delete_counter: Arc<AtomicU64>,
 }
 
 #[uniffi::export]
@@ -477,5 +487,19 @@ impl StressTestHandle {
     /// Returns the total count of post updates since starting.
     pub fn update_count(&self) -> u64 {
         self.update_counter.load(Ordering::Relaxed)
+    }
+
+    /// Get the current number of inserts performed
+    ///
+    /// Returns the total count of post inserts since starting.
+    pub fn insert_count(&self) -> u64 {
+        self.insert_counter.load(Ordering::Relaxed)
+    }
+
+    /// Get the current number of deletes performed
+    ///
+    /// Returns the total count of post deletes since starting.
+    pub fn delete_count(&self) -> u64 {
+        self.delete_counter.load(Ordering::Relaxed)
     }
 }

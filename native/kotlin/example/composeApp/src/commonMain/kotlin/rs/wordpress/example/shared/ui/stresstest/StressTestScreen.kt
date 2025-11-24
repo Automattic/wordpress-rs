@@ -29,6 +29,8 @@ import rs.wordpress.example.shared.ui.components.PostCard
 fun StressTestScreen(viewModel: StressTestViewModel = koinInject()) {
     val posts by viewModel.posts.collectAsState()
     val totalUpdates by viewModel.totalUpdates.collectAsState()
+    val totalInserts by viewModel.totalInserts.collectAsState()
+    val totalDeletes by viewModel.totalDeletes.collectAsState()
     val isRunning by viewModel.isRunning.collectAsState()
     val performanceMetrics by viewModel.performanceMetrics.collectAsState()
     val listState = rememberLazyListState()
@@ -51,7 +53,8 @@ fun StressTestScreen(viewModel: StressTestViewModel = koinInject()) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(text = "Total Posts: ${posts.size}")
-                    Text(text = "Total Updates: $totalUpdates")
+                    Text(text = "Updates: $totalUpdates | Inserts: $totalInserts | Deletes: $totalDeletes")
+                    Text(text = "Total Operations: ${totalUpdates + totalInserts + totalDeletes}")
                     Text(text = "Status: ${if (isRunning) "Running" else "Stopped"}")
 
                     performanceMetrics?.let { metrics ->
