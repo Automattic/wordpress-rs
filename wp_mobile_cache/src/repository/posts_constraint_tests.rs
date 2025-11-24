@@ -130,6 +130,22 @@ fn test_delete_non_existent_post_returns_zero(test_ctx: TestContext) {
 }
 
 #[rstest]
+fn test_delete_by_entity_id_non_existent_returns_zero(test_ctx: TestContext) {
+    // Create an EntityId with a non-existent rowid
+    let non_existent_entity_id = EntityId::new(test_ctx.site, EditContext::table(), RowId(99999));
+
+    let deleted = test_ctx
+        .post_repo
+        .delete_by_entity_id(&test_ctx.conn, &non_existent_entity_id)
+        .unwrap();
+
+    assert_eq!(
+        deleted, 0,
+        "Should return 0 when deleting non-existent entity"
+    );
+}
+
+#[rstest]
 fn test_count_returns_zero_for_empty_site(test_ctx: TestContext) {
     let count = test_ctx
         .post_repo
