@@ -59,8 +59,10 @@ fn stress_test_batch_update(
         let _result = cache.execute(|conn| {
             if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
                 let mut post = full_entity.data.post;
-                post.title.rendered = format!("Updated Post {} (batch #{})", post.id.0, current_count);
-                post.content.rendered = format!("<p>Content updated at batch #{}</p>", current_count);
+                post.title.rendered =
+                    format!("Updated Post {} (batch #{})", post.id.0, current_count);
+                post.content.rendered =
+                    format!("<p>Content updated at batch #{}</p>", current_count);
                 repo.upsert(conn, db_site, &post)?;
             }
             Ok::<_, wp_mobile_cache::SqliteDbError>(())

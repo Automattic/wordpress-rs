@@ -165,8 +165,10 @@ impl PostService {
         entity_id: &EntityId,
     ) -> Result<u64, wp_mobile_cache::SqliteDbError> {
         let repo = PostRepository::<EditContext>::new();
-        self.cache
-            .execute(|connection| repo.delete_by_entity_id(connection, entity_id).map(|n| n as u64))
+        self.cache.execute(|connection| {
+            repo.delete_by_entity_id(connection, entity_id)
+                .map(|n| n as u64)
+        })
     }
 
     /// Delete a post by its WordPress post ID
@@ -186,8 +188,10 @@ impl PostService {
         post_id: wp_api::posts::PostId,
     ) -> Result<u64, wp_mobile_cache::SqliteDbError> {
         let repo = PostRepository::<EditContext>::new();
-        self.cache
-            .execute(|connection| repo.delete_by_post_id(connection, &self.db_site, post_id).map(|n| n as u64))
+        self.cache.execute(|connection| {
+            repo.delete_by_post_id(connection, &self.db_site, post_id)
+                .map(|n| n as u64)
+        })
     }
 
     /// Create a filtered post collection with edit context
@@ -536,9 +540,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_by_post_id_non_existent_returns_zero(
-        post_service_ctx: PostServiceTestContext,
-    ) {
+    fn test_delete_by_post_id_non_existent_returns_zero(post_service_ctx: PostServiceTestContext) {
         // Test: Delete non-existent post
         let deleted = post_service_ctx
             .post_service
