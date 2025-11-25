@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Interceptor
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
@@ -13,10 +14,27 @@ import uniffi.wp_api.WpAuthenticationProvider
 
 class WpComApiClient(
     authProvider: WpAuthenticationProvider,
-    private val requestExecutor: RequestExecutor = WpRequestExecutor(),
+    private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
+
+    /**
+     * Convenience constructor that accepts a list of OkHttp interceptors.
+     * Uses [WpRequestExecutor] internally with the provided interceptors.
+     */
+    constructor(
+        authProvider: WpAuthenticationProvider,
+        interceptors: List<Interceptor>,
+        appNotifier: WpAppNotifier = EmptyAppNotifier(),
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ) : this(
+        authProvider,
+        requestExecutor = WpRequestExecutor(interceptors),
+        appNotifier,
+        dispatcher
+    )
+
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
     private val requestBuilder by lazy {
         UniffiWpComApiClient(

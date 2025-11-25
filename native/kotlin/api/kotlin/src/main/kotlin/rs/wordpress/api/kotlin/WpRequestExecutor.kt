@@ -35,7 +35,7 @@ import javax.net.ssl.SSLPeerUnverifiedException
 const val USER_AGENT_HEADER_NAME = "User-Agent"
 
 class WpRequestExecutor(
-    private val httpClient: WpHttpClient = WpHttpClient.DefaultHttpClient(),
+    private val httpClient: WpHttpClient,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val fileResolver: FileResolver = DefaultFileResolver(),
     private val uploadListener: UploadListener? = null

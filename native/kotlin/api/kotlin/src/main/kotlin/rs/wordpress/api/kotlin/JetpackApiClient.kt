@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Interceptor
 import uniffi.wp_api.ApiUrlResolver
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.RequestExecutor
@@ -18,20 +19,38 @@ import java.net.URL
 class JetpackApiClient(
     apiUrlResolver: ApiUrlResolver,
     authProvider: WpAuthenticationProvider,
-    private val requestExecutor: RequestExecutor = WpRequestExecutor(),
+    private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     constructor(
         wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,
-        requestExecutor: RequestExecutor = WpRequestExecutor(),
+        requestExecutor: RequestExecutor,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
         dispatcher: CoroutineDispatcher = Dispatchers.IO
     ) : this(
         apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(wpOrgSiteApiRootUrl.toString())),
         authProvider,
         requestExecutor,
+        appNotifier,
+        dispatcher
+    )
+
+    /**
+     * Convenience constructor that accepts a list of OkHttp interceptors.
+     * Uses [WpRequestExecutor] internally with the provided interceptors.
+     */
+    constructor(
+        wpOrgSiteApiRootUrl: URL,
+        authProvider: WpAuthenticationProvider,
+        interceptors: List<Interceptor>,
+        appNotifier: WpAppNotifier = EmptyAppNotifier(),
+        dispatcher: CoroutineDispatcher = Dispatchers.IO
+    ) : this(
+        wpOrgSiteApiRootUrl,
+        authProvider,
+        requestExecutor = WpRequestExecutor(interceptors),
         appNotifier,
         dispatcher
     )

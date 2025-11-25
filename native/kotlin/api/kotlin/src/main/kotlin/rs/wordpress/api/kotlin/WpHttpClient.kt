@@ -9,11 +9,11 @@ sealed class WpHttpClient {
     abstract fun getClient(): OkHttpClient
 
     class DefaultHttpClient(
-        private val interceptors: List<Interceptor> = emptyList()
+        private val interceptors: List<Interceptor>
     ) : WpHttpClient() {
-        private var client: OkHttpClient = buildClient()
-
         private var allowedHostnames: Map<String, List<String>> = emptyMap()
+
+        private var client: OkHttpClient = buildClient()
 
         fun addAllowedAlternativeNamesForHostname(hostname: String, allowedNames: List<String>) {
             // Preserve the previous records for this key
