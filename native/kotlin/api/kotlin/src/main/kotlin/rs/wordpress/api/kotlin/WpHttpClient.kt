@@ -1,5 +1,6 @@
 package rs.wordpress.api.kotlin
 
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLSession
@@ -7,8 +8,10 @@ import javax.net.ssl.SSLSession
 sealed class WpHttpClient {
     abstract fun getClient(): OkHttpClient
 
-    class DefaultHttpClient : WpHttpClient() {
-        private var client: OkHttpClient = OkHttpClient()
+    class DefaultHttpClient(
+        private val interceptors: List<Interceptor> = emptyList()
+    ) : WpHttpClient() {
+        private var client: OkHttpClient = buildClient()
 
         private var allowedHostnames: Map<String, List<String>> = emptyMap()
 
@@ -16,13 +19,14 @@ sealed class WpHttpClient {
             // Preserve the previous records for this key
             val previousList = allowedHostnames[hostname].orEmpty()
             allowedHostnames = allowedHostnames.plus(Pair(hostname, allowedNames.plus(previousList)))
-            updateClient()
+            client = buildClient()
         }
 
-        private fun updateClient() {
-            client = client.newBuilder()
-                .hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
-                .build()
+        private fun buildClient(): OkHttpClient {
+            return OkHttpClient.Builder().apply {
+                this@DefaultHttpClient.interceptors.forEach { addInterceptor(it) }
+                hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
+            }.build()
         }
 
         override fun getClient() = client

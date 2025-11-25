@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.HttpUrl
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttp
@@ -39,6 +40,23 @@ class WpRequestExecutor(
     private val fileResolver: FileResolver = DefaultFileResolver(),
     private val uploadListener: UploadListener? = null
 ) : RequestExecutor {
+
+    /**
+     * Convenience constructor that accepts a list of OkHttp interceptors.
+     * Uses [WpHttpClient.DefaultHttpClient] internally with the provided interceptors.
+     */
+    constructor(
+        interceptors: List<Interceptor>,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        fileResolver: FileResolver = DefaultFileResolver(),
+        uploadListener: UploadListener? = null
+    ) : this(
+        httpClient = WpHttpClient.DefaultHttpClient(interceptors),
+        dispatcher = dispatcher,
+        fileResolver = fileResolver,
+        uploadListener = uploadListener
+    )
+
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
             val requestBuilder = Request.Builder().url(request.url())
