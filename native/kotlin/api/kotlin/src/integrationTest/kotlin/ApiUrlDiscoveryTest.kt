@@ -298,6 +298,31 @@ class ApiUrlDiscoveryTest {
     }
 
     @Test
+    fun testAllowedHostnamesDoesNotBreakValidSites() = runTest {
+        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
+        val executor = WpRequestExecutor(httpClient)
+        val loginClient = WpLoginClient(requestExecutor = executor)
+
+        // First, configure an allowed hostname override for a specific cert/hostname pair
+        httpClient.addAllowedAlternativeNamesForHostname(
+            "vanilla.wpmt.co",
+            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
+        )
+
+        // The override should work
+        assertEquals(
+            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
+            loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
+                .assertSuccess().applicationPasswordsAuthenticationUrl.url()
+        )
+
+        // Other valid SSL sites should still work via fallback to default hostname verification.
+        // google.com uses wildcard/SAN certificates which require proper OkHttp verification.
+        val reason = loginClient.apiDiscovery("https://google.com").assertFailureFindApiRoot()
+        assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
+    }
+
+    @Test
     fun testCustomOkHttpClient() = runTest {
         val executor =
             WpRequestExecutor(httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient()))
