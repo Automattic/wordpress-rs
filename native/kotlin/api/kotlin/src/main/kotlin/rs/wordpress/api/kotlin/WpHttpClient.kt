@@ -25,7 +25,9 @@ sealed class WpHttpClient {
         private fun buildClient(): OkHttpClient {
             return OkHttpClient.Builder().apply {
                 this@DefaultHttpClient.interceptors.forEach { addInterceptor(it) }
-                hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
+                if (allowedHostnames.isNotEmpty()) {
+                    hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
+                }
             }.build()
         }
 
