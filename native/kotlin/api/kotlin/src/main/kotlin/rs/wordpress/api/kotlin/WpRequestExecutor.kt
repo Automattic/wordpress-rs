@@ -34,7 +34,7 @@ import javax.net.ssl.SSLPeerUnverifiedException
 
 const val USER_AGENT_HEADER_NAME = "User-Agent"
 
-class WpRequestExecutor(
+class WpRequestExecutor @JvmOverloads constructor(
     private val httpClient: WpHttpClient,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val fileResolver: FileResolver = DefaultFileResolver(),
@@ -45,6 +45,7 @@ class WpRequestExecutor(
      * Convenience constructor that accepts a list of OkHttp interceptors.
      * Uses [WpHttpClient.DefaultHttpClient] internally with the provided interceptors.
      */
+    @JvmOverloads
     constructor(
         interceptors: List<Interceptor>,
         dispatcher: CoroutineDispatcher = Dispatchers.IO,
