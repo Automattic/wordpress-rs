@@ -22,6 +22,7 @@ public actor WordPressAPI {
 
     public init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         apiRootUrl: ParsedUrl,
         authentication: WpAuthentication,
         middlewarePipeline: MiddlewarePipeline = .default,
@@ -30,7 +31,7 @@ public actor WordPressAPI {
         self.init(
             apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
             authenticationProvider: .staticWithAuth(auth: authentication),
-            executor: WpRequestExecutor(urlSession: urlSession),
+            executor: WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate),
             middlewarePipeline: middlewarePipeline,
             appNotifier: appNotifier
         )
@@ -54,6 +55,7 @@ public actor WordPressAPI {
 
     public init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,
         middlewarePipeline: MiddlewarePipeline = .default,
@@ -62,7 +64,7 @@ public actor WordPressAPI {
         self.init(
             apiUrlResolver: apiUrlResolver,
             authenticationProvider: authenticationProvider,
-            executor: WpRequestExecutor(urlSession: urlSession),
+            executor: WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate),
             middlewarePipeline: middlewarePipeline,
             appNotifier: appNotifier
         )
@@ -70,6 +72,7 @@ public actor WordPressAPI {
 
     public init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         siteUrl: String,
         apiRootUrl: ParsedUrl,
         username: String,
@@ -77,7 +80,7 @@ public actor WordPressAPI {
         middlewarePipeline: MiddlewarePipeline = .default,
         appNotifier: WpAppNotifier? = nil
     ) {
-        let executor = WpRequestExecutor(urlSession: urlSession)
+        let executor = WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate)
         let provider = CookiesNonceAuthenticationProvider.withSiteUrl(
             url: siteUrl,
             username: username,
@@ -95,13 +98,14 @@ public actor WordPressAPI {
 
     public init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         details: AutoDiscoveryAttemptSuccess,
         username: String,
         password: String,
         middlewarePipeline: MiddlewarePipeline = .default,
         appNotifier: WpAppNotifier? = nil
     ) {
-        let executor = WpRequestExecutor(urlSession: urlSession)
+        let executor = WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate)
         let provider = CookiesNonceAuthenticationProvider(
             username: username,
             password: password,

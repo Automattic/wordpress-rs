@@ -18,7 +18,7 @@ var package = Package(
     name: "WordPressAPI",
     platforms: [
         .iOS(.v16),
-        .macOS(.v12),
+        .macOS(.v13),
         .tvOS(.v16),
         .watchOS(.v9)
     ],
