@@ -1,6 +1,10 @@
 import Foundation
 import Testing
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 @testable import WordPressAPI
 @testable import WordPressAPIInternal
 
@@ -17,7 +21,10 @@ struct TaskDelegateTests {
         #expect(invocations.contains("urlSession(_:dataTask:didReceive:completionHandler:)"))
         #expect(invocations.contains("urlSession(_:dataTask:didReceive:)"))
         #expect(invocations.contains("urlSession(_:task:didCompleteWithError:)"))
+
+        #if !os(Linux)
         #expect(invocations.contains("urlSession(_:task:didFinishCollecting:)"))
+        #endif
     }
 
 }
