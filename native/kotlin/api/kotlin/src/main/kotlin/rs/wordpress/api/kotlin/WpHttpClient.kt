@@ -2,6 +2,7 @@ package rs.wordpress.api.kotlin
 
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.internal.tls.OkHostnameVerifier
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLSession
 
@@ -25,9 +26,7 @@ sealed class WpHttpClient {
         private fun buildClient(): OkHttpClient {
             return OkHttpClient.Builder().apply {
                 this@DefaultHttpClient.interceptors.forEach { addInterceptor(it) }
-                if (allowedHostnames.isNotEmpty()) {
-                    hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
-                }
+                hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
             }.build()
         }
 
@@ -41,9 +40,12 @@ sealed class WpHttpClient {
 
 private class WpRequestExecutorHostnameVerifier(private val allowedHostnames: Map<String, List<String>>) :
     HostnameVerifier {
-    override fun verify(hostname: String?, session: SSLSession?): Boolean =
-        session?.let {
-            val peerPrincipalName = it.peerPrincipal.name.replace("CN=", "")
-            peerPrincipalName == hostname || allowedHostnames[peerPrincipalName]?.contains(hostname) ?: false
-        } ?: false
+    override fun verify(hostname: String?, session: SSLSession?): Boolean {
+        if (hostname == null || session == null) return false
+
+        // Check our custom allowlist first, then fall back to default OkHttp verification
+        val peerPrincipalName = session.peerPrincipal.name.replace("CN=", "")
+        val customMatch = allowedHostnames[peerPrincipalName]?.contains(hostname) ?: false
+        return customMatch || OkHostnameVerifier.verify(hostname, session)
+    }
 }
