@@ -16,13 +16,14 @@ import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpOrgSiteApiUrlResolver
 import java.net.URL
 
-class WpApiClient(
+class WpApiClient @JvmOverloads constructor(
     apiUrlResolver: ApiUrlResolver,
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
+    @JvmOverloads
     constructor(
         wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,
@@ -41,6 +42,7 @@ class WpApiClient(
      * Convenience constructor that accepts a list of OkHttp interceptors.
      * Uses [WpRequestExecutor] internally with the provided interceptors.
      */
+    @JvmOverloads
     constructor(
         wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,

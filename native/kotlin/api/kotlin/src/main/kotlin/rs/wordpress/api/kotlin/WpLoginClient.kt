@@ -9,7 +9,7 @@ import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpLoginClient
 import uniffi.wp_api.WpApiMiddlewarePipeline
 
-class WpLoginClient(
+class WpLoginClient @JvmOverloads constructor(
     requestExecutor: RequestExecutor,
     middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -22,6 +22,7 @@ class WpLoginClient(
      * Convenience constructor that accepts a list of OkHttp interceptors.
      * Uses [WpRequestExecutor] internally with the provided interceptors.
      */
+    @JvmOverloads
     constructor(
         interceptors: List<Interceptor>,
         middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
