@@ -21,7 +21,7 @@ fun defaultApiClient(): WpApiClient {
     val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    return WpApiClient(testCredentials.apiRootUrl, authProvider)
+    return WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList())
 }
 
 fun <T> WpRequestResult<T>.assertSuccess() {

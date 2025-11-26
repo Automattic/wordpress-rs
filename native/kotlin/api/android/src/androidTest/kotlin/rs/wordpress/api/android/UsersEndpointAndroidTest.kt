@@ -11,7 +11,7 @@ import java.net.URL
 class UsersEndpointAndroidTest {
     // https://developer.android.com/studio/run/emulator-networking
     private val siteUrl = "http://10.0.2.2"
-    private val client = WpApiClient(URL(siteUrl), WpAuthenticationProvider.none())
+    private val client = WpApiClient(URL(siteUrl), WpAuthenticationProvider.none(), emptyList())
 
     @Test
     fun testUserListRequest() = runTest {

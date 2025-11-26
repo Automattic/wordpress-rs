@@ -25,7 +25,7 @@ import kotlin.test.assertContains
 
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
-    private val loginClient: WpLoginClient = WpLoginClient()
+    private val loginClient: WpLoginClient = WpLoginClient(emptyList())
 
     @Test
     fun testLocalSite() = runTest {
@@ -186,7 +186,7 @@ class ApiUrlDiscoveryTest {
         val invalid =
             ApiDiscoveryAuthenticationMiddleware(username = "invalid", password = "invalid")
         val client = WpLoginClient(
-            WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
+            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
         )
         val reason = client.apiDiscovery("https://basic-auth.wpmt.co")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
@@ -204,7 +204,7 @@ class ApiUrlDiscoveryTest {
         )
 
         val client = WpLoginClient(
-            WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(valid))
+            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(valid))
         )
 
         assertEquals(
@@ -283,7 +283,7 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 17 (with exception)
     fun testInvalidHttpsWithExceptionWorks() = runTest {
-        val httpClient = WpHttpClient.DefaultHttpClient()
+        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
         val executor = WpRequestExecutor(httpClient)
         httpClient.addAllowedAlternativeNamesForHostname(
             "vanilla.wpmt.co",

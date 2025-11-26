@@ -94,6 +94,7 @@ class MediaEndpointTest {
             password = TestCredentials.INSTANCE.adminPassword
         )
         val requestExecutor = WpRequestExecutor(
+            interceptors = emptyList(),
             fileResolver = FileResolverMock(),
             uploadListener = uploadListener
         )
@@ -144,6 +145,7 @@ class MediaEndpointTest {
             username = testCredentials.adminUsername, password = testCredentials.adminPassword
         )
         val requestExecutor = WpRequestExecutor(
+            interceptors = emptyList(),
             fileResolver = FileResolverMock()
         )
         return WpApiClient(

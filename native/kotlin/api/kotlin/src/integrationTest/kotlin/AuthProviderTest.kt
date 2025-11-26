@@ -21,7 +21,7 @@ class AuthProviderTest {
         val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
             username = testCredentials.adminUsername, password = testCredentials.adminPassword
         )
-        val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
+        val client = WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList())
 
         val currentUser = client.request { requestBuilder ->
             requestBuilder.users().retrieveMeWithEditContext()
@@ -52,7 +52,7 @@ class AuthProviderTest {
 
         val dynamicAuthProvider = DynamicAuthProvider()
         val authProvider = WpAuthenticationProvider.dynamic(dynamicAuthProvider)
-        val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
+        val client = WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList())
 
         // Assert that initial unauthorized request fails
         assert(client.request { requestBuilder ->
@@ -75,7 +75,7 @@ class AuthProviderTest {
         val modifiableAuthenticationProvider =
             ModifiableAuthenticationProvider(authentication = WpAuthentication.None)
         val authProvider = WpAuthenticationProvider.modifiable(modifiableAuthenticationProvider)
-        val client = WpApiClient(testCredentials.apiRootUrl, authProvider)
+        val client = WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList())
 
         // Assert that request fails without authentication
         assert(client.request { requestBuilder ->
