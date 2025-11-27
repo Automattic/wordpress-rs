@@ -169,7 +169,7 @@ test-swift:
 	$(MAKE) test-swift-$(uname)
 
 test-swift-linux:
-	docker exec -w /app -i wordpress make test-swift-linux-in-docker
+	docker exec -w /app -it wordpress make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
 	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_mobile --no-parallel

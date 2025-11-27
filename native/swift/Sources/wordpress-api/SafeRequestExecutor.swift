@@ -471,7 +471,12 @@ extension WpNetworkRequest: NetworkRequestContent {
             let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
                 let task = session.dataTask(with: request, completionHandler: completionHandler(continuation))
                 cancellation.task = task
+
+                // See https://github.com/Automattic/wordpress-rs/pull/1046
+                #if !os(Linux)
                 task.delegate = delegate
+                #endif
+
                 task.resume()
 
                 #if !os(Linux)
@@ -557,7 +562,12 @@ extension WpMultipartFormRequest: NetworkRequestContent {
                         session.uploadTask(with: request, fromFile: file, completionHandler: completion)
                     }
                 cancellation.task = task
+
+                // See https://github.com/Automattic/wordpress-rs/pull/1046
+                #if !os(Linux)
                 task.delegate = delegate
+                #endif
+
                 task.resume()
 
                 #if !os(Linux)
