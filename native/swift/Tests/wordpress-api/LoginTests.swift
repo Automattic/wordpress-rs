@@ -296,7 +296,7 @@ class LoginTests {
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
     @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
     func testAlternameWorks() async throws {
-        // "vanilla1.wpmt.co" is one of the alternative names in vanilla1.wpmt.co certificate.
+        // "vanilla1.wpmt.co" is one of the alternative names in vanilla.wpmt.co certificate.
         _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
     }
 
