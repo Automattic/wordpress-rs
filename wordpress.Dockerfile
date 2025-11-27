@@ -63,7 +63,7 @@ ENV PATH="/root/.local/share/swiftly/bin:$PATH"
 RUN curl -s -o swiftly.tar.gz "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" \
     && tar zxf swiftly.tar.gz \
     && rm swiftly.tar.gz \
-    && ./swiftly init --assume-yes --skip-install
+    && ./swiftly init --assume-yes --skip-install --platform debian12
 RUN apt-get update \
   && apt-get -y -qq install libicu-dev libcurl4-openssl-dev libedit-dev libsqlite3-dev \
     libncurses-dev libpython3-dev libxml2-dev uuid-dev git libstdc++-12-dev
