@@ -369,7 +369,66 @@ extension WpNetworkRequest: NetworkRequestContent {
     ) async throws -> (Data, URLResponse) {
         let request = try buildURLRequest(additionalHeaders: headers)
         #if os(Linux)
-        return try await session.data(for: request)
+        class DummyDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {}
+
+        // Issue: `NonceAuthenticationTests` fails on Linux when using `session.dataTask(...)` with
+        // a delegate. This issue does not occur on macOS.
+        //
+        // `NonceAuthenticationTests` performs a request that involves a redirect: the login request
+        // `wp-login.php?redirect_to=/rest-nonce` results in an HTTP redirect to retrieve
+        // the REST nonce. This request fails on Linux, depending on how `URLSession` is used
+        // to send the request.
+        //
+        // I tested the following options (✅ means the test passes; ❌ means the test fails):
+
+        // Option 1: ✅
+        // return try await session.data(for: request)
+
+        // Option 2: ✅
+        // return try await session.data(for: request, delegate: delegate)
+
+        // Option 3: ✅
+        // let dummyDelegate = DummyDelegate()
+        // return try await session.data(for: request, delegate: dummyDelegate)
+
+        // Option 4: ❌
+        return try await withCheckedThrowingContinuation { continuation in
+            let task = session.dataTask(with: request) { (data, response, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: (data!, response!))
+                }
+            }
+            task.delegate = delegate
+            task.resume()
+        }
+
+        // Option 5: ❌
+        // let dummyDelegate = DummyDelegate()
+        // return try await withCheckedThrowingContinuation { continuation in
+        //     let task = session.dataTask(with: request) { (data, response, error) in
+        //         if let error = error {
+        //             continuation.resume(throwing: error)
+        //         } else {
+        //             continuation.resume(returning: (data!, response!))
+        //         }
+        //     }
+        //     task.delegate = dummyDelegate
+        //     task.resume()
+        // }
+
+        // Option 6: ✅
+        // return try await withCheckedThrowingContinuation { continuation in
+        //     let task = session.dataTask(with: request) { (data, response, error) in
+        //         if let error = error {
+        //             continuation.resume(throwing: error)
+        //         } else {
+        //             continuation.resume(returning: (data!, response!))
+        //         }
+        //     }
+        //     task.resume()
+        // }
         #else
         return try await session.data(for: request, delegate: delegate)
         #endif
