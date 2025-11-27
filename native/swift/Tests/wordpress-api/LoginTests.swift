@@ -285,45 +285,21 @@ class LoginTests {
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 17: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
+    @Test("Login Spec Example 18: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
     func testInvalidHttpsWithExceptionWorks() async throws {
-        let session = URLSession(
-            configuration: .default,
-            delegate: HTTPSSessionDelegate(
-                allowedDomains: ["wordpress-1315525-4803651.cloudwaysapps.com"]
-            ),
-            delegateQueue: nil
-        )
-        let client = WordPressLoginClient(urlSession: session)
+        let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
+        executor.allowSSL(altNames: ["wordpress-1315525-4803651.cloudwaysapps.com"], forCommonName: "vanilla.wpmt.co")
+        let client = WordPressLoginClient(requestExecutor: executor)
         _ = try await client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
     }
 
-    final class HTTPSSessionDelegate: NSObject, URLSessionDelegate {
-
-        let allowedDomains: [String]
-
-        init(allowedDomains: [String] = []) {
-            self.allowedDomains = allowedDomains
-        }
-
-        #if !os(Linux)
-        // There's no ability to support self-signed (or otherwise invalid) SSL certificates in Linux until
-        // https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands.
-        func urlSession(
-            _ session: URLSession,
-            didReceive challenge: URLAuthenticationChallenge,
-            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-        ) {
-            guard allowedDomains.contains(challenge.protectionSpace.host),
-                  let trust = challenge.protectionSpace.serverTrust else {
-                completionHandler(.useCredential, nil)
-                return
-            }
-
-            completionHandler(.useCredential, URLCredential(trust: trust))
-        }
-        #endif
+    /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
+    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
+    func testAlternameWorks() async throws {
+        // "vanilla1.wpmt.co" is one of the alternative names in vanilla1.wpmt.co certificate.
+        _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
     }
+
 
     private func getApplicationPasswordsNotSupportedReason(
         from error: any Error

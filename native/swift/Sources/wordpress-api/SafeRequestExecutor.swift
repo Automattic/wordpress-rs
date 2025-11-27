@@ -71,6 +71,10 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         }
     }
 
+    public func allowSSL(altNames: [String], forCommonName cn: String) {
+        executorDelegate.allowSSL(altNames: altNames, forCommonName: cn)
+    }
+
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
         do {
             let (data, response) = try await request.perform(
@@ -272,6 +276,11 @@ private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
+    // When a site's domain is not included in its SSL certificate's common name and alternative names,
+    // URLSession rejects the HTTPs connection. Here we allow the consumers to add additional
+    // alternative names.
+    // The key is SSL certificate common name.
+    private var additionalAlternativeNames: [String: Set<String>] = [:]
 
     init(redirects: [String: [WpRedirect]] = [:]) {
         self.redirects = redirects
@@ -282,6 +291,37 @@ private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @
             redirects[taskID]
         }
     }
+
+    func allowSSL(altNames: [String], forCommonName cn: String) {
+        lock.withLock {
+            additionalAlternativeNames[cn, default: []].formUnion(altNames)
+        }
+    }
+
+    private func alternateNames(forCertificate cert: SslCertificateInfo) -> Set<String> {
+        lock.withLock {
+            additionalAlternativeNames[cert.commonName()] ?? []
+        }
+    }
+
+    #if !os(Linux)
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge
+    ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let trust = challenge.protectionSpace.serverTrust,
+           let certificateChain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+           let cert = certificateChain.first,
+           let cert = parseCertificate(data: SecCertificateCopyData(cert) as Data),
+           alternateNames(forCertificate: cert).contains(challenge.protectionSpace.host) {
+            return (.useCredential, URLCredential(trust: trust))
+        }
+
+        return (.performDefaultHandling, nil)
+    }
+    #endif
 
     func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
         NotificationCenter.default.post(name: RequestExecutorDelegate.didCreateTaskNotification, object: task)
