@@ -53,6 +53,7 @@ pub struct IpAddress {
 pub struct ApplicationPasswordCreateParams {
     /// A UUID provided by the application to uniquely identify it.
     /// It is recommended to use an UUID v5 with the URL or DNS namespace.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub app_id: Option<String>,
     /// The name of the application password.
     pub name: String,
@@ -74,6 +75,7 @@ pub struct ApplicationPasswordDeleteAllResponse {
 pub struct ApplicationPasswordUpdateParams {
     /// A UUID provided by the application to uniquely identify it.
     /// It is recommended to use an UUID v5 with the URL or DNS namespace.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub app_id: Option<String>,
     /// The name of the application password.
     pub name: String,
