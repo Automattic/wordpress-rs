@@ -1,6 +1,7 @@
-ARG WORDPRESS_VERSION="6.9-RC3"
+ARG WORDPRESS_VERSION="beta-6.9-RC3"
 
-FROM public.ecr.aws/docker/library/wordpress:${WORDPRESS_VERSION}
+# Using Docker Hub directly since ECR doesn't mirror beta/RC tags
+FROM docker.io/library/wordpress:${WORDPRESS_VERSION}
 
 RUN apt-get update  \
   && apt-get install -y wget gpg
