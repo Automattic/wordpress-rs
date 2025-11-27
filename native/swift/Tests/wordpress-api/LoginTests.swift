@@ -11,7 +11,7 @@ import FoundationNetworking
 @Suite("Login Tests", .enabled(if: !isLinux()))
 class LoginTests {
 
-    let client = WordPressLoginClient(urlSession: .shared)
+    let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
 
     @Test("Login Spec Example 1: Valid URL")
     func testValidURL() async throws {
@@ -172,7 +172,7 @@ class LoginTests {
 
         await #expect(performing: {
             _ = try await WordPressLoginClient(
-                urlSession: .shared,
+                urlSession: .init(configuration: .ephemeral),
                 middleware: MiddlewarePipeline(middlewares: invalid)
             ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
         }, throws: { error in
@@ -196,7 +196,7 @@ class LoginTests {
         let valid = ApiDiscoveryAuthenticationMiddleware(username: "test@example.com", password: "str0ngp4ssw0rd!")
 
         let parsedUrl = try await WordPressLoginClient(
-            urlSession: .shared,
+            urlSession: .init(configuration: .ephemeral),
             middleware: MiddlewarePipeline(middlewares: valid)
         ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
 
