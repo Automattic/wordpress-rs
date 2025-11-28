@@ -300,7 +300,6 @@ class LoginTests {
         _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
     }
 
-
     private func getApplicationPasswordsNotSupportedReason(
         from error: any Error
     ) throws -> ApplicationPasswordsNotSupportedReason? {

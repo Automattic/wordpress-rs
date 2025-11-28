@@ -71,8 +71,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         }
     }
 
-    public func allowSSL(altNames: [String], forCommonName cn: String) {
-        executorDelegate.allowSSL(altNames: altNames, forCommonName: cn)
+    public func allowSSL(altNames: [String], forCommonName name: String) {
+        executorDelegate.allowSSL(altNames: altNames, forCommonName: name)
     }
 
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -292,9 +292,9 @@ private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @
         }
     }
 
-    func allowSSL(altNames: [String], forCommonName cn: String) {
+    func allowSSL(altNames: [String], forCommonName name: String) {
         lock.withLock {
-            additionalAlternativeNames[cn, default: []].formUnion(altNames)
+            additionalAlternativeNames[name, default: []].formUnion(altNames)
         }
     }
 
