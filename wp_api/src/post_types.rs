@@ -1,7 +1,8 @@
-use crate::impl_as_query_value_from_to_string;
+use crate::{JsonValue, impl_as_query_value_from_to_string};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 use wp_contextual::WpContextual;
 use wp_serde_helper::deserialize_empty_array_or_hashmap;
 
@@ -97,7 +98,28 @@ pub struct PostTypeSupportsMap {
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     #[serde(flatten)]
     #[serde(rename = "supports")]
-    pub map: HashMap<PostTypeSupports, bool>,
+    pub map: HashMap<PostTypeSupports, Arc<PostTypeSupportsValue>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Object)]
+#[serde(transparent)]
+pub struct PostTypeSupportsValue {
+    #[serde(flatten)]
+    pub json_value: JsonValue,
+}
+
+#[uniffi::export]
+impl PostTypeSupportsValue {
+    fn as_json_value(&self) -> JsonValue {
+        self.json_value.clone()
+    }
+
+    pub fn as_json_bool(&self) -> Option<bool> {
+        match self.json_value {
+            JsonValue::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
