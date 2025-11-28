@@ -26,7 +26,7 @@ class PostTypesEndpointTest {
         val postTypesPost = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.Post)
         }.assertSuccessAndRetrieveData().data
-        assert(postTypesPost.supports.map[PostTypeSupports.Title]!!)
+        assert(postTypesPost.supports.map[PostTypeSupports.Title]!!.asJsonBool()!!)
         assertFalse(postTypesPost.capabilities[PostTypeCapabilities.EditPosts]!!.isEmpty())
     }
 
