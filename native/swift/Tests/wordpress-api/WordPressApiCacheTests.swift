@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import WordPressApiCache
+import WordPressAPI
 
 actor Test {
 
