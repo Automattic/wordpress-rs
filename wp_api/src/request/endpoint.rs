@@ -132,6 +132,10 @@ impl WpOrgSiteApiUrlResolver {
     pub fn new(api_root_url: Arc<ParsedUrl>) -> Self {
         Self { api_root_url }
     }
+
+    fn api_root_url(&self) -> Arc<ParsedUrl> {
+        self.api_root_url.clone()
+    }
 }
 
 #[uniffi::export]
