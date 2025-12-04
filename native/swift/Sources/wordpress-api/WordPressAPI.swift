@@ -17,7 +17,7 @@ public final class WordPressAPI: Sendable {
 
     private let apiUrlResolver: ApiUrlResolver
     let requestExecutor: SafeRequestExecutor
-    public let apiClientDelegate: WpApiClientDelegate
+    private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 
     public convenience init(
