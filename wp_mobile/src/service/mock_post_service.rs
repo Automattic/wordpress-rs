@@ -278,7 +278,7 @@ impl MockPostService {
         let update_counter_clone = update_counter.clone();
         let cache = self.cache.clone();
         let db_site = self.db_site;
-        let status_values = vec![
+        let status_values = [
             PostStatus::Draft,
             PostStatus::Pending,
             PostStatus::Publish,
