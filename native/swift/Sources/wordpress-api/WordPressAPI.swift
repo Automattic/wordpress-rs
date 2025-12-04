@@ -9,7 +9,7 @@ import FoundationNetworking
 import Combine
 #endif
 
-public actor WordPressAPI {
+public final class WordPressAPI: Sendable {
 
     enum Errors: Error {
         case unableToParseResponse
@@ -17,10 +17,10 @@ public actor WordPressAPI {
 
     private let apiUrlResolver: ApiUrlResolver
     let requestExecutor: SafeRequestExecutor
-    private let apiClientDelegate: WpApiClientDelegate
+    public let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 
-    public init(
+    public convenience init(
         urlSession: URLSession,
         apiRootUrl: ParsedUrl,
         authentication: WpAuthentication,
@@ -36,7 +36,7 @@ public actor WordPressAPI {
         )
     }
 
-    public init(
+    public convenience init(
         urlSession: URLSession,
         apiRootUrl: ParsedUrl,
         authenticationProvider: WpAuthenticationProvider,
@@ -52,7 +52,7 @@ public actor WordPressAPI {
         )
     }
 
-    public init(
+    public convenience init(
         urlSession: URLSession,
         apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,
@@ -68,7 +68,7 @@ public actor WordPressAPI {
         )
     }
 
-    public init(
+    public convenience init(
         urlSession: URLSession,
         siteUrl: String,
         apiRootUrl: ParsedUrl,
@@ -93,7 +93,7 @@ public actor WordPressAPI {
         )
     }
 
-    public init(
+    public convenience init(
         urlSession: URLSession,
         details: AutoDiscoveryAttemptSuccess,
         username: String,

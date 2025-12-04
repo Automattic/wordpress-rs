@@ -1,9 +1,9 @@
 import Foundation
 import WordPressAPIInternal
 
-public actor WordPressApiCache {
+public final class WordPressApiCache: Sendable {
 
-    private let cache: WpApiCache
+    public let cache: WpApiCache
     private let delegate: any DatabaseDelegate
 
     public struct Notifications {
@@ -24,12 +24,12 @@ public actor WordPressApiCache {
     }
 
     /// Creates a new in-memory cache
-    public init(delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
+    public convenience init(delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
         try self.init(path: ":memory:", delegate: delegate)
     }
 
     /// Creates a new cache at the specified file system URL
-    public init(url: URL, delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
+    public convenience init(url: URL, delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
         try self.init(path: url.absoluteString, delegate: delegate)
     }
 
