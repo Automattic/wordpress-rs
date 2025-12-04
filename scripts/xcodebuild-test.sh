@@ -29,7 +29,7 @@ echo "Runing on device: ${device_name}"
 export NSUnbufferedIO=YES
 
 xcodebuild \
-    -scheme WordPressAPI-Package \
+    -scheme WordPressAPI \
     -derivedDataPath DerivedData \
     -destination "id=${device_id}" \
     -skipPackagePluginValidation \
