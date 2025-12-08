@@ -50,7 +50,12 @@ struct RootListViewItem: View {
         case .collection(let name, let cachedResults, let fetchedResults, _):
             VStack(alignment: .leading) {
                 NavigationLink {
-                    ListView(viewModel: CollectionListViewModel(cachedResults: cachedResults, fetchedResults: fetchedResults) )
+                    ListView(
+                        viewModel: CollectionListViewModel(
+                            cachedResults: cachedResults,
+                            fetchedResults: fetchedResults
+                        )
+                    )
                 } label: {
                     Text(name)
                 }
@@ -83,7 +88,12 @@ enum RootListData: Identifiable, Sendable {
 
     case callback(String, TaskListViewModel.FetchDataTask, Category)
     case sequence(String, SequenceListViewModel.SequenceProvider, Category)
-    case collection(String, CollectionListViewModel.CachedResultProvider, CollectionListViewModel.FetchedResultsProvider, Category)
+    case collection(
+        String,
+        CollectionListViewModel.CachedResultProvider,
+        CollectionListViewModel.FetchedResultsProvider,
+        Category
+    )
 
     var id: String {
         switch self {

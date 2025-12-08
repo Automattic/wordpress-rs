@@ -98,11 +98,11 @@ protocol ListViewModel {
     typealias CachedResultProvider = @Sendable () async throws -> [ListViewData]
     typealias FetchedResultsProvider = @Sendable (() async -> Void) async throws -> [ListViewData]
 
-    var listItems: [String : ListViewData] = [:]
+    var listItems: [String: ListViewData] = [:]
 
     var shouldPresentAlert: Bool = false
 
-    var error: MyError? = nil
+    var error: MyError?
 
     private let cachePromise: CachedResultProvider
     private let fetchPromise: FetchedResultsProvider

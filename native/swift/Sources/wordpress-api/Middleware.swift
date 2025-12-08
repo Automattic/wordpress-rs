@@ -2,7 +2,7 @@ import WordPressAPIInternal
 import OSLog
 
 public final class DebugMiddleware: WpApiMiddleware {
-    public init(){}
+    public init() {}
 
     public func process(
         requestExecutor: any WordPressAPIInternal.RequestExecutor,

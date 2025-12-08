@@ -24,11 +24,13 @@ struct ExampleApp: App {
     @State
     var isLoadingInitialData: Bool = true
 
+    // swiftlint:disable:next force_try
     private let cache = try! WpApiCache(path: nil)
 
     private let handle: Any
 
     init() {
+        // swiftlint:disable:next force_try
         _ = try! cache.performMigrations()
         let mockService = MockPostService(
             cache: cache,
@@ -38,7 +40,13 @@ struct ExampleApp: App {
 
         let ids = mockService.generateAndInsertPosts(count: 10)
 
-        self.handle = mockService.startComprehensiveStressTest(entityIds: ids, minDelayMs: 100, maxDelayMs: 2000, minBatchSize: 100, maxBatchSize: 1000)
+        self.handle = mockService.startComprehensiveStressTest(
+            entityIds: ids,
+            minDelayMs: 100,
+            maxDelayMs: 2000,
+            minBatchSize: 100,
+            maxBatchSize: 1000
+        )
     }
 
     var body: some Scene {
@@ -149,14 +157,14 @@ struct ExampleApp: App {
             .filter { $0.visibility.showInNavMenus }
             .filter { $0.supports.map.keys.contains(allOf: [.title, .author, .customFields]) }
 
-        for type in postTypes {
+        for _ in postTypes {
 
             let collection = try await WordPressAPI.globalInstance
                 .asSelfHostedService()
                 .posts()
                 .createPostCollectionWithEditContext(filter: AnyPostFilter())
 
-            let sequence = DatabaseChangeNotifier.shared.startObserving(collection).map { updateHook in
+            let sequence = DatabaseChangeNotifier.shared.startObserving(collection).map { _ in
                 try await collection.loadData().map { $0.data.asListViewData }
             }
 
@@ -233,4 +241,3 @@ extension Collection where Self.Element: Equatable {
         }
     }
 }
-

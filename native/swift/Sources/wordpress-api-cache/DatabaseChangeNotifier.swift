@@ -270,7 +270,7 @@ public struct UpdateHookSequence: AsyncSequence, Sendable {
 
     let name: Notification.Name
 
-    public struct AsyncIterator : AsyncIteratorProtocol {
+    public struct AsyncIterator: AsyncIteratorProtocol {
         var publisher: AsyncCompactMapSequence<AsyncPublisher<NotificationCenter.Publisher>, UpdateHook>.Iterator
 
         init(name: Notification.Name) {

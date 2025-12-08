@@ -39,10 +39,11 @@ actor Test {
             appNotifier: MockAppNotifier()
         )
 
+        let apiUrl = try ParsedUrl.parse(input: "https://content-heavy.wpmt.co/wp-json")
         let service = try WpSelfHostedService(
             siteUrl: "https://content-heavy.wpmt.co",
             apiRoot: "https://content-heavy.wpmt.co/wp-json",
-            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: ParsedUrl.parse(input: "https://content-heavy.wpmt.co/wp-json")),
+            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiUrl),
             delegate: delegate,
             cache: cache
         )
@@ -57,17 +58,23 @@ actor Test {
 
         try await withThrowingTaskGroup { group in
 
-            for i in 0...10 {
+            for _ in 0...10 {
                 group.addTask {
-                    _ = mockService.startComprehensiveStressTest(entityIds: ids, minDelayMs: 1, maxDelayMs: 1000, minBatchSize: 100, maxBatchSize: 1000)
+                    _ = mockService.startComprehensiveStressTest(
+                        entityIds: ids,
+                        minDelayMs: 1,
+                        maxDelayMs: 1000,
+                        minBatchSize: 100,
+                        maxBatchSize: 1000
+                    )
                 }
             }
 
             group.addTask {
                 if #available(macOS 15.0, *) {
-                    for try await values in DatabaseChangeNotifier.shared.startObserving(publishedPosts).map({ hook in
+                    for try await values in DatabaseChangeNotifier.shared.startObserving(publishedPosts).map({ _ in
                         try await publishedPosts.loadData()
-                    }){
+                    }) {
                         print("Received update hook: \(values.count)")
                     }
                 } else {
