@@ -157,8 +157,7 @@ struct ExampleApp: App {
             .filter { $0.visibility.showInNavMenus }
             .filter { $0.supports.map.keys.contains(allOf: [.title, .author, .customFields]) }
 
-        for _ in postTypes {
-
+        for type in postTypes {
             let collection = try await WordPressAPI.globalInstance
                 .asSelfHostedService()
                 .posts()
