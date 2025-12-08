@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 import WordPressAPIInternal
 import Synchronization
 
@@ -121,10 +120,12 @@ public final class DatabaseChangeNotifier: DatabaseDelegate, Sendable {
         }
     }
 
+    #if canImport(Combine)
     @available(macOS 15.0, *)
     public func startObserving(_ collection: any ObservableCollection) -> UpdateHookSequence {
         UpdateHookSequence(name: notificationName(for: collection))
     }
+    #endif
 
     /// Stops observing changes to a specific database entity.
     ///
@@ -266,6 +267,9 @@ class TokenStore: @unchecked Sendable {
     }
 }
 
+#if canImport(Combine)
+import Combine
+
 public struct UpdateHookSequence: AsyncSequence, Sendable {
 
     let name: Notification.Name
@@ -292,3 +296,4 @@ public struct UpdateHookSequence: AsyncSequence, Sendable {
         AsyncIterator(name: name)
     }
 }
+#endif

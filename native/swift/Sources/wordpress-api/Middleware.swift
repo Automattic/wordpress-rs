@@ -1,5 +1,7 @@
 import WordPressAPIInternal
+#if canImport(OSLog)
 import OSLog
+#endif
 
 public final class DebugMiddleware: WpApiMiddleware {
     public init() {}
@@ -10,9 +12,11 @@ public final class DebugMiddleware: WpApiMiddleware {
         request: WordPressAPIInternal.WpNetworkRequest,
         context: RequestContext?
     ) async throws -> WordPressAPIInternal.WpNetworkResponse {
+        #if canImport(OSLog)
         Logger.requests.info("Performed Request:")
         Logger.requests.info("\t Method:\t\(request.method().rawValue)")
         Logger.requests.info("\t URL:\t\(request.url())")
+        #endif
         return response
     }
 }

@@ -1,3 +1,4 @@
+#if canImport(OSLog)
 import OSLog
 
 extension Logger {
@@ -7,3 +8,4 @@ extension Logger {
     /// Logs the view cycles like a view that appeared.
     static let requests = Logger(subsystem: subsystem, category: "http")
 }
+#endif
