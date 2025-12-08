@@ -12,7 +12,7 @@ actor Test {
     }
 
     @Test func testMigrationsWork() async throws {
-        let migrationsPerformed = try await self.cache.performMigrations()
+        let migrationsPerformed = try self.cache.performMigrations()
         #expect(migrationsPerformed == 6)
     }
 
@@ -27,7 +27,7 @@ actor Test {
         }
 
         self.cache.startListeningForUpdates()
-        let migrationCount = try await self.cache.performMigrations()
+        let migrationCount = try self.cache.performMigrations()
 
         // Wait for NotificationCenter to finish delivery
         try await Task.sleep(nanoseconds: 10 * NSEC_PER_MSEC)

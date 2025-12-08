@@ -39,7 +39,7 @@ public final class WordPressApiCache: Sendable {
         self.delegate = delegate
     }
 
-    public func performMigrations() async throws -> Int {
+    public func performMigrations() throws -> Int {
         return Int(try self.cache.performMigrations())
     }
 
