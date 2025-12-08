@@ -1,5 +1,7 @@
 import SwiftUI
 import WordPressAPI
+import WordPressAPIInternal
+import WordPressApiCache
 import Combine
 
 private let userListParams = UserListParams(perPage: 5)
@@ -21,6 +23,31 @@ struct ExampleApp: App {
 
     @State
     var isLoadingInitialData: Bool = true
+
+    // swiftlint:disable:next force_try
+    private let cache = try! WpApiCache(path: nil)
+
+    private let handle: Any
+
+    init() {
+        // swiftlint:disable:next force_try
+        _ = try! cache.performMigrations()
+        let mockService = MockPostService(
+            cache: cache,
+            siteUrl: "https://vanilla.wpmt.co",
+            apiRoot: "https://vanilla.wpmt.co/wp-json"
+        )
+
+        let ids = mockService.generateAndInsertPosts(count: 10)
+
+        self.handle = mockService.startComprehensiveStressTest(
+            entityIds: ids,
+            minDelayMs: 100,
+            maxDelayMs: 2000,
+            minBatchSize: 100,
+            maxBatchSize: 1000
+        )
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -131,13 +158,17 @@ struct ExampleApp: App {
             .filter { $0.supports.map.keys.contains(allOf: [.title, .author, .customFields]) }
 
         for type in postTypes {
-            baseData.append(RootListData(name: type.name, sequence: {
-                let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
-                    type: PostEndpointType.custom(type.restBase),
-                    params: postListParams
-                )
+            let collection = try await WordPressAPI.globalInstance
+                .asSelfHostedService()
+                .posts()
+                .createPostCollectionWithEditContext(filter: AnyPostFilter())
 
-                return ListViewSequence(underlyingSequence: sequence)
+            let sequence = DatabaseChangeNotifier.shared.startObserving(collection).map { _ in
+                try await collection.loadData().map { $0.data.asListViewData }
+            }
+
+            baseData.append(RootListData(name: type.name, sequence: {
+                ListViewSequence(underlyingSequence: sequence)
             }, category: .posts))
         }
 

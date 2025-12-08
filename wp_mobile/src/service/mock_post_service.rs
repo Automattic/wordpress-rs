@@ -278,6 +278,12 @@ impl MockPostService {
         let update_counter_clone = update_counter.clone();
         let cache = self.cache.clone();
         let db_site = self.db_site;
+        let status_values = [
+            PostStatus::Draft,
+            PostStatus::Pending,
+            PostStatus::Publish,
+            PostStatus::Future,
+        ];
 
         thread::spawn(move || {
             let repo = PostRepository::<EditContext>::new();
@@ -322,6 +328,12 @@ impl MockPostService {
                             );
                             post.content.rendered =
                                 format!("<p>Content updated at batch #{}</p>", current_count);
+
+                            // Randomize the post status
+                            let mut rng = rand::thread_rng();
+                            let status_index = rng.gen_range(0..status_values.len());
+                            post.status = status_values[status_index].clone();
+
                             repo.upsert(conn, &db_site, &post)?;
                         }
                         Ok::<_, wp_mobile_cache::SqliteDbError>(())
