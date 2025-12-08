@@ -26,11 +26,14 @@ actor Test {
             }
         }
 
+        // Wait for the observer Task to start running.
+        try await Task.sleep(nanoseconds: 100 * NSEC_PER_MSEC)
+
         self.cache.startListeningForUpdates()
         let migrationCount = try self.cache.performMigrations()
 
         // Wait for NotificationCenter to finish delivery
-        try await Task.sleep(nanoseconds: 10 * NSEC_PER_MSEC)
+        try await Task.sleep(nanoseconds: 100 * NSEC_PER_MSEC)
 
         #expect(migrationCount == self.changeCount)
         handle.cancel()
