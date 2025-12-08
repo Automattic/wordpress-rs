@@ -26,7 +26,7 @@ actor Test {
             }
         }
 
-        await self.cache.startListeningForUpdates()
+        self.cache.startListeningForUpdates()
         let migrationCount = try await self.cache.performMigrations()
 
         // Wait for NotificationCenter to finish delivery
