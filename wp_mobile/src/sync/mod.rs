@@ -8,9 +8,11 @@
 //! See `wp_mobile/docs/design/metadata_collection_design.md` for full design details.
 
 mod entity_metadata;
+mod kv_store;
 mod list_item;
 mod syncable_entity;
 
 pub use entity_metadata::EntityMetadata;
+pub use kv_store::{InMemoryKvStore, KvStore};
 pub use list_item::{HasId, ListItem};
 pub use syncable_entity::SyncableEntity;
