@@ -89,7 +89,7 @@ val selfHostedServiceModule = module {
             ),
             delegate = WpApiClientDelegate(
                 authProvider,
-                requestExecutor = WpRequestExecutor(),
+                requestExecutor = WpRequestExecutor(emptyList()),
                 middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
                 appNotifier = EmptyAppNotifier()
             ),
