@@ -60,7 +60,7 @@ fun createTestServiceContext(): TestServiceContext {
         apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(apiRootUrl)),
         delegate = WpApiClientDelegate(
             authProvider,
-            requestExecutor = WpRequestExecutor(),
+            requestExecutor = WpRequestExecutor(emptyList()),
             middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
             appNotifier = EmptyAppNotifier()
         ),

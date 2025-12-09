@@ -271,7 +271,7 @@ impl TermRelationshipRepository {
             HashMap::new(),
             |mut acc: HashMap<i64, Vec<DbTermRelationship>>, row_result| {
                 let relationship = row_result.map_err(SqliteDbError::from)?;
-                acc.entry(relationship.object_id.0 as i64)
+                acc.entry(relationship.object_id.0)
                     .or_default()
                     .push(relationship);
                 Ok::<_, SqliteDbError>(acc)

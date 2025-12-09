@@ -153,7 +153,7 @@ mod tests {
     /// Uses the same value for both row_id and mapped_site_id for convenience.
     /// In real data, these would be different (row_id is from db_sites table,
     /// mapped_site_id is from the type-specific table like self_hosted_sites).
-    fn make_db_site(id: u64) -> DbSite {
+    fn make_db_site(id: i64) -> DbSite {
         DbSite {
             row_id: RowId(id),
             site_type: DbSiteType::SelfHosted,

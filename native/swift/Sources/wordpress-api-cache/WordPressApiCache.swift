@@ -20,7 +20,7 @@ public actor WordPressApiCache {
         self.cache = try WpApiCache(path: path)
     }
 
-    public func performMigrations() async throws -> UInt64 {
+    public func performMigrations() async throws -> Int64 {
         try self.cache.performMigrations()
     }
 
