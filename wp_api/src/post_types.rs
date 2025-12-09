@@ -101,6 +101,28 @@ pub struct PostTypeSupportsMap {
     pub map: HashMap<PostTypeSupports, Arc<PostTypeSupportsValue>>,
 }
 
+impl PostTypeSupportsMap {
+    /// Check if the post type supports a specific feature by checking if the key is present.
+    ///
+    /// Note: This only checks for key presence, not the associated value. WordPress typically
+    /// includes a feature in the map with a `true` value when supported, and omits it entirely
+    /// when not supported. The value can also be an object with additional configuration (e.g.,
+    /// `editor` may have nested settings). We assume that if a key is present, the feature is
+    /// supported, regardless of the actual value.
+    pub fn supports(&self, feature: &PostTypeSupports) -> bool {
+        self.map.contains_key(feature)
+    }
+}
+
+/// Check if a post type supports a specific feature by checking if the key is present.
+///
+/// Note: This only checks for key presence, not the associated value. See
+/// `PostTypeSupportsMap::supports` for details on this assumption.
+#[uniffi::export]
+fn post_type_supports(supports_map: &PostTypeSupportsMap, feature: PostTypeSupports) -> bool {
+    supports_map.supports(&feature)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Object)]
 #[serde(transparent)]
 pub struct PostTypeSupportsValue {
