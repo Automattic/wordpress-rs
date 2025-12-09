@@ -8,7 +8,7 @@ use crate::{
 use std::sync::Arc;
 use wp_api::{
     api_client::WpApiClient,
-    posts::{AnyPostWithEditContext, PostId, SparseAnyPostFieldWithEditContext},
+    posts::{AnyPostWithEditContext, PostId, PostListParams, SparseAnyPostFieldWithEditContext},
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
@@ -161,6 +161,58 @@ impl PostService {
             total_pages: response.header_map.wp_total_pages(),
             current_page: page,
         })
+    }
+
+    /// Fetch full post data for specific post IDs and save to cache.
+    ///
+    /// This is used for selective sync - fetching only the posts that are
+    /// missing or stale in the cache. Uses the `include` parameter to batch
+    /// multiple posts in a single request.
+    ///
+    /// # Arguments
+    /// * `ids` - Post IDs to fetch
+    ///
+    /// # Returns
+    /// - `Ok(Vec<EntityId>)` with entity IDs of fetched posts
+    /// - `Err(FetchError)` if network or database error occurs
+    ///
+    /// # Note
+    /// If `ids` is empty, returns an empty Vec without making a network request.
+    pub async fn fetch_posts_by_ids(&self, ids: Vec<PostId>) -> Result<Vec<EntityId>, FetchError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let params = PostListParams {
+            include: ids,
+            // Ensure we get all requested posts regardless of default per_page
+            per_page: Some(100),
+            ..Default::default()
+        };
+
+        let response = self
+            .api_client
+            .posts()
+            .list_with_edit_context(&PostEndpointType::Posts, &params)
+            .await?;
+
+        // Upsert to database and collect entity IDs
+        let entity_ids = self.cache.execute(|conn| {
+            let repo = PostRepository::<EditContext>::new();
+
+            response
+                .data
+                .iter()
+                .map(|post| {
+                    repo.upsert(conn, &self.db_site, post)
+                        .map_err(|e| FetchError::Database {
+                            err_message: e.to_string(),
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })?;
+
+        Ok(entity_ids)
     }
 }
 
