@@ -957,7 +957,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01203cb8918f5711e73891b347816d932046f95f54207710bda99beaeb423bf4"
 dependencies = [
- "fluent-langneg",
+ "fluent-langneg 0.13.1",
  "fluent-syntax",
  "intl-memoizer",
  "intl_pluralrules",
@@ -969,11 +969,20 @@ dependencies = [
 
 [[package]]
 name = "fluent-langneg"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c4ad0989667548f06ccd0e306ed56b61bd4d35458d54df5ec7587c0e8ed5e94"
+checksum = "7eebbe59450baee8282d71676f3bfed5689aeab00b27545e83e5f14b1195e8b0"
 dependencies = [
  "unic-langid",
+]
+
+[[package]]
+name = "fluent-langneg"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d5439a5e4ef14dc761bfe1d6ecbc4ba6fd698814ee65e7e623fa85aa9348dcc"
+dependencies = [
+ "icu_locid",
 ]
 
 [[package]]
@@ -1007,7 +1016,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "407bcb5e8c7e4625c365b1180099b43e40fb6fd6d0ba53070229297246ba6392"
 dependencies = [
  "fluent-bundle",
- "fluent-langneg",
+ "fluent-langneg 0.13.1",
  "fluent-syntax",
  "fluent-template-macros",
  "flume",
@@ -5253,7 +5262,7 @@ name = "wp_localization"
 version = "0.1.0"
 dependencies = [
  "fluent-bundle",
- "fluent-langneg",
+ "fluent-langneg 0.14.2",
  "fluent-templates",
  "paste",
  "rstest",
