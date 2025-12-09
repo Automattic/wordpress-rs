@@ -150,9 +150,7 @@ impl PostService {
         let metadata: Vec<EntityMetadata<PostId>> = response
             .data
             .into_iter()
-            .filter_map(|sparse| {
-                Some(EntityMetadata::new(sparse.id?, sparse.modified_gmt?))
-            })
+            .filter_map(|sparse| Some(EntityMetadata::new(sparse.id?, sparse.modified_gmt?)))
             .collect();
 
         Ok(MetadataFetchResult {

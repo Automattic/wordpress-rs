@@ -7,6 +7,14 @@ use wp_mobile_cache::entity::FullEntity;
 
 use super::{EntityMetadata, KvStore, ListItem};
 
+/// Type alias for entity loader closure
+type EntityLoader<T, Id> =
+    Box<dyn Fn(&Id) -> Result<Option<FullEntity<T>>, LoadError> + Send + Sync>;
+
+/// Type alias for modified_gmt lookup closure
+type ModifiedGmtLoader<Id> =
+    Box<dyn Fn(&Id) -> Result<Option<WpGmtDateTime>, LoadError> + Send + Sync>;
+
 /// Collection that uses metadata-first fetching strategy.
 ///
 /// This collection type:
@@ -40,13 +48,11 @@ where
 
     /// Closure to load an entity from cache by ID
     /// Returns None if entity is not in cache
-    load_entity_by_id:
-        Box<dyn Fn(&Id) -> Result<Option<FullEntity<T>>, LoadError> + Send + Sync>,
+    load_entity_by_id: EntityLoader<T, Id>,
 
     /// Closure to get modified_gmt for a cached entity by ID
     /// Used to determine staleness without loading full entity
-    get_cached_modified_gmt:
-        Box<dyn Fn(&Id) -> Result<Option<WpGmtDateTime>, LoadError> + Send + Sync>,
+    get_cached_modified_gmt: ModifiedGmtLoader<Id>,
 }
 
 /// Error type for load operations
@@ -77,12 +83,8 @@ where
     pub fn new(
         kv_key: String,
         kv_store: Arc<dyn KvStore<Id>>,
-        load_entity_by_id: Box<
-            dyn Fn(&Id) -> Result<Option<FullEntity<T>>, LoadError> + Send + Sync,
-        >,
-        get_cached_modified_gmt: Box<
-            dyn Fn(&Id) -> Result<Option<WpGmtDateTime>, LoadError> + Send + Sync,
-        >,
+        load_entity_by_id: EntityLoader<T, Id>,
+        get_cached_modified_gmt: ModifiedGmtLoader<Id>,
     ) -> Self {
         Self {
             kv_key,
@@ -156,11 +158,9 @@ where
 
         metadata
             .iter()
-            .map(|meta| {
-                match (self.load_entity_by_id)(&meta.id)? {
-                    Some(entity) => Ok(ListItem::Loaded(entity)),
-                    None => Ok(ListItem::Loading(meta.clone())),
-                }
+            .map(|meta| match (self.load_entity_by_id)(&meta.id)? {
+                Some(entity) => Ok(ListItem::Loaded(entity)),
+                None => Ok(ListItem::Loading(meta.clone())),
             })
             .collect()
     }
@@ -189,10 +189,10 @@ where
 
         let mut stale = Vec::new();
         for meta in metadata {
-            if let Some(cached_modified) = (self.get_cached_modified_gmt)(&meta.id)? {
-                if cached_modified != meta.modified_gmt {
-                    stale.push(meta.id.clone());
-                }
+            if let Some(cached_modified) = (self.get_cached_modified_gmt)(&meta.id)?
+                && cached_modified != meta.modified_gmt
+            {
+                stale.push(meta.id.clone());
             }
         }
         Ok(stale)
@@ -209,9 +209,7 @@ where
             let cached_modified = (self.get_cached_modified_gmt)(&meta.id)?;
             match cached_modified {
                 None => needs_fetch.push(meta.id.clone()),
-                Some(cached) if cached != meta.modified_gmt => {
-                    needs_fetch.push(meta.id.clone())
-                }
+                Some(cached) if cached != meta.modified_gmt => needs_fetch.push(meta.id.clone()),
                 _ => {}
             }
         }
@@ -247,10 +245,7 @@ mod tests {
     struct TestId(i64);
 
     #[derive(Debug, Clone)]
-    struct TestEntity {
-        id: TestId,
-        title: String,
-    }
+    struct TestEntity;
 
     fn test_metadata(id: i64) -> EntityMetadata<TestId> {
         EntityMetadata::new(TestId(id), WpGmtDateTime::from_timestamp(1000 + id))
@@ -283,13 +278,7 @@ mod tests {
                         table: DbTable::PostsEditContext,
                         rowid: RowId(id.0),
                     });
-                    FullEntity::new(
-                        entity_id,
-                        TestEntity {
-                            id: *id,
-                            title: format!("Test {}", id.0),
-                        },
-                    )
+                    FullEntity::new(entity_id, TestEntity)
                 }))
             }),
             // For get_cached_modified_gmt, return the cached timestamp

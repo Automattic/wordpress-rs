@@ -68,11 +68,7 @@ where
     Id: Clone + Eq + Hash + Send + Sync,
 {
     fn get(&self, key: &str) -> Option<Vec<EntityMetadata<Id>>> {
-        self.data
-            .read()
-            .expect("RwLock poisoned")
-            .get(key)
-            .cloned()
+        self.data.read().expect("RwLock poisoned").get(key).cloned()
     }
 
     fn set(&self, key: &str, value: Vec<EntityMetadata<Id>>) {
@@ -84,9 +80,7 @@ where
 
     fn append(&self, key: &str, value: Vec<EntityMetadata<Id>>) {
         let mut data = self.data.write().expect("RwLock poisoned");
-        data.entry(key.to_string())
-            .or_insert_with(Vec::new)
-            .extend(value);
+        data.entry(key.to_string()).or_default().extend(value);
     }
 
     fn remove(&self, key: &str) {
@@ -94,10 +88,7 @@ where
     }
 
     fn contains(&self, key: &str) -> bool {
-        self.data
-            .read()
-            .expect("RwLock poisoned")
-            .contains_key(key)
+        self.data.read().expect("RwLock poisoned").contains_key(key)
     }
 }
 
