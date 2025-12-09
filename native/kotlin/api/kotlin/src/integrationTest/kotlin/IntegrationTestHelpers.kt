@@ -2,9 +2,16 @@ package rs.wordpress.api.kotlin
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserId
+import uniffi.wp_api.WpApiClientDelegate
+import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpOrgSiteApiUrlResolver
+import uniffi.wp_mobile.MockPostService
+import uniffi.wp_mobile.WpSelfHostedService
+import rs.wordpress.cache.kotlin.WordPressApiCache
 
 const val FIRST_USER_ID: UserId = 1
 const val SECOND_USER_ID: UserId = 2
@@ -22,6 +29,52 @@ fun defaultApiClient(): WpApiClient {
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
     return WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList())
+}
+
+data class TestServiceContext(
+    val service: WpSelfHostedService,
+    val mockPostService: MockPostService
+)
+
+fun createTestServiceContext(): TestServiceContext {
+    // Create and migrate cache
+    val wordPressApiCache = WordPressApiCache()
+    wordPressApiCache.performMigrations()
+
+    val testCredentials = TestCredentials.INSTANCE
+
+    // Create auth provider
+    val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
+        username = testCredentials.adminUsername,
+        password = testCredentials.adminPassword
+    )
+
+    val apiRootUrl = testCredentials.apiRootUrl.toString()
+    // Extract site URL by removing /wp-json suffix
+    val siteUrl = apiRootUrl.removeSuffix("/wp-json")
+
+    // Create self-hosted service
+    val service = WpSelfHostedService(
+        siteUrl = siteUrl,
+        apiRoot = apiRootUrl,
+        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(apiRootUrl)),
+        delegate = WpApiClientDelegate(
+            authProvider,
+            requestExecutor = WpRequestExecutor(),
+            middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
+            appNotifier = EmptyAppNotifier()
+        ),
+        cache = wordPressApiCache.cache
+    )
+
+    // Create mock post service with shared cache
+    val mockPostService = MockPostService(
+        wordPressApiCache.cache,
+        siteUrl,
+        apiRootUrl
+    )
+
+    return TestServiceContext(service, mockPostService)
 }
 
 fun <T> WpRequestResult<T>.assertSuccess() {

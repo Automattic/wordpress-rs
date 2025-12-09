@@ -1,5 +1,5 @@
 use crate::{
-    SqliteDbError,
+    DbTable, SqliteDbError,
     db_types::db_site::DbSite,
     repository::{InTransaction, QueryExecutor},
     term_relationships::DbTermRelationship,
@@ -15,7 +15,10 @@ use wp_api::terms::TermId;
 pub struct TermRelationshipRepository;
 
 impl TermRelationshipRepository {
-    const TABLE_NAME: &'static str = "term_relationships";
+    /// Get the database table for term relationships
+    pub const fn table() -> DbTable {
+        DbTable::TermRelationships
+    }
 
     /// Synchronize terms for an object (only insert new, delete removed, keep unchanged).
     ///
@@ -86,7 +89,7 @@ impl TermRelationshipRepository {
         let placeholders: Vec<_> = (0..term_ids.len()).map(|_| "?").collect();
         let sql = format!(
             "DELETE FROM {} WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ? AND term_id IN ({})",
-            Self::TABLE_NAME,
+            Self::table().table_name(),
             placeholders.join(", ")
         );
 
@@ -125,7 +128,7 @@ impl TermRelationshipRepository {
 
         let insert_sql = format!(
             "INSERT INTO {} (db_site_id, object_id, term_id, taxonomy_type) VALUES (?, ?, ?, ?)",
-            Self::TABLE_NAME
+            Self::table().table_name()
         );
 
         term_ids.iter().try_for_each(|term_id| {
@@ -150,7 +153,7 @@ impl TermRelationshipRepository {
     ) -> Result<Vec<TermId>, SqliteDbError> {
         let sql = format!(
             "SELECT term_id FROM {} WHERE db_site_id = ? AND object_id = ? AND taxonomy_type = ?",
-            Self::TABLE_NAME
+            Self::table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map(
@@ -177,7 +180,7 @@ impl TermRelationshipRepository {
     ) -> Result<HashMap<TaxonomyType, Vec<TermId>>, SqliteDbError> {
         let sql = format!(
             "SELECT taxonomy_type, term_id FROM {} WHERE db_site_id = ? AND object_id = ?",
-            Self::TABLE_NAME
+            Self::table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         let mut rows = stmt.query_map(rusqlite::params![site.row_id, object_id], |row| {
@@ -220,7 +223,7 @@ impl TermRelationshipRepository {
     ) -> Result<usize, SqliteDbError> {
         let sql = format!(
             "DELETE FROM {} WHERE db_site_id = ? AND object_id = ?",
-            Self::TABLE_NAME
+            Self::table().table_name()
         );
         executor.execute(&sql, rusqlite::params![site.row_id, object_id])
     }
@@ -253,7 +256,7 @@ impl TermRelationshipRepository {
 
         let sql = format!(
             "SELECT * FROM {} WHERE db_site_id = ? AND object_id IN ({})",
-            Self::TABLE_NAME,
+            Self::table().table_name(),
             ids_str
         );
 

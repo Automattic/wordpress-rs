@@ -20,7 +20,10 @@ extension WordPressAPI {
             return WordPressAPI(
                urlSession: .shared,
                apiRootUrl: apiRootUrl,
-               authentication: loginCredentials
+               authentication: loginCredentials,
+               middlewarePipeline: MiddlewarePipeline(middlewares: [
+                    DebugMiddleware()
+               ])
            )
         }
     }

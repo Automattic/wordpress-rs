@@ -1,25 +1,35 @@
 use rusqlite::hooks::Action;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 pub mod context;
 pub mod db_types;
+pub mod entity;
 pub mod repository;
 pub mod term_relationships;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 pub mod test_fixtures;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),
+    TableNameMismatch { expected: DbTable, actual: DbTable },
 }
 
 impl std::fmt::Display for SqliteDbError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SqliteDbError::SqliteError(message) => write!(f, "SqliteDbError: message={}", message),
+            SqliteDbError::TableNameMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "Table mismatch: expected '{}', but got '{}'",
+                    expected.table_name(),
+                    actual.table_name()
+                )
+            }
         }
     }
 }
@@ -29,6 +39,80 @@ impl From<rusqlite::Error> for SqliteDbError {
         SqliteDbError::SqliteError(err.to_string())
     }
 }
+
+/// Database table identifier.
+///
+/// Represents all tables tracked in the cache database. This enum provides
+/// a single source of truth for table names, ensuring consistency across
+/// the codebase and preventing typos.
+///
+/// Note: uniffi::Enum makes this type available to platform bindings but
+/// without exposing any methods (which is intentional - we don't want
+/// Kotlin/Swift to access table names directly).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+#[non_exhaustive]
+pub enum DbTable {
+    /// Posts with edit context (full data for editing)
+    PostsEditContext,
+    /// Posts with view context (public viewing data)
+    PostsViewContext,
+    /// Posts with embed context (minimal data for embeds)
+    PostsEmbedContext,
+    /// Self-hosted WordPress sites
+    SelfHostedSites,
+    /// Database sites mapping table
+    DbSites,
+    /// Term relationships (post-category, post-tag associations)
+    TermRelationships,
+}
+
+impl DbTable {
+    /// Get the database table name as a string.
+    ///
+    /// This is the only place where table names are defined as strings,
+    /// ensuring single source of truth for all SQL queries.
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            DbTable::PostsEditContext => "posts_edit_context",
+            DbTable::PostsViewContext => "posts_view_context",
+            DbTable::PostsEmbedContext => "posts_embed_context",
+            DbTable::SelfHostedSites => "self_hosted_sites",
+            DbTable::DbSites => "db_sites",
+            DbTable::TermRelationships => "term_relationships",
+        }
+    }
+}
+
+impl std::fmt::Display for DbTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.table_name())
+    }
+}
+
+/// Error type for DbTable conversion failures
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum DbTableError {
+    #[error("Unknown table: {0}")]
+    UnknownTable(String),
+}
+
+impl TryFrom<&str> for DbTable {
+    type Error = DbTableError;
+
+    fn try_from(table_name: &str) -> Result<Self, Self::Error> {
+        match table_name {
+            "posts_edit_context" => Ok(DbTable::PostsEditContext),
+            "posts_view_context" => Ok(DbTable::PostsViewContext),
+            "posts_embed_context" => Ok(DbTable::PostsEmbedContext),
+            "self_hosted_sites" => Ok(DbTable::SelfHostedSites),
+            "db_sites" => Ok(DbTable::DbSites),
+            "term_relationships" => Ok(DbTable::TermRelationships),
+            _ => Err(DbTableError::UnknownTable(table_name.to_string())),
+        }
+    }
+}
+
+uniffi::custom_newtype!(RowId, u64);
 
 /// Represents a database row ID (autoincrement field).
 /// SQLite rowids are guaranteed to be non-negative, so we use u64.
@@ -164,29 +248,106 @@ impl WpApiCache {
     }
 
     pub fn perform_migrations(&self) -> Result<u64, SqliteDbError> {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        Ok(MigrationManager::new(connection)?.perform_migrations()?)
+        self.execute(|connection| {
+            let mut mgr = MigrationManager::new(connection)?;
+            mgr.perform_migrations().map_err(SqliteDbError::from)
+        })
     }
 
-    pub fn start_listening_for_updates(&self, delegate: Arc<dyn DatabaseDelegate>) {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        connection.update_hook(Some(
-            move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
-                let hook_data = UpdateHook {
-                    action: action.into(),
-                    db_name: db_name.to_string(),
-                    table_name: table_name.to_string(),
-                    row_id,
-                };
-
-                delegate.did_update(hook_data);
-            },
-        ));
+    pub fn start_listening_for_updates(&self, delegate: std::sync::Arc<dyn DatabaseDelegate>) {
+        self.execute(|connection| {
+            connection.update_hook(Some(
+                move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
+                    match DbTable::try_from(table_name) {
+                        Ok(table) => {
+                            let hook_data = UpdateHook {
+                                action: action.into(),
+                                db_name: db_name.to_string(),
+                                table,
+                                row_id,
+                            };
+                            delegate.did_update(hook_data);
+                        }
+                        Err(_) => {
+                            // Ignore SQLite system tables (sqlite_sequence, sqlite_master, etc.)
+                            // and migration tracking table (_migrations)
+                            if !table_name.starts_with("sqlite_") && table_name != "_migrations" {
+                                eprintln!("Warning: Unknown table in update hook: {}", table_name);
+                            }
+                        }
+                    }
+                },
+            ));
+        });
     }
 
     pub fn stop_listening_for_updates(&self) {
-        let connection: &Connection = &self.inner.connection.lock().unwrap();
-        connection.update_hook(None::<fn(Action, &str, &str, i64)>);
+        self.execute(|connection| {
+            connection.update_hook(None::<fn(Action, &str, &str, i64)>);
+        });
+    }
+}
+
+impl WpApiCache {
+    /// Execute a database operation with scoped access to the connection.
+    ///
+    /// This is the **only** way to access the database. The provided closure
+    /// receives a mutable reference to the connection that is only valid within
+    /// the closure scope.
+    ///
+    /// This design prevents deadlocks by ensuring that:
+    /// 1. The connection cannot be held across multiple `execute()` calls
+    /// 2. The closure scope naturally encourages grouping related operations
+    /// 3. The lock is automatically released when the closure returns
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Read operation
+    /// let post = cache.execute(|conn| {
+    ///     repo.select_by_id(conn, post_id)
+    /// })?;
+    ///
+    /// // Write operation
+    /// cache.execute(|conn| {
+    ///     repo.upsert(conn, &site, &post)
+    /// })?;
+    /// ```
+    ///
+    /// # Preventing Deadlocks
+    ///
+    /// **Safe** - Lock is released between calls:
+    /// ```ignore
+    /// let data = cache.execute(|conn| read(conn))?;
+    /// cache.execute(|conn| write(conn, data))?;  // ✅ OK
+    /// ```
+    ///
+    /// **Unsafe** - Nested calls (requires explicit Arc clone, unlikely to write accidentally):
+    /// ```ignore
+    /// let cache2 = cache.clone();
+    /// cache.execute(|conn| {
+    ///     cache2.execute(|conn2| { ... })  // ⚠️ Deadlock!
+    /// })?;
+    /// ```
+    pub fn execute<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut Connection) -> R,
+    {
+        let mut conn = self.inner.connection.lock().unwrap();
+        f(&mut conn)
+    }
+}
+
+impl From<Connection> for WpApiCache {
+    /// Create a WpApiCache from an existing connection.
+    ///
+    /// This is typically used in tests to create a cache from an already-migrated
+    /// in-memory database connection.
+    fn from(connection: Connection) -> Self {
+        Self {
+            inner: DBManager {
+                connection: Mutex::new(connection),
+            },
+        }
     }
 }
 
@@ -279,10 +440,10 @@ pub struct User {
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct UpdateHook {
-    action: HookAction,
-    db_name: String,
-    table_name: String,
-    row_id: i64,
+    pub action: HookAction,
+    pub db_name: String,
+    pub table: DbTable,
+    pub row_id: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
@@ -304,18 +465,19 @@ impl From<Action> for HookAction {
 }
 
 struct DBManager {
+    /// Mutex-protected SQLite connection
+    /// Access only through WpApiCache::execute() to prevent deadlocks
     connection: Mutex<Connection>,
 }
 
 impl DBManager {
     pub fn new(path: &Option<String>) -> Result<Self, SqliteDbError> {
-        let connection: Connection;
-
-        if let Some(path) = path.clone() {
-            connection = Connection::open(path)?;
+        // Create the database connection
+        let connection = if let Some(path) = path {
+            Connection::open(path)?
         } else {
-            connection = Connection::open_in_memory()?;
-        }
+            Connection::open_in_memory()?
+        };
 
         Ok(Self {
             connection: Mutex::new(connection),

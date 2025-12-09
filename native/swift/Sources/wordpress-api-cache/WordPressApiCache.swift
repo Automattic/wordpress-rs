@@ -3,48 +3,29 @@ import WordPressAPIInternal
 
 public actor WordPressApiCache {
 
-    private let cache: WpApiCache
-    private let delegate: any DatabaseDelegate
-
-    public struct Notifications {
-        public static let cacheDidUpdate = Notification.Name("WordPressApiCache.cacheDidUpdate")
-
-        public static func name(for table: String) -> Notification.Name {
-            Notification.Name(rawValue: "WordPressApiCache.cacheDidUpdate.\(table)")
-        }
-    }
-
-    final public class ApiCacheDelegate: DatabaseDelegate {
-        public init() {}
-
-        public func didUpdate(updateHook: WordPressAPIInternal.UpdateHook) {
-            let name = Notifications.name(for: updateHook.tableName)
-            NotificationCenter.default.post(name: name, object: updateHook)
-        }
-    }
+    let cache: WpApiCache
 
     /// Creates a new in-memory cache
-    public init(delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
-        try self.init(path: ":memory:", delegate: delegate)
+    public init() throws {
+        try self.init(path: ":memory:")
     }
 
     /// Creates a new cache at the specified file system URL
-    public init(url: URL, delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
-        try self.init(path: url.absoluteString, delegate: delegate)
+    public init(url: URL) throws {
+        try self.init(path: url.absoluteString)
     }
 
     /// Creates a new cache at the specified path
-    public init(path: String, delegate: DatabaseDelegate = ApiCacheDelegate()) throws {
+    public init(path: String) throws {
         self.cache = try WpApiCache(path: path)
-        self.delegate = delegate
     }
 
-    public func performMigrations() async throws -> Int {
-        return Int(try self.cache.performMigrations())
+    public func performMigrations() async throws -> UInt64 {
+        try self.cache.performMigrations()
     }
 
     public func startListeningForUpdates() {
-        self.cache.startListeningForUpdates(delegate: self.delegate)
+        self.cache.startListeningForUpdates(delegate: DatabaseChangeNotifier.shared)
     }
 
     public func stopListeningForUpdates() {

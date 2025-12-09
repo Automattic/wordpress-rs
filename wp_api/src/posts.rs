@@ -518,6 +518,16 @@ pub enum PostStatus {
 
 impl_as_query_value_from_to_string!(PostStatus);
 
+/// Parse a string into a PostStatus.
+///
+/// This is a helper function for platform code that can't access the `FromStr` trait
+/// directly due to UniFFI limitations.
+#[uniffi::export]
+fn parse_post_status(s: &str) -> Option<PostStatus> {
+    use std::str::FromStr;
+    PostStatus::from_str(s).ok()
+}
+
 #[derive(
     Debug,
     Clone,

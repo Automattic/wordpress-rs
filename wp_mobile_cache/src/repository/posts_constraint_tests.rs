@@ -5,7 +5,10 @@
 
 use crate::{
     RowId,
+    context::EditContext,
     db_types::db_site::{DbSite, DbSiteType},
+    entity::EntityId,
+    repository::posts::PostContext,
     test_fixtures::{TestContext, posts::PostBuilder, test_ctx},
 };
 use rstest::*;
@@ -53,7 +56,7 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id)
         .expect("Failed to select post by post_id")
         .expect("Post should exist");
-    assert_eq!(retrieved.post.title.rendered, "Updated Title");
+    assert_eq!(retrieved.data.post.title.rendered, "Updated Title");
 }
 
 #[rstest]
@@ -98,10 +101,13 @@ fn test_select_by_post_id_returns_none_for_non_existent_post(test_ctx: TestConte
 }
 
 #[rstest]
-fn test_select_by_rowid_returns_none_for_non_existent_rowid(test_ctx: TestContext) {
+fn test_select_by_entity_id_returns_none_for_non_existent_rowid(test_ctx: TestContext) {
+    // Create an EntityId with a non-existent rowid
+    let non_existent_entity_id = EntityId::new(test_ctx.site, EditContext::table(), RowId(99999));
+
     let result = test_ctx
         .post_repo
-        .select_by_rowid(&test_ctx.conn, &test_ctx.site, RowId(99999))
+        .select_by_entity_id(&test_ctx.conn, &non_existent_entity_id)
         .unwrap();
 
     assert!(

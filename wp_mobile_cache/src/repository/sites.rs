@@ -1,21 +1,20 @@
 use crate::{
-    RowId, SqliteDbError,
+    DbTable, RowId, SqliteDbError,
     db_types::{
         db_site::{DbSite, DbSiteType},
         row_ext::RowExt,
         self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
     },
+    entity::{EntityId, FullEntity},
     repository::{QueryExecutor, TransactionManager},
 };
 use rusqlite::OptionalExtension;
+use std::sync::Arc;
 
 pub struct SiteRepository;
 
 impl SiteRepository {
-    const SELF_HOSTED_SITES_TABLE: &'static str = "self_hosted_sites";
-    const DB_SITES_TABLE: &'static str = "db_sites";
-
-    /// Upsert a self-hosted site and return both the DbSite and DbSelfHostedSite (atomic transaction).
+    /// Upsert a self-hosted site and return its EntityId (atomic transaction).
     ///
     /// If a site with the given URL already exists, updates it. Otherwise creates a new one.
     /// Uses SQLite's RETURNING clause to get the inserted/updated rowid.
@@ -23,7 +22,7 @@ impl SiteRepository {
         &self,
         transaction_manager: &mut impl TransactionManager,
         site: &SelfHostedSite,
-    ) -> Result<(DbSite, DbSelfHostedSite), SqliteDbError> {
+    ) -> Result<EntityId, SqliteDbError> {
         let tx = transaction_manager.transaction()?;
 
         // Upsert into self_hosted_sites and get the rowid
@@ -32,7 +31,7 @@ impl SiteRepository {
                 "INSERT INTO {} (url, api_root) VALUES (?, ?)
                  ON CONFLICT(url) DO UPDATE SET api_root = excluded.api_root
                  RETURNING rowid",
-                Self::SELF_HOSTED_SITES_TABLE
+                DbTable::SelfHostedSites.table_name()
             );
 
             let mut stmt = tx.prepare(&sql)?;
@@ -49,7 +48,7 @@ impl SiteRepository {
                  ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
                     site_type = excluded.site_type
                  RETURNING rowid",
-                Self::DB_SITES_TABLE
+                DbTable::DbSites.table_name()
             );
 
             let mut stmt = tx.prepare(&sql)?;
@@ -65,57 +64,69 @@ impl SiteRepository {
             mapped_site_id: self_hosted_site_id,
         };
 
-        let db_self_hosted_site = DbSelfHostedSite {
-            row_id: self_hosted_site_id,
-            url: site.url.clone(),
-            api_root: site.api_root.clone(),
-        };
-
         tx.commit().map_err(SqliteDbError::from)?;
-        Ok((db_site, db_self_hosted_site))
+        Ok(EntityId::new(
+            db_site,
+            DbTable::SelfHostedSites,
+            self_hosted_site_id,
+        ))
     }
 
-    /// Select a self-hosted site by its DbSite reference.
+    /// Select a self-hosted site by its EntityId.
     ///
+    /// Returns the site data paired with its EntityId, which encapsulates the
+    /// database identity (db_site_id, table_name, rowid).
+    ///
+    /// Returns an error if the EntityId's table name doesn't match "self_hosted_sites".
     /// Returns None if the site doesn't exist or isn't a self-hosted site.
     pub fn select_self_hosted_site(
         &self,
         executor: &impl QueryExecutor,
-        site: &DbSite,
-    ) -> Result<Option<DbSelfHostedSite>, SqliteDbError> {
-        if site.site_type != DbSiteType::SelfHosted {
+        entity_id: &EntityId,
+    ) -> Result<Option<FullEntity<DbSelfHostedSite>>, SqliteDbError> {
+        // Validate that the entity_id is for the correct table
+        entity_id.validate_table(DbTable::SelfHostedSites)?;
+
+        if entity_id.db_site.site_type != DbSiteType::SelfHosted {
             return Ok(None);
         }
 
         let sql = format!(
             "SELECT * FROM {} WHERE rowid = ?",
-            Self::SELF_HOSTED_SITES_TABLE
+            DbTable::SelfHostedSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
 
-        stmt.query_row([site.mapped_site_id], |row| {
-            Ok(DbSelfHostedSite {
-                row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
-                url: row.get_column(DbSelfHostedSiteColumn::Url)?,
-                api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
+        let db_self_hosted_site = stmt
+            .query_row([entity_id.db_site.mapped_site_id], |row| {
+                Ok(DbSelfHostedSite {
+                    row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
+                    url: row.get_column(DbSelfHostedSiteColumn::Url)?,
+                    api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
+                })
             })
-        })
-        .optional()
-        .map_err(SqliteDbError::from)
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(db_self_hosted_site.map(|db_self_hosted_site| {
+            let entity_id = Arc::new(*entity_id);
+            FullEntity::new(entity_id, db_self_hosted_site)
+        }))
     }
 
     /// Select a self-hosted site by URL.
     ///
-    /// Returns both the DbSite and DbSelfHostedSite if found.
+    /// Returns the site data (DbSite and DbSelfHostedSite) paired with its EntityId,
+    /// which encapsulates the database identity (db_site_id, table_name, rowid).
     pub fn select_self_hosted_site_by_url(
         &self,
         executor: &impl QueryExecutor,
         url: &str,
-    ) -> Result<Option<(DbSite, DbSelfHostedSite)>, SqliteDbError> {
+    ) -> Result<Option<FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
         // First get the self_hosted_site
         let sql = format!(
             "SELECT * FROM {} WHERE url = ?",
-            Self::SELF_HOSTED_SITES_TABLE
+            DbTable::SelfHostedSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
 
@@ -138,7 +149,7 @@ impl SiteRepository {
         let sql = format!(
             "SELECT rowid, site_type, mapped_site_id FROM {}
              WHERE site_type = ? AND mapped_site_id = ?",
-            Self::DB_SITES_TABLE
+            DbTable::DbSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
 
@@ -153,7 +164,14 @@ impl SiteRepository {
             .optional()
             .map_err(SqliteDbError::from)?;
 
-        Ok(db_site.map(|site| (site, self_hosted_site)))
+        Ok(db_site.map(|db_site| {
+            let entity_id = Arc::new(EntityId::new(
+                db_site,
+                DbTable::SelfHostedSites,
+                self_hosted_site.row_id,
+            ));
+            FullEntity::new(entity_id, (db_site, self_hosted_site))
+        }))
     }
 
     /// Count all sites in the database.
@@ -163,7 +181,7 @@ impl SiteRepository {
         &self,
         executor: &impl QueryExecutor,
     ) -> Result<usize, SqliteDbError> {
-        let sql = format!("SELECT COUNT(*) FROM {}", Self::DB_SITES_TABLE);
+        let sql = format!("SELECT COUNT(*) FROM {}", DbTable::DbSites.table_name());
         let mut stmt = executor.prepare(&sql)?;
         let count: i64 = stmt.query_row([], |row| row.get(0))?;
         Ok(count as usize)
@@ -176,7 +194,10 @@ impl SiteRepository {
         &self,
         executor: &impl QueryExecutor,
     ) -> Result<usize, SqliteDbError> {
-        let sql = format!("SELECT COUNT(*) FROM {}", Self::SELF_HOSTED_SITES_TABLE);
+        let sql = format!(
+            "SELECT COUNT(*) FROM {}",
+            DbTable::SelfHostedSites.table_name()
+        );
         let mut stmt = executor.prepare(&sql)?;
         let count: i64 = stmt.query_row([], |row| row.get(0))?;
         Ok(count as usize)
@@ -201,7 +222,7 @@ impl SiteRepository {
             DbSiteType::SelfHosted => {
                 let sql = format!(
                     "DELETE FROM {} WHERE rowid = ?",
-                    Self::SELF_HOSTED_SITES_TABLE
+                    DbTable::SelfHostedSites.table_name()
                 );
                 tx.execute(&sql, [site.mapped_site_id])?;
             }
@@ -212,7 +233,10 @@ impl SiteRepository {
 
         // Delete from sites table
         let sites_deleted = {
-            let sql = format!("DELETE FROM {} WHERE rowid = ?", Self::DB_SITES_TABLE);
+            let sql = format!(
+                "DELETE FROM {} WHERE rowid = ?",
+                DbTable::DbSites.table_name()
+            );
             tx.execute(&sql, [site.row_id])?
         };
 
@@ -231,7 +255,7 @@ impl SiteRepository {
         let site_data = self.select_self_hosted_site_by_url(transaction_manager, url)?;
 
         match site_data {
-            Some((db_site, _)) => self.delete_site(transaction_manager, &db_site),
+            Some(full_entity) => self.delete_site(transaction_manager, &full_entity.data.0),
             None => Ok(false),
         }
     }
@@ -240,8 +264,10 @@ impl SiteRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::get_table_column_names;
-    use crate::{MigrationManager, db_types::row_ext::ColumnIndex};
+    use crate::{
+        MigrationManager, db_types::row_ext::ColumnIndex, entity::EntityId,
+        test_fixtures::get_table_column_names,
+    };
     use rstest::*;
     use rusqlite::Connection;
 
@@ -281,17 +307,14 @@ mod tests {
             api_root: "https://example.com/wp-json".to_string(),
         };
 
-        let (db_site, db_self_hosted_site) = repo
+        let entity_id = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
-        // Verify self_hosted_sites entry
-        assert_eq!(db_self_hosted_site.url, site.url);
-        assert_eq!(db_self_hosted_site.api_root, site.api_root);
-
-        // Verify sites entry
-        assert_eq!(db_site.site_type, DbSiteType::SelfHosted);
-        assert_eq!(db_site.mapped_site_id, db_self_hosted_site.row_id);
+        // Verify the EntityId has correct table and site type
+        assert_eq!(entity_id.table, DbTable::SelfHostedSites);
+        assert_eq!(entity_id.db_site.site_type, DbSiteType::SelfHosted);
+        assert_eq!(entity_id.db_site.mapped_site_id, entity_id.rowid);
     }
 
     #[rstest]
@@ -304,7 +327,7 @@ mod tests {
             url: url.to_string(),
             api_root: "https://example.com/wp-json".to_string(),
         };
-        let (db_site1, db_self_hosted_site1) = repo
+        let entity_id1 = repo
             .upsert_self_hosted_site(&mut test_conn, &site1)
             .expect("Failed to upsert site");
 
@@ -313,16 +336,12 @@ mod tests {
             url: url.to_string(),
             api_root: "https://example.com/wordpress/wp-json".to_string(),
         };
-        let (db_site2, db_self_hosted_site2) = repo
+        let entity_id2 = repo
             .upsert_self_hosted_site(&mut test_conn, &site2)
             .expect("Failed to upsert site");
 
-        // Verify it updated the same row (same rowid) - this proves update, not insert
-        assert_eq!(db_self_hosted_site1.row_id, db_self_hosted_site2.row_id);
-        assert_eq!(db_site1.row_id, db_site2.row_id);
-
-        // Verify api_root was updated
-        assert_eq!(db_self_hosted_site2.api_root, site2.api_root);
+        // Verify it updated the same row (same EntityId) - this proves update, not insert
+        assert_eq!(entity_id1, entity_id2);
     }
 
     #[rstest]
@@ -335,19 +354,19 @@ mod tests {
             api_root: "https://example.com/wp-json".to_string(),
         };
 
-        let (db_site1, _) = repo
+        let entity_id1 = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("First upsert failed");
-        let (db_site2, _) = repo
+        let entity_id2 = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Second upsert failed");
-        let (db_site3, _) = repo
+        let entity_id3 = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Third upsert failed");
 
-        // All should return the same DbSite
-        assert_eq!(db_site1.row_id, db_site2.row_id);
-        assert_eq!(db_site2.row_id, db_site3.row_id);
+        // All should return the same EntityId
+        assert_eq!(entity_id1, entity_id2);
+        assert_eq!(entity_id2, entity_id3);
 
         // Verify only one entry exists in sites table (ensures bug fix works)
         let count = repo
@@ -367,17 +386,18 @@ mod tests {
             api_root: "https://example.com/wp-json".to_string(),
         };
 
-        let (db_site, original_db_self_hosted_site) = repo
+        let entity_id = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
-        // Select using DbSite reference
+        // Select using EntityId
         let retrieved = repo
-            .select_self_hosted_site(&test_conn, &db_site)
+            .select_self_hosted_site(&test_conn, &entity_id)
             .expect("Failed to select site")
             .expect("Site should exist");
 
-        assert_eq!(retrieved, original_db_self_hosted_site);
+        assert_eq!(retrieved.data.url, site.url);
+        assert_eq!(retrieved.data.api_root, site.api_root);
     }
 
     #[rstest]
@@ -391,8 +411,11 @@ mod tests {
             mapped_site_id: RowId(999),
         };
 
+        // Create an EntityId for this non-self-hosted site
+        let entity_id = EntityId::new(non_self_hosted_site, DbTable::SelfHostedSites, RowId(999));
+
         let result = repo
-            .select_self_hosted_site(&test_conn, &non_self_hosted_site)
+            .select_self_hosted_site(&test_conn, &entity_id)
             .expect("Query should succeed");
 
         assert_eq!(
@@ -411,8 +434,11 @@ mod tests {
             mapped_site_id: RowId(999),
         };
 
+        // Create an EntityId for this non-existent site
+        let entity_id = EntityId::new(non_existent_site, DbTable::SelfHostedSites, RowId(999));
+
         let result = repo
-            .select_self_hosted_site(&test_conn, &non_existent_site)
+            .select_self_hosted_site(&test_conn, &entity_id)
             .expect("Query should succeed");
 
         assert_eq!(result, None, "Should return None for non-existent site");
@@ -426,19 +452,22 @@ mod tests {
             api_root: "https://example.com/wp-json".to_string(),
         };
 
-        let (original_db_site, original_db_self_hosted_site) = repo
+        let entity_id = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
         // Select by URL
-        let (retrieved_db_site, retrieved_db_self_hosted_site) = repo
+        let retrieved = repo
             .select_self_hosted_site_by_url(&test_conn, &site.url)
             .expect("Failed to select site")
             .expect("Site should exist");
 
-        // Verify both structs match
-        assert_eq!(retrieved_db_site, original_db_site);
-        assert_eq!(retrieved_db_self_hosted_site, original_db_self_hosted_site);
+        // Verify the EntityId matches
+        assert_eq!(retrieved.entity_id.as_ref(), &entity_id);
+        // Verify data matches
+        assert_eq!(retrieved.data.0, entity_id.db_site);
+        assert_eq!(retrieved.data.1.url, site.url);
+        assert_eq!(retrieved.data.1.api_root, site.api_root);
     }
 
     #[rstest]
@@ -467,15 +496,15 @@ mod tests {
             api_root: "https://example2.com/wp-json".to_string(),
         };
 
-        let (db_site1, _) = repo
+        let entity_id1 = repo
             .upsert_self_hosted_site(&mut test_conn, &site1)
             .expect("Failed to upsert site1");
-        let (db_site2, _) = repo
+        let entity_id2 = repo
             .upsert_self_hosted_site(&mut test_conn, &site2)
             .expect("Failed to upsert site2");
 
-        // Verify different sites get different IDs
-        assert_ne!(db_site1.row_id, db_site2.row_id);
+        // Verify different sites get different EntityIds
+        assert_ne!(entity_id1, entity_id2);
 
         // Verify both can be retrieved by URL
         let retrieved1 = repo
@@ -498,7 +527,7 @@ mod tests {
         };
 
         // Create site
-        let (db_site, _) = repo
+        let entity_id = repo
             .upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
@@ -512,9 +541,9 @@ mod tests {
         assert_eq!(count_sites, 1);
         assert_eq!(count_self_hosted, 1);
 
-        // Delete site
+        // Delete site using DbSite from EntityId
         let deleted = repo
-            .delete_site(&mut test_conn, &db_site)
+            .delete_site(&mut test_conn, &entity_id.db_site)
             .expect("Failed to delete site");
         assert!(deleted, "Should return true when site is deleted");
 
@@ -565,16 +594,16 @@ mod tests {
             api_root: "https://example2.com/wp-json".to_string(),
         };
 
-        let (db_site1, _) = repo
+        let entity_id1 = repo
             .upsert_self_hosted_site(&mut test_conn, &site1)
             .expect("Failed to upsert site1");
-        let (db_site2, _) = repo
+        let entity_id2 = repo
             .upsert_self_hosted_site(&mut test_conn, &site2)
             .expect("Failed to upsert site2");
 
         // Delete site1
         let deleted = repo
-            .delete_site(&mut test_conn, &db_site1)
+            .delete_site(&mut test_conn, &entity_id1.db_site)
             .expect("Failed to delete site1");
         assert!(deleted);
 
@@ -590,8 +619,8 @@ mod tests {
             .expect("Failed to select site by URL");
         assert!(retrieved2.is_some(), "Site2 should still exist");
         assert_eq!(
-            retrieved2.expect("Site2 should exist").0.row_id,
-            db_site2.row_id
+            retrieved2.expect("Site2 should exist").entity_id.as_ref(),
+            &entity_id2
         );
     }
 

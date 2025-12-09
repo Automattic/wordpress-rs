@@ -13,7 +13,12 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 @Preview
-fun SiteScreen(onUsersClicked: () -> Unit, onPluginsClicked: () -> Unit) {
+fun SiteScreen(
+    onUsersClicked: () -> Unit,
+    onPluginsClicked: () -> Unit,
+    onStressTestClicked: () -> Unit,
+    onPostCollectionClicked: () -> Unit
+) {
     MaterialTheme {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -35,6 +40,16 @@ fun SiteScreen(onUsersClicked: () -> Unit, onPluginsClicked: () -> Unit) {
                     Column {
                         Button(onClick = onPluginsClicked) {
                             Text("Plugins")
+                        }
+                    }
+                    Column {
+                        Button(onClick = onStressTestClicked) {
+                            Text("Stress Test")
+                        }
+                    }
+                    Column {
+                        Button(onClick = onPostCollectionClicked) {
+                            Text("Post Collection")
                         }
                     }
                 }

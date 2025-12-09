@@ -12,9 +12,18 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_mobile"
 
 [dependencies]
+paste = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
 wp_mobile_cache = { path = "../wp_mobile_cache" }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+rstest = { workspace = true }
+rusqlite = { workspace = true }
+wp_mobile_cache = { path = "../wp_mobile_cache", features = ["test-helpers"] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }

@@ -9,7 +9,9 @@ import org.koin.compose.koinInject
 import rs.wordpress.example.shared.ui.login.LoginScreen
 import rs.wordpress.example.shared.ui.plugins.PluginListScreen
 import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
+import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
 import rs.wordpress.example.shared.ui.site.SiteScreen
+import rs.wordpress.example.shared.ui.stresstest.StressTestScreen
 import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
@@ -49,6 +51,12 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
                     },
                     onPluginsClicked = {
                         navController.navigate("plugins")
+                    },
+                    onStressTestClicked = {
+                        navController.navigate("stresstest")
+                    },
+                    onPostCollectionClicked = {
+                        navController.navigate("postcollection")
                     }
                 )
             }
@@ -57,6 +65,12 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
             }
             composable("plugins") {
                 PluginListScreen()
+            }
+            composable("stresstest") {
+                StressTestScreen()
+            }
+            composable("postcollection") {
+                PostCollectionScreen()
             }
         }
     }

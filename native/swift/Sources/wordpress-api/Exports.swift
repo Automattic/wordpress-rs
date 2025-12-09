@@ -31,6 +31,11 @@ public typealias WpApiParamOrder = WordPressAPIInternal.WpApiParamOrder
 public typealias UserCapability = WordPressAPIInternal.UserCapability
 public typealias UserRole = WordPressAPIInternal.UserRole
 
+// MARK: - Service Layer
+public typealias WpSelfHostedService = WordPressAPIInternal.WpSelfHostedService
+public typealias AnyPostFilter = WordPressAPIInternal.AnyPostFilter
+public typealias WpApiCache = WordPressAPIInternal.WpApiCache
+
 // MARK: - Login
 
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
