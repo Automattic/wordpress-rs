@@ -148,6 +148,52 @@ impl PostService {
             .execute(|connection| repo.count(connection, &self.db_site))
     }
 
+    /// Delete a post by its EntityId
+    ///
+    /// Returns the number of rows deleted (0 or 1).
+    /// Automatically deletes associated term relationships.
+    ///
+    /// # Arguments
+    /// * `entity_id` - The EntityId of the post to delete
+    ///
+    /// # Returns
+    /// - `Ok(1)` if the post was deleted
+    /// - `Ok(0)` if the post doesn't exist
+    /// - `Err` if there was a database error
+    pub fn delete_by_entity_id(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<u64, wp_mobile_cache::SqliteDbError> {
+        let repo = PostRepository::<EditContext>::new();
+        self.cache.execute(|connection| {
+            repo.delete_by_entity_id(connection, entity_id)
+                .map(|n| n as u64)
+        })
+    }
+
+    /// Delete a post by its WordPress post ID
+    ///
+    /// Returns the number of rows deleted (0 or 1).
+    /// Automatically deletes associated term relationships.
+    ///
+    /// # Arguments
+    /// * `post_id` - The WordPress post ID to delete
+    ///
+    /// # Returns
+    /// - `Ok(1)` if the post was deleted
+    /// - `Ok(0)` if the post doesn't exist
+    /// - `Err` if there was a database error
+    pub fn delete_by_post_id(
+        &self,
+        post_id: wp_api::posts::PostId,
+    ) -> Result<u64, wp_mobile_cache::SqliteDbError> {
+        let repo = PostRepository::<EditContext>::new();
+        self.cache.execute(|connection| {
+            repo.delete_by_post_id(connection, &self.db_site, post_id)
+                .map(|n| n as u64)
+        })
+    }
+
     /// Create a filtered post collection with edit context
     ///
     /// Returns a collection that:
@@ -400,6 +446,109 @@ mod tests {
         pub post_service: PostService,
         pub db_site: Arc<DbSite>,
         pub cache: Arc<WpApiCache>,
+    }
+
+    #[rstest]
+    fn test_delete_by_entity_id(post_service_ctx: PostServiceTestContext) {
+        // Setup: Insert test post
+        let test_post = insert_test_post(&post_service_ctx);
+        let entity_id = post_service_ctx
+            .cache
+            .execute(|conn| {
+                let repo = PostRepository::<EditContext>::new();
+                repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
+                    .map(|opt| opt.map(|full_entity| *full_entity.entity_id))
+            })
+            .expect("Database read should succeed")
+            .expect("Post should exist");
+
+        // Test: Delete by entity_id
+        let deleted = post_service_ctx
+            .post_service
+            .delete_by_entity_id(&entity_id)
+            .expect("Delete should succeed");
+
+        // Assert: Post was deleted
+        assert_eq!(deleted, 1, "Should delete 1 post");
+
+        // Verify post no longer exists
+        let result = post_service_ctx.cache.execute(|conn| {
+            let repo = PostRepository::<EditContext>::new();
+            repo.select_by_entity_id(conn, &entity_id)
+        });
+        assert!(
+            result.unwrap().is_none(),
+            "Post should not exist after deletion"
+        );
+    }
+
+    #[rstest]
+    fn test_delete_by_post_id(post_service_ctx: PostServiceTestContext) {
+        // Setup: Insert test post
+        let test_post = insert_test_post(&post_service_ctx);
+
+        // Test: Delete by post_id
+        let deleted = post_service_ctx
+            .post_service
+            .delete_by_post_id(test_post.id)
+            .expect("Delete should succeed");
+
+        // Assert: Post was deleted
+        assert_eq!(deleted, 1, "Should delete 1 post");
+
+        // Verify post no longer exists
+        let result = post_service_ctx.cache.execute(|conn| {
+            let repo = PostRepository::<EditContext>::new();
+            repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
+        });
+        assert!(
+            result.unwrap().is_none(),
+            "Post should not exist after deletion"
+        );
+    }
+
+    #[rstest]
+    fn test_delete_by_entity_id_non_existent_returns_zero(
+        post_service_ctx: PostServiceTestContext,
+    ) {
+        // Setup: Insert a post and get its entity_id
+        let test_post = insert_test_post(&post_service_ctx);
+        let entity_id = post_service_ctx
+            .cache
+            .execute(|conn| {
+                let repo = PostRepository::<EditContext>::new();
+                repo.select_by_post_id(conn, &post_service_ctx.db_site, test_post.id)
+                    .map(|opt| opt.map(|full_entity| *full_entity.entity_id))
+            })
+            .expect("Database read should succeed")
+            .expect("Post should exist");
+
+        // Setup: Delete the post via service
+        post_service_ctx
+            .post_service
+            .delete_by_entity_id(&entity_id)
+            .expect("First delete should succeed");
+
+        // Test: Try to delete again with the same entity_id (now non-existent)
+        let deleted = post_service_ctx
+            .post_service
+            .delete_by_entity_id(&entity_id)
+            .expect("Delete should not error");
+
+        // Assert: Should return 0
+        assert_eq!(deleted, 0, "Should return 0 for non-existent post");
+    }
+
+    #[rstest]
+    fn test_delete_by_post_id_non_existent_returns_zero(post_service_ctx: PostServiceTestContext) {
+        // Test: Delete non-existent post
+        let deleted = post_service_ctx
+            .post_service
+            .delete_by_post_id(PostId(99999))
+            .expect("Delete should not error");
+
+        // Assert: Should return 0
+        assert_eq!(deleted, 0, "Should return 0 for non-existent post");
     }
 
     /// rstest fixture providing a PostService with in-memory database

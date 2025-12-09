@@ -39,6 +39,12 @@ class StressTestViewModel(
     private val _totalUpdates = MutableStateFlow(0L)
     val totalUpdates: StateFlow<Long> = _totalUpdates.asStateFlow()
 
+    private val _totalInserts = MutableStateFlow(0L)
+    val totalInserts: StateFlow<Long> = _totalInserts.asStateFlow()
+
+    private val _totalDeletes = MutableStateFlow(0L)
+    val totalDeletes: StateFlow<Long> = _totalDeletes.asStateFlow()
+
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
@@ -132,9 +138,6 @@ class StressTestViewModel(
 
                 // Update performance metrics
                 updatePerformanceMetrics(loadDuration, totalLatency)
-
-                // Increment total updates counter
-                _totalUpdates.value += 1
             }
         }
 
@@ -145,14 +148,32 @@ class StressTestViewModel(
         // Start comprehensive stress test with:
         // - 10-100ms delay between batches (variable timing)
         // - 1-20 posts per batch (variable batch size)
+        // - 50% updates, 25% deletes, 25% inserts (operation weights)
         stressTestHandle = mockPostService.startComprehensiveStressTest(
             entityIds,
-            minDelayMs = 10u,
-            maxDelayMs = 100u,
-            minBatchSize = 1u,
-            maxBatchSize = 20u
+            uniffi.wp_mobile.StressTestConfig(
+                minDelayMs = 10u,
+                maxDelayMs = 100u,
+                minBatchSize = 1u,
+                maxBatchSize = 20u,
+                updateWeight = 50u,
+                deleteWeight = 25u,
+                insertWeight = 25u
+            )
         )
-        println("Comprehensive stress test started with ObservableCollection!")
+        println("Comprehensive stress test started with ObservableCollection (updates/deletes/inserts)!")
+
+        // Poll operation counters from the stress test handle
+        viewModelScope.launch(Dispatchers.Default) {
+            while (_isRunning.value) {
+                stressTestHandle?.let { handle ->
+                    _totalUpdates.value = handle.updateCount().toLong()
+                    _totalInserts.value = handle.insertCount().toLong()
+                    _totalDeletes.value = handle.deleteCount().toLong()
+                }
+                kotlinx.coroutines.delay(100) // Poll every 100ms
+            }
+        }
     }
 
     private fun updatePerformanceMetrics(loadDuration: Long, totalLatency: Long) {
@@ -203,6 +224,9 @@ class StressTestViewModel(
     }
 
     fun onCleared() {
+        // Stop the running flag to stop polling
+        _isRunning.value = false
+
         // Stop background updates
         stressTestHandle?.stop()
 

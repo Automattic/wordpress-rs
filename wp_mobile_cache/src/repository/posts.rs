@@ -307,6 +307,40 @@ impl<C: PostContext> PostRepository<C> {
         }))
     }
 
+    /// Delete a post by its EntityId for a given site.
+    ///
+    /// Returns the number of rows deleted (0 or 1).
+    /// Automatically deletes associated term relationships.
+    ///
+    /// Returns an error if the EntityId's table name doesn't match this repository's context.
+    /// Returns `Ok(0)` if no post with the given EntityId exists.
+    pub fn delete_by_entity_id(
+        &self,
+        executor: &impl QueryExecutor,
+        entity_id: &EntityId,
+    ) -> Result<usize, SqliteDbError> {
+        // Validate that the entity_id is for the correct table
+        entity_id.validate_table(C::table())?;
+
+        // Get the WordPress post ID from the rowid (lightweight SELECT)
+        let sql = format!(
+            "SELECT id FROM {} WHERE db_site_id = ? AND rowid = ?",
+            Self::table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let post_id = stmt
+            .query_row([entity_id.db_site.row_id, entity_id.rowid], |row| {
+                row.get::<_, i64>(0)
+            })
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        match post_id {
+            Some(id) => self.delete_by_post_id(executor, &entity_id.db_site, PostId(id)),
+            None => Ok(0), // Post doesn't exist
+        }
+    }
+
     /// Delete a post by its WordPress post ID for a given site.
     ///
     /// Returns the number of rows deleted (0 or 1).
@@ -317,12 +351,6 @@ impl<C: PostContext> PostRepository<C> {
         site: &DbSite,
         post_id: PostId,
     ) -> Result<usize, SqliteDbError> {
-        // First, try to get the rowid (if post doesn't exist, return 0)
-        let _db_post = match self.select_by_post_id(executor, site, post_id)? {
-            Some(post) => post,
-            None => return Ok(0), // Post doesn't exist
-        };
-
         // Delete term relationships using WordPress post ID
         let term_repo = TermRelationshipRepository;
         term_repo.delete_all_terms_for_object(executor, site, post_id.0)?;
@@ -1408,6 +1436,69 @@ mod tests {
             .delete_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(999))
             .unwrap();
         assert_eq!(deleted, 0);
+    }
+
+    #[rstest]
+    fn test_repository_delete_by_entity_id(mut test_ctx: TestContext) {
+        let post = PostBuilder::minimal().with_id(42).build();
+        let entity_id = test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .unwrap();
+
+        // Verify exists
+        test_ctx
+            .post_repo
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .expect("Should not error")
+            .expect("Post should exist");
+
+        // Delete
+        let deleted = test_ctx
+            .post_repo
+            .delete_by_entity_id(&test_ctx.conn, &entity_id)
+            .unwrap();
+        assert_eq!(deleted, 1);
+
+        // Verify no longer exists
+        let result = test_ctx
+            .post_repo
+            .select_by_entity_id(&test_ctx.conn, &entity_id)
+            .unwrap();
+        assert!(result.is_none(), "Post should not exist after deletion");
+    }
+
+    #[rstest]
+    fn test_delete_by_entity_id_deletes_terms(mut test_ctx: TestContext) {
+        // Insert post with terms
+        let post = PostBuilder::minimal()
+            .with_id(500)
+            .with_categories(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)])
+            .build();
+        let entity_id = test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .unwrap();
+
+        // Verify terms exist
+        let terms = test_ctx
+            .term_repo
+            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post.id.0)
+            .unwrap();
+        assert!(!terms.is_empty());
+
+        // Delete post by entity_id
+        test_ctx
+            .post_repo
+            .delete_by_entity_id(&test_ctx.conn, &entity_id)
+            .unwrap();
+
+        // Verify terms were also deleted
+        let terms_after = test_ctx
+            .term_repo
+            .get_all_terms_for_object(&test_ctx.conn, &test_ctx.site, post.id.0)
+            .unwrap();
+        assert!(terms_after.is_empty());
     }
 
     #[rstest]
