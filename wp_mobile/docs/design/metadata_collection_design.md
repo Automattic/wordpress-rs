@@ -475,3 +475,58 @@ The `MetadataCollection` provides an efficient sync strategy:
 5. **Clean separation** - posts table holds full data, KV store holds list structure
 
 This approach optimizes for the common case where most posts are cached and up-to-date, while still handling new/updated posts gracefully.
+
+---
+
+## Implementation Status
+
+**Branch**: `prototype/metadata-collection`
+
+### Completed Components
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| `SyncableEntity` trait | `wp_mobile/src/sync/syncable_entity.rs` | Trait for entities with `id` + `modified_gmt` |
+| `EntityMetadata<Id>` | `wp_mobile/src/sync/entity_metadata.rs` | Lightweight metadata struct |
+| `ListItem<T, Id>` | `wp_mobile/src/sync/list_item.rs` | Enum with `Loaded`, `Loading`, `Failed` variants |
+| `KvStore<Id>` trait | `wp_mobile/src/sync/kv_store.rs` | Abstraction for metadata persistence |
+| `InMemoryKvStore<Id>` | `wp_mobile/src/sync/kv_store.rs` | In-memory implementation |
+| `MetadataFetchResult<Id>` | `wp_mobile/src/sync/metadata_fetch_result.rs` | Result type for metadata fetches |
+| `MetadataCollection<T, Id>` | `wp_mobile/src/sync/metadata_collection.rs` | Core collection type |
+| `fetch_posts_metadata()` | `wp_mobile/src/service/posts.rs` | Lightweight metadata fetch |
+| `fetch_posts_by_ids()` | `wp_mobile/src/service/posts.rs` | Batch fetch by IDs |
+
+### Supporting Changes
+
+- Added `Clone`, `Copy` to `WpGmtDateTime` (`wp_api/src/date.rs`)
+- Added `Hash` to `wp_content_i64_id!` and `wp_content_u64_id!` macros (`wp_api/src/wp_content_macros.rs`)
+
+### Test Coverage
+
+- 6 tests for `InMemoryKvStore`
+- 9 tests for `MetadataCollection`
+- All 24 `wp_mobile` lib tests passing
+
+### Differences from Original Sketch
+
+1. **`MetadataCollection` uses closures instead of storing fetch functions**
+   - Original: Had `fetch_metadata` and `fetch_by_ids` closures in the struct
+   - Implemented: Uses `load_entity_by_id` and `get_cached_modified_gmt` closures; fetching is done externally via `PostService`
+
+2. **`ListItem` has three states, not two**
+   - Original: `Loaded` and `Loading` only
+   - Implemented: Added `Failed { metadata, error }` for error handling
+
+3. **`ListItem::Loading` holds full metadata, not just ID**
+   - Original: `Loading { id: Id }`
+   - Implemented: `Loading(EntityMetadata<Id>)` - preserves `modified_gmt` for display
+
+4. **Type aliases for closure types**
+   - Added `EntityLoader<T, Id>` and `ModifiedGmtLoader<Id>` to satisfy clippy's type complexity warnings
+
+### Next Steps
+
+1. Create a concrete `PostMetadataCollection` wrapper (similar to `PostCollectionWithEditContext`)
+2. Add method to get `modified_gmt` from cached posts in repository layer
+3. Integrate with platform-specific observable wrappers (iOS/Android)
+4. Consider disk-backed `KvStore` implementation
