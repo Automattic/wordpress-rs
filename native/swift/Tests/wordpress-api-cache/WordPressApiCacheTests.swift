@@ -62,10 +62,15 @@ actor Test {
                 group.addTask {
                     _ = mockService.startComprehensiveStressTest(
                         entityIds: ids,
-                        minDelayMs: 1,
-                        maxDelayMs: 1000,
-                        minBatchSize: 100,
-                        maxBatchSize: 1000
+                        config: StressTestConfig(
+                            minDelayMs: 1,
+                            maxDelayMs: 1000,
+                            minBatchSize: 100,
+                            maxBatchSize: 1000,
+                            updateWeight: 50,
+                            deleteWeight: 25,
+                            insertWeight: 25
+                        )
                     )
                 }
             }
