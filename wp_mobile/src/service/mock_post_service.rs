@@ -45,6 +45,14 @@ pub struct StressTestConfig {
     pub insert_weight: u32,
 }
 
+/// Status values for randomizing post status during stress testing
+const STRESS_TEST_STATUS_VALUES: [PostStatus; 4] = [
+    PostStatus::Draft,
+    PostStatus::Pending,
+    PostStatus::Publish,
+    PostStatus::Future,
+];
+
 /// Perform batch update operation for stress testing
 fn stress_test_batch_update(
     cache: &Arc<WpApiCache>,
@@ -63,6 +71,12 @@ fn stress_test_batch_update(
                     format!("Updated Post {} (batch #{})", post.id.0, current_count);
                 post.content.rendered =
                     format!("<p>Content updated at batch #{}</p>", current_count);
+
+                // Randomize the post status
+                let mut rng = rand::thread_rng();
+                let status_index = rng.gen_range(0..STRESS_TEST_STATUS_VALUES.len());
+                post.status = STRESS_TEST_STATUS_VALUES[status_index].clone();
+
                 repo.upsert(conn, db_site, &post)?;
             }
             Ok::<_, wp_mobile_cache::SqliteDbError>(())
