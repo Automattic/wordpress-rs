@@ -18,7 +18,7 @@ macro_rules! wp_content_i64_id {
     ($id_type:ident) => {
         $crate::impl_as_query_value_for_new_type!($id_type);
         ::uniffi::custom_newtype!($id_type, i64);
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
         pub struct $id_type(pub i64);
 
         impl ::core::str::FromStr for $id_type {
@@ -60,7 +60,7 @@ macro_rules! wp_content_u64_id {
     ($id_type:ident) => {
         $crate::impl_as_query_value_for_new_type!($id_type);
         ::uniffi::custom_newtype!($id_type, u64);
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ::serde::Serialize, ::serde::Deserialize)]
         pub struct $id_type(pub u64);
 
         impl ::core::str::FromStr for $id_type {

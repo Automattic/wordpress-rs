@@ -3,10 +3,12 @@ use crate::{
     PostCollectionWithEditContext,
     collection::{FetchError, FetchResult, StatelessCollection, post_collection::PostCollection},
     filters::AnyPostFilter,
+    sync::{EntityMetadata, MetadataFetchResult},
 };
 use std::sync::Arc;
 use wp_api::{
-    api_client::WpApiClient, posts::AnyPostWithEditContext,
+    api_client::WpApiClient,
+    posts::{AnyPostWithEditContext, PostId, SparseAnyPostFieldWithEditContext},
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
@@ -98,6 +100,63 @@ impl PostService {
 
         Ok(FetchResult {
             entity_ids,
+            total_items: response.header_map.wp_total().map(|n| n as i64),
+            total_pages: response.header_map.wp_total_pages(),
+            current_page: page,
+        })
+    }
+
+    /// Fetch only metadata (id + modified_gmt) for a page of posts.
+    ///
+    /// This is a lightweight fetch that returns just enough information to:
+    /// 1. Define list structure (order and IDs)
+    /// 2. Determine which posts need full fetching (missing or stale)
+    ///
+    /// Unlike `fetch_posts_page`, this does NOT upsert to the database.
+    /// The metadata is used transiently to drive selective sync.
+    ///
+    /// # Arguments
+    /// * `filter` - Post filter criteria
+    /// * `page` - Page number to fetch (1-indexed)
+    /// * `per_page` - Number of posts per page
+    ///
+    /// # Returns
+    /// - `Ok(MetadataFetchResult)` with post IDs and modification times
+    /// - `Err(FetchError)` if network error occurs
+    pub async fn fetch_posts_metadata(
+        &self,
+        filter: &AnyPostFilter,
+        page: u32,
+        per_page: u32,
+    ) -> Result<MetadataFetchResult<PostId>, FetchError> {
+        let mut params = filter.to_list_params();
+        params.page = Some(page);
+        params.per_page = Some(per_page);
+
+        let response = self
+            .api_client
+            .posts()
+            .filter_list_with_edit_context(
+                &PostEndpointType::Posts,
+                &params,
+                &[
+                    SparseAnyPostFieldWithEditContext::Id,
+                    SparseAnyPostFieldWithEditContext::ModifiedGmt,
+                ],
+            )
+            .await?;
+
+        // Map sparse posts to EntityMetadata, filtering out any with missing fields
+        let metadata: Vec<EntityMetadata<PostId>> = response
+            .data
+            .into_iter()
+            .filter_map(|sparse| {
+                Some(EntityMetadata::new(sparse.id?, sparse.modified_gmt?))
+            })
+            .collect();
+
+        Ok(MetadataFetchResult {
+            metadata,
             total_items: response.header_map.wp_total().map(|n| n as i64),
             total_pages: response.header_map.wp_total_pages(),
             current_page: page,

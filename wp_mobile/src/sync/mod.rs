@@ -10,9 +10,11 @@
 mod entity_metadata;
 mod kv_store;
 mod list_item;
+mod metadata_fetch_result;
 mod syncable_entity;
 
 pub use entity_metadata::EntityMetadata;
 pub use kv_store::{InMemoryKvStore, KvStore};
 pub use list_item::{HasId, ListItem};
+pub use metadata_fetch_result::MetadataFetchResult;
 pub use syncable_entity::SyncableEntity;
