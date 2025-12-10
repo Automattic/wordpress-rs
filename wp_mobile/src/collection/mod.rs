@@ -2,11 +2,13 @@ mod collection_error;
 mod fetch_error;
 mod fetch_result;
 pub(crate) mod post_collection;
+pub(crate) mod post_metadata_collection;
 mod stateless_collection;
 
 pub use collection_error::CollectionError;
 pub use fetch_error::FetchError;
 pub use fetch_result::FetchResult;
+pub use post_metadata_collection::{PostMetadataCollectionItem, PostMetadataCollectionWithEditContext};
 pub use stateless_collection::StatelessCollection;
 
 /// Macro to create UniFFI-compatible post collection wrappers

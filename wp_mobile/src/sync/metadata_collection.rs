@@ -1,10 +1,18 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use wp_mobile_cache::UpdateHook;
 
 use crate::collection::FetchError;
 
 use super::{CollectionItem, EntityStateReader, ListMetadataReader, MetadataFetcher, SyncResult};
+
+/// Mutable pagination state, wrapped in RwLock for interior mutability.
+#[derive(Debug)]
+struct PaginationState {
+    current_page: u32,
+    total_pages: Option<u32>,
+    per_page: u32,
+}
 
 /// Collection that uses metadata-first fetching strategy.
 ///
@@ -67,14 +75,8 @@ where
     /// Tables to monitor for relevant updates
     relevant_tables: Vec<wp_mobile_cache::DbTable>,
 
-    /// Current page number (0 = not loaded yet)
-    current_page: u32,
-
-    /// Total pages from last metadata fetch
-    total_pages: Option<u32>,
-
-    /// Items per page
-    per_page: u32,
+    /// Pagination state (uses interior mutability for UniFFI compatibility)
+    pagination: RwLock<PaginationState>,
 }
 
 impl<F> MetadataCollection<F>
@@ -102,17 +104,19 @@ where
             state_reader,
             fetcher,
             relevant_tables,
-            current_page: 0,
-            total_pages: None,
-            per_page: 20,
+            pagination: RwLock::new(PaginationState {
+                current_page: 0,
+                total_pages: None,
+                per_page: 20,
+            }),
         }
     }
 
     /// Set the number of items per page.
     ///
     /// Default is 20. Call this before `refresh()` if you need a different page size.
-    pub fn with_per_page(mut self, per_page: u32) -> Self {
-        self.per_page = per_page;
+    pub fn with_per_page(self, per_page: u32) -> Self {
+        self.pagination.write().unwrap().per_page = per_page;
         self
     }
 
@@ -147,10 +151,15 @@ where
     /// 3. Fetches missing/stale entities
     ///
     /// Returns sync statistics including counts and pagination info.
-    pub async fn refresh(&mut self) -> Result<SyncResult, FetchError> {
-        let result = self.fetcher.fetch_metadata(1, self.per_page, true).await?;
-        self.current_page = 1;
-        self.total_pages = result.total_pages;
+    pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
+        let per_page = self.pagination.read().unwrap().per_page;
+        let result = self.fetcher.fetch_metadata(1, per_page, true).await?;
+
+        {
+            let mut pagination = self.pagination.write().unwrap();
+            pagination.current_page = 1;
+            pagination.total_pages = result.total_pages;
+        }
 
         self.sync_missing_and_stale().await
     }
@@ -163,39 +172,52 @@ where
     /// 3. Fetches missing/stale entities from the new page
     ///
     /// Returns `SyncResult::no_op()` if already on the last page.
-    pub async fn load_next_page(&mut self) -> Result<SyncResult, FetchError> {
-        let next_page = self.current_page + 1;
+    pub async fn load_next_page(&self) -> Result<SyncResult, FetchError> {
+        let (next_page, per_page, total_pages) = {
+            let pagination = self.pagination.read().unwrap();
+            (
+                pagination.current_page + 1,
+                pagination.per_page,
+                pagination.total_pages,
+            )
+        };
 
         // Check if we're already at the last page
-        if self.total_pages.is_some_and(|total| next_page > total) {
+        if total_pages.is_some_and(|total| next_page > total) {
             return Ok(SyncResult::no_op(self.items().len(), false));
         }
 
         let result = self
             .fetcher
-            .fetch_metadata(next_page, self.per_page, false)
+            .fetch_metadata(next_page, per_page, false)
             .await?;
-        self.current_page = next_page;
-        self.total_pages = result.total_pages;
+
+        {
+            let mut pagination = self.pagination.write().unwrap();
+            pagination.current_page = next_page;
+            pagination.total_pages = result.total_pages;
+        }
 
         self.sync_missing_and_stale().await
     }
 
     /// Check if there are more pages to load.
     pub fn has_more_pages(&self) -> bool {
-        self.total_pages
-            .map(|total| self.current_page < total)
+        let pagination = self.pagination.read().unwrap();
+        pagination
+            .total_pages
+            .map(|total| pagination.current_page < total)
             .unwrap_or(true) // Unknown total = assume more pages
     }
 
     /// Get the current page number (0 = not loaded yet).
     pub fn current_page(&self) -> u32 {
-        self.current_page
+        self.pagination.read().unwrap().current_page
     }
 
     /// Get the total number of pages, if known.
     pub fn total_pages(&self) -> Option<u32> {
-        self.total_pages
+        self.pagination.read().unwrap().total_pages
     }
 
     /// Fetch missing and stale items.
@@ -335,7 +357,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_refresh_fetches_metadata_and_syncs() {
-        let (mut collection, _, _) = create_test_collection();
+        let (collection, _, _) = create_test_collection();
 
         let result = collection.refresh().await.unwrap();
 
@@ -348,7 +370,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_items_returns_correct_states() {
-        let (mut collection, _, _state_store) = create_test_collection();
+        let (collection, _, _state_store) = create_test_collection();
 
         // Before refresh - empty
         assert!(collection.items().is_empty());
@@ -363,7 +385,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_next_page_appends() {
-        let (mut collection, _, _) = create_test_collection();
+        let (collection, _, _) = create_test_collection();
 
         // First page
         collection.refresh().await.unwrap();
@@ -378,7 +400,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_next_page_at_end_returns_no_op() {
-        let (mut collection, _, _) = create_test_collection();
+        let (collection, _, _) = create_test_collection();
 
         // Load both pages
         collection.refresh().await.unwrap();
@@ -392,7 +414,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_has_more_pages() {
-        let (mut collection, _, _) = create_test_collection();
+        let (collection, _, _) = create_test_collection();
 
         // Before load - unknown, assume true
         assert!(collection.has_more_pages());
@@ -408,7 +430,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_items_needing_fetch_triggers_ensure_fetched() {
-        let (mut collection, _metadata_store, state_store) = create_test_collection();
+        let (collection, _metadata_store, state_store) = create_test_collection();
 
         // Pre-populate with some cached items
         state_store.set(11, EntityState::Cached);

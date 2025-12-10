@@ -636,6 +636,72 @@ Because `EntityStateStore` lives in the service (not the collection):
 
 ---
 
+## TODO: Refined State Representation
+
+The current `EntityState` enum treats states as mutually exclusive, but in reality states can overlap:
+
+- **Cached + Fetching** - Re-fetching a cached item (pull-to-refresh)
+- **Stale + Fetching** - Fetching an item we know is outdated
+- **Stale + Failed** - Tried to refresh stale item but failed
+
+### Approach 1: Two-Dimensional State
+
+Separate data availability from fetch status:
+
+```rust
+enum DataState {
+    Missing,           // No data, never fetched
+    Cached(Data),      // Fresh data available
+    Stale(Data),       // Outdated data (modified_gmt mismatch)
+}
+
+enum FetchStatus {
+    Idle,
+    Fetching,
+    Failed { error: String },
+}
+
+struct CollectionItem {
+    id: i64,
+    data_state: DataState,
+    fetch_status: FetchStatus,
+}
+```
+
+**Pros**: Composable, handles all combinations naturally
+**Cons**: Allows some invalid combinations (e.g., `Missing + Failed` without ever fetching)
+
+### Approach 2: Flattened Explicit States
+
+Enumerate all valid state combinations explicitly:
+
+```rust
+enum ItemState {
+    // No data
+    Missing,
+    MissingFetching,
+    MissingFailed { error: String },
+
+    // Has fresh data
+    Cached { data: Data },
+    CachedFetching { data: Data },  // Refreshing
+
+    // Has stale data
+    Stale { data: Data },
+    StaleFetching { data: Data },
+    StaleFailed { data: Data, error: String },
+}
+```
+
+**Pros**: Invalid states are unrepresentable, exhaustive matching
+**Cons**: Verbose, harder to extend
+
+### Current Status
+
+The current implementation uses a simple `EntityState` enum without data. For the prototype, the Kotlin wrapper will assemble the full state by combining `EntityState` with loaded data. This should be revisited and moved to Rust for a cleaner FFI boundary.
+
+---
+
 ## Summary
 
 | Component | Generic? | Owns | Reads |

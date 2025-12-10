@@ -1,14 +1,14 @@
 /// Result of a sync operation (refresh or load_next_page).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SyncResult {
     /// Number of items in the list after sync.
-    pub total_items: usize,
+    pub total_items: u64,
 
     /// Number of items that were fetched (missing + stale).
-    pub fetched_count: usize,
+    pub fetched_count: u64,
 
     /// Number of items that failed to fetch.
-    pub failed_count: usize,
+    pub failed_count: u64,
 
     /// Whether there are more pages available.
     pub has_more_pages: bool,
@@ -22,9 +22,9 @@ impl SyncResult {
         has_more_pages: bool,
     ) -> Self {
         Self {
-            total_items,
-            fetched_count,
-            failed_count,
+            total_items: total_items as u64,
+            fetched_count: fetched_count as u64,
+            failed_count: failed_count as u64,
             has_more_pages,
         }
     }
@@ -32,7 +32,7 @@ impl SyncResult {
     /// Create a result indicating no sync was needed.
     pub fn no_op(total_items: usize, has_more_pages: bool) -> Self {
         Self {
-            total_items,
+            total_items: total_items as u64,
             fetched_count: 0,
             failed_count: 0,
             has_more_pages,

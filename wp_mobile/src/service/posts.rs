@@ -1,11 +1,14 @@
 use crate::{
     AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext,
     PostCollectionWithEditContext,
-    collection::{FetchError, FetchResult, StatelessCollection, post_collection::PostCollection},
+    collection::{
+        FetchError, FetchResult, PostMetadataCollectionWithEditContext, StatelessCollection,
+        post_collection::PostCollection,
+    },
     filters::AnyPostFilter,
     sync::{
         EntityMetadata, EntityState, EntityStateReader, EntityStateStore, ListMetadataReader,
-        ListMetadataStore, MetadataFetchResult,
+        ListMetadataStore, MetadataCollection, MetadataFetchResult, PostMetadataFetcherWithEditContext,
     },
 };
 use std::sync::Arc;
@@ -349,6 +352,42 @@ impl PostService {
     pub fn get_entity_state_with_edit_context(&self, post_id: PostId) -> EntityState {
         self.state_store_with_edit_context.get(post_id.0)
     }
+
+    /// Read posts by IDs from the database cache.
+    ///
+    /// Returns full entity data for all requested IDs that exist in the cache.
+    /// Posts not in the cache are silently omitted from the result.
+    ///
+    /// # Arguments
+    /// * `ids` - Post IDs to load
+    ///
+    /// # Returns
+    /// - `Ok(Vec<FullEntity>)` with posts found in cache
+    /// - `Err` if database error occurs
+    pub fn read_posts_by_ids_from_db(
+        &self,
+        ids: &[i64],
+    ) -> Result<Vec<FullEntity<AnyPostWithEditContext>>, wp_mobile_cache::SqliteDbError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let repo = PostRepository::<EditContext>::new();
+
+        self.cache.execute(|connection| {
+            ids.iter()
+                .map(|&id| PostId(id))
+                .map(|post_id| repo.select_by_post_id(connection, &self.db_site, post_id))
+                .collect::<Result<Vec<_>, _>>()
+                .map(|options| {
+                    options
+                        .into_iter()
+                        .flatten()
+                        .map(|db_post| FullEntity::new(db_post.entity_id, db_post.data.post))
+                        .collect()
+                })
+        })
+    }
 }
 
 #[uniffi::export]
@@ -492,6 +531,62 @@ impl PostService {
         );
 
         PostCollection::new(filter, stateless_collection, self.clone()).into()
+    }
+
+    /// Create a metadata-first post collection with edit context
+    ///
+    /// Returns a collection that uses a two-phase sync strategy:
+    /// 1. Fetch lightweight metadata (id + modified_gmt) to define list structure
+    /// 2. Selectively fetch full data for missing or stale items
+    ///
+    /// Unlike `create_post_collection_with_edit_context` which fetches full data,
+    /// this collection shows cached items immediately and fetches only what's needed.
+    ///
+    /// # Arguments
+    /// * `filter` - Filter criteria for posts (status, etc.)
+    ///
+    /// # Example (Kotlin)
+    /// ```kotlin
+    /// val filter = AnyPostFilter(status = PostStatus.DRAFT)
+    /// val collection = postService.createPostMetadataCollectionWithEditContext(filter)
+    ///
+    /// // Initial load - fetches metadata, then syncs missing items
+    /// collection.refresh()
+    ///
+    /// // Get items with states and data
+    /// val items = collection.loadItems()
+    /// ```
+    pub fn create_post_metadata_collection_with_edit_context(
+        self: &Arc<Self>,
+        filter: AnyPostFilter,
+    ) -> PostMetadataCollectionWithEditContext {
+        // TODO: Implement proper cache key generation based on filter
+        // For now, use a simple key based on status
+        let kv_key = format!(
+            "site_{:?}:edit:posts:{}",
+            self.db_site.row_id,
+            filter
+                .status
+                .as_ref()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "all".to_string())
+        );
+
+        let fetcher = PostMetadataFetcherWithEditContext::new(
+            self.clone(),
+            filter.clone(),
+            kv_key.clone(),
+        );
+
+        let metadata_collection = MetadataCollection::new(
+            kv_key,
+            self.metadata_reader(),
+            self.state_reader_with_edit_context(),
+            fetcher,
+            vec![DbTable::PostsEditContext, DbTable::TermRelationships],
+        );
+
+        PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), filter)
     }
 
     /// Get a collection of all posts with edit context for this site.

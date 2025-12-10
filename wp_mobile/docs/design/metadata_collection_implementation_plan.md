@@ -46,6 +46,27 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 **Note:** No cleanup needed - the sync module was built fresh with v3 design.
 
+### Phase 6: UniFFI Export ✅
+- [x] **6.1** Add `PostMetadataCollectionWithEditContext` concrete type
+- [x] **6.2** Add `PostMetadataCollectionItem` record type (id + state + optional data)
+- [x] **6.3** Add UniFFI derives to `EntityState` (Enum) and `SyncResult` (Record)
+- [x] **6.4** Add interior mutability to `MetadataCollection` (`RwLock<PaginationState>`)
+- [x] **6.5** Add `create_post_metadata_collection_with_edit_context` to PostService
+- [x] **6.6** Add `read_posts_by_ids_from_db` helper method
+
+**Commit:** `f735de18` - "Add PostMetadataCollectionWithEditContext for UniFFI export"
+
+### Phase 7: Kotlin Wrapper (TODO)
+- [ ] **7.1** Create `ObservableMetadataCollection` wrapper class
+- [ ] **7.2** Register with `DatabaseChangeNotifier` for DB updates
+- [ ] **7.3** Add extension function on `PostService` to create observable wrapper
+- [ ] **7.4** Add TODO comment for state representation refinement
+
+### Phase 8: Example App Screen (TODO)
+- [ ] **8.1** Create `MetadataCollectionViewModel`
+- [ ] **8.2** Create `MetadataCollectionScreen` composable
+- [ ] **8.3** Wire up in navigation/DI
+
 ---
 
 ## Key Design Decisions (Quick Reference)
@@ -60,16 +81,17 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 ## Current Progress
 
-**Status:** All Phases Complete ✅
+**Status:** Rust implementation complete, Kotlin wrapper next
 
-**Last completed:** Phase 5 - Cleanup (N/A - no old code to remove)
+**Last completed:** Phase 6 - UniFFI Export
 
-**Next steps:** Ready for platform integration and testing
+**Next steps:** Phase 7 - Kotlin Wrapper (`ObservableMetadataCollection`)
 
 ---
 
 ## Notes
 
-- Old prototype code exists in `wp_mobile/src/sync/` - will be superseded
-- May need to add `DashMap` dependency for `EntityStateStore`
 - `last_fetched_at` fallback for staleness check (for entities without `modified_gmt`) - implementation deferred
+- State representation is simplified for prototype - see design doc "TODO: Refined State Representation" section
+- DB observer fires before state store update (potential race) - acceptable for prototype
+- `metadata_store` is shared across contexts (key includes context string), `state_store` is per-context

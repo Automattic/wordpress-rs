@@ -6,7 +6,7 @@
 /// - `Cached`: Successfully fetched and in cache
 /// - `Stale`: In cache but outdated (e.g., `modified_gmt` mismatch)
 /// - `Failed`: Fetch was attempted but failed
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum EntityState {
     /// Entity is not in cache and not being fetched.
     Missing,
