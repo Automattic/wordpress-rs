@@ -14,7 +14,10 @@ use crate::{
 use std::sync::Arc;
 use wp_api::{
     api_client::WpApiClient,
-    posts::{AnyPostWithEditContext, PostId, PostListParams, SparseAnyPostFieldWithEditContext},
+    posts::{
+        AnyPostWithEditContext, PostId, PostListParams, PostStatus,
+        SparseAnyPostFieldWithEditContext,
+    },
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
@@ -276,6 +279,15 @@ impl PostService {
             include: post_ids,
             // Ensure we get all requested posts regardless of default per_page
             per_page: Some(100),
+            // Include all statuses - WordPress defaults to 'publish' which would
+            // filter out drafts, pending, etc. when fetching by ID
+            status: vec![
+                PostStatus::Publish,
+                PostStatus::Draft,
+                PostStatus::Pending,
+                PostStatus::Private,
+                PostStatus::Future,
+            ],
             ..Default::default()
         };
 
