@@ -199,6 +199,11 @@ impl PostService {
     /// - If `is_first_page` is true, replaces existing metadata for `kv_key`
     /// - If `is_first_page` is false, appends to existing metadata
     ///
+    /// Additionally performs staleness detection:
+    /// - For posts currently marked as `Cached`, compares the fetched `modified_gmt`
+    ///   against the cached value in the database
+    /// - Posts with different `modified_gmt` are marked as `Stale`
+    ///
     /// Used by `MetadataFetcher` implementations to both fetch and store
     /// in one operation.
     ///
@@ -229,7 +234,62 @@ impl PostService {
             self.metadata_store.append(kv_key, result.metadata.clone());
         }
 
+        // Detect stale posts by comparing modified_gmt
+        self.detect_and_mark_stale_posts(&result.metadata);
+
         Ok(result)
+    }
+
+    /// Compare fetched metadata against cached posts and mark stale ones.
+    ///
+    /// For each post that is currently `Cached`, compares the fetched `modified_gmt`
+    /// against the database value. If they differ, the post is marked as `Stale`.
+    fn detect_and_mark_stale_posts(&self, metadata: &[EntityMetadata]) {
+        // Get IDs of posts that are currently Cached (candidates for staleness check)
+        let cached_ids: Vec<i64> = metadata
+            .iter()
+            .filter(|m| {
+                matches!(
+                    self.state_store_with_edit_context.get(m.id),
+                    EntityState::Cached
+                )
+            })
+            .map(|m| m.id)
+            .collect();
+
+        if cached_ids.is_empty() {
+            return;
+        }
+
+        // Query database for cached modified_gmt values
+        let cached_timestamps = self
+            .cache
+            .execute(|conn| {
+                let repo = PostRepository::<EditContext>::new();
+                repo.select_modified_gmt_by_ids(conn, &self.db_site, &cached_ids)
+            })
+            .unwrap_or_default();
+
+        // Compare and mark stale
+        let mut stale_count = 0;
+        for m in metadata.iter().filter(|m| cached_ids.contains(&m.id)) {
+            if let Some(fetched_modified) = &m.modified_gmt {
+                if let Some(cached_modified) = cached_timestamps.get(&m.id) {
+                    if fetched_modified != cached_modified {
+                        self.state_store_with_edit_context
+                            .set(m.id, EntityState::Stale);
+                        stale_count += 1;
+                    }
+                }
+            }
+        }
+
+        if stale_count > 0 {
+            println!(
+                "[PostService] Detected {} stale post(s) via modified_gmt comparison",
+                stale_count
+            );
+        }
     }
 
     /// Fetch full post data for specific post IDs and save to cache.
