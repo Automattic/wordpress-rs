@@ -67,10 +67,17 @@ This document tracks the implementation progress for the MetadataCollection desi
 - `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/DatabaseChangeNotifier.kt` (updated)
 - `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/PostServiceExtensions.kt` (updated)
 
-### Phase 8: Example App Screen (TODO)
-- [ ] **8.1** Create `MetadataCollectionViewModel`
-- [ ] **8.2** Create `MetadataCollectionScreen` composable
-- [ ] **8.3** Wire up in navigation/DI
+### Phase 8: Example App Screen ✅
+- [x] **8.1** Create `PostMetadataCollectionViewModel`
+- [x] **8.2** Create `PostMetadataCollectionScreen` composable
+- [x] **8.3** Wire up in navigation/DI
+
+**Files:**
+- `native/kotlin/example/composeApp/src/commonMain/kotlin/rs/wordpress/example/shared/ui/postmetadatacollection/PostMetadataCollectionViewModel.kt`
+- `native/kotlin/example/composeApp/src/commonMain/kotlin/rs/wordpress/example/shared/ui/postmetadatacollection/PostMetadataCollectionScreen.kt`
+- `native/kotlin/example/composeApp/src/commonMain/kotlin/rs/wordpress/example/shared/di/AppModule.kt` (updated)
+- `native/kotlin/example/composeApp/src/commonMain/kotlin/rs/wordpress/example/shared/App.kt` (updated)
+- `native/kotlin/example/composeApp/src/commonMain/kotlin/rs/wordpress/example/shared/ui/site/SiteScreen.kt` (updated)
 
 ---
 
@@ -86,11 +93,11 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 ## Current Progress
 
-**Status:** Kotlin wrapper complete, example app screen next
+**Status:** Implementation complete! All phases finished.
 
-**Last completed:** Phase 7 - Kotlin Wrapper
+**Last completed:** Phase 8 - Example App Screen
 
-**Next steps:** Phase 8 - Example App Screen (`MetadataCollectionViewModel`, `MetadataCollectionScreen`)
+**Next steps:** Testing and iteration based on feedback
 
 ---
 
