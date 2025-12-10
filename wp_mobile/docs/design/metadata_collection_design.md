@@ -530,3 +530,82 @@ This approach optimizes for the common case where most posts are cached and up-t
 2. Add method to get `modified_gmt` from cached posts in repository layer
 3. Integrate with platform-specific observable wrappers (iOS/Android)
 4. Consider disk-backed `KvStore` implementation
+
+---
+
+## Revised Design (v2) - Fully Generic Collection
+
+This revision moves toward a fully generic collection that doesn't need type-specific wrappers (except for uniffi).
+
+### Key Insights
+
+The collection follows the same pattern as `StatelessCollection`:
+- Rust side is a **handle** with `is_relevant_update()` and data accessors
+- Platform layer (Kotlin/Swift) wraps it as observable
+- `loadData()` is called by observers, not returned by collection methods
+
+Each **list item** becomes individually observable (like `ObservableEntity`):
+- Item holds `EntityMetadata<Id>` (id + modified_gmt)
+- Platform layer wraps each item as observable
+- `loadData()` on the item loads that specific entity from cache
+
+### Proposed Types
+
+#### MetadataCollection (Rust handle)
+
+```rust
+pub struct MetadataCollection<Id, F>
+where
+    Id: Clone + Eq + Hash + Send + Sync,
+    F: MetadataFetcher<Id>,
+{
+    kv_key: String,
+    kv_store: Arc<dyn KvStore<Id>>,
+    metadata: Option<Vec<EntityMetadata<Id>>>,
+    fetcher: F,
+    relevant_tables: Vec<DbTable>,
+}
+
+impl<Id, F> MetadataCollection<Id, F> {
+    /// Get current metadata items (for platform to wrap as observable)
+    pub fn items(&self) -> Option<&[EntityMetadata<Id>]> {
+        self.metadata.as_deref()
+    }
+
+    /// Check if update is relevant to this collection
+    pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
+        self.relevant_tables.contains(&hook.table)
+    }
+
+    /// Refresh metadata from network
+    pub async fn refresh(&mut self) -> Result<(), FetchError>;
+
+    /// Load next page
+    pub async fn load_next_page(&mut self) -> Result<(), FetchError>;
+}
+```
+
+#### MetadataFetcher Trait (no T parameter)
+
+```rust
+pub trait MetadataFetcher<Id> {
+    async fn fetch_metadata(&self, page: u32, per_page: u32)
+        -> Result<MetadataFetchResult<Id>, FetchError>;
+
+    // Fetches by IDs and puts in cache - no return needed
+    async fn fetch_by_ids(&self, ids: Vec<Id>)
+        -> Result<(), FetchError>;
+}
+```
+
+### Open Questions
+
+1. **KV Store Update Responsibility**: The `MetadataFetcher` implementation (e.g., for posts) needs to update the KV store. Service layer orchestrates whether to replace (first page) or append (subsequent pages).
+
+2. **Who calls `fetch_by_ids`?**: Service layer is natural fit, but issues:
+   - What happens when the request fails?
+   - What if missing >100 posts (API limit)?
+
+3. **Error Handling for Batch Fetches**: TBD
+
+4. **Batching Strategy for Large Missing Sets**: TBD
