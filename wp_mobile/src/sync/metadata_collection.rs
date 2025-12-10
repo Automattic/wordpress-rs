@@ -152,8 +152,20 @@ where
     ///
     /// Returns sync statistics including counts and pagination info.
     pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
+        println!("[MetadataCollection] Refreshing collection...");
+
         let per_page = self.pagination.read().unwrap().per_page;
         let result = self.fetcher.fetch_metadata(1, per_page, true).await?;
+
+        let total_pages_str = result
+            .total_pages
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "?".to_string());
+        println!(
+            "[MetadataCollection] Fetched metadata: page 1 of {}, {} items",
+            total_pages_str,
+            result.metadata.len()
+        );
 
         {
             let mut pagination = self.pagination.write().unwrap();
@@ -184,13 +196,25 @@ where
 
         // Check if we're already at the last page
         if total_pages.is_some_and(|total| next_page > total) {
+            println!("[MetadataCollection] Already at last page, nothing to load");
             return Ok(SyncResult::no_op(self.items().len(), false));
         }
+
+        println!("[MetadataCollection] Loading page {}...", next_page);
 
         let result = self
             .fetcher
             .fetch_metadata(next_page, per_page, false)
             .await?;
+
+        let total_pages_str = result
+            .total_pages
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "?".to_string());
+        println!(
+            "[MetadataCollection] Fetched metadata: page {} of {}, {} items",
+            next_page, total_pages_str, result.metadata.len()
+        );
 
         {
             let mut pagination = self.pagination.write().unwrap();
@@ -222,8 +246,24 @@ where
 
     /// Fetch missing and stale items.
     async fn sync_missing_and_stale(&self) -> Result<SyncResult, FetchError> {
+        use super::EntityState;
+
         let items = self.items();
         let total_items = items.len();
+
+        // Count by state for logging
+        let missing_count = items
+            .iter()
+            .filter(|item| matches!(item.state, EntityState::Missing))
+            .count();
+        let stale_count = items
+            .iter()
+            .filter(|item| matches!(item.state, EntityState::Stale))
+            .count();
+        let cached_count = items
+            .iter()
+            .filter(|item| matches!(item.state, EntityState::Cached))
+            .count();
 
         // Collect IDs that need fetching
         let ids_to_fetch: Vec<i64> = items
@@ -234,11 +274,23 @@ where
 
         let fetch_count = ids_to_fetch.len();
 
+        println!(
+            "[MetadataCollection] Sync: {} items total ({} cached, {} missing, {} stale)",
+            total_items, cached_count, missing_count, stale_count
+        );
+
         if !ids_to_fetch.is_empty() {
+            println!(
+                "[MetadataCollection] Fetching {} posts by ID...",
+                fetch_count
+            );
+
             // Batch into chunks of 100 (WordPress API limit)
             for chunk in ids_to_fetch.chunks(100) {
                 self.fetcher.ensure_fetched(chunk.to_vec()).await?;
             }
+        } else {
+            println!("[MetadataCollection] All items already cached, nothing to fetch");
         }
 
         // Count failures after fetch attempts
@@ -247,6 +299,14 @@ where
             .iter()
             .filter(|item| item.state.is_failed())
             .count();
+
+        if fetch_count > 0 {
+            let success_count = fetch_count - failed_count;
+            println!(
+                "[MetadataCollection] Fetched {} posts ({} succeeded, {} failed)",
+                fetch_count, success_count, failed_count
+            );
+        }
 
         Ok(SyncResult::new(
             total_items,
