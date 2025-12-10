@@ -10,19 +10,19 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 ## Order of Operations
 
-### Phase 1: Core Types (no dependencies)
-- [ ] **1.1** `EntityMetadata` - Struct with `i64` id + `Option<WpGmtDateTime>` (optional for entities without modified field)
-- [ ] **1.2** `EntityState` - Enum (Missing, Fetching, Cached, Stale, Failed)
-- [ ] **1.3** `CollectionItem` - Combines `EntityMetadata` + `EntityState`
-- [ ] **1.4** `SyncResult` & `MetadataFetchResult` - Result structs
+### Phase 1: Core Types (no dependencies) ✅
+- [x] **1.1** `EntityMetadata` - Struct with `i64` id + `Option<WpGmtDateTime>` (optional for entities without modified field)
+- [x] **1.2** `EntityState` - Enum (Missing, Fetching, Cached, Stale, Failed)
+- [x] **1.3** `CollectionItem` - Combines `EntityMetadata` + `EntityState`
+- [x] **1.4** `SyncResult` & `MetadataFetchResult` - Result structs
 
-**Commit message:** "Add core types for MetadataCollection"
+**Commit:** `81a45b67` - "Add core types for MetadataCollection (v3 design)"
 
-### Phase 2: Store Types
-- [ ] **2.1** `EntityStateStore` + `EntityStateReader` trait
-- [ ] **2.2** `ListMetadataStore` + `ListMetadataReader` trait
+### Phase 2: Store Types ✅
+- [x] **2.1** `EntityStateStore` + `EntityStateReader` trait
+- [x] **2.2** `ListMetadataStore` + `ListMetadataReader` trait
 
-**Commit message:** "Add EntityStateStore and ListMetadataStore"
+**Commit:** `19f27529` - "Add EntityStateStore and ListMetadataStore"
 
 ### Phase 3: Collection Infrastructure
 - [ ] **3.1** `MetadataFetcher` trait (async)
@@ -59,11 +59,11 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 ## Current Progress
 
-**Status:** Starting Phase 1
+**Status:** Starting Phase 3
 
-**Last completed:** Design document finalized and committed
+**Last completed:** Phase 2 - Store types (commit 19f27529)
 
-**Next task:** Implement `EntityMetadata` struct
+**Next task:** Implement `MetadataFetcher` trait
 
 ---
 
