@@ -128,7 +128,7 @@ impl PostService {
         filter: &AnyPostFilter,
         page: u32,
         per_page: u32,
-    ) -> Result<MetadataFetchResult<PostId>, FetchError> {
+    ) -> Result<MetadataFetchResult, FetchError> {
         let mut params = filter.to_list_params();
         params.page = Some(page);
         params.per_page = Some(per_page);
@@ -146,19 +146,19 @@ impl PostService {
             )
             .await?;
 
-        // Map sparse posts to EntityMetadata, filtering out any with missing fields
-        let metadata: Vec<EntityMetadata<PostId>> = response
+        // Map sparse posts to EntityMetadata, filtering out any with missing id
+        let metadata: Vec<EntityMetadata> = response
             .data
             .into_iter()
-            .filter_map(|sparse| Some(EntityMetadata::new(sparse.id?, sparse.modified_gmt?)))
+            .filter_map(|sparse| Some(EntityMetadata::new(sparse.id?.0, sparse.modified_gmt)))
             .collect();
 
-        Ok(MetadataFetchResult {
+        Ok(MetadataFetchResult::new(
             metadata,
-            total_items: response.header_map.wp_total().map(|n| n as i64),
-            total_pages: response.header_map.wp_total_pages(),
-            current_page: page,
-        })
+            response.header_map.wp_total().map(|n| n as i64),
+            response.header_map.wp_total_pages(),
+            page,
+        ))
     }
 
     /// Fetch full post data for specific post IDs and save to cache.

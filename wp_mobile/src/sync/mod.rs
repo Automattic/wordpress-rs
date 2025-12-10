@@ -1,22 +1,28 @@
 //! Metadata-based sync infrastructure for efficient list fetching.
 //!
-//! This module provides types and traits for a "smart sync" strategy:
+//! This module provides types for a "smart sync" strategy:
 //! 1. Fetch lightweight metadata (id + modified_gmt) to define list structure
 //! 2. Show cached entities immediately, with loading placeholders for missing items
 //! 3. Selectively fetch only entities that are missing or stale
 //!
-//! See `wp_mobile/docs/design/metadata_collection_design.md` for full design details.
+//! ## Key Types
+//!
+//! - [`EntityMetadata`] - Lightweight metadata (id + optional modified_gmt)
+//! - [`EntityState`] - Fetch state (Missing, Fetching, Cached, Stale, Failed)
+//! - [`CollectionItem`] - Combines metadata with state
+//! - [`MetadataFetchResult`] - Result of metadata-only fetch
+//! - [`SyncResult`] - Result of sync operation
+//!
+//! See `wp_mobile/docs/design/metadata_collection_v3.md` for full design details.
 
+mod collection_item;
 mod entity_metadata;
-mod kv_store;
-mod list_item;
-mod metadata_collection;
+mod entity_state;
 mod metadata_fetch_result;
-mod syncable_entity;
+mod sync_result;
 
+pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
-pub use kv_store::{InMemoryKvStore, KvStore};
-pub use list_item::{HasId, ListItem};
-pub use metadata_collection::{LoadError, MetadataCollection};
+pub use entity_state::EntityState;
 pub use metadata_fetch_result::MetadataFetchResult;
-pub use syncable_entity::SyncableEntity;
+pub use sync_result::SyncResult;
