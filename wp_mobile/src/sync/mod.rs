@@ -25,6 +25,10 @@
 //! - [`MetadataFetcher`] - Trait for fetching metadata and entities
 //! - [`MetadataCollection`] - Collection using metadata-first strategy
 //!
+//! ## Fetcher Implementations
+//!
+//! - [`PostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context
+//!
 //! See `wp_mobile/docs/design/metadata_collection_v3.md` for full design details.
 
 mod collection_item;
@@ -35,6 +39,7 @@ mod list_metadata_store;
 mod metadata_collection;
 mod metadata_fetch_result;
 mod metadata_fetcher;
+mod post_metadata_fetcher;
 mod sync_result;
 
 pub use collection_item::CollectionItem;
@@ -45,4 +50,5 @@ pub use list_metadata_store::{ListMetadataReader, ListMetadataStore};
 pub use metadata_collection::MetadataCollection;
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use metadata_fetcher::MetadataFetcher;
+pub use post_metadata_fetcher::PostMetadataFetcherWithEditContext;
 pub use sync_result::SyncResult;

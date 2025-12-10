@@ -3,7 +3,10 @@ use crate::{
     PostCollectionWithEditContext,
     collection::{FetchError, FetchResult, StatelessCollection, post_collection::PostCollection},
     filters::AnyPostFilter,
-    sync::{EntityMetadata, MetadataFetchResult},
+    sync::{
+        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, ListMetadataReader,
+        ListMetadataStore, MetadataFetchResult,
+    },
 };
 use std::sync::Arc;
 use wp_api::{
@@ -23,11 +26,32 @@ use wp_mobile_cache::{
 ///
 /// Provides a bridge between clients and the underlying network/cache layers.
 /// Handles fetching, creating, updating, and deleting posts.
+///
+/// # Metadata Sync Infrastructure
+///
+/// The service owns shared stores for metadata-first sync:
+/// - `state_store_with_edit_context`: Tracks fetch state per entity for edit context.
+///   Each context needs its own state store since the same entity ID can have different
+///   fetch states across contexts.
+/// - `metadata_store`: Tracks list structure per filter key. Shared across all contexts
+///   since keys should include the context (e.g., `"site_1:edit:posts:publish"`).
+///
+/// Collections get read-only access via reader methods. This ensures cross-collection
+/// consistency when multiple collections share the same underlying entities.
 #[derive(uniffi::Object)]
 pub struct PostService {
     db_site: Arc<DbSite>,
     api_client: Arc<WpApiClient>,
     cache: Arc<WpApiCache>,
+
+    /// Per-entity fetch state for edit context (memory-only, resets on app restart).
+    /// Each context needs its own state store since the same entity ID can have
+    /// different fetch states across contexts.
+    state_store_with_edit_context: Arc<EntityStateStore>,
+
+    /// List structure per filter key (memory-only). Shared across all contexts -
+    /// keys should include context in the key string (e.g., `"site_1:edit:posts:publish"`).
+    metadata_store: Arc<ListMetadataStore>,
 }
 
 impl PostService {
@@ -36,6 +60,8 @@ impl PostService {
             api_client,
             db_site,
             cache,
+            state_store_with_edit_context: Arc::new(EntityStateStore::new()),
+            metadata_store: Arc::new(ListMetadataStore::new()),
         }
     }
 
@@ -161,11 +187,58 @@ impl PostService {
         ))
     }
 
+    /// Fetch metadata and store in the metadata store.
+    ///
+    /// This combines `fetch_posts_metadata` with storing the results:
+    /// - If `is_first_page` is true, replaces existing metadata for `kv_key`
+    /// - If `is_first_page` is false, appends to existing metadata
+    ///
+    /// Used by `MetadataFetcher` implementations to both fetch and store
+    /// in one operation.
+    ///
+    /// # Arguments
+    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:publish")
+    /// * `filter` - Post filter criteria
+    /// * `page` - Page number to fetch (1-indexed)
+    /// * `per_page` - Number of posts per page
+    /// * `is_first_page` - If true, replaces metadata; if false, appends
+    ///
+    /// # Returns
+    /// - `Ok(MetadataFetchResult)` with post IDs and modification times
+    /// - `Err(FetchError)` if network error occurs
+    pub async fn fetch_and_store_metadata(
+        &self,
+        kv_key: &str,
+        filter: &AnyPostFilter,
+        page: u32,
+        per_page: u32,
+        is_first_page: bool,
+    ) -> Result<MetadataFetchResult, FetchError> {
+        let result = self.fetch_posts_metadata(filter, page, per_page).await?;
+
+        // Store metadata
+        if is_first_page {
+            self.metadata_store.set(kv_key, result.metadata.clone());
+        } else {
+            self.metadata_store.append(kv_key, result.metadata.clone());
+        }
+
+        Ok(result)
+    }
+
     /// Fetch full post data for specific post IDs and save to cache.
     ///
     /// This is used for selective sync - fetching only the posts that are
     /// missing or stale in the cache. Uses the `include` parameter to batch
     /// multiple posts in a single request.
+    ///
+    /// # State Tracking
+    ///
+    /// This method updates the entity state store:
+    /// 1. Filters out IDs that are already `Fetching` (prevents duplicate requests)
+    /// 2. Sets remaining IDs to `Fetching` before the API call
+    /// 3. On success: Sets fetched posts to `Cached`, missing posts to `Failed`
+    /// 4. On error: Sets all requested posts to `Failed`
     ///
     /// # Arguments
     /// * `ids` - Post IDs to fetch
@@ -175,42 +248,106 @@ impl PostService {
     /// - `Err(FetchError)` if network or database error occurs
     ///
     /// # Note
-    /// If `ids` is empty, returns an empty Vec without making a network request.
+    /// If `ids` is empty or all IDs are already fetching, returns an empty Vec
+    /// without making a network request.
     pub async fn fetch_posts_by_ids(&self, ids: Vec<PostId>) -> Result<Vec<EntityId>, FetchError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
 
+        // Convert to raw IDs and filter out already-fetching
+        let raw_ids: Vec<i64> = ids.iter().map(|id| id.0).collect();
+        let fetchable = self.state_store_with_edit_context.filter_fetchable(&raw_ids);
+
+        if fetchable.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Mark as fetching
+        self.state_store_with_edit_context.set_batch(&fetchable, EntityState::Fetching);
+
+        // Convert back to PostId for the API call
+        let post_ids: Vec<PostId> = fetchable.iter().map(|&id| PostId(id)).collect();
+
         let params = PostListParams {
-            include: ids,
+            include: post_ids,
             // Ensure we get all requested posts regardless of default per_page
             per_page: Some(100),
             ..Default::default()
         };
 
-        let response = self
+        match self
             .api_client
             .posts()
             .list_with_edit_context(&PostEndpointType::Posts, &params)
-            .await?;
+            .await
+        {
+            Ok(response) => {
+                // Upsert to database and collect entity IDs
+                let entity_ids = self.cache.execute(|conn| {
+                    let repo = PostRepository::<EditContext>::new();
 
-        // Upsert to database and collect entity IDs
-        let entity_ids = self.cache.execute(|conn| {
-            let repo = PostRepository::<EditContext>::new();
-
-            response
-                .data
-                .iter()
-                .map(|post| {
-                    repo.upsert(conn, &self.db_site, post)
-                        .map_err(|e| FetchError::Database {
-                            err_message: e.to_string(),
+                    response
+                        .data
+                        .iter()
+                        .map(|post| {
+                            repo.upsert(conn, &self.db_site, post)
+                                .map_err(|e| FetchError::Database {
+                                    err_message: e.to_string(),
+                                })
                         })
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })?;
+                        .collect::<Result<Vec<_>, _>>()
+                })?;
 
-        Ok(entity_ids)
+                // Mark successfully fetched posts as Cached
+                let fetched_ids: Vec<i64> = response.data.iter().map(|p| p.id.0).collect();
+                self.state_store_with_edit_context
+                    .set_batch(&fetched_ids, EntityState::Cached);
+
+                // Mark posts that were requested but not returned as Failed
+                let failed_ids: Vec<i64> = fetchable
+                    .iter()
+                    .filter(|id| !fetched_ids.contains(id))
+                    .copied()
+                    .collect();
+                if !failed_ids.is_empty() {
+                    self.state_store_with_edit_context
+                        .set_batch(&failed_ids, EntityState::failed("Not found"));
+                }
+
+                Ok(entity_ids)
+            }
+            Err(e) => {
+                // Mark all as failed
+                self.state_store_with_edit_context
+                    .set_batch(&fetchable, EntityState::failed(e.to_string()));
+                Err(e.into())
+            }
+        }
+    }
+
+    /// Get read-only access to the entity state store for edit context.
+    ///
+    /// Used by `MetadataCollection` to read entity states without
+    /// being able to modify them.
+    pub fn state_reader_with_edit_context(&self) -> Arc<dyn EntityStateReader> {
+        self.state_store_with_edit_context.clone()
+    }
+
+    /// Get read-only access to the list metadata store.
+    ///
+    /// Used by `MetadataCollection` to read list structure without
+    /// being able to modify it. The store is shared across all contexts -
+    /// callers should include context in the key string.
+    pub fn metadata_reader(&self) -> Arc<dyn ListMetadataReader> {
+        self.metadata_store.clone()
+    }
+
+    /// Get the current state for a post (edit context).
+    ///
+    /// Returns `EntityState::Missing` if no state has been recorded.
+    pub fn get_entity_state_with_edit_context(&self, post_id: PostId) -> EntityState {
+        self.state_store_with_edit_context.get(post_id.0)
     }
 }
 

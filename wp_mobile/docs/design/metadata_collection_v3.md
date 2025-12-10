@@ -8,20 +8,25 @@ This document captures the finalized design for `MetadataCollection`, a generic 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      PostServiceWithEditContext                              │
+│                              PostService                                     │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  Owned Stores (memory-only):                                                 │
 │  ┌─────────────────────────┐    ┌─────────────────────────────────────────┐ │
-│  │    EntityStateStore     │    │         ListMetadataStore               │ │
+│  │ state_store_with_       │    │         metadata_store                  │ │
+│  │      edit_context       │    │                                         │ │
+│  │                         │    │  RwLock<HashMap<                        │ │
+│  │  RwLock<HashMap<i64,    │    │    String,              // filter key   │ │
+│  │          EntityState>>  │    │    Vec<EntityMetadata>  // id + mod_gmt │ │
+│  │                         │    │  >>                                     │ │
+│  │  Per-entity fetch state │    │                                         │ │
+│  │  (Missing, Fetching,    │    │  List structure per filter              │ │
+│  │   Cached, Stale,        │    │  Shared across contexts - key includes  │ │
+│  │   Failed)               │    │  context: "site_1:edit:posts:publish"   │ │
 │  │                         │    │                                         │ │
-│  │  DashMap<i64,           │    │  RwLock<HashMap<                        │ │
-│  │          EntityState>   │    │    String,              // filter key   │ │
-│  │                         │    │    Vec<EntityMetadata>  // id + mod_gmt │ │
-│  │  Per-entity fetch state │    │  >>                                     │ │
-│  │  (Missing, Fetching,    │    │                                         │ │
-│  │   Cached, Stale,        │    │  List structure per filter              │ │
-│  │   Failed)               │    │  ("site_1:publish:date_desc" → [...])   │ │
+│  │  One per context (edit, │    │  (One store shared by all contexts)     │ │
+│  │  view, embed need       │    │                                         │ │
+│  │  separate stores)       │    │                                         │ │
 │  └────────────┬────────────┘    └──────────────────┬──────────────────────┘ │
 │               │                                     │                        │
 │               │ writes                              │ writes                 │
@@ -449,13 +454,13 @@ pub trait LocalMetadataFetcher {
 
 ---
 
-## Service Integration (PostServiceWithEditContext)
+## Service Integration (PostService)
 
 ```rust
-impl PostServiceWithEditContext {
+impl PostService {
     // Owned stores
-    state_store: Arc<EntityStateStore>,
-    metadata_store: Arc<ListMetadataStore>,
+    state_store_with_edit_context: Arc<EntityStateStore>,  // One per context
+    metadata_store: Arc<ListMetadataStore>,                // Shared (key includes context)
 
     /// Fetch metadata and store in ListMetadataStore
     pub async fn fetch_and_store_metadata(
@@ -506,13 +511,13 @@ impl PostServiceWithEditContext {
         let raw_ids: Vec<i64> = ids.iter().map(|id| id.0).collect();
 
         // Filter out already-fetching
-        let fetchable = self.state_store.filter_fetchable(&raw_ids);
+        let fetchable = self.state_store_with_edit_context.filter_fetchable(&raw_ids);
         if fetchable.is_empty() {
             return Ok(());
         }
 
         // Mark as fetching
-        self.state_store.set_batch(&fetchable, EntityState::Fetching);
+        self.state_store_with_edit_context.set_batch(&fetchable, EntityState::Fetching);
 
         // Fetch
         let post_ids: Vec<PostId> = fetchable.iter().map(|id| PostId(*id)).collect();
@@ -532,9 +537,9 @@ impl PostServiceWithEditContext {
                 // Mark as cached
                 let fetched_ids: Vec<i64> = response.data
                     .iter()
-                    .filter_map(|p| p.id.map(|id| id.0))
+                    .map(|p| p.id.0)
                     .collect();
-                self.state_store.set_batch(&fetched_ids, EntityState::Cached);
+                self.state_store_with_edit_context.set_batch(&fetched_ids, EntityState::Cached);
 
                 // Mark missing as failed (requested but not returned)
                 let failed_ids: Vec<i64> = fetchable
@@ -542,7 +547,7 @@ impl PostServiceWithEditContext {
                     .filter(|id| !fetched_ids.contains(id))
                     .copied()
                     .collect();
-                self.state_store.set_batch(&failed_ids, EntityState::Failed {
+                self.state_store_with_edit_context.set_batch(&failed_ids, EntityState::Failed {
                     error: "Not found".to_string(),
                 });
 
@@ -550,7 +555,7 @@ impl PostServiceWithEditContext {
             }
             Err(e) => {
                 // Mark all as failed
-                self.state_store.set_batch(&fetchable, EntityState::Failed {
+                self.state_store_with_edit_context.set_batch(&fetchable, EntityState::Failed {
                     error: e.to_string(),
                 });
                 Err(e)
@@ -559,8 +564,8 @@ impl PostServiceWithEditContext {
     }
 
     /// Get read-only access to stores (for MetadataCollection)
-    pub fn state_reader(&self) -> Arc<dyn EntityStateReader> {
-        self.state_store.clone()
+    pub fn state_reader_with_edit_context(&self) -> Arc<dyn EntityStateReader> {
+        self.state_store_with_edit_context.clone()
     }
 
     pub fn metadata_reader(&self) -> Arc<dyn ListMetadataReader> {
