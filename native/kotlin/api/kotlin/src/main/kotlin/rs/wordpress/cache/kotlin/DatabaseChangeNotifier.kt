@@ -15,13 +15,14 @@ import java.util.concurrent.CopyOnWriteArraySet
  * the observable's is_relevant_update closure handles all the matching logic in Rust.
  *
  * **Lifecycle Management**: Observables are registered when created and should be closed
- * when no longer needed. [ObservableEntity] and [ObservableCollection] implement [AutoCloseable]
- * and will automatically unregister when closed. Use `.use { }` blocks for automatic cleanup,
- * or call `.close()` manually.
+ * when no longer needed. [ObservableEntity], [ObservableCollection], and [ObservableMetadataCollection]
+ * implement [AutoCloseable] and will automatically unregister when closed. Use `.use { }` blocks
+ * for automatic cleanup, or call `.close()` manually.
  */
 object DatabaseChangeNotifier : DatabaseDelegate {
     private val observableEntities = CopyOnWriteArraySet<ObservableEntity<*>>()
     private val observableCollections = CopyOnWriteArraySet<ObservableCollection<*>>()
+    private val observableMetadataCollections = CopyOnWriteArraySet<ObservableMetadataCollection>()
 
     /**
      * Register an ObservableEntity to receive database change notifications.
@@ -58,13 +59,31 @@ object DatabaseChangeNotifier : DatabaseDelegate {
     }
 
     /**
+     * Register an ObservableMetadataCollection to receive database change notifications.
+     *
+     * The collection will be notified of all database updates and can decide internally
+     * whether the update is relevant to it.
+     */
+    fun register(collection: ObservableMetadataCollection) {
+        observableMetadataCollections.add(collection)
+    }
+
+    /**
+     * Unregister an ObservableMetadataCollection from receiving database change notifications.
+     */
+    fun unregister(collection: ObservableMetadataCollection) {
+        observableMetadataCollections.remove(collection)
+    }
+
+    /**
      * Called by WpApiCache when a database update occurs.
      *
-     * Notifies all registered observables (entities and collections), which will check if the update
-     * is relevant to them using their is_relevant_update() methods.
+     * Notifies all registered observables (entities, collections, and metadata collections),
+     * which will check if the update is relevant to them using their is_relevant_update() methods.
      */
     override fun didUpdate(updateHook: UpdateHook) {
         observableEntities.forEach { it.notifyIfRelevant(updateHook) }
         observableCollections.forEach { it.notifyIfRelevant(updateHook) }
+        observableMetadataCollections.forEach { it.notifyIfRelevant(updateHook) }
     }
 }

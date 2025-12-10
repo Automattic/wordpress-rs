@@ -56,11 +56,16 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 **Commit:** `f735de18` - "Add PostMetadataCollectionWithEditContext for UniFFI export"
 
-### Phase 7: Kotlin Wrapper (TODO)
-- [ ] **7.1** Create `ObservableMetadataCollection` wrapper class
-- [ ] **7.2** Register with `DatabaseChangeNotifier` for DB updates
-- [ ] **7.3** Add extension function on `PostService` to create observable wrapper
-- [ ] **7.4** Add TODO comment for state representation refinement
+### Phase 7: Kotlin Wrapper ✅
+- [x] **7.1** Create `ObservableMetadataCollection` wrapper class
+- [x] **7.2** Register with `DatabaseChangeNotifier` for DB updates
+- [x] **7.3** Add extension function on `PostService` to create observable wrapper
+- [x] **7.4** Add TODO comment for state representation refinement
+
+**Files:**
+- `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/ObservableMetadataCollection.kt`
+- `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/DatabaseChangeNotifier.kt` (updated)
+- `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/PostServiceExtensions.kt` (updated)
 
 ### Phase 8: Example App Screen (TODO)
 - [ ] **8.1** Create `MetadataCollectionViewModel`
@@ -81,11 +86,11 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 ## Current Progress
 
-**Status:** Rust implementation complete, Kotlin wrapper next
+**Status:** Kotlin wrapper complete, example app screen next
 
-**Last completed:** Phase 6 - UniFFI Export
+**Last completed:** Phase 7 - Kotlin Wrapper
 
-**Next steps:** Phase 7 - Kotlin Wrapper (`ObservableMetadataCollection`)
+**Next steps:** Phase 8 - Example App Screen (`MetadataCollectionViewModel`, `MetadataCollectionScreen`)
 
 ---
 

@@ -34,3 +34,26 @@ fun PostService.getObservablePostCollectionWithEditContext(
         isRelevantUpdate = collection::isRelevantUpdate
     )
 }
+
+/**
+ * Create an observable metadata collection for posts with edit context.
+ *
+ * This uses the "metadata-first" sync strategy:
+ * 1. Fetch lightweight metadata (id + modified_gmt) to define list structure
+ * 2. Selectively fetch full data for missing or stale items
+ *
+ * Unlike [getObservablePostCollectionWithEditContext] which fetches full data for all items,
+ * this collection shows cached items immediately and fetches only what's needed.
+ *
+ * Items include fetch state (Missing, Fetching, Cached, Stale, Failed) so the UI
+ * can show appropriate feedback for each item.
+ *
+ * @param filter Filter criteria for posts (status, etc.)
+ * @return Observable metadata collection that notifies on database changes
+ */
+fun PostService.getObservablePostMetadataCollectionWithEditContext(
+    filter: AnyPostFilter
+): ObservableMetadataCollection {
+    val collection = this.createPostMetadataCollectionWithEditContext(filter)
+    return createObservableMetadataCollection(collection)
+}
