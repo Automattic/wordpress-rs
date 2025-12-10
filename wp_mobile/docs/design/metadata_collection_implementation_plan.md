@@ -24,11 +24,11 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 **Commit:** `19f27529` - "Add EntityStateStore and ListMetadataStore"
 
-### Phase 3: Collection Infrastructure
-- [ ] **3.1** `MetadataFetcher` trait (async)
-- [ ] **3.2** `MetadataCollection<F>` struct
+### Phase 3: Collection Infrastructure ✅
+- [x] **3.1** `MetadataFetcher` trait (async)
+- [x] **3.2** `MetadataCollection<F>` struct
 
-**Commit message:** "Add MetadataFetcher trait and MetadataCollection"
+**Commit:** `aa9e4171` - "Add MetadataFetcher trait and MetadataCollection"
 
 ### Phase 4: Service Integration
 - [ ] **4.1** Add stores as fields to `PostServiceWithEditContext`
@@ -59,11 +59,11 @@ This document tracks the implementation progress for the MetadataCollection desi
 
 ## Current Progress
 
-**Status:** Starting Phase 3
+**Status:** Starting Phase 4
 
-**Last completed:** Phase 2 - Store types (commit 19f27529)
+**Last completed:** Phase 3 - Collection Infrastructure (commit aa9e4171)
 
-**Next task:** Implement `MetadataFetcher` trait
+**Next task:** Integrate stores into `PostServiceWithEditContext`
 
 ---
 

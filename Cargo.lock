@@ -5295,6 +5295,7 @@ dependencies = [
  "rstest",
  "rusqlite",
  "thiserror 2.0.17",
+ "tokio",
  "uniffi",
  "wp_api",
  "wp_mobile_cache",
