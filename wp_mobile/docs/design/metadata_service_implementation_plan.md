@@ -160,15 +160,20 @@ Changes:
 - Added `DbTable::ListMetadataItems` to relevant_tables for data update notifications
 - Updated `PostMetadataCollectionWithEditContext` to use the persistent fetcher type
 
-### 3.4 Remove Old Components
-**Status**: NOT STARTED
+### 3.4 Remove Old Components ✅
+**Status**: COMPLETE
 
-The in-memory `ListMetadataStore` is preserved for backwards compatibility.
-Can be removed once all callers migrate to persistent service.
+Removed deprecated in-memory components:
+- Deleted `list_metadata_store.rs` (replaced by `list_metadata_reader.rs` with trait only)
+- Removed `PostMetadataFetcherWithEditContext` (non-persistent fetcher)
+- Removed from `PostService`: `metadata_store` field, `metadata_reader()`, `fetch_and_store_metadata()`
+- Removed mock-based tests that depended on in-memory store
+
+**Commit**: `95a2db5f` - "Remove deprecated in-memory metadata store (Phase 3.4)"
 
 ---
 
-## Phase 4: Observer Split ✅ MOSTLY COMPLETE
+## Phase 4: Observer Split ✅ COMPLETE
 
 ### 4.1 Split is_relevant_update ✅
 **Status**: COMPLETE
@@ -250,6 +255,27 @@ Key fixes made during implementation:
 2. **Deadlock prevention**: Made `load_items()` and `sync_state()` async (UniFFI background dispatch)
 3. **Relevance checks**: Simplified to not query DB (avoids deadlock, accepts false positives)
 4. **Page validation**: Added `current_page == 0` check in `load_next_page()`
+5. **Race condition**: Fixed ViewModel state race where completion handlers overwrote observer updates
+6. **State persistence**: Collections now load pagination from database on creation
+
+### 5.5 Debug Print Cleanup ✅
+**Status**: COMPLETE
+
+- Removed verbose Kotlin debug prints (observer triggers)
+- Consolidated `fetch_and_store_metadata_persistent` prints into single summary line
+- Kept useful flow logs in `MetadataCollection` and stale detection in `PostService`
+
+**Commit**: `0b120639` - "Clean up debug prints for better readability"
+
+### 5.6 State Persistence on Filter Change ✅
+**Status**: COMPLETE
+
+- Added `get_current_page()` and `get_total_pages()` to `ListMetadataReader` trait
+- Implemented pagination methods in `MetadataService`
+- `MetadataCollection::new()` now loads persisted pagination from database
+- ViewModel reads pagination state from collection (which reads from DB)
+
+**Commit**: `30c69218` - "Fix state persistence when switching filters"
 
 ---
 
@@ -263,12 +289,15 @@ Key fixes made during implementation:
 | 3.1 | ⏸️ Deferred | - |
 | 3.2 | ✅ Complete | `5c83b435` |
 | 3.3 | ✅ Complete | `7854e9e7` |
-| 3.4 | 🔲 Not Started | - |
+| 3.4 | ✅ Complete | `95a2db5f` |
 | 4.1 | ✅ Complete | `ef4d65d0` |
-| 4.2 | ✅ Complete | (pending commit) |
+| 4.2 | ✅ Complete | `c29bcd50` |
 | 4.3 | ✅ Complete | `ef4d65d0` |
 | 5.1-5.2 | ✅ Complete | (inline) |
-| 5.3 | ✅ Complete | (pending commit) |
+| 5.3 | ✅ Complete | `c29bcd50` |
+| 5.4 | ✅ Complete | `c29bcd50`, `30c69218` |
+| 5.5 | ✅ Complete | `0b120639` |
+| 5.6 | ✅ Complete | `30c69218` |
 
 ## Dependency Order Summary
 
@@ -287,12 +316,20 @@ Phase 3.1 (Collection refactor) ⏸️ deferred
     ↓
 Phase 3.2-3.3 (PostService integration) ✅
     ↓
-Phase 3.4 (Cleanup) 🔲
+Phase 3.4 (Cleanup) ✅
     ↓
 Phase 4.1-4.3 (Observer split) ✅
     ↓
-Phase 5 (Testing & Example App) ✅
+Phase 5 (Testing, Bug Fixes, State Persistence) ✅
 ```
+
+## Implementation Complete 🎉
+
+All planned phases are complete. The MetadataService provides:
+- Database-backed list metadata with pagination persistence
+- Split observers for data vs state updates
+- State persistence across filter changes and app restarts
+- Clean debug logging for prototype testing
 
 ## Risk Areas
 

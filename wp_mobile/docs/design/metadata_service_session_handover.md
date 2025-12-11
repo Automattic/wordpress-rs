@@ -136,9 +136,61 @@ Following the stateless collection pattern (`wp_mobile/src/collection/mod.rs`), 
 ### Why Simplified Relevance Checks?
 Querying the DB inside `is_relevant_update()` defeats the purpose of lightweight relevance checking and causes deadlocks. Better to have false positives (extra refreshes) than deadlocks.
 
-## Remaining Work
+## Session 2: Final Polish (Dec 11, 2025)
 
-See `metadata_service_implementation_plan.md` for full details:
+### Phase 3.4: Remove In-Memory Store ✅
+Removed deprecated in-memory components:
+- Deleted `list_metadata_store.rs` (kept trait in `list_metadata_reader.rs`)
+- Removed `PostMetadataFetcherWithEditContext` (non-persistent fetcher)
+- Removed `metadata_store` field, `metadata_reader()`, `fetch_and_store_metadata()` from PostService
 
-- **Phase 3.4**: Remove deprecated in-memory store
-- **Remove debug println statements** from `fetch_and_store_metadata_persistent` and Kotlin files
+**Commit**: `95a2db5f`
+
+### Debug Print Cleanup ✅
+- Removed verbose Kotlin debug prints (ViewModel observer triggers, ObservableMetadataCollection)
+- Consolidated `fetch_and_store_metadata_persistent` prints into single summary line
+- Format: `[PostService] fetch_metadata_persistent:\n  key=... -> step -> step | OK/FAILED`
+
+**Commit**: `0b120639`
+
+### Bug Fix: Race Condition in State Updates ✅
+**Problem**: UI showed "Fetching Next Page" when logs showed IDLE. Race between completion handlers and state observers.
+**Cause**: `refresh()`/`loadNextPage()` completion did `_state.value.copy(isSyncing = false)` without including `syncState`, overwriting observer's update.
+**Fix**: Completion handlers now also set `syncState = collection.syncState()`.
+
+**Commit**: `30c69218`
+
+### Bug Fix: State Persistence on Filter Change ✅
+**Problem**: Switching filters showed `Page: 0` even for previously-fetched filters.
+**Cause**: `MetadataCollection::new()` initialized pagination to 0 instead of reading from database.
+**Fix**:
+- Added `get_current_page()` and `get_total_pages()` to `ListMetadataReader` trait
+- `MetadataCollection::new()` now loads persisted pagination from database
+
+**Commit**: `30c69218`
+
+### UI Improvements ✅
+- Added back buttons to both collection screens (for desktop navigation testing)
+- Changed Idle status color to dark green for better visibility
+- "Load Next Page" now triggers refresh when `currentPage == 0`
+
+**Commit**: `c29bcd50`
+
+## Final Commits
+
+| Commit | Description |
+|--------|-------------|
+| `c29bcd50` | Complete Phase 4 & 5: Split observers, async methods, UI improvements |
+| `95a2db5f` | Remove deprecated in-memory metadata store (Phase 3.4) |
+| `0b120639` | Clean up debug prints for better readability |
+| `30c69218` | Fix state persistence when switching filters |
+
+## Implementation Status: COMPLETE ✅
+
+All phases complete. See `metadata_service_implementation_plan.md` for full details.
+
+The MetadataService prototype provides:
+- Database-backed list metadata with full pagination persistence
+- Split observers for data vs state updates (efficient UI updates)
+- State persistence across filter changes and app restarts
+- Clean, readable debug logging for prototype testing
