@@ -262,7 +262,13 @@ impl WpApiCache {
     pub fn perform_migrations(&self) -> Result<i64, SqliteDbError> {
         self.execute(|connection| {
             let mut mgr = MigrationManager::new(connection)?;
-            mgr.perform_migrations().map_err(SqliteDbError::from)
+            let version = mgr.perform_migrations().map_err(SqliteDbError::from)?;
+
+            // Reset stale fetching states after migrations complete.
+            // See `reset_stale_fetching_states` for rationale.
+            Self::reset_stale_fetching_states_internal(connection);
+
+            Ok(version)
         })
     }
 
@@ -301,6 +307,89 @@ impl WpApiCache {
 }
 
 impl WpApiCache {
+    /// Resets stale fetching states (`FetchingFirstPage`, `FetchingNextPage`) to `Idle`.
+    ///
+    /// # Why This Is Needed
+    ///
+    /// The `ListState` enum includes transient states that represent in-progress operations:
+    /// - `FetchingFirstPage` - A refresh/pull-to-refresh is in progress
+    /// - `FetchingNextPage` - A "load more" pagination fetch is in progress
+    ///
+    /// If the app is killed, crashes, or the process terminates while a fetch is in progress,
+    /// these states will persist in the database. On the next app launch:
+    /// - UI might show a perpetual loading indicator
+    /// - New fetch attempts might be blocked if code checks "already fetching"
+    /// - State is inconsistent with reality (no fetch is actually in progress)
+    ///
+    /// # Why We Reset in `WpApiCache` Initialization
+    ///
+    /// We considered several approaches:
+    ///
+    /// 1. **Reset in `MetadataService::new()`** - Rejected because `MetadataService` is not
+    ///    a singleton. Multiple services (PostService, CommentService, etc.) each create
+    ///    their own `MetadataService` instance. Resetting on each instantiation would
+    ///    incorrectly reset states when a new service is created mid-session.
+    ///
+    /// 2. **Reset in `WpApiCache` initialization** (this approach) - Chosen because
+    ///    `WpApiCache` is typically created once at app startup, making it the right
+    ///    timing for session-boundary cleanup.
+    ///
+    /// 3. **Session tokens** - More complex: tag states with a session ID and treat
+    ///    mismatched sessions as stale. Adds schema complexity for minimal benefit.
+    ///
+    /// 4. **In-memory only for fetching states** - Keep transient states in memory,
+    ///    only persist `Idle`/`Error`. Adds complexity in state management.
+    ///
+    /// # Theoretical Issues
+    ///
+    /// This approach assumes `WpApiCache` is created once per app session. If an app
+    /// architecture creates multiple `WpApiCache` instances during a session (e.g.,
+    /// recreating it after a user logs out and back in), this would reset in-progress
+    /// fetches. In practice:
+    /// - Most apps create `WpApiCache` once at startup
+    /// - If your architecture differs, consider wrapping this in a "first launch" check
+    ///   or using a session token approach
+    ///
+    /// # Note on `Error` State
+    ///
+    /// We intentionally do NOT reset `Error` states. These represent completed (failed)
+    /// operations, not in-progress ones. Preserving them allows:
+    /// - UI to show "last sync failed" on launch
+    /// - Debugging by inspecting `error_message`
+    ///
+    /// If you need a fresh start, the user can trigger a refresh which will overwrite
+    /// the error state.
+    fn reset_stale_fetching_states_internal(connection: &mut Connection) {
+        use crate::list_metadata::ListState;
+
+        // Reset both fetching states to idle
+        let result = connection.execute(
+            "UPDATE list_metadata_state SET state = ?1 WHERE state IN (?2, ?3)",
+            params![
+                ListState::Idle.as_db_str(),
+                ListState::FetchingFirstPage.as_db_str(),
+                ListState::FetchingNextPage.as_db_str(),
+            ],
+        );
+
+        match result {
+            Ok(count) if count > 0 => {
+                eprintln!(
+                    "WpApiCache: Reset {} stale fetching state(s) from previous session",
+                    count
+                );
+            }
+            Ok(_) => {
+                // No stale states found - normal case
+            }
+            Err(e) => {
+                // Log but don't fail - table might not exist yet on fresh install
+                // (though we run this after migrations, so it should exist)
+                eprintln!("WpApiCache: Failed to reset stale fetching states: {}", e);
+            }
+        }
+    }
+
     /// Execute a database operation with scoped access to the connection.
     ///
     /// This is the **only** way to access the database. The provided closure
