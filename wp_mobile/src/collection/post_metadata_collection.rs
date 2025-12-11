@@ -186,12 +186,47 @@ impl PostMetadataCollectionWithEditContext {
         self.collection.total_pages()
     }
 
-    /// Check if a database update is relevant to this collection.
+    /// Get the current sync state for this collection.
     ///
-    /// Returns `true` if the update is to a table this collection monitors.
-    /// Platform layers use this to determine when to notify observers.
+    /// Returns the current `ListState`:
+    /// - `Idle` - No sync in progress
+    /// - `FetchingFirstPage` - Refresh in progress
+    /// - `FetchingNextPage` - Load more in progress
+    /// - `Error` - Last sync failed
+    ///
+    /// Use this to show loading indicators in the UI. Observe state changes
+    /// via `is_relevant_state_update`.
+    pub fn sync_state(&self) -> wp_mobile_cache::list_metadata::ListState {
+        self.collection.sync_state()
+    }
+
+    /// Check if a database update is relevant to this collection (either data or state).
+    ///
+    /// Returns `true` if the update affects either data or state.
+    /// For more granular control, use `is_relevant_data_update` or `is_relevant_state_update`.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
         self.collection.is_relevant_update(hook)
+    }
+
+    /// Check if a database update affects this collection's data.
+    ///
+    /// Returns `true` if the update is to:
+    /// - An entity table this collection monitors (PostsEditContext, TermRelationships)
+    /// - The ListMetadataItems table for this collection's key
+    ///
+    /// Use this for data observers that should refresh list contents.
+    pub fn is_relevant_data_update(&self, hook: &UpdateHook) -> bool {
+        self.collection.is_relevant_data_update(hook)
+    }
+
+    /// Check if a database update affects this collection's sync state.
+    ///
+    /// Returns `true` if the update is to the ListMetadataState table
+    /// for this collection's specific list.
+    ///
+    /// Use this for state observers that should update loading indicators.
+    pub fn is_relevant_state_update(&self, hook: &UpdateHook) -> bool {
+        self.collection.is_relevant_state_update(hook)
     }
 
     /// Get the filter for this collection.

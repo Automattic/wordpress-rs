@@ -481,6 +481,73 @@ impl ListMetadataRepository {
     ) -> Result<(), SqliteDbError> {
         self.update_state(executor, list_metadata_id, ListState::Error, Some(error_message))
     }
+
+    // ============================================
+    // Relevance checking for update hooks
+    // ============================================
+
+    /// Get the list_metadata_id (rowid) for a given key.
+    ///
+    /// Returns None if no list exists for this key yet.
+    /// Used by collections to cache the ID for relevance checking.
+    pub fn get_list_metadata_id(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &str,
+    ) -> Result<Option<RowId>, SqliteDbError> {
+        self.get_header(executor, site, key)
+            .map(|opt| opt.map(|h| h.row_id))
+    }
+
+    /// Get the list_metadata_id that a state row belongs to.
+    ///
+    /// Given a rowid from the list_metadata_state table, returns the
+    /// list_metadata_id (FK to list_metadata) that this state belongs to.
+    /// Returns None if the state row doesn't exist.
+    pub fn get_list_metadata_id_for_state_row(
+        &self,
+        executor: &impl QueryExecutor,
+        state_row_id: RowId,
+    ) -> Result<Option<RowId>, SqliteDbError> {
+        let sql = format!(
+            "SELECT list_metadata_id FROM {} WHERE rowid = ?",
+            Self::state_table().table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let result = stmt.query_row([state_row_id], |row| row.get::<_, RowId>(0));
+
+        match result {
+            Ok(id) => Ok(Some(id)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(SqliteDbError::from(e)),
+        }
+    }
+
+    /// Check if a list_metadata_items row belongs to a specific key.
+    ///
+    /// Given a rowid from the list_metadata_items table, checks if the item
+    /// belongs to the list identified by (site, key).
+    pub fn is_item_row_for_key(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &str,
+        item_row_id: RowId,
+    ) -> Result<bool, SqliteDbError> {
+        let sql = format!(
+            "SELECT 1 FROM {} WHERE rowid = ? AND db_site_id = ? AND key = ?",
+            Self::items_table().table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let result = stmt.query_row(rusqlite::params![item_row_id, site.row_id, key], |_| Ok(()));
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+            Err(e) => Err(SqliteDbError::from(e)),
+        }
+    }
 }
 
 /// Information returned when starting a refresh operation.

@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use wp_mobile_cache::UpdateHook;
+use wp_mobile_cache::{DbTable, UpdateHook};
 
 use crate::collection::FetchError;
 
@@ -12,6 +12,13 @@ struct PaginationState {
     current_page: u32,
     total_pages: Option<u32>,
     per_page: u32,
+}
+
+/// Cached state for relevance checking.
+#[derive(Debug, Default)]
+struct RelevanceCache {
+    /// Cached list_metadata_id (populated lazily on first state relevance check)
+    list_metadata_id: Option<i64>,
 }
 
 /// Collection that uses metadata-first fetching strategy.
@@ -72,11 +79,14 @@ where
     /// Fetcher for metadata and full entities
     fetcher: F,
 
-    /// Tables to monitor for relevant updates
-    relevant_tables: Vec<wp_mobile_cache::DbTable>,
+    /// Tables to monitor for data updates (entity tables like PostsEditContext)
+    relevant_data_tables: Vec<DbTable>,
 
     /// Pagination state (uses interior mutability for UniFFI compatibility)
     pagination: RwLock<PaginationState>,
+
+    /// Cached state for relevance checking
+    relevance_cache: RwLock<RelevanceCache>,
 }
 
 impl<F> MetadataCollection<F>
@@ -90,25 +100,26 @@ where
     /// * `metadata_reader` - Read-only access to list metadata store
     /// * `state_reader` - Read-only access to entity state store
     /// * `fetcher` - Implementation for fetching metadata and entities
-    /// * `relevant_tables` - DB tables to monitor for updates
+    /// * `relevant_data_tables` - DB tables to monitor for data updates (entity tables)
     pub fn new(
         kv_key: String,
         metadata_reader: Arc<dyn ListMetadataReader>,
         state_reader: Arc<dyn EntityStateReader>,
         fetcher: F,
-        relevant_tables: Vec<wp_mobile_cache::DbTable>,
+        relevant_data_tables: Vec<DbTable>,
     ) -> Self {
         Self {
             kv_key,
             metadata_reader,
             state_reader,
             fetcher,
-            relevant_tables,
+            relevant_data_tables,
             pagination: RwLock::new(PaginationState {
                 current_page: 0,
                 total_pages: None,
                 per_page: 20,
             }),
+            relevance_cache: RwLock::new(RelevanceCache::default()),
         }
     }
 
@@ -135,12 +146,86 @@ where
             .collect()
     }
 
-    /// Check if a database update is relevant to this collection.
+    /// Get the current sync state for this collection.
     ///
-    /// Returns `true` if the update is to a table this collection monitors.
-    /// Platform layers use this to determine when to notify observers.
+    /// Returns the current `ListState`:
+    /// - `Idle` - No sync in progress
+    /// - `FetchingFirstPage` - Refresh in progress
+    /// - `FetchingNextPage` - Load more in progress
+    /// - `Error` - Last sync failed
+    ///
+    /// Use this to show loading indicators in the UI.
+    pub fn sync_state(&self) -> wp_mobile_cache::list_metadata::ListState {
+        self.metadata_reader.get_sync_state(&self.kv_key)
+    }
+
+    /// Check if a database update is relevant to this collection (either data or state).
+    ///
+    /// Returns `true` if the update affects either data or state.
+    /// For more granular control, use `is_relevant_data_update` or `is_relevant_state_update`.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
-        self.relevant_tables.contains(&hook.table)
+        self.is_relevant_data_update(hook) || self.is_relevant_state_update(hook)
+    }
+
+    /// Check if a database update affects this collection's data.
+    ///
+    /// Returns `true` if the update is to:
+    /// - An entity table this collection monitors (e.g., PostsEditContext, TermRelationships)
+    /// - The ListMetadataItems table for this collection's key
+    ///
+    /// Use this for data observers that should refresh list contents.
+    pub fn is_relevant_data_update(&self, hook: &UpdateHook) -> bool {
+        // Check entity tables
+        if self.relevant_data_tables.contains(&hook.table) {
+            return true;
+        }
+
+        // Check ListMetadataItems for this specific key
+        if hook.table == DbTable::ListMetadataItems {
+            return self
+                .metadata_reader
+                .is_item_row_for_key(hook.row_id, &self.kv_key);
+        }
+
+        false
+    }
+
+    /// Check if a database update affects this collection's sync state.
+    ///
+    /// Returns `true` if the update is to the ListMetadataState table
+    /// for this collection's specific list.
+    ///
+    /// Use this for state observers that should update loading indicators.
+    pub fn is_relevant_state_update(&self, hook: &UpdateHook) -> bool {
+        if hook.table != DbTable::ListMetadataState {
+            return false;
+        }
+
+        // Get or cache the list_metadata_id
+        let list_metadata_id = {
+            let cache = self.relevance_cache.read().unwrap();
+            cache.list_metadata_id
+        };
+
+        let list_metadata_id = match list_metadata_id {
+            Some(id) => id,
+            None => {
+                // Try to get from database
+                let id = self.metadata_reader.get_list_metadata_id(&self.kv_key);
+                if let Some(id) = id {
+                    // Cache for next time
+                    self.relevance_cache.write().unwrap().list_metadata_id = Some(id);
+                    id
+                } else {
+                    // List doesn't exist yet, so this state update isn't for us
+                    return false;
+                }
+            }
+        };
+
+        // Check if the state row belongs to our list
+        self.metadata_reader
+            .is_state_row_for_list(hook.row_id, list_metadata_id)
     }
 
     /// Refresh the collection (fetch page 1, replace metadata).
