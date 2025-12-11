@@ -197,7 +197,13 @@ where
         // Check if we're already at the last page
         if total_pages.is_some_and(|total| next_page > total) {
             println!("[MetadataCollection] Already at last page, nothing to load");
-            return Ok(SyncResult::no_op(self.items().len(), false));
+            let pagination = self.pagination.read().unwrap();
+            return Ok(SyncResult::no_op(
+                self.items().len(),
+                false,
+                pagination.current_page,
+                pagination.total_pages,
+            ));
         }
 
         println!("[MetadataCollection] Loading page {}...", next_page);
@@ -308,11 +314,14 @@ where
             );
         }
 
+        let pagination = self.pagination.read().unwrap();
         Ok(SyncResult::new(
             total_items,
             fetch_count,
             failed_count,
             self.has_more_pages(),
+            pagination.current_page,
+            pagination.total_pages,
         ))
     }
 }

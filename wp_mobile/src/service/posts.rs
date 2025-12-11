@@ -6,9 +6,11 @@ use crate::{
         post_collection::PostCollection,
     },
     filters::AnyPostFilter,
+    service::metadata::MetadataService,
     sync::{
         EntityMetadata, EntityState, EntityStateReader, EntityStateStore, ListMetadataReader,
         ListMetadataStore, MetadataCollection, MetadataFetchResult, PostMetadataFetcherWithEditContext,
+        SyncResult,
     },
 };
 use std::sync::Arc;
@@ -39,8 +41,8 @@ use wp_mobile_cache::{
 /// - `state_store_with_edit_context`: Tracks fetch state per entity for edit context.
 ///   Each context needs its own state store since the same entity ID can have different
 ///   fetch states across contexts.
-/// - `metadata_store`: Tracks list structure per filter key. Shared across all contexts
-///   since keys should include the context (e.g., `"site_1:edit:posts:publish"`).
+/// - `metadata_store`: Tracks list structure per filter key (memory-only, legacy).
+/// - `metadata_service`: Database-backed list metadata (persists across app restarts).
 ///
 /// Collections get read-only access via reader methods. This ensures cross-collection
 /// consistency when multiple collections share the same underlying entities.
@@ -55,19 +57,26 @@ pub struct PostService {
     /// different fetch states across contexts.
     state_store_with_edit_context: Arc<EntityStateStore>,
 
-    /// List structure per filter key (memory-only). Shared across all contexts -
-    /// keys should include context in the key string (e.g., `"site_1:edit:posts:publish"`).
+    /// List structure per filter key (memory-only, legacy).
+    /// TODO: Replace with metadata_service for persistence.
     metadata_store: Arc<ListMetadataStore>,
+
+    /// Database-backed list metadata service.
+    /// Persists list structure across app restarts.
+    metadata_service: Arc<MetadataService>,
 }
 
 impl PostService {
     pub fn new(api_client: Arc<WpApiClient>, db_site: Arc<DbSite>, cache: Arc<WpApiCache>) -> Self {
+        let metadata_service = Arc::new(MetadataService::new(db_site.clone(), cache.clone()));
+
         Self {
             api_client,
             db_site,
             cache,
             state_store_with_edit_context: Arc::new(EntityStateStore::new()),
             metadata_store: Arc::new(ListMetadataStore::new()),
+            metadata_service,
         }
     }
 
@@ -291,6 +300,146 @@ impl PostService {
         }
     }
 
+    /// Sync a post list using persistent metadata storage.
+    ///
+    /// This method orchestrates the full sync flow:
+    /// 1. Updates state via MetadataService (FetchingFirstPage or FetchingNextPage)
+    /// 2. Fetches metadata from API
+    /// 3. Stores metadata in database via MetadataService
+    /// 4. Detects stale posts by comparing modified_gmt
+    /// 5. Fetches missing/stale posts
+    /// 6. Updates pagination info
+    /// 7. Sets state back to Idle (or Error on failure)
+    ///
+    /// # Arguments
+    /// * `key` - Metadata store key (e.g., "site_1:edit:posts:publish")
+    /// * `filter` - Post filter criteria
+    /// * `page` - Page number to fetch (1-indexed)
+    /// * `per_page` - Number of posts per page
+    /// * `is_refresh` - If true, replaces metadata; if false, appends
+    ///
+    /// # Returns
+    /// - `Ok(SyncResult)` with sync statistics
+    /// - `Err(FetchError)` if network or database error occurs
+    pub async fn sync_post_list(
+        &self,
+        key: &str,
+        filter: &AnyPostFilter,
+        page: u32,
+        per_page: u32,
+        is_refresh: bool,
+    ) -> Result<SyncResult, FetchError> {
+        use crate::service::WpServiceError;
+        use wp_mobile_cache::list_metadata::ListState;
+
+        // 1. Update state to fetching
+        let state = if is_refresh {
+            ListState::FetchingFirstPage
+        } else {
+            ListState::FetchingNextPage
+        };
+
+        self.metadata_service
+            .set_state(key, state, None)
+            .map_err(|e| match e {
+                WpServiceError::DatabaseError { err_message } => FetchError::Database { err_message },
+                WpServiceError::SiteNotFound => FetchError::Database {
+                    err_message: "Site not found".to_string(),
+                },
+            })?;
+
+        // 2. Fetch metadata from API
+        let metadata_result = match self.fetch_posts_metadata(filter, page, per_page).await {
+            Ok(result) => result,
+            Err(e) => {
+                // Update state to error
+                let _ = self
+                    .metadata_service
+                    .complete_sync_with_error(key, &e.to_string());
+                return Err(e);
+            }
+        };
+
+        // 3. Store metadata in database
+        let store_result = if is_refresh {
+            self.metadata_service.set_items(key, &metadata_result.metadata)
+        } else {
+            self.metadata_service.append_items(key, &metadata_result.metadata)
+        };
+
+        if let Err(e) = store_result {
+            let _ = self.metadata_service.complete_sync_with_error(key, &e.to_string());
+            return Err(FetchError::Database {
+                err_message: e.to_string(),
+            });
+        }
+
+        // 4. Detect stale posts
+        self.detect_and_mark_stale_posts(&metadata_result.metadata);
+
+        // 5. Fetch missing/stale posts
+        let ids_to_fetch: Vec<PostId> = metadata_result
+            .metadata
+            .iter()
+            .filter(|m| {
+                let state = self.state_store_with_edit_context.get(m.id);
+                matches!(state, EntityState::Missing | EntityState::Stale)
+            })
+            .map(|m| PostId(m.id))
+            .collect();
+
+        let fetched_count = ids_to_fetch.len();
+        let mut failed_count = 0;
+
+        if !ids_to_fetch.is_empty() {
+            // Batch into chunks of 100
+            for chunk in ids_to_fetch.chunks(100) {
+                if let Err(_e) = self.fetch_posts_by_ids(chunk.to_vec()).await {
+                    // Count failures - items not marked as Cached are considered failed
+                    failed_count += chunk
+                        .iter()
+                        .filter(|id| {
+                            !matches!(
+                                self.state_store_with_edit_context.get(id.0),
+                                EntityState::Cached
+                            )
+                        })
+                        .count();
+                }
+            }
+        }
+
+        // 6. Update pagination info
+        let _ = self.metadata_service.update_pagination(
+            key,
+            metadata_result.total_pages.map(|p| p as i64),
+            metadata_result.total_items,
+            page as i64,
+            per_page as i64,
+        );
+
+        // 7. Set state back to idle
+        let _ = self.metadata_service.complete_sync(key);
+
+        // Get total items from metadata service
+        let total_items = self
+            .metadata_service
+            .get_entity_ids(key)
+            .map(|ids| ids.len())
+            .unwrap_or(0);
+
+        let has_more_pages = self.metadata_service.has_more_pages(key).unwrap_or(false);
+
+        Ok(SyncResult::new(
+            total_items,
+            fetched_count,
+            failed_count,
+            has_more_pages,
+            page,
+            metadata_result.total_pages,
+        ))
+    }
+
     /// Fetch full post data for specific post IDs and save to cache.
     ///
     /// This is used for selective sync - fetching only the posts that are
@@ -408,13 +557,31 @@ impl PostService {
         self.state_store_with_edit_context.clone()
     }
 
-    /// Get read-only access to the list metadata store.
+    /// Get read-only access to the list metadata store (memory-only, legacy).
     ///
     /// Used by `MetadataCollection` to read list structure without
     /// being able to modify it. The store is shared across all contexts -
     /// callers should include context in the key string.
+    ///
+    /// Note: Consider using `persistent_metadata_reader()` for data that
+    /// should survive app restarts.
     pub fn metadata_reader(&self) -> Arc<dyn ListMetadataReader> {
         self.metadata_store.clone()
+    }
+
+    /// Get read-only access to the persistent metadata service.
+    ///
+    /// Returns a reader backed by the database, so list metadata persists
+    /// across app restarts. Use this for production collections.
+    pub fn persistent_metadata_reader(&self) -> Arc<MetadataService> {
+        self.metadata_service.clone()
+    }
+
+    /// Get direct access to the metadata service.
+    ///
+    /// Used when you need both read and write access to list metadata.
+    pub fn metadata_service(&self) -> Arc<MetadataService> {
+        self.metadata_service.clone()
     }
 
     /// Get the current state for a post (edit context).
