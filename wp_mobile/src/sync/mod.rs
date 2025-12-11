@@ -17,7 +17,6 @@
 //!
 //! - [`EntityStateStore`] - Tracks fetch state per entity (read-write)
 //! - [`EntityStateReader`] - Read-only access to entity states (trait)
-//! - [`ListMetadataStore`] - Tracks list structure per filter (read-write)
 //! - [`ListMetadataReader`] - Read-only access to list metadata (trait)
 //!
 //! ## Collection Types
@@ -27,7 +26,6 @@
 //!
 //! ## Fetcher Implementations
 //!
-//! - [`PostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context (in-memory store)
 //! - [`PersistentPostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context (database-backed)
 //!
 //! See `wp_mobile/docs/design/metadata_collection_v3.md` for full design details.
@@ -36,7 +34,7 @@ mod collection_item;
 mod entity_metadata;
 mod entity_state;
 mod entity_state_store;
-mod list_metadata_store;
+mod list_metadata_reader;
 mod metadata_collection;
 mod metadata_fetch_result;
 mod metadata_fetcher;
@@ -47,11 +45,9 @@ pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
 pub use entity_state::EntityState;
 pub use entity_state_store::{EntityStateReader, EntityStateStore};
-pub use list_metadata_store::{ListMetadataReader, ListMetadataStore};
+pub use list_metadata_reader::ListMetadataReader;
 pub use metadata_collection::MetadataCollection;
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use metadata_fetcher::MetadataFetcher;
-pub use post_metadata_fetcher::{
-    PersistentPostMetadataFetcherWithEditContext, PostMetadataFetcherWithEditContext,
-};
+pub use post_metadata_fetcher::PersistentPostMetadataFetcherWithEditContext;
 pub use sync_result::SyncResult;

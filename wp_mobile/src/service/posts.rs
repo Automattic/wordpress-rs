@@ -8,9 +8,8 @@ use crate::{
     filters::AnyPostFilter,
     service::metadata::MetadataService,
     sync::{
-        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, ListMetadataReader,
-        ListMetadataStore, MetadataCollection, MetadataFetchResult,
-        PersistentPostMetadataFetcherWithEditContext, SyncResult,
+        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataCollection,
+        MetadataFetchResult, PersistentPostMetadataFetcherWithEditContext, SyncResult,
     },
 };
 use std::sync::Arc;
@@ -41,7 +40,6 @@ use wp_mobile_cache::{
 /// - `state_store_with_edit_context`: Tracks fetch state per entity for edit context.
 ///   Each context needs its own state store since the same entity ID can have different
 ///   fetch states across contexts.
-/// - `metadata_store`: Tracks list structure per filter key (memory-only, legacy).
 /// - `metadata_service`: Database-backed list metadata (persists across app restarts).
 ///
 /// Collections get read-only access via reader methods. This ensures cross-collection
@@ -57,10 +55,6 @@ pub struct PostService {
     /// different fetch states across contexts.
     state_store_with_edit_context: Arc<EntityStateStore>,
 
-    /// List structure per filter key (memory-only, legacy).
-    /// TODO: Replace with metadata_service for persistence.
-    metadata_store: Arc<ListMetadataStore>,
-
     /// Database-backed list metadata service.
     /// Persists list structure across app restarts.
     metadata_service: Arc<MetadataService>,
@@ -75,7 +69,6 @@ impl PostService {
             db_site,
             cache,
             state_store_with_edit_context: Arc::new(EntityStateStore::new()),
-            metadata_store: Arc::new(ListMetadataStore::new()),
             metadata_service,
         }
     }
@@ -202,59 +195,10 @@ impl PostService {
         ))
     }
 
-    /// Fetch metadata and store in the metadata store.
-    ///
-    /// This combines `fetch_posts_metadata` with storing the results:
-    /// - If `is_first_page` is true, replaces existing metadata for `kv_key`
-    /// - If `is_first_page` is false, appends to existing metadata
-    ///
-    /// Additionally performs staleness detection:
-    /// - For posts currently marked as `Cached`, compares the fetched `modified_gmt`
-    ///   against the cached value in the database
-    /// - Posts with different `modified_gmt` are marked as `Stale`
-    ///
-    /// Used by `MetadataFetcher` implementations to both fetch and store
-    /// in one operation.
-    ///
-    /// # Arguments
-    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:publish")
-    /// * `filter` - Post filter criteria
-    /// * `page` - Page number to fetch (1-indexed)
-    /// * `per_page` - Number of posts per page
-    /// * `is_first_page` - If true, replaces metadata; if false, appends
-    ///
-    /// # Returns
-    /// - `Ok(MetadataFetchResult)` with post IDs and modification times
-    /// - `Err(FetchError)` if network error occurs
-    pub async fn fetch_and_store_metadata(
-        &self,
-        kv_key: &str,
-        filter: &AnyPostFilter,
-        page: u32,
-        per_page: u32,
-        is_first_page: bool,
-    ) -> Result<MetadataFetchResult, FetchError> {
-        let result = self.fetch_posts_metadata(filter, page, per_page).await?;
-
-        // Store metadata
-        if is_first_page {
-            self.metadata_store.set(kv_key, result.metadata.clone());
-        } else {
-            self.metadata_store.append(kv_key, result.metadata.clone());
-        }
-
-        // Detect stale posts by comparing modified_gmt
-        self.detect_and_mark_stale_posts(&result.metadata);
-
-        Ok(result)
-    }
-
     /// Fetch metadata and store it in the persistent database.
     ///
-    /// Similar to [`Self::fetch_and_store_metadata`] but stores to `MetadataService`
-    /// (database-backed) instead of the in-memory `ListMetadataStore`.
-    ///
-    /// Use this for collections that need metadata to persist across app restarts.
+    /// Stores metadata to `MetadataService` (database-backed) so list structure
+    /// persists across app restarts.
     ///
     /// # Arguments
     /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:publish")
@@ -690,18 +634,6 @@ impl PostService {
     /// being able to modify them.
     pub fn state_reader_with_edit_context(&self) -> Arc<dyn EntityStateReader> {
         self.state_store_with_edit_context.clone()
-    }
-
-    /// Get read-only access to the list metadata store (memory-only, legacy).
-    ///
-    /// Used by `MetadataCollection` to read list structure without
-    /// being able to modify it. The store is shared across all contexts -
-    /// callers should include context in the key string.
-    ///
-    /// Note: Consider using `persistent_metadata_reader()` for data that
-    /// should survive app restarts.
-    pub fn metadata_reader(&self) -> Arc<dyn ListMetadataReader> {
-        self.metadata_store.clone()
     }
 
     /// Get read-only access to the persistent metadata service.
