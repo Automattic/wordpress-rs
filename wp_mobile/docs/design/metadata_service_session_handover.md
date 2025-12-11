@@ -23,6 +23,12 @@
   - Collection now uses `persistent_metadata_reader()` and monitors `ListMetadataItems`
 - Preserved existing in-memory `metadata_store` for backwards compatibility (Phase 3.4 will remove)
 
+### Phase 4: Observer Split (mostly complete) ✅
+- Split `is_relevant_update` into `is_relevant_data_update` and `is_relevant_state_update`
+- Added relevance checking methods to `ListMetadataReader` trait
+- Added `sync_state()` method to query current ListState
+- Kotlin wrapper update (Phase 4.2) not started - requires platform-specific work
+
 ## Commits
 
 | Commit | Description |
@@ -32,6 +38,8 @@
 | `3c85514b` | Add MetadataService for database-backed list metadata |
 | `5c83b435` | Integrate MetadataService into PostService |
 | `7f2166e4` | Update MetadataService implementation plan with progress |
+| `7854e9e7` | Update PostMetadataCollection to use database-backed storage |
+| `ef4d65d0` | Split collection observers for data vs state updates |
 
 ## Key Files
 
@@ -89,6 +97,6 @@ See full documentation in `wp_mobile_cache/src/lib.rs`.
 
 See `metadata_service_implementation_plan.md` for full details:
 
-- **Phase 3.4**: Remove deprecated in-memory store (after migration)
-- **Phase 4**: Observer split (data vs state observers)
+- **Phase 3.4**: Remove deprecated in-memory store
+- **Phase 4.2**: Update Kotlin wrapper for split observers (platform-specific)
 - **Phase 5.3**: Update example app

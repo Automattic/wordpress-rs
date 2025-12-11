@@ -168,44 +168,42 @@ Can be removed once all callers migrate to persistent service.
 
 ---
 
-## Phase 4: Observer Split
+## Phase 4: Observer Split ✅ MOSTLY COMPLETE
 
-### 4.1 Split is_relevant_update
-**Status**: NOT STARTED
+### 4.1 Split is_relevant_update ✅
+**Status**: COMPLETE
 **File**: `wp_mobile/src/sync/metadata_collection.rs`
 
-Replace single `is_relevant_update` with:
-- `is_relevant_data_update(hook)` → checks ListMetadataItems + entity tables
-- `is_relevant_state_update(hook)` → checks ListMetadataState
+Split `is_relevant_update` into:
+- `is_relevant_data_update(hook)` → checks entity tables + ListMetadataItems
+- `is_relevant_state_update(hook)` → checks ListMetadataState with key matching
 
-Need to store `list_metadata_id` or derive it for state matching.
+Added to `ListMetadataReader` trait:
+- `get_list_metadata_id()` - get DB rowid for state matching
+- `is_item_row_for_key()` - check if item row belongs to key
+- `is_state_row_for_list()` - check if state row belongs to list
 
-**Commit**: "Split is_relevant_update into data and state checks"
+Added repository methods in `wp_mobile_cache` for relevance checking.
 
 ### 4.2 Update Kotlin Wrapper
-**Status**: NOT STARTED
+**Status**: NOT STARTED (requires platform-specific work)
 **File**: `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/ObservableMetadataCollection.kt`
 
-Changes:
+Changes needed:
 - Split `observers` into `dataObservers` and `stateObservers`
 - Add `addDataObserver()`, `addStateObserver()`, `removeDataObserver()`, `removeStateObserver()`
 - Keep `addObserver()` as convenience (adds to both)
 - Update `notifyIfRelevant()` to call appropriate observer lists
 
-**Commit**: "Split ObservableMetadataCollection observers for data vs state"
-
-### 4.3 Add State Query Method
-**Status**: NOT STARTED
+### 4.3 Add State Query Method ✅
+**Status**: COMPLETE
 **Files**:
-- `wp_mobile/src/collection/post_metadata_collection.rs`
-- Kotlin wrapper
+- `wp_mobile/src/sync/list_metadata_store.rs` - Added `get_sync_state()` to trait
+- `wp_mobile/src/service/metadata.rs` - Implemented for MetadataService
+- `wp_mobile/src/sync/metadata_collection.rs` - Added `sync_state()` method
+- `wp_mobile/src/collection/post_metadata_collection.rs` - Exposed to UniFFI
 
-Add method to query current sync state:
-- `syncState()` → ListState (idle, fetching_first_page, etc.)
-
-Useful for UI to show loading indicators.
-
-**Commit**: "Add syncState query to metadata collections"
+Added `sync_state()` method returning `ListState` (Idle, FetchingFirstPage, FetchingNextPage, Error)
 
 ---
 
@@ -252,9 +250,11 @@ Update to demonstrate:
 | 2.1-2.4 | ✅ Complete | `3c85514b` |
 | 3.1 | ⏸️ Deferred | - |
 | 3.2 | ✅ Complete | `5c83b435` |
-| 3.3 | ✅ Complete | - |
+| 3.3 | ✅ Complete | `7854e9e7` |
 | 3.4 | 🔲 Not Started | - |
-| 4.1-4.3 | 🔲 Not Started | - |
+| 4.1 | ✅ Complete | `ef4d65d0` |
+| 4.2 | 🔲 Not Started | - |
+| 4.3 | ✅ Complete | `ef4d65d0` |
 | 5.1-5.2 | ✅ Complete | (inline) |
 | 5.3 | 🔲 Not Started | - |
 
