@@ -9,7 +9,9 @@ use crate::{
     collection::{CollectionError, FetchError},
     filters::AnyPostFilter,
     service::posts::PostService,
-    sync::{EntityState, MetadataCollection, PostMetadataFetcherWithEditContext, SyncResult},
+    sync::{
+        EntityState, MetadataCollection, PersistentPostMetadataFetcherWithEditContext, SyncResult,
+    },
 };
 
 /// Item in a metadata collection with optional loaded data.
@@ -66,8 +68,8 @@ pub struct PostMetadataCollectionItem {
 /// ```
 #[derive(uniffi::Object)]
 pub struct PostMetadataCollectionWithEditContext {
-    /// The underlying metadata collection
-    collection: MetadataCollection<PostMetadataFetcherWithEditContext>,
+    /// The underlying metadata collection (database-backed)
+    collection: MetadataCollection<PersistentPostMetadataFetcherWithEditContext>,
 
     /// Reference to service for loading full entity data
     post_service: Arc<PostService>,
@@ -78,7 +80,7 @@ pub struct PostMetadataCollectionWithEditContext {
 
 impl PostMetadataCollectionWithEditContext {
     pub fn new(
-        collection: MetadataCollection<PostMetadataFetcherWithEditContext>,
+        collection: MetadataCollection<PersistentPostMetadataFetcherWithEditContext>,
         post_service: Arc<PostService>,
         filter: AnyPostFilter,
     ) -> Self {

@@ -148,10 +148,17 @@ Also extended `SyncResult` with `current_page` and `total_pages` fields.
 
 **Commit**: `5c83b435` - "Integrate MetadataService into PostService"
 
-### 3.3 Update Collection Creation
-**Status**: NOT STARTED
+### 3.3 Update Collection Creation ✅
+**Status**: COMPLETE
 
-Update `create_post_metadata_collection_with_edit_context` to use sync callback.
+Updated `create_post_metadata_collection_with_edit_context` to use persistent (database-backed) storage:
+
+Changes:
+- Added `fetch_and_store_metadata_persistent()` method to PostService (stores to MetadataService)
+- Created `PersistentPostMetadataFetcherWithEditContext` that uses the new method
+- Updated collection to use `persistent_metadata_reader()` instead of `metadata_reader()`
+- Added `DbTable::ListMetadataItems` to relevant_tables for data update notifications
+- Updated `PostMetadataCollectionWithEditContext` to use the persistent fetcher type
 
 ### 3.4 Remove Old Components
 **Status**: NOT STARTED
@@ -245,7 +252,8 @@ Update to demonstrate:
 | 2.1-2.4 | ✅ Complete | `3c85514b` |
 | 3.1 | ⏸️ Deferred | - |
 | 3.2 | ✅ Complete | `5c83b435` |
-| 3.3-3.4 | 🔲 Not Started | - |
+| 3.3 | ✅ Complete | - |
+| 3.4 | 🔲 Not Started | - |
 | 4.1-4.3 | 🔲 Not Started | - |
 | 5.1-5.2 | ✅ Complete | (inline) |
 | 5.3 | 🔲 Not Started | - |
@@ -265,7 +273,7 @@ Phase 2.1-2.4 (MetadataService) ✅
     ↓
 Phase 3.1 (Collection refactor) ⏸️ deferred
     ↓
-Phase 3.2-3.3 (PostService integration) ✅ partial
+Phase 3.2-3.3 (PostService integration) ✅
     ↓
 Phase 3.4 (Cleanup) 🔲
     ↓

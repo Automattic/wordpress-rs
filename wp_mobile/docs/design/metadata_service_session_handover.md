@@ -13,11 +13,15 @@
 - Implements `ListMetadataReader` trait for compatibility with existing code
 - 15 tests covering service operations
 
-### Phase 3: Integration (partial) ✅
+### Phase 3: Integration (mostly complete) ✅
 - Added `metadata_service` field to `PostService`
 - Added `sync_post_list()` method for database-backed sync orchestration
 - Extended `SyncResult` with `current_page` and `total_pages` fields
-- Preserved existing in-memory `metadata_store` for backwards compatibility
+- Updated `create_post_metadata_collection_with_edit_context` to use persistent storage:
+  - Added `fetch_and_store_metadata_persistent()` method
+  - Created `PersistentPostMetadataFetcherWithEditContext`
+  - Collection now uses `persistent_metadata_reader()` and monitors `ListMetadataItems`
+- Preserved existing in-memory `metadata_store` for backwards compatibility (Phase 3.4 will remove)
 
 ## Commits
 
@@ -85,7 +89,6 @@ See full documentation in `wp_mobile_cache/src/lib.rs`.
 
 See `metadata_service_implementation_plan.md` for full details:
 
-- **Phase 3.3**: Update collection creation to use sync callback
 - **Phase 3.4**: Remove deprecated in-memory store (after migration)
 - **Phase 4**: Observer split (data vs state observers)
 - **Phase 5.3**: Update example app

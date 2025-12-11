@@ -9,8 +9,8 @@ use crate::{
     service::metadata::MetadataService,
     sync::{
         EntityMetadata, EntityState, EntityStateReader, EntityStateStore, ListMetadataReader,
-        ListMetadataStore, MetadataCollection, MetadataFetchResult, PostMetadataFetcherWithEditContext,
-        SyncResult,
+        ListMetadataStore, MetadataCollection, MetadataFetchResult,
+        PersistentPostMetadataFetcherWithEditContext, SyncResult,
     },
 };
 use std::sync::Arc;
@@ -241,6 +241,65 @@ impl PostService {
             self.metadata_store.set(kv_key, result.metadata.clone());
         } else {
             self.metadata_store.append(kv_key, result.metadata.clone());
+        }
+
+        // Detect stale posts by comparing modified_gmt
+        self.detect_and_mark_stale_posts(&result.metadata);
+
+        Ok(result)
+    }
+
+    /// Fetch metadata and store it in the persistent database.
+    ///
+    /// Similar to [`Self::fetch_and_store_metadata`] but stores to `MetadataService`
+    /// (database-backed) instead of the in-memory `ListMetadataStore`.
+    ///
+    /// Use this for collections that need metadata to persist across app restarts.
+    ///
+    /// # Arguments
+    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:publish")
+    /// * `filter` - Post filter criteria
+    /// * `page` - Page number to fetch (1-indexed)
+    /// * `per_page` - Number of posts per page
+    /// * `is_first_page` - If true, replaces metadata; if false, appends
+    ///
+    /// # Returns
+    /// - `Ok(MetadataFetchResult)` with post IDs and modification times
+    /// - `Err(FetchError)` if network or database error occurs
+    pub async fn fetch_and_store_metadata_persistent(
+        &self,
+        kv_key: &str,
+        filter: &AnyPostFilter,
+        page: u32,
+        per_page: u32,
+        is_first_page: bool,
+    ) -> Result<MetadataFetchResult, FetchError> {
+        let result = self.fetch_posts_metadata(filter, page, per_page).await?;
+
+        // Store metadata to database
+        let store_result = if is_first_page {
+            self.metadata_service.set_items(kv_key, &result.metadata)
+        } else {
+            self.metadata_service.append_items(kv_key, &result.metadata)
+        };
+
+        if let Err(e) = store_result {
+            return Err(FetchError::Database {
+                err_message: e.to_string(),
+            });
+        }
+
+        // Update pagination info
+        if let Err(e) = self.metadata_service.update_pagination(
+            kv_key,
+            result.total_pages.map(|p| p as i64),
+            result.total_items,
+            page as i64,
+            per_page as i64,
+        ) {
+            return Err(FetchError::Database {
+                err_message: e.to_string(),
+            });
         }
 
         // Detect stale posts by comparing modified_gmt
@@ -810,7 +869,7 @@ impl PostService {
                 .unwrap_or_else(|| "all".to_string())
         );
 
-        let fetcher = PostMetadataFetcherWithEditContext::new(
+        let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
             self.clone(),
             filter.clone(),
             kv_key.clone(),
@@ -818,10 +877,14 @@ impl PostService {
 
         let metadata_collection = MetadataCollection::new(
             kv_key,
-            self.metadata_reader(),
+            self.persistent_metadata_reader(),
             self.state_reader_with_edit_context(),
             fetcher,
-            vec![DbTable::PostsEditContext, DbTable::TermRelationships],
+            vec![
+                DbTable::PostsEditContext,
+                DbTable::TermRelationships,
+                DbTable::ListMetadataItems,
+            ],
         );
 
         PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), filter)

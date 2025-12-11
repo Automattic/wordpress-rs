@@ -27,7 +27,8 @@
 //!
 //! ## Fetcher Implementations
 //!
-//! - [`PostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context
+//! - [`PostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context (in-memory store)
+//! - [`PersistentPostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context (database-backed)
 //!
 //! See `wp_mobile/docs/design/metadata_collection_v3.md` for full design details.
 
@@ -50,5 +51,7 @@ pub use list_metadata_store::{ListMetadataReader, ListMetadataStore};
 pub use metadata_collection::MetadataCollection;
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use metadata_fetcher::MetadataFetcher;
-pub use post_metadata_fetcher::PostMetadataFetcherWithEditContext;
+pub use post_metadata_fetcher::{
+    PersistentPostMetadataFetcherWithEditContext, PostMetadataFetcherWithEditContext,
+};
 pub use sync_result::SyncResult;
