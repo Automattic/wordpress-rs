@@ -98,6 +98,10 @@ where
         fetcher: F,
         relevant_data_tables: Vec<DbTable>,
     ) -> Self {
+        // Load persisted pagination state from database
+        let current_page = metadata_reader.get_current_page(&kv_key) as u32;
+        let total_pages = metadata_reader.get_total_pages(&kv_key).map(|p| p as u32);
+
         Self {
             kv_key,
             metadata_reader,
@@ -105,8 +109,8 @@ where
             fetcher,
             relevant_data_tables,
             pagination: RwLock::new(PaginationState {
-                current_page: 0,
-                total_pages: None,
+                current_page,
+                total_pages,
                 per_page: 20,
             }),
         }

@@ -383,6 +383,21 @@ impl ListMetadataReader for MetadataService {
         // Delegate to our existing method, default to Idle on error
         self.get_state(key).unwrap_or_default()
     }
+
+    fn get_current_page(&self, key: &str) -> i64 {
+        self.get_pagination(key)
+            .ok()
+            .flatten()
+            .map(|p| p.current_page)
+            .unwrap_or(0)
+    }
+
+    fn get_total_pages(&self, key: &str) -> Option<i64> {
+        self.get_pagination(key)
+            .ok()
+            .flatten()
+            .and_then(|p| p.total_pages)
+    }
 }
 
 /// Pagination info for a list.

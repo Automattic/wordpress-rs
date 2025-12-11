@@ -98,24 +98,32 @@ class PostMetadataCollectionViewModel(
     }
 
     /**
-     * Change the filter and reset pagination
+     * Change the filter and load persisted state from database
      */
     fun setFilter(status: String?) {
         val postStatus = status?.let { uniffi.wp_api.parsePostStatus(it) }
         val newFilter = AnyPostFilter(status = postStatus)
 
-        _state.value = PostMetadataCollectionState(
-            currentFilter = newFilter,
-            currentPage = 0u,
-            totalPages = null,
-            lastSyncResult = null,
-            lastError = null,
-            isSyncing = false
-        )
-
         observableCollection?.close()
         createObservableCollection(newFilter)
-        loadItemsFromCollection()
+
+        // Read persisted pagination state from database (sync values)
+        val collection = observableCollection
+        _state.value = PostMetadataCollectionState(
+            currentFilter = newFilter,
+            currentPage = collection?.currentPage() ?: 0u,
+            totalPages = collection?.totalPages(),
+            lastSyncResult = null,
+            lastError = null,
+            isSyncing = false,
+            syncState = ListState.IDLE
+        )
+
+        // Load items and syncState (async)
+        viewModelScope.launch(Dispatchers.Default) {
+            loadItemsFromCollectionInternal()
+            updateSyncState()
+        }
     }
 
     /**
@@ -136,14 +144,16 @@ class PostMetadataCollectionViewModel(
                     totalPages = collection.totalPages(),
                     lastSyncResult = result,
                     lastError = null,
-                    isSyncing = false
+                    isSyncing = false,
+                    syncState = collection.syncState()
                 )
 
                 loadItemsFromCollection()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     lastError = e.message ?: "Unknown error",
-                    isSyncing = false
+                    isSyncing = false,
+                    syncState = observableCollection?.syncState() ?: _state.value.syncState
                 )
             }
         }
@@ -174,14 +184,16 @@ class PostMetadataCollectionViewModel(
                     totalPages = collection.totalPages(),
                     lastSyncResult = result,
                     lastError = null,
-                    isSyncing = false
+                    isSyncing = false,
+                    syncState = collection.syncState()
                 )
 
                 loadItemsFromCollection()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     lastError = e.message ?: "Unknown error",
-                    isSyncing = false
+                    isSyncing = false,
+                    syncState = observableCollection?.syncState() ?: _state.value.syncState
                 )
             }
         }

@@ -58,4 +58,20 @@ pub trait ListMetadataReader: Send + Sync {
     fn get_sync_state(&self, _key: &str) -> wp_mobile_cache::list_metadata::ListState {
         wp_mobile_cache::list_metadata::ListState::Idle
     }
+
+    /// Get the current page number for a list.
+    ///
+    /// Returns 0 if no pages have been fetched yet.
+    /// Default implementation returns 0.
+    fn get_current_page(&self, _key: &str) -> i64 {
+        0
+    }
+
+    /// Get the total number of pages for a list.
+    ///
+    /// Returns `None` if unknown (no fetch has completed yet).
+    /// Default implementation returns `None`.
+    fn get_total_pages(&self, _key: &str) -> Option<i64> {
+        None
+    }
 }
