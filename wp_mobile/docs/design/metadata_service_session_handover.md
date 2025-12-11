@@ -23,11 +23,11 @@
   - Collection now uses `persistent_metadata_reader()` and monitors `ListMetadataItems`
 - Preserved existing in-memory `metadata_store` for backwards compatibility (Phase 3.4 will remove)
 
-### Phase 4: Observer Split (mostly complete) ✅
+### Phase 4: Observer Split ✅
 - Split `is_relevant_update` into `is_relevant_data_update` and `is_relevant_state_update`
 - Added relevance checking methods to `ListMetadataReader` trait
 - Added `sync_state()` method to query current ListState
-- Kotlin wrapper update (Phase 4.2) not started - requires platform-specific work
+- Kotlin wrapper updated with split observers (`addDataObserver`, `addStateObserver`)
 
 ## Commits
 
@@ -93,10 +93,52 @@ See full documentation in `wp_mobile_cache/src/lib.rs`.
 
 ---
 
+### Phase 5: Example App ✅
+- Updated `PostMetadataCollectionViewModel` with split observers (data + state)
+- Added `syncState: ListState` to UI state for tracking database-backed sync state
+- Updated `PostMetadataCollectionScreen` to display sync state indicator
+
+## Key Bug Fixes (This Session)
+
+### 1. State Management in `fetch_and_store_metadata_persistent`
+**Problem**: State was never updated because `begin_refresh()`/`complete_sync()` weren't called.
+**Fix**: Added proper state management:
+- `begin_refresh()` at start for first page (sets `FetchingFirstPage`)
+- `begin_fetch_next_page()` for subsequent pages (sets `FetchingNextPage`)
+- `complete_sync()` on success (sets `Idle`)
+- `complete_sync_with_error()` on failure (sets `Error`)
+
+### 2. Deadlock in Hook Callbacks
+**Problem**: SQLite update hooks fire synchronously during transactions. If the hook callback queries the DB, it deadlocks waiting for the connection held by the transaction.
+**Fix**:
+- Made `load_items()` and `sync_state()` async in Rust (UniFFI dispatches to background thread)
+- Simplified `is_relevant_data_update()` and `is_relevant_state_update()` to not query DB (just check table names)
+- Kotlin observers launch coroutines to call suspend functions
+
+### 3. Load Next Page Without Refresh
+**Problem**: Clicking "Load Next Page" before "Refresh" caused issues (`current_page == 0`).
+**Fix**: Added early return in `MetadataCollection::load_next_page()` when `current_page == 0`.
+
+## Key Files Modified
+
+- `wp_mobile/src/service/posts.rs` - State management in `fetch_and_store_metadata_persistent`
+- `wp_mobile/src/sync/metadata_collection.rs` - Simplified relevance checks, added page check
+- `wp_mobile/src/collection/post_metadata_collection.rs` - Made `load_items()` and `sync_state()` async
+- `native/kotlin/.../ObservableMetadataCollection.kt` - Suspend functions for `loadItems()` and `syncState()`
+- `native/kotlin/.../PostMetadataCollectionViewModel.kt` - Coroutine-based observers
+- `native/kotlin/.../PostMetadataCollectionScreen.kt` - Sync state UI display
+
+## Design Decisions
+
+### Why Async for `load_items()` and `sync_state()`?
+Following the stateless collection pattern (`wp_mobile/src/collection/mod.rs`), DB-querying functions should be async so UniFFI dispatches them to background threads on client platforms. This avoids deadlocks when called from hook callbacks.
+
+### Why Simplified Relevance Checks?
+Querying the DB inside `is_relevant_update()` defeats the purpose of lightweight relevance checking and causes deadlocks. Better to have false positives (extra refreshes) than deadlocks.
+
 ## Remaining Work
 
 See `metadata_service_implementation_plan.md` for full details:
 
 - **Phase 3.4**: Remove deprecated in-memory store
-- **Phase 4.2**: Update Kotlin wrapper for split observers (platform-specific)
-- **Phase 5.3**: Update example app
+- **Remove debug println statements** from `fetch_and_store_metadata_persistent` and Kotlin files

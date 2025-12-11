@@ -15,6 +15,7 @@ import uniffi.wp_mobile.EntityState
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.SyncResult
 import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile_cache.ListState
 
 /**
  * UI state for the post metadata collection screen
@@ -25,7 +26,8 @@ data class PostMetadataCollectionState(
     val totalPages: UInt? = null,
     val lastSyncResult: SyncResult? = null,
     val lastError: String? = null,
-    val isSyncing: Boolean = false
+    val isSyncing: Boolean = false,
+    val syncState: ListState = ListState.IDLE
 ) {
     val hasMorePages: Boolean
         get() = totalPages?.let { currentPage < it } ?: true
@@ -154,6 +156,12 @@ class PostMetadataCollectionViewModel(
         if (_state.value.isSyncing) return
         if (!_state.value.hasMorePages) return
 
+        // If no pages have been loaded yet, do a refresh instead
+        if (_state.value.currentPage == 0u) {
+            refresh()
+            return
+        }
+
         _state.value = _state.value.copy(isSyncing = true, lastError = null)
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -183,24 +191,48 @@ class PostMetadataCollectionViewModel(
         val postService = selfHostedService.posts()
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(filter)
 
-        observable.addObserver {
-            loadItemsFromCollection()
+        // Data observer: refresh list contents when data changes
+        // Note: Must dispatch to coroutine since loadItems() is a suspend function
+        observable.addDataObserver {
+            println("[ViewModel] Data observer triggered")
+            viewModelScope.launch(Dispatchers.Default) {
+                loadItemsFromCollectionInternal()
+            }
+        }
+
+        // State observer: update sync state indicator when state changes
+        // Note: Must dispatch to coroutine since syncState() is a suspend function
+        observable.addStateObserver {
+            println("[ViewModel] State observer triggered")
+            viewModelScope.launch(Dispatchers.Default) {
+                updateSyncState()
+            }
         }
 
         observableCollection = observable
     }
 
+    private suspend fun updateSyncState() {
+        val collection = observableCollection ?: return
+        val newSyncState = collection.syncState()
+        println("[ViewModel] updateSyncState: new state = $newSyncState")
+        _state.value = _state.value.copy(syncState = newSyncState)
+    }
+
+    private suspend fun loadItemsFromCollectionInternal() {
+        try {
+            val collection = observableCollection ?: return
+            val rawItems = collection.loadItems()
+            _items.value = rawItems.map { PostItemDisplayData.fromCollectionItem(it) }
+        } catch (e: Exception) {
+            println("Error loading items from collection: ${e.message}")
+            _items.value = emptyList()
+        }
+    }
+
     private fun loadItemsFromCollection() {
         viewModelScope.launch(Dispatchers.Default) {
-            try {
-                val collection = observableCollection ?: return@launch
-                val rawItems = collection.loadItems()
-
-                _items.value = rawItems.map { PostItemDisplayData.fromCollectionItem(it) }
-            } catch (e: Exception) {
-                println("Error loading items from collection: ${e.message}")
-                _items.value = emptyList()
-            }
+            loadItemsFromCollectionInternal()
         }
     }
 

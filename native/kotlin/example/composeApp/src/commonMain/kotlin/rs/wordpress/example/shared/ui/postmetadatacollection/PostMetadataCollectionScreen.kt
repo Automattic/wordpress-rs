@@ -36,10 +36,14 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
 import uniffi.wp_mobile.EntityState
+import uniffi.wp_mobile_cache.ListState
 
 @Composable
 @Preview
-fun PostMetadataCollectionScreen(viewModel: PostMetadataCollectionViewModel = koinInject()) {
+fun PostMetadataCollectionScreen(
+    viewModel: PostMetadataCollectionViewModel = koinInject(),
+    onBackClicked: (() -> Unit)? = null
+) {
     val state by viewModel.state.collectAsState()
     val items by viewModel.items.collectAsState()
     val listState = rememberLazyListState()
@@ -49,6 +53,19 @@ fun PostMetadataCollectionScreen(viewModel: PostMetadataCollectionViewModel = ko
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize().padding(16.dp),
         ) {
+            // Back button (for desktop)
+            if (onBackClicked != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    TextButton(onClick = onBackClicked) {
+                        Text("← Back")
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // Filter controls
             FilterControls(
                 currentFilter = state.filterStatusString,
@@ -185,6 +202,20 @@ fun InfoCard(
             Text(text = "Items: $itemCount")
             Text(text = "Page: ${state.currentPage}" + (state.totalPages?.let { " / $it" } ?: ""))
 
+            // Show sync state from database
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "Sync State:")
+                SyncStateIndicator(state.syncState)
+                Text(
+                    text = syncStateDisplayName(state.syncState),
+                    style = MaterialTheme.typography.body2,
+                    color = syncStateColor(state.syncState)
+                )
+            }
+
             // Show last sync result
             state.lastSyncResult?.let { result ->
                 Spacer(modifier = Modifier.height(8.dp))
@@ -314,6 +345,31 @@ fun stateDisplayName(state: EntityState): String = when (state) {
     is EntityState.Cached -> "cached"
     is EntityState.Stale -> "stale"
     is EntityState.Failed -> "failed"
+}
+
+@Composable
+fun SyncStateIndicator(state: ListState) {
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .clip(CircleShape)
+            .background(syncStateColor(state))
+    )
+}
+
+fun syncStateDisplayName(state: ListState): String = when (state) {
+    ListState.IDLE -> "Idle"
+    ListState.FETCHING_FIRST_PAGE -> "Fetching First Page"
+    ListState.FETCHING_NEXT_PAGE -> "Fetching Next Page"
+    ListState.ERROR -> "Error"
+}
+
+@Composable
+fun syncStateColor(state: ListState): Color = when (state) {
+    ListState.IDLE -> Color(0xFF2E7D32) // Dark green
+    ListState.FETCHING_FIRST_PAGE -> Color.Blue
+    ListState.FETCHING_NEXT_PAGE -> Color.Cyan
+    ListState.ERROR -> Color.Red
 }
 
 @Composable

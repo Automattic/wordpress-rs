@@ -3,6 +3,7 @@ package rs.wordpress.cache.kotlin
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.PostMetadataCollectionWithEditContext
 import uniffi.wp_mobile.SyncResult
+import uniffi.wp_mobile_cache.ListState
 import uniffi.wp_mobile_cache.UpdateHook
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -71,24 +72,69 @@ fun createObservableMetadataCollection(
 class ObservableMetadataCollection(
     private val collection: PostMetadataCollectionWithEditContext
 ) : AutoCloseable {
-    private val observers = CopyOnWriteArrayList<() -> Unit>()
+    private val dataObservers = CopyOnWriteArrayList<() -> Unit>()
+    private val stateObservers = CopyOnWriteArrayList<() -> Unit>()
 
     /**
-     * Add an observer to be notified when collection data changes.
+     * Add an observer for data changes (list contents changed).
      *
-     * Observers are called when a relevant database update occurs.
-     * The observer is a simple callback - it doesn't receive the new data,
-     * just a notification to re-read via [loadItems].
+     * Data observers are notified when:
+     * - Entity data changes (posts updated, deleted, etc.)
+     * - List metadata items change (list structure changed)
+     *
+     * Use this for refreshing list contents in the UI.
      */
-    fun addObserver(observer: () -> Unit) {
-        observers.add(observer)
+    fun addDataObserver(observer: () -> Unit) {
+        dataObservers.add(observer)
     }
 
     /**
-     * Remove a previously added observer.
+     * Add an observer for state changes (sync status changed).
+     *
+     * State observers are notified when the sync state changes:
+     * - Idle -> FetchingFirstPage (refresh started)
+     * - Idle -> FetchingNextPage (load more started)
+     * - Fetching* -> Idle (sync completed)
+     * - Fetching* -> Error (sync failed)
+     *
+     * Use this for updating loading indicators in the UI.
+     */
+    fun addStateObserver(observer: () -> Unit) {
+        stateObservers.add(observer)
+    }
+
+    /**
+     * Add an observer for both data and state changes.
+     *
+     * This is a convenience method that registers the observer for both
+     * data and state updates. Use this when you want to refresh the entire
+     * UI on any change.
+     */
+    fun addObserver(observer: () -> Unit) {
+        dataObservers.add(observer)
+        stateObservers.add(observer)
+    }
+
+    /**
+     * Remove a data observer.
+     */
+    fun removeDataObserver(observer: () -> Unit) {
+        dataObservers.remove(observer)
+    }
+
+    /**
+     * Remove a state observer.
+     */
+    fun removeStateObserver(observer: () -> Unit) {
+        stateObservers.remove(observer)
+    }
+
+    /**
+     * Remove an observer from both data and state lists.
      */
     fun removeObserver(observer: () -> Unit) {
-        observers.remove(observer)
+        dataObservers.remove(observer)
+        stateObservers.remove(observer)
     }
 
     /**
@@ -99,10 +145,10 @@ class ObservableMetadataCollection(
      * - `state`: Current fetch state (Missing, Fetching, Cached, Stale, Failed)
      * - `data`: Full entity data when state is Cached, null otherwise
      *
-     * This is a synchronous operation that reads from cache/memory stores.
+     * This is a suspend function that reads from cache/memory stores on a background thread.
      * Use the state to determine how to render each item in the UI.
      */
-    fun loadItems(): List<PostMetadataCollectionItem> = collection.loadItems()
+    suspend fun loadItems(): List<PostMetadataCollectionItem> = collection.loadItems()
 
     /**
      * Refresh the collection (fetch page 1, replace metadata).
@@ -148,13 +194,35 @@ class ObservableMetadataCollection(
     fun totalPages(): UInt? = collection.totalPages()
 
     /**
+     * Get the current sync state for this collection.
+     *
+     * Returns:
+     * - [ListState.IDLE] - No sync in progress
+     * - [ListState.FETCHING_FIRST_PAGE] - Refresh in progress
+     * - [ListState.FETCHING_NEXT_PAGE] - Load more in progress
+     * - [ListState.ERROR] - Last sync failed
+     *
+     * Use this with state observers to show loading indicators in the UI.
+     * This is a suspend function that reads from the database on a background thread.
+     */
+    suspend fun syncState(): ListState = collection.syncState()
+
+    /**
      * Internal method called by DatabaseChangeNotifier when a database update occurs.
      *
-     * Checks if the update is relevant to this collection, and if so, notifies all observers.
+     * Checks relevance and notifies appropriate observers:
+     * - Data updates -> dataObservers
+     * - State updates -> stateObservers
      */
     internal fun notifyIfRelevant(hook: UpdateHook) {
-        if (collection.isRelevantUpdate(hook)) {
-            observers.forEach { it() }
+        val isDataRelevant = collection.isRelevantDataUpdate(hook)
+        val isStateRelevant = collection.isRelevantStateUpdate(hook)
+        println("[ObservableMetadataCollection] notifyIfRelevant: table=${hook.table}, rowId=${hook.rowId}, isDataRelevant=$isDataRelevant, isStateRelevant=$isStateRelevant")
+        if (isDataRelevant) {
+            dataObservers.forEach { it() }
+        }
+        if (isStateRelevant) {
+            stateObservers.forEach { it() }
         }
     }
 

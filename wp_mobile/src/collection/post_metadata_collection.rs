@@ -102,7 +102,12 @@ impl PostMetadataCollectionWithEditContext {
     /// - `data`: Full entity data when state is Cached, None otherwise
     ///
     /// This is the primary method for getting collection contents to display.
-    pub fn load_items(&self) -> Result<Vec<PostMetadataCollectionItem>, CollectionError> {
+    ///
+    /// # Note
+    /// This async function is exported to client platforms (Kotlin/Swift) where it
+    /// will be executed on a background thread. The underlying Rust implementation
+    /// is synchronous as rusqlite doesn't support async operations.
+    pub async fn load_items(&self) -> Result<Vec<PostMetadataCollectionItem>, CollectionError> {
         let items = self.collection.items();
 
         // Load all cached posts in one query
@@ -196,7 +201,12 @@ impl PostMetadataCollectionWithEditContext {
     ///
     /// Use this to show loading indicators in the UI. Observe state changes
     /// via `is_relevant_state_update`.
-    pub fn sync_state(&self) -> wp_mobile_cache::list_metadata::ListState {
+    ///
+    /// # Note
+    /// This async function is exported to client platforms (Kotlin/Swift) where it
+    /// will be executed on a background thread. The underlying Rust implementation
+    /// is synchronous as rusqlite doesn't support async operations.
+    pub async fn sync_state(&self) -> wp_mobile_cache::list_metadata::ListState {
         self.collection.sync_state()
     }
 

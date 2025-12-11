@@ -274,9 +274,64 @@ impl PostService {
         per_page: u32,
         is_first_page: bool,
     ) -> Result<MetadataFetchResult, FetchError> {
-        let result = self.fetch_posts_metadata(filter, page, per_page).await?;
+        println!(
+            "[fetch_and_store_metadata_persistent] Starting: key={}, page={}, is_first_page={}",
+            kv_key, page, is_first_page
+        );
+
+        // Update state to fetching (this creates the list if needed)
+        if is_first_page {
+            println!("[fetch_and_store_metadata_persistent] Calling begin_refresh...");
+            if let Err(e) = self.metadata_service.begin_refresh(kv_key) {
+                println!("[fetch_and_store_metadata_persistent] begin_refresh failed: {}", e);
+                return Err(FetchError::Database {
+                    err_message: e.to_string(),
+                });
+            }
+            println!("[fetch_and_store_metadata_persistent] begin_refresh succeeded");
+        } else {
+            println!("[fetch_and_store_metadata_persistent] Calling begin_fetch_next_page...");
+            match self.metadata_service.begin_fetch_next_page(kv_key) {
+                Ok(Some(_)) => println!("[fetch_and_store_metadata_persistent] begin_fetch_next_page succeeded"),
+                Ok(None) => {
+                    // No pages to fetch - either no pages loaded yet or already at last page
+                    // This shouldn't happen if the caller checked properly, but handle it gracefully
+                    println!("[fetch_and_store_metadata_persistent] begin_fetch_next_page returned None - need refresh first or at last page");
+                    return Err(FetchError::Database {
+                        err_message: "Cannot load next page: no pages loaded yet or already at last page. Try refresh first.".to_string(),
+                    });
+                }
+                Err(e) => {
+                    println!("[fetch_and_store_metadata_persistent] begin_fetch_next_page failed: {}", e);
+                    return Err(FetchError::Database {
+                        err_message: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        // Fetch metadata from network
+        println!("[fetch_and_store_metadata_persistent] Fetching from network...");
+        let result = match self.fetch_posts_metadata(filter, page, per_page).await {
+            Ok(result) => {
+                println!(
+                    "[fetch_and_store_metadata_persistent] Network fetch succeeded: {} items",
+                    result.metadata.len()
+                );
+                result
+            }
+            Err(e) => {
+                println!("[fetch_and_store_metadata_persistent] Network fetch failed: {}", e);
+                // Mark sync as failed
+                let _ = self
+                    .metadata_service
+                    .complete_sync_with_error(kv_key, &e.to_string());
+                return Err(e);
+            }
+        };
 
         // Store metadata to database
+        println!("[fetch_and_store_metadata_persistent] Storing metadata to database...");
         let store_result = if is_first_page {
             self.metadata_service.set_items(kv_key, &result.metadata)
         } else {
@@ -284,12 +339,18 @@ impl PostService {
         };
 
         if let Err(e) = store_result {
+            println!("[fetch_and_store_metadata_persistent] Store metadata failed: {}", e);
+            let _ = self
+                .metadata_service
+                .complete_sync_with_error(kv_key, &e.to_string());
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
         }
+        println!("[fetch_and_store_metadata_persistent] Store metadata succeeded");
 
         // Update pagination info
+        println!("[fetch_and_store_metadata_persistent] Updating pagination...");
         if let Err(e) = self.metadata_service.update_pagination(
             kv_key,
             result.total_pages.map(|p| p as i64),
@@ -297,13 +358,28 @@ impl PostService {
             page as i64,
             per_page as i64,
         ) {
+            println!("[fetch_and_store_metadata_persistent] Update pagination failed: {}", e);
+            let _ = self
+                .metadata_service
+                .complete_sync_with_error(kv_key, &e.to_string());
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
         }
+        println!("[fetch_and_store_metadata_persistent] Update pagination succeeded");
 
         // Detect stale posts by comparing modified_gmt
         self.detect_and_mark_stale_posts(&result.metadata);
+
+        // Mark sync as complete
+        println!("[fetch_and_store_metadata_persistent] Calling complete_sync...");
+        if let Err(e) = self.metadata_service.complete_sync(kv_key) {
+            println!("[fetch_and_store_metadata_persistent] complete_sync failed: {}", e);
+            return Err(FetchError::Database {
+                err_message: e.to_string(),
+            });
+        }
+        println!("[fetch_and_store_metadata_persistent] complete_sync succeeded, returning result");
 
         Ok(result)
     }

@@ -14,13 +14,6 @@ struct PaginationState {
     per_page: u32,
 }
 
-/// Cached state for relevance checking.
-#[derive(Debug, Default)]
-struct RelevanceCache {
-    /// Cached list_metadata_id (populated lazily on first state relevance check)
-    list_metadata_id: Option<i64>,
-}
-
 /// Collection that uses metadata-first fetching strategy.
 ///
 /// This collection type:
@@ -84,9 +77,6 @@ where
 
     /// Pagination state (uses interior mutability for UniFFI compatibility)
     pagination: RwLock<PaginationState>,
-
-    /// Cached state for relevance checking
-    relevance_cache: RwLock<RelevanceCache>,
 }
 
 impl<F> MetadataCollection<F>
@@ -119,7 +109,6 @@ where
                 total_pages: None,
                 per_page: 20,
             }),
-            relevance_cache: RwLock::new(RelevanceCache::default()),
         }
     }
 
@@ -171,20 +160,23 @@ where
     ///
     /// Returns `true` if the update is to:
     /// - An entity table this collection monitors (e.g., PostsEditContext, TermRelationships)
-    /// - The ListMetadataItems table for this collection's key
+    /// - The ListMetadataItems table (any row - we can't filter by key without deadlocking)
     ///
     /// Use this for data observers that should refresh list contents.
+    ///
+    /// Note: We intentionally don't query the database here to avoid deadlocks when
+    /// the hook fires during a transaction. This means we may get false positives for
+    /// ListMetadataItems updates from other collections, but that's safe (just extra refreshes).
     pub fn is_relevant_data_update(&self, hook: &UpdateHook) -> bool {
         // Check entity tables
         if self.relevant_data_tables.contains(&hook.table) {
             return true;
         }
 
-        // Check ListMetadataItems for this specific key
+        // Check ListMetadataItems - return true for any update to avoid deadlock
+        // (we can't query the DB to check if it's our key during a hook callback)
         if hook.table == DbTable::ListMetadataItems {
-            return self
-                .metadata_reader
-                .is_item_row_for_key(hook.row_id, &self.kv_key);
+            return true;
         }
 
         false
@@ -192,40 +184,16 @@ where
 
     /// Check if a database update affects this collection's sync state.
     ///
-    /// Returns `true` if the update is to the ListMetadataState table
-    /// for this collection's specific list.
+    /// Returns `true` if the update is to the ListMetadataState table.
     ///
     /// Use this for state observers that should update loading indicators.
+    ///
+    /// Note: We intentionally don't query the database here to avoid deadlocks when
+    /// the hook fires during a transaction. This means we may get false positives for
+    /// state updates from other collections, but that's safe (just extra state reads).
     pub fn is_relevant_state_update(&self, hook: &UpdateHook) -> bool {
-        if hook.table != DbTable::ListMetadataState {
-            return false;
-        }
-
-        // Get or cache the list_metadata_id
-        let list_metadata_id = {
-            let cache = self.relevance_cache.read().unwrap();
-            cache.list_metadata_id
-        };
-
-        let list_metadata_id = match list_metadata_id {
-            Some(id) => id,
-            None => {
-                // Try to get from database
-                let id = self.metadata_reader.get_list_metadata_id(&self.kv_key);
-                if let Some(id) = id {
-                    // Cache for next time
-                    self.relevance_cache.write().unwrap().list_metadata_id = Some(id);
-                    id
-                } else {
-                    // List doesn't exist yet, so this state update isn't for us
-                    return false;
-                }
-            }
-        };
-
-        // Check if the state row belongs to our list
-        self.metadata_reader
-            .is_state_row_for_list(hook.row_id, list_metadata_id)
+        // Just check the table - don't query DB to avoid deadlock
+        hook.table == DbTable::ListMetadataState
     }
 
     /// Refresh the collection (fetch page 1, replace metadata).
@@ -268,26 +236,38 @@ where
     /// 2. Appends to existing metadata in the store
     /// 3. Fetches missing/stale entities from the new page
     ///
-    /// Returns `SyncResult::no_op()` if already on the last page.
+    /// Returns `SyncResult::no_op()` if already on the last page or no pages loaded yet.
     pub async fn load_next_page(&self) -> Result<SyncResult, FetchError> {
-        let (next_page, per_page, total_pages) = {
+        let (current_page, per_page, total_pages) = {
             let pagination = self.pagination.read().unwrap();
             (
-                pagination.current_page + 1,
+                pagination.current_page,
                 pagination.per_page,
                 pagination.total_pages,
             )
         };
 
+        // Check if no pages have been loaded yet (need refresh first)
+        if current_page == 0 {
+            println!("[MetadataCollection] No pages loaded yet, need refresh first");
+            return Ok(SyncResult::no_op(
+                self.items().len(),
+                true, // has_more_pages = true, but need refresh first
+                0,
+                None,
+            ));
+        }
+
+        let next_page = current_page + 1;
+
         // Check if we're already at the last page
         if total_pages.is_some_and(|total| next_page > total) {
             println!("[MetadataCollection] Already at last page, nothing to load");
-            let pagination = self.pagination.read().unwrap();
             return Ok(SyncResult::no_op(
                 self.items().len(),
                 false,
-                pagination.current_page,
-                pagination.total_pages,
+                current_page,
+                total_pages,
             ));
         }
 

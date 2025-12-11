@@ -185,15 +185,16 @@ Added to `ListMetadataReader` trait:
 
 Added repository methods in `wp_mobile_cache` for relevance checking.
 
-### 4.2 Update Kotlin Wrapper
-**Status**: NOT STARTED (requires platform-specific work)
+### 4.2 Update Kotlin Wrapper ✅
+**Status**: COMPLETE
 **File**: `native/kotlin/api/kotlin/src/main/kotlin/rs/wordpress/cache/kotlin/ObservableMetadataCollection.kt`
 
-Changes needed:
+Changes implemented:
 - Split `observers` into `dataObservers` and `stateObservers`
-- Add `addDataObserver()`, `addStateObserver()`, `removeDataObserver()`, `removeStateObserver()`
+- Added `addDataObserver()`, `addStateObserver()`, `removeDataObserver()`, `removeStateObserver()`
 - Keep `addObserver()` as convenience (adds to both)
-- Update `notifyIfRelevant()` to call appropriate observer lists
+- Updated `notifyIfRelevant()` to call appropriate observer lists based on relevance checks
+- Added `syncState()` method to query current `ListState` from database
 
 ### 4.3 Add State Query Method ✅
 **Status**: COMPLETE
@@ -228,16 +229,27 @@ Unit tests for MetadataService operations.
 
 **Test count**: 15 tests in MetadataService
 
-### 5.3 Update Example App
-**Status**: NOT STARTED
-**File**: Kotlin example app
+### 5.3 Update Example App ✅
+**Status**: COMPLETE
+**Files**:
+- `native/kotlin/example/composeApp/.../PostMetadataCollectionViewModel.kt`
+- `native/kotlin/example/composeApp/.../PostMetadataCollectionScreen.kt`
 
-Update to demonstrate:
-- Data observers for list content
-- State observers for loading indicator
-- Pull-to-refresh with proper state transitions
+Changes implemented:
+- Added `syncState: ListState` to `PostMetadataCollectionState`
+- Split observer registration: `addDataObserver` for list contents, `addStateObserver` for sync state
+- Added `SyncStateIndicator` component showing current sync state from database
+- Color-coded indicators: Green (Idle), Blue (FetchingFirstPage), Cyan (FetchingNextPage), Red (Error)
+- Observers use coroutines to call suspend functions (`loadItems()`, `syncState()`)
 
-**Commit**: "Update example app for split observers"
+### 5.4 Bug Fixes ✅
+**Status**: COMPLETE
+
+Key fixes made during implementation:
+1. **State management**: Added `begin_refresh()`/`complete_sync()` calls to `fetch_and_store_metadata_persistent`
+2. **Deadlock prevention**: Made `load_items()` and `sync_state()` async (UniFFI background dispatch)
+3. **Relevance checks**: Simplified to not query DB (avoids deadlock, accepts false positives)
+4. **Page validation**: Added `current_page == 0` check in `load_next_page()`
 
 ---
 
@@ -253,10 +265,10 @@ Update to demonstrate:
 | 3.3 | ✅ Complete | `7854e9e7` |
 | 3.4 | 🔲 Not Started | - |
 | 4.1 | ✅ Complete | `ef4d65d0` |
-| 4.2 | 🔲 Not Started | - |
+| 4.2 | ✅ Complete | (pending commit) |
 | 4.3 | ✅ Complete | `ef4d65d0` |
 | 5.1-5.2 | ✅ Complete | (inline) |
-| 5.3 | 🔲 Not Started | - |
+| 5.3 | ✅ Complete | (pending commit) |
 
 ## Dependency Order Summary
 
@@ -277,9 +289,9 @@ Phase 3.2-3.3 (PostService integration) ✅
     ↓
 Phase 3.4 (Cleanup) 🔲
     ↓
-Phase 4.1-4.3 (Observer split) 🔲
+Phase 4.1-4.3 (Observer split) ✅
     ↓
-Phase 5 (Testing) ✅ partial
+Phase 5 (Testing & Example App) ✅
 ```
 
 ## Risk Areas

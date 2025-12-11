@@ -74,10 +74,14 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
                 StressTestScreen()
             }
             composable("postcollection") {
-                PostCollectionScreen()
+                PostCollectionScreen(
+                    onBackClicked = { navController.popBackStack() }
+                )
             }
             composable("postmetadatacollection") {
-                PostMetadataCollectionScreen()
+                PostMetadataCollectionScreen(
+                    onBackClicked = { navController.popBackStack() }
+                )
             }
         }
     }
