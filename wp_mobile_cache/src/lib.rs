@@ -6,6 +6,7 @@ use std::sync::Mutex;
 pub mod context;
 pub mod db_types;
 pub mod entity;
+pub mod list_metadata;
 pub mod repository;
 pub mod term_relationships;
 
@@ -64,6 +65,12 @@ pub enum DbTable {
     DbSites,
     /// Term relationships (post-category, post-tag associations)
     TermRelationships,
+    /// List metadata headers (pagination, version)
+    ListMetadata,
+    /// List metadata items (entity IDs with ordering)
+    ListMetadataItems,
+    /// List metadata sync state (idle, fetching, error)
+    ListMetadataState,
 }
 
 impl DbTable {
@@ -79,6 +86,9 @@ impl DbTable {
             DbTable::SelfHostedSites => "self_hosted_sites",
             DbTable::DbSites => "db_sites",
             DbTable::TermRelationships => "term_relationships",
+            DbTable::ListMetadata => "list_metadata",
+            DbTable::ListMetadataItems => "list_metadata_items",
+            DbTable::ListMetadataState => "list_metadata_state",
         }
     }
 }
@@ -107,6 +117,9 @@ impl TryFrom<&str> for DbTable {
             "self_hosted_sites" => Ok(DbTable::SelfHostedSites),
             "db_sites" => Ok(DbTable::DbSites),
             "term_relationships" => Ok(DbTable::TermRelationships),
+            "list_metadata" => Ok(DbTable::ListMetadata),
+            "list_metadata_items" => Ok(DbTable::ListMetadataItems),
+            "list_metadata_state" => Ok(DbTable::ListMetadataState),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -350,13 +363,14 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 6] = [
+static MIGRATION_QUERIES: [&str; 7] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
     include_str!("../migrations/0004-create-posts-view-context-table.sql"),
     include_str!("../migrations/0005-create-posts-embed-context-table.sql"),
     include_str!("../migrations/0006-create-self-hosted-sites-table.sql"),
+    include_str!("../migrations/0007-create-list-metadata-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {
