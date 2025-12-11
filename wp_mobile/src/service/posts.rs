@@ -218,35 +218,39 @@ impl PostService {
         per_page: u32,
         is_first_page: bool,
     ) -> Result<MetadataFetchResult, FetchError> {
-        println!(
-            "[fetch_and_store_metadata_persistent] Starting: key={}, page={}, is_first_page={}",
+        let mut log = vec![format!(
+            "key={}, page={}, is_first_page={}",
             kv_key, page, is_first_page
-        );
+        )];
+
+        // Helper to print log on early return
+        let print_log = |log: &[String], status: &str| {
+            println!("[PostService] fetch_metadata_persistent:\n  {} | {}", log.join(" -> "), status);
+        };
 
         // Update state to fetching (this creates the list if needed)
         if is_first_page {
-            println!("[fetch_and_store_metadata_persistent] Calling begin_refresh...");
             if let Err(e) = self.metadata_service.begin_refresh(kv_key) {
-                println!("[fetch_and_store_metadata_persistent] begin_refresh failed: {}", e);
+                log.push(format!("begin_refresh failed: {}", e));
+                print_log(&log, "FAILED");
                 return Err(FetchError::Database {
                     err_message: e.to_string(),
                 });
             }
-            println!("[fetch_and_store_metadata_persistent] begin_refresh succeeded");
+            log.push("begin_refresh".to_string());
         } else {
-            println!("[fetch_and_store_metadata_persistent] Calling begin_fetch_next_page...");
             match self.metadata_service.begin_fetch_next_page(kv_key) {
-                Ok(Some(_)) => println!("[fetch_and_store_metadata_persistent] begin_fetch_next_page succeeded"),
+                Ok(Some(_)) => log.push("begin_fetch_next_page".to_string()),
                 Ok(None) => {
-                    // No pages to fetch - either no pages loaded yet or already at last page
-                    // This shouldn't happen if the caller checked properly, but handle it gracefully
-                    println!("[fetch_and_store_metadata_persistent] begin_fetch_next_page returned None - need refresh first or at last page");
+                    log.push("begin_fetch_next_page returned None".to_string());
+                    print_log(&log, "FAILED");
                     return Err(FetchError::Database {
                         err_message: "Cannot load next page: no pages loaded yet or already at last page. Try refresh first.".to_string(),
                     });
                 }
                 Err(e) => {
-                    println!("[fetch_and_store_metadata_persistent] begin_fetch_next_page failed: {}", e);
+                    log.push(format!("begin_fetch_next_page failed: {}", e));
+                    print_log(&log, "FAILED");
                     return Err(FetchError::Database {
                         err_message: e.to_string(),
                     });
@@ -255,18 +259,14 @@ impl PostService {
         }
 
         // Fetch metadata from network
-        println!("[fetch_and_store_metadata_persistent] Fetching from network...");
         let result = match self.fetch_posts_metadata(filter, page, per_page).await {
             Ok(result) => {
-                println!(
-                    "[fetch_and_store_metadata_persistent] Network fetch succeeded: {} items",
-                    result.metadata.len()
-                );
+                log.push(format!("fetched {} items", result.metadata.len()));
                 result
             }
             Err(e) => {
-                println!("[fetch_and_store_metadata_persistent] Network fetch failed: {}", e);
-                // Mark sync as failed
+                log.push(format!("network failed: {}", e));
+                print_log(&log, "FAILED");
                 let _ = self
                     .metadata_service
                     .complete_sync_with_error(kv_key, &e.to_string());
@@ -275,7 +275,6 @@ impl PostService {
         };
 
         // Store metadata to database
-        println!("[fetch_and_store_metadata_persistent] Storing metadata to database...");
         let store_result = if is_first_page {
             self.metadata_service.set_items(kv_key, &result.metadata)
         } else {
@@ -283,7 +282,8 @@ impl PostService {
         };
 
         if let Err(e) = store_result {
-            println!("[fetch_and_store_metadata_persistent] Store metadata failed: {}", e);
+            log.push(format!("store failed: {}", e));
+            print_log(&log, "FAILED");
             let _ = self
                 .metadata_service
                 .complete_sync_with_error(kv_key, &e.to_string());
@@ -291,10 +291,9 @@ impl PostService {
                 err_message: e.to_string(),
             });
         }
-        println!("[fetch_and_store_metadata_persistent] Store metadata succeeded");
+        log.push("stored".to_string());
 
         // Update pagination info
-        println!("[fetch_and_store_metadata_persistent] Updating pagination...");
         if let Err(e) = self.metadata_service.update_pagination(
             kv_key,
             result.total_pages.map(|p| p as i64),
@@ -302,7 +301,8 @@ impl PostService {
             page as i64,
             per_page as i64,
         ) {
-            println!("[fetch_and_store_metadata_persistent] Update pagination failed: {}", e);
+            log.push(format!("pagination failed: {}", e));
+            print_log(&log, "FAILED");
             let _ = self
                 .metadata_service
                 .complete_sync_with_error(kv_key, &e.to_string());
@@ -310,21 +310,21 @@ impl PostService {
                 err_message: e.to_string(),
             });
         }
-        println!("[fetch_and_store_metadata_persistent] Update pagination succeeded");
+        log.push("pagination".to_string());
 
         // Detect stale posts by comparing modified_gmt
         self.detect_and_mark_stale_posts(&result.metadata);
 
         // Mark sync as complete
-        println!("[fetch_and_store_metadata_persistent] Calling complete_sync...");
         if let Err(e) = self.metadata_service.complete_sync(kv_key) {
-            println!("[fetch_and_store_metadata_persistent] complete_sync failed: {}", e);
+            log.push(format!("complete_sync failed: {}", e));
+            print_log(&log, "FAILED");
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
         }
-        println!("[fetch_and_store_metadata_persistent] complete_sync succeeded, returning result");
 
+        print_log(&log, "OK");
         Ok(result)
     }
 

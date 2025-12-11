@@ -217,7 +217,6 @@ class ObservableMetadataCollection(
     internal fun notifyIfRelevant(hook: UpdateHook) {
         val isDataRelevant = collection.isRelevantDataUpdate(hook)
         val isStateRelevant = collection.isRelevantStateUpdate(hook)
-        println("[ObservableMetadataCollection] notifyIfRelevant: table=${hook.table}, rowId=${hook.rowId}, isDataRelevant=$isDataRelevant, isStateRelevant=$isStateRelevant")
         if (isDataRelevant) {
             dataObservers.forEach { it() }
         }

@@ -194,7 +194,6 @@ class PostMetadataCollectionViewModel(
         // Data observer: refresh list contents when data changes
         // Note: Must dispatch to coroutine since loadItems() is a suspend function
         observable.addDataObserver {
-            println("[ViewModel] Data observer triggered")
             viewModelScope.launch(Dispatchers.Default) {
                 loadItemsFromCollectionInternal()
             }
@@ -203,7 +202,6 @@ class PostMetadataCollectionViewModel(
         // State observer: update sync state indicator when state changes
         // Note: Must dispatch to coroutine since syncState() is a suspend function
         observable.addStateObserver {
-            println("[ViewModel] State observer triggered")
             viewModelScope.launch(Dispatchers.Default) {
                 updateSyncState()
             }
