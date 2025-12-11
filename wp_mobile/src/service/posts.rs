@@ -273,14 +273,13 @@ impl PostService {
         // Compare and mark stale
         let mut stale_count = 0;
         for m in metadata.iter().filter(|m| cached_ids.contains(&m.id)) {
-            if let Some(fetched_modified) = &m.modified_gmt {
-                if let Some(cached_modified) = cached_timestamps.get(&m.id) {
-                    if fetched_modified != cached_modified {
-                        self.state_store_with_edit_context
-                            .set(m.id, EntityState::Stale);
-                        stale_count += 1;
-                    }
-                }
+            if let Some(fetched_modified) = &m.modified_gmt
+                && let Some(cached_modified) = cached_timestamps.get(&m.id)
+                && fetched_modified != cached_modified
+            {
+                self.state_store_with_edit_context
+                    .set(m.id, EntityState::Stale);
+                stale_count += 1;
             }
         }
 
