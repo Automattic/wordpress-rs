@@ -375,6 +375,136 @@ impl ListMetadataRepository {
 
         Ok(())
     }
+
+    // ============================================================
+    // Concurrency Helpers
+    // ============================================================
+
+    /// Begin a refresh operation (fetch first page).
+    ///
+    /// Atomically:
+    /// 1. Creates header if needed
+    /// 2. Increments version (invalidates any in-flight load-more)
+    /// 3. Updates state to FetchingFirstPage
+    /// 4. Returns info needed for the fetch
+    ///
+    /// Call this before starting an API fetch for page 1.
+    pub fn begin_refresh(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &str,
+    ) -> Result<RefreshInfo, SqliteDbError> {
+        // Ensure header exists and get its ID
+        let list_metadata_id = self.get_or_create(executor, site, key)?;
+
+        // Increment version (invalidates any in-flight load-more)
+        let version = self.increment_version(executor, site, key)?;
+
+        // Update state to fetching
+        self.update_state(executor, list_metadata_id, ListState::FetchingFirstPage, None)?;
+
+        // Get header for pagination info
+        let header = self.get_header(executor, site, key)?.unwrap();
+
+        Ok(RefreshInfo {
+            list_metadata_id,
+            version,
+            per_page: header.per_page,
+        })
+    }
+
+    /// Begin a load-next-page operation.
+    ///
+    /// Atomically:
+    /// 1. Gets current pagination state
+    /// 2. Checks if there are more pages to load
+    /// 3. Updates state to FetchingNextPage
+    /// 4. Returns info needed for the fetch (including version for later check)
+    ///
+    /// Returns None if already at the last page or no pages loaded yet.
+    /// Call this before starting an API fetch for page N+1.
+    pub fn begin_fetch_next_page(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &str,
+    ) -> Result<Option<FetchNextPageInfo>, SqliteDbError> {
+        let header = match self.get_header(executor, site, key)? {
+            Some(h) => h,
+            None => return Ok(None), // List doesn't exist
+        };
+
+        // Check if we have pages loaded and more to fetch
+        if header.current_page == 0 {
+            return Ok(None); // No pages loaded yet, need refresh first
+        }
+
+        if let Some(total_pages) = header.total_pages
+            && header.current_page >= total_pages
+        {
+            return Ok(None); // Already at last page
+        }
+
+        let next_page = header.current_page + 1;
+
+        // Update state to fetching
+        self.update_state(executor, header.row_id, ListState::FetchingNextPage, None)?;
+
+        Ok(Some(FetchNextPageInfo {
+            list_metadata_id: header.row_id,
+            page: next_page,
+            version: header.version,
+            per_page: header.per_page,
+        }))
+    }
+
+    /// Complete a sync operation successfully.
+    ///
+    /// Updates state to Idle and clears any error message.
+    pub fn complete_sync(
+        &self,
+        executor: &impl QueryExecutor,
+        list_metadata_id: RowId,
+    ) -> Result<(), SqliteDbError> {
+        self.update_state(executor, list_metadata_id, ListState::Idle, None)
+    }
+
+    /// Complete a sync operation with an error.
+    ///
+    /// Updates state to Error with the provided message.
+    pub fn complete_sync_with_error(
+        &self,
+        executor: &impl QueryExecutor,
+        list_metadata_id: RowId,
+        error_message: &str,
+    ) -> Result<(), SqliteDbError> {
+        self.update_state(executor, list_metadata_id, ListState::Error, Some(error_message))
+    }
+}
+
+/// Information returned when starting a refresh operation.
+#[derive(Debug, Clone)]
+pub struct RefreshInfo {
+    /// Row ID of the list_metadata record
+    pub list_metadata_id: RowId,
+    /// New version number (for concurrency checking)
+    pub version: i64,
+    /// Items per page setting
+    pub per_page: i64,
+}
+
+/// Information returned when starting a load-next-page operation.
+#[derive(Debug, Clone)]
+pub struct FetchNextPageInfo {
+    /// Row ID of the list_metadata record
+    pub list_metadata_id: RowId,
+    /// Page number to fetch
+    pub page: i64,
+    /// Version at start (check before storing results)
+    pub version: i64,
+    /// Items per page setting
+    pub per_page: i64,
 }
 
 /// Input for creating a list metadata item.
@@ -772,5 +902,160 @@ mod tests {
         for (i, item) in retrieved.iter().enumerate() {
             assert_eq!(item.entity_id, ((i + 1) * 100) as i64);
         }
+    }
+
+    // ============================================================
+    // Concurrency Helper Tests
+    // ============================================================
+
+    #[rstest]
+    fn test_begin_refresh_creates_header_and_sets_state(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        let info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+
+        // Verify version was incremented (from 0 to 1)
+        assert_eq!(info.version, 1);
+        assert_eq!(info.per_page, 20); // default
+
+        // Verify state is FetchingFirstPage
+        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert_eq!(state, ListState::FetchingFirstPage);
+    }
+
+    #[rstest]
+    fn test_begin_refresh_increments_version_each_time(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:draft";
+
+        let info1 = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert_eq!(info1.version, 1);
+
+        // Complete the first refresh
+        repo.complete_sync(&test_ctx.conn, info1.list_metadata_id).unwrap();
+
+        let info2 = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert_eq!(info2.version, 2);
+    }
+
+    #[rstest]
+    fn test_begin_fetch_next_page_returns_none_for_non_existent_list(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+
+        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, "nonexistent").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[rstest]
+    fn test_begin_fetch_next_page_returns_none_when_no_pages_loaded(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        // Create header but don't set current_page
+        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+
+        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[rstest]
+    fn test_begin_fetch_next_page_returns_none_at_last_page(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        // Set up header with current_page = total_pages
+        let update = ListMetadataHeaderUpdate {
+            total_pages: Some(3),
+            total_items: Some(60),
+            current_page: 3,
+            per_page: 20,
+        };
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
+
+        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[rstest]
+    fn test_begin_fetch_next_page_returns_info_when_more_pages(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        // Set up header with more pages available
+        let update = ListMetadataHeaderUpdate {
+            total_pages: Some(5),
+            total_items: Some(100),
+            current_page: 2,
+            per_page: 20,
+        };
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
+
+        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert!(result.is_some());
+
+        let info = result.unwrap();
+        assert_eq!(info.page, 3); // next page
+        assert_eq!(info.per_page, 20);
+
+        // Verify state changed to FetchingNextPage
+        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert_eq!(state, ListState::FetchingNextPage);
+    }
+
+    #[rstest]
+    fn test_complete_sync_sets_state_to_idle(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        let info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.complete_sync(&test_ctx.conn, info.list_metadata_id).unwrap();
+
+        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert_eq!(state, ListState::Idle);
+    }
+
+    #[rstest]
+    fn test_complete_sync_with_error_sets_state_and_message(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        let info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.complete_sync_with_error(&test_ctx.conn, info.list_metadata_id, "Network timeout").unwrap();
+
+        let state_record = repo.get_state(&test_ctx.conn, info.list_metadata_id).unwrap().unwrap();
+        assert_eq!(state_record.state, ListState::Error);
+        assert_eq!(state_record.error_message.as_deref(), Some("Network timeout"));
+    }
+
+    #[rstest]
+    fn test_version_check_detects_stale_operation(test_ctx: TestContext) {
+        let repo = list_metadata_repo();
+        let key = "edit:posts:publish";
+
+        // Start a refresh (version becomes 1)
+        let refresh_info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        assert_eq!(refresh_info.version, 1);
+
+        // Update header to simulate page 1 loaded
+        let update = ListMetadataHeaderUpdate {
+            total_pages: Some(5),
+            total_items: Some(100),
+            current_page: 1,
+            per_page: 20,
+        };
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
+        repo.complete_sync(&test_ctx.conn, refresh_info.list_metadata_id).unwrap();
+
+        // Start load-next-page (captures version = 1)
+        let next_page_info = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap().unwrap();
+        let captured_version = next_page_info.version;
+
+        // Another refresh happens (version becomes 2)
+        repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+
+        // Version check should fail (stale)
+        let is_valid = repo.check_version(&test_ctx.conn, &test_ctx.site, key, captured_version).unwrap();
+        assert!(!is_valid, "Version should not match after refresh");
     }
 }
