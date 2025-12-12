@@ -5,8 +5,8 @@ use wp_mobile_cache::{
     db_types::db_site::DbSite,
     list_metadata::ListState,
     repository::list_metadata::{
-        FetchNextPageInfo, ListMetadataHeaderUpdate, ListMetadataItemInput,
-        ListMetadataRepository, RefreshInfo,
+        FetchNextPageInfo, ListMetadataHeaderUpdate, ListMetadataItemInput, ListMetadataRepository,
+        RefreshInfo,
     },
 };
 
@@ -101,10 +101,7 @@ impl MetadataService {
     /// Get pagination info for a list.
     ///
     /// Returns None if the list doesn't exist.
-    pub fn get_pagination(
-        &self,
-        key: &str,
-    ) -> Result<Option<ListPaginationInfo>, WpServiceError> {
+    pub fn get_pagination(&self, key: &str) -> Result<Option<ListPaginationInfo>, WpServiceError> {
         self.cache.execute(|conn| {
             let header = self.repo.get_header(conn, &self.db_site, key)?;
             Ok(header.map(|h| ListPaginationInfo {
@@ -147,7 +144,10 @@ impl MetadataService {
     /// Check if the current version matches expected (for stale detection).
     pub fn check_version(&self, key: &str, expected_version: i64) -> Result<bool, WpServiceError> {
         self.cache
-            .execute(|conn| self.repo.check_version(conn, &self.db_site, key, expected_version))
+            .execute(|conn| {
+                self.repo
+                    .check_version(conn, &self.db_site, key, expected_version)
+            })
             .map_err(Into::into)
     }
 
@@ -415,8 +415,7 @@ mod tests {
     use rstest::*;
     use rusqlite::Connection;
     use wp_mobile_cache::{
-        MigrationManager, WpApiCache,
-        db_types::self_hosted_site::SelfHostedSite,
+        MigrationManager, WpApiCache, db_types::self_hosted_site::SelfHostedSite,
         repository::sites::SiteRepository,
     };
 
@@ -485,12 +484,18 @@ mod tests {
 
         test_ctx
             .service
-            .set_items(key, &[EntityMetadata::new(1, None), EntityMetadata::new(2, None)])
+            .set_items(
+                key,
+                &[EntityMetadata::new(1, None), EntityMetadata::new(2, None)],
+            )
             .unwrap();
 
         test_ctx
             .service
-            .set_items(key, &[EntityMetadata::new(10, None), EntityMetadata::new(20, None)])
+            .set_items(
+                key,
+                &[EntityMetadata::new(10, None), EntityMetadata::new(20, None)],
+            )
             .unwrap();
 
         let ids = test_ctx.service.get_entity_ids(key).unwrap();
@@ -508,7 +513,10 @@ mod tests {
 
         test_ctx
             .service
-            .append_items(key, &[EntityMetadata::new(2, None), EntityMetadata::new(3, None)])
+            .append_items(
+                key,
+                &[EntityMetadata::new(2, None), EntityMetadata::new(3, None)],
+            )
             .unwrap();
 
         let ids = test_ctx.service.get_entity_ids(key).unwrap();
@@ -555,15 +563,24 @@ mod tests {
         let key = "edit:posts:publish";
 
         // No pages loaded yet
-        test_ctx.service.update_pagination(key, Some(3), None, 0, 20).unwrap();
+        test_ctx
+            .service
+            .update_pagination(key, Some(3), None, 0, 20)
+            .unwrap();
         assert!(test_ctx.service.has_more_pages(key).unwrap());
 
         // Page 1 of 3 loaded
-        test_ctx.service.update_pagination(key, Some(3), None, 1, 20).unwrap();
+        test_ctx
+            .service
+            .update_pagination(key, Some(3), None, 1, 20)
+            .unwrap();
         assert!(test_ctx.service.has_more_pages(key).unwrap());
 
         // Page 3 of 3 loaded (no more)
-        test_ctx.service.update_pagination(key, Some(3), None, 3, 20).unwrap();
+        test_ctx
+            .service
+            .update_pagination(key, Some(3), None, 3, 20)
+            .unwrap();
         assert!(!test_ctx.service.has_more_pages(key).unwrap());
     }
 
@@ -598,7 +615,10 @@ mod tests {
 
         // Set up: page 1 of 3 loaded
         test_ctx.service.begin_refresh(key).unwrap();
-        test_ctx.service.update_pagination(key, Some(3), None, 1, 20).unwrap();
+        test_ctx
+            .service
+            .update_pagination(key, Some(3), None, 1, 20)
+            .unwrap();
         test_ctx.service.complete_sync(key).unwrap();
 
         let result = test_ctx.service.begin_fetch_next_page(key).unwrap();
@@ -615,7 +635,10 @@ mod tests {
             .service
             .set_items(key, &[EntityMetadata::new(1, None)])
             .unwrap();
-        test_ctx.service.update_pagination(key, Some(1), None, 1, 20).unwrap();
+        test_ctx
+            .service
+            .update_pagination(key, Some(1), None, 1, 20)
+            .unwrap();
 
         test_ctx.service.delete_list(key).unwrap();
 
@@ -626,7 +649,10 @@ mod tests {
     #[rstest]
     fn test_list_metadata_reader_trait(test_ctx: TestContext) {
         let key = "edit:posts:publish";
-        let metadata = vec![EntityMetadata::new(100, None), EntityMetadata::new(200, None)];
+        let metadata = vec![
+            EntityMetadata::new(100, None),
+            EntityMetadata::new(200, None),
+        ];
 
         test_ctx.service.set_items(key, &metadata).unwrap();
 

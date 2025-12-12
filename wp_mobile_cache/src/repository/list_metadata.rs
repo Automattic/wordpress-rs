@@ -402,7 +402,12 @@ impl ListMetadataRepository {
         let version = self.increment_version(executor, site, key)?;
 
         // Update state to fetching
-        self.update_state(executor, list_metadata_id, ListState::FetchingFirstPage, None)?;
+        self.update_state(
+            executor,
+            list_metadata_id,
+            ListState::FetchingFirstPage,
+            None,
+        )?;
 
         // Get header for pagination info
         let header = self.get_header(executor, site, key)?.unwrap();
@@ -479,7 +484,12 @@ impl ListMetadataRepository {
         list_metadata_id: RowId,
         error_message: &str,
     ) -> Result<(), SqliteDbError> {
-        self.update_state(executor, list_metadata_id, ListState::Error, Some(error_message))
+        self.update_state(
+            executor,
+            list_metadata_id,
+            ListState::Error,
+            Some(error_message),
+        )
     }
 
     // ============================================
@@ -621,10 +631,15 @@ mod tests {
         let key = "edit:posts:publish";
 
         // Create new header
-        let row_id = repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let row_id = repo
+            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Verify it was created with defaults
-        let header = repo.get_header(&test_ctx.conn, &test_ctx.site, key).unwrap().unwrap();
+        let header = repo
+            .get_header(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap()
+            .unwrap();
         assert_eq!(header.row_id, row_id);
         assert_eq!(header.key, key);
         assert_eq!(header.current_page, 0);
@@ -640,10 +655,14 @@ mod tests {
         let key = "edit:posts:draft";
 
         // Create initial header
-        let first_row_id = repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let first_row_id = repo
+            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Get or create again should return same rowid
-        let second_row_id = repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let second_row_id = repo
+            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         assert_eq!(first_row_id, second_row_id);
     }
@@ -688,7 +707,8 @@ mod tests {
         let key = "edit:posts:publish";
 
         // Create header (version = 0)
-        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Check version matches
         let matches = repo
@@ -776,7 +796,8 @@ mod tests {
             },
         ];
 
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items).unwrap();
+        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
+            .unwrap();
 
         let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 3);
@@ -793,18 +814,35 @@ mod tests {
 
         // Insert initial items
         let initial_items = vec![
-            ListMetadataItemInput { entity_id: 1, modified_gmt: None },
-            ListMetadataItemInput { entity_id: 2, modified_gmt: None },
+            ListMetadataItemInput {
+                entity_id: 1,
+                modified_gmt: None,
+            },
+            ListMetadataItemInput {
+                entity_id: 2,
+                modified_gmt: None,
+            },
         ];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items).unwrap();
+        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
+            .unwrap();
 
         // Replace with new items
         let new_items = vec![
-            ListMetadataItemInput { entity_id: 10, modified_gmt: None },
-            ListMetadataItemInput { entity_id: 20, modified_gmt: None },
-            ListMetadataItemInput { entity_id: 30, modified_gmt: None },
+            ListMetadataItemInput {
+                entity_id: 10,
+                modified_gmt: None,
+            },
+            ListMetadataItemInput {
+                entity_id: 20,
+                modified_gmt: None,
+            },
+            ListMetadataItemInput {
+                entity_id: 30,
+                modified_gmt: None,
+            },
         ];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &new_items).unwrap();
+        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &new_items)
+            .unwrap();
 
         let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 3);
@@ -820,17 +858,31 @@ mod tests {
 
         // Insert initial items
         let initial_items = vec![
-            ListMetadataItemInput { entity_id: 1, modified_gmt: None },
-            ListMetadataItemInput { entity_id: 2, modified_gmt: None },
+            ListMetadataItemInput {
+                entity_id: 1,
+                modified_gmt: None,
+            },
+            ListMetadataItemInput {
+                entity_id: 2,
+                modified_gmt: None,
+            },
         ];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items).unwrap();
+        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
+            .unwrap();
 
         // Append more items
         let more_items = vec![
-            ListMetadataItemInput { entity_id: 3, modified_gmt: None },
-            ListMetadataItemInput { entity_id: 4, modified_gmt: None },
+            ListMetadataItemInput {
+                entity_id: 3,
+                modified_gmt: None,
+            },
+            ListMetadataItemInput {
+                entity_id: 4,
+                modified_gmt: None,
+            },
         ];
-        repo.append_items(&test_ctx.conn, &test_ctx.site, key, &more_items).unwrap();
+        repo.append_items(&test_ctx.conn, &test_ctx.site, key, &more_items)
+            .unwrap();
 
         let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 4);
@@ -852,9 +904,13 @@ mod tests {
             per_page: 20,
         };
 
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+            .unwrap();
 
-        let header = repo.get_header(&test_ctx.conn, &test_ctx.site, key).unwrap().unwrap();
+        let header = repo
+            .get_header(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap()
+            .unwrap();
         assert_eq!(header.total_pages, Some(5));
         assert_eq!(header.total_items, Some(100));
         assert_eq!(header.current_page, 1);
@@ -867,8 +923,11 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let list_id = repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
-        repo.update_state(&test_ctx.conn, list_id, ListState::FetchingFirstPage, None).unwrap();
+        let list_id = repo
+            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
+        repo.update_state(&test_ctx.conn, list_id, ListState::FetchingFirstPage, None)
+            .unwrap();
 
         let state = repo.get_state(&test_ctx.conn, list_id).unwrap().unwrap();
         assert_eq!(state.state, ListState::FetchingFirstPage);
@@ -880,13 +939,22 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:draft";
 
-        let list_id = repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let list_id = repo
+            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Set initial state
-        repo.update_state(&test_ctx.conn, list_id, ListState::FetchingFirstPage, None).unwrap();
+        repo.update_state(&test_ctx.conn, list_id, ListState::FetchingFirstPage, None)
+            .unwrap();
 
         // Update to error state
-        repo.update_state(&test_ctx.conn, list_id, ListState::Error, Some("Network error")).unwrap();
+        repo.update_state(
+            &test_ctx.conn,
+            list_id,
+            ListState::Error,
+            Some("Network error"),
+        )
+        .unwrap();
 
         let state = repo.get_state(&test_ctx.conn, list_id).unwrap().unwrap();
         assert_eq!(state.state, ListState::Error);
@@ -898,9 +966,18 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:pending";
 
-        repo.update_state_by_key(&test_ctx.conn, &test_ctx.site, key, ListState::FetchingNextPage, None).unwrap();
+        repo.update_state_by_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            key,
+            ListState::FetchingNextPage,
+            None,
+        )
+        .unwrap();
 
-        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let state = repo
+            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
@@ -910,20 +987,30 @@ mod tests {
         let key = "edit:posts:publish";
 
         // Create header (version starts at 0)
-        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
-        let initial_version = repo.get_version(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
+        let initial_version = repo
+            .get_version(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(initial_version, 0);
 
         // Increment version
-        let new_version = repo.increment_version(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let new_version = repo
+            .increment_version(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(new_version, 1);
 
         // Increment again
-        let newer_version = repo.increment_version(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let newer_version = repo
+            .increment_version(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(newer_version, 2);
 
         // Verify last_first_page_fetched_at is set
-        let header = repo.get_header(&test_ctx.conn, &test_ctx.site, key).unwrap().unwrap();
+        let header = repo
+            .get_header(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap()
+            .unwrap();
         assert!(header.last_first_page_fetched_at.is_some());
     }
 
@@ -933,21 +1020,45 @@ mod tests {
         let key = "edit:posts:publish";
 
         // Create header and add items and state
-        let list_id = repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
-        let items = vec![ListMetadataItemInput { entity_id: 1, modified_gmt: None }];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items).unwrap();
-        repo.update_state(&test_ctx.conn, list_id, ListState::Idle, None).unwrap();
+        let list_id = repo
+            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
+        let items = vec![ListMetadataItemInput {
+            entity_id: 1,
+            modified_gmt: None,
+        }];
+        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
+            .unwrap();
+        repo.update_state(&test_ctx.conn, list_id, ListState::Idle, None)
+            .unwrap();
 
         // Verify data exists
-        assert!(repo.get_header(&test_ctx.conn, &test_ctx.site, key).unwrap().is_some());
-        assert_eq!(repo.get_item_count(&test_ctx.conn, &test_ctx.site, key).unwrap(), 1);
+        assert!(
+            repo.get_header(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            repo.get_item_count(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap(),
+            1
+        );
 
         // Delete the list
-        repo.delete_list(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.delete_list(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Verify everything is deleted
-        assert!(repo.get_header(&test_ctx.conn, &test_ctx.site, key).unwrap().is_none());
-        assert_eq!(repo.get_item_count(&test_ctx.conn, &test_ctx.site, key).unwrap(), 0);
+        assert!(
+            repo.get_header(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            repo.get_item_count(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap(),
+            0
+        );
     }
 
     #[rstest]
@@ -957,10 +1068,14 @@ mod tests {
 
         // Insert items in specific order
         let items: Vec<ListMetadataItemInput> = (1..=10)
-            .map(|i| ListMetadataItemInput { entity_id: i * 100, modified_gmt: None })
+            .map(|i| ListMetadataItemInput {
+                entity_id: i * 100,
+                modified_gmt: None,
+            })
             .collect();
 
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items).unwrap();
+        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
+            .unwrap();
 
         let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 10);
@@ -980,14 +1095,18 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let info = repo
+            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Verify version was incremented (from 0 to 1)
         assert_eq!(info.version, 1);
         assert_eq!(info.per_page, 20); // default
 
         // Verify state is FetchingFirstPage
-        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let state = repo
+            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(state, ListState::FetchingFirstPage);
     }
 
@@ -996,13 +1115,18 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:draft";
 
-        let info1 = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let info1 = repo
+            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(info1.version, 1);
 
         // Complete the first refresh
-        repo.complete_sync(&test_ctx.conn, info1.list_metadata_id).unwrap();
+        repo.complete_sync(&test_ctx.conn, info1.list_metadata_id)
+            .unwrap();
 
-        let info2 = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let info2 = repo
+            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(info2.version, 2);
     }
 
@@ -1010,7 +1134,9 @@ mod tests {
     fn test_begin_fetch_next_page_returns_none_for_non_existent_list(test_ctx: TestContext) {
         let repo = list_metadata_repo();
 
-        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, "nonexistent").unwrap();
+        let result = repo
+            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, "nonexistent")
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -1020,9 +1146,12 @@ mod tests {
         let key = "edit:posts:publish";
 
         // Create header but don't set current_page
-        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
-        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let result = repo
+            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -1038,9 +1167,12 @@ mod tests {
             current_page: 3,
             per_page: 20,
         };
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+            .unwrap();
 
-        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let result = repo
+            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -1056,9 +1188,12 @@ mod tests {
             current_page: 2,
             per_page: 20,
         };
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+            .unwrap();
 
-        let result = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let result = repo
+            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert!(result.is_some());
 
         let info = result.unwrap();
@@ -1066,7 +1201,9 @@ mod tests {
         assert_eq!(info.per_page, 20);
 
         // Verify state changed to FetchingNextPage
-        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let state = repo
+            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
@@ -1075,10 +1212,15 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
-        repo.complete_sync(&test_ctx.conn, info.list_metadata_id).unwrap();
+        let info = repo
+            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
+        repo.complete_sync(&test_ctx.conn, info.list_metadata_id)
+            .unwrap();
 
-        let state = repo.get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let state = repo
+            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(state, ListState::Idle);
     }
 
@@ -1087,12 +1229,21 @@ mod tests {
         let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
-        repo.complete_sync_with_error(&test_ctx.conn, info.list_metadata_id, "Network timeout").unwrap();
+        let info = repo
+            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
+        repo.complete_sync_with_error(&test_ctx.conn, info.list_metadata_id, "Network timeout")
+            .unwrap();
 
-        let state_record = repo.get_state(&test_ctx.conn, info.list_metadata_id).unwrap().unwrap();
+        let state_record = repo
+            .get_state(&test_ctx.conn, info.list_metadata_id)
+            .unwrap()
+            .unwrap();
         assert_eq!(state_record.state, ListState::Error);
-        assert_eq!(state_record.error_message.as_deref(), Some("Network timeout"));
+        assert_eq!(
+            state_record.error_message.as_deref(),
+            Some("Network timeout")
+        );
     }
 
     #[rstest]
@@ -1101,7 +1252,9 @@ mod tests {
         let key = "edit:posts:publish";
 
         // Start a refresh (version becomes 1)
-        let refresh_info = repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let refresh_info = repo
+            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
         assert_eq!(refresh_info.version, 1);
 
         // Update header to simulate page 1 loaded
@@ -1111,18 +1264,26 @@ mod tests {
             current_page: 1,
             per_page: 20,
         };
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update).unwrap();
-        repo.complete_sync(&test_ctx.conn, refresh_info.list_metadata_id).unwrap();
+        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+            .unwrap();
+        repo.complete_sync(&test_ctx.conn, refresh_info.list_metadata_id)
+            .unwrap();
 
         // Start load-next-page (captures version = 1)
-        let next_page_info = repo.begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key).unwrap().unwrap();
+        let next_page_info = repo
+            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap()
+            .unwrap();
         let captured_version = next_page_info.version;
 
         // Another refresh happens (version becomes 2)
-        repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key)
+            .unwrap();
 
         // Version check should fail (stale)
-        let is_valid = repo.check_version(&test_ctx.conn, &test_ctx.site, key, captured_version).unwrap();
+        let is_valid = repo
+            .check_version(&test_ctx.conn, &test_ctx.site, key, captured_version)
+            .unwrap();
         assert!(!is_valid, "Version should not match after refresh");
     }
 }

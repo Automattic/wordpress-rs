@@ -288,7 +288,9 @@ where
             .unwrap_or_else(|| "?".to_string());
         println!(
             "[MetadataCollection] Fetched metadata: page {} of {}, {} items",
-            next_page, total_pages_str, result.metadata.len()
+            next_page,
+            total_pages_str,
+            result.metadata.len()
         );
 
         {

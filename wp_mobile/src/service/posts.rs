@@ -225,7 +225,11 @@ impl PostService {
 
         // Helper to print log on early return
         let print_log = |log: &[String], status: &str| {
-            println!("[PostService] fetch_metadata_persistent:\n  {} | {}", log.join(" -> "), status);
+            println!(
+                "[PostService] fetch_metadata_persistent:\n  {} | {}",
+                log.join(" -> "),
+                status
+            );
         };
 
         // Update state to fetching (this creates the list if needed)
@@ -421,7 +425,9 @@ impl PostService {
         self.metadata_service
             .set_state(key, state, None)
             .map_err(|e| match e {
-                WpServiceError::DatabaseError { err_message } => FetchError::Database { err_message },
+                WpServiceError::DatabaseError { err_message } => {
+                    FetchError::Database { err_message }
+                }
                 WpServiceError::SiteNotFound => FetchError::Database {
                     err_message: "Site not found".to_string(),
                 },
@@ -441,13 +447,17 @@ impl PostService {
 
         // 3. Store metadata in database
         let store_result = if is_refresh {
-            self.metadata_service.set_items(key, &metadata_result.metadata)
+            self.metadata_service
+                .set_items(key, &metadata_result.metadata)
         } else {
-            self.metadata_service.append_items(key, &metadata_result.metadata)
+            self.metadata_service
+                .append_items(key, &metadata_result.metadata)
         };
 
         if let Err(e) = store_result {
-            let _ = self.metadata_service.complete_sync_with_error(key, &e.to_string());
+            let _ = self
+                .metadata_service
+                .complete_sync_with_error(key, &e.to_string());
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
@@ -550,14 +560,17 @@ impl PostService {
 
         // Convert to raw IDs and filter out already-fetching
         let raw_ids: Vec<i64> = ids.iter().map(|id| id.0).collect();
-        let fetchable = self.state_store_with_edit_context.filter_fetchable(&raw_ids);
+        let fetchable = self
+            .state_store_with_edit_context
+            .filter_fetchable(&raw_ids);
 
         if fetchable.is_empty() {
             return Ok(Vec::new());
         }
 
         // Mark as fetching
-        self.state_store_with_edit_context.set_batch(&fetchable, EntityState::Fetching);
+        self.state_store_with_edit_context
+            .set_batch(&fetchable, EntityState::Fetching);
 
         // Convert back to PostId for the API call
         let post_ids: Vec<PostId> = fetchable.iter().map(|&id| PostId(id)).collect();
@@ -593,10 +606,11 @@ impl PostService {
                         .data
                         .iter()
                         .map(|post| {
-                            repo.upsert(conn, &self.db_site, post)
-                                .map_err(|e| FetchError::Database {
+                            repo.upsert(conn, &self.db_site, post).map_err(|e| {
+                                FetchError::Database {
                                     err_message: e.to_string(),
-                                })
+                                }
+                            })
                         })
                         .collect::<Result<Vec<_>, _>>()
                 })?;

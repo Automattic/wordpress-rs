@@ -8,7 +8,9 @@ mod stateless_collection;
 pub use collection_error::CollectionError;
 pub use fetch_error::FetchError;
 pub use fetch_result::FetchResult;
-pub use post_metadata_collection::{PostMetadataCollectionItem, PostMetadataCollectionWithEditContext};
+pub use post_metadata_collection::{
+    PostMetadataCollectionItem, PostMetadataCollectionWithEditContext,
+};
 pub use stateless_collection::StatelessCollection;
 
 /// Macro to create UniFFI-compatible post collection wrappers
