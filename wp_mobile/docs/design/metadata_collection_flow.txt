@@ -1,0 +1,255 @@
+METADATA COLLECTION FLOW
+========================
+
+Initial State: Site exists in `db_sites` table, no posts fetched yet
+
+
+═══════════════════════════════════════════════════════════════════════
+                        FIRST PAGE (REFRESH)
+═══════════════════════════════════════════════════════════════════════
+
+                         USER TRIGGERS REFRESH
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. MetadataCollection.refresh()                                    │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  2. PostService.fetch_and_store_metadata_persistent(is_first=true)  │
+│                                                                     │
+│     a) begin_refresh()                                              │
+│        └─► DB: list_metadata_state = "fetching_first_page"          │
+│                                                                     │
+│     b) Fetch from WordPress API                                     │
+│        GET /wp/v2/posts?_fields=id,modified_gmt&page=1              │
+│        └─► Response: [{id: 1, modified_gmt: "..."}, {id: 2, ...}]   │
+│                                                                     │
+│     c) Store metadata (REPLACE mode for page 1)                     │
+│        └─► DB: list_metadata (header: total_pages=5, current_page=1)│
+│        └─► DB: list_metadata_items (DELETE old, INSERT new)         │
+│                                                                     │
+│     d) Detect stale posts (compare modified_gmt with cached)        │
+│        └─► Memory: state_store marks changed posts as Stale         │
+│                                                                     │
+│     e) complete_sync()                                              │
+│        └─► DB: list_metadata_state = "idle"                         │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  3. sync_missing_and_stale()                                        │
+│                                                                     │
+│     All posts are Missing (first launch)                            │
+│     GET /wp/v2/posts?include=1,2,3,...                              │
+│                                                                     │
+│     └─► DB: posts (full post data)                                  │
+│     └─► Memory: state_store[1] = Cached, state_store[2] = Cached... │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+                      UI RENDERS PAGE 1 POSTS
+
+
+═══════════════════════════════════════════════════════════════════════
+                     SECOND PAGE (LOAD MORE)
+═══════════════════════════════════════════════════════════════════════
+
+                      USER SCROLLS TO BOTTOM
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. MetadataCollection.load_next_page()                             │
+│                                                                     │
+│     Check: current_page(1) < total_pages(5)? → Yes, proceed         │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  2. PostService.fetch_and_store_metadata_persistent(is_first=false) │
+│                                                                     │
+│     a) begin_fetch_next_page()                                      │
+│        └─► DB: list_metadata_state = "fetching_next_page"           │
+│                                                                     │
+│     b) Fetch from WordPress API                                     │
+│        GET /wp/v2/posts?_fields=id,modified_gmt&page=2              │
+│        └─► Response: [{id: 21, ...}, {id: 22, ...}, ...]            │
+│                                                                     │
+│     c) Store metadata (APPEND mode for page 2+)                     │
+│        └─► DB: list_metadata (update: current_page=2)               │
+│        └─► DB: list_metadata_items (INSERT at end, keep existing)   │
+│                                                                     │
+│     d) Detect stale posts                                           │
+│        └─► Memory: state_store marks changed posts as Stale         │
+│                                                                     │
+│     e) complete_sync()                                              │
+│        └─► DB: list_metadata_state = "idle"                         │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  3. sync_missing_and_stale()                                        │
+│                                                                     │
+│     Page 2 posts are Missing, Page 1 posts already Cached           │
+│     GET /wp/v2/posts?include=21,22,23,...  (only new IDs)           │
+│                                                                     │
+│     └─► DB: posts (page 2 posts)                                    │
+│     └─► Memory: state_store[21] = Cached, ...                       │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+                   UI RENDERS PAGE 1 + PAGE 2 POSTS
+
+
+═══════════════════════════════════════════════════════════════════════
+                         API REFERENCE
+═══════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  ObservableMetadataCollection (Kotlin)                              │
+│  ════════════════════════════════════                               │
+│  Wrapper with observer pattern for UI reactivity                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  SYNC OPERATIONS (suspend)                                          │
+│  ─────────────────────────                                          │
+│  refresh()        → SyncResult    ──► MetadataCollection.refresh()  │
+│  loadNextPage()   → SyncResult    ──► MetadataCollection.load_next_page()
+│                                                                     │
+│  DATA ACCESS (suspend)                                              │
+│  ─────────────────────                                              │
+│  loadItems()      → List<Item>    ──► MetadataCollection.items()    │
+│  syncState()      → ListState     ──► MetadataCollection.sync_state()
+│                                                                     │
+│  PAGINATION                                                         │
+│  ──────────                                                         │
+│  hasMorePages()   → Boolean       ──► MetadataCollection.has_more_pages()
+│  currentPage()    → UInt          ──► MetadataCollection.current_page()
+│  totalPages()     → UInt?         ──► MetadataCollection.total_pages()
+│                                                                     │
+│  OBSERVERS                                                          │
+│  ─────────                                                          │
+│  addDataObserver(callback)        Fires when list contents change   │
+│  addStateObserver(callback)       Fires when sync state changes     │
+│  addObserver(callback)            Fires on both                     │
+│  removeObserver(callback)                                           │
+│  close()                          Unregister from notifier          │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                   calls via UniFFI│
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  MetadataCollection<F> (Rust)                                       │
+│  ════════════════════════════                                       │
+│  Core collection logic, reads from DB + memory state store          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  SYNC OPERATIONS (async)                                            │
+│  ───────────────────────                                            │
+│  refresh()          Fetch page 1, replace metadata, sync entities   │
+│  load_next_page()   Fetch next page, append metadata, sync entities │
+│                                                                     │
+│  DATA ACCESS                                                        │
+│  ───────────                                                        │
+│  items()            → Vec<CollectionItem>   [id, state, modified]   │
+│  sync_state()       → ListState             [Idle, Fetching*, Error]│
+│                                                                     │
+│  PAGINATION                                                         │
+│  ──────────                                                         │
+│  has_more_pages()   → bool                                          │
+│  current_page()     → u32                                           │
+│  total_pages()      → Option<u32>                                   │
+│                                                                     │
+│  RELEVANCE CHECKS (for observer routing)                            │
+│  ───────────────────────────────────────                            │
+│  is_relevant_data_update(hook)   Entity tables + ListMetadataItems  │
+│  is_relevant_state_update(hook)  ListMetadataState table only       │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════
+                      DATABASE TABLES
+═══════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────┐
+│     list_metadata        │  One row per filter (e.g. "posts:publish")
+├──────────────────────────┤
+│ key           TEXT       │  "edit:posts:publish"
+│ total_pages   INTEGER    │  5
+│ current_page  INTEGER    │  2 (last loaded page)
+│ per_page      INTEGER    │  20
+│ version       INTEGER    │  For concurrency control
+└──────────────────────────┘
+            │ 1:N
+            ▼
+┌──────────────────────────┐
+│   list_metadata_items    │  Ordered entity IDs (rowid = display order)
+├──────────────────────────┤
+│ key           TEXT       │  "edit:posts:publish"
+│ entity_id     INTEGER    │  123
+│ modified_gmt  TEXT       │  "2024-01-15T10:30:00"
+└──────────────────────────┘
+
+┌──────────────────────────┐
+│   list_metadata_state    │  Sync status (separate for efficient observers)
+├──────────────────────────┤
+│ state         TEXT       │  "idle" | "fetching_first_page" |
+│                          │  "fetching_next_page" | "error"
+│ error_message TEXT       │  null or error details
+└──────────────────────────┘
+
+┌──────────────────────────┐
+│         posts            │  Full post content
+├──────────────────────────┤
+│ id            INTEGER    │  123
+│ title         TEXT       │  "Hello World"
+│ content       TEXT       │  "<p>...</p>"
+│ modified_gmt  TEXT       │  "2024-01-15T10:30:00"  ← used for stale check
+│ ...                      │
+└──────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════
+                    ENTITY STATE (Memory)
+═══════════════════════════════════════════════════════════════════════
+
+                                              modified_gmt changed
+     ┌─────────┐        ┌──────────┐        ┌────────┐        ┌───────┐
+     │ Missing │───────▶│ Fetching │───────▶│ Cached │───────▶│ Stale │
+     └─────────┘        └──────────┘        └────────┘        └───────┘
+                             │  ▲                                  │
+                             │  └──────────────────────────────────┘
+                             │                 retry
+                             ▼
+                        ┌────────┐
+                        │ Failed │
+                        └────────┘
+
+  • Stored in memory-only HashMap (state_store)
+  • Resets to Missing on app restart
+  • Shared across all collections for same entity ID
+
+
+═══════════════════════════════════════════════════════════════════════
+                    OBSERVER NOTIFICATION FLOW
+═══════════════════════════════════════════════════════════════════════
+
+  SQLite Update Hook fires
+           │
+           ▼
+  DatabaseChangeNotifier.notify(hook)
+           │
+           ├──► collection.isRelevantDataUpdate(hook)?
+           │         │
+           │         └── YES ──► dataObservers.forEach { it() }
+           │                           │
+           │                           └──► UI reloads list
+           │
+           └──► collection.isRelevantStateUpdate(hook)?
+                     │
+                     └── YES ──► stateObservers.forEach { it() }
+                                       │
+                                       └──► UI updates loading indicator
