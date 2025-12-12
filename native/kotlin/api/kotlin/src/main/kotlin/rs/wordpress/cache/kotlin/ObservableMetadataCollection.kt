@@ -7,9 +7,9 @@ import uniffi.wp_mobile_cache.ListState
 import uniffi.wp_mobile_cache.UpdateHook
 import java.util.concurrent.CopyOnWriteArrayList
 
-// TODO: Move state representation to Rust with proper enum modeling.
-// See metadata_collection_v3.md "TODO: Refined State Representation"
-// Current design uses separate fields (id, state, data); should be a sealed class for type safety.
+// Design note: State representation could be moved to Rust with proper enum modeling.
+// See metadata_collection_v3.md for "Refined State Representation" design.
+// Current design uses separate fields (id, state, data); could be a sealed class for type safety.
 // The current EntityState enum doesn't carry data, so we assemble the full state in Kotlin.
 
 /**
@@ -69,6 +69,7 @@ fun createObservableMetadataCollection(
  * Implements [AutoCloseable] to support cleanup. Call [close] when done (typically in
  * ViewModel.onCleared()) to unregister from [DatabaseChangeNotifier].
  */
+@Suppress("TooManyFunctions") // Observer pattern requires multiple add/remove/notify methods
 class ObservableMetadataCollection(
     private val collection: PostMetadataCollectionWithEditContext
 ) : AutoCloseable {
