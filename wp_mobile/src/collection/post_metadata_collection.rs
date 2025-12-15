@@ -14,29 +14,57 @@ use crate::{
     },
 };
 
-/// Item in a metadata collection with optional loaded data.
+/// Combined state and data for a post item in a metadata collection.
 ///
-/// Combines the collection item (id + state) with the full entity data
-/// when available in the cache.
+/// This enum provides type-safe representation of item state with associated data.
+/// Data presence is encoded in the variant itself, eliminating the need for
+/// separate `state` and `data` fields.
 ///
-/// Note: `data` being `Some` is independent of `state`. Data may exist in
-/// the cache while state is `Missing` (after app restart) or `Failed`
-/// (showing last known data). Use `state` to determine fetch requirements,
-/// not data availability.
-// TODO: Move state representation to Rust with proper enum modeling.
-// See metadata_collection_v3.md "TODO: Refined State Representation"
-// Current design uses separate fields; should be a sealed enum for type safety.
+/// # Variants with data
+/// - `FetchingWithData`: Refresh in progress, showing cached data
+/// - `Cached`: Fresh data, no fetch needed
+/// - `Stale`: Outdated data, could benefit from refresh
+/// - `FailedWithData`: Fetch failed, showing last known data
+///
+/// # Variants without data
+/// - `Missing`: Needs fetch, no cached data available
+/// - `Fetching`: Fetch in progress, no cached data to show
+/// - `Failed`: Fetch failed, no cached data available
+#[derive(uniffi::Enum)]
+pub enum PostItemState {
+    /// No cached data available, needs fetch
+    Missing,
+
+    /// Fetch in progress, no cached data to show
+    Fetching,
+
+    /// Fetch in progress, showing cached data while loading
+    FetchingWithData { data: crate::FullEntityAnyPostWithEditContext },
+
+    /// Fresh cached data, no fetch needed
+    Cached { data: crate::FullEntityAnyPostWithEditContext },
+
+    /// Cached data is outdated, could benefit from refresh
+    Stale { data: crate::FullEntityAnyPostWithEditContext },
+
+    /// Fetch failed, no cached data available
+    Failed { error: String },
+
+    /// Fetch failed, showing last known cached data
+    FailedWithData { error: String, data: crate::FullEntityAnyPostWithEditContext },
+}
+
+/// Item in a metadata collection with type-safe state representation.
+///
+/// The `state` enum encodes both the sync status and data availability,
+/// making it impossible to have inconsistent combinations.
 #[derive(uniffi::Record)]
 pub struct PostMetadataCollectionItem {
     /// The post ID
     pub id: i64,
 
-    /// Current fetch state - indicates whether a fetch is needed/in-progress
-    pub state: EntityState,
-
-    /// Full entity data from cache, if available.
-    /// Note: May be present even when state is Missing, Stale, or Failed.
-    pub data: Option<crate::FullEntityAnyPostWithEditContext>,
+    /// Combined state and data - see [`PostItemState`] for variants
+    pub state: PostItemState,
 }
 
 /// Metadata-first collection for posts with edit context.
@@ -61,10 +89,13 @@ pub struct PostMetadataCollectionItem {
 /// let items = collection.load_items()?;
 /// for item in items {
 ///     match item.state {
-///         EntityState::Cached => { /* show item.data */ }
-///         EntityState::Fetching => { /* show loading */ }
-///         EntityState::Failed { .. } => { /* show error */ }
-///         _ => { /* show placeholder */ }
+///         PostItemState::Cached { data } => { /* show data */ }
+///         PostItemState::Stale { data } => { /* show data, maybe refresh */ }
+///         PostItemState::FetchingWithData { data } => { /* show data + loading */ }
+///         PostItemState::FailedWithData { error, data } => { /* show data + error */ }
+///         PostItemState::Fetching => { /* show loading placeholder */ }
+///         PostItemState::Missing => { /* show placeholder */ }
+///         PostItemState::Failed { error } => { /* show error */ }
 ///     }
 /// }
 ///
@@ -101,17 +132,17 @@ impl PostMetadataCollectionWithEditContext {
 impl PostMetadataCollectionWithEditContext {
     /// Load all items with their current states and data.
     ///
-    /// Returns items in list order with:
-    /// - `id`: The post ID
-    /// - `state`: Current fetch state (Missing, Fetching, Cached, Stale, Failed)
-    /// - `data`: Full entity data from cache, if available (independent of state)
+    /// Returns items in list order with type-safe state representation.
+    /// Each item's `state` is a [`PostItemState`] variant that encodes both
+    /// the sync status and data availability.
     ///
     /// This is the primary method for getting collection contents to display.
     ///
     /// # Note
-    /// Data availability is independent of fetch state. After an app restart,
-    /// items may have `state = Missing` but still have cached data available.
-    /// The state indicates whether a fetch is needed, not whether data exists.
+    /// Data availability is independent of the internal `EntityState`. After an app
+    /// restart, items may have internal state `Missing` but still have cached data
+    /// available. This method will return `FetchingWithData`, `Stale`, or `FailedWithData`
+    /// variants appropriately when cached data exists.
     ///
     /// This async function is exported to client platforms (Kotlin/Swift) where it
     /// will be executed on a background thread. The underlying Rust implementation
@@ -119,7 +150,7 @@ impl PostMetadataCollectionWithEditContext {
     pub async fn load_items(&self) -> Result<Vec<PostMetadataCollectionItem>, CollectionError> {
         let items = self.collection.items();
 
-        // Load ALL posts from cache - data availability is independent of fetch state.
+        // Load ALL posts from cache - data availability is independent of EntityState.
         // After app restart, EntityState resets to Missing but data may still be cached.
         let all_ids: Vec<i64> = items.iter().map(|item| item.id()).collect();
 
@@ -137,18 +168,37 @@ impl PostMetadataCollectionWithEditContext {
         let mut cached_map: std::collections::HashMap<i64, FullEntity<AnyPostWithEditContext>> =
             cached_posts.into_iter().map(|p| (p.data.id.0, p)).collect();
 
-        // Combine items with their data (if available in cache)
+        // Combine EntityState with cache data into type-safe PostItemState
         let result = items
             .into_iter()
             .map(|item| {
-                // Data may exist regardless of state - try to get it from cache
-                let data = cached_map.remove(&item.id()).map(|e| e.into());
+                let id = item.id();
+                let cached_data = cached_map.remove(&id).map(|e| e.into());
+                let state = match (item.state, cached_data) {
+                    // Missing state
+                    (EntityState::Missing, None) => PostItemState::Missing,
+                    (EntityState::Missing, Some(data)) => PostItemState::Stale { data },
 
-                PostMetadataCollectionItem {
-                    id: item.id(),
-                    state: item.state,
-                    data,
-                }
+                    // Fetching state
+                    (EntityState::Fetching, None) => PostItemState::Fetching,
+                    (EntityState::Fetching, Some(data)) => PostItemState::FetchingWithData { data },
+
+                    // Cached state (should always have data, but handle gracefully)
+                    (EntityState::Cached, Some(data)) => PostItemState::Cached { data },
+                    (EntityState::Cached, None) => PostItemState::Missing,
+
+                    // Stale state (should always have data, but handle gracefully)
+                    (EntityState::Stale, Some(data)) => PostItemState::Stale { data },
+                    (EntityState::Stale, None) => PostItemState::Missing,
+
+                    // Failed state
+                    (EntityState::Failed { error }, None) => PostItemState::Failed { error },
+                    (EntityState::Failed { error }, Some(data)) => {
+                        PostItemState::FailedWithData { error, data }
+                    }
+                };
+
+                PostMetadataCollectionItem { id, state }
             })
             .collect();
 

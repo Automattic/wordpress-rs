@@ -7,11 +7,6 @@ import uniffi.wp_mobile_cache.ListState
 import uniffi.wp_mobile_cache.UpdateHook
 import java.util.concurrent.CopyOnWriteArrayList
 
-// Design note: State representation could be moved to Rust with proper enum modeling.
-// See metadata_collection_v3.md for "Refined State Representation" design.
-// Current design uses separate fields (id, state, data); could be a sealed class for type safety.
-// The current EntityState enum doesn't carry data, so we assemble the full state in Kotlin.
-
 /**
  * Create an observable metadata collection that notifies observers when data changes.
  *
@@ -141,13 +136,19 @@ class ObservableMetadataCollection(
     /**
      * Load all items with their current states and data.
      *
-     * Returns items in list order with:
-     * - `id`: The post ID
-     * - `state`: Current fetch state (Missing, Fetching, Cached, Stale, Failed)
-     * - `data`: Full entity data when state is Cached, null otherwise
+     * Returns items in list order with type-safe state representation.
+     * Each item's `state` is a [PostItemState] sealed class that encodes both
+     * sync status and data availability:
      *
-     * This is a suspend function that reads from cache/memory stores on a background thread.
-     * Use the state to determine how to render each item in the UI.
+     * - [PostItemState.Cached]: Fresh data, no fetch needed
+     * - [PostItemState.Stale]: Outdated data, could benefit from refresh
+     * - [PostItemState.FetchingWithData]: Refresh in progress, showing cached data
+     * - [PostItemState.FailedWithData]: Fetch failed, showing last known data
+     * - [PostItemState.Missing]: Needs fetch, no cached data
+     * - [PostItemState.Fetching]: Fetch in progress, no cached data
+     * - [PostItemState.Failed]: Fetch failed, no cached data
+     *
+     * This is a suspend function that reads from cache on a background thread.
      */
     suspend fun loadItems(): List<PostMetadataCollectionItem> = collection.loadItems()
 
