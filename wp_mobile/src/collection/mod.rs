@@ -9,9 +9,68 @@ pub use collection_error::CollectionError;
 pub use fetch_error::FetchError;
 pub use fetch_result::FetchResult;
 pub use post_metadata_collection::{
-    PostMetadataCollectionItem, PostMetadataCollectionWithEditContext,
+    PostItemState, PostMetadataCollectionItem, PostMetadataCollectionWithEditContext,
 };
 pub use stateless_collection::StatelessCollection;
+
+/// Macro to create UniFFI-compatible item state enums for metadata collections.
+///
+/// This macro generates a type-safe enum that combines sync status with data availability.
+/// Data presence is encoded in the variant itself, eliminating inconsistent states.
+///
+/// # Parameters
+/// - `$state_name`: Name for the enum (e.g., `PostItemState`)
+/// - `$full_entity_type`: The FullEntity wrapper type (e.g., `FullEntityAnyPostWithEditContext`)
+///
+/// # Generated Variants
+/// - `Missing`: No cached data, needs fetch
+/// - `Fetching`: Fetch in progress, no cached data
+/// - `FetchingWithData { data }`: Fetch in progress, showing cached data
+/// - `Cached { data }`: Fresh cached data
+/// - `Stale { data }`: Outdated cached data
+/// - `Failed { error }`: Fetch failed, no cached data
+/// - `FailedWithData { error, data }`: Fetch failed, showing cached data
+///
+/// # Usage
+/// ```ignore
+/// wp_mobile_item_state!(PostItemState, FullEntityAnyPostWithEditContext);
+/// ```
+#[macro_export]
+macro_rules! wp_mobile_item_state {
+    ($state_name:ident, $full_entity_type:ty) => {
+        /// Combined state and data for an item in a metadata collection.
+        ///
+        /// This enum provides type-safe representation of item state with associated data.
+        /// Data presence is encoded in the variant itself, eliminating the need for
+        /// separate `state` and `data` fields.
+        #[derive(uniffi::Enum)]
+        pub enum $state_name {
+            /// No cached data available, needs fetch
+            Missing,
+
+            /// Fetch in progress, no cached data to show
+            Fetching,
+
+            /// Fetch in progress, showing cached data while loading
+            FetchingWithData { data: $full_entity_type },
+
+            /// Fresh cached data, no fetch needed
+            Cached { data: $full_entity_type },
+
+            /// Cached data is outdated, could benefit from refresh
+            Stale { data: $full_entity_type },
+
+            /// Fetch failed, no cached data available
+            Failed { error: String },
+
+            /// Fetch failed, showing last known cached data
+            FailedWithData {
+                error: String,
+                data: $full_entity_type,
+            },
+        }
+    };
+}
 
 /// Macro to create UniFFI-compatible post collection wrappers
 ///

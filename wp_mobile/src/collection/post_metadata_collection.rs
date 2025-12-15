@@ -14,45 +14,8 @@ use crate::{
     },
 };
 
-/// Combined state and data for a post item in a metadata collection.
-///
-/// This enum provides type-safe representation of item state with associated data.
-/// Data presence is encoded in the variant itself, eliminating the need for
-/// separate `state` and `data` fields.
-///
-/// # Variants with data
-/// - `FetchingWithData`: Refresh in progress, showing cached data
-/// - `Cached`: Fresh data, no fetch needed
-/// - `Stale`: Outdated data, could benefit from refresh
-/// - `FailedWithData`: Fetch failed, showing last known data
-///
-/// # Variants without data
-/// - `Missing`: Needs fetch, no cached data available
-/// - `Fetching`: Fetch in progress, no cached data to show
-/// - `Failed`: Fetch failed, no cached data available
-#[derive(uniffi::Enum)]
-pub enum PostItemState {
-    /// No cached data available, needs fetch
-    Missing,
-
-    /// Fetch in progress, no cached data to show
-    Fetching,
-
-    /// Fetch in progress, showing cached data while loading
-    FetchingWithData { data: crate::FullEntityAnyPostWithEditContext },
-
-    /// Fresh cached data, no fetch needed
-    Cached { data: crate::FullEntityAnyPostWithEditContext },
-
-    /// Cached data is outdated, could benefit from refresh
-    Stale { data: crate::FullEntityAnyPostWithEditContext },
-
-    /// Fetch failed, no cached data available
-    Failed { error: String },
-
-    /// Fetch failed, showing last known cached data
-    FailedWithData { error: String, data: crate::FullEntityAnyPostWithEditContext },
-}
+// Generate PostItemState enum using the macro
+crate::wp_mobile_item_state!(PostItemState, crate::FullEntityAnyPostWithEditContext);
 
 /// Item in a metadata collection with type-safe state representation.
 ///
