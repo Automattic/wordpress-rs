@@ -17,7 +17,12 @@ use crate::{
 /// Item in a metadata collection with optional loaded data.
 ///
 /// Combines the collection item (id + state) with the full entity data
-/// when available (i.e., when state is Cached).
+/// when available in the cache.
+///
+/// Note: `data` being `Some` is independent of `state`. Data may exist in
+/// the cache while state is `Missing` (after app restart) or `Failed`
+/// (showing last known data). Use `state` to determine fetch requirements,
+/// not data availability.
 // TODO: Move state representation to Rust with proper enum modeling.
 // See metadata_collection_v3.md "TODO: Refined State Representation"
 // Current design uses separate fields; should be a sealed enum for type safety.
@@ -26,11 +31,11 @@ pub struct PostMetadataCollectionItem {
     /// The post ID
     pub id: i64,
 
-    /// Current fetch state
+    /// Current fetch state - indicates whether a fetch is needed/in-progress
     pub state: EntityState,
 
-    /// Full entity data, present when state is Cached
-    /// None for Missing, Fetching, or Failed states
+    /// Full entity data from cache, if available.
+    /// Note: May be present even when state is Missing, Stale, or Failed.
     pub data: Option<crate::FullEntityAnyPostWithEditContext>,
 }
 
@@ -99,29 +104,30 @@ impl PostMetadataCollectionWithEditContext {
     /// Returns items in list order with:
     /// - `id`: The post ID
     /// - `state`: Current fetch state (Missing, Fetching, Cached, Stale, Failed)
-    /// - `data`: Full entity data when state is Cached, None otherwise
+    /// - `data`: Full entity data from cache, if available (independent of state)
     ///
     /// This is the primary method for getting collection contents to display.
     ///
     /// # Note
+    /// Data availability is independent of fetch state. After an app restart,
+    /// items may have `state = Missing` but still have cached data available.
+    /// The state indicates whether a fetch is needed, not whether data exists.
+    ///
     /// This async function is exported to client platforms (Kotlin/Swift) where it
     /// will be executed on a background thread. The underlying Rust implementation
     /// is synchronous as rusqlite doesn't support async operations.
     pub async fn load_items(&self) -> Result<Vec<PostMetadataCollectionItem>, CollectionError> {
         let items = self.collection.items();
 
-        // Load all cached posts in one query
-        let cached_ids: Vec<i64> = items
-            .iter()
-            .filter(|item| item.state.is_cached())
-            .map(|item| item.id())
-            .collect();
+        // Load ALL posts from cache - data availability is independent of fetch state.
+        // After app restart, EntityState resets to Missing but data may still be cached.
+        let all_ids: Vec<i64> = items.iter().map(|item| item.id()).collect();
 
-        let cached_posts = if cached_ids.is_empty() {
+        let cached_posts = if all_ids.is_empty() {
             Vec::new()
         } else {
             self.post_service
-                .read_posts_by_ids_from_db(&cached_ids)
+                .read_posts_by_ids_from_db(&all_ids)
                 .map_err(|e| CollectionError::DatabaseError {
                     err_message: e.to_string(),
                 })?
@@ -131,15 +137,12 @@ impl PostMetadataCollectionWithEditContext {
         let mut cached_map: std::collections::HashMap<i64, FullEntity<AnyPostWithEditContext>> =
             cached_posts.into_iter().map(|p| (p.data.id.0, p)).collect();
 
-        // Combine items with their data
+        // Combine items with their data (if available in cache)
         let result = items
             .into_iter()
             .map(|item| {
-                let data = if item.state.is_cached() {
-                    cached_map.remove(&item.id()).map(|e| e.into())
-                } else {
-                    None
-                };
+                // Data may exist regardless of state - try to get it from cache
+                let data = cached_map.remove(&item.id()).map(|e| e.into());
 
                 PostMetadataCollectionItem {
                     id: item.id(),
