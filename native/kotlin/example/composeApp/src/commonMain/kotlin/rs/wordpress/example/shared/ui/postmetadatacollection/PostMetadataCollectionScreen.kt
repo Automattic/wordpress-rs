@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
-import uniffi.wp_mobile.EntityState
+import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile_cache.ListState
 
 @Composable
@@ -322,13 +322,15 @@ fun PostItemCard(item: PostItemDisplayData) {
 }
 
 @Composable
-fun StateIndicator(state: EntityState) {
+fun StateIndicator(state: PostItemState) {
     val color = when (state) {
-        is EntityState.Missing -> Color.Gray
-        is EntityState.Fetching -> Color.Blue
-        is EntityState.Cached -> Color.Green
-        is EntityState.Stale -> Color.Yellow
-        is EntityState.Failed -> Color.Red
+        is PostItemState.Missing -> Color.Gray
+        is PostItemState.Fetching -> Color.Blue
+        is PostItemState.FetchingWithData -> Color.Blue
+        is PostItemState.Cached -> Color.Green
+        is PostItemState.Stale -> Color.Yellow
+        is PostItemState.Failed -> Color.Red
+        is PostItemState.FailedWithData -> Color.Red
     }
 
     Box(
@@ -339,12 +341,14 @@ fun StateIndicator(state: EntityState) {
     )
 }
 
-fun stateDisplayName(state: EntityState): String = when (state) {
-    is EntityState.Missing -> "missing"
-    is EntityState.Fetching -> "fetching"
-    is EntityState.Cached -> "cached"
-    is EntityState.Stale -> "stale"
-    is EntityState.Failed -> "failed"
+fun stateDisplayName(state: PostItemState): String = when (state) {
+    is PostItemState.Missing -> "missing"
+    is PostItemState.Fetching -> "fetching"
+    is PostItemState.FetchingWithData -> "fetching"
+    is PostItemState.Cached -> "cached"
+    is PostItemState.Stale -> "stale"
+    is PostItemState.Failed -> "failed"
+    is PostItemState.FailedWithData -> "failed"
 }
 
 @Composable

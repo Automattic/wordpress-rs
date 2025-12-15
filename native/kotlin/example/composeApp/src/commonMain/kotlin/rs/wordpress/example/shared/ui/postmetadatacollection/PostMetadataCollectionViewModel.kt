@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.ObservableMetadataCollection
 import rs.wordpress.cache.kotlin.getObservablePostMetadataCollectionWithEditContext
 import uniffi.wp_api.PostListParams
-import uniffi.wp_mobile.EntityState
+import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.SyncResult
 import uniffi.wp_mobile.WpSelfHostedService
@@ -52,7 +52,7 @@ data class PostMetadataCollectionState(
  */
 data class PostItemDisplayData(
     val id: Long,
-    val state: EntityState,
+    val state: PostItemState,
     val title: String?,
     val contentPreview: String?,
     val status: String?,
@@ -61,18 +61,32 @@ data class PostItemDisplayData(
 ) {
     companion object {
         fun fromCollectionItem(item: PostMetadataCollectionItem): PostItemDisplayData {
-            val data = item.data
+            // Extract data from state variants that carry data
+            val data = when (val s = item.state) {
+                is PostItemState.Cached -> s.data
+                is PostItemState.Stale -> s.data
+                is PostItemState.FetchingWithData -> s.data
+                is PostItemState.FailedWithData -> s.data
+                else -> null
+            }
+
+            val isLoading = item.state is PostItemState.Fetching ||
+                item.state is PostItemState.FetchingWithData
+
+            val errorMessage = when (val s = item.state) {
+                is PostItemState.Failed -> s.error
+                is PostItemState.FailedWithData -> s.error
+                else -> null
+            }
+
             return PostItemDisplayData(
                 id = item.id,
                 state = item.state,
                 title = data?.data?.title?.rendered,
                 contentPreview = data?.data?.content?.rendered?.take(100),
                 status = data?.data?.status?.toString(),
-                isLoading = item.state is EntityState.Fetching,
-                errorMessage = when (val s = item.state) {
-                    is EntityState.Failed -> s.error
-                    else -> null
-                }
+                isLoading = isLoading,
+                errorMessage = errorMessage
             )
         }
     }
