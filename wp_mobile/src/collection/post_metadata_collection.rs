@@ -2,12 +2,11 @@
 
 use std::sync::Arc;
 
-use wp_api::posts::AnyPostWithEditContext;
+use wp_api::posts::{AnyPostWithEditContext, PostListParams};
 use wp_mobile_cache::{UpdateHook, entity::FullEntity};
 
 use crate::{
     collection::{CollectionError, FetchError},
-    filters::AnyPostFilter,
     service::posts::PostService,
     sync::{
         EntityState, MetadataCollection, PersistentPostMetadataFetcherWithEditContext, SyncResult,
@@ -43,7 +42,7 @@ pub struct PostMetadataCollectionItem {
 ///
 /// ```ignore
 /// // Create collection
-/// let collection = post_service.create_post_metadata_collection_with_edit_context(filter);
+/// let collection = post_service.create_post_metadata_collection_with_edit_context(params);
 ///
 /// // Initial load - fetches metadata, then syncs missing items
 /// collection.refresh().await?;
@@ -73,20 +72,20 @@ pub struct PostMetadataCollectionWithEditContext {
     /// Reference to service for loading full entity data
     post_service: Arc<PostService>,
 
-    /// The filter for this collection
-    filter: AnyPostFilter,
+    /// The API parameters for this collection
+    params: PostListParams,
 }
 
 impl PostMetadataCollectionWithEditContext {
     pub fn new(
         collection: MetadataCollection<PersistentPostMetadataFetcherWithEditContext>,
         post_service: Arc<PostService>,
-        filter: AnyPostFilter,
+        params: PostListParams,
     ) -> Self {
         Self {
             collection,
             post_service,
-            filter,
+            params,
         }
     }
 }
@@ -255,8 +254,8 @@ impl PostMetadataCollectionWithEditContext {
         self.collection.is_relevant_state_update(hook)
     }
 
-    /// Get the filter for this collection.
-    pub fn filter(&self) -> AnyPostFilter {
-        self.filter.clone()
+    /// Get the API parameters for this collection.
+    pub fn params(&self) -> PostListParams {
+        self.params.clone()
     }
 }

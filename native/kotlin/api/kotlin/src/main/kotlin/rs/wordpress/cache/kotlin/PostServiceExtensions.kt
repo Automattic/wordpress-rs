@@ -1,5 +1,6 @@
 package rs.wordpress.cache.kotlin
 
+import uniffi.wp_api.PostListParams
 import uniffi.wp_mobile.AnyPostFilter
 import uniffi.wp_mobile.FullEntityAnyPostWithEditContext
 import uniffi.wp_mobile.PostService
@@ -48,12 +49,12 @@ fun PostService.getObservablePostCollectionWithEditContext(
  * Items include fetch state (Missing, Fetching, Cached, Stale, Failed) so the UI
  * can show appropriate feedback for each item.
  *
- * @param filter Filter criteria for posts (status, etc.)
+ * @param params Post list API parameters (status, author, categories, etc.)
  * @return Observable metadata collection that notifies on database changes
  */
 fun PostService.getObservablePostMetadataCollectionWithEditContext(
-    filter: AnyPostFilter
+    params: PostListParams
 ): ObservableMetadataCollection {
-    val collection = this.createPostMetadataCollectionWithEditContext(filter)
+    val collection = this.createPostMetadataCollectionWithEditContext(params)
     return createObservableMetadataCollection(collection)
 }

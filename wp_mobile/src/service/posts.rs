@@ -1,6 +1,7 @@
 use crate::{
     AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext,
     PostCollectionWithEditContext,
+    cache_key::post_list_params_cache_key,
     collection::{
         FetchError, FetchResult, PostMetadataCollectionWithEditContext, StatelessCollection,
         post_collection::PostCollection,
@@ -150,7 +151,7 @@ impl PostService {
     /// The metadata is used transiently to drive selective sync.
     ///
     /// # Arguments
-    /// * `filter` - Post filter criteria
+    /// * `params` - Post list API parameters
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
     ///
@@ -159,20 +160,21 @@ impl PostService {
     /// - `Err(FetchError)` if network error occurs
     pub async fn fetch_posts_metadata(
         &self,
-        filter: &AnyPostFilter,
+        params: &PostListParams,
         page: u32,
         per_page: u32,
     ) -> Result<MetadataFetchResult, FetchError> {
-        let mut params = filter.to_list_params();
-        params.page = Some(page);
-        params.per_page = Some(per_page);
+        // Clone params and override pagination fields
+        let mut request_params = params.clone();
+        request_params.page = Some(page);
+        request_params.per_page = Some(per_page);
 
         let response = self
             .api_client
             .posts()
             .filter_list_with_edit_context(
                 &PostEndpointType::Posts,
-                &params,
+                &request_params,
                 &[
                     SparseAnyPostFieldWithEditContext::Id,
                     SparseAnyPostFieldWithEditContext::ModifiedGmt,
@@ -201,8 +203,8 @@ impl PostService {
     /// persists across app restarts.
     ///
     /// # Arguments
-    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:publish")
-    /// * `filter` - Post filter criteria
+    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
+    /// * `params` - Post list API parameters
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
     /// * `is_first_page` - If true, replaces metadata; if false, appends
@@ -213,7 +215,7 @@ impl PostService {
     pub async fn fetch_and_store_metadata_persistent(
         &self,
         kv_key: &str,
-        filter: &AnyPostFilter,
+        params: &PostListParams,
         page: u32,
         per_page: u32,
         is_first_page: bool,
@@ -263,7 +265,7 @@ impl PostService {
         }
 
         // Fetch metadata from network
-        let result = match self.fetch_posts_metadata(filter, page, per_page).await {
+        let result = match self.fetch_posts_metadata(params, page, per_page).await {
             Ok(result) => {
                 log.push(format!("fetched {} items", result.metadata.len()));
                 result
@@ -395,8 +397,8 @@ impl PostService {
     /// 7. Sets state back to Idle (or Error on failure)
     ///
     /// # Arguments
-    /// * `key` - Metadata store key (e.g., "site_1:edit:posts:publish")
-    /// * `filter` - Post filter criteria
+    /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
+    /// * `params` - Post list API parameters
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
     /// * `is_refresh` - If true, replaces metadata; if false, appends
@@ -407,7 +409,7 @@ impl PostService {
     pub async fn sync_post_list(
         &self,
         key: &str,
-        filter: &AnyPostFilter,
+        params: &PostListParams,
         page: u32,
         per_page: u32,
         is_refresh: bool,
@@ -434,7 +436,7 @@ impl PostService {
             })?;
 
         // 2. Fetch metadata from API
-        let metadata_result = match self.fetch_posts_metadata(filter, page, per_page).await {
+        let metadata_result = match self.fetch_posts_metadata(params, page, per_page).await {
             Ok(result) => result,
             Err(e) => {
                 // Update state to error
@@ -862,12 +864,12 @@ impl PostService {
     /// this collection shows cached items immediately and fetches only what's needed.
     ///
     /// # Arguments
-    /// * `filter` - Filter criteria for posts (status, etc.)
+    /// * `params` - Post list API parameters (status, author, categories, etc.)
     ///
     /// # Example (Kotlin)
     /// ```kotlin
-    /// val filter = AnyPostFilter(status = PostStatus.DRAFT)
-    /// val collection = postService.createPostMetadataCollectionWithEditContext(filter)
+    /// val params = PostListParams(status = listOf(PostStatus.DRAFT))
+    /// val collection = postService.createPostMetadataCollectionWithEditContext(params)
     ///
     /// // Initial load - fetches metadata, then syncs missing items
     /// collection.refresh()
@@ -877,23 +879,15 @@ impl PostService {
     /// ```
     pub fn create_post_metadata_collection_with_edit_context(
         self: &Arc<Self>,
-        filter: AnyPostFilter,
+        params: PostListParams,
     ) -> PostMetadataCollectionWithEditContext {
-        // TODO: Implement proper cache key generation based on filter
-        // For now, use a simple key based on status
-        let kv_key = format!(
-            "site_{:?}:edit:posts:{}",
-            self.db_site.row_id,
-            filter
-                .status
-                .as_ref()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "all".to_string())
-        );
+        // Generate cache key from filter-relevant params (excludes pagination fields)
+        let cache_key = post_list_params_cache_key(&params);
+        let kv_key = format!("site_{:?}:edit:posts:{}", self.db_site.row_id, cache_key);
 
         let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
             self.clone(),
-            filter.clone(),
+            params.clone(),
             kv_key.clone(),
         );
 
@@ -909,7 +903,7 @@ impl PostService {
             ],
         );
 
-        PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), filter)
+        PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), params)
     }
 
     /// Get a collection of all posts with edit context for this site.

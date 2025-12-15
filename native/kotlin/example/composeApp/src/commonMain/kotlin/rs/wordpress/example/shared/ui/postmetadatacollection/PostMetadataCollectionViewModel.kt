@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.ObservableMetadataCollection
 import rs.wordpress.cache.kotlin.getObservablePostMetadataCollectionWithEditContext
-import uniffi.wp_mobile.AnyPostFilter
+import uniffi.wp_api.PostListParams
 import uniffi.wp_mobile.EntityState
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.SyncResult
@@ -21,7 +21,7 @@ import uniffi.wp_mobile_cache.ListState
  * UI state for the post metadata collection screen
  */
 data class PostMetadataCollectionState(
-    val currentFilter: AnyPostFilter,
+    val currentParams: PostListParams,
     val currentPage: UInt = 0u,
     val totalPages: UInt? = null,
     val lastSyncResult: SyncResult? = null,
@@ -34,18 +34,17 @@ data class PostMetadataCollectionState(
 
     val filterDisplayName: String
         get() {
-            val status = currentFilter.status
-            val statusString = status?.toString() ?: ""
+            val statuses = currentParams.status
             return when {
-                status == null -> "All Posts"
-                statusString.contains("draft", ignoreCase = true) -> "Drafts"
-                statusString.contains("publish", ignoreCase = true) -> "Published"
-                else -> statusString
+                statuses.isEmpty() -> "All Posts"
+                statuses.any { it.toString().contains("draft", ignoreCase = true) } -> "Drafts"
+                statuses.any { it.toString().contains("publish", ignoreCase = true) } -> "Published"
+                else -> statuses.firstOrNull()?.toString() ?: "All Posts"
             }
         }
 
     val filterStatusString: String?
-        get() = currentFilter.status?.toString()?.lowercase()
+        get() = currentParams.status.firstOrNull()?.toString()?.lowercase()
 }
 
 /**
@@ -84,7 +83,7 @@ class PostMetadataCollectionViewModel(
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _state = MutableStateFlow(PostMetadataCollectionState(currentFilter = AnyPostFilter(null)))
+    private val _state = MutableStateFlow(PostMetadataCollectionState(currentParams = PostListParams()))
     val state: StateFlow<PostMetadataCollectionState> = _state.asStateFlow()
 
     private val _items = MutableStateFlow<List<PostItemDisplayData>>(emptyList())
@@ -93,7 +92,7 @@ class PostMetadataCollectionViewModel(
     private var observableCollection: ObservableMetadataCollection? = null
 
     init {
-        createObservableCollection(_state.value.currentFilter)
+        createObservableCollection(_state.value.currentParams)
         loadItemsFromCollection()
     }
 
@@ -102,15 +101,17 @@ class PostMetadataCollectionViewModel(
      */
     fun setFilter(status: String?) {
         val postStatus = status?.let { uniffi.wp_api.parsePostStatus(it) }
-        val newFilter = AnyPostFilter(status = postStatus)
+        val newParams = PostListParams(
+            status = if (postStatus != null) listOf(postStatus) else emptyList()
+        )
 
         observableCollection?.close()
-        createObservableCollection(newFilter)
+        createObservableCollection(newParams)
 
         // Read persisted pagination state from database (sync values)
         val collection = observableCollection
         _state.value = PostMetadataCollectionState(
-            currentFilter = newFilter,
+            currentParams = newParams,
             currentPage = collection?.currentPage() ?: 0u,
             totalPages = collection?.totalPages(),
             lastSyncResult = null,
@@ -199,9 +200,9 @@ class PostMetadataCollectionViewModel(
         }
     }
 
-    private fun createObservableCollection(filter: AnyPostFilter) {
+    private fun createObservableCollection(params: PostListParams) {
         val postService = selfHostedService.posts()
-        val observable = postService.getObservablePostMetadataCollectionWithEditContext(filter)
+        val observable = postService.getObservablePostMetadataCollectionWithEditContext(params)
 
         // Data observer: refresh list contents when data changes
         // Note: Must dispatch to coroutine since loadItems() is a suspend function

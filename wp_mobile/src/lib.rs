@@ -2,6 +2,7 @@
 pub use wp_api;
 pub use wp_mobile_cache;
 
+mod cache_key;
 pub mod collection;
 pub mod entity;
 pub mod filters;

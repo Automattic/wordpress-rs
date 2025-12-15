@@ -16,6 +16,7 @@ paste = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
+url = { workspace = true }
 wp_api = { path = "../wp_api" }
 wp_mobile_cache = { path = "../wp_mobile_cache" }
 

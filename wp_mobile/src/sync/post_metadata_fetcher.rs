@@ -2,11 +2,10 @@
 
 use std::sync::Arc;
 
-use wp_api::posts::PostId;
+use wp_api::posts::{PostId, PostListParams};
 
 use crate::{
     collection::FetchError,
-    filters::AnyPostFilter,
     service::posts::PostService,
     sync::{MetadataFetchResult, MetadataFetcher},
 };
@@ -21,12 +20,12 @@ use crate::{
 /// ```ignore
 /// let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
 ///     service.clone(),
-///     filter,
-///     "site_1:edit:posts:publish".to_string(),
+///     params,
+///     "site_1:edit:posts:status=publish".to_string(),
 /// );
 ///
 /// let mut collection = MetadataCollection::new(
-///     "site_1:edit:posts:publish".to_string(),
+///     "site_1:edit:posts:status=publish".to_string(),
 ///     service.persistent_metadata_reader(),  // DB-backed reader
 ///     service.state_reader_with_edit_context(),
 ///     fetcher,
@@ -37,8 +36,8 @@ pub struct PersistentPostMetadataFetcherWithEditContext {
     /// Reference to the post service
     service: Arc<PostService>,
 
-    /// Filter for the post list
-    filter: AnyPostFilter,
+    /// API parameters for the post list
+    params: PostListParams,
 
     /// Key for metadata store lookup
     kv_key: String,
@@ -49,12 +48,12 @@ impl PersistentPostMetadataFetcherWithEditContext {
     ///
     /// # Arguments
     /// * `service` - The post service to delegate to
-    /// * `filter` - Filter criteria for the post list
-    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:publish")
-    pub fn new(service: Arc<PostService>, filter: AnyPostFilter, kv_key: String) -> Self {
+    /// * `params` - API parameters for the post list query
+    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
+    pub fn new(service: Arc<PostService>, params: PostListParams, kv_key: String) -> Self {
         Self {
             service,
-            filter,
+            params,
             kv_key,
         }
     }
@@ -70,7 +69,7 @@ impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
         self.service
             .fetch_and_store_metadata_persistent(
                 &self.kv_key,
-                &self.filter,
+                &self.params,
                 page,
                 per_page,
                 is_first_page,
