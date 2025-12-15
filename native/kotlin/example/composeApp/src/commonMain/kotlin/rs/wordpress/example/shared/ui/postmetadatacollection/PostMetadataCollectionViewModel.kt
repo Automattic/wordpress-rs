@@ -26,9 +26,16 @@ data class PostMetadataCollectionState(
     val totalPages: UInt? = null,
     val lastSyncResult: SyncResult? = null,
     val lastError: String? = null,
-    val isSyncing: Boolean = false,
     val syncState: ListState = ListState.IDLE
 ) {
+    /**
+     * Whether a sync operation is in progress.
+     * Derived from syncState - the single source of truth from the database.
+     */
+    val isSyncing: Boolean
+        get() = syncState == ListState.FETCHING_FIRST_PAGE ||
+                syncState == ListState.FETCHING_NEXT_PAGE
+
     val hasMorePages: Boolean
         get() = totalPages?.let { currentPage < it } ?: true
 
@@ -130,7 +137,6 @@ class PostMetadataCollectionViewModel(
             totalPages = collection?.totalPages(),
             lastSyncResult = null,
             lastError = null,
-            isSyncing = false,
             syncState = ListState.IDLE
         )
 
@@ -143,11 +149,14 @@ class PostMetadataCollectionViewModel(
 
     /**
      * Refresh the collection (fetch page 1, sync missing/stale)
+     *
+     * Note: syncState is managed by the database and observed via state observer.
+     * We don't manually toggle isSyncing - it's derived from syncState.
      */
     fun refresh() {
         if (_state.value.isSyncing) return
 
-        _state.value = _state.value.copy(isSyncing = true, lastError = null)
+        _state.value = _state.value.copy(lastError = null)
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -158,17 +167,11 @@ class PostMetadataCollectionViewModel(
                     currentPage = collection.currentPage(),
                     totalPages = collection.totalPages(),
                     lastSyncResult = result,
-                    lastError = null,
-                    isSyncing = false,
-                    syncState = collection.syncState()
+                    lastError = null
                 )
-
-                loadItemsFromCollection()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
-                    lastError = e.message ?: "Unknown error",
-                    isSyncing = false,
-                    syncState = observableCollection?.syncState() ?: _state.value.syncState
+                    lastError = e.message ?: "Unknown error"
                 )
             }
         }
@@ -176,6 +179,9 @@ class PostMetadataCollectionViewModel(
 
     /**
      * Load the next page of items
+     *
+     * Note: syncState is managed by the database and observed via state observer.
+     * We don't manually toggle isSyncing - it's derived from syncState.
      */
     fun loadNextPage() {
         if (_state.value.isSyncing) return
@@ -187,7 +193,7 @@ class PostMetadataCollectionViewModel(
             return
         }
 
-        _state.value = _state.value.copy(isSyncing = true, lastError = null)
+        _state.value = _state.value.copy(lastError = null)
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -198,17 +204,11 @@ class PostMetadataCollectionViewModel(
                     currentPage = collection.currentPage(),
                     totalPages = collection.totalPages(),
                     lastSyncResult = result,
-                    lastError = null,
-                    isSyncing = false,
-                    syncState = collection.syncState()
+                    lastError = null
                 )
-
-                loadItemsFromCollection()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
-                    lastError = e.message ?: "Unknown error",
-                    isSyncing = false,
-                    syncState = observableCollection?.syncState() ?: _state.value.syncState
+                    lastError = e.message ?: "Unknown error"
                 )
             }
         }
