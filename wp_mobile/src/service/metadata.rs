@@ -306,81 +306,15 @@ impl MetadataService {
         })?;
         Ok(())
     }
-
-    // ============================================
-    // Relevance checking for update hooks
-    // ============================================
-
-    /// Get the list_metadata_id (rowid) for a given key.
-    ///
-    /// Returns None if no list exists for this key yet.
-    /// Used by collections to cache the ID for state update matching.
-    pub fn get_list_metadata_id(&self, key: &str) -> Option<i64> {
-        self.cache
-            .execute(|conn| self.repo.get_list_metadata_id(conn, &self.db_site, key))
-            .ok()
-            .flatten()
-            .map(i64::from) // Convert RowId to i64 for trait interface
-    }
-
-    /// Check if a list_metadata_state row belongs to a specific list_metadata_id.
-    ///
-    /// Given a rowid from the list_metadata_state table (from an UpdateHook),
-    /// returns true if that state row belongs to the given list_metadata_id.
-    pub fn is_state_row_for_list(&self, state_row_id: i64, list_metadata_id: i64) -> bool {
-        use wp_mobile_cache::RowId;
-
-        self.cache
-            .execute(|conn| {
-                self.repo
-                    .get_list_metadata_id_for_state_row(conn, RowId::from(state_row_id))
-            })
-            .ok()
-            .flatten()
-            .is_some_and(|id| i64::from(id) == list_metadata_id)
-    }
-
-    /// Check if a list_metadata_items row belongs to a specific key.
-    ///
-    /// Given a rowid from the list_metadata_items table (from an UpdateHook),
-    /// returns true if that item row belongs to this service's site and the given key.
-    pub fn is_item_row_for_key(&self, item_row_id: i64, key: &str) -> bool {
-        use wp_mobile_cache::RowId;
-
-        self.cache
-            .execute(|conn| {
-                self.repo
-                    .is_item_row_for_key(conn, &self.db_site, key, RowId::from(item_row_id))
-            })
-            .unwrap_or(false)
-    }
 }
 
 /// Implement ListMetadataReader for database-backed metadata.
 ///
 /// This allows MetadataCollection to read list structure from the database
 /// through the same trait interface it uses for in-memory stores.
-///
-/// Unlike the in-memory implementation, this also supports relevance checking
-/// methods for split observers (data vs state updates).
 impl ListMetadataReader for MetadataService {
     fn get(&self, key: &str) -> Option<Vec<EntityMetadata>> {
         self.get_metadata(key).ok().flatten()
-    }
-
-    fn get_list_metadata_id(&self, key: &str) -> Option<i64> {
-        // Delegate to our existing method
-        MetadataService::get_list_metadata_id(self, key)
-    }
-
-    fn is_item_row_for_key(&self, item_row_id: i64, key: &str) -> bool {
-        // Delegate to our existing method
-        MetadataService::is_item_row_for_key(self, item_row_id, key)
-    }
-
-    fn is_state_row_for_list(&self, state_row_id: i64, list_metadata_id: i64) -> bool {
-        // Delegate to our existing method
-        MetadataService::is_state_row_for_list(self, state_row_id, list_metadata_id)
     }
 
     fn get_sync_state(&self, key: &str) -> wp_mobile_cache::list_metadata::ListState {
