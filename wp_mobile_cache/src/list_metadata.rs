@@ -42,6 +42,10 @@ pub struct DbListMetadataItem {
     pub entity_id: i64,
     /// Last modified timestamp (for staleness detection)
     pub modified_gmt: Option<String>,
+    /// Parent entity ID (for hierarchical post types like pages)
+    pub parent: Option<i64>,
+    /// Menu order (for hierarchical post types)
+    pub menu_order: Option<i64>,
 }
 
 /// Represents sync state for a list metadata.

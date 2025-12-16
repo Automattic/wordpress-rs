@@ -58,6 +58,8 @@ pub enum ListMetadataItemColumn {
     Key = 2,
     EntityId = 3,
     ModifiedGmt = 4,
+    Parent = 5,
+    MenuOrder = 6,
 }
 
 impl ColumnIndex for ListMetadataItemColumn {
@@ -77,6 +79,8 @@ impl DbListMetadataItem {
             key: row.get_column(Col::Key)?,
             entity_id: row.get_column(Col::EntityId)?,
             modified_gmt: row.get_column(Col::ModifiedGmt)?,
+            parent: row.get_column(Col::Parent)?,
+            menu_order: row.get_column(Col::MenuOrder)?,
         })
     }
 }

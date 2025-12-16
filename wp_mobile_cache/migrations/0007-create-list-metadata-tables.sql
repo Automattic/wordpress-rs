@@ -23,6 +23,8 @@ CREATE TABLE `list_metadata_items` (
   `key` TEXT NOT NULL,
   `entity_id` INTEGER NOT NULL,     -- post/comment/etc ID
   `modified_gmt` TEXT,              -- nullable for entities without it
+  `parent` INTEGER,                 -- parent post ID (for hierarchical post types like pages)
+  `menu_order` INTEGER,             -- menu order (for hierarchical post types)
 
   FOREIGN KEY (db_site_id) REFERENCES db_sites(id) ON DELETE CASCADE
 ) STRICT;

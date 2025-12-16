@@ -180,6 +180,8 @@ impl PostService {
                 &[
                     SparseAnyPostFieldWithEditContext::Id,
                     SparseAnyPostFieldWithEditContext::ModifiedGmt,
+                    SparseAnyPostFieldWithEditContext::Parent,
+                    SparseAnyPostFieldWithEditContext::MenuOrder,
                 ],
             )
             .await?;
@@ -188,7 +190,14 @@ impl PostService {
         let metadata: Vec<EntityMetadata> = response
             .data
             .into_iter()
-            .filter_map(|sparse| Some(EntityMetadata::new(sparse.id?.0, sparse.modified_gmt)))
+            .filter_map(|sparse| {
+                Some(EntityMetadata::new(
+                    sparse.id?.0,
+                    sparse.modified_gmt,
+                    sparse.parent.map(|p| p.0),
+                    sparse.menu_order.map(|m| m as i64),
+                ))
+            })
             .collect();
 
         Ok(MetadataFetchResult::new(

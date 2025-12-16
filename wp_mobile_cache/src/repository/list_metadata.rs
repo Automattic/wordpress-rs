@@ -244,14 +244,21 @@ impl ListMetadataRepository {
         }
 
         let insert_sql = format!(
-            "INSERT INTO {} (db_site_id, key, entity_id, modified_gmt) VALUES (?, ?, ?, ?)",
+            "INSERT INTO {} (db_site_id, key, entity_id, modified_gmt, parent, menu_order) VALUES (?, ?, ?, ?, ?, ?)",
             Self::items_table().table_name()
         );
 
         for item in items {
             executor.execute(
                 &insert_sql,
-                rusqlite::params![site.row_id, key, item.entity_id, item.modified_gmt],
+                rusqlite::params![
+                    site.row_id,
+                    key,
+                    item.entity_id,
+                    item.modified_gmt,
+                    item.parent,
+                    item.menu_order
+                ],
             )?;
         }
 
@@ -591,6 +598,10 @@ pub struct ListMetadataItemInput {
     pub entity_id: i64,
     /// Last modified timestamp (for staleness detection)
     pub modified_gmt: Option<String>,
+    /// Parent entity ID (for hierarchical post types like pages)
+    pub parent: Option<i64>,
+    /// Menu order (for hierarchical post types)
+    pub menu_order: Option<i64>,
 }
 
 /// Update parameters for list metadata header.
@@ -749,7 +760,7 @@ mod tests {
     #[rstest]
     fn test_list_metadata_items_column_enum_matches_schema(test_ctx: TestContext) {
         let sql = format!(
-            "SELECT rowid, db_site_id, key, entity_id, modified_gmt FROM {}",
+            "SELECT rowid, db_site_id, key, entity_id, modified_gmt, parent, menu_order FROM {}",
             ListMetadataRepository::items_table().table_name()
         );
         let stmt = test_ctx.conn.prepare(&sql);
@@ -785,14 +796,20 @@ mod tests {
             ListMetadataItemInput {
                 entity_id: 100,
                 modified_gmt: Some("2024-01-01T00:00:00Z".to_string()),
+                parent: Some(50),
+                menu_order: Some(1),
             },
             ListMetadataItemInput {
                 entity_id: 200,
                 modified_gmt: Some("2024-01-02T00:00:00Z".to_string()),
+                parent: Some(50),
+                menu_order: Some(2),
             },
             ListMetadataItemInput {
                 entity_id: 300,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
         ];
 
@@ -802,9 +819,13 @@ mod tests {
         let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 100);
+        assert_eq!(retrieved[0].parent, Some(50));
+        assert_eq!(retrieved[0].menu_order, Some(1));
         assert_eq!(retrieved[1].entity_id, 200);
         assert_eq!(retrieved[2].entity_id, 300);
         assert!(retrieved[2].modified_gmt.is_none());
+        assert!(retrieved[2].parent.is_none());
+        assert!(retrieved[2].menu_order.is_none());
     }
 
     #[rstest]
@@ -817,10 +838,14 @@ mod tests {
             ListMetadataItemInput {
                 entity_id: 1,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
             ListMetadataItemInput {
                 entity_id: 2,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
         ];
         repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
@@ -831,14 +856,20 @@ mod tests {
             ListMetadataItemInput {
                 entity_id: 10,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
             ListMetadataItemInput {
                 entity_id: 20,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
             ListMetadataItemInput {
                 entity_id: 30,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
         ];
         repo.set_items(&test_ctx.conn, &test_ctx.site, key, &new_items)
@@ -861,10 +892,14 @@ mod tests {
             ListMetadataItemInput {
                 entity_id: 1,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
             ListMetadataItemInput {
                 entity_id: 2,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
         ];
         repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
@@ -875,10 +910,14 @@ mod tests {
             ListMetadataItemInput {
                 entity_id: 3,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
             ListMetadataItemInput {
                 entity_id: 4,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             },
         ];
         repo.append_items(&test_ctx.conn, &test_ctx.site, key, &more_items)
@@ -1026,6 +1065,8 @@ mod tests {
         let items = vec![ListMetadataItemInput {
             entity_id: 1,
             modified_gmt: None,
+            parent: None,
+            menu_order: None,
         }];
         repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
             .unwrap();
@@ -1071,6 +1112,8 @@ mod tests {
             .map(|i| ListMetadataItemInput {
                 entity_id: i * 100,
                 modified_gmt: None,
+                parent: None,
+                menu_order: None,
             })
             .collect();
 

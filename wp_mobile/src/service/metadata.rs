@@ -83,7 +83,7 @@ impl MetadataService {
                     let modified_gmt = item
                         .modified_gmt
                         .and_then(|s| s.parse::<WpGmtDateTime>().ok());
-                    EntityMetadata::new(item.entity_id, modified_gmt)
+                    EntityMetadata::new(item.entity_id, modified_gmt, item.parent, item.menu_order)
                 })
                 .collect();
 
@@ -165,6 +165,8 @@ impl MetadataService {
             .map(|m| ListMetadataItemInput {
                 entity_id: m.id,
                 modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
             })
             .collect();
 
@@ -186,6 +188,8 @@ impl MetadataService {
             .map(|m| ListMetadataItemInput {
                 entity_id: m.id,
                 modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
             })
             .collect();
 
@@ -467,9 +471,9 @@ mod tests {
     fn test_set_and_get_items(test_ctx: TestContext) {
         let key = "edit:posts:publish";
         let metadata = vec![
-            EntityMetadata::new(100, None),
-            EntityMetadata::new(200, None),
-            EntityMetadata::new(300, None),
+            EntityMetadata::new(100, None, None, None),
+            EntityMetadata::new(200, None, None, None),
+            EntityMetadata::new(300, None, None, None),
         ];
 
         test_ctx.service.set_items(key, &metadata).unwrap();
@@ -486,7 +490,10 @@ mod tests {
             .service
             .set_items(
                 key,
-                &[EntityMetadata::new(1, None), EntityMetadata::new(2, None)],
+                &[
+                    EntityMetadata::new(1, None, None, None),
+                    EntityMetadata::new(2, None, None, None),
+                ],
             )
             .unwrap();
 
@@ -494,7 +501,10 @@ mod tests {
             .service
             .set_items(
                 key,
-                &[EntityMetadata::new(10, None), EntityMetadata::new(20, None)],
+                &[
+                    EntityMetadata::new(10, None, None, None),
+                    EntityMetadata::new(20, None, None, None),
+                ],
             )
             .unwrap();
 
@@ -508,14 +518,17 @@ mod tests {
 
         test_ctx
             .service
-            .set_items(key, &[EntityMetadata::new(1, None)])
+            .set_items(key, &[EntityMetadata::new(1, None, None, None)])
             .unwrap();
 
         test_ctx
             .service
             .append_items(
                 key,
-                &[EntityMetadata::new(2, None), EntityMetadata::new(3, None)],
+                &[
+                    EntityMetadata::new(2, None, None, None),
+                    EntityMetadata::new(3, None, None, None),
+                ],
             )
             .unwrap();
 
@@ -633,7 +646,7 @@ mod tests {
 
         test_ctx
             .service
-            .set_items(key, &[EntityMetadata::new(1, None)])
+            .set_items(key, &[EntityMetadata::new(1, None, None, None)])
             .unwrap();
         test_ctx
             .service
@@ -650,8 +663,8 @@ mod tests {
     fn test_list_metadata_reader_trait(test_ctx: TestContext) {
         let key = "edit:posts:publish";
         let metadata = vec![
-            EntityMetadata::new(100, None),
-            EntityMetadata::new(200, None),
+            EntityMetadata::new(100, None, None, None),
+            EntityMetadata::new(200, None, None, None),
         ];
 
         test_ctx.service.set_items(key, &metadata).unwrap();
