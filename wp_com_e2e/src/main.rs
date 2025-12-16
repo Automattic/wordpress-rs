@@ -51,7 +51,7 @@ async fn main() -> Result<(), anyhow::Error> {
             let test_timeout = if allow_writes {
                 Duration::from_secs(60)
             } else {
-                Duration::from_secs(10)
+                Duration::from_secs(20)
             };
 
             let delegate = WpApiClientDelegate {

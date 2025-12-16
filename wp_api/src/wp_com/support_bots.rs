@@ -90,7 +90,6 @@ pub enum MessageContext {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct BotMessageContext {
-    pub question_tags: HashMap<String, String>,
     pub sources: Vec<BotMessageContextSource>,
     pub flags: HashMap<String, bool>,
 }
@@ -283,6 +282,7 @@ mod tests {
     #[rstest]
     #[case("single-conversation-01.json", 1965758)]
     #[case("single-conversation-02.json", 1234567)]
+    #[case("single-conversation-03.json", 3456789)]
     fn test_bot_conversation_deserialization(
         #[case] json_file_path: &str,
         #[case] expected_chat_id: u64,
