@@ -1,11 +1,28 @@
 package rs.wordpress.cache.kotlin
 
+import uniffi.wp_mobile.ListInfo
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.PostMetadataCollectionWithEditContext
 import uniffi.wp_mobile.SyncResult
 import uniffi.wp_mobile_cache.ListState
 import uniffi.wp_mobile_cache.UpdateHook
 import java.util.concurrent.CopyOnWriteArrayList
+
+/**
+ * Check if there are more pages to load.
+ *
+ * Returns `true` if:
+ * - Total pages is unknown (assume more)
+ * - Current page is less than total pages
+ */
+val ListInfo.hasMorePages: Boolean
+    get() = totalPages?.let { currentPage < it } ?: true
+
+/**
+ * Check if a sync operation is in progress.
+ */
+val ListInfo.isSyncing: Boolean
+    get() = state == ListState.FETCHING_FIRST_PAGE || state == ListState.FETCHING_NEXT_PAGE
 
 /**
  * Create an observable metadata collection that notifies observers when data changes.
@@ -69,7 +86,7 @@ class ObservableMetadataCollection(
     private val collection: PostMetadataCollectionWithEditContext
 ) : AutoCloseable {
     private val dataObservers = CopyOnWriteArrayList<() -> Unit>()
-    private val stateObservers = CopyOnWriteArrayList<() -> Unit>()
+    private val listInfoObservers = CopyOnWriteArrayList<() -> Unit>()
 
     /**
      * Add an observer for data changes (list contents changed).
@@ -85,30 +102,28 @@ class ObservableMetadataCollection(
     }
 
     /**
-     * Add an observer for state changes (sync status changed).
+     * Add an observer for list info changes (pagination or sync state changed).
      *
-     * State observers are notified when the sync state changes:
-     * - Idle -> FetchingFirstPage (refresh started)
-     * - Idle -> FetchingNextPage (load more started)
-     * - Fetching* -> Idle (sync completed)
-     * - Fetching* -> Error (sync failed)
+     * ListInfo observers are notified when:
+     * - Pagination info changes (current page, total pages updated after fetch)
+     * - Sync state changes (Idle -> FetchingFirstPage, etc.)
      *
-     * Use this for updating loading indicators in the UI.
+     * Use this for updating pagination display and loading indicators in the UI.
      */
-    fun addStateObserver(observer: () -> Unit) {
-        stateObservers.add(observer)
+    fun addListInfoObserver(observer: () -> Unit) {
+        listInfoObservers.add(observer)
     }
 
     /**
-     * Add an observer for both data and state changes.
+     * Add an observer for both data and list info changes.
      *
      * This is a convenience method that registers the observer for both
-     * data and state updates. Use this when you want to refresh the entire
+     * data and list info updates. Use this when you want to refresh the entire
      * UI on any change.
      */
     fun addObserver(observer: () -> Unit) {
         dataObservers.add(observer)
-        stateObservers.add(observer)
+        listInfoObservers.add(observer)
     }
 
     /**
@@ -119,18 +134,18 @@ class ObservableMetadataCollection(
     }
 
     /**
-     * Remove a state observer.
+     * Remove a list info observer.
      */
-    fun removeStateObserver(observer: () -> Unit) {
-        stateObservers.remove(observer)
+    fun removeListInfoObserver(observer: () -> Unit) {
+        listInfoObservers.remove(observer)
     }
 
     /**
-     * Remove an observer from both data and state lists.
+     * Remove an observer from both data and list info lists.
      */
     fun removeObserver(observer: () -> Unit) {
         dataObservers.remove(observer)
-        stateObservers.remove(observer)
+        listInfoObservers.remove(observer)
     }
 
     /**
@@ -181,49 +196,37 @@ class ObservableMetadataCollection(
     suspend fun loadNextPage(): SyncResult = collection.loadNextPage()
 
     /**
-     * Check if there are more pages to load.
-     */
-    fun hasMorePages(): Boolean = collection.hasMorePages()
-
-    /**
-     * Get the current page number (0 = not loaded yet).
-     */
-    fun currentPage(): UInt = collection.currentPage()
-
-    /**
-     * Get the total number of pages, if known.
-     */
-    fun totalPages(): UInt? = collection.totalPages()
-
-    /**
-     * Get the current sync state for this collection.
+     * Get combined list info (pagination + sync state) in a single query.
      *
-     * Returns:
-     * - [ListState.IDLE] - No sync in progress
-     * - [ListState.FETCHING_FIRST_PAGE] - Refresh in progress
-     * - [ListState.FETCHING_NEXT_PAGE] - Load more in progress
-     * - [ListState.ERROR] - Last sync failed
+     * Returns `null` if the list hasn't been created yet.
      *
-     * Use this with state observers to show loading indicators in the UI.
-     * This is a suspend function that reads from the database on a background thread.
+     * The returned [ListInfo] contains:
+     * - `state`: Current sync state (IDLE, FETCHING_FIRST_PAGE, FETCHING_NEXT_PAGE, ERROR)
+     * - `errorMessage`: Error message if state is ERROR
+     * - `currentPage`: Current page number (0 = not loaded yet)
+     * - `totalPages`: Total pages if known
+     * - `totalItems`: Total items if known
+     * - `perPage`: Items per page setting
+     *
+     * Use [ListInfo.hasMorePages] extension to check if more pages are available.
      */
-    suspend fun syncState(): ListState = collection.syncState()
+    fun listInfo(): ListInfo? = collection.listInfo()
 
     /**
      * Internal method called by DatabaseChangeNotifier when a database update occurs.
      *
      * Checks relevance and notifies appropriate observers:
      * - Data updates -> dataObservers
-     * - State updates -> stateObservers
+     * - List info updates -> listInfoObservers
      */
     internal fun notifyIfRelevant(hook: UpdateHook) {
         val isDataRelevant = collection.isRelevantDataUpdate(hook)
-        val isStateRelevant = collection.isRelevantStateUpdate(hook)
+        val isListInfoRelevant = collection.isRelevantListInfoUpdate(hook)
         if (isDataRelevant) {
             dataObservers.forEach { it() }
         }
-        if (isStateRelevant) {
-            stateObservers.forEach { it() }
+        if (isListInfoRelevant) {
+            listInfoObservers.forEach { it() }
         }
     }
 

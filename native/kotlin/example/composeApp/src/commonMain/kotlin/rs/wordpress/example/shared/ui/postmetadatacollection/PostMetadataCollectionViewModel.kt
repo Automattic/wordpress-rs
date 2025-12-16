@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.ObservableMetadataCollection
 import rs.wordpress.cache.kotlin.getObservablePostMetadataCollectionWithEditContext
+import rs.wordpress.cache.kotlin.hasMorePages
+import rs.wordpress.cache.kotlin.isSyncing
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.PostListParams
+import uniffi.wp_mobile.ListInfo
 import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.SyncResult
@@ -23,22 +26,28 @@ import uniffi.wp_mobile_cache.ListState
  */
 data class PostMetadataCollectionState(
     val currentParams: PostListParams,
-    val currentPage: UInt = 0u,
-    val totalPages: UInt? = null,
+    val listInfo: ListInfo? = null,
     val lastSyncResult: SyncResult? = null,
-    val lastError: String? = null,
-    val syncState: ListState = ListState.IDLE
+    val lastError: String? = null
 ) {
     /**
      * Whether a sync operation is in progress.
-     * Derived from syncState - the single source of truth from the database.
+     * Derived from listInfo.state - the single source of truth from the database.
      */
     val isSyncing: Boolean
-        get() = syncState == ListState.FETCHING_FIRST_PAGE ||
-                syncState == ListState.FETCHING_NEXT_PAGE
+        get() = listInfo?.isSyncing ?: false
 
     val hasMorePages: Boolean
-        get() = totalPages?.let { currentPage < it } ?: true
+        get() = listInfo?.hasMorePages ?: true
+
+    val currentPage: Long
+        get() = listInfo?.currentPage ?: 0L
+
+    val totalPages: Long?
+        get() = listInfo?.totalPages
+
+    val syncState: ListState
+        get() = listInfo?.state ?: ListState.IDLE
 
     val filterDisplayName: String
         get() {
@@ -130,29 +139,23 @@ class PostMetadataCollectionViewModel(
         observableCollection?.close()
         createObservableCollection(newParams)
 
-        // Read persisted pagination state from database (sync values)
-        val collection = observableCollection
+        // Read persisted state from database (single query)
         _state.value = PostMetadataCollectionState(
             currentParams = newParams,
-            currentPage = collection?.currentPage() ?: 0u,
-            totalPages = collection?.totalPages(),
+            listInfo = observableCollection?.listInfo(),
             lastSyncResult = null,
-            lastError = null,
-            syncState = ListState.IDLE
+            lastError = null
         )
 
-        // Load items and syncState (async)
-        viewModelScope.launch(Dispatchers.Default) {
-            loadItemsFromCollectionInternal()
-            updateSyncState()
-        }
+        // Load items (async)
+        loadItemsFromCollection()
     }
 
     /**
      * Refresh the collection (fetch page 1, sync missing/stale)
      *
      * Note: syncState is managed by the database and observed via state observer.
-     * We don't manually toggle isSyncing - it's derived from syncState.
+     * We don't manually toggle isSyncing - it's derived from listInfo.state.
      */
     fun refresh() {
         if (_state.value.isSyncing) return
@@ -165,8 +168,7 @@ class PostMetadataCollectionViewModel(
                 val result = collection.refresh()
 
                 _state.value = _state.value.copy(
-                    currentPage = collection.currentPage(),
-                    totalPages = collection.totalPages(),
+                    listInfo = collection.listInfo(),
                     lastSyncResult = result,
                     lastError = null
                 )
@@ -182,14 +184,14 @@ class PostMetadataCollectionViewModel(
      * Load the next page of items
      *
      * Note: syncState is managed by the database and observed via state observer.
-     * We don't manually toggle isSyncing - it's derived from syncState.
+     * We don't manually toggle isSyncing - it's derived from listInfo.state.
      */
     fun loadNextPage() {
         if (_state.value.isSyncing) return
         if (!_state.value.hasMorePages) return
 
         // If no pages have been loaded yet, do a refresh instead
-        if (_state.value.currentPage == 0u) {
+        if (_state.value.currentPage == 0L) {
             refresh()
             return
         }
@@ -202,8 +204,7 @@ class PostMetadataCollectionViewModel(
                 val result = collection.loadNextPage()
 
                 _state.value = _state.value.copy(
-                    currentPage = collection.currentPage(),
-                    totalPages = collection.totalPages(),
+                    listInfo = collection.listInfo(),
                     lastSyncResult = result,
                     lastError = null
                 )
@@ -223,29 +224,26 @@ class PostMetadataCollectionViewModel(
         )
 
         // Data observer: refresh list contents when data changes
-        // Note: Must dispatch to coroutine since loadItems() is a suspend function
         observable.addDataObserver {
             viewModelScope.launch(Dispatchers.Default) {
                 loadItemsFromCollectionInternal()
             }
         }
 
-        // State observer: update sync state indicator when state changes
-        // Note: Must dispatch to coroutine since syncState() is a suspend function
-        observable.addStateObserver {
+        // ListInfo observer: update listInfo when pagination or sync state changes
+        observable.addListInfoObserver {
             viewModelScope.launch(Dispatchers.Default) {
-                updateSyncState()
+                updateListInfo()
             }
         }
 
         observableCollection = observable
     }
 
-    private suspend fun updateSyncState() {
-        val collection = observableCollection ?: return
-        val newSyncState = collection.syncState()
-        println("[ViewModel] updateSyncState: new state = $newSyncState")
-        _state.value = _state.value.copy(syncState = newSyncState)
+    private fun updateListInfo() {
+        val newListInfo = observableCollection?.listInfo()
+        println("[ViewModel] updateListInfo: new state = ${newListInfo?.state}")
+        _state.value = _state.value.copy(listInfo = newListInfo)
     }
 
     private suspend fun loadItemsFromCollectionInternal() {

@@ -9,7 +9,8 @@ use crate::{
     collection::{CollectionError, FetchError},
     service::posts::PostService,
     sync::{
-        EntityState, MetadataCollection, PersistentPostMetadataFetcherWithEditContext, SyncResult,
+        EntityState, ListInfo, MetadataCollection, PersistentPostMetadataFetcherWithEditContext,
+        SyncResult,
     },
 };
 
@@ -191,6 +192,15 @@ impl PostMetadataCollectionWithEditContext {
         self.collection.load_next_page().await
     }
 
+    /// Get combined list info (pagination + sync state) in a single query.
+    ///
+    /// Returns `None` if the list hasn't been created yet.
+    /// Use this instead of calling `current_page()`, `total_pages()`, `sync_state()`
+    /// separately to avoid multiple database queries.
+    pub fn list_info(&self) -> Option<ListInfo> {
+        self.collection.list_info()
+    }
+
     /// Check if there are more pages to load.
     pub fn has_more_pages(&self) -> bool {
         self.collection.has_more_pages()
@@ -244,14 +254,15 @@ impl PostMetadataCollectionWithEditContext {
         self.collection.is_relevant_data_update(hook)
     }
 
-    /// Check if a database update affects this collection's sync state.
+    /// Check if a database update affects this collection's list info (pagination + state).
     ///
-    /// Returns `true` if the update is to the ListMetadataState table
-    /// for this collection's specific list.
+    /// Returns `true` if the update is to:
+    /// - `ListMetadata` table (pagination info changed)
+    /// - `ListMetadataState` table (sync state changed)
     ///
-    /// Use this for state observers that should update loading indicators.
-    pub fn is_relevant_state_update(&self, hook: &UpdateHook) -> bool {
-        self.collection.is_relevant_state_update(hook)
+    /// Use this for listInfo observers that should update pagination display and loading indicators.
+    pub fn is_relevant_list_info_update(&self, hook: &UpdateHook) -> bool {
+        self.collection.is_relevant_list_info_update(hook)
     }
 
     /// Get the API parameters for this collection.

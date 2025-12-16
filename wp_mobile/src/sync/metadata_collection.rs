@@ -145,12 +145,12 @@ where
         self.list_info().map(|info| info.state).unwrap_or_default()
     }
 
-    /// Check if a database update is relevant to this collection (either data or state).
+    /// Check if a database update is relevant to this collection (either data or list info).
     ///
-    /// Returns `true` if the update affects either data or state.
-    /// For more granular control, use `is_relevant_data_update` or `is_relevant_state_update`.
+    /// Returns `true` if the update affects either data or list info.
+    /// For more granular control, use `is_relevant_data_update` or `is_relevant_list_info_update`.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
-        self.is_relevant_data_update(hook) || self.is_relevant_state_update(hook)
+        self.is_relevant_data_update(hook) || self.is_relevant_list_info_update(hook)
     }
 
     /// Check if a database update affects this collection's data.
@@ -179,18 +179,20 @@ where
         false
     }
 
-    /// Check if a database update affects this collection's sync state.
+    /// Check if a database update affects this collection's list info (pagination + state).
     ///
-    /// Returns `true` if the update is to the ListMetadataState table.
+    /// Returns `true` if the update is to:
+    /// - `ListMetadata` table (pagination info changed)
+    /// - `ListMetadataState` table (sync state changed)
     ///
-    /// Use this for state observers that should update loading indicators.
+    /// Use this for listInfo observers that should update pagination display and loading indicators.
     ///
     /// Note: We intentionally don't query the database here to avoid deadlocks when
     /// the hook fires during a transaction. This means we may get false positives for
-    /// state updates from other collections, but that's safe (just extra state reads).
-    pub fn is_relevant_state_update(&self, hook: &UpdateHook) -> bool {
+    /// updates from other collections, but that's safe (just extra reads).
+    pub fn is_relevant_list_info_update(&self, hook: &UpdateHook) -> bool {
         // Just check the table - don't query DB to avoid deadlock
-        hook.table == DbTable::ListMetadataState
+        hook.table == DbTable::ListMetadata || hook.table == DbTable::ListMetadataState
     }
 
     /// Refresh the collection (fetch page 1, replace metadata).

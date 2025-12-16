@@ -4,7 +4,7 @@ use wp_mobile_cache::list_metadata::ListState;
 /// Combined list information: pagination + sync state.
 ///
 /// Returned by a single JOIN query on `list_metadata` + `list_metadata_state` tables.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ListInfo {
     /// Current sync state (Idle, FetchingFirstPage, FetchingNextPage, Error)
     pub state: ListState,
