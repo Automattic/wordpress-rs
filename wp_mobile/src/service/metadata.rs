@@ -402,6 +402,21 @@ impl ListMetadataReader for MetadataService {
             .flatten()
             .and_then(|p| p.total_pages)
     }
+
+    fn get_total_items(&self, key: &str) -> Option<i64> {
+        self.get_pagination(key)
+            .ok()
+            .flatten()
+            .and_then(|p| p.total_items)
+    }
+
+    fn get_per_page(&self, key: &str) -> i64 {
+        self.get_pagination(key)
+            .ok()
+            .flatten()
+            .map(|p| p.per_page)
+            .unwrap_or(20)
+    }
 }
 
 /// Pagination info for a list.

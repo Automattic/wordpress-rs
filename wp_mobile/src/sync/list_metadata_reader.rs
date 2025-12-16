@@ -74,4 +74,20 @@ pub trait ListMetadataReader: Send + Sync {
     fn get_total_pages(&self, _key: &str) -> Option<i64> {
         None
     }
+
+    /// Get the total number of items for a list.
+    ///
+    /// Returns `None` if unknown (no fetch has completed yet).
+    /// Default implementation returns `None`.
+    fn get_total_items(&self, _key: &str) -> Option<i64> {
+        None
+    }
+
+    /// Get the items per page setting for a list.
+    ///
+    /// Returns the configured per_page value, or 20 as default.
+    /// Default implementation returns 20.
+    fn get_per_page(&self, _key: &str) -> i64 {
+        20
+    }
 }
