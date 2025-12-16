@@ -45,7 +45,7 @@ pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
 pub use entity_state::EntityState;
 pub use entity_state_store::{EntityStateReader, EntityStateStore};
-pub use list_metadata_reader::ListMetadataReader;
+pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_collection::MetadataCollection;
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use metadata_fetcher::MetadataFetcher;

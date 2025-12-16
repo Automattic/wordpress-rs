@@ -1,7 +1,9 @@
 use crate::{
     DbTable, RowId, SqliteDbError,
     db_types::db_site::DbSite,
-    list_metadata::{DbListMetadata, DbListMetadataItem, DbListMetadataState, ListState},
+    list_metadata::{
+        DbListHeaderWithState, DbListMetadata, DbListMetadataItem, DbListMetadataState, ListState,
+    },
     repository::QueryExecutor,
 };
 
@@ -142,6 +144,38 @@ impl ListMetadataRepository {
                 Ok(state.map(|s| s.state).unwrap_or(ListState::Idle))
             }
             None => Ok(ListState::Idle),
+        }
+    }
+
+    /// Get header with state in a single JOIN query.
+    ///
+    /// Returns pagination info + sync state combined. More efficient than
+    /// calling `get_header()` and `get_state()` separately when both are needed.
+    ///
+    /// Returns `None` if the list doesn't exist.
+    pub fn get_header_with_state(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &str,
+    ) -> Result<Option<DbListHeaderWithState>, SqliteDbError> {
+        let sql = format!(
+            "SELECT m.total_pages, m.total_items, m.current_page, m.per_page, s.state, s.error_message \
+             FROM {} m \
+             LEFT JOIN {} s ON s.list_metadata_id = m.rowid \
+             WHERE m.db_site_id = ? AND m.key = ?",
+            Self::header_table().table_name(),
+            Self::state_table().table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let mut rows = stmt.query_map(rusqlite::params![site.row_id, key], |row| {
+            DbListHeaderWithState::from_row(row)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        })?;
+
+        match rows.next() {
+            Some(result) => Ok(Some(result.map_err(SqliteDbError::from)?)),
+            None => Ok(None),
         }
     }
 

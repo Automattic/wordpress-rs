@@ -4,7 +4,9 @@ use wp_mobile_cache::{DbTable, UpdateHook};
 
 use crate::collection::FetchError;
 
-use super::{CollectionItem, EntityStateReader, ListMetadataReader, MetadataFetcher, SyncResult};
+use super::{
+    CollectionItem, EntityStateReader, ListInfo, ListMetadataReader, MetadataFetcher, SyncResult,
+};
 
 /// Collection that uses metadata-first fetching strategy.
 ///
@@ -114,13 +116,20 @@ where
     /// the metadata with the current fetch state.
     pub fn items(&self) -> Vec<CollectionItem> {
         self.metadata_reader
-            .get(&self.kv_key)
+            .get_items(&self.kv_key)
             .unwrap_or_default()
             .into_iter()
             .map(|metadata| {
                 CollectionItem::new(metadata.clone(), self.state_reader.get(metadata.id))
             })
             .collect()
+    }
+
+    /// Get the combined list info (pagination + sync state) in a single query.
+    ///
+    /// Returns `None` if no metadata has been stored for this key.
+    pub fn list_info(&self) -> Option<ListInfo> {
+        self.metadata_reader.get_list_info(&self.kv_key)
     }
 
     /// Get the current sync state for this collection.
@@ -133,7 +142,7 @@ where
     ///
     /// Use this to show loading indicators in the UI.
     pub fn sync_state(&self) -> wp_mobile_cache::list_metadata::ListState {
-        self.metadata_reader.get_sync_state(&self.kv_key)
+        self.list_info().map(|info| info.state).unwrap_or_default()
     }
 
     /// Check if a database update is relevant to this collection (either data or state).
@@ -269,28 +278,28 @@ where
 
     /// Check if there are more pages to load.
     pub fn has_more_pages(&self) -> bool {
-        let current_page = self.current_page();
-        let total_pages = self.total_pages();
-        total_pages
-            .map(|total| current_page < total)
-            .unwrap_or(true) // Unknown total = assume more pages
+        self.list_info()
+            .and_then(|info| info.total_pages.map(|total| info.current_page < total))
+            .unwrap_or(true) // Unknown total or no info = assume more pages
     }
 
     /// Get the current page number (0 = not loaded yet).
     pub fn current_page(&self) -> u32 {
-        self.metadata_reader.get_current_page(&self.kv_key) as u32
+        self.list_info()
+            .map(|info| info.current_page as u32)
+            .unwrap_or(0)
     }
 
     /// Get the total number of pages, if known.
     pub fn total_pages(&self) -> Option<u32> {
-        self.metadata_reader
-            .get_total_pages(&self.kv_key)
+        self.list_info()
+            .and_then(|info| info.total_pages)
             .map(|p| p as u32)
     }
 
     /// Get the total number of items, if known.
     pub fn total_items(&self) -> Option<i64> {
-        self.metadata_reader.get_total_items(&self.kv_key)
+        self.list_info().and_then(|info| info.total_items)
     }
 
     /// Fetch missing and stale items.

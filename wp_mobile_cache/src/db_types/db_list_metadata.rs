@@ -1,7 +1,9 @@
 use crate::{
     SqliteDbError,
     db_types::row_ext::{ColumnIndex, RowExt},
-    list_metadata::{DbListMetadata, DbListMetadataItem, DbListMetadataState, ListState},
+    list_metadata::{
+        DbListHeaderWithState, DbListMetadata, DbListMetadataItem, DbListMetadataState, ListState,
+    },
 };
 use rusqlite::Row;
 
@@ -116,6 +118,49 @@ impl DbListMetadataState {
             state: ListState::from(state_str),
             error_message: row.get_column(Col::ErrorMessage)?,
             updated_at: row.get_column(Col::UpdatedAt)?,
+        })
+    }
+}
+
+/// Column indexes for the header + state JOIN query.
+///
+/// Query: SELECT m.total_pages, m.total_items, m.current_page, m.per_page, s.state, s.error_message
+///        FROM list_metadata m LEFT JOIN list_metadata_state s ON ...
+#[repr(usize)]
+#[derive(Debug, Clone, Copy)]
+pub enum ListHeaderWithStateColumn {
+    TotalPages = 0,
+    TotalItems = 1,
+    CurrentPage = 2,
+    PerPage = 3,
+    State = 4,
+    ErrorMessage = 5,
+}
+
+impl ColumnIndex for ListHeaderWithStateColumn {
+    fn as_index(&self) -> usize {
+        *self as usize
+    }
+}
+
+impl DbListHeaderWithState {
+    /// Construct from a JOIN query row.
+    ///
+    /// Expects columns in order: total_pages, total_items, current_page, per_page, state, error_message
+    pub fn from_row(row: &Row) -> Result<Self, SqliteDbError> {
+        use ListHeaderWithStateColumn as Col;
+
+        // state is nullable due to LEFT JOIN - default to "idle"
+        let state_str: Option<String> = row.get_column(Col::State)?;
+        let state = state_str.map(ListState::from).unwrap_or(ListState::Idle);
+
+        Ok(Self {
+            state,
+            error_message: row.get_column(Col::ErrorMessage)?,
+            current_page: row.get_column(Col::CurrentPage)?,
+            total_pages: row.get_column(Col::TotalPages)?,
+            total_items: row.get_column(Col::TotalItems)?,
+            per_page: row.get_column(Col::PerPage)?,
         })
     }
 }

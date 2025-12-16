@@ -10,7 +10,7 @@ use wp_mobile_cache::{
     },
 };
 
-use crate::sync::{EntityMetadata, ListMetadataReader};
+use crate::sync::{EntityMetadata, ListInfo, ListMetadataReader};
 
 use super::WpServiceError;
 
@@ -313,43 +313,23 @@ impl MetadataService {
 /// This allows MetadataCollection to read list structure from the database
 /// through the same trait interface it uses for in-memory stores.
 impl ListMetadataReader for MetadataService {
-    fn get(&self, key: &str) -> Option<Vec<EntityMetadata>> {
+    fn get_list_info(&self, key: &str) -> Option<ListInfo> {
+        self.cache
+            .execute(|conn| self.repo.get_header_with_state(conn, &self.db_site, key))
+            .ok()
+            .flatten()
+            .map(|db| ListInfo {
+                state: db.state,
+                error_message: db.error_message,
+                current_page: db.current_page,
+                total_pages: db.total_pages,
+                total_items: db.total_items,
+                per_page: db.per_page,
+            })
+    }
+
+    fn get_items(&self, key: &str) -> Option<Vec<EntityMetadata>> {
         self.get_metadata(key).ok().flatten()
-    }
-
-    fn get_sync_state(&self, key: &str) -> wp_mobile_cache::list_metadata::ListState {
-        // Delegate to our existing method, default to Idle on error
-        self.get_state(key).unwrap_or_default()
-    }
-
-    fn get_current_page(&self, key: &str) -> i64 {
-        self.get_pagination(key)
-            .ok()
-            .flatten()
-            .map(|p| p.current_page)
-            .unwrap_or(0)
-    }
-
-    fn get_total_pages(&self, key: &str) -> Option<i64> {
-        self.get_pagination(key)
-            .ok()
-            .flatten()
-            .and_then(|p| p.total_pages)
-    }
-
-    fn get_total_items(&self, key: &str) -> Option<i64> {
-        self.get_pagination(key)
-            .ok()
-            .flatten()
-            .and_then(|p| p.total_items)
-    }
-
-    fn get_per_page(&self, key: &str) -> i64 {
-        self.get_pagination(key)
-            .ok()
-            .flatten()
-            .map(|p| p.per_page)
-            .unwrap_or(20)
     }
 }
 
@@ -609,7 +589,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_list_metadata_reader_trait(test_ctx: TestContext) {
+    fn test_list_metadata_reader_get_items(test_ctx: TestContext) {
         let key = "edit:posts:publish";
         let metadata = vec![
             EntityMetadata::new(100, None, None, None),
@@ -620,7 +600,7 @@ mod tests {
 
         // Access via trait
         let reader: &dyn ListMetadataReader = &test_ctx.service;
-        let result = reader.get(key).unwrap();
+        let result = reader.get_items(key).unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].id, 100);
@@ -628,8 +608,48 @@ mod tests {
     }
 
     #[rstest]
-    fn test_list_metadata_reader_returns_none_for_non_existent(test_ctx: TestContext) {
+    fn test_list_metadata_reader_get_items_returns_none_for_non_existent(test_ctx: TestContext) {
         let reader: &dyn ListMetadataReader = &test_ctx.service;
-        assert!(reader.get("nonexistent").is_none());
+        assert!(reader.get_items("nonexistent").is_none());
+    }
+
+    #[rstest]
+    fn test_list_metadata_reader_get_list_info(test_ctx: TestContext) {
+        let key = "edit:posts:publish";
+
+        // Initially no info
+        let reader: &dyn ListMetadataReader = &test_ctx.service;
+        assert!(reader.get_list_info(key).is_none());
+
+        // Create header via update_pagination (this creates the list metadata entry)
+        test_ctx
+            .service
+            .update_pagination(key, Some(5), Some(100), 1, 20)
+            .unwrap();
+
+        let info = reader.get_list_info(key).unwrap();
+        assert_eq!(info.current_page, 1);
+        assert_eq!(info.per_page, 20);
+        assert_eq!(info.total_pages, Some(5));
+        assert_eq!(info.total_items, Some(100));
+        assert_eq!(info.state, wp_mobile_cache::list_metadata::ListState::Idle);
+    }
+
+    #[rstest]
+    fn test_list_metadata_reader_get_list_info_with_state(test_ctx: TestContext) {
+        let key = "edit:posts:publish";
+        let metadata = vec![EntityMetadata::new(100, None, None, None)];
+        test_ctx.service.set_items(key, &metadata).unwrap();
+
+        // Start a refresh
+        test_ctx.service.begin_refresh(key).unwrap();
+
+        let reader: &dyn ListMetadataReader = &test_ctx.service;
+        let info = reader.get_list_info(key).unwrap();
+
+        assert_eq!(
+            info.state,
+            wp_mobile_cache::list_metadata::ListState::FetchingFirstPage
+        );
     }
 }

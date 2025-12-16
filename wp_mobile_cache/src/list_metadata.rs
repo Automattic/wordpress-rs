@@ -110,3 +110,22 @@ impl From<String> for ListState {
         ListState::from(s.as_str())
     }
 }
+
+/// Combined header + state from a JOIN query.
+///
+/// Contains pagination info from `list_metadata` and sync state from `list_metadata_state`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbListHeaderWithState {
+    /// Current sync state (defaults to Idle if no state record exists)
+    pub state: ListState,
+    /// Error message if state is Error
+    pub error_message: Option<String>,
+    /// Current page that has been loaded (0 = no pages loaded)
+    pub current_page: i64,
+    /// Total number of pages from API response
+    pub total_pages: Option<i64>,
+    /// Total number of items from API response
+    pub total_items: Option<i64>,
+    /// Items per page
+    pub per_page: i64,
+}
