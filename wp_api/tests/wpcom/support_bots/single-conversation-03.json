@@ -1,0 +1,50 @@
+{
+  "chat_id": 3456789,
+  "wpcom_user_id": 876543,
+  "external_id": null,
+  "external_id_provider": null,
+  "session_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+  "bot_slug": "jetpack-chat-mobile",
+  "bot_version": "2.1.1",
+  "created_at": "2025-12-15 19:04:43",
+  "zendesk_ticket_id": null,
+  "messages": [
+    {
+      "message_id": 3000001,
+      "content": "Hello, testing the bot again",
+      "role": "user",
+      "created_at": "2025-12-15 19:04:43",
+      "context": {
+        "selectedSiteId": null,
+        "message": "Hello, testing the bot again",
+        "wpcom_user_id": 876543,
+        "wpcom_user_name": "testuser",
+        "user_paid_support_eligibility": {
+          "is_user_eligible": true,
+          "is_chat_restricted": false,
+          "wapuu_assistant_enabled": true,
+          "support_level": "p2-plus",
+          "user_field_flow_name": null
+        },
+        "plan": [],
+        "products": [],
+        "plan_interface": false
+      },
+      "ts": 1765825483
+    },
+    {
+      "message_id": 3000002,
+      "content": "Hey there! I'm here to help with any questions about the Jetpack Mobile app. What can I assist you with today?",
+      "role": "bot",
+      "created_at": "2025-12-15 19:04:51",
+      "context": {
+        "sources": [],
+        "flags": {
+          "forward_to_human_support": false,
+          "canned_response": false
+        }
+      },
+      "ts": 1765825491
+    }
+  ]
+}
