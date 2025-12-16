@@ -1,7 +1,7 @@
 use crate::{
     AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext,
     PostCollectionWithEditContext,
-    cache_key::post_list_params_cache_key,
+    cache_key::{endpoint_type_cache_key, post_list_params_cache_key},
     collection::{
         FetchError, FetchResult, PostMetadataCollectionWithEditContext, StatelessCollection,
         post_collection::PostCollection,
@@ -151,6 +151,7 @@ impl PostService {
     /// The metadata is used transiently to drive selective sync.
     ///
     /// # Arguments
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `params` - Post list API parameters
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
@@ -160,6 +161,7 @@ impl PostService {
     /// - `Err(FetchError)` if network error occurs
     pub async fn fetch_posts_metadata(
         &self,
+        endpoint_type: &PostEndpointType,
         params: &PostListParams,
         page: u32,
         per_page: u32,
@@ -173,7 +175,7 @@ impl PostService {
             .api_client
             .posts()
             .filter_list_with_edit_context(
-                &PostEndpointType::Posts,
+                endpoint_type,
                 &request_params,
                 &[
                     SparseAnyPostFieldWithEditContext::Id,
@@ -204,6 +206,7 @@ impl PostService {
     ///
     /// # Arguments
     /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `params` - Post list API parameters
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
@@ -215,6 +218,7 @@ impl PostService {
     pub async fn fetch_and_store_metadata_persistent(
         &self,
         kv_key: &str,
+        endpoint_type: &PostEndpointType,
         params: &PostListParams,
         page: u32,
         per_page: u32,
@@ -265,7 +269,10 @@ impl PostService {
         }
 
         // Fetch metadata from network
-        let result = match self.fetch_posts_metadata(params, page, per_page).await {
+        let result = match self
+            .fetch_posts_metadata(endpoint_type, params, page, per_page)
+            .await
+        {
             Ok(result) => {
                 log.push(format!("fetched {} items", result.metadata.len()));
                 result
@@ -398,6 +405,7 @@ impl PostService {
     ///
     /// # Arguments
     /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `params` - Post list API parameters
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
@@ -409,6 +417,7 @@ impl PostService {
     pub async fn sync_post_list(
         &self,
         key: &str,
+        endpoint_type: &PostEndpointType,
         params: &PostListParams,
         page: u32,
         per_page: u32,
@@ -436,7 +445,10 @@ impl PostService {
             })?;
 
         // 2. Fetch metadata from API
-        let metadata_result = match self.fetch_posts_metadata(params, page, per_page).await {
+        let metadata_result = match self
+            .fetch_posts_metadata(endpoint_type, params, page, per_page)
+            .await
+        {
             Ok(result) => result,
             Err(e) => {
                 // Update state to error
@@ -485,7 +497,7 @@ impl PostService {
         if !ids_to_fetch.is_empty() {
             // Batch into chunks of 100
             for chunk in ids_to_fetch.chunks(100) {
-                if let Err(_e) = self.fetch_posts_by_ids(chunk.to_vec()).await {
+                if let Err(_e) = self.fetch_posts_by_ids(endpoint_type, chunk.to_vec()).await {
                     // Count failures - items not marked as Cached are considered failed
                     failed_count += chunk
                         .iter()
@@ -546,6 +558,7 @@ impl PostService {
     /// 4. On error: Sets all requested posts to `Failed`
     ///
     /// # Arguments
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `ids` - Post IDs to fetch
     ///
     /// # Returns
@@ -555,7 +568,11 @@ impl PostService {
     /// # Note
     /// If `ids` is empty or all IDs are already fetching, returns an empty Vec
     /// without making a network request.
-    pub async fn fetch_posts_by_ids(&self, ids: Vec<PostId>) -> Result<Vec<EntityId>, FetchError> {
+    pub async fn fetch_posts_by_ids(
+        &self,
+        endpoint_type: &PostEndpointType,
+        ids: Vec<PostId>,
+    ) -> Result<Vec<EntityId>, FetchError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -596,7 +613,7 @@ impl PostService {
         match self
             .api_client
             .posts()
-            .list_with_edit_context(&PostEndpointType::Posts, &params)
+            .list_with_edit_context(endpoint_type, &params)
             .await
         {
             Ok(response) => {
@@ -864,12 +881,16 @@ impl PostService {
     /// this collection shows cached items immediately and fetches only what's needed.
     ///
     /// # Arguments
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `params` - Post list API parameters (status, author, categories, etc.)
     ///
     /// # Example (Kotlin)
     /// ```kotlin
     /// val params = PostListParams(status = listOf(PostStatus.DRAFT))
-    /// val collection = postService.createPostMetadataCollectionWithEditContext(params)
+    /// val collection = postService.createPostMetadataCollectionWithEditContext(
+    ///     PostEndpointType.POSTS,
+    ///     params
+    /// )
     ///
     /// // Initial load - fetches metadata, then syncs missing items
     /// collection.refresh()
@@ -879,14 +900,20 @@ impl PostService {
     /// ```
     pub fn create_post_metadata_collection_with_edit_context(
         self: &Arc<Self>,
+        endpoint_type: PostEndpointType,
         params: PostListParams,
     ) -> PostMetadataCollectionWithEditContext {
         // Generate cache key from filter-relevant params (excludes pagination fields)
         let cache_key = post_list_params_cache_key(&params);
-        let kv_key = format!("site_{:?}:edit:posts:{}", self.db_site.row_id, cache_key);
+        let endpoint_key = endpoint_type_cache_key(&endpoint_type);
+        let kv_key = format!(
+            "site_{:?}:edit:{}:{}",
+            self.db_site.row_id, endpoint_key, cache_key
+        );
 
         let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
             self.clone(),
+            endpoint_type,
             params.clone(),
             kv_key.clone(),
         );

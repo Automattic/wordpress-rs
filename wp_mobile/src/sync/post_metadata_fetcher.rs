@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use wp_api::posts::{PostId, PostListParams};
+use wp_api::{
+    posts::{PostId, PostListParams},
+    request::endpoint::posts_endpoint::PostEndpointType,
+};
 
 use crate::{
     collection::FetchError,
@@ -36,6 +39,9 @@ pub struct PersistentPostMetadataFetcherWithEditContext {
     /// Reference to the post service
     service: Arc<PostService>,
 
+    /// The post endpoint type (Posts, Pages, or Custom)
+    endpoint_type: PostEndpointType,
+
     /// API parameters for the post list
     params: PostListParams,
 
@@ -48,11 +54,18 @@ impl PersistentPostMetadataFetcherWithEditContext {
     ///
     /// # Arguments
     /// * `service` - The post service to delegate to
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `params` - API parameters for the post list query
     /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
-    pub fn new(service: Arc<PostService>, params: PostListParams, kv_key: String) -> Self {
+    pub fn new(
+        service: Arc<PostService>,
+        endpoint_type: PostEndpointType,
+        params: PostListParams,
+        kv_key: String,
+    ) -> Self {
         Self {
             service,
+            endpoint_type,
             params,
             kv_key,
         }
@@ -69,6 +82,7 @@ impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
         self.service
             .fetch_and_store_metadata_persistent(
                 &self.kv_key,
+                &self.endpoint_type,
                 &self.params,
                 page,
                 per_page,
@@ -79,7 +93,9 @@ impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
 
     async fn ensure_fetched(&self, ids: Vec<i64>) -> Result<(), FetchError> {
         let post_ids: Vec<PostId> = ids.into_iter().map(PostId).collect();
-        self.service.fetch_posts_by_ids(post_ids).await?;
+        self.service
+            .fetch_posts_by_ids(&self.endpoint_type, post_ids)
+            .await?;
         Ok(())
     }
 }

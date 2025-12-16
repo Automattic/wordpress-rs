@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.ObservableMetadataCollection
 import rs.wordpress.cache.kotlin.getObservablePostMetadataCollectionWithEditContext
+import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.PostListParams
 import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile.PostMetadataCollectionItem
@@ -216,7 +217,10 @@ class PostMetadataCollectionViewModel(
 
     private fun createObservableCollection(params: PostListParams) {
         val postService = selfHostedService.posts()
-        val observable = postService.getObservablePostMetadataCollectionWithEditContext(params)
+        val observable = postService.getObservablePostMetadataCollectionWithEditContext(
+            PostEndpointType.Posts,
+            params
+        )
 
         // Data observer: refresh list contents when data changes
         // Note: Must dispatch to coroutine since loadItems() is a suspend function

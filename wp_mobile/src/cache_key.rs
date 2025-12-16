@@ -7,8 +7,36 @@
 use url::Url;
 use wp_api::{
     posts::{PostListParams, PostListParamsField},
+    request::endpoint::posts_endpoint::PostEndpointType,
     url_query::AsQueryValue,
 };
+
+/// Generates a cache key segment from a `PostEndpointType`.
+///
+/// Uses a `post_type_` prefix to avoid conflicts with custom post type names
+/// that might match other cache key segments.
+///
+/// # Returns
+/// A string suitable for use in cache keys:
+/// - `PostEndpointType::Posts` → `"post_type_posts"`
+/// - `PostEndpointType::Pages` → `"post_type_pages"`
+/// - `PostEndpointType::Custom(name)` → `"post_type_custom_{name}"`
+///
+/// # Example
+/// ```ignore
+/// let key = endpoint_type_cache_key(&PostEndpointType::Posts);
+/// assert_eq!(key, "post_type_posts");
+///
+/// let key = endpoint_type_cache_key(&PostEndpointType::Custom("products".to_string()));
+/// assert_eq!(key, "post_type_custom_products");
+/// ```
+pub fn endpoint_type_cache_key(endpoint_type: &PostEndpointType) -> String {
+    match endpoint_type {
+        PostEndpointType::Posts => "post_type_posts".to_string(),
+        PostEndpointType::Pages => "post_type_pages".to_string(),
+        PostEndpointType::Custom(name) => format!("post_type_custom_{}", name),
+    }
+}
 
 /// Extension trait to add query pairs using `AsQueryValue`.
 ///
@@ -249,5 +277,23 @@ mod tests {
         let key = post_list_params_cache_key(&params);
         // Fields should be in alphabetical order: author, search, status
         assert_eq!(key, "author=5&search=hello&status=publish");
+    }
+
+    #[test]
+    fn test_endpoint_type_posts() {
+        let key = endpoint_type_cache_key(&PostEndpointType::Posts);
+        assert_eq!(key, "post_type_posts");
+    }
+
+    #[test]
+    fn test_endpoint_type_pages() {
+        let key = endpoint_type_cache_key(&PostEndpointType::Pages);
+        assert_eq!(key, "post_type_pages");
+    }
+
+    #[test]
+    fn test_endpoint_type_custom() {
+        let key = endpoint_type_cache_key(&PostEndpointType::Custom("products".to_string()));
+        assert_eq!(key, "post_type_custom_products");
     }
 }
