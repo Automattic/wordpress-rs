@@ -8,7 +8,7 @@ CREATE TABLE `list_metadata` (
   `current_page` INTEGER NOT NULL DEFAULT 0,
   `per_page` INTEGER NOT NULL DEFAULT 20,
   `last_first_page_fetched_at` TEXT,
-  `last_updated_at` TEXT,
+  `last_fetched_at` TEXT,
   `version` INTEGER NOT NULL DEFAULT 0,
 
   FOREIGN KEY (db_site_id) REFERENCES db_sites(id) ON DELETE CASCADE

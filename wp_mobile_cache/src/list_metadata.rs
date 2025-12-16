@@ -21,8 +21,8 @@ pub struct DbListMetadata {
     pub per_page: i64,
     /// ISO 8601 timestamp of when page 1 was last fetched
     pub last_first_page_fetched_at: Option<String>,
-    /// ISO 8601 timestamp of last update
-    pub last_updated_at: Option<String>,
+    /// ISO 8601 timestamp of when any page was last fetched
+    pub last_fetched_at: Option<String>,
     /// Version number, incremented on page 1 refresh for concurrency control
     pub version: i64,
 }

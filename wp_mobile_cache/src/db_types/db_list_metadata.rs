@@ -18,7 +18,7 @@ pub enum ListMetadataColumn {
     CurrentPage = 5,
     PerPage = 6,
     LastFirstPageFetchedAt = 7,
-    LastUpdatedAt = 8,
+    LastFetchedAt = 8,
     Version = 9,
 }
 
@@ -42,7 +42,7 @@ impl DbListMetadata {
             current_page: row.get_column(Col::CurrentPage)?,
             per_page: row.get_column(Col::PerPage)?,
             last_first_page_fetched_at: row.get_column(Col::LastFirstPageFetchedAt)?,
-            last_updated_at: row.get_column(Col::LastUpdatedAt)?,
+            last_fetched_at: row.get_column(Col::LastFetchedAt)?,
             version: row.get_column(Col::Version)?,
         })
     }

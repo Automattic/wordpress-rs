@@ -277,7 +277,7 @@ impl ListMetadataRepository {
         self.get_or_create(executor, site, key)?;
 
         let sql = format!(
-            "UPDATE {} SET total_pages = ?, total_items = ?, current_page = ?, per_page = ?, last_updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE db_site_id = ? AND key = ?",
+            "UPDATE {} SET total_pages = ?, total_items = ?, current_page = ?, per_page = ?, last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE db_site_id = ? AND key = ?",
             Self::header_table().table_name()
         );
 
@@ -747,7 +747,7 @@ mod tests {
     fn test_list_metadata_column_enum_matches_schema(test_ctx: TestContext) {
         // Verify column order by selecting specific columns and checking positions
         let sql = format!(
-            "SELECT rowid, db_site_id, key, total_pages, total_items, current_page, per_page, last_first_page_fetched_at, last_updated_at, version FROM {}",
+            "SELECT rowid, db_site_id, key, total_pages, total_items, current_page, per_page, last_first_page_fetched_at, last_fetched_at, version FROM {}",
             ListMetadataRepository::header_table().table_name()
         );
         let stmt = test_ctx.conn.prepare(&sql);
@@ -954,7 +954,7 @@ mod tests {
         assert_eq!(header.total_items, Some(100));
         assert_eq!(header.current_page, 1);
         assert_eq!(header.per_page, 20);
-        assert!(header.last_updated_at.is_some());
+        assert!(header.last_fetched_at.is_some());
     }
 
     #[rstest]
