@@ -14,21 +14,12 @@ use crate::{
     },
 };
 
-// Generate PostItemState enum using the macro
-crate::wp_mobile_item_state!(PostItemState, crate::FullEntityAnyPostWithEditContext);
-
-/// Item in a metadata collection with type-safe state representation.
-///
-/// The `state` enum encodes both the sync status and data availability,
-/// making it impossible to have inconsistent combinations.
-#[derive(uniffi::Record)]
-pub struct PostMetadataCollectionItem {
-    /// The post ID
-    pub id: i64,
-
-    /// Combined state and data - see [`PostItemState`] for variants
-    pub state: PostItemState,
-}
+// Generate PostItemState enum and PostMetadataCollectionItem struct using the macro
+crate::wp_mobile_metadata_item!(
+    PostMetadataCollectionItem,
+    PostItemState,
+    crate::FullEntityAnyPostWithEditContext
+);
 
 /// Metadata-first collection for posts with edit context.
 ///
@@ -136,6 +127,9 @@ impl PostMetadataCollectionWithEditContext {
             .into_iter()
             .map(|item| {
                 let id = item.id();
+                // Extract parent and menu_order from metadata (available immediately)
+                let parent = item.metadata.parent;
+                let menu_order = item.metadata.menu_order;
                 let cached_data = cached_map.remove(&id).map(|e| e.into());
                 let state = match (item.state, cached_data) {
                     // Missing state
@@ -161,7 +155,12 @@ impl PostMetadataCollectionWithEditContext {
                     }
                 };
 
-                PostMetadataCollectionItem { id, state }
+                PostMetadataCollectionItem {
+                    id,
+                    parent,
+                    menu_order,
+                    state,
+                }
             })
             .collect();
 

@@ -72,6 +72,80 @@ macro_rules! wp_mobile_item_state {
     };
 }
 
+/// Macro to create UniFFI-compatible metadata collection item types.
+///
+/// This macro generates both the state enum and the collection item struct for
+/// metadata-driven collections. The generated types are suitable for use across
+/// language boundaries via UniFFI.
+///
+/// # Parameters
+/// - `$item_name`: Name for the collection item struct (e.g., `PostMetadataCollectionItem`)
+/// - `$state_name`: Name for the state enum (e.g., `PostItemState`)
+/// - `$full_entity_type`: The FullEntity wrapper type (e.g., `FullEntityAnyPostWithEditContext`)
+///
+/// # Generated Types
+///
+/// ## State Enum (`$state_name`)
+/// - `Missing`: No cached data, needs fetch
+/// - `Fetching`: Fetch in progress, no cached data
+/// - `FetchingWithData { data }`: Fetch in progress, showing cached data
+/// - `Cached { data }`: Fresh cached data
+/// - `Stale { data }`: Outdated cached data
+/// - `Failed { error }`: Fetch failed, no cached data
+/// - `FailedWithData { error, data }`: Fetch failed, showing cached data
+///
+/// ## Collection Item Struct (`$item_name`)
+/// - `id: i64`: The entity ID
+/// - `parent: Option<i64>`: Parent entity ID (from list metadata, for hierarchical types)
+/// - `menu_order: Option<i64>`: Menu order (from list metadata, for hierarchical types)
+/// - `state: $state_name`: The combined state and data
+///
+/// # Usage
+/// ```ignore
+/// wp_mobile_metadata_item!(
+///     PostMetadataCollectionItem,
+///     PostItemState,
+///     FullEntityAnyPostWithEditContext
+/// );
+/// ```
+#[macro_export]
+macro_rules! wp_mobile_metadata_item {
+    ($item_name:ident, $state_name:ident, $full_entity_type:ty) => {
+        // Generate the state enum using the existing macro
+        $crate::wp_mobile_item_state!($state_name, $full_entity_type);
+
+        /// Item in a metadata collection with type-safe state representation.
+        ///
+        /// The `state` enum encodes both the sync status and data availability,
+        /// making it impossible to have inconsistent combinations.
+        ///
+        /// The `parent` and `menu_order` fields come from the list metadata store,
+        /// making them available immediately without waiting for full entity data
+        /// to be fetched. This enables building hierarchical views (like page trees)
+        /// as soon as the list structure is known.
+        #[derive(uniffi::Record)]
+        pub struct $item_name {
+            /// The entity ID
+            pub id: i64,
+
+            /// Parent entity ID (from list metadata, for hierarchical post types like pages)
+            ///
+            /// This value comes from the list metadata, so it's available immediately
+            /// without waiting for the full post data to be fetched.
+            pub parent: Option<i64>,
+
+            /// Menu order (from list metadata, for hierarchical post types)
+            ///
+            /// This value comes from the list metadata, so it's available immediately
+            /// without waiting for the full post data to be fetched.
+            pub menu_order: Option<i64>,
+
+            /// Combined state and data - see the state enum for variants
+            pub state: $state_name,
+        }
+    };
+}
+
 /// Macro to create UniFFI-compatible post collection wrappers
 ///
 /// This macro generates a wrapper type for `PostCollection<T>` that can be used
