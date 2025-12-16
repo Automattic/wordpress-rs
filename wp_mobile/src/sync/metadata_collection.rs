@@ -1,18 +1,10 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use wp_mobile_cache::{DbTable, UpdateHook};
 
 use crate::collection::FetchError;
 
 use super::{CollectionItem, EntityStateReader, ListMetadataReader, MetadataFetcher, SyncResult};
-
-/// Mutable pagination state, wrapped in RwLock for interior mutability.
-#[derive(Debug)]
-struct PaginationState {
-    current_page: u32,
-    total_pages: Option<u32>,
-    per_page: u32,
-}
 
 /// Collection that uses metadata-first fetching strategy.
 ///
@@ -75,8 +67,8 @@ where
     /// Tables to monitor for data updates (entity tables like PostsEditContext)
     relevant_data_tables: Vec<DbTable>,
 
-    /// Pagination state (uses interior mutability for UniFFI compatibility)
-    pagination: RwLock<PaginationState>,
+    /// Items per page configuration (default: 20)
+    per_page: u32,
 }
 
 impl<F> MetadataCollection<F>
@@ -98,29 +90,21 @@ where
         fetcher: F,
         relevant_data_tables: Vec<DbTable>,
     ) -> Self {
-        // Load persisted pagination state from database
-        let current_page = metadata_reader.get_current_page(&kv_key) as u32;
-        let total_pages = metadata_reader.get_total_pages(&kv_key).map(|p| p as u32);
-
         Self {
             kv_key,
             metadata_reader,
             state_reader,
             fetcher,
             relevant_data_tables,
-            pagination: RwLock::new(PaginationState {
-                current_page,
-                total_pages,
-                per_page: 20,
-            }),
+            per_page: 20,
         }
     }
 
     /// Set the number of items per page.
     ///
     /// Default is 20. Call this before `refresh()` if you need a different page size.
-    pub fn with_per_page(self, per_page: u32) -> Self {
-        self.pagination.write().unwrap().per_page = per_page;
+    pub fn with_per_page(mut self, per_page: u32) -> Self {
+        self.per_page = per_page;
         self
     }
 
@@ -211,8 +195,7 @@ where
     pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
         println!("[MetadataCollection] Refreshing collection...");
 
-        let per_page = self.pagination.read().unwrap().per_page;
-        let result = self.fetcher.fetch_metadata(1, per_page, true).await?;
+        let result = self.fetcher.fetch_metadata(1, self.per_page, true).await?;
 
         let total_pages_str = result
             .total_pages
@@ -223,12 +206,6 @@ where
             total_pages_str,
             result.metadata.len()
         );
-
-        {
-            let mut pagination = self.pagination.write().unwrap();
-            pagination.current_page = 1;
-            pagination.total_pages = result.total_pages;
-        }
 
         self.sync_missing_and_stale().await
     }
@@ -242,14 +219,8 @@ where
     ///
     /// Returns `SyncResult::no_op()` if already on the last page or no pages loaded yet.
     pub async fn load_next_page(&self) -> Result<SyncResult, FetchError> {
-        let (current_page, per_page, total_pages) = {
-            let pagination = self.pagination.read().unwrap();
-            (
-                pagination.current_page,
-                pagination.per_page,
-                pagination.total_pages,
-            )
-        };
+        let current_page = self.current_page();
+        let total_pages = self.total_pages();
 
         // Check if no pages have been loaded yet (need refresh first)
         if current_page == 0 {
@@ -279,7 +250,7 @@ where
 
         let result = self
             .fetcher
-            .fetch_metadata(next_page, per_page, false)
+            .fetch_metadata(next_page, self.per_page, false)
             .await?;
 
         let total_pages_str = result
@@ -293,32 +264,33 @@ where
             result.metadata.len()
         );
 
-        {
-            let mut pagination = self.pagination.write().unwrap();
-            pagination.current_page = next_page;
-            pagination.total_pages = result.total_pages;
-        }
-
         self.sync_missing_and_stale().await
     }
 
     /// Check if there are more pages to load.
     pub fn has_more_pages(&self) -> bool {
-        let pagination = self.pagination.read().unwrap();
-        pagination
-            .total_pages
-            .map(|total| pagination.current_page < total)
+        let current_page = self.current_page();
+        let total_pages = self.total_pages();
+        total_pages
+            .map(|total| current_page < total)
             .unwrap_or(true) // Unknown total = assume more pages
     }
 
     /// Get the current page number (0 = not loaded yet).
     pub fn current_page(&self) -> u32 {
-        self.pagination.read().unwrap().current_page
+        self.metadata_reader.get_current_page(&self.kv_key) as u32
     }
 
     /// Get the total number of pages, if known.
     pub fn total_pages(&self) -> Option<u32> {
-        self.pagination.read().unwrap().total_pages
+        self.metadata_reader
+            .get_total_pages(&self.kv_key)
+            .map(|p| p as u32)
+    }
+
+    /// Get the total number of items, if known.
+    pub fn total_items(&self) -> Option<i64> {
+        self.metadata_reader.get_total_items(&self.kv_key)
     }
 
     /// Fetch missing and stale items.
@@ -385,14 +357,13 @@ where
             );
         }
 
-        let pagination = self.pagination.read().unwrap();
         Ok(SyncResult::new(
             total_items,
             fetch_count,
             failed_count,
             self.has_more_pages(),
-            pagination.current_page,
-            pagination.total_pages,
+            self.current_page(),
+            self.total_pages(),
         ))
     }
 }
