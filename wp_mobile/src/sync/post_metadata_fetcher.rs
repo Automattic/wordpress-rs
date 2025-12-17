@@ -2,13 +2,11 @@
 
 use std::sync::Arc;
 
-use wp_api::{
-    posts::{PostId, PostListParams},
-    request::endpoint::posts_endpoint::PostEndpointType,
-};
+use wp_api::{posts::PostId, request::endpoint::posts_endpoint::PostEndpointType};
 
 use crate::{
     collection::FetchError,
+    filters::PostListFilter,
     service::posts::PostService,
     sync::{MetadataFetchResult, MetadataFetcher},
 };
@@ -23,7 +21,8 @@ use crate::{
 /// ```ignore
 /// let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
 ///     service.clone(),
-///     params,
+///     PostEndpointType::Posts,
+///     filter,
 ///     "site_1:edit:posts:status=publish".to_string(),
 /// );
 ///
@@ -42,8 +41,8 @@ pub struct PersistentPostMetadataFetcherWithEditContext {
     /// The post endpoint type (Posts, Pages, or Custom)
     endpoint_type: PostEndpointType,
 
-    /// API parameters for the post list
-    params: PostListParams,
+    /// Filter parameters for the post list (excludes pagination)
+    filter: PostListFilter,
 
     /// Key for metadata store lookup
     kv_key: String,
@@ -55,18 +54,18 @@ impl PersistentPostMetadataFetcherWithEditContext {
     /// # Arguments
     /// * `service` - The post service to delegate to
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `params` - API parameters for the post list query
+    /// * `filter` - Filter parameters for the post list (pagination is managed internally)
     /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
     pub fn new(
         service: Arc<PostService>,
         endpoint_type: PostEndpointType,
-        params: PostListParams,
+        filter: PostListFilter,
         kv_key: String,
     ) -> Self {
         Self {
             service,
             endpoint_type,
-            params,
+            filter,
             kv_key,
         }
     }
@@ -83,7 +82,7 @@ impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
             .fetch_and_store_metadata_persistent(
                 &self.kv_key,
                 &self.endpoint_type,
-                &self.params,
+                &self.filter,
                 page,
                 per_page,
                 is_first_page,

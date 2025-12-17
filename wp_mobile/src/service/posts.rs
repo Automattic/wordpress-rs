@@ -1,12 +1,12 @@
 use crate::{
     AllAnyPostWithEditContextCollection, EntityAnyPostWithEditContext,
     PostCollectionWithEditContext,
-    cache_key::{endpoint_type_cache_key, post_list_params_cache_key},
+    cache_key::{endpoint_type_cache_key, post_list_filter_cache_key},
     collection::{
         FetchError, FetchResult, PostMetadataCollectionWithEditContext, StatelessCollection,
         post_collection::PostCollection,
     },
-    filters::AnyPostFilter,
+    filters::{AnyPostFilter, PostListFilter},
     service::metadata::MetadataService,
     sync::{
         EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataCollection,
@@ -152,7 +152,7 @@ impl PostService {
     ///
     /// # Arguments
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `params` - Post list API parameters
+    /// * `filter` - Filter parameters (pagination is provided separately)
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
     ///
@@ -162,14 +162,12 @@ impl PostService {
     pub async fn fetch_posts_metadata(
         &self,
         endpoint_type: &PostEndpointType,
-        params: &PostListParams,
+        filter: &PostListFilter,
         page: u32,
         per_page: u32,
     ) -> Result<MetadataFetchResult, FetchError> {
-        // Clone params and override pagination fields
-        let mut request_params = params.clone();
-        request_params.page = Some(page);
-        request_params.per_page = Some(per_page);
+        // Convert filter to params with pagination
+        let request_params = filter.to_list_params(page, per_page);
 
         let response = self
             .api_client
@@ -216,7 +214,7 @@ impl PostService {
     /// # Arguments
     /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `params` - Post list API parameters
+    /// * `filter` - Filter parameters (pagination is provided separately)
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
     /// * `is_first_page` - If true, replaces metadata; if false, appends
@@ -228,7 +226,7 @@ impl PostService {
         &self,
         kv_key: &str,
         endpoint_type: &PostEndpointType,
-        params: &PostListParams,
+        filter: &PostListFilter,
         page: u32,
         per_page: u32,
         is_first_page: bool,
@@ -279,7 +277,7 @@ impl PostService {
 
         // Fetch metadata from network
         let result = match self
-            .fetch_posts_metadata(endpoint_type, params, page, per_page)
+            .fetch_posts_metadata(endpoint_type, filter, page, per_page)
             .await
         {
             Ok(result) => {
@@ -415,7 +413,7 @@ impl PostService {
     /// # Arguments
     /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `params` - Post list API parameters
+    /// * `filter` - Filter parameters (pagination is provided separately)
     /// * `page` - Page number to fetch (1-indexed)
     /// * `per_page` - Number of posts per page
     /// * `is_refresh` - If true, replaces metadata; if false, appends
@@ -427,7 +425,7 @@ impl PostService {
         &self,
         key: &str,
         endpoint_type: &PostEndpointType,
-        params: &PostListParams,
+        filter: &PostListFilter,
         page: u32,
         per_page: u32,
         is_refresh: bool,
@@ -455,7 +453,7 @@ impl PostService {
 
         // 2. Fetch metadata from API
         let metadata_result = match self
-            .fetch_posts_metadata(endpoint_type, params, page, per_page)
+            .fetch_posts_metadata(endpoint_type, filter, page, per_page)
             .await
         {
             Ok(result) => result,
@@ -891,14 +889,14 @@ impl PostService {
     ///
     /// # Arguments
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `params` - Post list API parameters (status, author, categories, etc.)
+    /// * `filter` - Filter parameters (status, author, categories, etc.)
     ///
     /// # Example (Kotlin)
     /// ```kotlin
-    /// val params = PostListParams(status = listOf(PostStatus.DRAFT))
+    /// val filter = PostListFilter(status = listOf(PostStatus.DRAFT))
     /// val collection = postService.createPostMetadataCollectionWithEditContext(
     ///     PostEndpointType.POSTS,
-    ///     params
+    ///     filter
     /// )
     ///
     /// // Initial load - fetches metadata, then syncs missing items
@@ -910,10 +908,10 @@ impl PostService {
     pub fn create_post_metadata_collection_with_edit_context(
         self: &Arc<Self>,
         endpoint_type: PostEndpointType,
-        params: PostListParams,
+        filter: PostListFilter,
     ) -> PostMetadataCollectionWithEditContext {
-        // Generate cache key from filter-relevant params (excludes pagination fields)
-        let cache_key = post_list_params_cache_key(&params);
+        // Generate cache key from filter
+        let cache_key = post_list_filter_cache_key(&filter);
         let endpoint_key = endpoint_type_cache_key(&endpoint_type);
         let kv_key = format!(
             "site_{:?}:edit:{}:{}",
@@ -923,7 +921,7 @@ impl PostService {
         let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
             self.clone(),
             endpoint_type,
-            params.clone(),
+            filter.clone(),
             kv_key.clone(),
         );
 
@@ -939,7 +937,7 @@ impl PostService {
             ],
         );
 
-        PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), params)
+        PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), filter)
     }
 
     /// Get a collection of all posts with edit context for this site.

@@ -1,9 +1,9 @@
 package rs.wordpress.cache.kotlin
 
 import uniffi.wp_api.PostEndpointType
-import uniffi.wp_api.PostListParams
 import uniffi.wp_mobile.AnyPostFilter
 import uniffi.wp_mobile.FullEntityAnyPostWithEditContext
+import uniffi.wp_mobile.PostListFilter
 import uniffi.wp_mobile.PostService
 import uniffi.wp_mobile_cache.EntityId
 
@@ -51,13 +51,13 @@ fun PostService.getObservablePostCollectionWithEditContext(
  * can show appropriate feedback for each item.
  *
  * @param endpointType The post endpoint type (Posts, Pages, or Custom)
- * @param params Post list API parameters (status, author, categories, etc.)
+ * @param filter Filter parameters (status, author, categories, etc.)
  * @return Observable metadata collection that notifies on database changes
  */
 fun PostService.getObservablePostMetadataCollectionWithEditContext(
     endpointType: PostEndpointType,
-    params: PostListParams
+    filter: PostListFilter
 ): ObservableMetadataCollection {
-    val collection = this.createPostMetadataCollectionWithEditContext(endpointType, params)
+    val collection = this.createPostMetadataCollectionWithEditContext(endpointType, filter)
     return createObservableMetadataCollection(collection)
 }

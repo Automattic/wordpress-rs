@@ -13,9 +13,9 @@ import rs.wordpress.cache.kotlin.getObservablePostMetadataCollectionWithEditCont
 import rs.wordpress.cache.kotlin.hasMorePages
 import rs.wordpress.cache.kotlin.isSyncing
 import uniffi.wp_api.PostEndpointType
-import uniffi.wp_api.PostListParams
 import uniffi.wp_mobile.ListInfo
 import uniffi.wp_mobile.PostItemState
+import uniffi.wp_mobile.PostListFilter
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.SyncResult
 import uniffi.wp_mobile.WpSelfHostedService
@@ -25,7 +25,7 @@ import uniffi.wp_mobile_cache.ListState
  * UI state for the post metadata collection screen
  */
 data class PostMetadataCollectionState(
-    val currentParams: PostListParams,
+    val currentFilter: PostListFilter,
     val listInfo: ListInfo? = null,
     val lastSyncResult: SyncResult? = null,
     val lastError: String? = null
@@ -51,7 +51,7 @@ data class PostMetadataCollectionState(
 
     val filterDisplayName: String
         get() {
-            val statuses = currentParams.status
+            val statuses = currentFilter.status
             return when {
                 statuses.isEmpty() -> "All Posts"
                 statuses.any { it.toString().contains("draft", ignoreCase = true) } -> "Drafts"
@@ -61,7 +61,7 @@ data class PostMetadataCollectionState(
         }
 
     val filterStatusString: String?
-        get() = currentParams.status.firstOrNull()?.toString()?.lowercase()
+        get() = currentFilter.status.firstOrNull()?.toString()?.lowercase()
 }
 
 /**
@@ -114,7 +114,7 @@ class PostMetadataCollectionViewModel(
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _state = MutableStateFlow(PostMetadataCollectionState(currentParams = PostListParams()))
+    private val _state = MutableStateFlow(PostMetadataCollectionState(currentFilter = PostListFilter()))
     val state: StateFlow<PostMetadataCollectionState> = _state.asStateFlow()
 
     private val _items = MutableStateFlow<List<PostItemDisplayData>>(emptyList())
@@ -123,7 +123,7 @@ class PostMetadataCollectionViewModel(
     private var observableCollection: ObservableMetadataCollection? = null
 
     init {
-        createObservableCollection(_state.value.currentParams)
+        createObservableCollection(_state.value.currentFilter)
         loadItemsFromCollection()
     }
 
@@ -132,16 +132,16 @@ class PostMetadataCollectionViewModel(
      */
     fun setFilter(status: String?) {
         val postStatus = status?.let { uniffi.wp_api.parsePostStatus(it) }
-        val newParams = PostListParams(
+        val newFilter = PostListFilter(
             status = if (postStatus != null) listOf(postStatus) else emptyList()
         )
 
         observableCollection?.close()
-        createObservableCollection(newParams)
+        createObservableCollection(newFilter)
 
         // Read persisted state from database (single query)
         _state.value = PostMetadataCollectionState(
-            currentParams = newParams,
+            currentFilter = newFilter,
             listInfo = observableCollection?.listInfo(),
             lastSyncResult = null,
             lastError = null
@@ -216,11 +216,11 @@ class PostMetadataCollectionViewModel(
         }
     }
 
-    private fun createObservableCollection(params: PostListParams) {
+    private fun createObservableCollection(filter: PostListFilter) {
         val postService = selfHostedService.posts()
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(
             PostEndpointType.Posts,
-            params
+            filter
         )
 
         // Data observer: refresh list contents when data changes
