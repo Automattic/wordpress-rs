@@ -6,8 +6,7 @@
 
 use url::Url;
 use wp_api::{
-    posts::PostListParamsField,
-    request::endpoint::posts_endpoint::PostEndpointType,
+    posts::PostListParamsField, request::endpoint::posts_endpoint::PostEndpointType,
     url_query::AsQueryValue,
 };
 
