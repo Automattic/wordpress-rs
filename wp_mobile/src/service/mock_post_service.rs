@@ -73,8 +73,8 @@ fn stress_test_batch_update(
                     format!("<p>Content updated at batch #{}</p>", current_count);
 
                 // Randomize the post status
-                let mut rng = rand::thread_rng();
-                let status_index = rng.gen_range(0..STRESS_TEST_STATUS_VALUES.len());
+                let mut rng = rand::rng();
+                let status_index = rng.random_range(0..STRESS_TEST_STATUS_VALUES.len());
                 post.status = STRESS_TEST_STATUS_VALUES[status_index].clone();
 
                 repo.upsert(conn, db_site, &post)?;
@@ -389,7 +389,7 @@ impl MockPostService {
 
         thread::spawn(move || {
             let repo = PostRepository::<EditContext>::new();
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let mut next_insert_id: i64 = 20000; // Start IDs for inserted posts
 
             // Calculate total weight for operation selection
@@ -412,11 +412,11 @@ impl MockPostService {
                 }
 
                 // Determine batch size for this iteration
-                let batch_size = rng.gen_range(config.min_batch_size..=config.max_batch_size);
+                let batch_size = rng.random_range(config.min_batch_size..=config.max_batch_size);
                 let batch_size = batch_size.min(entity_ids.len() as u32);
 
                 // Choose operation based on weights
-                let roll = rng.gen_range(0..total_weight);
+                let roll = rng.random_range(0..total_weight);
                 let operation = if roll < config.update_weight {
                     StressTestOperation::Update
                 } else if roll < config.update_weight + config.delete_weight {
@@ -429,7 +429,7 @@ impl MockPostService {
 
                 // Select random posts for this batch
                 let batch_indices: Vec<usize> = (0..batch_size)
-                    .map(|_| rng.gen_range(0..entity_ids.len()))
+                    .map(|_| rng.random_range(0..entity_ids.len()))
                     .collect();
 
                 match operation {
@@ -462,7 +462,7 @@ impl MockPostService {
                 }
 
                 // Variable delay between batches
-                let delay_ms = rng.gen_range(config.min_delay_ms..=config.max_delay_ms);
+                let delay_ms = rng.random_range(config.min_delay_ms..=config.max_delay_ms);
                 thread::sleep(Duration::from_millis(delay_ms));
             }
         });
