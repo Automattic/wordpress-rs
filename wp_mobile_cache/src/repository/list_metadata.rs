@@ -435,41 +435,6 @@ impl ListMetadataRepository {
         Self::update_state_by_list_metadata_id(executor, list_metadata_id, state, error_message)
     }
 
-    /// Increment version by ID and return the new value.
-    ///
-    /// Used when starting a refresh to invalidate any in-flight load-more operations.
-    pub fn increment_version_by_list_metadata_id(
-        executor: &impl QueryExecutor,
-        list_metadata_id: RowId,
-    ) -> Result<i64, SqliteDbError> {
-        let sql = format!(
-            "UPDATE {} SET version = version + 1, last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE rowid = ?",
-            Self::header_table().table_name()
-        );
-        executor.execute(&sql, rusqlite::params![list_metadata_id])?;
-
-        // Return the new version
-        let sql = format!(
-            "SELECT version FROM {} WHERE rowid = ?",
-            Self::header_table().table_name()
-        );
-        let mut stmt = executor.prepare(&sql)?;
-        stmt.query_row(rusqlite::params![list_metadata_id], |row| row.get(0))
-            .map_err(SqliteDbError::from)
-    }
-
-    /// Increment version by site and key and return the new value.
-    ///
-    /// If you already have the `list_metadata_id`, use `increment_version_by_list_metadata_id` instead.
-    pub fn increment_version_by_list_key(
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
-    ) -> Result<i64, SqliteDbError> {
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
-        Self::increment_version_by_list_metadata_id(executor, list_metadata_id)
-    }
-
     /// Delete all data for a list (header, items, and state).
     pub fn delete_list(
         executor: &impl QueryExecutor,
@@ -1124,43 +1089,6 @@ mod tests {
             ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
                 .expect("should succeed");
         assert_eq!(state, ListState::FetchingNextPage);
-    }
-
-    #[rstest]
-    fn test_increment_version(test_ctx: TestContext) {
-        let key = ListKey::from("edit:posts:publish");
-
-        // Create header (version starts at 0)
-        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-            .expect("should succeed");
-        let initial_version =
-            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, &key)
-                .expect("should succeed");
-        assert_eq!(initial_version, 0);
-
-        // Increment version
-        let new_version = ListMetadataRepository::increment_version_by_list_key(
-            &test_ctx.conn,
-            &test_ctx.site,
-            &key,
-        )
-        .expect("should succeed");
-        assert_eq!(new_version, 1);
-
-        // Increment again
-        let newer_version = ListMetadataRepository::increment_version_by_list_key(
-            &test_ctx.conn,
-            &test_ctx.site,
-            &key,
-        )
-        .expect("should succeed");
-        assert_eq!(newer_version, 2);
-
-        // Verify last_first_page_fetched_at is set
-        let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
-            .expect("query should succeed")
-            .expect("should succeed");
-        assert!(header.last_first_page_fetched_at.is_some());
     }
 
     #[rstest]
