@@ -20,6 +20,7 @@ pub enum SqliteDbError {
     SqliteError(String),
     ConstraintViolation(String),
     TableNameMismatch { expected: DbTable, actual: DbTable },
+    PerPageMismatch { expected: i64, actual: i64 },
 }
 
 impl std::fmt::Display for SqliteDbError {
@@ -35,6 +36,13 @@ impl std::fmt::Display for SqliteDbError {
                     "Table mismatch: expected '{}', but got '{}'",
                     expected.table_name(),
                     actual.table_name()
+                )
+            }
+            SqliteDbError::PerPageMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "per_page mismatch: expected {}, but list has {}",
+                    expected, actual
                 )
             }
         }

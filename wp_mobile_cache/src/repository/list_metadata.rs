@@ -60,8 +60,9 @@ impl ListMetadataRepository {
 
     /// Get or create list metadata header.
     ///
-    /// If the header doesn't exist, creates it with default values and returns its rowid.
-    /// If it exists, returns the existing rowid.
+    /// If the header doesn't exist, creates it with the given `per_page` and returns its rowid.
+    /// If it exists with matching `per_page`, returns the existing rowid.
+    /// If it exists with different `per_page`, returns `PerPageMismatch` error.
     ///
     /// This function is safe against race conditions: if another thread creates the header
     /// between our SELECT and INSERT, we catch the constraint violation and re-fetch.
@@ -69,30 +70,42 @@ impl ListMetadataRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
+        per_page: i64,
     ) -> Result<RowId, SqliteDbError> {
         // Try to get existing
         if let Some(header) = Self::get_header(executor, site, key)? {
+            if header.per_page != per_page {
+                return Err(SqliteDbError::PerPageMismatch {
+                    expected: per_page,
+                    actual: header.per_page,
+                });
+            }
             return Ok(header.row_id);
         }
 
-        // Create new header with defaults
+        // Create new header
         let sql = format!(
-            "INSERT INTO {} (db_site_id, key, current_page, per_page, version) VALUES (?, ?, 0, 20, 0)",
+            "INSERT INTO {} (db_site_id, key, current_page, per_page, version) VALUES (?, ?, 0, ?, 0)",
             Self::header_table().table_name()
         );
 
-        match executor.execute(&sql, rusqlite::params![site.row_id, key]) {
+        match executor.execute(&sql, rusqlite::params![site.row_id, key, per_page]) {
             Ok(_) => Ok(executor.last_insert_rowid()),
             Err(SqliteDbError::ConstraintViolation(_)) => {
                 // Race condition: another thread created it between our SELECT and INSERT.
-                // Re-fetch to get the row created by the other thread.
-                Self::get_header(executor, site, key)?
-                    .map(|h| h.row_id)
-                    .ok_or_else(|| {
-                        SqliteDbError::SqliteError(
-                            "Header disappeared after constraint violation".to_string(),
-                        )
-                    })
+                // Re-fetch and validate per_page matches.
+                let header = Self::get_header(executor, site, key)?.ok_or_else(|| {
+                    SqliteDbError::SqliteError(
+                        "Header disappeared after constraint violation".to_string(),
+                    )
+                })?;
+                if header.per_page != per_page {
+                    return Err(SqliteDbError::PerPageMismatch {
+                        expected: per_page,
+                        actual: header.per_page,
+                    });
+                }
+                Ok(header.row_id)
             }
             Err(e) => Err(e),
         }
@@ -280,9 +293,10 @@ impl ListMetadataRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
+        per_page: i64,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        let list_metadata_id = Self::get_or_create(executor, site, key, per_page)?;
         Self::set_items_by_list_metadata_id(executor, list_metadata_id, items)
     }
 
@@ -311,9 +325,10 @@ impl ListMetadataRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
+        per_page: i64,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        let list_metadata_id = Self::get_or_create(executor, site, key, per_page)?;
         Self::append_items_by_list_metadata_id(executor, list_metadata_id, items)
     }
 
@@ -393,7 +408,7 @@ impl ListMetadataRepository {
         key: &ListKey,
         update: &ListMetadataHeaderUpdate,
     ) -> Result<(), SqliteDbError> {
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        let list_metadata_id = Self::get_or_create(executor, site, key, update.per_page)?;
         Self::update_header_by_list_metadata_id(executor, list_metadata_id, update)
     }
 
@@ -428,10 +443,11 @@ impl ListMetadataRepository {
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
+        per_page: i64,
         state: ListState,
         error_message: Option<&str>,
     ) -> Result<(), SqliteDbError> {
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        let list_metadata_id = Self::get_or_create(executor, site, key, per_page)?;
         Self::update_state_by_list_metadata_id(executor, list_metadata_id, state, error_message)
     }
 
@@ -456,19 +472,22 @@ impl ListMetadataRepository {
     /// Get or create a list header and increment its version in a single query.
     ///
     /// Uses `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` to atomically:
-    /// - Create the header with version=1 if it doesn't exist
+    /// - Create the header with the given `per_page` and version=1 if it doesn't exist
     /// - Increment the version and update `last_first_page_fetched_at` if it exists
     /// - Return the rowid, new version, and per_page
+    ///
+    /// Returns `PerPageMismatch` error if the existing header has a different `per_page`.
     ///
     /// This is more efficient than calling `get_or_create` + `increment_version` separately.
     pub fn get_or_create_and_increment_version(
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
+        per_page: i64,
     ) -> Result<HeaderVersionInfo, SqliteDbError> {
         let sql = format!(
             "INSERT INTO {} (db_site_id, key, current_page, per_page, version, last_first_page_fetched_at) \
-             VALUES (?1, ?2, 0, 20, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) \
+             VALUES (?1, ?2, 0, ?3, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) \
              ON CONFLICT(db_site_id, key) DO UPDATE SET \
                  version = version + 1, \
                  last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
@@ -477,14 +496,25 @@ impl ListMetadataRepository {
         );
 
         let mut stmt = executor.prepare(&sql)?;
-        stmt.query_row(rusqlite::params![site.row_id, key], |row| {
-            Ok(HeaderVersionInfo {
-                list_metadata_id: row.get(0)?,
-                version: row.get(1)?,
-                per_page: row.get(2)?,
+        let info = stmt
+            .query_row(rusqlite::params![site.row_id, key, per_page], |row| {
+                Ok(HeaderVersionInfo {
+                    list_metadata_id: row.get(0)?,
+                    version: row.get(1)?,
+                    per_page: row.get(2)?,
+                })
             })
-        })
-        .map_err(SqliteDbError::from)
+            .map_err(SqliteDbError::from)?;
+
+        // Validate per_page matches (could differ if row already existed)
+        if info.per_page != per_page {
+            return Err(SqliteDbError::PerPageMismatch {
+                expected: per_page,
+                actual: info.per_page,
+            });
+        }
+
+        Ok(info)
     }
 
     /// Reset stale fetching states to Idle.
@@ -558,6 +588,8 @@ mod tests {
     use crate::test_fixtures::{TestContext, test_ctx};
     use rstest::*;
 
+    const TEST_PER_PAGE: i64 = 25;
+
     #[rstest]
     fn test_get_header_returns_none_for_non_existent(test_ctx: TestContext) {
         let result = ListMetadataRepository::get_header(
@@ -574,17 +606,22 @@ mod tests {
         let key = ListKey::from("edit:posts:publish");
 
         // Create new header
-        let row_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-            .expect("should succeed");
+        let row_id = ListMetadataRepository::get_or_create(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+        )
+        .expect("should succeed");
 
-        // Verify it was created with defaults
+        // Verify it was created with provided per_page
         let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
             .expect("query should succeed")
             .expect("should succeed");
         assert_eq!(header.row_id, row_id);
         assert_eq!(header.key, key.as_str());
         assert_eq!(header.current_page, 0);
-        assert_eq!(header.per_page, 20);
+        assert_eq!(header.per_page, TEST_PER_PAGE);
         assert_eq!(header.version, 0);
         assert!(header.total_pages.is_none());
         assert!(header.total_items.is_none());
@@ -595,16 +632,44 @@ mod tests {
         let key = ListKey::from("edit:posts:draft");
 
         // Create initial header
-        let first_row_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-                .expect("should succeed");
+        let first_row_id = ListMetadataRepository::get_or_create(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+        )
+        .expect("should succeed");
 
         // Get or create again should return same rowid
-        let second_row_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-                .expect("should succeed");
+        let second_row_id = ListMetadataRepository::get_or_create(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+        )
+        .expect("should succeed");
 
         assert_eq!(first_row_id, second_row_id);
+    }
+
+    #[rstest]
+    fn test_get_or_create_fails_on_per_page_mismatch(test_ctx: TestContext) {
+        let key = ListKey::from("edit:posts:mismatch");
+
+        // Create header with per_page = 25
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key, 25)
+            .expect("should succeed");
+
+        // Try to get_or_create with different per_page
+        let result =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key, 10);
+        assert!(matches!(
+            result,
+            Err(SqliteDbError::PerPageMismatch {
+                expected: 10,
+                actual: 25
+            })
+        ));
     }
 
     #[rstest]
@@ -728,8 +793,14 @@ mod tests {
             },
         ];
 
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items)
-            .expect("should succeed");
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+            &items,
+        )
+        .expect("should succeed");
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
@@ -768,6 +839,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
             &initial_items,
         )
         .expect("should succeed");
@@ -797,6 +869,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
             &new_items,
         )
         .expect("should succeed");
@@ -833,6 +906,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
             &initial_items,
         )
         .expect("should succeed");
@@ -856,6 +930,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
             &more_items,
         )
         .expect("should succeed");
@@ -878,7 +953,7 @@ mod tests {
             total_pages: Some(5),
             total_items: Some(100),
             current_page: 1,
-            per_page: 20,
+            per_page: TEST_PER_PAGE,
         };
 
         ListMetadataRepository::update_header_by_list_key(
@@ -895,7 +970,7 @@ mod tests {
         assert_eq!(header.total_pages, Some(5));
         assert_eq!(header.total_items, Some(100));
         assert_eq!(header.current_page, 1);
-        assert_eq!(header.per_page, 20);
+        assert_eq!(header.per_page, TEST_PER_PAGE);
         assert!(header.last_fetched_at.is_some());
     }
 
@@ -903,8 +978,13 @@ mod tests {
     fn test_update_state_creates_new_state(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:publish");
 
-        let list_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-            .expect("should succeed");
+        let list_id = ListMetadataRepository::get_or_create(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+        )
+        .expect("should succeed");
         ListMetadataRepository::update_state_by_list_metadata_id(
             &test_ctx.conn,
             list_id,
@@ -924,8 +1004,13 @@ mod tests {
     fn test_update_state_updates_existing_state(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:draft");
 
-        let list_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-            .expect("should succeed");
+        let list_id = ListMetadataRepository::get_or_create(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+        )
+        .expect("should succeed");
 
         // Set initial state
         ListMetadataRepository::update_state_by_list_metadata_id(
@@ -960,6 +1045,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
             ListState::FetchingNextPage,
             None,
         )
@@ -980,10 +1066,11 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
         )
         .expect("should succeed");
         assert_eq!(info.version, 1);
-        assert_eq!(info.per_page, 20);
+        assert_eq!(info.per_page, TEST_PER_PAGE);
 
         // Verify header was created
         let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
@@ -998,7 +1085,7 @@ mod tests {
         let key = ListKey::from("edit:posts:existing");
 
         // Create header first
-        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key, TEST_PER_PAGE)
             .expect("should succeed");
 
         // Now call get_or_create_and_increment_version - should increment from 0 to 1
@@ -1006,6 +1093,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
         )
         .expect("should succeed");
         assert_eq!(info1.version, 1);
@@ -1015,6 +1103,7 @@ mod tests {
             &test_ctx.conn,
             &test_ctx.site,
             &key,
+            TEST_PER_PAGE,
         )
         .expect("should succeed");
         assert_eq!(info2.version, 2);
@@ -1026,16 +1115,27 @@ mod tests {
         let key = ListKey::from("edit:posts:publish");
 
         // Create header and add items and state
-        let list_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
-            .expect("should succeed");
+        let list_id = ListMetadataRepository::get_or_create(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+        )
+        .expect("should succeed");
         let items = vec![ListMetadataItemInput {
             entity_id: 1,
             modified_gmt: None,
             parent: None,
             menu_order: None,
         }];
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items)
-            .expect("should succeed");
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+            &items,
+        )
+        .expect("should succeed");
         ListMetadataRepository::update_state_by_list_metadata_id(
             &test_ctx.conn,
             list_id,
@@ -1095,8 +1195,14 @@ mod tests {
             })
             .collect();
 
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items)
-            .expect("should succeed");
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            TEST_PER_PAGE,
+            &items,
+        )
+        .expect("should succeed");
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
