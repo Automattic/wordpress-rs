@@ -1,4 +1,4 @@
-use crate::impl_as_query_value_from_to_string;
+use crate::{JsonValue, impl_as_query_value_from_to_string};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -97,7 +97,29 @@ pub struct PostTypeSupportsMap {
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     #[serde(flatten)]
     #[serde(rename = "supports")]
-    pub map: HashMap<PostTypeSupports, bool>,
+    pub map: HashMap<PostTypeSupports, JsonValue>,
+}
+
+impl PostTypeSupportsMap {
+    /// Check if the post type supports a specific feature by checking if the key is present.
+    ///
+    /// Note: This only checks for key presence, not the associated value. WordPress typically
+    /// includes a feature in the map with a `true` value when supported, and omits it entirely
+    /// when not supported. The value can also be an object with additional configuration (e.g.,
+    /// `editor` may have nested settings). We assume that if a key is present, the feature is
+    /// supported, regardless of the actual value.
+    pub fn supports(&self, feature: &PostTypeSupports) -> bool {
+        self.map.contains_key(feature)
+    }
+}
+
+/// Check if a post type supports a specific feature by checking if the key is present.
+///
+/// Note: This only checks for key presence, not the associated value. See
+/// `PostTypeSupportsMap::supports` for details on this assumption.
+#[uniffi::export]
+fn post_type_supports(supports_map: &PostTypeSupportsMap, feature: PostTypeSupports) -> bool {
+    supports_map.supports(&feature)
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
