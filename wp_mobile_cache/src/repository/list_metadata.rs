@@ -82,17 +82,14 @@ impl ListMetadataRepository {
         Ok(executor.last_insert_rowid())
     }
 
-    /// Get all items for a list, ordered by rowid (insertion order = display order).
-    pub fn get_items(
+    /// Get all items for a list by ID, ordered by rowid (insertion order = display order).
+    ///
+    /// Use this when you already have the `list_metadata_id` from a previous call
+    /// (e.g., from `get_or_create` or `begin_refresh`) to avoid an extra lookup.
+    pub fn get_items_by_list_metadata_id(
         executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
+        list_metadata_id: RowId,
     ) -> Result<Vec<DbListMetadataItem>, SqliteDbError> {
-        let list_metadata_id = match Self::get_header(executor, site, key)? {
-            Some(header) => header.row_id,
-            None => return Ok(Vec::new()),
-        };
-
         let sql = format!(
             "SELECT * FROM {} WHERE list_metadata_id = ? ORDER BY rowid",
             Self::items_table().table_name()
@@ -105,6 +102,20 @@ impl ListMetadataRepository {
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(SqliteDbError::from)
+    }
+
+    /// Get all items for a list by site and key, ordered by rowid (insertion order = display order).
+    ///
+    /// If you already have the `list_metadata_id`, use `get_items_by_list_metadata_id` instead.
+    pub fn get_items_by_list_key(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &ListKey,
+    ) -> Result<Vec<DbListMetadataItem>, SqliteDbError> {
+        match Self::get_header(executor, site, key)? {
+            Some(header) => Self::get_items_by_list_metadata_id(executor, header.row_id),
+            None => Ok(Vec::new()),
+        }
     }
 
     /// Get the current sync state for a list.
@@ -200,17 +211,13 @@ impl ListMetadataRepository {
         Ok(current_version == expected_version)
     }
 
-    /// Get the item count for a list.
-    pub fn get_item_count(
+    /// Get the item count for a list by ID.
+    ///
+    /// Use this when you already have the `list_metadata_id` from a previous call.
+    pub fn get_item_count_by_list_metadata_id(
         executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
+        list_metadata_id: RowId,
     ) -> Result<i64, SqliteDbError> {
-        let list_metadata_id = match Self::get_header(executor, site, key)? {
-            Some(header) => header.row_id,
-            None => return Ok(0),
-        };
-
         let sql = format!(
             "SELECT COUNT(*) FROM {} WHERE list_metadata_id = ?",
             Self::items_table().table_name()
@@ -218,6 +225,20 @@ impl ListMetadataRepository {
         let mut stmt = executor.prepare(&sql)?;
         stmt.query_row(rusqlite::params![list_metadata_id], |row| row.get(0))
             .map_err(SqliteDbError::from)
+    }
+
+    /// Get the item count for a list by site and key.
+    ///
+    /// If you already have the `list_metadata_id`, use `get_item_count_by_list_metadata_id` instead.
+    pub fn get_item_count_by_list_key(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &ListKey,
+    ) -> Result<i64, SqliteDbError> {
+        match Self::get_header(executor, site, key)? {
+            Some(header) => Self::get_item_count_by_list_metadata_id(executor, header.row_id),
+            None => Ok(0),
+        }
     }
 
     // ============================================================
@@ -645,7 +666,7 @@ mod tests {
 
     #[rstest]
     fn test_get_items_returns_empty_for_non_existent_list(test_ctx: TestContext) {
-        let items = ListMetadataRepository::get_items(
+        let items = ListMetadataRepository::get_items_by_list_key(
             &test_ctx.conn,
             &test_ctx.site,
             &ListKey::from("nonexistent:key"),
@@ -702,7 +723,7 @@ mod tests {
 
     #[rstest]
     fn test_get_item_count_returns_zero_for_empty_list(test_ctx: TestContext) {
-        let count = ListMetadataRepository::get_item_count(
+        let count = ListMetadataRepository::get_item_count_by_list_key(
             &test_ctx.conn,
             &test_ctx.site,
             &ListKey::from("empty:list"),
@@ -783,7 +804,7 @@ mod tests {
         ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 100);
         assert_eq!(retrieved[0].parent, Some(50));
@@ -842,7 +863,7 @@ mod tests {
             .unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 10);
         assert_eq!(retrieved[1].entity_id, 20);
@@ -890,7 +911,7 @@ mod tests {
             .unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(retrieved.len(), 4);
         assert_eq!(retrieved[0].entity_id, 1);
         assert_eq!(retrieved[1].entity_id, 2);
@@ -1046,7 +1067,7 @@ mod tests {
                 .is_some()
         );
         assert_eq!(
-            ListMetadataRepository::get_item_count(&test_ctx.conn, &test_ctx.site, &key).unwrap(),
+            ListMetadataRepository::get_item_count_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap(),
             1
         );
 
@@ -1060,7 +1081,7 @@ mod tests {
                 .is_none()
         );
         assert_eq!(
-            ListMetadataRepository::get_item_count(&test_ctx.conn, &test_ctx.site, &key).unwrap(),
+            ListMetadataRepository::get_item_count_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap(),
             0
         );
     }
@@ -1082,7 +1103,7 @@ mod tests {
         ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(retrieved.len(), 10);
 
         // Verify order is preserved (rowid ordering)
