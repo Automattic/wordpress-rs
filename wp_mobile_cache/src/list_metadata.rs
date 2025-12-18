@@ -90,15 +90,14 @@ impl ToSql for ListState {
 
 impl FromSql for ListState {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
-        i32::column_result(value).map(|i| match i {
-            0 => ListState::Idle,
-            1 => ListState::FetchingFirstPage,
-            2 => ListState::FetchingNextPage,
-            3 => ListState::Error,
-            _ => {
-                debug_assert!(false, "Unknown ListState value: {}", i);
-                ListState::Idle
-            }
+        i32::column_result(value).and_then(|i| match i {
+            0 => Ok(ListState::Idle),
+            1 => Ok(ListState::FetchingFirstPage),
+            2 => Ok(ListState::FetchingNextPage),
+            3 => Ok(ListState::Error),
+            _ => Err(rusqlite::types::FromSqlError::Other(
+                format!("Invalid ListState value: {}", i).into(),
+            )),
         })
     }
 }
