@@ -349,7 +349,7 @@ impl ListMetadataRepository {
 
         executor.execute(
             &sql,
-            rusqlite::params![list_metadata_id, state.as_db_str(), error_message],
+            rusqlite::params![list_metadata_id, state, error_message],
         )?;
 
         Ok(())

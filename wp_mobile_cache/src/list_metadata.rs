@@ -1,4 +1,5 @@
 use crate::RowId;
+use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 
 /// Represents list metadata header in the database.
 ///
@@ -64,50 +65,41 @@ pub struct DbListMetadataState {
 }
 
 /// Sync state for a list.
+///
+/// Stored as INTEGER in the database. The repr(i32) ensures stable values
+/// even if the enum definition order changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, uniffi::Enum)]
+#[repr(i32)]
 pub enum ListState {
     /// No sync in progress
     #[default]
-    Idle,
+    Idle = 0,
     /// Fetching first page (pull-to-refresh)
-    FetchingFirstPage,
+    FetchingFirstPage = 1,
     /// Fetching subsequent page (load more)
-    FetchingNextPage,
+    FetchingNextPage = 2,
     /// Last sync failed
-    Error,
+    Error = 3,
 }
 
-impl ListState {
-    /// Convert to database string representation.
-    pub fn as_db_str(&self) -> &'static str {
-        match self {
-            ListState::Idle => "idle",
-            ListState::FetchingFirstPage => "fetching_first_page",
-            ListState::FetchingNextPage => "fetching_next_page",
-            ListState::Error => "error",
-        }
+impl ToSql for ListState {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(*self as i32))
     }
 }
 
-impl From<&str> for ListState {
-    fn from(s: &str) -> Self {
-        match s {
-            "idle" => ListState::Idle,
-            "fetching_first_page" => ListState::FetchingFirstPage,
-            "fetching_next_page" => ListState::FetchingNextPage,
-            "error" => ListState::Error,
+impl FromSql for ListState {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
+        i32::column_result(value).map(|i| match i {
+            0 => ListState::Idle,
+            1 => ListState::FetchingFirstPage,
+            2 => ListState::FetchingNextPage,
+            3 => ListState::Error,
             _ => {
-                // Default to Idle for unknown states to avoid panics
-                eprintln!("Warning: Unknown ListState '{}', defaulting to Idle", s);
+                debug_assert!(false, "Unknown ListState value: {}", i);
                 ListState::Idle
             }
-        }
-    }
-}
-
-impl From<String> for ListState {
-    fn from(s: String) -> Self {
-        ListState::from(s.as_str())
+        })
     }
 }
 

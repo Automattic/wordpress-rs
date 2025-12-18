@@ -36,7 +36,7 @@ CREATE INDEX idx_list_metadata_items_entity ON list_metadata_items(db_site_id, e
 CREATE TABLE `list_metadata_state` (
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
   `list_metadata_id` INTEGER NOT NULL,
-  `state` TEXT NOT NULL DEFAULT 'idle',  -- idle, fetching_first_page, fetching_next_page, error
+  `state` INTEGER NOT NULL DEFAULT 0,  -- 0=idle, 1=fetching_first_page, 2=fetching_next_page, 3=error
   `error_message` TEXT,
   `updated_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 

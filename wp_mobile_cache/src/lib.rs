@@ -366,9 +366,9 @@ impl WpApiCache {
         let result = connection.execute(
             "UPDATE list_metadata_state SET state = ?1 WHERE state IN (?2, ?3)",
             params![
-                ListState::Idle.as_db_str(),
-                ListState::FetchingFirstPage.as_db_str(),
-                ListState::FetchingNextPage.as_db_str(),
+                ListState::Idle as i32,
+                ListState::FetchingFirstPage as i32,
+                ListState::FetchingNextPage as i32,
             ],
         );
 
