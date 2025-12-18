@@ -197,20 +197,6 @@ impl ListMetadataRepository {
         Ok(header.map(|h| h.version).unwrap_or(0))
     }
 
-    /// Check if the current version matches the expected version.
-    ///
-    /// Used for concurrency control to detect if a refresh happened
-    /// while a load-more operation was in progress.
-    pub fn check_version(
-        executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
-        expected_version: i64,
-    ) -> Result<bool, SqliteDbError> {
-        let current_version = Self::get_version(executor, site, key)?;
-        Ok(current_version == expected_version)
-    }
-
     /// Get the item count for a list by ID.
     ///
     /// Use this when you already have the `list_metadata_id` from a previous call.
@@ -255,7 +241,11 @@ impl ListMetadataRepository {
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
-        log::debug!("ListMetadataRepository::set_items: key={}, count={}", key, items.len());
+        log::debug!(
+            "ListMetadataRepository::set_items: key={}, count={}",
+            key,
+            items.len()
+        );
 
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
 
@@ -282,7 +272,11 @@ impl ListMetadataRepository {
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
-        log::debug!("ListMetadataRepository::append_items: key={}, count={}", key, items.len());
+        log::debug!(
+            "ListMetadataRepository::append_items: key={}, count={}",
+            key,
+            items.len()
+        );
 
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
         Self::insert_items(executor, list_metadata_id, items)
@@ -535,7 +529,10 @@ impl ListMetadataRepository {
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
     ) -> Result<(), SqliteDbError> {
-        log::debug!("ListMetadataRepository::complete_sync: list_metadata_id={}", list_metadata_id.0);
+        log::debug!(
+            "ListMetadataRepository::complete_sync: list_metadata_id={}",
+            list_metadata_id.0
+        );
         Self::update_state(executor, list_metadata_id, ListState::Idle, None)
     }
 
@@ -704,24 +701,6 @@ mod tests {
     }
 
     #[rstest]
-    fn test_check_version_returns_true_for_matching_version(test_ctx: TestContext) {
-        let key = ListKey::from("edit:posts:publish");
-
-        // Create header (version = 0)
-        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
-
-        // Check version matches
-        let matches =
-            ListMetadataRepository::check_version(&test_ctx.conn, &test_ctx.site, &key, 0).unwrap();
-        assert!(matches);
-
-        // Check version doesn't match
-        let matches =
-            ListMetadataRepository::check_version(&test_ctx.conn, &test_ctx.site, &key, 1).unwrap();
-        assert!(!matches);
-    }
-
-    #[rstest]
     fn test_get_item_count_returns_zero_for_empty_list(test_ctx: TestContext) {
         let count = ListMetadataRepository::get_item_count_by_list_key(
             &test_ctx.conn,
@@ -804,7 +783,8 @@ mod tests {
         ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 100);
         assert_eq!(retrieved[0].parent, Some(50));
@@ -863,7 +843,8 @@ mod tests {
             .unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 10);
         assert_eq!(retrieved[1].entity_id, 20);
@@ -911,7 +892,8 @@ mod tests {
             .unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .unwrap();
         assert_eq!(retrieved.len(), 4);
         assert_eq!(retrieved[0].entity_id, 1);
         assert_eq!(retrieved[1].entity_id, 2);
@@ -1067,7 +1049,12 @@ mod tests {
                 .is_some()
         );
         assert_eq!(
-            ListMetadataRepository::get_item_count_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap(),
+            ListMetadataRepository::get_item_count_by_list_key(
+                &test_ctx.conn,
+                &test_ctx.site,
+                &key
+            )
+            .unwrap(),
             1
         );
 
@@ -1081,7 +1068,12 @@ mod tests {
                 .is_none()
         );
         assert_eq!(
-            ListMetadataRepository::get_item_count_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap(),
+            ListMetadataRepository::get_item_count_by_list_key(
+                &test_ctx.conn,
+                &test_ctx.site,
+                &key
+            )
+            .unwrap(),
             0
         );
     }
@@ -1103,7 +1095,8 @@ mod tests {
         ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
 
         let retrieved =
-            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .unwrap();
         assert_eq!(retrieved.len(), 10);
 
         // Verify order is preserved (rowid ordering)
@@ -1290,13 +1283,11 @@ mod tests {
         ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
 
         // Version check should fail (stale)
-        let is_valid = ListMetadataRepository::check_version(
-            &test_ctx.conn,
-            &test_ctx.site,
-            &key,
-            captured_version,
-        )
-        .unwrap();
-        assert!(!is_valid, "Version should not match after refresh");
+        let current_version =
+            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        assert_ne!(
+            current_version, captured_version,
+            "Version should not match after refresh"
+        );
     }
 }
