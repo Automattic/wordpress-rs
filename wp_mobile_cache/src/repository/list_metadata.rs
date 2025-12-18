@@ -118,10 +118,10 @@ impl ListMetadataRepository {
         }
     }
 
-    /// Get the current sync state for a list.
+    /// Get the current sync state for a list by ID.
     ///
     /// Returns None if no state record exists (list not yet synced).
-    pub fn get_state(
+    pub fn get_state_by_list_metadata_id(
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
     ) -> Result<Option<DbListMetadataState>, SqliteDbError> {
@@ -145,7 +145,7 @@ impl ListMetadataRepository {
     ///
     /// Uses a JOIN query internally for efficiency.
     /// Returns ListState::Idle if the list or state doesn't exist.
-    pub fn get_state_by_key(
+    pub fn get_state_by_list_key(
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
@@ -231,23 +231,20 @@ impl ListMetadataRepository {
     // Write Operations
     // ============================================================
 
-    /// Set items for a list, replacing any existing items.
+    /// Set items for a list by ID, replacing any existing items.
     ///
     /// Used for refresh (page 1) - deletes all existing items and inserts new ones.
     /// Items are inserted in order, so rowid determines display order.
-    pub fn set_items(
+    pub fn set_items_by_list_metadata_id(
         executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
+        list_metadata_id: RowId,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
         log::debug!(
-            "ListMetadataRepository::set_items: key={}, count={}",
-            key,
+            "ListMetadataRepository::set_items_by_list_metadata_id: list_metadata_id={}, count={}",
+            list_metadata_id.0,
             items.len()
         );
-
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
 
         // Delete existing items
         let delete_sql = format!(
@@ -257,29 +254,51 @@ impl ListMetadataRepository {
         executor.execute(&delete_sql, rusqlite::params![list_metadata_id])?;
 
         // Insert new items
-        Self::insert_items(executor, list_metadata_id, items)?;
-
-        Ok(())
+        Self::insert_items(executor, list_metadata_id, items)
     }
 
-    /// Append items to an existing list.
+    /// Set items for a list by site and key, replacing any existing items.
     ///
-    /// Used for load-more (page 2+) - appends items without deleting existing ones.
-    /// Items are inserted in order, so they appear after existing items.
-    pub fn append_items(
+    /// If you already have the `list_metadata_id`, use `set_items_by_list_metadata_id` instead.
+    pub fn set_items_by_list_key(
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        Self::set_items_by_list_metadata_id(executor, list_metadata_id, items)
+    }
+
+    /// Append items to an existing list by ID.
+    ///
+    /// Used for load-more (page 2+) - appends items without deleting existing ones.
+    /// Items are inserted in order, so they appear after existing items.
+    pub fn append_items_by_list_metadata_id(
+        executor: &impl QueryExecutor,
+        list_metadata_id: RowId,
+        items: &[ListMetadataItemInput],
+    ) -> Result<(), SqliteDbError> {
         log::debug!(
-            "ListMetadataRepository::append_items: key={}, count={}",
-            key,
+            "ListMetadataRepository::append_items_by_list_metadata_id: list_metadata_id={}, count={}",
+            list_metadata_id.0,
             items.len()
         );
 
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
         Self::insert_items(executor, list_metadata_id, items)
+    }
+
+    /// Append items to an existing list by site and key.
+    ///
+    /// If you already have the `list_metadata_id`, use `append_items_by_list_metadata_id` instead.
+    pub fn append_items_by_list_key(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &ListKey,
+        items: &[ListMetadataItemInput],
+    ) -> Result<(), SqliteDbError> {
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        Self::append_items_by_list_metadata_id(executor, list_metadata_id, items)
     }
 
     /// Internal helper to insert items using batch insert for better performance.
@@ -324,18 +343,14 @@ impl ListMetadataRepository {
         })
     }
 
-    /// Update header pagination info.
-    pub fn update_header(
+    /// Update header pagination info by ID.
+    pub fn update_header_by_list_metadata_id(
         executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
+        list_metadata_id: RowId,
         update: &ListMetadataHeaderUpdate,
     ) -> Result<(), SqliteDbError> {
-        // Ensure header exists
-        Self::get_or_create(executor, site, key)?;
-
         let sql = format!(
-            "UPDATE {} SET total_pages = ?, total_items = ?, current_page = ?, per_page = ?, last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE db_site_id = ? AND key = ?",
+            "UPDATE {} SET total_pages = ?, total_items = ?, current_page = ?, per_page = ?, last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE rowid = ?",
             Self::header_table().table_name()
         );
 
@@ -346,18 +361,30 @@ impl ListMetadataRepository {
                 update.total_items,
                 update.current_page,
                 update.per_page,
-                site.row_id,
-                key
+                list_metadata_id
             ],
         )?;
 
         Ok(())
     }
 
-    /// Update sync state for a list.
+    /// Update header pagination info by site and key.
+    ///
+    /// If you already have the `list_metadata_id`, use `update_header_by_list_metadata_id` instead.
+    pub fn update_header_by_list_key(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &ListKey,
+        update: &ListMetadataHeaderUpdate,
+    ) -> Result<(), SqliteDbError> {
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        Self::update_header_by_list_metadata_id(executor, list_metadata_id, update)
+    }
+
+    /// Update sync state for a list by ID.
     ///
     /// Creates the state record if it doesn't exist (upsert).
-    pub fn update_state(
+    pub fn update_state_by_list_metadata_id(
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
         state: ListState,
@@ -380,8 +407,8 @@ impl ListMetadataRepository {
 
     /// Update sync state for a list by site and key.
     ///
-    /// Convenience method that looks up or creates the list_metadata_id first.
-    pub fn update_state_by_key(
+    /// If you already have the `list_metadata_id`, use `update_state_by_list_metadata_id` instead.
+    pub fn update_state_by_list_key(
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
@@ -389,29 +416,42 @@ impl ListMetadataRepository {
         error_message: Option<&str>,
     ) -> Result<(), SqliteDbError> {
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
-        Self::update_state(executor, list_metadata_id, state, error_message)
+        Self::update_state_by_list_metadata_id(executor, list_metadata_id, state, error_message)
     }
 
-    /// Increment version and return the new value.
+    /// Increment version by ID and return the new value.
     ///
     /// Used when starting a refresh to invalidate any in-flight load-more operations.
-    pub fn increment_version(
+    pub fn increment_version_by_list_metadata_id(
+        executor: &impl QueryExecutor,
+        list_metadata_id: RowId,
+    ) -> Result<i64, SqliteDbError> {
+        let sql = format!(
+            "UPDATE {} SET version = version + 1, last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE rowid = ?",
+            Self::header_table().table_name()
+        );
+        executor.execute(&sql, rusqlite::params![list_metadata_id])?;
+
+        // Return the new version
+        let sql = format!(
+            "SELECT version FROM {} WHERE rowid = ?",
+            Self::header_table().table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        stmt.query_row(rusqlite::params![list_metadata_id], |row| row.get(0))
+            .map_err(SqliteDbError::from)
+    }
+
+    /// Increment version by site and key and return the new value.
+    ///
+    /// If you already have the `list_metadata_id`, use `increment_version_by_list_metadata_id` instead.
+    pub fn increment_version_by_list_key(
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &ListKey,
     ) -> Result<i64, SqliteDbError> {
-        // Ensure header exists
-        Self::get_or_create(executor, site, key)?;
-
-        let sql = format!(
-            "UPDATE {} SET version = version + 1, last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE db_site_id = ? AND key = ?",
-            Self::header_table().table_name()
-        );
-
-        executor.execute(&sql, rusqlite::params![site.row_id, key])?;
-
-        // Return the new version
-        Self::get_version(executor, site, key)
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        Self::increment_version_by_list_metadata_id(executor, list_metadata_id)
     }
 
     /// Delete all data for a list (header, items, and state).
@@ -456,10 +496,10 @@ impl ListMetadataRepository {
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
 
         // Increment version (invalidates any in-flight load-more)
-        let version = Self::increment_version(executor, site, key)?;
+        let version = Self::increment_version_by_list_metadata_id(executor, list_metadata_id)?;
 
         // Update state to fetching
-        Self::update_state(
+        Self::update_state_by_list_metadata_id(
             executor,
             list_metadata_id,
             ListState::FetchingFirstPage,
@@ -512,7 +552,7 @@ impl ListMetadataRepository {
         let next_page = header.current_page + 1;
 
         // Update state to fetching
-        Self::update_state(executor, header.row_id, ListState::FetchingNextPage, None)?;
+        Self::update_state_by_list_metadata_id(executor, header.row_id, ListState::FetchingNextPage, None)?;
 
         Ok(Some(FetchNextPageInfo {
             list_metadata_id: header.row_id,
@@ -533,7 +573,7 @@ impl ListMetadataRepository {
             "ListMetadataRepository::complete_sync: list_metadata_id={}",
             list_metadata_id.0
         );
-        Self::update_state(executor, list_metadata_id, ListState::Idle, None)
+        Self::update_state_by_list_metadata_id(executor, list_metadata_id, ListState::Idle, None)
     }
 
     /// Complete a sync operation with an error.
@@ -549,7 +589,7 @@ impl ListMetadataRepository {
             list_metadata_id.0,
             error_message
         );
-        Self::update_state(
+        Self::update_state_by_list_metadata_id(
             executor,
             list_metadata_id,
             ListState::Error,
@@ -674,13 +714,13 @@ mod tests {
 
     #[rstest]
     fn test_get_state_returns_none_for_non_existent(test_ctx: TestContext) {
-        let result = ListMetadataRepository::get_state(&test_ctx.conn, RowId(999999)).unwrap();
+        let result = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, RowId(999999)).unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_get_state_by_key_returns_idle_for_non_existent_list(test_ctx: TestContext) {
-        let state = ListMetadataRepository::get_state_by_key(
+        let state = ListMetadataRepository::get_state_by_list_key(
             &test_ctx.conn,
             &test_ctx.site,
             &ListKey::from("nonexistent:key"),
@@ -780,7 +820,7 @@ mod tests {
             },
         ];
 
-        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
@@ -815,7 +855,7 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &initial_items)
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &initial_items)
             .unwrap();
 
         // Replace with new items
@@ -839,7 +879,7 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &new_items)
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &new_items)
             .unwrap();
 
         let retrieved =
@@ -870,7 +910,7 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &initial_items)
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &initial_items)
             .unwrap();
 
         // Append more items
@@ -888,7 +928,7 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::append_items(&test_ctx.conn, &test_ctx.site, &key, &more_items)
+        ListMetadataRepository::append_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &more_items)
             .unwrap();
 
         let retrieved =
@@ -912,7 +952,7 @@ mod tests {
             per_page: 20,
         };
 
-        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, &key, &update)
+        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
             .unwrap();
 
         let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
@@ -931,7 +971,7 @@ mod tests {
 
         let list_id =
             ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
-        ListMetadataRepository::update_state(
+        ListMetadataRepository::update_state_by_list_metadata_id(
             &test_ctx.conn,
             list_id,
             ListState::FetchingFirstPage,
@@ -939,7 +979,7 @@ mod tests {
         )
         .unwrap();
 
-        let state = ListMetadataRepository::get_state(&test_ctx.conn, list_id)
+        let state = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, list_id)
             .unwrap()
             .unwrap();
         assert_eq!(state.state, ListState::FetchingFirstPage);
@@ -954,7 +994,7 @@ mod tests {
             ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
 
         // Set initial state
-        ListMetadataRepository::update_state(
+        ListMetadataRepository::update_state_by_list_metadata_id(
             &test_ctx.conn,
             list_id,
             ListState::FetchingFirstPage,
@@ -963,7 +1003,7 @@ mod tests {
         .unwrap();
 
         // Update to error state
-        ListMetadataRepository::update_state(
+        ListMetadataRepository::update_state_by_list_metadata_id(
             &test_ctx.conn,
             list_id,
             ListState::Error,
@@ -971,7 +1011,7 @@ mod tests {
         )
         .unwrap();
 
-        let state = ListMetadataRepository::get_state(&test_ctx.conn, list_id)
+        let state = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, list_id)
             .unwrap()
             .unwrap();
         assert_eq!(state.state, ListState::Error);
@@ -982,7 +1022,7 @@ mod tests {
     fn test_update_state_by_key(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:pending");
 
-        ListMetadataRepository::update_state_by_key(
+        ListMetadataRepository::update_state_by_list_key(
             &test_ctx.conn,
             &test_ctx.site,
             &key,
@@ -992,7 +1032,7 @@ mod tests {
         .unwrap();
 
         let state =
-            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
@@ -1008,13 +1048,13 @@ mod tests {
 
         // Increment version
         let new_version =
-            ListMetadataRepository::increment_version(&test_ctx.conn, &test_ctx.site, &key)
+            ListMetadataRepository::increment_version_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
                 .unwrap();
         assert_eq!(new_version, 1);
 
         // Increment again
         let newer_version =
-            ListMetadataRepository::increment_version(&test_ctx.conn, &test_ctx.site, &key)
+            ListMetadataRepository::increment_version_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
                 .unwrap();
         assert_eq!(newer_version, 2);
 
@@ -1038,8 +1078,8 @@ mod tests {
             parent: None,
             menu_order: None,
         }];
-        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
-        ListMetadataRepository::update_state(&test_ctx.conn, list_id, ListState::Idle, None)
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
+        ListMetadataRepository::update_state_by_list_metadata_id(&test_ctx.conn, list_id, ListState::Idle, None)
             .unwrap();
 
         // Verify data exists
@@ -1092,7 +1132,7 @@ mod tests {
             })
             .collect();
 
-        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
@@ -1122,7 +1162,7 @@ mod tests {
 
         // Verify state is FetchingFirstPage
         let state =
-            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(state, ListState::FetchingFirstPage);
     }
 
@@ -1177,7 +1217,7 @@ mod tests {
             current_page: 3,
             per_page: 20,
         };
-        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, &key, &update)
+        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
             .unwrap();
 
         let result =
@@ -1197,7 +1237,7 @@ mod tests {
             current_page: 2,
             per_page: 20,
         };
-        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, &key, &update)
+        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
             .unwrap();
 
         let result =
@@ -1211,7 +1251,7 @@ mod tests {
 
         // Verify state changed to FetchingNextPage
         let state =
-            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
@@ -1224,7 +1264,7 @@ mod tests {
         ListMetadataRepository::complete_sync(&test_ctx.conn, info.list_metadata_id).unwrap();
 
         let state =
-            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
         assert_eq!(state, ListState::Idle);
     }
 
@@ -1241,7 +1281,7 @@ mod tests {
         )
         .unwrap();
 
-        let state_record = ListMetadataRepository::get_state(&test_ctx.conn, info.list_metadata_id)
+        let state_record = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, info.list_metadata_id)
             .unwrap()
             .unwrap();
         assert_eq!(state_record.state, ListState::Error);
@@ -1267,7 +1307,7 @@ mod tests {
             current_page: 1,
             per_page: 20,
         };
-        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, &key, &update)
+        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
             .unwrap();
         ListMetadataRepository::complete_sync(&test_ctx.conn, refresh_info.list_metadata_id)
             .unwrap();
