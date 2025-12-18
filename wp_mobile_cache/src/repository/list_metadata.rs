@@ -255,7 +255,7 @@ impl ListMetadataRepository {
         Self::insert_items(executor, site, key, items)
     }
 
-    /// Internal helper to insert items.
+    /// Internal helper to insert items using batch insert for better performance.
     fn insert_items(
         executor: &impl QueryExecutor,
         site: &DbSite,
@@ -266,26 +266,37 @@ impl ListMetadataRepository {
             return Ok(());
         }
 
-        let insert_sql = format!(
-            "INSERT INTO {} (db_site_id, key, entity_id, modified_gmt, parent, menu_order) VALUES (?, ?, ?, ?, ?, ?)",
-            Self::items_table().table_name()
-        );
+        // SQLite has a variable limit (default 999). Each item uses 6 variables,
+        // so batch in chunks of ~150 items to stay well under the limit.
+        const BATCH_SIZE: usize = 150;
 
-        for item in items {
-            executor.execute(
-                &insert_sql,
-                rusqlite::params![
-                    site.row_id,
-                    key,
-                    item.entity_id,
-                    item.modified_gmt,
-                    item.parent,
-                    item.menu_order
-                ],
-            )?;
-        }
+        items.chunks(BATCH_SIZE).try_for_each(|chunk| {
+            let placeholders = vec!["(?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
+            let sql = format!(
+                "INSERT INTO {} (db_site_id, key, entity_id, modified_gmt, parent, menu_order) VALUES {}",
+                Self::items_table().table_name(),
+                placeholders
+            );
 
-        Ok(())
+            let params: Vec<Box<dyn rusqlite::ToSql>> = chunk
+                .iter()
+                .flat_map(|item| -> [Box<dyn rusqlite::ToSql>; 6] {
+                    [
+                        Box::new(site.row_id),
+                        Box::new(key.to_string()),
+                        Box::new(item.entity_id),
+                        Box::new(item.modified_gmt.clone()),
+                        Box::new(item.parent),
+                        Box::new(item.menu_order),
+                    ]
+                })
+                .collect();
+
+            let param_refs: Vec<&dyn rusqlite::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+            executor.execute(&sql, param_refs.as_slice())?;
+            Ok(())
+        })
     }
 
     /// Update header pagination info.
