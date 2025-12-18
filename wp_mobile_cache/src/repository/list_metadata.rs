@@ -507,7 +507,8 @@ impl ListMetadataRepository {
         )?;
 
         // Get header for pagination info
-        let header = Self::get_header(executor, site, key)?.unwrap();
+        let header =
+            Self::get_header(executor, site, key)?.expect("header must exist after get_or_create");
 
         Ok(RefreshInfo {
             list_metadata_id,
@@ -552,7 +553,12 @@ impl ListMetadataRepository {
         let next_page = header.current_page + 1;
 
         // Update state to fetching
-        Self::update_state_by_list_metadata_id(executor, header.row_id, ListState::FetchingNextPage, None)?;
+        Self::update_state_by_list_metadata_id(
+            executor,
+            header.row_id,
+            ListState::FetchingNextPage,
+            None,
+        )?;
 
         Ok(Some(FetchNextPageInfo {
             list_metadata_id: header.row_id,
@@ -661,7 +667,7 @@ mod tests {
             &test_ctx.site,
             &ListKey::from("nonexistent:key"),
         )
-        .unwrap();
+        .expect("should succeed");
         assert!(result.is_none());
     }
 
@@ -670,13 +676,13 @@ mod tests {
         let key = ListKey::from("edit:posts:publish");
 
         // Create new header
-        let row_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let row_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
 
         // Verify it was created with defaults
         let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
-            .unwrap()
-            .unwrap();
+            .expect("query should succeed")
+            .expect("should succeed");
         assert_eq!(header.row_id, row_id);
         assert_eq!(header.key, key.as_str());
         assert_eq!(header.current_page, 0);
@@ -692,11 +698,13 @@ mod tests {
 
         // Create initial header
         let first_row_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
 
         // Get or create again should return same rowid
         let second_row_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
 
         assert_eq!(first_row_id, second_row_id);
     }
@@ -708,13 +716,15 @@ mod tests {
             &test_ctx.site,
             &ListKey::from("nonexistent:key"),
         )
-        .unwrap();
+        .expect("should succeed");
         assert!(items.is_empty());
     }
 
     #[rstest]
     fn test_get_state_returns_none_for_non_existent(test_ctx: TestContext) {
-        let result = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, RowId(999999)).unwrap();
+        let result =
+            ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, RowId(999999))
+                .expect("should succeed");
         assert!(result.is_none());
     }
 
@@ -725,7 +735,7 @@ mod tests {
             &test_ctx.site,
             &ListKey::from("nonexistent:key"),
         )
-        .unwrap();
+        .expect("should succeed");
         assert_eq!(state, ListState::Idle);
     }
 
@@ -736,7 +746,7 @@ mod tests {
             &test_ctx.site,
             &ListKey::from("nonexistent:key"),
         )
-        .unwrap();
+        .expect("should succeed");
         assert_eq!(version, 0);
     }
 
@@ -747,7 +757,7 @@ mod tests {
             &test_ctx.site,
             &ListKey::from("empty:list"),
         )
-        .unwrap();
+        .expect("should succeed");
         assert_eq!(count, 0);
     }
 
@@ -820,11 +830,12 @@ mod tests {
             },
         ];
 
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items)
+            .expect("should succeed");
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 100);
         assert_eq!(retrieved[0].parent, Some(50));
@@ -855,8 +866,13 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &initial_items)
-            .unwrap();
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &initial_items,
+        )
+        .expect("should succeed");
 
         // Replace with new items
         let new_items = vec![
@@ -879,12 +895,17 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &new_items)
-            .unwrap();
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &new_items,
+        )
+        .expect("should succeed");
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 10);
         assert_eq!(retrieved[1].entity_id, 20);
@@ -910,8 +931,13 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &initial_items)
-            .unwrap();
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &initial_items,
+        )
+        .expect("should succeed");
 
         // Append more items
         let more_items = vec![
@@ -928,12 +954,17 @@ mod tests {
                 menu_order: None,
             },
         ];
-        ListMetadataRepository::append_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &more_items)
-            .unwrap();
+        ListMetadataRepository::append_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &more_items,
+        )
+        .expect("should succeed");
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert_eq!(retrieved.len(), 4);
         assert_eq!(retrieved[0].entity_id, 1);
         assert_eq!(retrieved[1].entity_id, 2);
@@ -952,12 +983,17 @@ mod tests {
             per_page: 20,
         };
 
-        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
-            .unwrap();
+        ListMetadataRepository::update_header_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &update,
+        )
+        .expect("should succeed");
 
         let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
-            .unwrap()
-            .unwrap();
+            .expect("query should succeed")
+            .expect("should succeed");
         assert_eq!(header.total_pages, Some(5));
         assert_eq!(header.total_items, Some(100));
         assert_eq!(header.current_page, 1);
@@ -969,19 +1005,19 @@ mod tests {
     fn test_update_state_creates_new_state(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:publish");
 
-        let list_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let list_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
         ListMetadataRepository::update_state_by_list_metadata_id(
             &test_ctx.conn,
             list_id,
             ListState::FetchingFirstPage,
             None,
         )
-        .unwrap();
+        .expect("should succeed");
 
         let state = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, list_id)
-            .unwrap()
-            .unwrap();
+            .expect("query should succeed")
+            .expect("should succeed");
         assert_eq!(state.state, ListState::FetchingFirstPage);
         assert!(state.error_message.is_none());
     }
@@ -990,8 +1026,8 @@ mod tests {
     fn test_update_state_updates_existing_state(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:draft");
 
-        let list_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let list_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
 
         // Set initial state
         ListMetadataRepository::update_state_by_list_metadata_id(
@@ -1000,7 +1036,7 @@ mod tests {
             ListState::FetchingFirstPage,
             None,
         )
-        .unwrap();
+        .expect("should succeed");
 
         // Update to error state
         ListMetadataRepository::update_state_by_list_metadata_id(
@@ -1009,11 +1045,11 @@ mod tests {
             ListState::Error,
             Some("Network error"),
         )
-        .unwrap();
+        .expect("should succeed");
 
         let state = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, list_id)
-            .unwrap()
-            .unwrap();
+            .expect("query should succeed")
+            .expect("should succeed");
         assert_eq!(state.state, ListState::Error);
         assert_eq!(state.error_message.as_deref(), Some("Network error"));
     }
@@ -1029,10 +1065,11 @@ mod tests {
             ListState::FetchingNextPage,
             None,
         )
-        .unwrap();
+        .expect("should succeed");
 
         let state =
-            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
@@ -1041,27 +1078,35 @@ mod tests {
         let key = ListKey::from("edit:posts:publish");
 
         // Create header (version starts at 0)
-        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
         let initial_version =
-            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_eq!(initial_version, 0);
 
         // Increment version
-        let new_version =
-            ListMetadataRepository::increment_version_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+        let new_version = ListMetadataRepository::increment_version_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+        )
+        .expect("should succeed");
         assert_eq!(new_version, 1);
 
         // Increment again
-        let newer_version =
-            ListMetadataRepository::increment_version_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+        let newer_version = ListMetadataRepository::increment_version_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+        )
+        .expect("should succeed");
         assert_eq!(newer_version, 2);
 
         // Verify last_first_page_fetched_at is set
         let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
-            .unwrap()
-            .unwrap();
+            .expect("query should succeed")
+            .expect("should succeed");
         assert!(header.last_first_page_fetched_at.is_some());
     }
 
@@ -1070,22 +1115,28 @@ mod tests {
         let key = ListKey::from("edit:posts:publish");
 
         // Create header and add items and state
-        let list_id =
-            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let list_id = ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
         let items = vec![ListMetadataItemInput {
             entity_id: 1,
             modified_gmt: None,
             parent: None,
             menu_order: None,
         }];
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
-        ListMetadataRepository::update_state_by_list_metadata_id(&test_ctx.conn, list_id, ListState::Idle, None)
-            .unwrap();
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items)
+            .expect("should succeed");
+        ListMetadataRepository::update_state_by_list_metadata_id(
+            &test_ctx.conn,
+            list_id,
+            ListState::Idle,
+            None,
+        )
+        .expect("should succeed");
 
         // Verify data exists
         assert!(
             ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap()
+                .expect("query should succeed")
                 .is_some()
         );
         assert_eq!(
@@ -1094,17 +1145,18 @@ mod tests {
                 &test_ctx.site,
                 &key
             )
-            .unwrap(),
+            .expect("query should succeed"),
             1
         );
 
         // Delete the list
-        ListMetadataRepository::delete_list(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        ListMetadataRepository::delete_list(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
 
         // Verify everything is deleted
         assert!(
             ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap()
+                .expect("query should succeed")
                 .is_none()
         );
         assert_eq!(
@@ -1113,7 +1165,7 @@ mod tests {
                 &test_ctx.site,
                 &key
             )
-            .unwrap(),
+            .expect("query should succeed"),
             0
         );
     }
@@ -1132,11 +1184,12 @@ mod tests {
             })
             .collect();
 
-        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items).unwrap();
+        ListMetadataRepository::set_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &items)
+            .expect("should succeed");
 
         let retrieved =
             ListMetadataRepository::get_items_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert_eq!(retrieved.len(), 10);
 
         // Verify order is preserved (rowid ordering)
@@ -1153,8 +1206,8 @@ mod tests {
     fn test_begin_refresh_creates_header_and_sets_state(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:publish");
 
-        let info =
-            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let info = ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
 
         // Verify version was incremented (from 0 to 1)
         assert_eq!(info.version, 1);
@@ -1162,7 +1215,8 @@ mod tests {
 
         // Verify state is FetchingFirstPage
         let state =
-            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_eq!(state, ListState::FetchingFirstPage);
     }
 
@@ -1170,15 +1224,16 @@ mod tests {
     fn test_begin_refresh_increments_version_each_time(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:draft");
 
-        let info1 =
-            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let info1 = ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
         assert_eq!(info1.version, 1);
 
         // Complete the first refresh
-        ListMetadataRepository::complete_sync(&test_ctx.conn, info1.list_metadata_id).unwrap();
+        ListMetadataRepository::complete_sync(&test_ctx.conn, info1.list_metadata_id)
+            .expect("should succeed");
 
-        let info2 =
-            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let info2 = ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
         assert_eq!(info2.version, 2);
     }
 
@@ -1189,7 +1244,7 @@ mod tests {
             &test_ctx.site,
             &ListKey::from("nonexistent"),
         )
-        .unwrap();
+        .expect("should succeed");
         assert!(result.is_none());
     }
 
@@ -1198,11 +1253,12 @@ mod tests {
         let key = ListKey::from("edit:posts:publish");
 
         // Create header but don't set current_page
-        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
 
         let result =
             ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert!(result.is_none());
     }
 
@@ -1217,12 +1273,17 @@ mod tests {
             current_page: 3,
             per_page: 20,
         };
-        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
-            .unwrap();
+        ListMetadataRepository::update_header_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &update,
+        )
+        .expect("should succeed");
 
         let result =
             ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert!(result.is_none());
     }
 
@@ -1237,21 +1298,27 @@ mod tests {
             current_page: 2,
             per_page: 20,
         };
-        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
-            .unwrap();
+        ListMetadataRepository::update_header_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &update,
+        )
+        .expect("should succeed");
 
         let result =
             ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap();
+                .expect("should succeed");
         assert!(result.is_some());
 
-        let info = result.unwrap();
+        let info = result.expect("should succeed");
         assert_eq!(info.page, 3); // next page
         assert_eq!(info.per_page, 20);
 
         // Verify state changed to FetchingNextPage
         let state =
-            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
@@ -1259,12 +1326,14 @@ mod tests {
     fn test_complete_sync_sets_state_to_idle(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:publish");
 
-        let info =
-            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
-        ListMetadataRepository::complete_sync(&test_ctx.conn, info.list_metadata_id).unwrap();
+        let info = ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
+        ListMetadataRepository::complete_sync(&test_ctx.conn, info.list_metadata_id)
+            .expect("should succeed");
 
         let state =
-            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_state_by_list_key(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_eq!(state, ListState::Idle);
     }
 
@@ -1272,18 +1341,21 @@ mod tests {
     fn test_complete_sync_with_error_sets_state_and_message(test_ctx: TestContext) {
         let key = ListKey::from("edit:posts:publish");
 
-        let info =
-            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        let info = ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
         ListMetadataRepository::complete_sync_with_error(
             &test_ctx.conn,
             info.list_metadata_id,
             "Network timeout",
         )
-        .unwrap();
+        .expect("should succeed");
 
-        let state_record = ListMetadataRepository::get_state_by_list_metadata_id(&test_ctx.conn, info.list_metadata_id)
-            .unwrap()
-            .unwrap();
+        let state_record = ListMetadataRepository::get_state_by_list_metadata_id(
+            &test_ctx.conn,
+            info.list_metadata_id,
+        )
+        .expect("query should succeed")
+        .expect("should succeed");
         assert_eq!(state_record.state, ListState::Error);
         assert_eq!(
             state_record.error_message.as_deref(),
@@ -1297,7 +1369,8 @@ mod tests {
 
         // Start a refresh (version becomes 1)
         let refresh_info =
-            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_eq!(refresh_info.version, 1);
 
         // Update header to simulate page 1 loaded
@@ -1307,24 +1380,31 @@ mod tests {
             current_page: 1,
             per_page: 20,
         };
-        ListMetadataRepository::update_header_by_list_key(&test_ctx.conn, &test_ctx.site, &key, &update)
-            .unwrap();
+        ListMetadataRepository::update_header_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+            &update,
+        )
+        .expect("should succeed");
         ListMetadataRepository::complete_sync(&test_ctx.conn, refresh_info.list_metadata_id)
-            .unwrap();
+            .expect("should succeed");
 
         // Start load-next-page (captures version = 1)
         let next_page_info =
             ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, &key)
-                .unwrap()
-                .unwrap();
+                .expect("query should succeed")
+                .expect("should succeed");
         let captured_version = next_page_info.version;
 
         // Another refresh happens (version becomes 2)
-        ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+        ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
 
         // Version check should fail (stale)
         let current_version =
-            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, &key).unwrap();
+            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, &key)
+                .expect("should succeed");
         assert_ne!(
             current_version, captured_version,
             "Version should not match after refresh"
