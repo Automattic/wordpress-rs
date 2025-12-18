@@ -9,7 +9,8 @@ use crate::{
 
 /// Repository for managing list metadata in the database.
 ///
-/// Provides methods for querying and managing list pagination, items, and sync state.
+/// Provides associated functions for querying and managing list pagination,
+/// items, and sync state. All functions are stateless.
 pub struct ListMetadataRepository;
 
 impl ListMetadataRepository {
@@ -36,7 +37,6 @@ impl ListMetadataRepository {
     ///
     /// Returns None if the list doesn't exist.
     pub fn get_header(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -62,13 +62,12 @@ impl ListMetadataRepository {
     /// If the header doesn't exist, creates it with default values and returns its rowid.
     /// If it exists, returns the existing rowid.
     pub fn get_or_create(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<RowId, SqliteDbError> {
         // Try to get existing
-        if let Some(header) = self.get_header(executor, site, key)? {
+        if let Some(header) = Self::get_header(executor, site, key)? {
             return Ok(header.row_id);
         }
 
@@ -84,7 +83,6 @@ impl ListMetadataRepository {
 
     /// Get all items for a list, ordered by rowid (insertion order = display order).
     pub fn get_items(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -107,7 +105,6 @@ impl ListMetadataRepository {
     ///
     /// Returns None if no state record exists (list not yet synced).
     pub fn get_state(
-        &self,
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
     ) -> Result<Option<DbListMetadataState>, SqliteDbError> {
@@ -132,15 +129,14 @@ impl ListMetadataRepository {
     /// Convenience method that looks up the list_metadata_id first.
     /// Returns ListState::Idle if the list or state doesn't exist.
     pub fn get_state_by_key(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<ListState, SqliteDbError> {
-        let header = self.get_header(executor, site, key)?;
+        let header = Self::get_header(executor, site, key)?;
         match header {
             Some(h) => {
-                let state = self.get_state(executor, h.row_id)?;
+                let state = Self::get_state(executor, h.row_id)?;
                 Ok(state.map(|s| s.state).unwrap_or(ListState::Idle))
             }
             None => Ok(ListState::Idle),
@@ -154,7 +150,6 @@ impl ListMetadataRepository {
     ///
     /// Returns `None` if the list doesn't exist.
     pub fn get_header_with_state(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -183,12 +178,11 @@ impl ListMetadataRepository {
     ///
     /// Returns 0 if the list doesn't exist.
     pub fn get_version(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<i64, SqliteDbError> {
-        let header = self.get_header(executor, site, key)?;
+        let header = Self::get_header(executor, site, key)?;
         Ok(header.map(|h| h.version).unwrap_or(0))
     }
 
@@ -197,19 +191,17 @@ impl ListMetadataRepository {
     /// Used for concurrency control to detect if a refresh happened
     /// while a load-more operation was in progress.
     pub fn check_version(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
         expected_version: i64,
     ) -> Result<bool, SqliteDbError> {
-        let current_version = self.get_version(executor, site, key)?;
+        let current_version = Self::get_version(executor, site, key)?;
         Ok(current_version == expected_version)
     }
 
     /// Get the item count for a list.
     pub fn get_item_count(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -232,7 +224,6 @@ impl ListMetadataRepository {
     /// Used for refresh (page 1) - deletes all existing items and inserts new ones.
     /// Items are inserted in order, so rowid determines display order.
     pub fn set_items(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -246,7 +237,7 @@ impl ListMetadataRepository {
         executor.execute(&delete_sql, rusqlite::params![site.row_id, key])?;
 
         // Insert new items
-        self.insert_items(executor, site, key, items)?;
+        Self::insert_items(executor, site, key, items)?;
 
         Ok(())
     }
@@ -256,18 +247,16 @@ impl ListMetadataRepository {
     /// Used for load-more (page 2+) - appends items without deleting existing ones.
     /// Items are inserted in order, so they appear after existing items.
     pub fn append_items(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
-        self.insert_items(executor, site, key, items)
+        Self::insert_items(executor, site, key, items)
     }
 
     /// Internal helper to insert items.
     fn insert_items(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -301,14 +290,13 @@ impl ListMetadataRepository {
 
     /// Update header pagination info.
     pub fn update_header(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
         update: &ListMetadataHeaderUpdate,
     ) -> Result<(), SqliteDbError> {
         // Ensure header exists
-        self.get_or_create(executor, site, key)?;
+        Self::get_or_create(executor, site, key)?;
 
         let sql = format!(
             "UPDATE {} SET total_pages = ?, total_items = ?, current_page = ?, per_page = ?, last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE db_site_id = ? AND key = ?",
@@ -334,7 +322,6 @@ impl ListMetadataRepository {
     ///
     /// Creates the state record if it doesn't exist (upsert).
     pub fn update_state(
-        &self,
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
         state: ListState,
@@ -359,28 +346,26 @@ impl ListMetadataRepository {
     ///
     /// Convenience method that looks up or creates the list_metadata_id first.
     pub fn update_state_by_key(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
         state: ListState,
         error_message: Option<&str>,
     ) -> Result<(), SqliteDbError> {
-        let list_metadata_id = self.get_or_create(executor, site, key)?;
-        self.update_state(executor, list_metadata_id, state, error_message)
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        Self::update_state(executor, list_metadata_id, state, error_message)
     }
 
     /// Increment version and return the new value.
     ///
     /// Used when starting a refresh to invalidate any in-flight load-more operations.
     pub fn increment_version(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<i64, SqliteDbError> {
         // Ensure header exists
-        self.get_or_create(executor, site, key)?;
+        Self::get_or_create(executor, site, key)?;
 
         let sql = format!(
             "UPDATE {} SET version = version + 1, last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE db_site_id = ? AND key = ?",
@@ -390,12 +375,11 @@ impl ListMetadataRepository {
         executor.execute(&sql, rusqlite::params![site.row_id, key])?;
 
         // Return the new version
-        self.get_version(executor, site, key)
+        Self::get_version(executor, site, key)
     }
 
     /// Delete all data for a list (header, items, and state).
     pub fn delete_list(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -431,19 +415,18 @@ impl ListMetadataRepository {
     ///
     /// Call this before starting an API fetch for page 1.
     pub fn begin_refresh(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<RefreshInfo, SqliteDbError> {
         // Ensure header exists and get its ID
-        let list_metadata_id = self.get_or_create(executor, site, key)?;
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
 
         // Increment version (invalidates any in-flight load-more)
-        let version = self.increment_version(executor, site, key)?;
+        let version = Self::increment_version(executor, site, key)?;
 
         // Update state to fetching
-        self.update_state(
+        Self::update_state(
             executor,
             list_metadata_id,
             ListState::FetchingFirstPage,
@@ -451,7 +434,7 @@ impl ListMetadataRepository {
         )?;
 
         // Get header for pagination info
-        let header = self.get_header(executor, site, key)?.unwrap();
+        let header = Self::get_header(executor, site, key)?.unwrap();
 
         Ok(RefreshInfo {
             list_metadata_id,
@@ -471,12 +454,11 @@ impl ListMetadataRepository {
     /// Returns None if already at the last page or no pages loaded yet.
     /// Call this before starting an API fetch for page N+1.
     pub fn begin_fetch_next_page(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<Option<FetchNextPageInfo>, SqliteDbError> {
-        let header = match self.get_header(executor, site, key)? {
+        let header = match Self::get_header(executor, site, key)? {
             Some(h) => h,
             None => return Ok(None), // List doesn't exist
         };
@@ -495,7 +477,7 @@ impl ListMetadataRepository {
         let next_page = header.current_page + 1;
 
         // Update state to fetching
-        self.update_state(executor, header.row_id, ListState::FetchingNextPage, None)?;
+        Self::update_state(executor, header.row_id, ListState::FetchingNextPage, None)?;
 
         Ok(Some(FetchNextPageInfo {
             list_metadata_id: header.row_id,
@@ -509,23 +491,21 @@ impl ListMetadataRepository {
     ///
     /// Updates state to Idle and clears any error message.
     pub fn complete_sync(
-        &self,
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
     ) -> Result<(), SqliteDbError> {
-        self.update_state(executor, list_metadata_id, ListState::Idle, None)
+        Self::update_state(executor, list_metadata_id, ListState::Idle, None)
     }
 
     /// Complete a sync operation with an error.
     ///
     /// Updates state to Error with the provided message.
     pub fn complete_sync_with_error(
-        &self,
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
         error_message: &str,
     ) -> Result<(), SqliteDbError> {
-        self.update_state(
+        Self::update_state(
             executor,
             list_metadata_id,
             ListState::Error,
@@ -542,13 +522,11 @@ impl ListMetadataRepository {
     /// Returns None if no list exists for this key yet.
     /// Used by collections to cache the ID for relevance checking.
     pub fn get_list_metadata_id(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<Option<RowId>, SqliteDbError> {
-        self.get_header(executor, site, key)
-            .map(|opt| opt.map(|h| h.row_id))
+        Self::get_header(executor, site, key).map(|opt| opt.map(|h| h.row_id))
     }
 
     /// Get the list_metadata_id that a state row belongs to.
@@ -557,7 +535,6 @@ impl ListMetadataRepository {
     /// list_metadata_id (FK to list_metadata) that this state belongs to.
     /// Returns None if the state row doesn't exist.
     pub fn get_list_metadata_id_for_state_row(
-        &self,
         executor: &impl QueryExecutor,
         state_row_id: RowId,
     ) -> Result<Option<RowId>, SqliteDbError> {
@@ -580,7 +557,6 @@ impl ListMetadataRepository {
     /// Given a rowid from the list_metadata_items table, checks if the item
     /// belongs to the list identified by (site, key).
     pub fn is_item_row_for_key(
-        &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
@@ -657,32 +633,24 @@ mod tests {
     use crate::test_fixtures::{TestContext, test_ctx};
     use rstest::*;
 
-    fn list_metadata_repo() -> ListMetadataRepository {
-        ListMetadataRepository
-    }
-
     #[rstest]
     fn test_get_header_returns_none_for_non_existent(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-        let result = repo
-            .get_header(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
-            .unwrap();
+        let result =
+            ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
+                .unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_get_or_create_creates_new_header(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Create new header
-        let row_id = repo
-            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let row_id =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Verify it was created with defaults
-        let header = repo
-            .get_header(&test_ctx.conn, &test_ctx.site, key)
+        let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, key)
             .unwrap()
             .unwrap();
         assert_eq!(header.row_id, row_id);
@@ -696,84 +664,75 @@ mod tests {
 
     #[rstest]
     fn test_get_or_create_returns_existing_header(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:draft";
 
         // Create initial header
-        let first_row_id = repo
-            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let first_row_id =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Get or create again should return same rowid
-        let second_row_id = repo
-            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let second_row_id =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         assert_eq!(first_row_id, second_row_id);
     }
 
     #[rstest]
     fn test_get_items_returns_empty_for_non_existent_list(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-        let items = repo
-            .get_items(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
-            .unwrap();
+        let items =
+            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
+                .unwrap();
         assert!(items.is_empty());
     }
 
     #[rstest]
     fn test_get_state_returns_none_for_non_existent(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-        let result = repo.get_state(&test_ctx.conn, RowId(999999)).unwrap();
+        let result = ListMetadataRepository::get_state(&test_ctx.conn, RowId(999999)).unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_get_state_by_key_returns_idle_for_non_existent_list(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-        let state = repo
-            .get_state_by_key(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
-            .unwrap();
+        let state = ListMetadataRepository::get_state_by_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            "nonexistent:key",
+        )
+        .unwrap();
         assert_eq!(state, ListState::Idle);
     }
 
     #[rstest]
     fn test_get_version_returns_zero_for_non_existent_list(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-        let version = repo
-            .get_version(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
-            .unwrap();
+        let version =
+            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, "nonexistent:key")
+                .unwrap();
         assert_eq!(version, 0);
     }
 
     #[rstest]
     fn test_check_version_returns_true_for_matching_version(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Create header (version = 0)
-        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Check version matches
-        let matches = repo
-            .check_version(&test_ctx.conn, &test_ctx.site, key, 0)
-            .unwrap();
+        let matches =
+            ListMetadataRepository::check_version(&test_ctx.conn, &test_ctx.site, key, 0).unwrap();
         assert!(matches);
 
         // Check version doesn't match
-        let matches = repo
-            .check_version(&test_ctx.conn, &test_ctx.site, key, 1)
-            .unwrap();
+        let matches =
+            ListMetadataRepository::check_version(&test_ctx.conn, &test_ctx.site, key, 1).unwrap();
         assert!(!matches);
     }
 
     #[rstest]
     fn test_get_item_count_returns_zero_for_empty_list(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-        let count = repo
-            .get_item_count(&test_ctx.conn, &test_ctx.site, "empty:list")
-            .unwrap();
+        let count =
+            ListMetadataRepository::get_item_count(&test_ctx.conn, &test_ctx.site, "empty:list")
+                .unwrap();
         assert_eq!(count, 0);
     }
 
@@ -823,7 +782,6 @@ mod tests {
 
     #[rstest]
     fn test_set_items_inserts_new_items(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         let items = vec![
@@ -847,10 +805,10 @@ mod tests {
             },
         ];
 
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
-            .unwrap();
+        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, key, &items).unwrap();
 
-        let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let retrieved =
+            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 100);
         assert_eq!(retrieved[0].parent, Some(50));
@@ -864,7 +822,6 @@ mod tests {
 
     #[rstest]
     fn test_set_items_replaces_existing_items(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:draft";
 
         // Insert initial items
@@ -882,7 +839,7 @@ mod tests {
                 menu_order: None,
             },
         ];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
+        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
             .unwrap();
 
         // Replace with new items
@@ -906,10 +863,10 @@ mod tests {
                 menu_order: None,
             },
         ];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &new_items)
-            .unwrap();
+        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, key, &new_items).unwrap();
 
-        let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let retrieved =
+            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 3);
         assert_eq!(retrieved[0].entity_id, 10);
         assert_eq!(retrieved[1].entity_id, 20);
@@ -918,7 +875,6 @@ mod tests {
 
     #[rstest]
     fn test_append_items_adds_to_existing(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:pending";
 
         // Insert initial items
@@ -936,7 +892,7 @@ mod tests {
                 menu_order: None,
             },
         ];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
+        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, key, &initial_items)
             .unwrap();
 
         // Append more items
@@ -954,10 +910,11 @@ mod tests {
                 menu_order: None,
             },
         ];
-        repo.append_items(&test_ctx.conn, &test_ctx.site, key, &more_items)
+        ListMetadataRepository::append_items(&test_ctx.conn, &test_ctx.site, key, &more_items)
             .unwrap();
 
-        let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let retrieved =
+            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 4);
         assert_eq!(retrieved[0].entity_id, 1);
         assert_eq!(retrieved[1].entity_id, 2);
@@ -967,7 +924,6 @@ mod tests {
 
     #[rstest]
     fn test_update_header_updates_pagination(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         let update = ListMetadataHeaderUpdate {
@@ -977,11 +933,10 @@ mod tests {
             per_page: 20,
         };
 
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, key, &update)
             .unwrap();
 
-        let header = repo
-            .get_header(&test_ctx.conn, &test_ctx.site, key)
+        let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, key)
             .unwrap()
             .unwrap();
         assert_eq!(header.total_pages, Some(5));
@@ -993,35 +948,43 @@ mod tests {
 
     #[rstest]
     fn test_update_state_creates_new_state(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let list_id = repo
-            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
-        repo.update_state(&test_ctx.conn, list_id, ListState::FetchingFirstPage, None)
-            .unwrap();
+        let list_id =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        ListMetadataRepository::update_state(
+            &test_ctx.conn,
+            list_id,
+            ListState::FetchingFirstPage,
+            None,
+        )
+        .unwrap();
 
-        let state = repo.get_state(&test_ctx.conn, list_id).unwrap().unwrap();
+        let state = ListMetadataRepository::get_state(&test_ctx.conn, list_id)
+            .unwrap()
+            .unwrap();
         assert_eq!(state.state, ListState::FetchingFirstPage);
         assert!(state.error_message.is_none());
     }
 
     #[rstest]
     fn test_update_state_updates_existing_state(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:draft";
 
-        let list_id = repo
-            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let list_id =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Set initial state
-        repo.update_state(&test_ctx.conn, list_id, ListState::FetchingFirstPage, None)
-            .unwrap();
+        ListMetadataRepository::update_state(
+            &test_ctx.conn,
+            list_id,
+            ListState::FetchingFirstPage,
+            None,
+        )
+        .unwrap();
 
         // Update to error state
-        repo.update_state(
+        ListMetadataRepository::update_state(
             &test_ctx.conn,
             list_id,
             ListState::Error,
@@ -1029,17 +992,18 @@ mod tests {
         )
         .unwrap();
 
-        let state = repo.get_state(&test_ctx.conn, list_id).unwrap().unwrap();
+        let state = ListMetadataRepository::get_state(&test_ctx.conn, list_id)
+            .unwrap()
+            .unwrap();
         assert_eq!(state.state, ListState::Error);
         assert_eq!(state.error_message.as_deref(), Some("Network error"));
     }
 
     #[rstest]
     fn test_update_state_by_key(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:pending";
 
-        repo.update_state_by_key(
+        ListMetadataRepository::update_state_by_key(
             &test_ctx.conn,
             &test_ctx.site,
             key,
@@ -1048,40 +1012,33 @@ mod tests {
         )
         .unwrap();
 
-        let state = repo
-            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let state =
+            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
     #[rstest]
     fn test_increment_version(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Create header (version starts at 0)
-        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
-        let initial_version = repo
-            .get_version(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let initial_version =
+            ListMetadataRepository::get_version(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(initial_version, 0);
 
         // Increment version
-        let new_version = repo
-            .increment_version(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let new_version =
+            ListMetadataRepository::increment_version(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(new_version, 1);
 
         // Increment again
-        let newer_version = repo
-            .increment_version(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let newer_version =
+            ListMetadataRepository::increment_version(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(newer_version, 2);
 
         // Verify last_first_page_fetched_at is set
-        let header = repo
-            .get_header(&test_ctx.conn, &test_ctx.site, key)
+        let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, key)
             .unwrap()
             .unwrap();
         assert!(header.last_first_page_fetched_at.is_some());
@@ -1089,56 +1046,49 @@ mod tests {
 
     #[rstest]
     fn test_delete_list_removes_all_data(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Create header and add items and state
-        let list_id = repo
-            .get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let list_id =
+            ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
         let items = vec![ListMetadataItemInput {
             entity_id: 1,
             modified_gmt: None,
             parent: None,
             menu_order: None,
         }];
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
-            .unwrap();
-        repo.update_state(&test_ctx.conn, list_id, ListState::Idle, None)
+        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, key, &items).unwrap();
+        ListMetadataRepository::update_state(&test_ctx.conn, list_id, ListState::Idle, None)
             .unwrap();
 
         // Verify data exists
         assert!(
-            repo.get_header(&test_ctx.conn, &test_ctx.site, key)
+            ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, key)
                 .unwrap()
                 .is_some()
         );
         assert_eq!(
-            repo.get_item_count(&test_ctx.conn, &test_ctx.site, key)
-                .unwrap(),
+            ListMetadataRepository::get_item_count(&test_ctx.conn, &test_ctx.site, key).unwrap(),
             1
         );
 
         // Delete the list
-        repo.delete_list(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        ListMetadataRepository::delete_list(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Verify everything is deleted
         assert!(
-            repo.get_header(&test_ctx.conn, &test_ctx.site, key)
+            ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, key)
                 .unwrap()
                 .is_none()
         );
         assert_eq!(
-            repo.get_item_count(&test_ctx.conn, &test_ctx.site, key)
-                .unwrap(),
+            ListMetadataRepository::get_item_count(&test_ctx.conn, &test_ctx.site, key).unwrap(),
             0
         );
     }
 
     #[rstest]
     fn test_items_preserve_order(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:ordered";
 
         // Insert items in specific order
@@ -1151,10 +1101,10 @@ mod tests {
             })
             .collect();
 
-        repo.set_items(&test_ctx.conn, &test_ctx.site, key, &items)
-            .unwrap();
+        ListMetadataRepository::set_items(&test_ctx.conn, &test_ctx.site, key, &items).unwrap();
 
-        let retrieved = repo.get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        let retrieved =
+            ListMetadataRepository::get_items(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(retrieved.len(), 10);
 
         // Verify order is preserved (rowid ordering)
@@ -1169,72 +1119,63 @@ mod tests {
 
     #[rstest]
     fn test_begin_refresh_creates_header_and_sets_state(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let info = repo
-            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let info =
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Verify version was incremented (from 0 to 1)
         assert_eq!(info.version, 1);
         assert_eq!(info.per_page, 20); // default
 
         // Verify state is FetchingFirstPage
-        let state = repo
-            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let state =
+            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(state, ListState::FetchingFirstPage);
     }
 
     #[rstest]
     fn test_begin_refresh_increments_version_each_time(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:draft";
 
-        let info1 = repo
-            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let info1 =
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(info1.version, 1);
 
         // Complete the first refresh
-        repo.complete_sync(&test_ctx.conn, info1.list_metadata_id)
-            .unwrap();
+        ListMetadataRepository::complete_sync(&test_ctx.conn, info1.list_metadata_id).unwrap();
 
-        let info2 = repo
-            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let info2 =
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(info2.version, 2);
     }
 
     #[rstest]
     fn test_begin_fetch_next_page_returns_none_for_non_existent_list(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
-
-        let result = repo
-            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, "nonexistent")
-            .unwrap();
+        let result = ListMetadataRepository::begin_fetch_next_page(
+            &test_ctx.conn,
+            &test_ctx.site,
+            "nonexistent",
+        )
+        .unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_begin_fetch_next_page_returns_none_when_no_pages_loaded(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Create header but don't set current_page
-        repo.get_or_create(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
-        let result = repo
-            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let result =
+            ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_begin_fetch_next_page_returns_none_at_last_page(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Set up header with current_page = total_pages
@@ -1244,18 +1185,17 @@ mod tests {
             current_page: 3,
             per_page: 20,
         };
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, key, &update)
             .unwrap();
 
-        let result = repo
-            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let result =
+            ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_begin_fetch_next_page_returns_info_when_more_pages(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Set up header with more pages available
@@ -1265,12 +1205,12 @@ mod tests {
             current_page: 2,
             per_page: 20,
         };
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, key, &update)
             .unwrap();
 
-        let result = repo
-            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let result =
+            ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap();
         assert!(result.is_some());
 
         let info = result.unwrap();
@@ -1278,42 +1218,38 @@ mod tests {
         assert_eq!(info.per_page, 20);
 
         // Verify state changed to FetchingNextPage
-        let state = repo
-            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let state =
+            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(state, ListState::FetchingNextPage);
     }
 
     #[rstest]
     fn test_complete_sync_sets_state_to_idle(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let info = repo
-            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
-        repo.complete_sync(&test_ctx.conn, info.list_metadata_id)
-            .unwrap();
+        let info =
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        ListMetadataRepository::complete_sync(&test_ctx.conn, info.list_metadata_id).unwrap();
 
-        let state = repo
-            .get_state_by_key(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let state =
+            ListMetadataRepository::get_state_by_key(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(state, ListState::Idle);
     }
 
     #[rstest]
     fn test_complete_sync_with_error_sets_state_and_message(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
-        let info = repo
-            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
-        repo.complete_sync_with_error(&test_ctx.conn, info.list_metadata_id, "Network timeout")
-            .unwrap();
+        let info =
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
+        ListMetadataRepository::complete_sync_with_error(
+            &test_ctx.conn,
+            info.list_metadata_id,
+            "Network timeout",
+        )
+        .unwrap();
 
-        let state_record = repo
-            .get_state(&test_ctx.conn, info.list_metadata_id)
+        let state_record = ListMetadataRepository::get_state(&test_ctx.conn, info.list_metadata_id)
             .unwrap()
             .unwrap();
         assert_eq!(state_record.state, ListState::Error);
@@ -1325,13 +1261,11 @@ mod tests {
 
     #[rstest]
     fn test_version_check_detects_stale_operation(test_ctx: TestContext) {
-        let repo = list_metadata_repo();
         let key = "edit:posts:publish";
 
         // Start a refresh (version becomes 1)
-        let refresh_info = repo
-            .begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        let refresh_info =
+            ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
         assert_eq!(refresh_info.version, 1);
 
         // Update header to simulate page 1 loaded
@@ -1341,26 +1275,29 @@ mod tests {
             current_page: 1,
             per_page: 20,
         };
-        repo.update_header(&test_ctx.conn, &test_ctx.site, key, &update)
+        ListMetadataRepository::update_header(&test_ctx.conn, &test_ctx.site, key, &update)
             .unwrap();
-        repo.complete_sync(&test_ctx.conn, refresh_info.list_metadata_id)
+        ListMetadataRepository::complete_sync(&test_ctx.conn, refresh_info.list_metadata_id)
             .unwrap();
 
         // Start load-next-page (captures version = 1)
-        let next_page_info = repo
-            .begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap()
-            .unwrap();
+        let next_page_info =
+            ListMetadataRepository::begin_fetch_next_page(&test_ctx.conn, &test_ctx.site, key)
+                .unwrap()
+                .unwrap();
         let captured_version = next_page_info.version;
 
         // Another refresh happens (version becomes 2)
-        repo.begin_refresh(&test_ctx.conn, &test_ctx.site, key)
-            .unwrap();
+        ListMetadataRepository::begin_refresh(&test_ctx.conn, &test_ctx.site, key).unwrap();
 
         // Version check should fail (stale)
-        let is_valid = repo
-            .check_version(&test_ctx.conn, &test_ctx.site, key, captured_version)
-            .unwrap();
+        let is_valid = ListMetadataRepository::check_version(
+            &test_ctx.conn,
+            &test_ctx.site,
+            key,
+            captured_version,
+        )
+        .unwrap();
         assert!(!is_valid, "Version should not match after refresh");
     }
 }
