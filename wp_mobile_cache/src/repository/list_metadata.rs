@@ -234,6 +234,8 @@ impl ListMetadataRepository {
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
+        log::debug!("ListMetadataRepository::set_items: key={}, count={}", key, items.len());
+
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
 
         // Delete existing items
@@ -259,6 +261,8 @@ impl ListMetadataRepository {
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
+        log::debug!("ListMetadataRepository::append_items: key={}, count={}", key, items.len());
+
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
         Self::insert_items(executor, list_metadata_id, items)
     }
@@ -401,6 +405,8 @@ impl ListMetadataRepository {
         site: &DbSite,
         key: &ListKey,
     ) -> Result<(), SqliteDbError> {
+        log::debug!("ListMetadataRepository::delete_list: key={}", key);
+
         // Delete header - items and state are cascade deleted via FK
         let sql = format!(
             "DELETE FROM {} WHERE db_site_id = ? AND key = ?",
@@ -429,6 +435,8 @@ impl ListMetadataRepository {
         site: &DbSite,
         key: &ListKey,
     ) -> Result<RefreshInfo, SqliteDbError> {
+        log::debug!("ListMetadataRepository::begin_refresh: key={}", key);
+
         // Ensure header exists and get its ID
         let list_metadata_id = Self::get_or_create(executor, site, key)?;
 
@@ -468,6 +476,8 @@ impl ListMetadataRepository {
         site: &DbSite,
         key: &ListKey,
     ) -> Result<Option<FetchNextPageInfo>, SqliteDbError> {
+        log::debug!("ListMetadataRepository::begin_fetch_next_page: key={}", key);
+
         let header = match Self::get_header(executor, site, key)? {
             Some(h) => h,
             None => return Ok(None), // List doesn't exist
@@ -504,6 +514,7 @@ impl ListMetadataRepository {
         executor: &impl QueryExecutor,
         list_metadata_id: RowId,
     ) -> Result<(), SqliteDbError> {
+        log::debug!("ListMetadataRepository::complete_sync: list_metadata_id={}", list_metadata_id.0);
         Self::update_state(executor, list_metadata_id, ListState::Idle, None)
     }
 
@@ -515,6 +526,11 @@ impl ListMetadataRepository {
         list_metadata_id: RowId,
         error_message: &str,
     ) -> Result<(), SqliteDbError> {
+        log::debug!(
+            "ListMetadataRepository::complete_sync_with_error: list_metadata_id={}, error={}",
+            list_metadata_id.0,
+            error_message
+        );
         Self::update_state(
             executor,
             list_metadata_id,

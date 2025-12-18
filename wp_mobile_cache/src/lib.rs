@@ -291,7 +291,7 @@ impl WpApiCache {
                             // Ignore SQLite system tables (sqlite_sequence, sqlite_master, etc.)
                             // and migration tracking table (_migrations)
                             if !table_name.starts_with("sqlite_") && table_name != "_migrations" {
-                                eprintln!("Warning: Unknown table in update hook: {}", table_name);
+                                log::warn!("Unknown table in update hook: {}", table_name);
                             }
                         }
                     }
