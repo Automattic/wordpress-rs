@@ -488,6 +488,40 @@ impl ListMetadataRepository {
         Ok(())
     }
 
+    /// Get or create a list header and increment its version in a single query.
+    ///
+    /// Uses `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` to atomically:
+    /// - Create the header with version=1 if it doesn't exist
+    /// - Increment the version and update `last_first_page_fetched_at` if it exists
+    /// - Return the rowid, new version, and per_page
+    ///
+    /// This is more efficient than calling `get_or_create` + `increment_version` separately.
+    pub fn get_or_create_and_increment_version(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &ListKey,
+    ) -> Result<HeaderVersionInfo, SqliteDbError> {
+        let sql = format!(
+            "INSERT INTO {} (db_site_id, key, current_page, per_page, version, last_first_page_fetched_at) \
+             VALUES (?1, ?2, 0, 20, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) \
+             ON CONFLICT(db_site_id, key) DO UPDATE SET \
+                 version = version + 1, \
+                 last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+             RETURNING rowid, version, per_page",
+            Self::header_table().table_name()
+        );
+
+        let mut stmt = executor.prepare(&sql)?;
+        stmt.query_row(rusqlite::params![site.row_id, key], |row| {
+            Ok(HeaderVersionInfo {
+                list_metadata_id: row.get(0)?,
+                version: row.get(1)?,
+                per_page: row.get(2)?,
+            })
+        })
+        .map_err(SqliteDbError::from)
+    }
+
     // ============================================================
     // Concurrency Helpers
     // ============================================================
@@ -495,10 +529,9 @@ impl ListMetadataRepository {
     /// Begin a refresh operation (fetch first page).
     ///
     /// Atomically:
-    /// 1. Creates header if needed
-    /// 2. Increments version (invalidates any in-flight load-more)
-    /// 3. Updates state to FetchingFirstPage
-    /// 4. Returns info needed for the fetch
+    /// 1. Creates header if needed and increments version
+    /// 2. Updates state to FetchingFirstPage
+    /// 3. Returns info needed for the fetch
     ///
     /// Call this before starting an API fetch for page 1.
     pub fn begin_refresh(
@@ -508,28 +541,21 @@ impl ListMetadataRepository {
     ) -> Result<RefreshInfo, SqliteDbError> {
         log::debug!("ListMetadataRepository::begin_refresh: key={}", key);
 
-        // Ensure header exists and get its ID
-        let list_metadata_id = Self::get_or_create(executor, site, key)?;
-
-        // Increment version (invalidates any in-flight load-more)
-        let version = Self::increment_version_by_list_metadata_id(executor, list_metadata_id)?;
+        // Get or create header and increment version in a single query
+        let header_info = Self::get_or_create_and_increment_version(executor, site, key)?;
 
         // Update state to fetching
         Self::update_state_by_list_metadata_id(
             executor,
-            list_metadata_id,
+            header_info.list_metadata_id,
             ListState::FetchingFirstPage,
             None,
         )?;
 
-        // Get header for pagination info
-        let header =
-            Self::get_header(executor, site, key)?.expect("header must exist after get_or_create");
-
         Ok(RefreshInfo {
-            list_metadata_id,
-            version,
-            per_page: header.per_page,
+            list_metadata_id: header_info.list_metadata_id,
+            version: header_info.version,
+            per_page: header_info.per_page,
         })
     }
 
@@ -618,6 +644,17 @@ impl ListMetadataRepository {
             Some(error_message),
         )
     }
+}
+
+/// Header info returned from `get_or_create_and_increment_version`.
+#[derive(Debug, Clone)]
+pub struct HeaderVersionInfo {
+    /// Row ID of the list_metadata record
+    pub list_metadata_id: RowId,
+    /// Current version number
+    pub version: i64,
+    /// Items per page setting
+    pub per_page: i64,
 }
 
 /// Information returned when starting a refresh operation.
@@ -1124,6 +1161,56 @@ mod tests {
             .expect("query should succeed")
             .expect("should succeed");
         assert!(header.last_first_page_fetched_at.is_some());
+    }
+
+    #[rstest]
+    fn test_get_or_create_and_increment_version_creates_new(test_ctx: TestContext) {
+        let key = ListKey::from("edit:posts:new");
+
+        // First call creates header with version 1
+        let info = ListMetadataRepository::get_or_create_and_increment_version(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+        )
+        .expect("should succeed");
+        assert_eq!(info.version, 1);
+        assert_eq!(info.per_page, 20);
+
+        // Verify header was created
+        let header = ListMetadataRepository::get_header(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("query should succeed")
+            .expect("should exist");
+        assert_eq!(header.row_id, info.list_metadata_id);
+        assert_eq!(header.version, 1);
+    }
+
+    #[rstest]
+    fn test_get_or_create_and_increment_version_increments_existing(test_ctx: TestContext) {
+        let key = ListKey::from("edit:posts:existing");
+
+        // Create header first
+        ListMetadataRepository::get_or_create(&test_ctx.conn, &test_ctx.site, &key)
+            .expect("should succeed");
+
+        // Now call get_or_create_and_increment_version - should increment from 0 to 1
+        let info1 = ListMetadataRepository::get_or_create_and_increment_version(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+        )
+        .expect("should succeed");
+        assert_eq!(info1.version, 1);
+
+        // Call again - should increment to 2
+        let info2 = ListMetadataRepository::get_or_create_and_increment_version(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &key,
+        )
+        .expect("should succeed");
+        assert_eq!(info2.version, 2);
+        assert_eq!(info2.list_metadata_id, info1.list_metadata_id);
     }
 
     #[rstest]
