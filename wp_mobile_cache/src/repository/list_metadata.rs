@@ -126,21 +126,15 @@ impl ListMetadataRepository {
 
     /// Get the current sync state for a list by site and key.
     ///
-    /// Convenience method that looks up the list_metadata_id first.
+    /// Uses a JOIN query internally for efficiency.
     /// Returns ListState::Idle if the list or state doesn't exist.
     pub fn get_state_by_key(
         executor: &impl QueryExecutor,
         site: &DbSite,
         key: &str,
     ) -> Result<ListState, SqliteDbError> {
-        let header = Self::get_header(executor, site, key)?;
-        match header {
-            Some(h) => {
-                let state = Self::get_state(executor, h.row_id)?;
-                Ok(state.map(|s| s.state).unwrap_or(ListState::Idle))
-            }
-            None => Ok(ListState::Idle),
-        }
+        Self::get_header_with_state(executor, site, key)
+            .map(|opt| opt.map(|h| h.state).unwrap_or(ListState::Idle))
     }
 
     /// Get header with state in a single JOIN query.
