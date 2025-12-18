@@ -56,12 +56,11 @@ impl DbListMetadata {
 #[derive(Debug, Clone, Copy)]
 pub enum ListMetadataItemColumn {
     Rowid = 0,
-    DbSiteId = 1,
-    Key = 2,
-    EntityId = 3,
-    ModifiedGmt = 4,
-    Parent = 5,
-    MenuOrder = 6,
+    ListMetadataId = 1,
+    EntityId = 2,
+    ModifiedGmt = 3,
+    Parent = 4,
+    MenuOrder = 5,
 }
 
 impl ColumnIndex for ListMetadataItemColumn {
@@ -77,8 +76,7 @@ impl DbListMetadataItem {
 
         Ok(Self {
             row_id: row.get_column(Col::Rowid)?,
-            db_site_id: row.get_column(Col::DbSiteId)?,
-            key: row.get_column(Col::Key)?,
+            list_metadata_id: row.get_column(Col::ListMetadataId)?,
             entity_id: row.get_column(Col::EntityId)?,
             modified_gmt: row.get_column(Col::ModifiedGmt)?,
             parent: row.get_column(Col::Parent)?,

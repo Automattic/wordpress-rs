@@ -88,12 +88,17 @@ impl ListMetadataRepository {
         site: &DbSite,
         key: &ListKey,
     ) -> Result<Vec<DbListMetadataItem>, SqliteDbError> {
+        let list_metadata_id = match Self::get_header(executor, site, key)? {
+            Some(header) => header.row_id,
+            None => return Ok(Vec::new()),
+        };
+
         let sql = format!(
-            "SELECT * FROM {} WHERE db_site_id = ? AND key = ? ORDER BY rowid",
+            "SELECT * FROM {} WHERE list_metadata_id = ? ORDER BY rowid",
             Self::items_table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        let rows = stmt.query_map(rusqlite::params![site.row_id, key.as_str()], |row| {
+        let rows = stmt.query_map(rusqlite::params![list_metadata_id], |row| {
             DbListMetadataItem::from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
@@ -201,15 +206,18 @@ impl ListMetadataRepository {
         site: &DbSite,
         key: &ListKey,
     ) -> Result<i64, SqliteDbError> {
+        let list_metadata_id = match Self::get_header(executor, site, key)? {
+            Some(header) => header.row_id,
+            None => return Ok(0),
+        };
+
         let sql = format!(
-            "SELECT COUNT(*) FROM {} WHERE db_site_id = ? AND key = ?",
+            "SELECT COUNT(*) FROM {} WHERE list_metadata_id = ?",
             Self::items_table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        stmt.query_row(rusqlite::params![site.row_id, key.as_str()], |row| {
-            row.get(0)
-        })
-        .map_err(SqliteDbError::from)
+        stmt.query_row(rusqlite::params![list_metadata_id], |row| row.get(0))
+            .map_err(SqliteDbError::from)
     }
 
     // ============================================================
@@ -226,15 +234,17 @@ impl ListMetadataRepository {
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+
         // Delete existing items
         let delete_sql = format!(
-            "DELETE FROM {} WHERE db_site_id = ? AND key = ?",
+            "DELETE FROM {} WHERE list_metadata_id = ?",
             Self::items_table().table_name()
         );
-        executor.execute(&delete_sql, rusqlite::params![site.row_id, key.as_str()])?;
+        executor.execute(&delete_sql, rusqlite::params![list_metadata_id])?;
 
         // Insert new items
-        Self::insert_items(executor, site, key, items)?;
+        Self::insert_items(executor, list_metadata_id, items)?;
 
         Ok(())
     }
@@ -249,38 +259,37 @@ impl ListMetadataRepository {
         key: &ListKey,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
-        Self::insert_items(executor, site, key, items)
+        let list_metadata_id = Self::get_or_create(executor, site, key)?;
+        Self::insert_items(executor, list_metadata_id, items)
     }
 
     /// Internal helper to insert items using batch insert for better performance.
     fn insert_items(
         executor: &impl QueryExecutor,
-        site: &DbSite,
-        key: &ListKey,
+        list_metadata_id: RowId,
         items: &[ListMetadataItemInput],
     ) -> Result<(), SqliteDbError> {
         if items.is_empty() {
             return Ok(());
         }
 
-        // SQLite has a variable limit (default 999). Each item uses 6 variables,
-        // so batch in chunks of ~150 items to stay well under the limit.
-        const BATCH_SIZE: usize = 150;
+        // SQLite has a variable limit (default 999). Each item uses 5 variables,
+        // so batch in chunks of ~180 items to stay well under the limit.
+        const BATCH_SIZE: usize = 180;
 
         items.chunks(BATCH_SIZE).try_for_each(|chunk| {
-            let placeholders = vec!["(?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
+            let placeholders = vec!["(?, ?, ?, ?, ?)"; chunk.len()].join(", ");
             let sql = format!(
-                "INSERT INTO {} (db_site_id, key, entity_id, modified_gmt, parent, menu_order) VALUES {}",
+                "INSERT INTO {} (list_metadata_id, entity_id, modified_gmt, parent, menu_order) VALUES {}",
                 Self::items_table().table_name(),
                 placeholders
             );
 
             let params: Vec<Box<dyn rusqlite::ToSql>> = chunk
                 .iter()
-                .flat_map(|item| -> [Box<dyn rusqlite::ToSql>; 6] {
+                .flat_map(|item| -> [Box<dyn rusqlite::ToSql>; 5] {
                     [
-                        Box::new(site.row_id),
-                        Box::new(key.as_str().to_string()),
+                        Box::new(list_metadata_id),
                         Box::new(item.entity_id),
                         Box::new(item.modified_gmt.clone()),
                         Box::new(item.parent),
@@ -392,25 +401,12 @@ impl ListMetadataRepository {
         site: &DbSite,
         key: &ListKey,
     ) -> Result<(), SqliteDbError> {
-        // Delete items first (no FK constraint to header)
-        let delete_items_sql = format!(
-            "DELETE FROM {} WHERE db_site_id = ? AND key = ?",
-            Self::items_table().table_name()
-        );
-        executor.execute(
-            &delete_items_sql,
-            rusqlite::params![site.row_id, key.as_str()],
-        )?;
-
-        // Delete header (state will be cascade deleted via FK)
-        let delete_header_sql = format!(
+        // Delete header - items and state are cascade deleted via FK
+        let sql = format!(
             "DELETE FROM {} WHERE db_site_id = ? AND key = ?",
             Self::header_table().table_name()
         );
-        executor.execute(
-            &delete_header_sql,
-            rusqlite::params![site.row_id, key.as_str()],
-        )?;
+        executor.execute(&sql, rusqlite::params![site.row_id, key.as_str()])?;
 
         Ok(())
     }
@@ -577,8 +573,11 @@ impl ListMetadataRepository {
         item_row_id: RowId,
     ) -> Result<bool, SqliteDbError> {
         let sql = format!(
-            "SELECT 1 FROM {} WHERE rowid = ? AND db_site_id = ? AND key = ?",
-            Self::items_table().table_name()
+            "SELECT 1 FROM {} i \
+             JOIN {} m ON i.list_metadata_id = m.rowid \
+             WHERE i.rowid = ? AND m.db_site_id = ? AND m.key = ?",
+            Self::items_table().table_name(),
+            Self::header_table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
         let result = stmt.query_row(
@@ -782,7 +781,7 @@ mod tests {
     #[rstest]
     fn test_list_metadata_items_column_enum_matches_schema(test_ctx: TestContext) {
         let sql = format!(
-            "SELECT rowid, db_site_id, key, entity_id, modified_gmt, parent, menu_order FROM {}",
+            "SELECT rowid, list_metadata_id, entity_id, modified_gmt, parent, menu_order FROM {}",
             ListMetadataRepository::items_table().table_name()
         );
         let stmt = test_ctx.conn.prepare(&sql);

@@ -79,10 +79,8 @@ pub struct DbListMetadata {
 pub struct DbListMetadataItem {
     /// SQLite rowid (determines display order)
     pub row_id: RowId,
-    /// Database site ID
-    pub db_site_id: RowId,
-    /// List key this item belongs to
-    pub key: String,
+    /// Foreign key to list_metadata table
+    pub list_metadata_id: RowId,
     /// Entity ID (post ID, comment ID, etc.)
     pub entity_id: i64,
     /// Last modified timestamp (for staleness detection)

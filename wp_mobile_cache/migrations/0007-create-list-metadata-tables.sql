@@ -19,18 +19,17 @@ CREATE UNIQUE INDEX idx_list_metadata_unique_key ON list_metadata(db_site_id, ke
 -- Table 2: List items (rowid = insertion order = display order)
 CREATE TABLE `list_metadata_items` (
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
-  `db_site_id` INTEGER NOT NULL,
-  `key` TEXT NOT NULL,
+  `list_metadata_id` INTEGER NOT NULL,
   `entity_id` INTEGER NOT NULL,     -- post/comment/etc ID
   `modified_gmt` TEXT,              -- nullable for entities without it
   `parent` INTEGER,                 -- parent post ID (for hierarchical post types like pages)
   `menu_order` INTEGER,             -- menu order (for hierarchical post types)
 
-  FOREIGN KEY (db_site_id) REFERENCES db_sites(id) ON DELETE CASCADE
+  FOREIGN KEY (list_metadata_id) REFERENCES list_metadata(rowid) ON DELETE CASCADE
 ) STRICT;
 
-CREATE INDEX idx_list_metadata_items_key ON list_metadata_items(db_site_id, key);
-CREATE INDEX idx_list_metadata_items_entity ON list_metadata_items(db_site_id, entity_id);
+CREATE INDEX idx_list_metadata_items_list ON list_metadata_items(list_metadata_id);
+CREATE INDEX idx_list_metadata_items_entity ON list_metadata_items(list_metadata_id, entity_id);
 
 -- Table 3: Sync state (FK to list_metadata, not duplicating key)
 CREATE TABLE `list_metadata_state` (
