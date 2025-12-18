@@ -47,7 +47,7 @@ impl ListMetadataRepository {
             Self::header_table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        let mut rows = stmt.query_map(rusqlite::params![site.row_id, key.as_str()], |row| {
+        let mut rows = stmt.query_map(rusqlite::params![site.row_id, key], |row| {
             DbListMetadata::from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
@@ -77,7 +77,7 @@ impl ListMetadataRepository {
             "INSERT INTO {} (db_site_id, key, current_page, per_page, version) VALUES (?, ?, 0, 20, 0)",
             Self::header_table().table_name()
         );
-        executor.execute(&sql, rusqlite::params![site.row_id, key.as_str()])?;
+        executor.execute(&sql, rusqlite::params![site.row_id, key])?;
 
         Ok(executor.last_insert_rowid())
     }
@@ -163,7 +163,7 @@ impl ListMetadataRepository {
             Self::state_table().table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
-        let mut rows = stmt.query_map(rusqlite::params![site.row_id, key.as_str()], |row| {
+        let mut rows = stmt.query_map(rusqlite::params![site.row_id, key], |row| {
             DbListHeaderWithState::from_row(row)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
@@ -332,7 +332,7 @@ impl ListMetadataRepository {
                 update.current_page,
                 update.per_page,
                 site.row_id,
-                key.as_str()
+                key
             ],
         )?;
 
@@ -393,7 +393,7 @@ impl ListMetadataRepository {
             Self::header_table().table_name()
         );
 
-        executor.execute(&sql, rusqlite::params![site.row_id, key.as_str()])?;
+        executor.execute(&sql, rusqlite::params![site.row_id, key])?;
 
         // Return the new version
         Self::get_version(executor, site, key)
@@ -412,7 +412,7 @@ impl ListMetadataRepository {
             "DELETE FROM {} WHERE db_site_id = ? AND key = ?",
             Self::header_table().table_name()
         );
-        executor.execute(&sql, rusqlite::params![site.row_id, key.as_str()])?;
+        executor.execute(&sql, rusqlite::params![site.row_id, key])?;
 
         Ok(())
     }
@@ -597,7 +597,7 @@ impl ListMetadataRepository {
         );
         let mut stmt = executor.prepare(&sql)?;
         let result = stmt.query_row(
-            rusqlite::params![item_row_id, site.row_id, key.as_str()],
+            rusqlite::params![item_row_id, site.row_id, key],
             |_| Ok(()),
         );
 

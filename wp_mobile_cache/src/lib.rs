@@ -265,9 +265,12 @@ impl WpApiCache {
             let version = mgr.perform_migrations().map_err(SqliteDbError::from)?;
 
             // Reset stale fetching states after migrations complete.
-            // Errors are ignored: this is a best-effort cleanup, and failure doesn't
-            // affect core functionality (worst case: UI shows stale loading state).
-            let _ = Self::reset_stale_fetching_states_internal(connection);
+            // Errors are logged but not propagated: this is a best-effort cleanup,
+            // and failure doesn't affect core functionality (worst case: UI shows
+            // stale loading state).
+            if let Err(e) = Self::reset_stale_fetching_states_internal(connection) {
+                log::warn!("Failed to reset stale fetching states: {}", e);
+            }
 
             Ok(version)
         })

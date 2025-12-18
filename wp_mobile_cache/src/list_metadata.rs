@@ -45,6 +45,18 @@ impl From<String> for ListKey {
     }
 }
 
+impl ToSql for ListKey {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0.as_str()))
+    }
+}
+
+impl FromSql for ListKey {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
+        String::column_result(value).map(ListKey)
+    }
+}
+
 /// Represents list metadata header in the database.
 ///
 /// Stores pagination info and version for a specific list (e.g., "edit:posts:publish").
