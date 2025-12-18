@@ -62,6 +62,9 @@ impl ListMetadataRepository {
     ///
     /// If the header doesn't exist, creates it with default values and returns its rowid.
     /// If it exists, returns the existing rowid.
+    ///
+    /// This function is safe against race conditions: if another thread creates the header
+    /// between our SELECT and INSERT, we catch the constraint violation and re-fetch.
     pub fn get_or_create(
         executor: &impl QueryExecutor,
         site: &DbSite,
@@ -77,9 +80,22 @@ impl ListMetadataRepository {
             "INSERT INTO {} (db_site_id, key, current_page, per_page, version) VALUES (?, ?, 0, 20, 0)",
             Self::header_table().table_name()
         );
-        executor.execute(&sql, rusqlite::params![site.row_id, key])?;
 
-        Ok(executor.last_insert_rowid())
+        match executor.execute(&sql, rusqlite::params![site.row_id, key]) {
+            Ok(_) => Ok(executor.last_insert_rowid()),
+            Err(SqliteDbError::ConstraintViolation(_)) => {
+                // Race condition: another thread created it between our SELECT and INSERT.
+                // Re-fetch to get the row created by the other thread.
+                Self::get_header(executor, site, key)?
+                    .map(|h| h.row_id)
+                    .ok_or_else(|| {
+                        SqliteDbError::SqliteError(
+                            "Header disappeared after constraint violation".to_string(),
+                        )
+                    })
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Get all items for a list by ID, ordered by rowid (insertion order = display order).

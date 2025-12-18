@@ -16,6 +16,7 @@ pub mod test_fixtures;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SqliteDbError {
     SqliteError(String),
+    ConstraintViolation(String),
     TableNameMismatch { expected: DbTable, actual: DbTable },
 }
 
@@ -23,6 +24,9 @@ impl std::fmt::Display for SqliteDbError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SqliteDbError::SqliteError(message) => write!(f, "SqliteDbError: message={}", message),
+            SqliteDbError::ConstraintViolation(message) => {
+                write!(f, "Constraint violation: {}", message)
+            }
             SqliteDbError::TableNameMismatch { expected, actual } => {
                 write!(
                     f,
@@ -37,6 +41,11 @@ impl std::fmt::Display for SqliteDbError {
 
 impl From<rusqlite::Error> for SqliteDbError {
     fn from(err: rusqlite::Error) -> Self {
+        if let rusqlite::Error::SqliteFailure(sqlite_err, _) = &err
+            && sqlite_err.code == rusqlite::ErrorCode::ConstraintViolation
+        {
+            return SqliteDbError::ConstraintViolation(err.to_string());
+        }
         SqliteDbError::SqliteError(err.to_string())
     }
 }
