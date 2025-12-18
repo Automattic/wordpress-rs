@@ -1,5 +1,49 @@
 use crate::RowId;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
+use std::fmt;
+
+/// Type-safe wrapper for list keys.
+///
+/// List keys identify specific lists, e.g., `"edit:posts:publish"` or `"view:comments"`.
+/// Using a newtype prevents accidental misuse of arbitrary strings as keys.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ListKey(String);
+
+impl ListKey {
+    /// Create a new ListKey from a string.
+    pub fn new(key: impl Into<String>) -> Self {
+        Self(key.into())
+    }
+
+    /// Get the key as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for ListKey {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for ListKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for ListKey {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for ListKey {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
 
 /// Represents list metadata header in the database.
 ///
