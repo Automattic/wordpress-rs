@@ -3,6 +3,8 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::Mutex;
 
+use crate::repository::list_metadata::ListMetadataRepository;
+
 pub mod context;
 pub mod db_types;
 pub mod entity;
@@ -277,7 +279,7 @@ impl WpApiCache {
             // Errors are logged but not propagated: this is a best-effort cleanup,
             // and failure doesn't affect core functionality (worst case: UI shows
             // stale loading state).
-            if let Err(e) = Self::reset_stale_fetching_states_internal(connection) {
+            if let Err(e) = ListMetadataRepository::reset_stale_fetching_states(connection) {
                 log::warn!("Failed to reset stale fetching states: {}", e);
             }
 
@@ -320,31 +322,6 @@ impl WpApiCache {
 }
 
 impl WpApiCache {
-    /// Resets stale fetching states (`FetchingFirstPage`, `FetchingNextPage`) to `Idle`.
-    ///
-    /// If the app terminates while a fetch is in progress, these transient states persist
-    /// in the database. On next launch, this could cause perpetual loading indicators or
-    /// blocked fetches. We reset them during `WpApiCache` initialization since it's
-    /// typically created once at app startup.
-    ///
-    /// Note: `Error` states are intentionally preserved for UI feedback and debugging.
-    fn reset_stale_fetching_states_internal(
-        connection: &mut Connection,
-    ) -> Result<usize, SqliteDbError> {
-        use crate::list_metadata::ListState;
-
-        connection
-            .execute(
-                "UPDATE list_metadata_state SET state = ?1 WHERE state IN (?2, ?3)",
-                params![
-                    ListState::Idle as i32,
-                    ListState::FetchingFirstPage as i32,
-                    ListState::FetchingNextPage as i32,
-                ],
-            )
-            .map_err(SqliteDbError::from)
-    }
-
     /// Execute a database operation with scoped access to the connection.
     ///
     /// This is the **only** way to access the database. The provided closure

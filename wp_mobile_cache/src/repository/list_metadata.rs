@@ -486,6 +486,33 @@ impl ListMetadataRepository {
         })
         .map_err(SqliteDbError::from)
     }
+
+    /// Reset stale fetching states to Idle.
+    ///
+    /// If the app terminates while a fetch is in progress, `FetchingFirstPage` and
+    /// `FetchingNextPage` states persist in the database. On next launch, this could
+    /// cause perpetual loading indicators or blocked fetches.
+    ///
+    /// This resets those transient states to `Idle`. Error states are intentionally
+    /// preserved for UI feedback and debugging.
+    ///
+    /// Returns the number of rows updated.
+    pub fn reset_stale_fetching_states(
+        executor: &impl QueryExecutor,
+    ) -> Result<usize, SqliteDbError> {
+        let sql = format!(
+            "UPDATE {} SET state = ?1 WHERE state IN (?2, ?3)",
+            Self::state_table().table_name()
+        );
+        executor.execute(
+            &sql,
+            rusqlite::params![
+                ListState::Idle as i32,
+                ListState::FetchingFirstPage as i32,
+                ListState::FetchingNextPage as i32,
+            ],
+        )
+    }
 }
 
 /// Header info returned from `get_or_create_and_increment_version`.
