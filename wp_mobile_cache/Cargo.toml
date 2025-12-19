@@ -8,6 +8,7 @@ default = ["rusqlite/bundled"]
 test-helpers = ["dep:chrono", "dep:integration_test_credentials", "dep:rstest"]
 
 [dependencies]
+log = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

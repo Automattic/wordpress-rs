@@ -10,6 +10,6 @@ class WordPressApiCacheTest {
 
     @Test
     fun testThatMigrationsWork() = runTest {
-        assertEquals(6, WordPressApiCache().performMigrations())
+        assertEquals(7, WordPressApiCache().performMigrations())
     }
 }
