@@ -465,6 +465,7 @@ mod tests {
     #[case("api-details/test-case-02.json")]
     #[case("api-details/test-case-03.json")]
     #[case("api-details/test-case-04.json")]
+    #[case("api-details/test-case-05.json")]
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
