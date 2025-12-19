@@ -23,10 +23,11 @@ use wp_api::{
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
-    DbTable, WpApiCache,
+    DbTable, RowId, WpApiCache,
     context::EditContext,
     db_types::db_site::DbSite,
     entity::{Entity, EntityId, FullEntity},
+    list_metadata::ListKey,
     repository::posts::PostRepository,
 };
 
@@ -212,7 +213,7 @@ impl PostService {
     /// persists across app restarts.
     ///
     /// # Arguments
-    /// * `kv_key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
+    /// * `key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `filter` - Filter parameters (pagination is provided separately)
     /// * `page` - Page number to fetch (1-indexed)
@@ -224,7 +225,7 @@ impl PostService {
     /// - `Err(FetchError)` if network or database error occurs
     pub async fn fetch_and_store_metadata_persistent(
         &self,
-        kv_key: &str,
+        key: &ListKey,
         endpoint_type: &PostEndpointType,
         filter: &PostListFilter,
         page: u32,
@@ -233,7 +234,7 @@ impl PostService {
     ) -> Result<MetadataFetchResult, FetchError> {
         let mut log = vec![format!(
             "key={}, page={}, is_first_page={}",
-            kv_key, page, is_first_page
+            key, page, is_first_page
         )];
 
         // Helper to print log on early return
@@ -246,18 +247,27 @@ impl PostService {
         };
 
         // Update state to fetching (this creates the list if needed)
-        if is_first_page {
-            if let Err(e) = self.metadata_service.begin_refresh(kv_key) {
-                log.push(format!("begin_refresh failed: {}", e));
-                print_log(&log, "FAILED");
-                return Err(FetchError::Database {
-                    err_message: e.to_string(),
-                });
+        // Track list_metadata_id for later complete_sync calls
+        let list_metadata_id: RowId = if is_first_page {
+            match self.metadata_service.begin_refresh(key, per_page as i64) {
+                Ok(info) => {
+                    log.push("begin_refresh".to_string());
+                    info.list_metadata_id
+                }
+                Err(e) => {
+                    log.push(format!("begin_refresh failed: {}", e));
+                    print_log(&log, "FAILED");
+                    return Err(FetchError::Database {
+                        err_message: e.to_string(),
+                    });
+                }
             }
-            log.push("begin_refresh".to_string());
         } else {
-            match self.metadata_service.begin_fetch_next_page(kv_key) {
-                Ok(Some(_)) => log.push("begin_fetch_next_page".to_string()),
+            match self.metadata_service.begin_fetch_next_page(key) {
+                Ok(Some(info)) => {
+                    log.push("begin_fetch_next_page".to_string());
+                    info.list_metadata_id
+                }
                 Ok(None) => {
                     log.push("begin_fetch_next_page returned None".to_string());
                     print_log(&log, "FAILED");
@@ -273,7 +283,7 @@ impl PostService {
                     });
                 }
             }
-        }
+        };
 
         // Fetch metadata from network
         let result = match self
@@ -289,16 +299,18 @@ impl PostService {
                 print_log(&log, "FAILED");
                 let _ = self
                     .metadata_service
-                    .complete_sync_with_error(kv_key, &e.to_string());
+                    .complete_sync_with_error(list_metadata_id, &e.to_string());
                 return Err(e);
             }
         };
 
         // Store metadata to database
         let store_result = if is_first_page {
-            self.metadata_service.set_items(kv_key, &result.metadata)
+            self.metadata_service
+                .set_items(key, per_page as i64, &result.metadata)
         } else {
-            self.metadata_service.append_items(kv_key, &result.metadata)
+            self.metadata_service
+                .append_items(key, per_page as i64, &result.metadata)
         };
 
         if let Err(e) = store_result {
@@ -306,7 +318,7 @@ impl PostService {
             print_log(&log, "FAILED");
             let _ = self
                 .metadata_service
-                .complete_sync_with_error(kv_key, &e.to_string());
+                .complete_sync_with_error(list_metadata_id, &e.to_string());
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
@@ -315,7 +327,7 @@ impl PostService {
 
         // Update pagination info
         if let Err(e) = self.metadata_service.update_pagination(
-            kv_key,
+            key,
             result.total_pages.map(|p| p as i64),
             result.total_items,
             page as i64,
@@ -325,7 +337,7 @@ impl PostService {
             print_log(&log, "FAILED");
             let _ = self
                 .metadata_service
-                .complete_sync_with_error(kv_key, &e.to_string());
+                .complete_sync_with_error(list_metadata_id, &e.to_string());
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
@@ -336,7 +348,7 @@ impl PostService {
         self.detect_and_mark_stale_posts(&result.metadata);
 
         // Mark sync as complete
-        if let Err(e) = self.metadata_service.complete_sync(kv_key) {
+        if let Err(e) = self.metadata_service.complete_sync(list_metadata_id) {
             log.push(format!("complete_sync failed: {}", e));
             print_log(&log, "FAILED");
             return Err(FetchError::Database {
@@ -423,7 +435,7 @@ impl PostService {
     /// - `Err(FetchError)` if network or database error occurs
     pub async fn sync_post_list(
         &self,
-        key: &str,
+        key: &ListKey,
         endpoint_type: &PostEndpointType,
         filter: &PostListFilter,
         page: u32,
@@ -441,7 +453,7 @@ impl PostService {
         };
 
         self.metadata_service
-            .set_state(key, state, None)
+            .set_state(key, per_page as i64, state, None)
             .map_err(|e| match e {
                 WpServiceError::DatabaseError { err_message } => {
                     FetchError::Database { err_message }
@@ -461,7 +473,7 @@ impl PostService {
                 // Update state to error
                 let _ = self
                     .metadata_service
-                    .complete_sync_with_error(key, &e.to_string());
+                    .complete_sync_with_error_by_key(key, &e.to_string());
                 return Err(e);
             }
         };
@@ -469,16 +481,16 @@ impl PostService {
         // 3. Store metadata in database
         let store_result = if is_refresh {
             self.metadata_service
-                .set_items(key, &metadata_result.metadata)
+                .set_items(key, per_page as i64, &metadata_result.metadata)
         } else {
             self.metadata_service
-                .append_items(key, &metadata_result.metadata)
+                .append_items(key, per_page as i64, &metadata_result.metadata)
         };
 
         if let Err(e) = store_result {
             let _ = self
                 .metadata_service
-                .complete_sync_with_error(key, &e.to_string());
+                .complete_sync_with_error_by_key(key, &e.to_string());
             return Err(FetchError::Database {
                 err_message: e.to_string(),
             });
@@ -529,7 +541,7 @@ impl PostService {
         );
 
         // 7. Set state back to idle
-        let _ = self.metadata_service.complete_sync(key);
+        let _ = self.metadata_service.complete_sync_by_key(key);
 
         // Get total items from metadata service
         let total_items = self
@@ -913,20 +925,21 @@ impl PostService {
         // Generate cache key from filter
         let cache_key = post_list_filter_cache_key(&filter);
         let endpoint_key = endpoint_type_cache_key(&endpoint_type);
-        let kv_key = format!(
+        let key: ListKey = format!(
             "site_{:?}:edit:{}:{}",
             self.db_site.row_id, endpoint_key, cache_key
-        );
+        )
+        .into();
 
         let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
             self.clone(),
             endpoint_type,
             filter.clone(),
-            kv_key.clone(),
+            key.clone(),
         );
 
         let metadata_collection = MetadataCollection::new(
-            kv_key,
+            key,
             self.persistent_metadata_reader(),
             self.state_reader_with_edit_context(),
             fetcher,

@@ -1,5 +1,5 @@
 use super::EntityMetadata;
-use wp_mobile_cache::list_metadata::ListState;
+use wp_mobile_cache::list_metadata::{ListKey, ListState};
 
 /// Combined list information: pagination + sync state.
 ///
@@ -28,11 +28,11 @@ pub trait ListMetadataReader: Send + Sync {
     /// Get list info (pagination + state) in a single query.
     ///
     /// Returns `None` if no metadata has been stored for this key.
-    fn get_list_info(&self, key: &str) -> Option<ListInfo>;
+    fn get_list_info(&self, key: &ListKey) -> Option<ListInfo>;
 
     /// Get the items for a list.
     ///
     /// Returns `None` if no metadata has been stored for this key.
     /// Returns `Some(vec![])` if the list exists but has no items.
-    fn get_items(&self, key: &str) -> Option<Vec<EntityMetadata>>;
+    fn get_items(&self, key: &ListKey) -> Option<Vec<EntityMetadata>>;
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use wp_mobile_cache::{DbTable, UpdateHook};
+use wp_mobile_cache::{DbTable, UpdateHook, list_metadata::ListKey};
 
 use crate::collection::FetchError;
 
@@ -55,7 +55,7 @@ where
     F: MetadataFetcher,
 {
     /// Key for metadata store lookup
-    kv_key: String,
+    key: ListKey,
 
     /// Read-only access to list metadata
     metadata_reader: Arc<dyn ListMetadataReader>,
@@ -80,20 +80,20 @@ where
     /// Create a new metadata collection.
     ///
     /// # Arguments
-    /// * `kv_key` - Key for metadata store lookup (e.g., "site_1:posts:publish")
+    /// * `key` - Key for metadata store lookup (e.g., "site_1:posts:publish")
     /// * `metadata_reader` - Read-only access to list metadata store
     /// * `state_reader` - Read-only access to entity state store
     /// * `fetcher` - Implementation for fetching metadata and entities
     /// * `relevant_data_tables` - DB tables to monitor for data updates (entity tables)
     pub fn new(
-        kv_key: String,
+        key: ListKey,
         metadata_reader: Arc<dyn ListMetadataReader>,
         state_reader: Arc<dyn EntityStateReader>,
         fetcher: F,
         relevant_data_tables: Vec<DbTable>,
     ) -> Self {
         Self {
-            kv_key,
+            key,
             metadata_reader,
             state_reader,
             fetcher,
@@ -116,7 +116,7 @@ where
     /// the metadata with the current fetch state.
     pub fn items(&self) -> Vec<CollectionItem> {
         self.metadata_reader
-            .get_items(&self.kv_key)
+            .get_items(&self.key)
             .unwrap_or_default()
             .into_iter()
             .map(|metadata| {
@@ -129,7 +129,7 @@ where
     ///
     /// Returns `None` if no metadata has been stored for this key.
     pub fn list_info(&self) -> Option<ListInfo> {
-        self.metadata_reader.get_list_info(&self.kv_key)
+        self.metadata_reader.get_list_info(&self.key)
     }
 
     /// Get the current sync state for this collection.

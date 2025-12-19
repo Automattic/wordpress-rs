@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use wp_api::prelude::WpGmtDateTime;
 use wp_mobile_cache::{
-    WpApiCache,
+    RowId, WpApiCache,
     db_types::db_site::DbSite,
-    list_metadata::ListState,
+    list_metadata::{ListKey, ListState},
     repository::list_metadata::{
         FetchNextPageInfo, ListMetadataHeaderUpdate, ListMetadataItemInput, ListMetadataRepository,
         RefreshInfo,
@@ -35,17 +35,12 @@ use super::WpServiceError;
 pub struct MetadataService {
     db_site: Arc<DbSite>,
     cache: Arc<WpApiCache>,
-    repo: ListMetadataRepository,
 }
 
 impl MetadataService {
     /// Create a new MetadataService for a specific site.
     pub fn new(db_site: Arc<DbSite>, cache: Arc<WpApiCache>) -> Self {
-        Self {
-            db_site,
-            cache,
-            repo: ListMetadataRepository,
-        }
+        Self { db_site, cache }
     }
 
     // ============================================================
@@ -56,9 +51,9 @@ impl MetadataService {
     ///
     /// Returns entity IDs in display order (rowid order from database).
     /// Returns empty Vec if the list doesn't exist.
-    pub fn get_entity_ids(&self, key: &str) -> Result<Vec<i64>, WpServiceError> {
+    pub fn get_entity_ids(&self, key: &ListKey) -> Result<Vec<i64>, WpServiceError> {
         self.cache.execute(|conn| {
-            let items = self.repo.get_items(conn, &self.db_site, key)?;
+            let items = ListMetadataRepository::get_items_by_list_key(conn, &self.db_site, key)?;
             Ok(items.into_iter().map(|item| item.entity_id).collect())
         })
     }
@@ -66,13 +61,16 @@ impl MetadataService {
     /// Get list metadata as EntityMetadata structs (for ListMetadataReader trait).
     ///
     /// Converts database items to the format expected by MetadataCollection.
-    pub fn get_metadata(&self, key: &str) -> Result<Option<Vec<EntityMetadata>>, WpServiceError> {
+    pub fn get_metadata(
+        &self,
+        key: &ListKey,
+    ) -> Result<Option<Vec<EntityMetadata>>, WpServiceError> {
         self.cache.execute(|conn| {
-            let items = self.repo.get_items(conn, &self.db_site, key)?;
+            let items = ListMetadataRepository::get_items_by_list_key(conn, &self.db_site, key)?;
 
             if items.is_empty() {
                 // Check if header exists - if not, list truly doesn't exist
-                if self.repo.get_header(conn, &self.db_site, key)?.is_none() {
+                if ListMetadataRepository::get_header(conn, &self.db_site, key)?.is_none() {
                     return Ok(None);
                 }
             }
@@ -92,18 +90,21 @@ impl MetadataService {
     }
 
     /// Get the current sync state for a list.
-    pub fn get_state(&self, key: &str) -> Result<ListState, WpServiceError> {
+    pub fn get_state(&self, key: &ListKey) -> Result<ListState, WpServiceError> {
         self.cache
-            .execute(|conn| self.repo.get_state_by_key(conn, &self.db_site, key))
+            .execute(|conn| ListMetadataRepository::get_state_by_list_key(conn, &self.db_site, key))
             .map_err(Into::into)
     }
 
     /// Get pagination info for a list.
     ///
     /// Returns None if the list doesn't exist.
-    pub fn get_pagination(&self, key: &str) -> Result<Option<ListPaginationInfo>, WpServiceError> {
+    pub fn get_pagination(
+        &self,
+        key: &ListKey,
+    ) -> Result<Option<ListPaginationInfo>, WpServiceError> {
         self.cache.execute(|conn| {
-            let header = self.repo.get_header(conn, &self.db_site, key)?;
+            let header = ListMetadataRepository::get_header(conn, &self.db_site, key)?;
             Ok(header.map(|h| ListPaginationInfo {
                 total_pages: h.total_pages,
                 total_items: h.total_items,
@@ -114,9 +115,9 @@ impl MetadataService {
     }
 
     /// Check if there are more pages to load.
-    pub fn has_more_pages(&self, key: &str) -> Result<bool, WpServiceError> {
+    pub fn has_more_pages(&self, key: &ListKey) -> Result<bool, WpServiceError> {
         self.cache.execute(|conn| {
-            let header = match self.repo.get_header(conn, &self.db_site, key)? {
+            let header = match ListMetadataRepository::get_header(conn, &self.db_site, key)? {
                 Some(h) => h,
                 None => return Ok(false),
             };
@@ -135,20 +136,20 @@ impl MetadataService {
     }
 
     /// Get the current version for concurrency checking.
-    pub fn get_version(&self, key: &str) -> Result<i64, WpServiceError> {
+    pub fn get_version(&self, key: &ListKey) -> Result<i64, WpServiceError> {
         self.cache
-            .execute(|conn| self.repo.get_version(conn, &self.db_site, key))
+            .execute(|conn| ListMetadataRepository::get_version(conn, &self.db_site, key))
             .map_err(Into::into)
     }
 
     /// Check if the current version matches expected (for stale detection).
-    pub fn check_version(&self, key: &str, expected_version: i64) -> Result<bool, WpServiceError> {
-        self.cache
-            .execute(|conn| {
-                self.repo
-                    .check_version(conn, &self.db_site, key, expected_version)
-            })
-            .map_err(Into::into)
+    pub fn check_version(
+        &self,
+        key: &ListKey,
+        expected_version: i64,
+    ) -> Result<bool, WpServiceError> {
+        let current_version = self.get_version(key)?;
+        Ok(current_version == expected_version)
     }
 
     // ============================================================
@@ -159,28 +160,10 @@ impl MetadataService {
     ///
     /// Used for refresh (page 1) - clears existing items and stores new ones.
     /// Items are stored in the order provided.
-    pub fn set_items(&self, key: &str, metadata: &[EntityMetadata]) -> Result<(), WpServiceError> {
-        let items: Vec<ListMetadataItemInput> = metadata
-            .iter()
-            .map(|m| ListMetadataItemInput {
-                entity_id: m.id,
-                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
-                parent: m.parent,
-                menu_order: m.menu_order,
-            })
-            .collect();
-
-        self.cache
-            .execute(|conn| self.repo.set_items(conn, &self.db_site, key, &items))
-            .map_err(Into::into)
-    }
-
-    /// Append items to a list (for load-more).
-    ///
-    /// Used for subsequent pages - adds to existing items without clearing.
-    pub fn append_items(
+    pub fn set_items(
         &self,
-        key: &str,
+        key: &ListKey,
+        per_page: i64,
         metadata: &[EntityMetadata],
     ) -> Result<(), WpServiceError> {
         let items: Vec<ListMetadataItemInput> = metadata
@@ -194,14 +177,54 @@ impl MetadataService {
             .collect();
 
         self.cache
-            .execute(|conn| self.repo.append_items(conn, &self.db_site, key, &items))
+            .execute(|conn| {
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &self.db_site,
+                    key,
+                    per_page,
+                    &items,
+                )
+            })
+            .map_err(Into::into)
+    }
+
+    /// Append items to a list (for load-more).
+    ///
+    /// Used for subsequent pages - adds to existing items without clearing.
+    pub fn append_items(
+        &self,
+        key: &ListKey,
+        per_page: i64,
+        metadata: &[EntityMetadata],
+    ) -> Result<(), WpServiceError> {
+        let items: Vec<ListMetadataItemInput> = metadata
+            .iter()
+            .map(|m| ListMetadataItemInput {
+                entity_id: m.id,
+                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
+            })
+            .collect();
+
+        self.cache
+            .execute(|conn| {
+                ListMetadataRepository::append_items_by_list_key(
+                    conn,
+                    &self.db_site,
+                    key,
+                    per_page,
+                    &items,
+                )
+            })
             .map_err(Into::into)
     }
 
     /// Update pagination info after a fetch.
     pub fn update_pagination(
         &self,
-        key: &str,
+        key: &ListKey,
         total_pages: Option<i64>,
         total_items: Option<i64>,
         current_page: i64,
@@ -215,14 +238,16 @@ impl MetadataService {
         };
 
         self.cache
-            .execute(|conn| self.repo.update_header(conn, &self.db_site, key, &update))
+            .execute(|conn| {
+                ListMetadataRepository::update_header_by_list_key(conn, &self.db_site, key, &update)
+            })
             .map_err(Into::into)
     }
 
     /// Delete all data for a list.
-    pub fn delete_list(&self, key: &str) -> Result<(), WpServiceError> {
+    pub fn delete_list(&self, key: &ListKey) -> Result<(), WpServiceError> {
         self.cache
-            .execute(|conn| self.repo.delete_list(conn, &self.db_site, key))
+            .execute(|conn| ListMetadataRepository::delete_list(conn, &self.db_site, key))
             .map_err(Into::into)
     }
 
@@ -233,14 +258,21 @@ impl MetadataService {
     /// Update sync state for a list.
     pub fn set_state(
         &self,
-        key: &str,
+        key: &ListKey,
+        per_page: i64,
         state: ListState,
         error_message: Option<&str>,
     ) -> Result<(), WpServiceError> {
         self.cache
             .execute(|conn| {
-                self.repo
-                    .update_state_by_key(conn, &self.db_site, key, state, error_message)
+                ListMetadataRepository::update_state_by_list_key(
+                    conn,
+                    &self.db_site,
+                    key,
+                    per_page,
+                    state,
+                    error_message,
+                )
             })
             .map_err(Into::into)
     }
@@ -257,9 +289,15 @@ impl MetadataService {
     /// 3. Sets state to FetchingFirstPage
     ///
     /// Returns info needed to make the API call and check version afterward.
-    pub fn begin_refresh(&self, key: &str) -> Result<RefreshInfo, WpServiceError> {
+    pub fn begin_refresh(
+        &self,
+        key: &ListKey,
+        per_page: i64,
+    ) -> Result<RefreshInfo, WpServiceError> {
         self.cache
-            .execute(|conn| self.repo.begin_refresh(conn, &self.db_site, key))
+            .execute(|conn| {
+                ListMetadataRepository::begin_refresh(conn, &self.db_site, key, per_page)
+            })
             .map_err(Into::into)
     }
 
@@ -273,36 +311,72 @@ impl MetadataService {
     /// Returns info including version to check before storing results.
     pub fn begin_fetch_next_page(
         &self,
-        key: &str,
+        key: &ListKey,
     ) -> Result<Option<FetchNextPageInfo>, WpServiceError> {
         self.cache
-            .execute(|conn| self.repo.begin_fetch_next_page(conn, &self.db_site, key))
+            .execute(|conn| ListMetadataRepository::begin_fetch_next_page(conn, &self.db_site, key))
             .map_err(Into::into)
     }
 
-    /// Complete a sync operation successfully.
+    /// Complete a sync operation successfully (by list_metadata_id).
     ///
-    /// Sets state to Idle.
-    pub fn complete_sync(&self, key: &str) -> Result<(), WpServiceError> {
+    /// Sets state to Idle. Use this when you have the `list_metadata_id` from
+    /// `begin_refresh` or `begin_fetch_next_page`.
+    pub fn complete_sync(&self, list_metadata_id: RowId) -> Result<(), WpServiceError> {
+        self.cache
+            .execute(|conn| ListMetadataRepository::complete_sync(conn, list_metadata_id))?;
+        Ok(())
+    }
+
+    /// Complete a sync operation successfully (by key).
+    ///
+    /// Sets state to Idle. Use this when you don't have the `list_metadata_id`.
+    /// Does nothing if the list doesn't exist.
+    pub fn complete_sync_by_key(&self, key: &ListKey) -> Result<(), WpServiceError> {
+        use wp_mobile_cache::SqliteDbError;
         self.cache.execute(|conn| {
-            let list_id = self.repo.get_or_create(conn, &self.db_site, key)?;
-            self.repo.complete_sync(conn, list_id)
+            if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)? {
+                ListMetadataRepository::complete_sync(conn, header.row_id)?;
+            }
+            Ok::<(), SqliteDbError>(())
         })?;
         Ok(())
     }
 
-    /// Complete a sync operation with error.
+    /// Complete a sync operation with error (by list_metadata_id).
     ///
-    /// Sets state to Error with the provided message.
+    /// Sets state to Error with the provided message. Use this when you have the
+    /// `list_metadata_id` from `begin_refresh` or `begin_fetch_next_page`.
     pub fn complete_sync_with_error(
         &self,
-        key: &str,
+        list_metadata_id: RowId,
         error_message: &str,
     ) -> Result<(), WpServiceError> {
         self.cache.execute(|conn| {
-            let list_id = self.repo.get_or_create(conn, &self.db_site, key)?;
-            self.repo
-                .complete_sync_with_error(conn, list_id, error_message)
+            ListMetadataRepository::complete_sync_with_error(conn, list_metadata_id, error_message)
+        })?;
+        Ok(())
+    }
+
+    /// Complete a sync operation with error (by key).
+    ///
+    /// Sets state to Error with the provided message. Use this when you don't have
+    /// the `list_metadata_id`. Does nothing if the list doesn't exist.
+    pub fn complete_sync_with_error_by_key(
+        &self,
+        key: &ListKey,
+        error_message: &str,
+    ) -> Result<(), WpServiceError> {
+        use wp_mobile_cache::SqliteDbError;
+        self.cache.execute(|conn| {
+            if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)? {
+                ListMetadataRepository::complete_sync_with_error(
+                    conn,
+                    header.row_id,
+                    error_message,
+                )?;
+            }
+            Ok::<(), SqliteDbError>(())
         })?;
         Ok(())
     }
@@ -313,9 +387,9 @@ impl MetadataService {
 /// This allows MetadataCollection to read list structure from the database
 /// through the same trait interface it uses for in-memory stores.
 impl ListMetadataReader for MetadataService {
-    fn get_list_info(&self, key: &str) -> Option<ListInfo> {
+    fn get_list_info(&self, key: &ListKey) -> Option<ListInfo> {
         self.cache
-            .execute(|conn| self.repo.get_header_with_state(conn, &self.db_site, key))
+            .execute(|conn| ListMetadataRepository::get_header_with_state(conn, &self.db_site, key))
             .ok()
             .flatten()
             .map(|db| ListInfo {
@@ -328,7 +402,7 @@ impl ListMetadataReader for MetadataService {
             })
     }
 
-    fn get_items(&self, key: &str) -> Option<Vec<EntityMetadata>> {
+    fn get_items(&self, key: &ListKey) -> Option<Vec<EntityMetadata>> {
         self.get_metadata(key).ok().flatten()
     }
 }
@@ -384,41 +458,49 @@ mod tests {
         TestContext { service, cache }
     }
 
+    const PER_PAGE: i64 = 20;
+
     #[rstest]
     fn test_get_entity_ids_returns_empty_for_non_existent(test_ctx: TestContext) {
-        let ids = test_ctx.service.get_entity_ids("nonexistent").unwrap();
+        let key = ListKey::from("nonexistent");
+        let ids = test_ctx.service.get_entity_ids(&key).unwrap();
         assert!(ids.is_empty());
     }
 
     #[rstest]
     fn test_get_metadata_returns_none_for_non_existent(test_ctx: TestContext) {
-        let metadata = test_ctx.service.get_metadata("nonexistent").unwrap();
+        let key = ListKey::from("nonexistent");
+        let metadata = test_ctx.service.get_metadata(&key).unwrap();
         assert!(metadata.is_none());
     }
 
     #[rstest]
     fn test_set_and_get_items(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
         let metadata = vec![
             EntityMetadata::new(100, None, None, None),
             EntityMetadata::new(200, None, None, None),
             EntityMetadata::new(300, None, None, None),
         ];
 
-        test_ctx.service.set_items(key, &metadata).unwrap();
+        test_ctx
+            .service
+            .set_items(&key, PER_PAGE, &metadata)
+            .unwrap();
 
-        let ids = test_ctx.service.get_entity_ids(key).unwrap();
+        let ids = test_ctx.service.get_entity_ids(&key).unwrap();
         assert_eq!(ids, vec![100, 200, 300]);
     }
 
     #[rstest]
     fn test_set_items_replaces_existing(test_ctx: TestContext) {
-        let key = "edit:posts:draft";
+        let key = ListKey::from("edit:posts:draft");
 
         test_ctx
             .service
             .set_items(
-                key,
+                &key,
+                PER_PAGE,
                 &[
                     EntityMetadata::new(1, None, None, None),
                     EntityMetadata::new(2, None, None, None),
@@ -429,7 +511,8 @@ mod tests {
         test_ctx
             .service
             .set_items(
-                key,
+                &key,
+                PER_PAGE,
                 &[
                     EntityMetadata::new(10, None, None, None),
                     EntityMetadata::new(20, None, None, None),
@@ -437,23 +520,24 @@ mod tests {
             )
             .unwrap();
 
-        let ids = test_ctx.service.get_entity_ids(key).unwrap();
+        let ids = test_ctx.service.get_entity_ids(&key).unwrap();
         assert_eq!(ids, vec![10, 20]);
     }
 
     #[rstest]
     fn test_append_items(test_ctx: TestContext) {
-        let key = "edit:posts:pending";
+        let key = ListKey::from("edit:posts:pending");
 
         test_ctx
             .service
-            .set_items(key, &[EntityMetadata::new(1, None, None, None)])
+            .set_items(&key, PER_PAGE, &[EntityMetadata::new(1, None, None, None)])
             .unwrap();
 
         test_ctx
             .service
             .append_items(
-                key,
+                &key,
+                PER_PAGE,
                 &[
                     EntityMetadata::new(2, None, None, None),
                     EntityMetadata::new(3, None, None, None),
@@ -461,39 +545,40 @@ mod tests {
             )
             .unwrap();
 
-        let ids = test_ctx.service.get_entity_ids(key).unwrap();
+        let ids = test_ctx.service.get_entity_ids(&key).unwrap();
         assert_eq!(ids, vec![1, 2, 3]);
     }
 
     #[rstest]
     fn test_get_state_returns_idle_for_non_existent(test_ctx: TestContext) {
-        let state = test_ctx.service.get_state("nonexistent").unwrap();
+        let key = ListKey::from("nonexistent");
+        let state = test_ctx.service.get_state(&key).unwrap();
         assert_eq!(state, ListState::Idle);
     }
 
     #[rstest]
     fn test_set_and_get_state(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         test_ctx
             .service
-            .set_state(key, ListState::FetchingFirstPage, None)
+            .set_state(&key, PER_PAGE, ListState::FetchingFirstPage, None)
             .unwrap();
 
-        let state = test_ctx.service.get_state(key).unwrap();
+        let state = test_ctx.service.get_state(&key).unwrap();
         assert_eq!(state, ListState::FetchingFirstPage);
     }
 
     #[rstest]
     fn test_update_and_get_pagination(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         test_ctx
             .service
-            .update_pagination(key, Some(5), Some(100), 1, 20)
+            .update_pagination(&key, Some(5), Some(100), 1, 20)
             .unwrap();
 
-        let pagination = test_ctx.service.get_pagination(key).unwrap().unwrap();
+        let pagination = test_ctx.service.get_pagination(&key).unwrap().unwrap();
         assert_eq!(pagination.total_pages, Some(5));
         assert_eq!(pagination.total_items, Some(100));
         assert_eq!(pagination.current_page, 1);
@@ -502,68 +587,77 @@ mod tests {
 
     #[rstest]
     fn test_has_more_pages(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         // No pages loaded yet
         test_ctx
             .service
-            .update_pagination(key, Some(3), None, 0, 20)
+            .update_pagination(&key, Some(3), None, 0, 20)
             .unwrap();
-        assert!(test_ctx.service.has_more_pages(key).unwrap());
+        assert!(test_ctx.service.has_more_pages(&key).unwrap());
 
         // Page 1 of 3 loaded
         test_ctx
             .service
-            .update_pagination(key, Some(3), None, 1, 20)
+            .update_pagination(&key, Some(3), None, 1, 20)
             .unwrap();
-        assert!(test_ctx.service.has_more_pages(key).unwrap());
+        assert!(test_ctx.service.has_more_pages(&key).unwrap());
 
         // Page 3 of 3 loaded (no more)
         test_ctx
             .service
-            .update_pagination(key, Some(3), None, 3, 20)
+            .update_pagination(&key, Some(3), None, 3, 20)
             .unwrap();
-        assert!(!test_ctx.service.has_more_pages(key).unwrap());
+        assert!(!test_ctx.service.has_more_pages(&key).unwrap());
     }
 
     #[rstest]
     fn test_begin_refresh_increments_version(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
-        let info1 = test_ctx.service.begin_refresh(key).unwrap();
+        let info1 = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
         assert_eq!(info1.version, 1);
 
-        test_ctx.service.complete_sync(key).unwrap();
+        test_ctx
+            .service
+            .complete_sync(info1.list_metadata_id)
+            .unwrap();
 
-        let info2 = test_ctx.service.begin_refresh(key).unwrap();
+        let info2 = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
         assert_eq!(info2.version, 2);
     }
 
     #[rstest]
     fn test_begin_fetch_next_page_returns_none_when_no_pages(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         // Create header but don't load any pages
-        test_ctx.service.begin_refresh(key).unwrap();
-        test_ctx.service.complete_sync(key).unwrap();
+        let info = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
+        test_ctx
+            .service
+            .complete_sync(info.list_metadata_id)
+            .unwrap();
 
-        let result = test_ctx.service.begin_fetch_next_page(key).unwrap();
+        let result = test_ctx.service.begin_fetch_next_page(&key).unwrap();
         assert!(result.is_none());
     }
 
     #[rstest]
     fn test_begin_fetch_next_page_returns_info_when_more_pages(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         // Set up: page 1 of 3 loaded
-        test_ctx.service.begin_refresh(key).unwrap();
+        let info = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
         test_ctx
             .service
-            .update_pagination(key, Some(3), None, 1, 20)
+            .update_pagination(&key, Some(3), None, 1, 20)
             .unwrap();
-        test_ctx.service.complete_sync(key).unwrap();
+        test_ctx
+            .service
+            .complete_sync(info.list_metadata_id)
+            .unwrap();
 
-        let result = test_ctx.service.begin_fetch_next_page(key).unwrap();
+        let result = test_ctx.service.begin_fetch_next_page(&key).unwrap();
         assert!(result.is_some());
         let info = result.unwrap();
         assert_eq!(info.page, 2);
@@ -571,36 +665,39 @@ mod tests {
 
     #[rstest]
     fn test_delete_list(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         test_ctx
             .service
-            .set_items(key, &[EntityMetadata::new(1, None, None, None)])
+            .set_items(&key, PER_PAGE, &[EntityMetadata::new(1, None, None, None)])
             .unwrap();
         test_ctx
             .service
-            .update_pagination(key, Some(1), None, 1, 20)
+            .update_pagination(&key, Some(1), None, 1, 20)
             .unwrap();
 
-        test_ctx.service.delete_list(key).unwrap();
+        test_ctx.service.delete_list(&key).unwrap();
 
-        assert!(test_ctx.service.get_metadata(key).unwrap().is_none());
-        assert!(test_ctx.service.get_pagination(key).unwrap().is_none());
+        assert!(test_ctx.service.get_metadata(&key).unwrap().is_none());
+        assert!(test_ctx.service.get_pagination(&key).unwrap().is_none());
     }
 
     #[rstest]
     fn test_list_metadata_reader_get_items(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
         let metadata = vec![
             EntityMetadata::new(100, None, None, None),
             EntityMetadata::new(200, None, None, None),
         ];
 
-        test_ctx.service.set_items(key, &metadata).unwrap();
+        test_ctx
+            .service
+            .set_items(&key, PER_PAGE, &metadata)
+            .unwrap();
 
         // Access via trait
         let reader: &dyn ListMetadataReader = &test_ctx.service;
-        let result = reader.get_items(key).unwrap();
+        let result = reader.get_items(&key).unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].id, 100);
@@ -609,25 +706,26 @@ mod tests {
 
     #[rstest]
     fn test_list_metadata_reader_get_items_returns_none_for_non_existent(test_ctx: TestContext) {
+        let key = ListKey::from("nonexistent");
         let reader: &dyn ListMetadataReader = &test_ctx.service;
-        assert!(reader.get_items("nonexistent").is_none());
+        assert!(reader.get_items(&key).is_none());
     }
 
     #[rstest]
     fn test_list_metadata_reader_get_list_info(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
 
         // Initially no info
         let reader: &dyn ListMetadataReader = &test_ctx.service;
-        assert!(reader.get_list_info(key).is_none());
+        assert!(reader.get_list_info(&key).is_none());
 
         // Create header via update_pagination (this creates the list metadata entry)
         test_ctx
             .service
-            .update_pagination(key, Some(5), Some(100), 1, 20)
+            .update_pagination(&key, Some(5), Some(100), 1, 20)
             .unwrap();
 
-        let info = reader.get_list_info(key).unwrap();
+        let info = reader.get_list_info(&key).unwrap();
         assert_eq!(info.current_page, 1);
         assert_eq!(info.per_page, 20);
         assert_eq!(info.total_pages, Some(5));
@@ -637,15 +735,18 @@ mod tests {
 
     #[rstest]
     fn test_list_metadata_reader_get_list_info_with_state(test_ctx: TestContext) {
-        let key = "edit:posts:publish";
+        let key = ListKey::from("edit:posts:publish");
         let metadata = vec![EntityMetadata::new(100, None, None, None)];
-        test_ctx.service.set_items(key, &metadata).unwrap();
+        test_ctx
+            .service
+            .set_items(&key, PER_PAGE, &metadata)
+            .unwrap();
 
         // Start a refresh
-        test_ctx.service.begin_refresh(key).unwrap();
+        test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
 
         let reader: &dyn ListMetadataReader = &test_ctx.service;
-        let info = reader.get_list_info(key).unwrap();
+        let info = reader.get_list_info(&key).unwrap();
 
         assert_eq!(
             info.state,
